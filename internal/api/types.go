@@ -375,7 +375,37 @@ type Health struct {
 	// GitAccess is, per remote host, how the daemon's own git network
 	// operations went, sorted by host.
 	GitAccess []GitAccess `json:"git_access,omitempty"`
+	// Store is the store's schema version and state; nil from a daemon that
+	// predates it.
+	Store *StoreStatus `json:"store,omitempty"`
 }
+
+// StoreStatus is the store as the daemon found it. A daemon whose store is
+// not open answers only its health, with State saying why and Fix the
+// command that gets past it.
+type StoreStatus struct {
+	// Version is the store's schema version and Reads the one this release
+	// creates and migrates to.
+	Version uint32 `json:"version"`
+	Reads   uint32 `json:"reads"`
+	// State is one of the Store* states.
+	State   string `json:"state"`
+	Message string `json:"message,omitempty"`
+	Fix     string `json:"fix,omitempty"`
+	// LastBackup is the newest copy of the store in the backups directory.
+	LastBackup   string    `json:"last_backup,omitempty"`
+	LastBackupAt time.Time `json:"last_backup_at,omitzero"`
+}
+
+// The states of StoreStatus: StoreOK is open; the others leave the store
+// closed until a command fixes it or, for StoreBusy, the command finishes.
+const (
+	StoreOK             = "ok"
+	StoreBusy           = "busy"
+	StoreNeedsMigration = "needs-migration"
+	StoreTooNew         = "too-new"
+	StoreFailed         = "failed"
+)
 
 // GitAccess is the latest git network operation the daemon ran against a
 // host and its latest success; LastOK is nil when none succeeded yet.

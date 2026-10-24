@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/client/menubar"
@@ -175,6 +176,8 @@ type Env struct {
 	noJobs bool
 	// changes is serve's one change log; nil outside serve.
 	changes *change.Log
+	// storeStatus is the store as serve opened it, for the health.
+	storeStatus *api.StoreStatus
 	// meter is the registry serve attaches to its context.
 	meter *meter.Registry
 	// gitAccess keeps how serve's git network operations went per host.
@@ -667,6 +670,7 @@ func commands() map[string]command {
 		"trust":             runTrust,
 		"uninstall":         runUninstall,
 		"serve":             runServe,
+		"store":             runStore,
 		"app":               runApp,
 		"pause":             func(ctx context.Context, e *Env, args []string) error { return runPause(ctx, e, true, args) },
 		"resume":            func(ctx context.Context, e *Env, args []string) error { return runPause(ctx, e, false, args) },
