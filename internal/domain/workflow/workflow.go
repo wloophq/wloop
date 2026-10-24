@@ -144,6 +144,7 @@ type Workflow struct {
 	Key               []string // fact names; empty means the slot's fingerprint fact
 	Approval          Approval
 	Source            string // manifest path
+	Bundled           bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.

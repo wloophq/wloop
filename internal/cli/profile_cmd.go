@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/backup"
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -352,11 +353,44 @@ func printBlockList(w io.Writer, tree profile.Tree, intents *dintent.Registry) {
 func printIntents(w io.Writer, intents *dintent.Registry) {
 	fmt.Fprintln(w, "Intents")
 	for _, d := range intents.All() {
-		source := "bundled"
-		if !d.Bundled {
-			source = filepath.Join(d.Source.Dir, "intent.toml")
-		}
-		fmt.Fprintf(w, "  %-16s %s   %s\n", d.Name, source, d.Summary)
+		fmt.Fprintf(w, "  %-16s %s   %s\n", d.Name, intentSource(d, func(p string) string { return p }), d.Summary)
+	}
+	fmt.Fprintln(w)
+}
+
+// intentSource is where d is declared: bundled, with the files a profile
+// overrides, or the user manifest's path through rel.
+func intentSource(d dintent.Def, rel func(string) string) string {
+	return sourceOf(d.Bundled, d.Source.Overrides, rel(filepath.Join(d.Source.Dir, "intent.toml")))
+}
+
+func sourceOf(bundled bool, overrides []string, manifest string) string {
+	switch {
+	case bundled && len(overrides) > 0:
+		return "bundled, overridden: " + strings.Join(overrides, ", ")
+	case bundled:
+		return "bundled"
+	}
+	return manifest
+}
+
+// profileWorkflows are the workflows a profile defines or overrides.
+func profileWorkflows(ws []workflow.Workflow) []workflow.Workflow {
+	return slices.DeleteFunc(slices.Clone(ws), func(w workflow.Workflow) bool { return w.Bundled && len(w.Overrides) == 0 })
+}
+
+func printWorkflows(w io.Writer, ws []workflow.Workflow) {
+	ws = profileWorkflows(ws)
+	if len(ws) == 0 {
+		return
+	}
+	width := 0
+	for _, wf := range ws {
+		width = max(width, len(wf.Name))
+	}
+	fmt.Fprintln(w, "Workflows")
+	for _, wf := range ws {
+		fmt.Fprintf(w, "  %-*s   %s\n", width, wf.Name, sourceOf(wf.Bundled, wf.Overrides, wf.Source))
 	}
 	fmt.Fprintln(w)
 }
@@ -394,8 +428,10 @@ func runProfileCheck(e *Env, args []string) error {
 	loaded, problems := intentload.Load(layer, turn.BundledFS(), b, turn.CheckTemplate)
 	if out.TTY {
 		e.writeIntents(out, dir, loaded.Registry)
+		e.writeWorkflows(out, dir, loaded.Workflows)
 	} else {
 		printIntents(e.Out, loaded.Registry)
+		printWorkflows(e.Out, loaded.Workflows)
 	}
 	if len(problems) > 0 {
 		if errOut.TTY {

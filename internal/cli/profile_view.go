@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -110,10 +111,8 @@ func (e *Env) writeIntents(t termfmt.Term, dir string, intents *dintent.Registry
 	nw := 0
 	var sws []int
 	for i, d := range defs {
-		names[i], sources[i] = termfmt.Clean(string(d.Name)), "bundled"
-		if !d.Bundled {
-			sources[i] = termfmt.Clean(e.inProfile(dir, filepath.Join(d.Source.Dir, "intent.toml")))
-		}
+		names[i] = termfmt.Clean(string(d.Name))
+		sources[i] = termfmt.Clean(intentSource(d, func(p string) string { return e.inProfile(dir, p) }))
 		nw, sws = max(nw, termfmt.Cells(names[i])), append(sws, termfmt.Cells(sources[i]))
 	}
 	sw := pathColumn(width, 2+nw+2, sws...)
@@ -121,6 +120,32 @@ func (e *Env) writeIntents(t termfmt.Term, dir string, intents *dintent.Registry
 		above, head := pathHead(width, "  "+names[i]+strings.Repeat(" ", nw-termfmt.Cells(names[i])+2), 2+nw+2, sources[i], t.Dim)
 		for _, l := range append(above, columned(width, head, 2+nw+2+sw+2, d.Summary, plain)...) {
 			fmt.Fprintln(e.Out, l)
+		}
+	}
+	fmt.Fprintln(e.Out)
+}
+
+// writeWorkflows lists the workflows the profile defines or overrides, with
+// where each is declared.
+func (e *Env) writeWorkflows(t termfmt.Term, dir string, all []workflow.Workflow) {
+	ws := profileWorkflows(all)
+	if len(ws) == 0 {
+		return
+	}
+	width := reportWidth(t)
+	e.sectionHeader(t, "Workflows", len(ws))
+	nw := 0
+	for _, w := range ws {
+		nw = max(nw, termfmt.Cells(termfmt.Clean(w.Name)))
+	}
+	for _, w := range ws {
+		name := termfmt.Clean(w.Name)
+		source := termfmt.Clean(sourceOf(w.Bundled, w.Overrides, e.inProfile(dir, w.Source)))
+		above, head := pathHead(width, "  "+name+strings.Repeat(" ", nw-termfmt.Cells(name)+2), 2+nw+2, source, t.Dim)
+		for _, l := range append(above, head) {
+			if l != "" {
+				fmt.Fprintln(e.Out, l)
+			}
 		}
 	}
 	fmt.Fprintln(e.Out)

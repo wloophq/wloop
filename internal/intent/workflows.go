@@ -171,6 +171,7 @@ func (u *wUnit) load(intentProblem func(string) string) {
 	s.at = positions(src)
 	u.wf = s.defineWorkflow(u.name, m, intentProblem)
 	u.wf.Source = file
+	u.wf.Bundled = u.bundled
 	u.wf.Overrides = overrides(u.files.overlay)
 }
 
