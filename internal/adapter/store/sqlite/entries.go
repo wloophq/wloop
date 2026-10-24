@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
@@ -25,6 +26,19 @@ func (db *DB) Entries() coregtd.Store { return entryStore{db} }
 
 const entryColumns = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
 	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated`
+
+// upsertEntrySQL updates an existing entry in place: a REPLACE would delete
+// the row first and cascade into its projects row.
+var upsertEntrySQL = func() string {
+	cols := strings.Split(entryColumns+`, rev`, ",")
+	set := make([]string, 0, len(cols)-1)
+	for _, c := range cols[1:] {
+		c = strings.TrimSpace(c)
+		set = append(set, c+` = excluded.`+c)
+	}
+	return `INSERT INTO entries (` + entryColumns + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
+		`) ON CONFLICT (id) DO UPDATE SET ` + strings.Join(set, `, `)
+}()
 
 const (
 	notEnded     = `state NOT IN ('done', 'trash')`
@@ -406,8 +420,7 @@ func writeEntry(ctx context.Context, tx *Tx, e gtd.Entry, rev uint64) error {
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO entries (`+entryColumns+`, rev)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := tx.ExecContext(ctx, upsertEntrySQL,
 		string(e.ID), string(e.Kind), string(e.State), e.Title, e.Notes, e.Focus.On, e.Focus.Auto, eventTime(e.Focus.At),
 		e.Area, string(e.Project), e.Position, e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity,
 		string(e.Snooze.Return), e.Snooze.Mute, waiting, eventTime(e.Deadline), e.Changed, eventTime(e.SeenAt), e.Origin,
