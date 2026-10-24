@@ -605,7 +605,9 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
 		Getenv:     func(string) string { return "" },
-		Harness:    harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
+
+		ViewDebounce: 10 * time.Millisecond,
+		Harness:      harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
 
 		NativeAvailable: func() bool { return false },
 		Exit:            func(code int) { t.Errorf("unexpected exit %d", code) },
