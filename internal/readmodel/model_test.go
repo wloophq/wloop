@@ -877,6 +877,43 @@ func TestAChangeBehindTheTombstonesIsAll(t *testing.T) {
 	}
 }
 
+func TestRunPublishesWhatMovedBeforeItStarted(t *testing.T) {
+	log := change.NewLog(change.DefaultWindow, nil)
+	p := &threads{}
+	p.set(threadUnits(0, 20))
+	m := readmodel.New(log, nil, nil, nil, nil, p)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.set(threadUnits(0, 10))
+	log.Note(port.TopicPRs)
+	moved, err := m.Rows(ctx, api.ViewAll, api.Since{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.Rev == first.Rev {
+		t.Fatalf("ten units left and the rev stayed at %d", first.Rev)
+	}
+	published := make(chan api.Change, 4)
+	done := make(chan struct{})
+	go func() {
+		m.Run(ctx, func(c api.Change) { published <- c })
+		close(done)
+	}()
+	defer func() { cancel(); <-done }()
+	select {
+	case c := <-published:
+		if c.Rev != moved.Rev || c.All || !slices.Equal(c.Units, threadUnits(10, 20)) {
+			t.Fatalf("change %+v for a client at rev %d", c, first.Rev)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("a client at rev %d was never told of rev %d", first.Rev, moved.Rev)
+	}
+}
+
 func TestCheckCleanOnFixture(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)
 	r := newRig(t, f)
