@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
 )
 
@@ -271,7 +272,7 @@ var gitWait = 5 * time.Second
 func repositoryRoot(ctx context.Context, dir string) string {
 	ctx, cancel := context.WithTimeout(ctx, gitWait)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	cmd := exec.CommandContext(ctx, gitx.Binary(), "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool {
 		return strings.HasPrefix(kv, "GIT_DIR=") || strings.HasPrefix(kv, "GIT_WORK_TREE=") || strings.HasPrefix(kv, "GIT_COMMON_DIR=")
 	})

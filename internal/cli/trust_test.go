@@ -19,6 +19,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -69,7 +70,7 @@ func gitRepo(t *testing.T) string {
 	t.Helper()
 	repo := filepath.Join(t.TempDir(), "repo")
 	for _, args := range [][]string{{"init", "-q", repo}, {"-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"}} {
-		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		if out, err := exec.Command(gitx.Binary(), args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
@@ -220,7 +221,7 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 func TestTrustCommandTrustsTheRepositoryOnlyWhenTheUserRunsIt(t *testing.T) {
 	root := gitRepo(t)
 	wt := filepath.Join(t.TempDir(), "wt")
-	if out, err := exec.Command("git", "-C", root, "worktree", "add", "-q", "-b", "feature", wt).CombinedOutput(); err != nil {
+	if out, err := exec.Command(gitx.Binary(), "-C", root, "worktree", "add", "-q", "-b", "feature", wt).CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
 	m := &fake.Manager{WorkspaceList: []wsdomain.Workspace{{ID: "ws-9", Path: wt, DisplayName: "REVIEW feature"}}}

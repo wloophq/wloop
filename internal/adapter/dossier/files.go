@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/meter"
 )
 
@@ -425,7 +426,7 @@ func (f Files) git(ctx context.Context, dir string, repo bool, args ...string) (
 	}, args...)
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", full...)
+	cmd := exec.CommandContext(ctx, gitx.Binary(), full...)
 	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

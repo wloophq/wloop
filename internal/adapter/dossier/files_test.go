@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/dossiers"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/gitx"
 )
 
 type clock struct{ now time.Time }
@@ -67,7 +68,7 @@ func (e *env) open(t *testing.T, u unit.Unit) dossier.Dossier {
 
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.Command(gitx.Binary(), append([]string{"-C", dir}, args...)...)
 	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "GIT_") }),
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
 	out, err := cmd.CombinedOutput()

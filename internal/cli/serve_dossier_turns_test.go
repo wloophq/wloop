@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/gitx"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -240,7 +241,7 @@ func assertTurnEndCommits(t *testing.T, te *testEnv) {
 }
 
 func gitLog(dir string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "log", "-1", "--format=%s")
+	cmd := exec.Command(gitx.Binary(), "-C", dir, "log", "-1", "--format=%s")
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_DIR="+filepath.Join(dir, ".git"))
 	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err

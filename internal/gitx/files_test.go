@@ -22,7 +22,7 @@ func wantSpawns(t *testing.T, sc *meter.Scope, want int64) {
 
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+	out, err := exec.Command(Binary(), append([]string{"-C", dir}, args...)...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}

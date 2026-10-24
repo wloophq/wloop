@@ -49,7 +49,7 @@ type Exec struct{}
 func (Exec) Run(ctx context.Context, dir string, env []string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.CommandContext(ctx, Binary(), append([]string{"-C", dir}, args...)...)
 	if len(env) > 0 {
 		cmd.Env = append(cmd.Environ(), env...)
 	}
