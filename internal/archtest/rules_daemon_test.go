@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/importer"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
@@ -33,14 +31,9 @@ func ruleR8(self string, imports []string) []string {
 	return out
 }
 
-// portMethods counts the methods of each interface type files declare,
+// portMethods counts the methods of each interface type pkg declares,
 // those of embedded interfaces included.
-func portMethods(fset *token.FileSet, files []*ast.File) (map[string]int, error) {
-	conf := types.Config{Importer: importer.ForCompiler(fset, "source", nil)}
-	pkg, err := conf.Check("ports", fset, files, nil)
-	if err != nil {
-		return nil, err
-	}
+func portMethods(pkg *types.Package) map[string]int {
 	out := map[string]int{}
 	for _, name := range pkg.Scope().Names() {
 		if tn, ok := pkg.Scope().Lookup(name).(*types.TypeName); ok {
@@ -49,7 +42,7 @@ func portMethods(fset *token.FileSet, files []*ast.File) (map[string]int, error)
 			}
 		}
 	}
-	return out, nil
+	return out
 }
 
 func TestDaemonImports(t *testing.T) {
@@ -67,24 +60,11 @@ func TestDaemonImports(t *testing.T) {
 	if !seen {
 		t.Error("internal/daemon is missing from the package list")
 	}
-	fset := token.NewFileSet()
-	var files []*ast.File
-	for _, p := range packages(t) {
-		if p.ImportPath != module+"internal/daemon" {
-			continue
-		}
-		for _, name := range p.GoFiles {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			files = append(files, f)
-		}
-	}
-	counts, err := portMethods(fset, files)
+	daemon, err := newChecker(t, []string{module + "internal/daemon"}).check(module + "internal/daemon")
 	if err != nil {
 		t.Fatal(err)
 	}
+	counts := portMethods(daemon)
 	for name, n := range counts {
 		if n > 5 {
 			t.Errorf("daemon.%s has %d methods; a port has at most five", name, n)
@@ -110,10 +90,12 @@ type Big interface{ A(); B(); C(); D(); E(); F() }
 type Composite interface{ Small; Big; G() }
 type Pair interface{ Small; context.Context }
 `)
-	got, err := portMethods(fset, []*ast.File{ports})
+	conf := types.Config{Importer: importer.ForCompiler(fset, "source", nil)}
+	pkg, err := conf.Check("ports", fset, []*ast.File{ports}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	got := portMethods(pkg)
 	if got["Small"] != 5 || got["Big"] != 6 || got["Composite"] != 7 || got["Pair"] != 9 {
 		t.Fatalf("methods: %v", got)
 	}
