@@ -1,6 +1,7 @@
 package menubar
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -46,6 +47,7 @@ type fakeDaemon struct {
 	rows       map[string][]api.Row
 	health     api.Health
 	err        error
+	rowsErr    error // RowsSince answers it, the health still answering
 	actions    []string
 	reqs       []actionCall
 	paused     []bool
@@ -75,8 +77,8 @@ func (f *fakeDaemon) RowsSince(_ context.Context, since api.Since) (api.RowsPage
 	defer f.mu.Unlock()
 	f.reads++
 	f.sinces = append(f.sinces, since)
-	if f.err != nil {
-		return api.RowsPage{}, f.err
+	if f.err != nil || f.rowsErr != nil {
+		return api.RowsPage{}, cmp.Or(f.err, f.rowsErr)
 	}
 	if p := f.delta; p != nil {
 		f.delta = nil

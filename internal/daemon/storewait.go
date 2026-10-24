@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -115,12 +116,13 @@ func (w StoreWait) health() api.Health {
 	st := w.Status()
 	h := api.Health{Version: w.Version, Build: web.Build(w.Version), Jobs: []api.JobStatus{}, Warnings: []string{}, Store: &st}
 	if st.Message != "" {
-		h.Warnings = append(h.Warnings, storeWarning(st))
+		h.Warnings = append(h.Warnings, StoreWarning(st))
 	}
 	return h
 }
 
-func storeWarning(st api.StoreStatus) string {
+// StoreWarning is st as one line: the message and the command to run.
+func StoreWarning(st api.StoreStatus) string {
 	if st.Fix == "" {
 		return "store: " + st.Message
 	}
@@ -128,14 +130,20 @@ func storeWarning(st api.StoreStatus) string {
 }
 
 func (w StoreWait) handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(rw http.ResponseWriter, _ *http.Request) { writeJSON(rw, w.health()) })
-	mux.HandleFunc("/api/", func(rw http.ResponseWriter, _ *http.Request) {
-		st := w.Status()
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(rw).Encode(map[string]string{"error": "the store is not open: " + st.Message, "fix": st.Fix})
+	page := web.Handler(w.Version)
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/health" && (r.Method == http.MethodGet || r.Method == http.MethodHead):
+			writeJSON(rw, w.health())
+		case strings.HasPrefix(r.URL.Path, "/api/"):
+			st := w.Status()
+			rw.Header().Set("Content-Type", "application/json")
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(rw).Encode(map[string]string{"error": "the store is not open: " + st.Message, "fix": st.Fix})
+		case r.Method == http.MethodGet || r.Method == http.MethodHead:
+			page.ServeHTTP(rw, r)
+		default:
+			http.Error(rw, "the store is not open", http.StatusServiceUnavailable)
+		}
 	})
-	mux.Handle("GET /", web.Handler(w.Version))
-	return mux
 }

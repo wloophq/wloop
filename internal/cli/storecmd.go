@@ -65,18 +65,11 @@ func (e *Env) openStore(ctx context.Context, logf func(string, ...any)) (*sqlite
 		if err != nil || db != nil {
 			return db, unlock, err
 		}
-		logf("store: %s; serving only the health until that changes", daemonStoreWarning(wait.status))
+		logf("%s; serving only the health until that changes", daemon.StoreWarning(wait.status))
 		if err := e.storeWait(ctx, wait); err != nil || ctx.Err() != nil {
 			return nil, nil, err
 		}
 	}
-}
-
-func daemonStoreWarning(st api.StoreStatus) string {
-	if st.Fix == "" {
-		return st.Message
-	}
-	return st.Message + "; run `" + st.Fix + "`"
 }
 
 func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.DB, func(), storeWaiting, error) {
@@ -462,9 +455,9 @@ func (e *Env) reportStore(ctx context.Context) {
 		if c, err := e.daemonClient(ctx); err == nil {
 			if h, err := c.Health(ctx); err == nil && h.Store != nil {
 				if h.Store.State == api.StoreOK {
-					fmt.Fprintf(e.Out, "Store: schema version %d.\n", h.Store.Version)
+					fmt.Fprintf(e.Out, "store: schema version %d.\n", h.Store.Version)
 				} else {
-					fmt.Fprintf(e.Out, "Store: %s.\n", daemonStoreWarning(*h.Store))
+					fmt.Fprintf(e.Out, "%s.\n", daemon.StoreWarning(*h.Store))
 				}
 				return
 			}
