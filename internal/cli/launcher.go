@@ -64,6 +64,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 		return err
 	}
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: requestTrigger(l.Trigger), Unit: ref.Unit(), Payload: turnPR(pr), Guidance: l.Guidance, Inputs: l.Inputs, Why: l.Why}
+	e.withAddressReason(ctx, cfg, &r)
 	if l.ResumeOf != 0 {
 		books, err := e.Turns.Store.Books(ctx, l.Unit)
 		if err != nil {
@@ -240,6 +241,7 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 			return false, err
 		}
 		r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Guidance: sr.guidance, Inputs: inputs}
+		e.withAddressReason(ctx, cfg, &r)
 		submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
 		sr.pr, sr.cfg, sr.inputs, sr.submitted = pr, cfg, inputs, submitted
 		if err == nil {

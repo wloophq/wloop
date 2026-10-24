@@ -631,3 +631,20 @@ func TestTurnRecordsItsWorkflow(t *testing.T) {
 		}
 	})
 }
+
+func TestAnAddressRoundSaysWhyNow(t *testing.T) {
+	sc := addressScenario(t)
+	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
+	r.units.Set(r.u, "pr.address.reviewers", []string{"bob", "jussara-ai"})
+	r.units.Set(r.u, "pr.address.checks", []string{})
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(sc.ws.Prompts) != 1 {
+		t.Fatalf("prompts %+v", sc.ws.Prompts)
+	}
+	text := turnText(t, sc.te, sc.ws.Prompts[0].Text)
+	if !strings.Contains(text, "## Why now") || !strings.Contains(text, "- @bob\n- @jussara-ai\n") {
+		t.Fatalf("turn:\n%s", text)
+	}
+}

@@ -57,6 +57,8 @@ type step struct {
 	fresh bool
 	// why is the workflow that started the round.
 	why *workflow.Why
+	// address is why an address round runs now, nil on other rounds.
+	address *turn.RoundReason
 }
 
 func (s step) key() string { return s.pr.String() }
@@ -66,7 +68,9 @@ func (s step) payload() turn.Payload {
 	if s.read == nil {
 		return nil
 	}
-	return turnPR(s.read)
+	p := turnPR(s.read)
+	p.Address = s.address
+	return p
 }
 
 func (s step) roundKind() string {
@@ -269,6 +273,7 @@ type roundCall struct {
 	Observed  bool
 	Confirmed bool
 	Why       *workflow.Why
+	Address   *turn.RoundReason
 }
 
 // sendRound sends c's round with st as the round state, through send, so a
@@ -286,7 +291,7 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
 		fingerprint: c.Fingerprint, checksHead: c.ChecksHead, lastReviewAt: c.LastReviewAt,
 		read: &github.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
-		fresh: true, why: c.Why}, c.Guidance)
+		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
 }
 
 func (s *sweep) send(ctx context.Context, st step, guidance string) (sent bool, err error) {
