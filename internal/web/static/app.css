@@ -281,6 +281,12 @@ tbody tr.g-head:hover { background: none; }
 tr.g-head th { padding: 12px 8px 4px 10px; text-align: left; font: 600 12px var(--sans); color: var(--ink); background: var(--bg); border-left: 4px solid var(--strip, var(--rule)); }
 .g-toggle { padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 tr.g-head .count { margin-left: 8px; font: 12px var(--mono); color: var(--muted); }
+.update {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+}
+
 .warnings details { white-space: pre-wrap; margin-top: 2px; }
 .warnings summary { cursor: pointer; }
 

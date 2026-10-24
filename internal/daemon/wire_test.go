@@ -94,6 +94,9 @@ func TestWireShape(t *testing.T) {
 		if c.golden == "rows.json" {
 			v = v.(map[string]any)["rows"]
 		}
+		if c.golden == "health.json" {
+			v.(map[string]any)["build"] = "<build>"
+		}
 		got, _ := json.MarshalIndent(v, "", "  ")
 		path := filepath.Join("testdata", "wire", c.golden)
 		if *updateWire {

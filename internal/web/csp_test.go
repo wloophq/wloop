@@ -8,7 +8,7 @@ import (
 )
 
 func TestEveryCockpitResponseCarriesTheCSP(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	for _, p := range []string{"/", "/static/app.js", "/static/app.css", "/static/vendor/echarts.min.js", "/nowhere"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
@@ -29,7 +29,7 @@ func TestEveryCockpitResponseCarriesTheCSP(t *testing.T) {
 
 func TestThePageHasNoInlineScript(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	page := rec.Body.String()
 	for _, tag := range strings.Split(page, "<script")[1:] {
 		head, body, _ := strings.Cut(tag, ">")

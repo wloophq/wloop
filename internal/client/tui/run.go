@@ -30,6 +30,7 @@ type Daemon interface {
 	ActOnPlan(ctx context.Context, req api.PlanActRequest) (api.PlanResponse, error)
 	GTD(ctx context.Context) (api.GTDCatalog, error)
 	EntriesSince(ctx context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error)
+	Counters(ctx context.Context, area string, terms ...string) (api.Counters, error)
 	Entry(ctx context.Context, id string) (api.EntryView, error)
 	EntryDo(ctx context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error)
 	EntryDrafts(ctx context.Context, entry string) ([]api.Draft, error)
@@ -97,6 +98,10 @@ type loaded struct {
 	entries    *entriesRead
 	entriesErr error
 	counters   *api.Counters
+	// filtered are the counts of the entries the filter keeps, when this
+	// load read them.
+	filtered    *filteredRead
+	filteredErr error
 	// review is the Review when the screen shows it.
 	review    *api.Review
 	reviewErr error
@@ -105,6 +110,13 @@ type loaded struct {
 type entriesRead struct {
 	view     string
 	entries  []api.EntryView
+	counters api.Counters
+}
+
+// filteredRead are the counters of area narrowed to the entries the
+// filter keeps.
+type filteredRead struct {
+	area     string
 	counters api.Counters
 }
 
@@ -176,7 +188,7 @@ func Run(ctx context.Context, cfg Config) error {
 	// and asks again for an open detail a page changed.
 	track := func() {
 		view, area, ok := m.EntryQuery()
-		if (shown.set(view, area, ok) && ok) || shown.setReview(m.inReview()) {
+		if (shown.set(view, area, ok) && ok) || shown.setReview(m.inReview()) || shown.setFilter(m.area, m.FilterTerms()) {
 			kick()
 		}
 		if c, ok := m.Refetch(); ok {
@@ -246,6 +258,7 @@ func Run(ctx context.Context, cfg Config) error {
 				due.rows.Store(true)
 				due.plan.Store(true)
 				due.entries.Store(true)
+				due.filtered.Store(true)
 				kick()
 			}
 		case <-tick.C:
@@ -277,6 +290,9 @@ func (m *Model) apply(r loaded) {
 	if e := r.entries; e != nil {
 		m.SetEntries(e.view, e.entries, e.counters)
 	}
+	if f := r.filtered; f != nil {
+		m.SetFilteredCounters(f.area, f.counters)
+	}
 	if r.plan != nil || r.planErr != nil {
 		m.SetPlan(deref(r.plan), r.planErr)
 	}
@@ -291,6 +307,8 @@ func (m *Model) apply(r loaded) {
 		m.status = "entries not refreshed: " + r.entriesErr.Error()
 	case r.reviewErr != nil:
 		m.status = "review not refreshed: " + r.reviewErr.Error()
+	case r.filteredErr != nil:
+		m.status = "filtered counts not refreshed: " + r.filteredErr.Error()
 	}
 }
 
@@ -359,8 +377,8 @@ func (c *cursor) set(s api.Since) {
 // wants are what the next load asks the daemon for; counters are the
 // counts the last change carried.
 type wants struct {
-	health, rows, plan, entries atomic.Bool
-	counters                    atomic.Pointer[api.Counters]
+	health, rows, plan, entries, filtered atomic.Bool
+	counters                              atomic.Pointer[api.Counters]
 }
 
 func (r *wants) all() {
@@ -368,6 +386,7 @@ func (r *wants) all() {
 	r.rows.Store(true)
 	r.plan.Store(true)
 	r.entries.Store(true)
+	r.filtered.Store(true)
 }
 
 // query is the GTD view the screen shows and the area it follows, shared
@@ -377,6 +396,26 @@ type query struct {
 	view, area string
 	ok         bool
 	review     bool
+	// filterArea and terms are the area the tabs count and the filter's
+	// words, which narrow the counts.
+	filterArea string
+	terms      []string
+}
+
+// setFilter records the filter's words and the area the tabs count,
+// reporting a change while the filter has words.
+func (q *query) setFilter(area string, terms []string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	changed := q.filterArea != area || !slices.Equal(q.terms, terms)
+	q.filterArea, q.terms = area, terms
+	return changed && len(terms) > 0
+}
+
+func (q *query) filter() (string, []string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.filterArea, q.terms
 }
 
 // setReview records whether the screen shows the Review, reporting a change to showing it.
@@ -456,7 +495,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 	var plan []api.PlanItem
 	var err error
 	sets := map[string]*entrySet{}
-	var pulled string
+	var pulled, counted string
 	for {
 		select {
 		case <-ctx.Done():
@@ -500,6 +539,7 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 			}
 			r.entries, r.entriesErr = readEntries(ctx, d, have.gtd, due, shown, sets, &pulled)
 			r.counters = due.counters.Swap(nil)
+			r.filtered, r.filteredErr = readFiltered(ctx, d, have.gtd, due, shown, &counted)
 		}
 		answering.Store(err == nil)
 		select {
@@ -587,6 +627,28 @@ func readEntries(ctx context.Context, d Daemon, gtd bool, due *wants, shown *que
 	return &entriesRead{view: q.View, entries: set.list(), counters: c}, nil
 }
 
+// readFiltered reads the counters the filter narrows when the filter has
+// words and they, the area or the entries changed since the last read.
+func readFiltered(ctx context.Context, d Daemon, gtd bool, due *wants, shown *query, counted *string) (*filteredRead, error) {
+	area, terms := shown.filter()
+	named := due.filtered.Swap(false)
+	if !gtd || len(terms) == 0 {
+		*counted = ""
+		return nil, nil
+	}
+	key := area + "\x00" + strings.Join(terms, "\x00")
+	if !named && key == *counted {
+		return nil, nil
+	}
+	c, err := d.Counters(ctx, area, terms...)
+	if err != nil {
+		due.filtered.Store(true)
+		return nil, err
+	}
+	*counted = key
+	return &filteredRead{area: area, counters: c}, nil
+}
+
 // follow asks for a refresh on every change the daemon announces and on each
 // reconnection. A daemon that answers but has no event stream is polled
 // every Refresh instead of being asked for it again every Reconnect.
@@ -629,6 +691,7 @@ func listen(ctx context.Context, events <-chan api.Change, at *cursor, due *want
 			}
 			if c.Counters != nil || c.All {
 				due.entries.Store(true)
+				due.filtered.Store(true)
 			}
 			if c.Counters != nil {
 				counters := *c.Counters

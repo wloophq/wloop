@@ -41,6 +41,9 @@ var coreViewIDs = []string{"focus", "inbox", "outbox", "next", "waiting", "proje
 // noGTD stands in for gtd.js where a test runs app.js's loading alone.
 const noGTD = "const loadGTD = async () => {};\n"
 
+// noUpdate stands in for update.js where a test runs app.js's loading alone.
+const noUpdate = "const checkBuild = () => {};\n"
+
 // gtdScripts are routes.js, gtd.js and detail.js.
 func gtdScripts(t *testing.T) string {
 	return staticJS(t, "routes.js") + staticJS(t, "gtd.js") + staticJS(t, "detail.js")

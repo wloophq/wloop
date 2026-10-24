@@ -30,7 +30,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
 	})
-	mux.Handle("GET /", web.Handler())
+	mux.Handle("GET /", web.Handler(s.deps.Version))
 	return s.versioned(s.afterReconcile(mux))
 }
 
@@ -165,6 +165,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	s.noteConfigStale()
 	h := api.Health{
 		Version:            s.deps.Version,
+		Build:              web.Build(s.deps.Version),
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
 		Viewer:             s.viewer.cachedLogin(),

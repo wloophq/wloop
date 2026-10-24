@@ -58,6 +58,7 @@ type fakeDaemon struct {
 	entryDelta   map[string][]api.EntryView
 	counters     api.Counters
 	entryAsks    []entryAsk
+	counterAsks  [][]string
 	drafts       []api.Draft
 	entryDos     []entryDo
 	captures     []string
@@ -109,6 +110,26 @@ func (f *fakeDaemon) EntriesSince(_ context.Context, q client.EntryQuery, since 
 	page := api.EntriesPage{Epoch: "g1", Rev: f.entryRev, Entries: f.entryDelta[q.View], Removed: []string{}, Counters: f.counters}
 	delete(f.entryDelta, q.View)
 	return page, nil
+}
+
+// Counters counts each view's entries holding every term.
+func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (api.Counters, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.counterAsks = append(f.counterAsks, terms)
+	if f.down {
+		return api.Counters{}, errors.New("connection refused")
+	}
+	c := api.Counters{Area: area, Views: map[string]int{}}
+	for v, es := range f.entries {
+		c.Views[v] = 0
+		for _, e := range es {
+			if api.EntryMatches(e, terms) {
+				c.Views[v]++
+			}
+		}
+	}
+	return c, nil
 }
 
 func (f *fakeDaemon) Entry(_ context.Context, id string) (api.EntryView, error) {

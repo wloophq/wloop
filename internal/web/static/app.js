@@ -1021,7 +1021,7 @@ function lensHash(change) {
 
 function renderRail() {
   const lens = readLens();
-  const nav = gtdNav(gtdState.catalog, catalog.views, [...pluginViews.keys()], gtdState.counters);
+  const nav = gtdNav(gtdState.catalog, catalog.views, [...pluginViews.keys()], gtdCounters(readHash()));
   const views = railSections(nav, providerName).flatMap((sec) => [
     sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
     ...sec.views.map((v) => {
@@ -2487,7 +2487,10 @@ async function load() {
     }
     state.loaded = true;
   }
-  if (health.status === "fulfilled") state.health = health.value;
+  if (health.status === "fulfilled") {
+    state.health = health.value;
+    checkBuild(state.health);
+  }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
   if (failed.length) {
     state.error = `Could not reach the daemon: ${[...new Set(failed.map((r) => r.reason.message))].join("; ")}`;
@@ -2593,7 +2596,10 @@ async function applyChange(c) {
       const page = await getJSON(`/api/rows?since=${encodeURIComponent(`${state.epoch}:${state.rev}`)}`);
       if (!mergeRows(page)) return load();
     }
-    if (c.health) state.health = await getJSON("/api/health");
+    if (c.health) {
+      state.health = await getJSON("/api/health");
+      checkBuild(state.health);
+    }
   } catch {
     return load();
   }

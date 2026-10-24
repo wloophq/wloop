@@ -1,7 +1,7 @@
 "use strict";
 
 const GTD_DEFAULT_VIEW = "focus";
-const gtdState = { catalog: null, catalogError: "", key: "", page: null, entries: [], counters: null, error: "" };
+const gtdState = { catalog: null, catalogError: "", key: "", page: null, entries: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function gtdViews(cat = gtdState.catalog) {
   return (cat && cat.views) || [];
@@ -62,8 +62,40 @@ function entriesURL(view, area, ctx, since) {
   return "/api/entries?" + p.toString();
 }
 
-function countersURL(area) {
-  return "/api/counters" + (area ? "?area=" + encodeURIComponent(area) : "");
+// countersURL counts area, every area when "", narrowed to the entries
+// holding each of ts.
+function countersURL(area, ts) {
+  const p = new URLSearchParams();
+  if (area) p.set("area", area);
+  for (const t of ts || []) p.append("term", t);
+  const q = p.toString();
+  return "/api/counters" + (q ? "?" + q : "");
+}
+
+// gtdCounters are the counts the rail, the area picker and the context
+// chips show: with free words in the filter, those of the entries it keeps,
+// the last read while a newer one is on its way; null before the first.
+function gtdCounters(route) {
+  if (!gtdTerms(route.q).length) return gtdState.counters;
+  const f = gtdState.filtered;
+  return f && f.area === (route.area || "") ? f.counters : null;
+}
+
+// loadFiltered reads the counters the filter's free words narrow; only the
+// latest read is kept.
+async function loadFiltered(route) {
+  const ts = gtdTerms(route.q);
+  if (!ts.length) {
+    gtdState.filtered = null;
+    return;
+  }
+  const seq = ++gtdState.filterSeq;
+  try {
+    const c = await getJSON(countersURL(route.area, ts));
+    if (seq === gtdState.filterSeq) gtdState.filtered = { area: route.area || "", counters: c };
+  } catch {
+    // The rail keeps its last counts.
+  }
 }
 
 function gtdQueryKey(view, area, ctx) {
@@ -106,7 +138,7 @@ function applyEntriesPage(key, view, page) {
 
 // loadGTD loads the catalog once, then the list of route (the hash's when
 // not given, read once the catalog can resolve it) with its counters, or the
-// counters alone on a plugin view.
+// counters alone on a plugin view, and the counters the filter narrows.
 async function loadGTD(given) {
   if (!gtdState.catalog) {
     try {
@@ -118,6 +150,10 @@ async function loadGTD(given) {
     }
   }
   const route = given || readHash();
+  await Promise.all([loadGTDList(route), loadFiltered(route)]);
+}
+
+async function loadGTDList(route) {
   if (route.view === "review" && isGTDView(route.view)) return loadReview();
   if (!isGTDView(route.view)) {
     try {
@@ -250,7 +286,7 @@ function areaPicker(route) {
   const areas = (gtdState.catalog && gtdState.catalog.areas) || [];
   if (!areas.length) return null;
   if (route.view === "inbox") return h("span", { class: "lens-label" }, "Inbox shows every area");
-  const counts = (gtdState.counters && gtdState.counters.areas) || {};
+  const counts = (gtdCounters(route) || {}).areas || {};
   return h("label", { class: "lens-pick" },
     h("span", { class: "lens-label" }, "Area"),
     h("select", { "data-focus": "gtd:area", onchange: (ev) => writeHash({ area: ev.target.value }) },
@@ -261,7 +297,7 @@ function areaPicker(route) {
 function contextChips(route) {
   if (route.view !== "next") return null;
   const ctxs = (gtdState.catalog && gtdState.catalog.contexts) || [];
-  const counts = (gtdState.counters && gtdState.counters.contexts) || {};
+  const counts = (gtdCounters(route) || {}).contexts || {};
   return ctxs.map((c) => {
     const on = route.ctx.includes(c);
     const next = on ? route.ctx.filter((x) => x !== c) : [...route.ctx, c];
@@ -281,18 +317,18 @@ const GTD_EMPTY = {
   logbook: "Nothing done or filed yet.",
 };
 
-// entryHaystack is what the filter's free words search in an entry: its title and notes, its items, the
-// people it waits on, its conversations and repositories, its project, area and contexts, and its message
-// or draft.
+// entryHaystack is what the filter's free words search in an entry, the texts the daemon's counters search
+// (api.EntryView.Texts): its title, notes, state, kind, area, project and contexts, its units, the people
+// it waits on, its items, its cards' people, its draft and its message.
 function entryHaystack(e) {
   const d = e.draft || {};
   const m = e.message || {};
-  return [e.title, e.notes, e.area, e.project_title, ...(e.contexts || []),
-    ...(e.items || []).map((it) => it.summary),
+  return [e.title, e.notes, e.state, e.kind, e.area, e.project_title, ...(e.contexts || []),
+    ...(e.units || []).flatMap((u, i) => [(e.unit_labels || [])[i] || unitLabel(u), `${u.provider}:${u.key}`]),
     ...((e.waiting || {}).on || []).map((p) => p.name),
-    ...(e.unit_labels || []), ...(e.units || []).map((u) => `${u.provider}:${u.key}`),
+    ...(e.items || []).map((it) => it.summary),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
-    m.text, d.text, d.where, d.reaction, d.unit].map((x) => gtdFold(x));
+    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => gtdFold(x));
 }
 
 function gtdFold(s) {
@@ -312,12 +348,17 @@ function entryMatches(e, ts) {
   return ts.every((t) => hay.some((f) => f.includes(t)));
 }
 
-// gtdList is the list of a core view.
+// gtdList is the list of a core view; its heading counts what the filter
+// shows of the view, as a pull request list's bar does.
 function gtdList(route, open) {
   const label = (gtdViews().find((v) => v.id === route.view) || {}).label || route.view;
-  const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, label), areaPicker(route), contextChips(route))];
+  const loaded = gtdState.key === gtdQueryKey(route.view, route.area, route.ctx);
+  const ts = gtdTerms(route.q);
+  const shown = loaded ? gtdState.entries.filter((e) => entryMatches(e, ts)) : [];
+  const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, label), areaPicker(route), contextChips(route),
+    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${gtdState.entries.length}`) : null)];
   if (gtdState.error) parts.push(h("p", { class: "plan-error" }, gtdState.error));
-  if (gtdState.key !== gtdQueryKey(route.view, route.area, route.ctx)) {
+  if (!loaded) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
   }
@@ -325,8 +366,6 @@ function gtdList(route, open) {
     parts.push(h("p", { class: "empty" }, GTD_EMPTY[route.view] || "Nothing here."));
     return parts;
   }
-  const ts = gtdTerms(route.q);
-  const shown = gtdState.entries.filter((e) => entryMatches(e, ts));
   if (!shown.length) {
     parts.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
     return parts;

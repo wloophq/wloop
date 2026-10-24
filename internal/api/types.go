@@ -349,7 +349,10 @@ type RateLimit struct {
 }
 
 type Health struct {
-	Version   string       `json:"version"`
+	Version string `json:"version"`
+	// Build names the cockpit the daemon serves; a page that loaded another
+	// reloads.
+	Build     string       `json:"build"`
 	Jobs      []JobStatus  `json:"jobs"`
 	Warnings  []string     `json:"warnings"`
 	RateLimit RateLimit    `json:"rate_limit"`

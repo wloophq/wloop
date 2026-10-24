@@ -9,7 +9,7 @@ import (
 )
 
 func TestServesIndexAndAssets(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `id="rail"`) || !strings.Contains(rec.Body.String(), `/static/app.js`) {
@@ -29,7 +29,7 @@ func TestServesIndexAndAssets(t *testing.T) {
 
 func TestCockpitKnowsThePendingRound(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"/api/pause", "data-deadline"} {
 		if !strings.Contains(body, want) {
@@ -40,7 +40,7 @@ func TestCockpitKnowsThePendingRound(t *testing.T) {
 
 func TestCockpitHasTheRecentView(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{`v.id === "recent"`, "/api/activity", "renderActivity"} {
 		if !strings.Contains(body, want) {
@@ -51,7 +51,7 @@ func TestCockpitHasTheRecentView(t *testing.T) {
 
 func TestCockpitHasTheDoneView(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"/api/workspaces/remove-done", `removed: "workspace removed"`, "Remove all clean", `h("details"`, "out.detail", "k.detail"} {
 		if !strings.Contains(body, want) {
@@ -62,7 +62,7 @@ func TestCockpitHasTheDoneView(t *testing.T) {
 
 func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{`blocked: "round blocked"`, `round_blocked: "round blocked"`, `round_unblocked: "round unblocked"`, `"round_blocked", "round_unblocked"`} {
 		if !strings.Contains(body, want) {
@@ -73,7 +73,7 @@ func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
 
 func TestCockpitListsTheFailingChecks(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	for _, want := range []string{"function checksBlock", `unitPath(keyUnit(pr), "checks")`, "c.steps", `if (d.row.kind === "checks") loadChecks(pr);`} {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Errorf("app.js lacks %s", want)
@@ -83,7 +83,7 @@ func TestCockpitListsTheFailingChecks(t *testing.T) {
 
 func TestCockpitNeverShowsTheCardCommentAsAQuestion(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	for _, gone := range []string{"function asksBlock", "workspace.comment"} {
 		if strings.Contains(rec.Body.String(), gone) {
 			t.Errorf("app.js still has %s", gone)
@@ -93,7 +93,7 @@ func TestCockpitNeverShowsTheCardCommentAsAQuestion(t *testing.T) {
 
 func TestCockpitShowsTheTurn(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
 		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
@@ -103,7 +103,7 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 		}
 	}
 	rec = httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
 	for _, want := range []string{".d-question", ".d-artifact", ".act-note"} {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Errorf("app.css lacks %s", want)
@@ -113,7 +113,7 @@ func TestCockpitShowsTheTurn(t *testing.T) {
 
 func TestCockpitShowsTheBrief(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	body := rec.Body.String()
 	for _, want := range []string{"function briefBlock", "briefBlock(d.brief, r, readLens())", "open_questions", "risk_why", `"Brief pending"`, "stale", `["low", "medium", "high"]`} {
 		if !strings.Contains(body, want) {
@@ -126,7 +126,7 @@ func TestCockpitShowsTheBrief(t *testing.T) {
 		}
 	}
 	rec = httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
 	css := rec.Body.String()
 	_, rule, _ := strings.Cut(css, ".d-brief {")
 	rule, _, _ = strings.Cut(rule, "}")
@@ -136,7 +136,7 @@ func TestCockpitShowsTheBrief(t *testing.T) {
 }
 
 func TestCockpitHasTheStalledBoard(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js":  {"function renderBoard", `layout: p.get("layout") === "board"`, `f.id === "lane"`, `"aria-pressed"`},
 		"/":               {`id="board"`},
@@ -153,7 +153,7 @@ func TestCockpitHasTheStalledBoard(t *testing.T) {
 }
 
 func TestCockpitHasTheFilter(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js": {"function fold", "function terms", "function matches", "function marked", "function urlKey",
 			"function matchesActivity", `p.get("q")`, "history.replaceState", "function typing", "function emptyNote"},
@@ -172,7 +172,7 @@ func TestCockpitHasTheFilter(t *testing.T) {
 }
 
 func TestCockpitHasExplore(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	for path, wants := range map[string][]string{
 		"/static/app.js": {"function renderExplore", "function explore(", `"/api/explore"`, `"/api/explore/recent"`, "function actOnCandidate", `actionButtons(c, "explore"`, `"/api/actions"`, "function loadSpecs",
 			`"-reviewed-by:@me"`, `"draft:false"`, "function candidateItem", `p.get("x")`, "r.read", "r.empty", "EXPLORE_SORTS", "candidateWait(c, row,", "stalled_review_hours", "Active in the last 30 days"},
@@ -191,7 +191,7 @@ func TestCockpitHasExplore(t *testing.T) {
 
 func TestHiddenBeatsEveryDisplayRule(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
 	if !strings.Contains(rec.Body.String(), "[hidden] { display: none !important; }") {
 		t.Fatal("app.css lets a display rule show an element marked hidden")
 	}
@@ -199,7 +199,7 @@ func TestHiddenBeatsEveryDisplayRule(t *testing.T) {
 
 func TestGuidanceSitsAboveTheActions(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	Handler("").ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
 	if !strings.Contains(rec.Body.String(), "box.replaceChildren(...[top, guidance, acts, log].filter(Boolean))") {
 		t.Fatal("the detail panel does not put guidance between the facts and the actions")
 	}

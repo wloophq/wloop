@@ -13,6 +13,7 @@
   "briefs": {
     "open": false
   },
+  "build": "\u003cbuild\u003e",
   "jobs": [
     {
       "every": 3600000000000,
