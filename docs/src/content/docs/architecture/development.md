@@ -16,9 +16,20 @@ make scan-brand   # check that nothing the program writes names the default prod
 
 ## Running your checkout
 
-`make dev-install` builds the checkout and makes that build the installed one: it links `~/.local/bin/{{command}}` to `bin/{{command}}`, then runs `install` and `app install` with it, so the agent homes, the app and the LaunchAgents run your build. After pulling or changing the code, run it again; it restarts the daemon on the new binary.
+`make dev-install` builds the checkout and makes that build the installed one: it links `~/.local/bin/{{command}}` to `bin/{{command}}`, then runs `install` and `app install` with it, so the agent homes, the app and the LaunchAgents run your build. After pulling or changing the code, run it again; it restarts the daemon on the new binary, then runs `store migrate`, which asks before migrating the store to a schema your build adds. A release does not read a store migrated past it, so switch back with `{{command}} store restore`.
 
 Uninstall the Homebrew cask first (`brew uninstall --cask {{command}}`), or put `~/.local/bin` ahead of the Homebrew directory in your `PATH`, so the shell runs the same binary as the daemon. To go back to a release, install the cask and run `{{command}} install` and `{{command}} app install` with it.
+
+## Changing the store's schema
+
+`internal/adapter/store/sqlite/schema.sql` is the current schema, which a new store runs; `migrations` in `migrate.go` take an existing store there, one version each. To change the schema:
+
+1. Edit `schema.sql` to the end state. A column `ALTER TABLE ... ADD COLUMN` adds goes last in its table, where SQLite puts it.
+2. Append a `migration` with `to` set to the next version and an `up` that takes a store from the previous one there, in the transaction it is given. A change `ALTER TABLE` cannot make is the [12-step rebuild](https://www.sqlite.org/lang_altertable.html#otheralter), with `foreignKeysOff` set: the runner turns enforcement off around the transaction and fails a rebuild that leaves more foreign key violations than it found. Set `compatible` to an earlier version when releases at that version keep working on the result, such as after a column they ignore.
+3. Bump `SchemaVersion` and copy `schema.sql` to `testdata/schema-v<version>.sql`.
+4. When the migration moves or derives data, add a test that writes rows at the previous version, migrates and reads them back.
+
+The tests build a store from each frozen schema, migrate it and compare it with a new store from `schema.sql`: tables, columns, keys, indexes and their SQL. They also fail when `schema.sql` differs from the frozen copy of the current version, so a schema change without a migration does not pass. A migration in a release is never edited; a fix is a new migration.
 
 ## The documentation site
 
