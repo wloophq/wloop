@@ -293,6 +293,22 @@ func TestTokenQuerySetsCookieAndRedirects(t *testing.T) {
 	resp.Body.Close()
 }
 
+func TestTokenRedirectStaysOnThisHost(t *testing.T) {
+	s := New(testDeps(t))
+	srv := newTestServer(t, s.AuthHandler())
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for _, path := range []string{"//evil.test/x", "/\\evil.test/x"} {
+		resp, err := client.Get(srv + path + "?token=" + s.token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if got := resp.Header.Get("Location"); got != "/evil.test/x" {
+			t.Fatalf("%s: location %q", path, got)
+		}
+	}
+}
+
 func TestCrossSitePostIsForbidden(t *testing.T) {
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())

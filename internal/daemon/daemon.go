@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -637,8 +638,7 @@ func (s *Server) AuthHandler() http.Handler {
 		if t := q.Get("token"); t != "" && s.validToken(t) {
 			http.SetCookie(w, &http.Cookie{Name: tokenCookie, Value: t, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 			q.Del("token")
-			u := *r.URL
-			u.RawQuery = q.Encode()
+			u := url.URL{Path: "/" + strings.TrimLeft(r.URL.Path, `/\`), RawQuery: q.Encode()}
 			http.Redirect(w, r, u.RequestURI(), http.StatusSeeOther)
 			return
 		}
