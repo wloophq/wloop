@@ -138,9 +138,12 @@ type Model struct {
 	entries       map[string][]api.EntryView
 	entriesLoaded bool
 	counters      api.Counters
-	area          string
-	entrySel      string
-	entryAt       int
+	// filtered are the counts of the entries the filter's words keep, as
+	// last read.
+	filtered *api.Counters
+	area     string
+	entrySel string
+	entryAt  int
 	// detailID is the entry whose detail is open; opened is what the
 	// daemon answered for it, stale once a page changed it.
 	detailID    string

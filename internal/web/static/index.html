@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="build" content="{{build}}">
 <title>{{name}} cockpit</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/app.css?v={{build}}">
 </head>
 <body>
 <header id="top">
@@ -15,6 +16,7 @@
   <span id="notice" class="notice" role="status" aria-live="polite"></span>
 </header>
 <div id="warnings" class="warnings" role="alert" hidden></div>
+<div id="update" class="update" role="status" hidden>A new version is running. <button id="update-reload" type="button" class="act" data-focus="update:reload">Reload</button></div>
 <main id="app">
   <nav id="rail" aria-label="Views">
     <ul id="views" class="views"></ul>
@@ -63,15 +65,16 @@
   <div id="detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize the detail panel" tabindex="0"></div>
   <aside id="detail" aria-label="Detail" hidden></aside>
 </main>
-<script src="/static/vendor/echarts.min.js"></script>
-<script src="/static/dash.js"></script>
-<script src="/static/plugins.js"></script>
-<script src="/static/routes.js"></script>
-<script src="/static/gtd.js"></script>
-<script src="/static/review.js"></script>
-<script src="/static/detail.js"></script>
-<script src="/static/app.js"></script>
-<script src="/static/palette.js"></script>
-<script src="/static/keys.js"></script>
+<script src="/static/vendor/echarts.min.js?v={{build}}"></script>
+<script src="/static/dash.js?v={{build}}"></script>
+<script src="/static/plugins.js?v={{build}}"></script>
+<script src="/static/routes.js?v={{build}}"></script>
+<script src="/static/gtd.js?v={{build}}"></script>
+<script src="/static/review.js?v={{build}}"></script>
+<script src="/static/detail.js?v={{build}}"></script>
+<script src="/static/update.js?v={{build}}"></script>
+<script src="/static/app.js?v={{build}}"></script>
+<script src="/static/palette.js?v={{build}}"></script>
+<script src="/static/keys.js?v={{build}}"></script>
 </body>
 </html>

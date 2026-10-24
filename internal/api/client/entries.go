@@ -63,11 +63,18 @@ func (c *Client) EntryDo(ctx context.Context, id, verb string, req api.EntryRequ
 	return res, err
 }
 
-// Counters are the counters of area, "" for every area.
-func (c *Client) Counters(ctx context.Context, area string) (api.Counters, error) {
-	path := api.CountersPath
+// Counters are the counters of area, "" for every area, of the entries holding every term.
+func (c *Client) Counters(ctx context.Context, area string, terms ...string) (api.Counters, error) {
+	q := url.Values{}
 	if area != "" {
-		path += "?" + url.Values{"area": {area}}.Encode()
+		q.Set("area", area)
+	}
+	if len(terms) > 0 {
+		q[api.CountersTerm] = terms
+	}
+	path := api.CountersPath
+	if len(q) > 0 {
+		path += "?" + q.Encode()
 	}
 	var out api.Counters
 	err := c.do(ctx, ReadTimeout, http.MethodGet, path, nil, &out)

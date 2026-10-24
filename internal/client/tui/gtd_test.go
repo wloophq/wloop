@@ -727,3 +727,46 @@ func TestOutboxRetrySendsTheRevOnScreen(t *testing.T) {
 		t.Fatalf("retried %+v %v", c, ok)
 	}
 }
+
+func TestTheFilterNarrowsTheGTDTabCounts(t *testing.T) {
+	m := gtdModel(t)
+	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"}, Key{Name: KeyEnter, Read: 1})
+	tabs := m.Render(220, 20, now)[0]
+	if strings.Contains(tabs, "Next 4") || !strings.Contains(tabs, "Next") {
+		t.Fatalf("before the filtered counts arrive the tabs keep no unfiltered count: %q", tabs)
+	}
+	m.SetFilteredCounters("", api.Counters{Views: map[string]int{"focus": 1, "inbox": 0, "next": 2}})
+	tabs = m.Render(220, 20, now)[0]
+	for _, want := range []string{"[Focus 1]", "Inbox 0", "Next 2"} {
+		if !strings.Contains(tabs, want) {
+			t.Errorf("filtered tabs lack %q: %q", want, tabs)
+		}
+	}
+	m.SetFilteredCounters("OSS", api.Counters{Views: map[string]int{"next": 9}})
+	if tabs = m.Render(220, 20, now)[0]; !strings.Contains(tabs, "Next 2") {
+		t.Errorf("counts of another area replaced the area's: %q", tabs)
+	}
+	press(m, Key{Name: KeyEsc, Read: 2})
+	if tabs = m.Render(220, 20, now)[0]; !strings.Contains(tabs, "Next 4") || !strings.Contains(tabs, "Inbox 2") {
+		t.Errorf("a cleared filter brings back the whole counts: %q", tabs)
+	}
+}
+
+func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
+	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+	term, done := start(t, d)
+	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
+	term.press(Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"})
+	eventually(t, "the filtered counts", func() bool {
+		s := term.screen()
+		return strings.Contains(s, "Next 2") && strings.Contains(s, "Inbox 0") && strings.Contains(s, "Waiting 0")
+	})
+	d.mu.Lock()
+	asks := slices.Clone(d.counterAsks)
+	d.mu.Unlock()
+	if len(asks) == 0 || !slices.Equal(asks[len(asks)-1], []string{"computer"}) {
+		t.Errorf("counter asks %v", asks)
+	}
+	term.press(Key{Name: KeyEsc})
+	quit(t, term, done)
+}

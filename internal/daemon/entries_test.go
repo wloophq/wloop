@@ -653,3 +653,36 @@ func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
 }
+
+func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
+	r := newEntriesRig(t, nil)
+	r.put(t, mixedEntries()...)
+	for _, area := range []string{"", "OSS"} {
+		for _, terms := range [][]string{{"launch"}, {"oss"}, {"OSS", "decide"}, {"nothing-holds-this"}} {
+			q := url.Values{api.CountersTerm: terms}
+			if area != "" {
+				q.Set("area", area)
+			}
+			var c api.Counters
+			if code := get(t, r.s, api.CountersPath+"?"+q.Encode(), &c); code != 200 {
+				t.Fatalf("%v: %d", terms, code)
+			}
+			for _, view := range []string{"focus", "inbox", "next", "waiting", "projects", "someday", "logbook"} {
+				v := url.Values{"view": {view}, "area": {area}}
+				n := 0
+				for _, e := range r.page(t, v.Encode()).Entries {
+					if api.EntryMatches(e, terms) {
+						n++
+					}
+				}
+				if c.Views[view] != n {
+					t.Errorf("area %q terms %v: %s counts %d, the filtered list shows %d", area, terms, view, c.Views[view], n)
+				}
+			}
+		}
+	}
+	var c api.Counters
+	if get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersTerm: {"launch"}}.Encode(), &c); c.Areas["OSS"] != 2 || c.Areas["Hiring"] != 0 {
+		t.Errorf("areas under a filter: %v", c.Areas)
+	}
+}

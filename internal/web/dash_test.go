@@ -509,7 +509,7 @@ process.stdout.write(JSON.stringify({ Pal: pal, Color: dashTheme(pal).color }));
 }
 
 func TestCockpitHasTheBacklogDashboard(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 	get := func(path string) string {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))

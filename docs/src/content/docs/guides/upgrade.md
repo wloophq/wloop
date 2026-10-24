@@ -12,6 +12,8 @@ brew upgrade {{command}}
 
 Run them in this order. `install` rewrites what each agent home needs from the new release; `app install` rebuilds the app bundle from the new binary and restarts the daemon and the menu bar on it. On a Mac without the menu bar, use `{{command}} app install --no-menu-bar`. On Linux, restart your `{{command}} serve` service.
 
+An open cockpit tab notices the restarted daemon serves another build and reloads itself. While it holds text you have not sent (a reply, a guidance, an answer, a draft being edited) or an open dialog, it shows "A new version is running." with a **Reload** button instead.
+
 `doctor` reports a daemon older than the CLI, and a client and a daemon of different API major versions refuse each other and name the one to restart. To restart the daemon by hand on macOS:
 
 ```sh

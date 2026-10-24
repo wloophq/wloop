@@ -295,7 +295,7 @@ func (m *Model) pickArea(n int) {
 
 func (m *Model) setArea(a string) {
 	m.area = a
-	m.counters = api.Counters{}
+	m.counters, m.filtered = api.Counters{}, nil
 	m.status = "area: " + cmp.Or(a, "every area")
 }
 

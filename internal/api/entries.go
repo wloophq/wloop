@@ -11,7 +11,7 @@ import (
 
 // The entries' routes: GTDPath serves the GTDCatalog, EntriesPath lists a view (query parameters view, area,
 // context as "a,b" and since, a Since's String) and takes a capture, EntryVerb runs a verb, CountersPath
-// serves the counters of the query parameter area, DigestPath the daily digest of the query parameter day
+// serves the counters of the query parameter area (narrowed to the entries holding each CountersTerm), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
 	GTDPath      = "/api/gtd"

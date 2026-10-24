@@ -123,6 +123,85 @@ func (s *Service) Counts(ctx context.Context, area string) (gtd.Counters, error)
 	return s.withSources(ctx, c, area)
 }
 
+// CountsWhere is Counts over the entries keep holds: each view, area and context counts only the entries of its
+// list that keep takes, so a client's filter narrows the counters as it narrows the lists.
+func (s *Service) CountsWhere(ctx context.Context, area string, keep func(gtd.Entry) (bool, error)) (gtd.Counters, error) {
+	open, err := s.d.Store.Entries(ctx, gtd.Query{View: gtd.ViewOpen})
+	if err != nil {
+		return gtd.Counters{}, err
+	}
+	logbook, err := s.d.Store.Entries(ctx, gtd.Query{View: gtd.ViewLogbook})
+	if err != nil {
+		return gtd.Counters{}, err
+	}
+	all := open
+	for _, e := range logbook {
+		if !slices.ContainsFunc(open, func(o gtd.Entry) bool { return o.ID == e.ID }) {
+			all = append(all, e)
+		}
+	}
+	kept := map[gtd.ID]bool{}
+	count := func(es []gtd.Entry) ([]gtd.Entry, error) {
+		var out []gtd.Entry
+		for _, e := range es {
+			k, seen := kept[e.ID]
+			if !seen {
+				if k, err = keep(e); err != nil {
+					return nil, err
+				}
+				kept[e.ID] = k
+			}
+			if k {
+				out = append(out, e)
+			}
+		}
+		return out, nil
+	}
+	c := gtd.Counters{Area: area, Views: map[gtd.View]int{gtd.ViewOutbox: 0}, Areas: map[string]int{}, Contexts: map[string]int{}}
+	for _, v := range gtd.StoredViews {
+		es, err := count(s.shown(v, gtd.Select(all, gtd.Query{View: v, Area: area})))
+		if err != nil {
+			return gtd.Counters{}, err
+		}
+		c.Views[v] = len(es)
+	}
+	next, err := count(s.shown(gtd.ViewNext, gtd.Select(all, gtd.Query{View: gtd.ViewNext})))
+	if err != nil {
+		return gtd.Counters{}, err
+	}
+	for _, e := range next {
+		if e.Area != "" {
+			c.Areas[e.Area]++
+		}
+		if area == "" || e.Area == area {
+			for _, cx := range e.Contexts {
+				c.Contexts[cx]++
+			}
+		}
+	}
+	s.reg.RLock()
+	views := make(map[gtd.View]ViewSource, len(s.views))
+	for v, vs := range s.views {
+		views[v] = vs.src
+	}
+	s.reg.RUnlock()
+	for v, src := range views {
+		if v == gtd.ViewReview {
+			continue
+		}
+		es, err := src.Entries(ctx, gtd.Query{View: v, Area: area})
+		if err != nil {
+			return gtd.Counters{}, err
+		}
+		if es, err = count(es); err != nil {
+			return gtd.Counters{}, err
+		}
+		c.Views[v] = len(es)
+	}
+	c.Badge = c.Views[gtd.ViewInbox] + c.Views[gtd.ViewOutbox]
+	return c, nil
+}
+
 // withSources is c, the stored views' counters without a disabled plugin's entries, with each ViewSource's count
 // but review's.
 func (s *Service) withSources(ctx context.Context, c gtd.Counters, area string) (gtd.Counters, error) {

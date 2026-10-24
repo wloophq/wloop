@@ -33,6 +33,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/web"
 )
 
 // newServer seeds a store with acme/api#7 (open, review requested from me,
@@ -330,6 +331,9 @@ func TestHealthListsVersionAndWarnings(t *testing.T) {
 	var h api.Health
 	if code := get(t, s, "/api/health", &h); code != 200 || h.Version != "test" || !slices.Contains(h.Warnings, "fast: rate limit low") || !h.SlowSync {
 		t.Fatalf("%d %+v", code, h)
+	}
+	if h.Build == "" || h.Build != web.Build("test") {
+		t.Errorf("health names build %q, the cockpit it serves is %q", h.Build, web.Build("test"))
 	}
 }
 

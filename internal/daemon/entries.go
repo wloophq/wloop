@@ -539,7 +539,24 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	c, err := g.Counts(r.Context(), r.URL.Query().Get("area"))
+	ctx, q := r.Context(), r.URL.Query()
+	var terms []string
+	for _, t := range q[api.CountersTerm] {
+		if t = strings.TrimSpace(t); t != "" {
+			terms = append(terms, t)
+		}
+	}
+	var c gtd.Counters
+	var err error
+	if len(terms) == 0 {
+		c, err = g.Counts(ctx, q.Get("area"))
+	} else {
+		vs := s.entryViews(ctx, g, false)
+		c, err = g.CountsWhere(ctx, q.Get("area"), func(e gtd.Entry) (bool, error) {
+			v, err := vs.view(ctx, e)
+			return err == nil && api.EntryMatches(v, terms), err
+		})
+	}
 	if err != nil {
 		writeGTDError(w, err)
 		return

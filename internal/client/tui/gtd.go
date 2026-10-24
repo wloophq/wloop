@@ -64,6 +64,27 @@ func (m *Model) SetCounters(c api.Counters) {
 	}
 }
 
+// SetFilteredCounters takes the counts of area narrowed to the entries
+// the filter keeps.
+func (m *Model) SetFilteredCounters(area string, c api.Counters) {
+	if area == m.area {
+		m.filtered = &c
+	}
+}
+
+// FilterTerms are the filter's words.
+func (m *Model) FilterTerms() []string { return strings.Fields(string(m.filter)) }
+
+// tabCounters are the counts the GTD tabs show: with a filter, those of the
+// entries it keeps, the last read while a newer one is on its way; nil
+// before the first.
+func (m *Model) tabCounters() *api.Counters {
+	if len(m.FilterTerms()) == 0 {
+		return &m.counters
+	}
+	return m.filtered
+}
+
 // gtdBase is the index of the first GTD view, after the plan.
 func (m *Model) gtdBase() int { return m.planView() + 1 }
 
@@ -195,40 +216,9 @@ func groupHead(view, key string) string {
 }
 
 // entryMatches reports whether every word of query is in one of the
-// entry's texts, as Matches does for a row.
+// entry's texts.
 func entryMatches(e api.EntryView, query string) bool {
-	if strings.TrimSpace(query) == "" {
-		return true
-	}
-	r := api.Row{Title: e.Title}
-	extra := []string{e.Notes, e.Area, e.ProjectTitle, e.State, e.Kind}
-	extra = append(extra, e.Contexts...)
-	for i := range e.Units {
-		extra = append(extra, e.UnitLabel(i))
-	}
-	if w := e.Waiting; w != nil {
-		for _, p := range w.On {
-			extra = append(extra, p.Name)
-		}
-	}
-	for _, it := range e.Items {
-		extra = append(extra, it.Summary)
-	}
-	for _, s := range e.Cards {
-		for _, p := range s.Card.WaitsOn {
-			extra = append(extra, p.Name)
-		}
-		if h := s.Card.LastHuman; h != nil {
-			extra = append(extra, h.Who.Name)
-		}
-	}
-	if d := e.Draft; d != nil {
-		extra = append(extra, d.Target, d.Where, d.Text)
-	}
-	if msg := e.Message; msg != nil {
-		extra = append(extra, msg.Text)
-	}
-	return Matches(r, query, "", extra...)
+	return api.EntryMatches(e, strings.Fields(query))
 }
 
 func (m *Model) entryCursor(entries []api.EntryView) int {
@@ -448,8 +438,12 @@ func (m *Model) entryWhere(e api.EntryView) string {
 // gtdTabs are the GTD views with their counts.
 func (m *Model) gtdTabs() []string {
 	out := make([]string, len(m.gtd))
+	views := map[string]int{}
+	if c := m.tabCounters(); c != nil {
+		views = c.Views
+	}
 	for i, v := range m.gtd {
-		if n, ok := m.counters.Views[v.ID]; ok {
+		if n, ok := views[v.ID]; ok {
 			out[i] = fmt.Sprintf("%s %d", v.Label, n)
 			continue
 		}
