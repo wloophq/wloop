@@ -86,6 +86,47 @@ type PR struct {
 	ReviewRequested bool
 	// LastReviewVerdict is the state of your newest review, comments included.
 	LastReviewVerdict string
+	// Address is why an address round runs now; nil on any other turn.
+	Address *RoundReason
+}
+
+// RoundReason is what an address round answers: the reviewers and the
+// failing checks. Handled marks what an earlier round already covered.
+type RoundReason struct {
+	Reviewers []RoundReviewer
+	Checks    []FailingCheck
+}
+
+type RoundReviewer struct {
+	Login   string
+	Handled bool
+}
+
+// FailingCheck is a check that failed on the head; Summary and URL are the
+// CI's own text.
+type FailingCheck struct {
+	Name, Summary, URL string
+	Handled            bool
+}
+
+func (r *RoundReason) ReviewerLogins() []string {
+	out := []string{}
+	if r != nil {
+		for _, v := range r.Reviewers {
+			out = append(out, v.Login)
+		}
+	}
+	return out
+}
+
+func (r *RoundReason) CheckNames() []string {
+	out := []string{}
+	if r != nil {
+		for _, c := range r.Checks {
+			out = append(out, c.Name)
+		}
+	}
+	return out
 }
 
 func (p PR) Slug() string { return fmt.Sprintf("%s/%s#%d", p.Owner, p.Repo, p.Number) }
