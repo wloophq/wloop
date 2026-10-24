@@ -64,3 +64,28 @@ func TestKindValid(t *testing.T) {
 		t.Error("unknown kind valid")
 	}
 }
+
+func TestShapeAndKindRoundTrip(t *testing.T) {
+	want := map[Kind]struct {
+		purpose  string
+		delivery Delivery
+	}{
+		Reply: {"reply", Message}, Nudge: {"nudge", Message}, Close: {"close", Message},
+		React: {"react", Reaction}, AskOwner: {"ask_owner", Message}, Comment: {"comment", CommentDelivery},
+	}
+	for _, k := range Kinds {
+		p, d := ShapeOf(k)
+		if w := want[k]; p != w.purpose || d != w.delivery {
+			t.Errorf("%s: %s %s", k, p, d)
+		}
+		if got := KindOf(p, d); got != k {
+			t.Errorf("KindOf(%s, %s) = %s, want %s", p, d, got, k)
+		}
+	}
+	if got := KindOf("close", Reaction); got != React {
+		t.Errorf("a closing reaction is a react: %s", got)
+	}
+	if got := KindOf("ping", Message); got != Reply {
+		t.Errorf("a message of any other purpose is a reply: %s", got)
+	}
+}
