@@ -29,6 +29,10 @@ var (
 // storeWaitEvery paces a daemon's checks of a store it cannot open yet.
 var storeWaitEvery = 5 * time.Second
 
+// storeReportWait bounds how long app install waits for the restarted
+// daemon to say how it found the store.
+var storeReportWait = 15 * time.Second
+
 // storeLockWait bounds how long a store command waits for the daemon to
 // let go of the store before stopping it.
 var storeLockWait = 10 * time.Second
@@ -449,3 +453,29 @@ func storeCommandError(path string, err error) error {
 }
 
 func megabytes(n int64) string { return fmt.Sprintf("%d MB", (n+999_999)/1_000_000) }
+
+// reportStore prints the store's state once the daemon answers, which on a
+// release follows any migration it ran at start.
+func (e *Env) reportStore(ctx context.Context) {
+	deadline := time.Now().Add(storeReportWait)
+	for {
+		if c, err := e.daemonClient(ctx); err == nil {
+			if h, err := c.Health(ctx); err == nil && h.Store != nil {
+				if h.Store.State == api.StoreOK {
+					fmt.Fprintf(e.Out, "Store: schema version %d.\n", h.Store.Version)
+				} else {
+					fmt.Fprintf(e.Out, "Store: %s.\n", daemonStoreWarning(*h.Store))
+				}
+				return
+			}
+		}
+		if !time.Now().Before(deadline) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}

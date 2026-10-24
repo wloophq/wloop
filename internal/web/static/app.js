@@ -2492,7 +2492,9 @@ async function load() {
     checkBuild(state.health);
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
-  if (failed.length) {
+  // A daemon that cannot open its store says why in its health's warnings.
+  const storeClosed = state.health && state.health.store && state.health.store.state !== "ok";
+  if (failed.length && !storeClosed) {
     state.error = `Could not reach the daemon: ${[...new Set(failed.map((r) => r.reason.message))].join("; ")}`;
   } else {
     state.error = "";
