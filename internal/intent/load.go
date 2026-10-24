@@ -81,12 +81,16 @@ type Loaded struct {
 	Registry  *dintent.Registry
 	Templates map[dintent.Name]*template.Template // body on a clone of base, missingkey=error
 	Programs  map[dintent.Name]Programs
-	Problems  Problems                  // user intents that did not load; the bundled layer never has problems
+	Problems  Problems                  // user intents that did not load, and overrides read as bundled
 	Broken    map[dintent.Name]Problems // user intents that failed, keyed by directory name
+	Reverted  map[dintent.Name]Problems // bundled intents read without the user's override, which does not load
 
 	Workflows       []workflow.Workflow // by order, then name; a user workflow that failed is not here
 	BrokenWorkflows map[string]Problems // user workflows that failed, keyed by directory name
+	// RevertedWorkflows are bundled workflows read without the user's override, which does not load.
+	RevertedWorkflows map[string]Problems
 
+	skipped  []dintent.Name // kinds whose blocks need what a reverted override declared
 	layers   []profile.Layer
 	loadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
 	treeOnce sync.Once
@@ -147,27 +151,63 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		l, broken := load(layers, bundled, base, check, reverted)
 		if len(broken) == 0 {
 			l.Problems = append(reverted.problems(), l.Problems...)
+			l.Reverted = map[dintent.Name]Problems{}
+			for n, r := range reverted {
+				l.Reverted[n] = r.problems
+			}
+			l.skipped = reverted.skipped(l.Registry)
 			return l, l.Problems
 		}
-		maps.Copy(reverted, broken)
+		for n, r := range broken {
+			reverted[n] = r
+		}
 	}
 }
 
 // brokenOverlays are the bundled intents read without their overlay, with
-// the problems their overlay caused.
-type brokenOverlays map[dintent.Name]Problems
+// the problems their overlay caused and what it declared, when it decoded.
+type brokenOverlays map[dintent.Name]revert
+
+type revert struct {
+	problems Problems
+	def      *dintent.Def
+}
 
 func (b brokenOverlays) problems() Problems {
 	var out Problems
 	for _, n := range slices.Sorted(maps.Keys(b)) {
-		out = append(out, b[n]...)
+		out = append(out, b[n].problems...)
 	}
 	return out
 }
 
-// brokenBy is the overlays that break: those that do not load, and, when a
-// bundled intent without an overlay breaks, the overlays it names as a
-// profile, else every overlay, each with a problem on its directory.
+// skipped is the kinds whose blocks only parse with what a reverted
+// override declared: a profile the bundled intents do not name, or dims the
+// bundled intent does not list.
+func (b brokenOverlays) skipped(r *dintent.Registry) []dintent.Name {
+	kinds := profile.Kinds(r)
+	var out []dintent.Name
+	for n, rv := range b {
+		names := []string{string(n)}
+		if d := rv.def; d != nil {
+			names = append(append(names, d.Profile), profilesOf(d.AlsoProfiles)...)
+			if bd, _ := r.Get(n); slices.ContainsFunc(d.Dims, func(dim string) bool { return !slices.Contains(bd.Dims, dim) }) {
+				out = append(out, n)
+			}
+		}
+		for _, k := range names {
+			if k != "" && !slices.Contains(kinds, profile.Kind(k)) {
+				out = append(out, dintent.Name(k))
+			}
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// brokenBy is the overlays that break: those that do not load, and those a
+// bundled intent without an overlay names as a profile when it breaks, each
+// with a problem on the user's files.
 func brokenBy(units []*unit) brokenOverlays {
 	out := brokenOverlays{}
 	overlaid := map[dintent.Name]*unit{}
@@ -177,31 +217,34 @@ func brokenBy(units []*unit) brokenOverlays {
 		}
 		overlaid[u.name] = u
 		if u.broken() {
-			out[u.name] = append(slices.Clone(u.sheet.problems), u.keyProblems...)
+			out[u.name] = revert{problems: u.files.own(append(slices.Clone(u.sheet.problems), u.keyProblems...), "intent.toml"), def: u.declared()}
 		}
 	}
 	for _, u := range units {
-		if !u.bundled || len(u.files.overlay) > 0 || !u.broken() {
+		if !u.bundled || len(u.files.overlay) > 0 || !u.broken() || !u.defined {
 			continue
 		}
-		var blamed []*unit
-		if u.defined {
-			for _, n := range append([]string{u.def.Profile}, profilesOf(u.def.AlsoProfiles)...) {
-				if o := overlaid[dintent.Name(n)]; o != nil {
-					blamed = append(blamed, o)
-				}
-			}
-		}
-		if len(blamed) == 0 {
-			blamed = slices.Collect(maps.Values(overlaid))
-		}
 		why := u.sheet.problems.Sorted()[0]
-		for _, o := range blamed {
-			out[o.name] = append(out[o.name], Problem{File: o.files.overlay[len(o.files.overlay)-1],
+		for _, n := range append([]string{u.def.Profile}, profilesOf(u.def.AlsoProfiles)...) {
+			o := overlaid[dintent.Name(n)]
+			if o == nil {
+				continue
+			}
+			r := out[o.name]
+			r.def = o.declared()
+			r.problems = append(r.problems, Problem{File: o.files.overlay[len(o.files.overlay)-1],
 				Msg: fmt.Sprintf("this override of %s breaks the bundled %s (%s), so %s loads as bundled", o.name, u.name, Problems{why}.Error(), o.name)})
+			out[o.name] = r
 		}
 	}
 	return out
+}
+
+func (u *unit) declared() *dintent.Def {
+	if !u.defined {
+		return nil
+	}
+	return &u.def
 }
 
 func profilesOf(also []dintent.AlsoProfile) []string {
@@ -300,7 +343,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems Problems
-	l.Workflows, l.BrokenWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
 	l.Problems = append(l.Problems, wfProblems...)
 	return l, broken
 }
@@ -315,9 +358,13 @@ func (l *Loaded) intentProblem(name string) string {
 	return ""
 }
 
-// BrokenNames is the names of the user intents that did not load, sorted.
+// BrokenNames is the kinds whose blocks are skipped, sorted: the user
+// intents that did not load, and the kinds whose blocks need what a reverted
+// override declared.
 func (l *Loaded) BrokenNames() []dintent.Name {
-	return slices.Sorted(maps.Keys(l.Broken))
+	out := append(slices.Collect(maps.Keys(l.Broken)), l.skipped...)
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // Rules is intent's record rules; for a broken user intent the error carries its first problem.
@@ -335,15 +382,16 @@ func (u *unit) load(base *template.Template) {
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})
 	}
+	const missing = "missing: every intent directory holds intent.toml and instructions.md.tmpl"
 	src, err := u.files.read("intent.toml")
 	if err != nil {
-		s.problems = append(s.problems, Problem{File: file, Msg: "missing: every intent directory holds intent.toml and instructions.md.tmpl"})
+		s.problems = append(s.problems, readProblem(file, err, missing))
 		return
 	}
 	tmplFile := u.files.path("instructions.md.tmpl")
 	body, err := u.files.read("instructions.md.tmpl")
 	if err != nil {
-		s.problems = append(s.problems, Problem{File: tmplFile, Msg: "missing: every intent directory holds intent.toml and instructions.md.tmpl"})
+		s.problems = append(s.problems, readProblem(tmplFile, err, missing))
 	}
 	m, problems, skip, complete := decode[manifest](file, src)
 	if !complete {
@@ -371,16 +419,24 @@ func (u *unit) load(base *template.Template) {
 }
 
 // crossCheck applies the rules that span manifests: profile references, keys and flags.
-// Bundled intents come first, so a user intent is the one that yields; a broken
-// intent is checked after every clean one and claims no key, flag or workspace.
+// Bundled intents claim first, then user intents, then overrides of bundled
+// ones: in a clash, a user intent yields to a bundled one, and an override
+// yields to both. A broken intent is checked after every clean one and claims
+// no key, flag or workspace.
 func crossCheck(units []*unit) {
+	rank := func(u *unit) int {
+		switch {
+		case len(u.files.overlay) > 0:
+			return 2
+		case u.bundled:
+			return 0
+		}
+		return 1
+	}
 	ordered := slices.Clone(units)
 	slices.SortStableFunc(ordered, func(a, b *unit) int {
-		if a.bundled != b.bundled {
-			if a.bundled {
-				return -1
-			}
-			return 1
+		if c := rank(a) - rank(b); c != 0 {
+			return c
 		}
 		return strings.Compare(string(a.name), string(b.name))
 	})

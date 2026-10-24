@@ -837,13 +837,19 @@ func roundDuration(d time.Duration) string {
 }
 
 // intentChecks load the profile's intents: a line per user intent that
-// does not load, with all its problems, else the intents the loop runs.
+// does not load and per override read as bundled, with all its problems,
+// else the intents the loop runs.
 func (e *Env) intentChecks() []check {
 	l := e.loadedIntents()
 	var out []check
+	fix := "fix the manifest; '" + e.command() + " profile check' lists every problem"
 	for _, name := range slices.Sorted(maps.Keys(l.Broken)) {
 		problems := strings.ReplaceAll(l.Broken[name].Error(), "\n", "\n            ")
-		out = append(out, check{markMissing, "intent " + string(name), "does not load:\n            " + problems, "fix the manifest; '" + e.command() + " profile check' lists every problem"})
+		out = append(out, check{markMissing, "intent " + string(name), "does not load:\n            " + problems, fix})
+	}
+	for _, name := range slices.Sorted(maps.Keys(l.Reverted)) {
+		problems := strings.ReplaceAll(l.Reverted[name].Error(), "\n", "\n            ")
+		out = append(out, check{markMissing, "intent " + string(name), "runs as bundled, the override does not load:\n            " + problems, fix})
 	}
 	if len(out) > 0 {
 		return out

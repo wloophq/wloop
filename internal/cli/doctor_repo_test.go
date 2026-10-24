@@ -48,6 +48,18 @@ func TestDoctorRepoListsBlocksAndConditions(t *testing.T) {
 	}
 }
 
+func TestDoctorRepoNamesARevertedOverride(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	agentDaemon(t, te)
+	user := t.TempDir()
+	os.MkdirAll(filepath.Join(user, "intents", "nudge"), 0o700)
+	os.WriteFile(filepath.Join(user, "intents", "nudge", "instructions.md.tmpl"), []byte("{{\n"), 0o600)
+	te.cfg.Profile = user
+	if code := te.run("profile", "show", "acme/api"); code != 0 || !strings.Contains(te.out.String(), "nudge    runs as bundled, the override does not load") {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+}
+
 func TestDoctorRepoShowsResolverErrors(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
