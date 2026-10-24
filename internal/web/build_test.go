@@ -10,7 +10,7 @@ import (
 )
 
 func TestTheBuildChangesWithTheVersionAndAnyAsset(t *testing.T) {
-	if Build("dev") != Build("dev") {
+	if first, again := Build("dev"), Build("dev"); first != again {
 		t.Fatal("the build of one binary moves")
 	}
 	if Build("v1.0.0") == Build("v1.0.1") {
