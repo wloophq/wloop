@@ -24,8 +24,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/gitx"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -133,7 +133,8 @@ func (a *dossierAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error)
 
 func TestHeadlessReadsTheDossier(t *testing.T) {
 	te, db := servedDossiers(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	d := serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	svc, ok := d.Headless.(*headless.Service)
 	if !ok {
