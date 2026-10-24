@@ -30,6 +30,7 @@ func TestWriterPragmas(t *testing.T) {
 		"cache_size":         "-8000",
 		"mmap_size":          "67108864",
 		"journal_size_limit": "8388608",
+		"foreign_keys":       "1",
 		"busy_timeout":       "5000",
 		"query_only":         "0",
 	}

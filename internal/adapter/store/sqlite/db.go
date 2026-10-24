@@ -24,7 +24,7 @@ const ReadConns = 4
 
 const pragmas = "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)" +
 	"&_pragma=temp_store(MEMORY)&_pragma=cache_size(-8000)&_pragma=mmap_size(67108864)" +
-	"&_pragma=journal_size_limit(8388608)"
+	"&_pragma=journal_size_limit(8388608)&_pragma=foreign_keys(1)"
 
 const (
 	writerDSN = "?" + pragmas + "&_txlock=immediate"
