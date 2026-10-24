@@ -99,7 +99,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 	}
 	takeOver := beforeSet(d, h.inputs, beforeTakeOver)
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Agent: h.agent, Inputs: h.inputs}
-	e.withAddressReason(ctx, cfg, &r)
+	e.withAddressReason(ctx, cfg, d, &r)
 	if d.OwnerOnly {
 		owned, err := e.ownedByHand(ctx, cfg.For(ref.Owner, ref.Repo), repos, all, ref, pr, cwd)
 		if err != nil {

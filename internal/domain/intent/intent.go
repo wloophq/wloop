@@ -18,6 +18,9 @@ type Name string
 // DimRound is the profile dimension that selects by review round.
 const DimRound = "round"
 
+// DimReviewer is the profile dimension that selects an address round by a reviewer it answers.
+const DimReviewer = "reviewer"
+
 // The intents Go binds by name; every other use of an intent goes through the registry.
 const (
 	Review  Name = "review"

@@ -481,7 +481,7 @@ Name the block of the profile a rule with these conditions goes in, and the bloc
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 
 Examples:
@@ -504,7 +504,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 | `--section <heading>` | The ## heading the rule goes under |
 | `--title <title>` | The block's heading, for a new block |

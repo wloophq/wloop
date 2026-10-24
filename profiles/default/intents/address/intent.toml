@@ -10,6 +10,7 @@ owner_only = true
 board     = "author"
 drives_row = true
 profile   = "address"
+dims      = ["reviewer"]
 records   = '!turn.needs_take_over'
 on_sent   = ["mark_addressed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
 

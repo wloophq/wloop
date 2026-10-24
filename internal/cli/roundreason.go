@@ -71,12 +71,12 @@ func containsLogin(list []string, s string) bool {
 
 func factList(f workflow.Facts, name string) []string { return inputList(f[name]) }
 
-// withAddressReason gives an address request asked for by hand what its
-// round finds, from the inventory's full read and the round state; without
-// a full read the turn goes without it.
-func (e *Env) withAddressReason(ctx context.Context, cfg config.Config, r *turn.Request) {
+// withAddressReason gives the request of an intent whose blocks select by
+// reviewer what its round finds, from the inventory's full read and the
+// round state; without a full read the turn goes without it.
+func (e *Env) withAddressReason(ctx context.Context, cfg config.Config, d dintent.Def, r *turn.Request) {
 	p, ok := r.Payload.(*turn.PR)
-	if !ok || p.Address != nil || r.Intent != turn.Intent(dintent.Address) {
+	if !ok || p.Address != nil || !slices.Contains(d.Dims, dintent.DimReviewer) {
 		return
 	}
 	ref := prOf(r.Unit)
