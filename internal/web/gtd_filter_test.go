@@ -113,9 +113,10 @@ process.stdout.write(JSON.stringify(text(byClass(gtdList({ view: "inbox", area: 
 	}
 }
 
-// TestTheCockpitAndTheDaemonMatchTheSameEntries keeps entryMatches and
-// api.EntryMatches reading the same texts, so a rail count the daemon
-// narrows agrees with the list the cockpit narrows.
+// TestTheCockpitAndTheDaemonMatchTheSameEntries keeps the cockpit's list
+// and the daemon's counts on the same entries: the daemon matches the terms
+// the cockpit sends, trimmed as handleCounters trims them, with
+// api.EntryMatches.
 func TestTheCockpitAndTheDaemonMatchTheSameEntries(t *testing.T) {
 	gh := unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}
 	es := []api.EntryView{
@@ -134,19 +135,59 @@ func TestTheCockpitAndTheDaemonMatchTheSameEntries(t *testing.T) {
 			e.Kind = "draft"
 			e.Draft = &api.Draft{Unit: "slack/T1/C1", Target: "C0REL", Where: "#releases", Text: "Ship it", Reaction: "eyes"}
 		}),
+		entry("d", "next", func(e *api.EntryView) { e.Title = "Škoda deal with Erdős" }),
+		entry("e", "next", func(e *api.EntryView) { e.Title = "회의 준비, がんばる" }),
+		entry("f", "next", func(e *api.EntryView) { e.Title, e.Notes = "Send the invoice", "e\u0301clair and CAFÉ" }),
 	}
-	queries := [][]string{{"acao"}, {"runbook", "oss"}, {"launch"}, {"@reply"}, {"acme/api#12"}, {"slack:t1/c9"}, {"deploys"}, {"bruna"},
-		{"question"}, {"octocat"}, {"dora"}, {"window"}, {"c0rel"}, {"releases"}, {"ship"}, {"eyes"}, {"slack/t1"}, {"next"}, {"capture"},
-		{"draft", "ship"}, {"nobody"}, {"entry a", "ação"}}
-	var got [][]bool
+	queries := []string{"acao", "runbook oss", "launch", "@reply", "acme/api#12", "slack:t1/c9", "deploys", "bruna", "question", "octocat",
+		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"entry a" ação`,
+		"Škoda", "skoda", "erdos", "Erdős", "회의", "が", "がんばる", `"invoice `, `" the invoice"`, `"send the"`, "eclair", "éclair", "cafe",
+		"repo:acme invoice"}
+	var got []struct {
+		Terms   []string `json:"terms"`
+		Matches []bool   `json:"matches"`
+	}
 	nodeRun(t, gtdPrelude(t), nil, `
-process.stdout.write(JSON.stringify(input.queries.map((ts) => input.entries.map((e) => entryMatches(e, ts.map(gtdFold))))));`,
-		map[string]any{"entries": es, "queries": queries}, &got)
-	for i, ts := range queries {
-		for j, e := range es {
-			if want := api.EntryMatches(e, ts); got[i][j] != want {
-				t.Errorf("terms %v on %s: cockpit %v, daemon %v", ts, e.ID, got[i][j], want)
+process.stdout.write(JSON.stringify(input.queries.map((q) => {
+  const ts = gtdTerms(q);
+  return { terms: ts, matches: input.entries.map((e) => entryMatches(e, ts)) };
+})));`, map[string]any{"entries": es, "queries": queries}, &got)
+	for i, q := range queries {
+		var sent []string
+		for _, term := range got[i].Terms {
+			if term = strings.TrimSpace(term); term != "" {
+				sent = append(sent, term)
 			}
 		}
+		for j, e := range es {
+			if want := api.EntryMatches(e, sent); got[i].Matches[j] != want {
+				t.Errorf("%q (terms %q) on %s: the list shows %v, the daemon counts %v", q, got[i].Terms, e.ID, got[i].Matches[j], want)
+			}
+		}
+	}
+}
+
+func TestAFailedFilteredReadLeavesTheRailWithoutCounts(t *testing.T) {
+	var got struct {
+		Rail   []any `json:"rail"`
+		Failed []any `json:"failed"`
+	}
+	nodeRun(t, gtdPrelude(t), nil, `
+let fail = false;
+async function getJSON() { if (fail) throw new Error("HTTP 500"); return input.counters; }
+gtdState.catalog = input.cat;
+const counts = (route) => gtdNav(gtdState.catalog, [], [], gtdCounters(route)).map((v) => v.count);
+(async () => {
+  await loadFiltered({ area: "", q: "invoice" });
+  const rail = counts({ area: "", q: "invoice" });
+  fail = true;
+  await loadFiltered({ area: "", q: "invoices" });
+  process.stdout.write(JSON.stringify({ rail, failed: counts({ area: "", q: "invoices" }) }));
+})();`, map[string]any{"cat": gtdCatalog(), "counters": api.Counters{Views: map[string]int{"next": 2}}}, &got)
+	if got.Rail[3] != 2.0 {
+		t.Errorf("rail %v", got.Rail)
+	}
+	if slices.ContainsFunc(got.Failed, func(c any) bool { return c != "" }) {
+		t.Errorf("after a failed read the rail still shows the counts of an earlier filter: %v", got.Failed)
 	}
 }

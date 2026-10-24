@@ -93,6 +93,7 @@ func TestANewBuildReloadsOrOffersTo(t *testing.T) {
 		{"guidance kept for a closed detail", "b2", `state.guidance["github:acme/api#1"] = "rebase first";`, outcome{Banner: true}},
 		{"a draft being edited", "b2", `detailState.editing.set("draft:7", "Deployed");`, outcome{Banner: true}},
 		{"an answer typed", "b2", `detailState.answer = "after ten";`, outcome{Banner: true}},
+		{"an action on its way", "b2", `state.busy.add("github:acme/api#1");`, outcome{Banner: true}},
 		{"reloaded for this build already", "b2", `stored = "b2";`, outcome{Banner: true, Stored: "b2"}},
 	}
 	for _, c := range cases {
@@ -105,7 +106,7 @@ let stored = "";
 let reloads = 0;
 const banner = { hidden: true };
 const reload = { onclick: null };
-const state = { guidance: {} };
+const state = { guidance: {}, busy: new Set() };
 const detailState = { answer: "", guidance: "", compose: { key: "", text: "", reaction: "" }, editing: new Map() };
 const document = {
   querySelector: (sel) => sel.startsWith("meta") ? { getAttribute: () => "b1" } : dialogOpen ? {} : null,

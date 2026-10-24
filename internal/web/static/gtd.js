@@ -62,6 +62,9 @@ function entriesURL(view, area, ctx, since) {
   return "/api/entries?" + p.toString();
 }
 
+// FILTER_COUNT_DELAY_MS lets a burst of keystrokes ask for the counts once.
+const FILTER_COUNT_DELAY_MS = 250;
+
 // countersURL counts area, every area when "", narrowed to the entries
 // holding each of ts.
 function countersURL(area, ts) {
@@ -81,20 +84,29 @@ function gtdCounters(route) {
   return f && f.area === (route.area || "") ? f.counters : null;
 }
 
-// loadFiltered reads the counters the filter's free words narrow; only the
-// latest read is kept.
+// filteredKey names the counts of the free words of route in its area.
+function filteredKey(route) {
+  return [route.area || "", ...gtdTerms(route.q)].join("\u0000");
+}
+
+// loadFiltered reads the counters the filter's free words narrow, once
+// the words stop changing for FILTER_COUNT_DELAY_MS; only the latest read
+// is kept, and a failed one leaves the rail without counts.
 async function loadFiltered(route) {
   const ts = gtdTerms(route.q);
+  const seq = ++gtdState.filterSeq;
   if (!ts.length) {
     gtdState.filtered = null;
     return;
   }
-  const seq = ++gtdState.filterSeq;
+  const key = filteredKey(route);
+  if (!gtdState.filtered || gtdState.filtered.key !== key) await new Promise((done) => setTimeout(done, FILTER_COUNT_DELAY_MS));
+  if (seq !== gtdState.filterSeq) return;
   try {
     const c = await getJSON(countersURL(route.area, ts));
-    if (seq === gtdState.filterSeq) gtdState.filtered = { area: route.area || "", counters: c };
+    if (seq === gtdState.filterSeq) gtdState.filtered = { key, area: route.area || "", counters: c };
   } catch {
-    // The rail keeps its last counts.
+    if (seq === gtdState.filterSeq) gtdState.filtered = null;
   }
 }
 
@@ -331,14 +343,23 @@ function entryHaystack(e) {
     d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => gtdFold(x));
 }
 
+// GTD_ACCENTS are the accents api.Fold folds; gtdFold folds as api.Fold does, so the daemon's counts
+// match what the list shows.
+const GTD_ACCENTS = {
+  á: "a", à: "a", â: "a", ã: "a", ä: "a", é: "e", è: "e", ê: "e", ë: "e", í: "i", ì: "i", î: "i", ï: "i",
+  ó: "o", ò: "o", ô: "o", õ: "o", ö: "o", ú: "u", ù: "u", û: "u", ü: "u", ç: "c", ñ: "n",
+};
+
 function gtdFold(s) {
-  return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => GTD_ACCENTS[c]).replace(/\p{Mn}/gu, "");
 }
 
-// gtdTerms are the free words of the filter query, as the pull request lists read them.
+// gtdTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
+// daemon reads them.
 function gtdTerms(q) {
-  if (typeof terms === "function") return terms(q);
-  return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).map((t) => gtdFold(t.replace(/^"|"$/g, ""))).filter(Boolean);
+  const qualifier = typeof qualifierOf === "function" ? qualifierOf : () => null;
+  return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).filter((t) => !qualifier(t))
+    .map((t) => gtdFold(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
 }
 
 // entryMatches says whether every free word of ts is in e.

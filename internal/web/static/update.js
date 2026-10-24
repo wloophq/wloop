@@ -21,10 +21,11 @@ const TEXT_INPUTS = 'textarea, input:not([type]), input[type="text"], input[type
 const HASH_INPUTS = new Set(["search", "explore-q"]);
 
 // reloadBlocked says whether a reload would lose something: an open dialog,
-// or text typed in a field or kept for a composer, a guidance or an answer
-// not shown.
+// an action whose answer is on its way, or text typed in a field or kept
+// for a composer, a guidance or an answer not shown.
 function reloadBlocked(doc) {
   if (doc.querySelector('[role="dialog"], dialog[open], .pal-back')) return true;
+  if (typeof state !== "undefined" && state.busy && state.busy.size) return true;
   const texts = [...doc.querySelectorAll(TEXT_INPUTS)].filter((el) => !HASH_INPUTS.has(el.id)).map((el) => el.value);
   if (typeof state !== "undefined") texts.push(...Object.values(state.guidance || {}));
   if (typeof detailState !== "undefined") {
