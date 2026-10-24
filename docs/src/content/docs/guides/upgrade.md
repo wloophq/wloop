@@ -42,7 +42,7 @@ A release can declare that earlier releases keep reading the store after its mig
 {{command}} store restore          # the newest one this release reads
 ```
 
-Release v0.1.0 has no `store restore` and refuses any store it did not create; to go back to it, run `{{command}} store restore` with the newer binary first, choosing a backup at the earlier release's version.
+Release v0.1.0 has no `store restore` and refuses a store at any version but 1; to go back to it, run `{{command}} store restore` with the newer binary first, choosing a backup at the earlier release's version.
 
 Run `{{command}} uninstall` first, while the newer binary is still installed: it takes the LaunchAgents, the app and the MCP registration, the hooks and the permissions of every agent home out, which an earlier release would otherwise leave calling a command it may not have; the config and the data stay. Then install the earlier release and run `install` and `app install` again.
 
