@@ -40,7 +40,7 @@ text = "Ask the author of {{.PR.Slug}} one question."
 states = ["done", "asked", "failed"]
 ```
 
-The directory name is the intent's name: a lower-case letter, then 1 to 23 lower-case letters, digits or `-`. It may not repeat a bundled intent or a CLI command.
+The directory name is the intent's name: a lower-case letter, then 1 to 23 lower-case letters, digits or `-`. It may not repeat a CLI command; a bundled intent's name overrides that intent, as [Change a bundled intent](#change-a-bundled-intent) shows.
 
 ## 2. The instructions
 
@@ -106,3 +106,18 @@ A user intent runs only when you ask. To start it on its own, write a [workflow]
 With the `#:schema ../intent.schema.json` line at the top of each manifest, editors with Taplo (the "Even Better TOML" extension in VS Code, `taplo lsp` elsewhere) complete keys, show each field's description and flag unknown keys as you type. `profile check` remains the full check.
 
 A broken intent of yours disables only itself: its command exits 1 with its problems, its action stays disabled with the reason, and every other intent keeps working. The [intent manifest](/reference/intent-manifest/) lists every field.
+
+## Change a bundled intent
+
+A directory of your profile named as a bundled intent overrides it file by file. To rewrite what an address round says and keep the rest of `address`:
+
+```sh
+{{command}} profile show acme/api --show            # the bundled instructions, rendered
+mkdir -p <profile>/intents/address
+# write <profile>/intents/address/instructions.md.tmpl
+{{command}} profile check
+```
+
+Each file you write replaces the bundled file of the same name; the files you leave out are the bundled ones. An `intent.toml` of yours replaces the bundled manifest whole, with no merge of keys, so start from a copy of the bundled one. `profile check` lists the intent as `bundled, overridden: instructions.md.tmpl`. When your files do not load, or break another bundled intent, the bundled intent stays in force and `profile check` reports the problem against your file.
+
+Judgment blocks (`intent=address.md`) remain the way to add to what a turn looks for; override the instructions when you want to change what the turn is.
