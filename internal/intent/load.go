@@ -123,7 +123,7 @@ type unit struct {
 	dir     string // as shown in problems
 	source  dintent.Source
 	bundled bool
-	read    func(file string) ([]byte, error)
+	files   files
 
 	sheet    *sheet
 	def      dintent.Def
@@ -138,26 +138,100 @@ func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 
 // Load reads intents/ of the bundled FS and of each directory layer; check may be nil.
 // Layers with an empty Dir are skipped: the bundled intents come from bundled only.
+// A user directory named as a bundled intent overrides its files one by one;
+// when the result does not load, the bundled intent stays and the problems
+// name the user's files.
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
+	reverted := brokenOverlays{}
+	for {
+		l, broken := load(layers, bundled, base, check, reverted)
+		if len(broken) == 0 {
+			l.Problems = append(reverted.problems(), l.Problems...)
+			return l, l.Problems
+		}
+		maps.Copy(reverted, broken)
+	}
+}
+
+// brokenOverlays are the bundled intents read without their overlay, with
+// the problems their overlay caused.
+type brokenOverlays map[dintent.Name]Problems
+
+func (b brokenOverlays) problems() Problems {
+	var out Problems
+	for _, n := range slices.Sorted(maps.Keys(b)) {
+		out = append(out, b[n]...)
+	}
+	return out
+}
+
+// brokenBy is the overlays that break: those that do not load, and, when a
+// bundled intent without an overlay breaks, the overlays it names as a
+// profile, else every overlay, each with a problem on its directory.
+func brokenBy(units []*unit) brokenOverlays {
+	out := brokenOverlays{}
+	overlaid := map[dintent.Name]*unit{}
+	for _, u := range units {
+		if len(u.files.overlay) == 0 {
+			continue
+		}
+		overlaid[u.name] = u
+		if u.broken() {
+			out[u.name] = append(slices.Clone(u.sheet.problems), u.keyProblems...)
+		}
+	}
+	for _, u := range units {
+		if !u.bundled || len(u.files.overlay) > 0 || !u.broken() {
+			continue
+		}
+		var blamed []*unit
+		if u.defined {
+			for _, n := range append([]string{u.def.Profile}, profilesOf(u.def.AlsoProfiles)...) {
+				if o := overlaid[dintent.Name(n)]; o != nil {
+					blamed = append(blamed, o)
+				}
+			}
+		}
+		if len(blamed) == 0 {
+			blamed = slices.Collect(maps.Values(overlaid))
+		}
+		why := u.sheet.problems.Sorted()[0]
+		for _, o := range blamed {
+			out[o.name] = append(out[o.name], Problem{File: o.files.overlay[len(o.files.overlay)-1],
+				Msg: fmt.Sprintf("this override of %s breaks the bundled %s (%s), so %s loads as bundled", o.name, u.name, Problems{why}.Error(), o.name)})
+		}
+	}
+	return out
+}
+
+func profilesOf(also []dintent.AlsoProfile) []string {
+	out := make([]string, len(also))
+	for i, a := range also {
+		out[i] = a.Profile
+	}
+	return out
+}
+
+// load is one pass of Load; the intents in plain are read without their
+// overlay. It returns the overlaid intents that broke.
+func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays) (*Loaded, brokenOverlays) {
 	var units []*unit
 	var dirProblems Problems
+	bundledUnits := map[dintent.Name]*unit{}
 	if bundled != nil {
 		entries, _ := fs.ReadDir(bundled, "intents")
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
-			dir := path.Join("intents", e.Name())
-			units = append(units, &unit{
-				name: dintent.Name(e.Name()), dir: dir, bundled: true,
+			u := &unit{
+				name: dintent.Name(e.Name()), dir: path.Join("intents", e.Name()), bundled: true,
 				source: dintent.Source{Layer: "bundled"},
-				read:   func(f string) ([]byte, error) { return fs.ReadFile(bundled, path.Join(dir, f)) },
-			})
+			}
+			u.files = files{bundled: bundled, dir: u.dir}
+			units = append(units, u)
+			bundledUnits[u.name] = u
 		}
-	}
-	bundledNames := map[dintent.Name]bool{}
-	for _, u := range units {
-		bundledNames[u.name] = true
 	}
 	seen := map[dintent.Name]string{}
 	for _, l := range layers {
@@ -171,10 +245,14 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			}
 			name := dintent.Name(e.Name())
 			dir := filepath.Join(l.Dir, "intents", e.Name())
-			switch {
-			case bundledNames[name]:
-				dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is bundled; change its judgment with intent=%s.md blocks", name, name)})
+			if b := bundledUnits[name]; b != nil {
+				if _, skip := plain[name]; !skip && len(overrides([]string{dir})) > 0 {
+					b.files.overlay = append(b.files.overlay, dir)
+					b.source = dintent.Source{Layer: l.Name, Dir: dir, Overrides: overrides(b.files.overlay)}
+				}
 				continue
+			}
+			switch {
 			case slices.Contains(builtin.ReservedNames, string(name)):
 				dirProblems = append(dirProblems, Problem{File: dir, Msg: fmt.Sprintf("%s is reserved: a command, an action or a profile word", name)})
 				continue
@@ -186,7 +264,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			units = append(units, &unit{
 				name: name, dir: dir,
 				source: dintent.Source{Layer: l.Name, Dir: dir},
-				read:   func(f string) ([]byte, error) { return os.ReadFile(filepath.Join(dir, f)) },
+				files:  files{dir: dir},
 			})
 		}
 	}
@@ -205,6 +283,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		layers:    layers,
 	}
 	var defs []dintent.Def
+	broken := brokenBy(units)
 	for _, u := range units {
 		if u.broken() {
 			u.sheet.problems = append(u.sheet.problems, u.keyProblems...)
@@ -223,7 +302,7 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	var wfProblems Problems
 	l.Workflows, l.BrokenWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
 	l.Problems = append(l.Problems, wfProblems...)
-	return l, l.Problems
+	return l, broken
 }
 
 func (l *Loaded) intentProblem(name string) string {
@@ -249,27 +328,20 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) join(f string) string {
-	if u.bundled {
-		return path.Join(u.dir, f)
-	}
-	return filepath.Join(u.dir, f)
-}
-
 func (u *unit) load(base *template.Template) {
-	file := u.join("intent.toml")
+	file := u.files.path("intent.toml")
 	s := &sheet{file: file}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})
 	}
-	src, err := u.read("intent.toml")
+	src, err := u.files.read("intent.toml")
 	if err != nil {
 		s.problems = append(s.problems, Problem{File: file, Msg: "missing: every intent directory holds intent.toml and instructions.md.tmpl"})
 		return
 	}
-	tmplFile := u.join("instructions.md.tmpl")
-	body, err := u.read("instructions.md.tmpl")
+	tmplFile := u.files.path("instructions.md.tmpl")
+	body, err := u.files.read("instructions.md.tmpl")
 	if err != nil {
 		s.problems = append(s.problems, Problem{File: tmplFile, Msg: "missing: every intent directory holds intent.toml and instructions.md.tmpl"})
 	}

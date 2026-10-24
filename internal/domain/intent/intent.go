@@ -171,6 +171,9 @@ type Resume struct{ HeadMoved string }
 
 type Source struct {
 	Layer, Dir string // Dir "" for bundled
+	// Overrides are the files, relative to Dir, that replace a bundled
+	// intent's; the bundled intent's other files are inherited.
+	Overrides []string
 }
 
 // Registry is the set of loaded intents, read-only once built.

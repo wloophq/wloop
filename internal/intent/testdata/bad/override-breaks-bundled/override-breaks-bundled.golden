@@ -1,0 +1,1 @@
+testdata/bad/override-breaks-bundled/intents/review: this override of review breaks the bundled address (intents/address/intent.toml:34:11: also_profiles[0].profile: review is not an intent with judgment blocks), so review loads as bundled

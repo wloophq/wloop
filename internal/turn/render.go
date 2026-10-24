@@ -199,7 +199,7 @@ func instructionsOf(d dintent.Def, l *intentload.Loaded, devDir string) (*templa
 	rel := path.Join("intents", string(d.Name), "instructions.md.tmpl")
 	var raw []byte
 	switch {
-	case d.Bundled:
+	case d.Bundled && !slices.Contains(d.Source.Overrides, "instructions.md.tmpl"):
 		if raw, err = os.ReadFile(filepath.Join(devDir, filepath.FromSlash(rel))); errors.Is(err, fs.ErrNotExist) {
 			raw, err = fs.ReadFile(BundledFS(), rel)
 		}
