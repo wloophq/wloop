@@ -56,7 +56,7 @@ After `brew upgrade`, run `wloop install` and, on macOS, `wloop app install` aga
 
 ```bash
 make test    # go test -race ./...
-make lint    # gofmt and go vet
+make lint    # gofmt and golangci-lint
 make build   # binary in ./bin
 ```
 
