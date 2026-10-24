@@ -195,7 +195,7 @@ func readFixture(t *testing.T, dir, name string, v any) {
 // and the removal read the fixture's paths, git and the disk the real ones.
 type fixturePaths struct{ roots []string }
 
-var fixtureRoots = []string{"/home/user/", "/private/tmp/"}
+var fixtureRoots = []string{"/Users/user/", "/private/tmp/"}
 
 func (p fixturePaths) real(s string) string {
 	for _, r := range fixtureRoots {

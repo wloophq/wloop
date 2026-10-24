@@ -184,42 +184,42 @@
    "reason": "no agent"
   },
   {
-   "unit": "workspace:/home/user/src/widgets",
+   "unit": "workspace:/Users/user/src/widgets",
    "clock": "A",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "unit": "workspace:/Users/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
    "clock": "A",
    "workflow": "workspace-temporary",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "unit": "workspace:/Users/user/worktrees/widgets/REVIEW-feat-batch-upload",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_finished_for 22h7m \u003c cleanup.workspace_grace 24h"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "unit": "workspace:/Users/user/worktrees/widgets/REVIEW-feat-dark-mode",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_finished_for 3h45m \u003c cleanup.workspace_grace 24h"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/me-cache-tuning",
+   "unit": "workspace:/Users/user/worktrees/widgets/me-cache-tuning",
    "clock": "A",
    "workflow": "workspace-idle-no-pr",
    "decision": "not matched",
    "threshold": "workspace.quiet_for 264h5m \u003c cleanup.stale_workspace 336h"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/me-runbook-command",
+   "unit": "workspace:/Users/user/worktrees/widgets/me-runbook-command",
    "clock": "A",
    "workflow": "workspace-idle-no-pr",
    "decision": "not matched",
@@ -233,84 +233,84 @@
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/src/handbook",
+   "unit": "workspace:/Users/user/src/handbook",
    "clock": "A",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "unit": "workspace:/Users/user/worktrees/handbook/REVIEW-docs-style-guide",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
   },
   {
-   "unit": "workspace:/home/user/worktrees/handbook/catalog",
+   "unit": "workspace:/Users/user/worktrees/handbook/catalog",
    "clock": "A",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /home/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
   },
   {
-   "unit": "workspace:/home/user/src/billing",
+   "unit": "workspace:/Users/user/src/billing",
    "clock": "A",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/billing/invoice-export",
+   "unit": "workspace:/Users/user/worktrees/billing/invoice-export",
    "clock": "A",
    "workflow": "workspace-author-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/src/gadgets",
+   "unit": "workspace:/Users/user/src/gadgets",
    "clock": "A",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-adr-queue-backend",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_finished_for 22h3m \u003c cleanup.workspace_grace 24h"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-docs-webhooks",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_finished_for 22h7m \u003c cleanup.workspace_grace 24h"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-feat-search-filters",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-fix-login-timeout",
    "clock": "A",
    "workflow": "workspace-duplicate",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_state \"open\""
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/scratch-notes",
+   "unit": "workspace:/Users/user/worktrees/gadgets/scratch-notes",
    "clock": "A",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
@@ -503,53 +503,53 @@
    "reason": "no agent"
   },
   {
-   "unit": "workspace:/home/user/src/widgets",
+   "unit": "workspace:/Users/user/src/widgets",
    "clock": "B",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "unit": "workspace:/Users/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
    "reason": "waits for you"
   },
   {
-   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "unit": "workspace:/Users/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
    "clock": "B",
    "workflow": "workspace-temporary",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "unit": "workspace:/Users/user/worktrees/widgets/REVIEW-feat-batch-upload",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote], workspace.dirty 1, workspace.unpushed 4: 4 commits not pushed in /home/user/worktrees/widgets/REVIEW-feat-batch-upload; back them up with: git push origin HEAD:refs/heads/me/backup-feat/batch-upload"
+   "reason": "workspace.pendency [modified files, commits on no remote], workspace.dirty 1, workspace.unpushed 4: 4 commits not pushed in /Users/user/worktrees/widgets/REVIEW-feat-batch-upload; back them up with: git push origin HEAD:refs/heads/me/backup-feat/batch-upload"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "unit": "workspace:/Users/user/worktrees/widgets/REVIEW-feat-dark-mode",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/me-cache-tuning",
+   "unit": "workspace:/Users/user/worktrees/widgets/me-cache-tuning",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
    "reason": "waits for you"
   },
   {
-   "unit": "workspace:/home/user/worktrees/widgets/me-runbook-command",
+   "unit": "workspace:/Users/user/worktrees/widgets/me-runbook-command",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [commits on no remote]: 3 commits not pushed in /home/user/worktrees/widgets/me-runbook-command; back them up with: git push origin HEAD:refs/heads/me/backup-chore/runbook-command"
+   "reason": "workspace.pendency [commits on no remote]: 3 commits not pushed in /Users/user/worktrees/widgets/me-runbook-command; back them up with: git push origin HEAD:refs/heads/me/backup-chore/runbook-command"
   },
   {
    "unit": "workspace:/private/tmp/scratch/widgets-review",
@@ -566,84 +566,84 @@
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/src/handbook",
+   "unit": "workspace:/Users/user/src/handbook",
    "clock": "B",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "unit": "workspace:/Users/user/worktrees/handbook/REVIEW-docs-style-guide",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
   },
   {
-   "unit": "workspace:/home/user/worktrees/handbook/catalog",
+   "unit": "workspace:/Users/user/worktrees/handbook/catalog",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",
-   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /home/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /Users/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
   },
   {
-   "unit": "workspace:/home/user/src/billing",
+   "unit": "workspace:/Users/user/src/billing",
    "clock": "B",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/billing/invoice-export",
+   "unit": "workspace:/Users/user/worktrees/billing/invoice-export",
    "clock": "B",
    "workflow": "workspace-author-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/src/gadgets",
+   "unit": "workspace:/Users/user/src/gadgets",
    "clock": "B",
    "workflow": "-",
    "decision": "not matched",
    "threshold": "workspace.main"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-adr-queue-backend",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-docs-webhooks",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-feat-search-filters",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-fix-login-timeout",
    "clock": "B",
    "workflow": "workspace-duplicate",
    "decision": "pending",
    "reason": "observe mode"
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "unit": "workspace:/Users/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
    "threshold": "workspace.pr_state \"open\""
   },
   {
-   "unit": "workspace:/home/user/worktrees/gadgets/scratch-notes",
+   "unit": "workspace:/Users/user/worktrees/gadgets/scratch-notes",
    "clock": "B",
    "workflow": "workspace-idle-no-pr",
    "decision": "pending",

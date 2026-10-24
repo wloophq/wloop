@@ -6,7 +6,7 @@
   "last_output": "2026-10-20T11:15:31.511000Z",
   "tab_id": "00000000-0000-4000-a000-000000000002",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-pricing"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-pricing"
  },
  {
   "agent": "claude",
@@ -24,7 +24,7 @@
   "last_output": "2026-10-20T11:15:31.511000Z",
   "tab_id": "00000000-0000-4000-a000-000000000007",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-style-guide"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-style-guide"
  },
  {
   "agent": "claude",
@@ -33,7 +33,7 @@
   "last_output": "2026-10-20T11:15:31.514000Z",
   "tab_id": "00000000-0000-4000-a000-000000000009",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/me-delivery-limits"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/me-delivery-limits"
  },
  {
   "agent": "claude",
@@ -42,7 +42,7 @@
   "last_output": "2026-10-20T11:15:31.533000Z",
   "tab_id": "00000000-0000-4000-a000-000000000011",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-data-section"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-data-section"
  },
  {
   "agent": "claude",
@@ -51,7 +51,7 @@
   "last_output": "2026-10-20T11:15:31.516000Z",
   "tab_id": "00000000-0000-4000-a000-000000000013",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-lint-fixes"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/me-lint-fixes"
  },
  {
   "agent": "claude",
@@ -60,7 +60,7 @@
   "last_output": "2026-10-20T16:33:01.763000Z",
   "tab_id": "00000000-0000-4000-a000-000000000015",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-event-ids"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/me-event-ids"
  },
  {
   "agent": "claude",
@@ -69,7 +69,7 @@
   "last_output": "2026-10-20T11:15:31.572000Z",
   "tab_id": "00000000-0000-4000-a000-000000000017",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-fix-size-cap"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/REVIEW-fix-size-cap"
  },
  {
   "agent": "claude",
@@ -78,7 +78,7 @@
   "last_output": "2026-10-20T16:28:15.050000Z",
   "tab_id": "00000000-0000-4000-a000-000000000019",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-api-intro"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-api-intro"
  },
  {
   "agent": "claude",
@@ -87,7 +87,7 @@
   "last_output": "2026-10-20T11:15:31.513000Z",
   "tab_id": "00000000-0000-4000-a000-000000000021",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-adr-queue-backend"
+  "workspace_id": "00000000-0000-4000-8000-000000000004::/Users/user/worktrees/gadgets/REVIEW-adr-queue-backend"
  },
  {
   "agent": "claude",
@@ -96,24 +96,24 @@
   "last_output": "2026-10-20T16:34:38.105000Z",
   "tab_id": "00000000-0000-4000-a000-000000000023",
   "usable": true,
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-feat-dark-mode"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/REVIEW-feat-dark-mode"
  },
  {
   "agent": "claude",
   "agent_state": "done",
   "handle": "term_00000000-0000-4000-a000-000000000024",
   "last_output": "",
-  "tab_id": "pty:00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-versioning@@6743253b",
+  "tab_id": "pty:00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-versioning@@6743253b",
   "usable": false,
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-versioning"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-versioning"
  },
  {
   "agent": "claude",
   "agent_state": "",
   "handle": "term_00000000-0000-4000-a000-000000000025",
   "last_output": "2026-10-20T16:39:18.690000Z",
-  "tab_id": "pty:00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/fix-config-select@@7365eab5",
+  "tab_id": "pty:00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/fix-config-select@@7365eab5",
   "usable": false,
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/fix-config-select"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/fix-config-select"
  }
 ]
