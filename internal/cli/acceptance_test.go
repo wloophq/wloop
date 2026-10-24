@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -214,17 +215,18 @@ func (p fixturePaths) fixture(s string) string {
 }
 
 // fixtureGit runs git on the real checkouts of the fixture's paths. It keeps
-// the answers of reading commands until a writing one runs or a test changes
-// a file (forget): every spawn costs, and the checkouts are shared.
+// the answers of reading commands until a writing one runs or the test
+// changes a file (forget): every spawn costs.
 type fixtureGit struct {
-	p    fixturePaths
-	next gitx.Runner
+	p       fixturePaths
+	next    gitx.Runner
+	answers *gitAnswers
 }
 
-var gitAnswers = struct {
+type gitAnswers struct {
 	mu   sync.Mutex
 	seen map[string]gitAnswer
-}{seen: map[string]gitAnswer{}}
+}
 
 type gitAnswer struct {
 	out []byte
@@ -233,10 +235,10 @@ type gitAnswer struct {
 
 var readingGit = []string{"rev-parse", "status", "rev-list", "symbolic-ref", "show-ref", "for-each-ref", "merge-base", "ls-remote", "log", "cat-file", "stash", "config"}
 
-func forgetGit() {
-	gitAnswers.mu.Lock()
-	clear(gitAnswers.seen)
-	gitAnswers.mu.Unlock()
+func (a *gitAnswers) forget() {
+	a.mu.Lock()
+	clear(a.seen)
+	a.mu.Unlock()
 }
 
 func (g fixtureGit) Run(ctx context.Context, dir string, env []string, args ...string) ([]byte, error) {
@@ -254,21 +256,21 @@ func (g fixtureGit) Run(ctx context.Context, dir string, env []string, args ...s
 	key := dir + "\x00" + strings.Join(args, "\x00")
 	reading := slices.Contains(readingGit, verb) && !(verb == "stash" && !slices.Contains(args, "list"))
 	if reading {
-		gitAnswers.mu.Lock()
-		a, ok := gitAnswers.seen[key]
-		gitAnswers.mu.Unlock()
+		g.answers.mu.Lock()
+		a, ok := g.answers.seen[key]
+		g.answers.mu.Unlock()
 		if ok {
 			return a.out, a.err
 		}
 	} else {
-		forgetGit()
+		g.answers.forget()
 	}
 	out, err := g.next.Run(ctx, g.p.real(dir), env, mapped...)
 	out = []byte(g.p.fixture(string(out)))
 	if reading && ctx.Err() == nil {
-		gitAnswers.mu.Lock()
-		gitAnswers.seen[key] = gitAnswer{out, err}
-		gitAnswers.mu.Unlock()
+		g.answers.mu.Lock()
+		g.answers.seen[key] = gitAnswer{out, err}
+		g.answers.mu.Unlock()
 	}
 	return out, err
 }
@@ -333,6 +335,7 @@ type fixtureEnv struct {
 	te         *testEnv
 	db         *sqlite.DB
 	paths      fixturePaths
+	answers    *gitAnswers
 	mgr        *fake.Manager
 	sessions   *turnstest.Sessions
 	snap       *fixtureSnapshot
@@ -463,8 +466,8 @@ func buildCheckouts(t *testing.T, paths fixturePaths, repos []fxRepo, wss []fxWo
 	return heads
 }
 
-// checkouts are built once per test binary: git is most of a fixture's
-// cost. Tests restore any file they change.
+// fxCheckouts are built once per test binary, git being most of a fixture's
+// cost; each test works on its own copy of them.
 var fxCheckouts struct {
 	once  sync.Once
 	ok    bool
@@ -498,7 +501,60 @@ func sharedCheckouts(t *testing.T, repos []fxRepo, wss []fxWorkspace, prs []fxPR
 	if !fxCheckouts.ok {
 		t.Fatal("the fixture's checkouts failed to build")
 	}
-	return fxCheckouts.paths, fxCheckouts.heads
+	return copyCheckouts(t, fxCheckouts.paths), fxCheckouts.heads
+}
+
+// copyCheckouts copies the checkouts under from to a test directory and
+// points the git files that name from's root, worktree links and remote
+// URLs, at the copy.
+func copyCheckouts(t *testing.T, from fixturePaths) fixturePaths {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "fx")
+	to := fixturePaths{roots: []string{root}}
+	if resolved, err := filepath.EvalSymlinks(filepath.Dir(root)); err == nil && resolved != filepath.Dir(root) {
+		to.roots = append(to.roots, filepath.Join(resolved, "fx"))
+	}
+	pairs := make([]string, 0, 2*len(from.roots))
+	for i := len(from.roots) - 1; i >= 0; i-- {
+		pairs = append(pairs, from.roots[i], to.roots[min(i, len(to.roots)-1)])
+	}
+	rewrite := strings.NewReplacer(pairs...)
+	err := filepath.WalkDir(from.roots[0], func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(from.roots[0], p)
+		dst := filepath.Join(root, rel)
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case d.IsDir():
+			return os.MkdirAll(dst, info.Mode().Perm())
+		case d.Type()&fs.ModeSymlink != 0:
+			target, err := os.Readlink(p)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(rewrite.Replace(target), dst)
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if names := slices.ContainsFunc(from.roots, func(r string) bool { return bytes.Contains(b, []byte(r)) }); names {
+			if bytes.IndexByte(b, 0) >= 0 {
+				return fmt.Errorf("%s is binary and names the fixture's root", rel)
+			}
+			b = []byte(rewrite.Replace(string(b)))
+		}
+		return os.WriteFile(dst, b, info.Mode().Perm())
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return to
 }
 
 func ownerName(remoteKey string) (string, string) {
@@ -565,7 +621,8 @@ func loadFixture(t *testing.T, dir string, now time.Time) *fixtureEnv {
 	te := newTestEnv(t, f.mgr)
 	f.te = te
 	te.Env.Now = func() time.Time { return f.now }
-	te.Env.Git = gitx.Git{R: fixtureGit{p: f.paths, next: gitx.Exec{}}}
+	f.answers = &gitAnswers{seen: map[string]gitAnswer{}}
+	te.Env.Git = gitx.Git{R: fixtureGit{p: f.paths, next: gitx.Exec{}, answers: f.answers}}
 	te.Env.Files = fixtureFiles{p: f.paths}
 	te.changes = change.NewLog(change.DefaultWindow, nil)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), te.changes)
@@ -995,6 +1052,7 @@ func sweepOnce(t *testing.T, eng *automation.Engine) {
 }
 
 func TestCleanupPlanAtTheFixtureClock(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	rows := f.rows(t, f.engine(t), "A")
 	f.checkScope(t, rows)
@@ -1031,6 +1089,7 @@ func (f *fixtureEnv) laterClock(t *testing.T, eng *automation.Engine) time.Time 
 }
 
 func TestWorkspacesHoldingWorkWaitPastEveryThreshold(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	eng := f.engine(t)
 	f.now = f.laterClock(t, eng)
@@ -1085,6 +1144,7 @@ func (f *fixtureEnv) markFetched() error {
 }
 
 func TestShippedModesHoldTheRemovals(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	eng := f.engine(t)
 	f.now = f.laterClock(t, eng)
@@ -1117,6 +1177,7 @@ func TestShippedModesHoldTheRemovals(t *testing.T) {
 }
 
 func TestHygieneDismissesTheTurnOfAMergedPRAndRefusesAnAnswerToAGoneWorkspace(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	ctx := context.Background()
 	eng := f.engine(t)
@@ -1191,6 +1252,7 @@ func TestHygieneDismissesTheTurnOfAMergedPRAndRefusesAnAnswerToAGoneWorkspace(t 
 }
 
 func TestATurnOpenWhenThePRClosedIsDismissed(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	ctx := context.Background()
 	refs := map[string]string{"acme/widgets#9001": "sent", "acme/widgets#9002": "started"}
@@ -1220,6 +1282,7 @@ func TestATurnOpenWhenThePRClosedIsDismissed(t *testing.T) {
 }
 
 func TestCredentialJSONIdenticalToMainIsRemovable(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	eng := f.engine(t)
 	f.now = f.laterClock(t, eng)
@@ -1231,11 +1294,7 @@ func TestCredentialJSONIdenticalToMainIsRemovable(t *testing.T) {
 	if err := os.WriteFile(path, []byte("another secret\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	forgetGit()
-	t.Cleanup(func() {
-		os.WriteFile(path, []byte("secret\n"), 0o644)
-		forgetGit()
-	})
+	f.answers.forget()
 	f.now = f.now.Add(time.Duration(config.Defaults().Sweep.Slow))
 	if it := itemOf(t, evaluate(t, eng), workspaceUnit(w.Path), "workspace-review-finished"); it.Decision != workflow.DecisionBlocked || !strings.Contains(it.Reason, "credential.json") {
 		t.Fatalf("a differing credential.json: %s (%s)", it.Decision, it.Reason)
@@ -1243,6 +1302,7 @@ func TestCredentialJSONIdenticalToMainIsRemovable(t *testing.T) {
 }
 
 func TestManualSessionsWaitForTheUser(t *testing.T) {
+	t.Parallel()
 	f := loadFixture(t, cleanupFixture, clockA)
 	eng := f.engine(t)
 	f.now = f.laterClock(t, eng)
@@ -1444,6 +1504,7 @@ func TestAuthorFinishedSkipsReviewWorkspacesAndOpenPRs(t *testing.T) {
 }
 
 func TestSessionGoneClosesOnlyTheSessionWhoseWorktreeIsGone(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	expired := []string{"term_00000000-0000-4000-a000-000000000050"}
 
