@@ -20,7 +20,21 @@ An open cockpit tab notices the restarted daemon serves another build and reload
 launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}
 ```
 
+## The store
+
+When a release changes the store's schema, the daemon migrates `<state>/store.db` the first time it starts on it. Before the first change it copies the store beside itself as `store.db.v<N>.bak`, `<N>` being the version it had; an existing backup is kept and the new one takes a time suffix. An earlier release refuses a migrated store, and `doctor` says so.
+
 ## Going back to an earlier release
+
+When the newer release migrated the store, stop the daemon and move the backup over the store before installing the earlier release, which cannot read the migrated one:
+
+```sh
+launchctl bootout gui/$(id -u)/io.github.{{org}}.{{name}}    # macOS; on Linux, stop your {{command}} serve service
+mv <state>/store.db.v1.bak <state>/store.db
+rm -f <state>/store.db-wal <state>/store.db-shm
+```
+
+What the daemon recorded after the migration is lost with the newer store.
 
 Run `{{command}} uninstall` first, while the newer binary is still installed: it takes the LaunchAgents, the app and the MCP registration, the hooks and the permissions of every agent home out, which an earlier release would otherwise leave calling a command it may not have; the config and the data stay. Then install the earlier release and run `install` and `app install` again.
 

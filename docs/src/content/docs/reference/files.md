@@ -19,6 +19,7 @@ description: Where the configuration, the state, the logs and the installed piec
 | Path | Holds |
 |---|---|
 | `store.db` | the SQLite store, which only the daemon opens: the inventory and the history of every pull request, your holds and mutes, the round state and the pause, the turns with their instructions, records and answers, the agent sessions, the GTD entries, the Inbox messages, the Outbox drafts, the items and the admitted Slack messages. Open it read-only while the daemon runs |
+| `store.db.v<N>.bak` | the store as it was at schema version `<N>`, copied before the daemon migrated it; see [Upgrade](/guides/upgrade/#going-back-to-an-earlier-release) |
 | `mcp.key` | the secret of the MCP endpoint (mode 0600) |
 | `daemon.sock` | the socket the CLI talks to |
 | `daemon.lock` | keeps a second daemon from starting |
