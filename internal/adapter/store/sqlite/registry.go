@@ -31,7 +31,7 @@ func scanSession(row interface{ Scan(...any) error }) (turn.Session, error) {
 
 func (s *Store) Session(ctx context.Context, id string) (turn.Session, bool, error) {
 	got, err := scanSession(s.db.R().QueryRowContext(ctx, `SELECT `+sessionColumns+sessionsFrom+` WHERE s.session_id = ?`, id))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return turn.Session{}, false, nil
 	}
 	return got, err == nil, err
@@ -142,7 +142,7 @@ func bindHandle(ctx context.Context, tx *Tx, id, manager, handle, runtime string
 			_, err = tx.ExecContext(ctx, `UPDATE session_handles SET runtime = ? WHERE session_id = ? AND to_at = '' AND runtime = ''`, runtime, id)
 		}
 		return err
-	case err != nil && err != sql.ErrNoRows:
+	case err != nil && !errors.Is(err, sql.ErrNoRows):
 		return err
 	}
 	from := formatTime(at)

@@ -400,7 +400,7 @@ func TestGitHubPublishNeverPingsThroughAnotherProvidersName(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := f.posted(issue12)
-	want := "ask Ana @​alice (ana@​corp.test) and @​acme/core"
+	want := "ask Ana @\u200balice (ana@\u200bcorp.test) and @\u200bacme/core"
 	if len(got) != 1 || got[0].Body != want {
 		t.Fatalf("posted %+v, want body %q", got, want)
 	}

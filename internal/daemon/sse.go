@@ -304,7 +304,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		case <-ping.C:
 			msg = ": ping\n\n"
 		}
-		if _, err := fmt.Fprint(w, msg); err != nil {
+		if _, err := fmt.Fprint(w, msg); err != nil { //nolint:gosec // G705: a text/event-stream of JSON events, not HTML
 			return
 		}
 		flusher.Flush()

@@ -19,6 +19,8 @@ func WriteLockHeld(t *testing.T, path string) bool {
 	if _, err := other.Exec(`BEGIN IMMEDIATE`); err != nil {
 		return true
 	}
-	other.Exec(`ROLLBACK`)
+	if _, err := other.Exec(`ROLLBACK`); err != nil {
+		t.Fatal(err)
+	}
 	return false
 }

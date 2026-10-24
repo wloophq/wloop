@@ -260,7 +260,7 @@ func NewEnv() *Env {
 		},
 		QuitNative: macos.Quit,
 		Exit:       os.Exit,
-		Reexec:     func() error { return syscall.Exec(exe, os.Args, os.Environ()) },
+		Reexec:     func() error { return syscall.Exec(exe, os.Args, os.Environ()) }, //nolint:gosec // G702: re-executes this binary with its own arguments
 		Agents:     agents,
 		Homes:      homes,
 		Usage:      defaultUsage(home),

@@ -75,7 +75,7 @@ func (l *Log) append(n note) port.Change {
 
 	l.mu.Lock()
 	l.gen++
-	l.ring[int(l.gen%port.Generation(len(l.ring)))] = n
+	l.ring[int(l.gen%port.Generation(len(l.ring)))] = n //nolint:gosec // G115: the modulo keeps it below len(l.ring)
 	c := port.Change{Gen: l.gen, Epoch: l.epoch, Topics: n.topics, Units: n.units, All: n.all}
 	subs := l.subs
 	l.mu.Unlock()
@@ -120,7 +120,7 @@ func (l *Log) Since(from port.Generation, topics port.Topic) port.Change {
 	}
 	var units []unit.Unit
 	for g := from + 1; g <= l.gen; g++ {
-		n := l.ring[int(g%size)]
+		n := l.ring[int(g%size)] //nolint:gosec // G115: the modulo keeps it below len(l.ring)
 		if n.topics&topics == 0 {
 			continue
 		}

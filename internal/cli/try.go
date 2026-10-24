@@ -181,7 +181,7 @@ func runTry(ctx context.Context, e *Env, args []string) error {
 	out, runErr := h.Headless(ctx, s, sent.Prompt)
 	raw, err := os.ReadFile(filepath.Join(wt, dturn.ScratchDir, "dry-run.json"))
 	if err != nil {
-		return fmt.Errorf("the agent wrote no review (%v); its last output:\n%s", errors.Join(runErr, err), lastLines(string(out), 30))
+		return fmt.Errorf("the agent wrote no review (%w); its last output:\n%s", errors.Join(runErr, err), lastLines(string(out), 30))
 	}
 	return printDryRun(e, raw)
 }

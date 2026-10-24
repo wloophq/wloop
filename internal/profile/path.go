@@ -2,6 +2,7 @@ package profile
 
 import (
 	"cmp"
+	"errors"
 	"net/url"
 	"slices"
 	"strings"
@@ -234,7 +235,10 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 		return bad(problem, "")
 	}
 	if err := checkOrder(p, intents); err != nil {
-		e := err.(PathError)
+		var e PathError
+		if !errors.As(err, &e) {
+			return BlockPath{}, false, err
+		}
 		e.File = rel
 		return BlockPath{}, false, e
 	}

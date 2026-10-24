@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -296,7 +297,7 @@ func (s *Store) BookOf(ctx context.Context, k turns.Key) (turn.Book, bool, error
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
 		var u unit.Unit
 		err := tx.QueryRowContext(ctx, bookOfQuery(k), bookOfArgs(k)...).Scan(&u.Provider, &u.Key)
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		if err != nil {

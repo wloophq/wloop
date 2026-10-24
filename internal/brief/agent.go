@@ -72,7 +72,9 @@ func decode(raw []byte) (Brief, []string, error) {
 		return Brief{}, nil, fmt.Errorf("%w: data after the brief", ErrInvalid)
 	}
 	var fields map[string]json.RawMessage
-	json.Unmarshal(raw, &fields)
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return Brief{}, nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
 	for _, k := range []string{"goal", "context", "kind", "size", "risk", "risk_why", "open_questions", "tags"} {
 		if _, ok := fields[k]; !ok {
 			return Brief{}, nil, fmt.Errorf("%w: no %s", ErrInvalid, k)

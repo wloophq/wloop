@@ -330,7 +330,7 @@ func (c *Client) Events(ctx context.Context, client string, since api.Since) (<-
 		cancel()
 		return nil, err
 	}
-	resp, err := c.send(req)
+	resp, err := c.send(req) //nolint:bodyclose // the reading goroutine closes it
 	if err != nil {
 		cancel()
 		return nil, err

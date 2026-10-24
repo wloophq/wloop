@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
@@ -21,7 +22,7 @@ func (w Worktrees) Worktree(ctx context.Context, path string) (wsdomain.Custody,
 	var at string
 	err := w.db.R().QueryRowContext(ctx, `SELECT path, repo, manager, workspace_id, created_by, at FROM worktrees WHERE path = ?`, path).
 		Scan(&c.Path, &c.Repo, &c.Manager, &c.WorkspaceID, &c.CreatedBy, &at)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return wsdomain.Custody{}, false, nil
 	}
 	if err != nil {

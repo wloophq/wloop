@@ -541,7 +541,7 @@ func (c *Cache) get() (loaded *Loaded, reloaded bool) {
 		reloaded = c.loaded != nil
 		c.loaded, _ = Load(layers, c.bundled, c.base, c.check)
 		c.loaded.loadTree = c.opts.LoadTree
-		c.loaded.Tree()
+		_, _ = c.loaded.Tree()
 		c.stamp = stamp
 	}
 	return c.loaded, reloaded
