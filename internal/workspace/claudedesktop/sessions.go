@@ -43,7 +43,7 @@ func agentState(status string) turn.AgentState {
 
 // listed is the registry's processes whose working directory is a listed worktree.
 func (m *Manager) listed(ctx context.Context) ([]entry, error) {
-	wss, _, err := m.Workspaces(ctx)
+	wss, err := m.worktrees()
 	if err != nil {
 		return nil, err
 	}

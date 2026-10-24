@@ -220,8 +220,8 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 		}
 	}
 
-	switch {
-	case cfg.ProjectsDir == "":
+	switch cfg.ProjectsDir {
+	case "":
 		add(markInfo, "projects_dir", "not set; 'review' needs it only to clone a repository "+display+" does not know yet", "")
 	default:
 		if fi, err := os.Stat(cfg.ProjectsDir); err != nil || !fi.IsDir() {

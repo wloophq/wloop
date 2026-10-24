@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -97,7 +98,10 @@ func Load(chain []Layer, intents *dintent.Registry, broken []dintent.Name) (Tree
 			}
 			p, ok, err := ParsePath(rel, intents)
 			if err != nil {
-				e := err.(PathError)
+				var e PathError
+				if !errors.As(err, &e) {
+					return err
+				}
 				e.File = fileName(l, rel)
 				return e
 			}

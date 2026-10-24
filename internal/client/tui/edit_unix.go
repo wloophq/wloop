@@ -16,7 +16,7 @@ import (
 
 // readable waits up to wait for f to have input; false when it has none yet.
 func readable(f *os.File, wait time.Duration) (bool, error) {
-	fds := []unix.PollFd{{Fd: int32(f.Fd()), Events: unix.POLLIN}}
+	fds := []unix.PollFd{{Fd: int32(f.Fd()), Events: unix.POLLIN}} //nolint:gosec // G115: file descriptors fit in an int32
 	n, err := unix.Poll(fds, int(wait.Milliseconds()))
 	if errors.Is(err, unix.EINTR) {
 		return false, nil
@@ -42,7 +42,7 @@ func (t *TTY) Edit(initial string) (string, error) {
 		return "", errors.Join(err, t.enter())
 	}
 	editor := cmp.Or(os.Getenv("VISUAL"), os.Getenv("EDITOR"), "vi")
-	cmd := exec.Command("/bin/sh", "-c", editor+` "$1"`, "sh", f.Name())
+	cmd := exec.Command("/bin/sh", "-c", editor+` "$1"`, "sh", f.Name()) //nolint:gosec // G702: $VISUAL and $EDITOR are shell commands by convention; the file goes as $1
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = t.in, t.out, t.out
 	ran := cmd.Run()
 	if err := t.enter(); err != nil {

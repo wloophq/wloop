@@ -23,21 +23,37 @@ func (m *Manager) root() string {
 	return r
 }
 
-func (m *Manager) List(ctx context.Context) ([]wsdomain.Workspace, error) {
-	out, _, err := m.Workspaces(ctx)
-	return out, err
+func (m *Manager) List(context.Context) ([]wsdomain.Workspace, error) {
+	return m.worktrees()
 }
 
-// Workspaces lists the git worktrees at <Root>/<repo name>/<name>, read from
-// their files so a sweep spawns no git process.
+// Workspaces lists the worktrees with a scope that is complete whether the app
+// runs or not, since they are read from disk. While the app runs, the scope
+// names its runtime, as the terminals' does.
 func (m *Manager) Workspaces(ctx context.Context) ([]wsdomain.Workspace, wsdomain.Scope, error) {
+	out, err := m.worktrees()
+	if err != nil {
+		return nil, wsdomain.Scope{}, err
+	}
+	scope := wsdomain.Scope{Hosts: []string{wsdomain.LocalHost}, Complete: true}
+	if id, err := m.runtime(ctx); err == nil {
+		scope.RuntimeID = id
+	} else if ctx.Err() != nil {
+		return nil, wsdomain.Scope{}, ctx.Err()
+	}
+	return out, scope, nil
+}
+
+// worktrees are the git worktrees at <Root>/<repo name>/<name>, read from
+// their files so a sweep spawns no git process.
+func (m *Manager) worktrees() ([]wsdomain.Workspace, error) {
 	root := m.root()
 	repos, err := os.ReadDir(root)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, m.workspaceScope(), nil
+		return nil, nil
 	}
 	if err != nil {
-		return nil, wsdomain.Scope{}, fmt.Errorf("listing %s: %w", root, err)
+		return nil, fmt.Errorf("listing %s: %w", root, err)
 	}
 	var out []wsdomain.Workspace
 	for _, r := range repos {
@@ -46,7 +62,7 @@ func (m *Manager) Workspaces(ctx context.Context) ([]wsdomain.Workspace, wsdomai
 		}
 		names, err := os.ReadDir(filepath.Join(root, r.Name()))
 		if err != nil {
-			return nil, wsdomain.Scope{}, fmt.Errorf("listing %s: %w", filepath.Join(root, r.Name()), err)
+			return nil, fmt.Errorf("listing %s: %w", filepath.Join(root, r.Name()), err)
 		}
 		for _, n := range names {
 			if ws, ok := worktreeAt(filepath.Join(root, r.Name(), n.Name())); ok && n.IsDir() {
@@ -54,11 +70,7 @@ func (m *Manager) Workspaces(ctx context.Context) ([]wsdomain.Workspace, wsdomai
 			}
 		}
 	}
-	return out, m.workspaceScope(), nil
-}
-
-func (m *Manager) workspaceScope() wsdomain.Scope {
-	return wsdomain.Scope{Hosts: []string{wsdomain.LocalHost}, Complete: true}
+	return out, nil
 }
 
 // worktreeAt is the linked worktree checked out at path; a main checkout or

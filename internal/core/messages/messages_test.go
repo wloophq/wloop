@@ -581,12 +581,12 @@ func TestReaskRetitlesTheEntry(t *testing.T) {
 func TestCleanDropsBidiOverrides(t *testing.T) {
 	r := newRig(t)
 	r.ledger.proposals = []coreitems.Proposal{{ID: 4, Unit: r7, Item: "i2", Op: items.Op{Op: items.OpResolve, Item: "i2"},
-		Reason: "done‮⁦ here", State: coreitems.ProposalOpen}}
+		Reason: "done\u202e\u2066 here", State: coreitems.ProposalOpen}}
 	if err := r.svc.ReconcileProposals(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	m := r.only(t)
-	if strings.ContainsAny(m.Text, "‮⁦") || strings.ContainsAny(r.entry(t, m.EntryID).Title, "‮⁦") {
+	if strings.ContainsAny(m.Text, "\u202e\u2066") || strings.ContainsAny(r.entry(t, m.EntryID).Title, "\u202e\u2066") {
 		t.Fatalf("text %q", m.Text)
 	}
 }

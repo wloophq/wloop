@@ -90,7 +90,7 @@ func writeTar(ctx context.Context, w io.Writer, dir string) error {
 		if d.IsDir() {
 			return nil
 		}
-		src, err := os.Open(p)
+		src, err := os.Open(p) //nolint:gosec // G122: walks the dossier directory, which only this user can write
 		if err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ func extract(ctx context.Context, tarball, into string) error {
 			if err := os.MkdirAll(filepath.Dir(target), dirMode); err != nil {
 				return err
 			}
-			if err := writeFile(target, tr, os.FileMode(h.Mode).Perm()&^0o077|0o400); err != nil {
+			if err := writeFile(target, tr, os.FileMode(h.Mode&0o777)&^0o077|0o400); err != nil {
 				return err
 			}
 		default:

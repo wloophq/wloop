@@ -238,37 +238,36 @@ func Apply(dir string, changes []Change, backup func(path string, raw []byte) (s
 		}
 	}
 	var done []Change
-	restore := func() {
+	restore := func() error {
+		var errs []error
 		for i := len(done) - 1; i >= 0; i-- {
 			c := done[i]
 			switch {
 			case c.From != "":
-				writeFile(filepath.Join(dir, filepath.FromSlash(c.From)), c.Before)
+				errs = append(errs, writeFile(filepath.Join(dir, filepath.FromSlash(c.From)), c.Before))
 				removeEmpty(dir, c.File)
 			case c.Before == nil:
 				removeEmpty(dir, c.File)
 			default:
-				writeFile(c.File, c.Before)
+				errs = append(errs, writeFile(c.File, c.Before))
 			}
 		}
+		return errors.Join(errs...)
 	}
 	for _, c := range changes {
 		if err := writeFile(c.File, c.After); err != nil {
-			restore()
-			return err
+			return errors.Join(err, restore())
 		}
 		if c.From != "" {
 			if err := os.Remove(filepath.Join(dir, filepath.FromSlash(c.From))); err != nil {
 				done = append(done, Change{File: c.File, Before: nil})
-				restore()
-				return err
+				return errors.Join(err, restore())
 			}
 		}
 		done = append(done, c)
 	}
 	if _, err := Load([]Layer{{Name: "user", Source: dir, Dir: dir}}, intents, broken); err != nil {
-		restore()
-		return fmt.Errorf("the profile would no longer load, so nothing changed: %w", err)
+		return errors.Join(fmt.Errorf("the profile would no longer load, so nothing changed: %w", err), restore())
 	}
 	return nil
 }

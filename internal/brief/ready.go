@@ -291,7 +291,7 @@ func (q *Queue) spawn(ctx context.Context, p dinv.PR, trigger string, timeout ti
 			q.trial(base, p, timeout)
 			return
 		}
-		q.brief(base, p, trigger, timeout)
+		_ = q.brief(base, p, trigger, timeout)
 	})
 }
 

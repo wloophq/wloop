@@ -310,11 +310,11 @@ func tighten(dir string) error {
 		}
 		switch {
 		case d.IsDir() && info.Mode().Perm() != dirMode:
-			return os.Chmod(p, dirMode)
+			return os.Chmod(p, dirMode) //nolint:gosec // G122: walks the dossier directory, which only this user can write
 		case info.Mode().IsRegular() && links(info) > 1:
 			return nil
 		case info.Mode().IsRegular() && info.Mode().Perm()&0o077 != 0:
-			return os.Chmod(p, info.Mode().Perm()&^0o077)
+			return os.Chmod(p, info.Mode().Perm()&^0o077) //nolint:gosec // G122: walks the dossier directory, which only this user can write
 		}
 		return nil
 	})

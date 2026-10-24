@@ -8,11 +8,17 @@ description: Build and test from source, work on the procedures, and check a rel
 ```sh
 make build        # the binary in ./bin
 make test         # go test -race ./...
-make lint         # gofmt and go vet
+make lint         # gofmt and golangci-lint
 make fuzz         # fuzz the predicate compilers for 60 s each
 make test-brand   # the tests, built with a test product name
 make scan-brand   # check that nothing the program writes names the default product name
 ```
+
+## Running your checkout
+
+`make dev-install` builds the checkout and makes that build the installed one: it links `~/.local/bin/{{command}}` to `bin/{{command}}`, then runs `install` and `app install` with it, so the agent homes, the app and the LaunchAgents run your build. After pulling or changing the code, run it again; it restarts the daemon on the new binary.
+
+Uninstall the Homebrew cask first (`brew uninstall --cask {{command}}`), or put `~/.local/bin` ahead of the Homebrew directory in your `PATH`, so the shell runs the same binary as the daemon. To go back to a release, install the cask and run `{{command}} install` and `{{command}} app install` with it.
 
 ## The documentation site
 

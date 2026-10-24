@@ -1,0 +1,78 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - errcheck
+    - errorlint
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        # Deferred after Commit, where it returns sql.ErrTxDone.
+        - (*database/sql.Tx).Rollback
+    gosec:
+      excludes:
+        # Duplicates errcheck, which has its own exclusions.
+        - G104
+        # Private state is written 0600/0700 explicitly; 0644/0755 is kept for
+        # files other programs read (LaunchAgent plist, app bundle, skills,
+        # profile, config).
+        - G301
+        - G302
+        - G306
+        # The tool runs git, gh, agent CLIs and $EDITOR on paths from the
+        # user's own configuration and repositories by design.
+        - G204
+        - G703
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        # Style suggestions: the negated form and the explicit embedded
+        # selector are kept where they read closer to the rule they encode.
+        - -QF1001
+        - -QF1008
+  exclusions:
+    presets:
+      - std-error-handling
+      - common-false-positives
+    rules:
+      # Tests ignore errors of setup helpers on purpose (a failure shows up
+      # as a failing assertion) and write fixtures with fixed modes and paths.
+      - path: _test\.go
+        linters: [errcheck, gosec]
+      # An error wraps the one sentinel that classifies it and formats the
+      # cause with %v, so errors.Is does not match through the classification.
+      - linters: [errorlint]
+        text: "non-wrapping format verb"
+        source: '%w[^"]*%[vs]'
+      # Tests assert on the exact error value or type a function returns.
+      - path: _test\.go
+        linters: [errorlint]
+      - path: _test\.go
+        linters: [staticcheck]
+        text: "^(ST|S1|QF)"
+      # Deliberate misspellings that test unknown keys and names.
+      - path: (internal/config/config_test|internal/profile/path_test)\.go
+        linters: [misspell]
+      # The panic is the behavior under test.
+      - path: internal/daemon/jobs_test\.go
+        text: "SA5000"
+      # Calls the same function twice to assert it is deterministic or cached.
+      - path: (internal/brief/brief_test|internal/daemon/rows_test)\.go
+        text: "SA4000"
+      # mcpPost closes the body before returning the response.
+      - path: internal/cli/serve_test\.go
+        linters: [bodyclose]

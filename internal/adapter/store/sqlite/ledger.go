@@ -317,7 +317,7 @@ func stringArgs(in map[string]any) (map[string]string, error) {
 
 func encodeFact(f workflow.Fact) (storedValue, error) {
 	var typ string
-	var v any = f.Value
+	v := f.Value
 	switch x := f.Value.(type) {
 	case nil:
 		return storedValue{Name: f.Name, Type: "nil"}, nil

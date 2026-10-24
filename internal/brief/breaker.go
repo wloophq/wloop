@@ -150,7 +150,7 @@ func (q *Queue) startTrial(ref github.Ref, now time.Time) bool {
 // trial runs the trial whose claim startTrial took.
 func (q *Queue) trial(ctx context.Context, p dinv.PR, timeout time.Duration) {
 	defer q.endTrial()
-	q.brief(ctx, p, TriggerTrial, timeout)
+	_ = q.brief(ctx, p, TriggerTrial, timeout)
 }
 
 func (q *Queue) endTrial() {
