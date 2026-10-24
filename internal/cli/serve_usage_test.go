@@ -135,7 +135,8 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	store := inventory.New(db)
 	running := func() int64 {
 		id, err := store.StartBriefRun(ctx, dinv.BriefRun{PR: github.Ref(usageRef), Trigger: "background", StartedAt: testNow.Add(-time.Hour)})

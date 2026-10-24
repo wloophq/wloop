@@ -19,7 +19,7 @@ func realRepo(t *testing.T) (dir, worktree, first, second string) {
 	dir, worktree = t.TempDir(), filepath.Join(t.TempDir(), "wt")
 	run := func(args ...string) string {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := exec.Command(Binary(), append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)

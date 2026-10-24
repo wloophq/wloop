@@ -605,7 +605,9 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
 		Getenv:     func(string) string { return "" },
-		Harness:    harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
+
+		ViewDebounce: 10 * time.Millisecond,
+		Harness:      harnessOf(map[string]harness.Protocol{"claude": claude.Protocol{}}, defaultManagers()),
 
 		NativeAvailable: func() bool { return false },
 		Exit:            func(code int) { t.Errorf("unexpected exit %d", code) },
@@ -823,4 +825,23 @@ func (te *testEnv) agentCommand(ctx context.Context, cfg config.Config, worktree
 		return "", err
 	}
 	return a.Command(s)
+}
+
+// serveLog logs to t until t ends: serve's loops outlive the test that
+// started them, and testing panics or races on a log after the end.
+func serveLog(t *testing.T) func(string, ...any) {
+	var mu sync.Mutex
+	ended := false
+	t.Cleanup(func() {
+		mu.Lock()
+		ended = true
+		mu.Unlock()
+	})
+	return func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if !ended {
+			t.Logf(format, args...)
+		}
+	}
 }

@@ -219,7 +219,14 @@ func (p *Provider) local(ctx context.Context, w workspace.Workspace, activity ti
 
 func (p *Provider) readLocal(ctx context.Context, dir string, disposable []string) (local, error) {
 	var l local
+	var unpushedErr error
+	unpushed := make(chan struct{})
+	go func() {
+		defer close(unpushed)
+		l.unpushed, unpushedErr = p.d.Git.Unpushed(ctx, dir)
+	}()
 	dirty, untracked, err := p.d.Git.Status(ctx, dir)
+	<-unpushed
 	if err != nil {
 		return l, err
 	}
@@ -229,8 +236,7 @@ func (p *Provider) readLocal(ctx context.Context, dir string, disposable []strin
 			l.untracked++
 		}
 	}
-	l.unpushed, err = p.d.Git.Unpushed(ctx, dir)
-	return l, err
+	return l, unpushedErr
 }
 
 func (p *Provider) facts(ctx context.Context, snap *workspace.Snapshot, ix *index, w workspace.Workspace, cfg config.Config) (workflow.Facts, []time.Time, error) {

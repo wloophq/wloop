@@ -113,9 +113,11 @@ type Env struct {
 	LoadConfig func() (config.Config, error)
 	// IntentRecheck is how long the intent registry trusts the profile's stamp; zero rechecks on every read.
 	IntentRecheck time.Duration
-	ConfigPath    string
-	StateDir      string
-	Home          string
+	// ViewDebounce is how long serve's view sinks gather wakes before they flush; zero is views.FlushDebounce.
+	ViewDebounce time.Duration
+	ConfigPath   string
+	StateDir     string
+	Home         string
 	// HomeOverride is the session home a round by hand brings; nil reads
 	// the caller's from Getenv.
 	HomeOverride *string

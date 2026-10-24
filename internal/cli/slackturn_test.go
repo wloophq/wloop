@@ -213,7 +213,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() { cancel(); <-te.served.done }()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
@@ -329,7 +329,7 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 	defer db.Close()
 	seedSlack(t, db)
 	ctx := context.Background()
-	d := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
 		if _, err := d.Startup(ctx); err != nil {
 			t.Fatal(err)

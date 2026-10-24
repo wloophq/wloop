@@ -25,6 +25,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -47,12 +48,12 @@ func servedDossiersAfter(t *testing.T, degraded bool) (*testEnv, *sqlite.DB) {
 	t.Cleanup(func() { db.Close() })
 	if degraded {
 		dctx, stop := context.WithCancel(context.Background())
-		serveDeps(dctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+		serveDeps(dctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 		stop()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 	if te.dossierTurns == nil {
 		t.Fatal("the dossiers are not wired into the turns")
 	}
@@ -132,7 +133,8 @@ func (a *dossierAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error)
 
 func TestHeadlessReadsTheDossier(t *testing.T) {
 	te, db := servedDossiers(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	d := serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	svc, ok := d.Headless.(*headless.Service)
 	if !ok {
@@ -183,7 +185,7 @@ func serveDepsAgain(t *testing.T, te *testEnv, db *sqlite.DB) *headless.Service 
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	svc, ok := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil).Headless.(*headless.Service)
+	svc, ok := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil).Headless.(*headless.Service)
 	if !ok {
 		t.Fatal("no headless service")
 	}
@@ -240,7 +242,7 @@ func assertTurnEndCommits(t *testing.T, te *testEnv) {
 }
 
 func gitLog(dir string) (string, error) {
-	cmd := exec.Command("git", "-C", dir, "log", "-1", "--format=%s")
+	cmd := exec.Command(gitx.Binary(), "-C", dir, "log", "-1", "--format=%s")
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_DIR="+filepath.Join(dir, ".git"))
 	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err
@@ -272,7 +274,7 @@ func TestDossierSpendSurvivesARestart(t *testing.T) {
 	}
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	serveDeps(cctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	serveDeps(cctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 	if err := compactOnce(); !errors.Is(err, dossiers.ErrOverCap) {
 		t.Fatalf("a restarted daemon ran a call past the day's cap: %v", err)
 	}

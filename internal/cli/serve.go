@@ -857,7 +857,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	repo := sqlite.New(db)
 	clock := clockFunc(func() time.Time { return e.Now() })
-	v := &views.Service{Books: trackedBooks{books: repo, cards: e.viewFacts()}, Intents: registryPort{e}, State: repo, Sinks: viewSinks, Clock: clock, Log: logf, Paused: e.boardPaused, Debounce: views.FlushDebounce,
+	v := &views.Service{Books: trackedBooks{books: repo, cards: e.viewFacts()}, Intents: registryPort{e}, State: repo, Sinks: viewSinks, Clock: clock, Log: logf, Paused: e.boardPaused, Debounce: cmp.Or(e.ViewDebounce, views.FlushDebounce),
 		Facts: e.viewFacts()}
 	if e.changes != nil {
 		v.Changes = e.changes

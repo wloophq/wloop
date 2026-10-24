@@ -7,8 +7,8 @@
   "mcp_at": "2026-10-18T20:52:31.924613Z",
   "pane": "00000000-0000-4000-a000-000000000002:00000000-0000-4000-a000-000000000027",
   "started_at": "2026-10-18T20:52:31.515602Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-pricing",
-  "worktree": "/home/user/worktrees/handbook/REVIEW-docs-pricing"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-pricing",
+  "worktree": "/Users/user/worktrees/handbook/REVIEW-docs-pricing"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000028",
@@ -19,7 +19,7 @@
   "pane": "00000000-0000-4000-a000-000000000004:00000000-0000-4000-a000-000000000029",
   "started_at": "2026-10-19T00:26:06.451375Z",
   "workspace_id": "folder:00000000-0000-4000-a000-000000000005",
-  "worktree": "/home/user/src"
+  "worktree": "/Users/user/src"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000030",
@@ -29,8 +29,8 @@
   "mcp_at": "2026-10-19T14:23:32.776915Z",
   "pane": "00000000-0000-4000-a000-000000000007:00000000-0000-4000-a000-000000000031",
   "started_at": "2026-10-19T14:23:32.444167Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-style-guide",
-  "worktree": "/home/user/worktrees/handbook/REVIEW-docs-style-guide"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-style-guide",
+  "worktree": "/Users/user/worktrees/handbook/REVIEW-docs-style-guide"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000032",
@@ -40,8 +40,8 @@
   "mcp_at": "2026-10-20T18:07:25.1205Z",
   "pane": "00000000-0000-4000-a000-000000000009:00000000-0000-4000-a000-000000000033",
   "started_at": "2026-10-19T12:51:21.11553Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/me-delivery-limits",
-  "worktree": "/home/user/worktrees/handbook/me-delivery-limits"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/me-delivery-limits",
+  "worktree": "/Users/user/worktrees/handbook/me-delivery-limits"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000034",
@@ -51,8 +51,8 @@
   "mcp_at": "2026-10-18T21:28:08.249775Z",
   "pane": "00000000-0000-4000-a000-000000000013:00000000-0000-4000-a000-000000000035",
   "started_at": "2026-10-18T21:28:07.982163Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-lint-fixes",
-  "worktree": "/home/user/worktrees/widgets/me-lint-fixes"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/me-lint-fixes",
+  "worktree": "/Users/user/worktrees/widgets/me-lint-fixes"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000036",
@@ -62,8 +62,8 @@
   "mcp_at": "2026-10-20T13:07:53.793332Z",
   "pane": "00000000-0000-4000-a000-000000000015:00000000-0000-4000-a000-000000000037",
   "started_at": "2026-10-20T12:02:51.850224Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-event-ids",
-  "worktree": "/home/user/worktrees/widgets/me-event-ids"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/me-event-ids",
+  "worktree": "/Users/user/worktrees/widgets/me-event-ids"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000038",
@@ -73,8 +73,8 @@
   "mcp_at": "2026-10-19T19:55:24.437293Z",
   "pane": "00000000-0000-4000-a000-000000000017:00000000-0000-4000-a000-000000000039",
   "started_at": "2026-10-19T19:55:24.195084Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-fix-size-cap",
-  "worktree": "/home/user/worktrees/widgets/REVIEW-fix-size-cap"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/REVIEW-fix-size-cap",
+  "worktree": "/Users/user/worktrees/widgets/REVIEW-fix-size-cap"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000040",
@@ -84,8 +84,8 @@
   "mcp_at": "2026-10-20T16:23:56.208618Z",
   "pane": "00000000-0000-4000-a000-000000000019:00000000-0000-4000-a000-000000000041",
   "started_at": "2026-10-20T16:23:55.693405Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-api-intro",
-  "worktree": "/home/user/worktrees/handbook/REVIEW-docs-api-intro"
+  "workspace_id": "00000000-0000-4000-8000-000000000002::/Users/user/worktrees/handbook/REVIEW-docs-api-intro",
+  "worktree": "/Users/user/worktrees/handbook/REVIEW-docs-api-intro"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000042",
@@ -95,8 +95,8 @@
   "mcp_at": "2026-10-19T13:21:42.369421Z",
   "pane": "00000000-0000-4000-a000-000000000021:00000000-0000-4000-a000-000000000043",
   "started_at": "2026-10-19T13:21:42.151268Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
-  "worktree": "/home/user/worktrees/gadgets/REVIEW-adr-queue-backend"
+  "workspace_id": "00000000-0000-4000-8000-000000000004::/Users/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+  "worktree": "/Users/user/worktrees/gadgets/REVIEW-adr-queue-backend"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000044",
@@ -106,8 +106,8 @@
   "mcp_at": "2026-10-20T02:04:28.576048Z",
   "pane": "00000000-0000-4000-a000-000000000023:00000000-0000-4000-a000-000000000045",
   "started_at": "2026-10-20T02:04:28.191087Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
-  "worktree": "/home/user/worktrees/widgets/REVIEW-feat-dark-mode"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/REVIEW-feat-dark-mode",
+  "worktree": "/Users/user/worktrees/widgets/REVIEW-feat-dark-mode"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000046",
@@ -117,8 +117,8 @@
   "mcp_at": "2026-10-19T20:39:11.863972Z",
   "pane": "00000000-0000-4000-a000-000000000047:00000000-0000-4000-a000-000000000048",
   "started_at": "2026-10-19T20:39:09.292591Z",
-  "workspace_id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/fix-config-select",
-  "worktree": "/home/user/worktrees/widgets/fix-config-select"
+  "workspace_id": "00000000-0000-4000-8000-000000000001::/Users/user/worktrees/widgets/fix-config-select",
+  "worktree": "/Users/user/worktrees/widgets/fix-config-select"
  },
  {
   "agent_session": "00000000-0000-4000-a000-000000000049",
@@ -128,8 +128,8 @@
   "mcp_at": "2026-10-20T06:51:53.775609Z",
   "pane": "00000000-0000-4000-a000-000000000051:00000000-0000-4000-a000-000000000052",
   "started_at": "2026-10-20T06:51:53.487882Z",
-  "workspace_id": "00000000-0000-4000-a000-000000000053::/home/user/worktrees/probe/probe-gone",
-  "worktree": "/home/user/worktrees/probe/probe-gone",
+  "workspace_id": "00000000-0000-4000-a000-000000000053::/Users/user/worktrees/probe/probe-gone",
+  "worktree": "/Users/user/worktrees/probe/probe-gone",
   "worktree_gone": true
  }
 ]

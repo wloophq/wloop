@@ -100,7 +100,7 @@ func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
 		saved := plugins
 		plugins = ps
 		defer func() { plugins = saved }()
-		d := serveDeps(context.Background(), te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+		d := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 		d.Startup = nil
 		return daemon.New(d)
 	}

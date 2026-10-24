@@ -14,6 +14,7 @@ import (
 	"time"
 
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -142,7 +143,7 @@ func newRepo(t *testing.T, dir string) string {
 	t.Helper()
 	run := func(args ...string) {
 		t.Helper()
-		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+		if out, err := exec.Command(gitx.Binary(), append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
 			t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
 		}
 	}
