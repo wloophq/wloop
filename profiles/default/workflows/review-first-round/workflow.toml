@@ -1,0 +1,17 @@
+description = "Start the first review round of a pull request that requests my review"
+subject = "github"
+when = 'pr.first.due'
+order = 20
+key = ["pr.fingerprint"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "review"
+round = "first"
+
+[approval]
+default = "run"
+window = "60s"

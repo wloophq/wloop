@@ -1,0 +1,330 @@
+{
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "brief",
+  "viewer_role",
+  "started_by_viewer",
+  "items",
+  "verdict",
+  "verdict_why",
+  "closure_posted",
+  "segments",
+  "links"
+ ],
+ "properties": {
+  "brief": {
+   "type": "string",
+   "maxLength": 600
+  },
+  "viewer_role": {
+   "type": "string",
+   "enum": [
+    "requester",
+    "assignee",
+    "both",
+    "cc",
+    "none"
+   ]
+  },
+  "started_by_viewer": {
+   "type": "boolean"
+  },
+  "items": {
+   "type": "array",
+   "maxItems": 15,
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "ref",
+     "kind",
+     "summary",
+     "origin_ts",
+     "requester",
+     "assignees",
+     "assignment_ts",
+     "assignment_basis",
+     "waiting_on",
+     "state",
+     "resolution",
+     "evidence_ts",
+     "evidence_kind",
+     "confidence",
+     "ambiguity",
+     "links",
+     "context",
+     "options",
+     "deadline",
+     "mode",
+     "place"
+    ],
+    "properties": {
+     "ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "request",
+       "question",
+       "decision",
+       "todo"
+      ]
+     },
+     "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+     },
+     "origin_ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     },
+     "requester": {
+      "type": "string"
+     },
+     "assignees": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "assignment_ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     },
+     "assignment_basis": {
+      "type": "string",
+      "enum": [
+       "explicit_mention",
+       "dm_addressee",
+       "reply_context",
+       "self_assigned",
+       "reassigned",
+       "group_ask",
+       "none"
+      ]
+     },
+     "waiting_on": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "open",
+       "resolved"
+      ]
+     },
+     "resolution": {
+      "type": "string",
+      "enum": [
+       "none",
+       "done",
+       "answered",
+       "fixed",
+       "delegated",
+       "declined",
+       "dismissed",
+       "superseded",
+       "moot"
+      ]
+     },
+     "evidence_ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     },
+     "evidence_kind": {
+      "type": "string",
+      "enum": [
+       "none",
+       "message",
+       "reaction",
+       "external_claim"
+      ]
+     },
+     "confidence": {
+      "type": "string",
+      "enum": [
+       "high",
+       "low"
+      ]
+     },
+     "ambiguity": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "links": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "url",
+        "label"
+       ],
+       "properties": {
+        "url": {
+         "type": "string"
+        },
+        "label": {
+         "type": "string",
+         "maxLength": 80
+        }
+       }
+      }
+     },
+     "context": {
+      "type": "string",
+      "maxLength": 700
+     },
+     "options": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "option",
+        "backed_by"
+       ],
+       "properties": {
+        "option": {
+         "type": "string",
+         "maxLength": 200
+        },
+        "backed_by": {
+         "type": "array",
+         "items": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     },
+     "deadline": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "mode": {
+      "type": "string",
+      "enum": [
+       "none",
+       "headless",
+       "session"
+      ]
+     },
+     "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "context",
+       "why"
+      ],
+      "properties": {
+       "context": {
+        "type": "string",
+        "maxLength": 80
+       },
+       "why": {
+        "type": "string",
+        "maxLength": 200
+       }
+      }
+     }
+    }
+   }
+  },
+  "verdict": {
+   "type": "string",
+   "enum": [
+    "waits_on_viewer",
+    "waits_on_others",
+    "needs_closure",
+    "resolved",
+    "fyi"
+   ]
+  },
+  "verdict_why": {
+   "type": "string",
+   "maxLength": 300
+  },
+  "closure_posted": {
+   "type": "boolean"
+  },
+  "segments": {
+   "type": "array",
+   "maxItems": 20,
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "ref",
+     "from_ts",
+     "to_ts",
+     "topic"
+    ],
+    "properties": {
+     "ref": {
+      "type": "string",
+      "pattern": "^(s[0-9]+|new)$"
+     },
+     "from_ts": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     },
+     "to_ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     },
+     "topic": {
+      "type": "string",
+      "maxLength": 200
+     }
+    }
+   }
+  },
+  "links": {
+   "type": "array",
+   "maxItems": 30,
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "item",
+     "target",
+     "kind",
+     "evidence_ts"
+    ],
+    "properties": {
+     "item": {
+      "type": "string"
+     },
+     "target": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "mention",
+       "review",
+       "merge"
+      ]
+     },
+     "evidence_ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$"
+     }
+    }
+   }
+  }
+ }
+}

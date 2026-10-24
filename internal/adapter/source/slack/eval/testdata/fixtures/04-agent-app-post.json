@@ -1,0 +1,35 @@
+{
+ "id": "04-agent-app-post",
+ "kind": "thread",
+ "channel_id": "C0000000003",
+ "channel_name": "ops-requests",
+ "channel_type": "private",
+ "permalink": "https://example.com/archives/C0000000003/p1792759200000100",
+ "focus_ts": "",
+ "messages": [
+  {
+   "ts": "1792759200.000100",
+   "thread_ts": "1792759200.000100",
+   "user_id": "U0000000004",
+   "user_name": "Carol",
+   "is_bot": true,
+   "app_name": "Helper",
+   "text": "Posted through the assistant: <@U0000000001> the staging certificate expires on 2026-10-30, who renews it?",
+   "reactions": [],
+   "reply_count": 1,
+   "edited": false
+  },
+  {
+   "ts": "1792759800.000200",
+   "thread_ts": "1792759200.000100",
+   "user_id": "U0000000002",
+   "user_name": "Ann",
+   "is_bot": false,
+   "app_name": "",
+   "text": "I can renew it if Vera approves the cost.",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  }
+ ]
+}

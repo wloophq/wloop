@@ -1,0 +1,19 @@
+description = "Offer to remove a workspace with no pull request, no session and no activity for cleanup.stale_workspace"
+subject = "workspace"
+when = '!workspace.main && workspace.pr == "" && workspace.sessions == 0 && workspace.quiet_for > config.cleanup.stale_workspace && workspace.path_exists'
+mode = "apply"
+order = 25
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "workspace.remove"
+
+[limits]
+per_run = 5
+per_day = 30
+
+[approval]
+default = "wait"
+wait_when = 'size(workspace.pendency) > 0'

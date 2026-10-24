@@ -1,0 +1,23 @@
+{
+ "id": "03-mention-access-request",
+ "kind": "mention",
+ "channel_id": "C0000000002",
+ "channel_name": "platform-help",
+ "channel_type": "channel",
+ "permalink": "https://example.com/archives/C0000000002/p1792672800000100",
+ "focus_ts": "",
+ "messages": [
+  {
+   "ts": "1792672800.000100",
+   "thread_ts": "1792672800.000100",
+   "user_id": "U0000000003",
+   "user_name": "Bob",
+   "is_bot": false,
+   "app_name": "",
+   "text": "<@U0000000001> could you grant me write access to the docs repository? I need it for the onboarding guide.",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  }
+ ]
+}

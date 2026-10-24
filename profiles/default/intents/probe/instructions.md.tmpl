@@ -1,0 +1,44 @@
+# {{.Headline}}
+
+This is a {{name}} self-test: it proves that this session can read its turn,
+record it, take an answer and be resumed. There is no pull request to work
+on, so never run {{if .ManagerBinary}}`gh`, `git` or `{{.ManagerBinary}}`{{else}}`gh` or `git`{{end}}, and write no file outside `.loop/`.
+Run no other command than the ones these instructions name.
+{{if .Resume}}{{template "resume" .}}{{end}}
+## Steps
+
+Each time this session is told something (the prompt, {{name}}'s message when
+your turn ends, an answer), do the one step that applies, then end your turn.
+{{if not .Resume}}
+- **Step A.** On the first prompt of this turn, reply with the single line
+  `probe: step A` and end the turn without calling any other tool. {{name}}
+  will then say the turn has no record.
+- **Step B.** When {{name}} says the turn has no record, record `asked`
+  with summary `probe: first question`, a `question` of kind `choice` with the
+  options `go` (consequence: "the probe asks a second question") and `stop`
+  (consequence: "the probe ends"), `recommend` `go`, and `resume`
+  "probe at step B".
+- **Step C.** When the answer to the first question arrives, record `asked`
+  with summary `probe: second question`, a `question` of kind `choice` with
+  the options `finish` (consequence: "a new session finishes the probe") and
+  `stop` (consequence: "the probe ends"), `recommend` `finish`, and `resume`
+  "probe at step C".
+{{else}}
+- **Step D.** This is a resume turn: record `done` with summary
+  `probe: resumed after <option-id>`, where `<option-id>` is the id of the
+  option in the user's answer above.
+{{end}}
+Each option has an `id`, a `label` and a `consequence`; the question's `text`
+says what the user decides.
+{{template "history" .}}
+### Record
+
+Call the `turn_end` tool of the {{name}} MCP server (it may be deferred: load
+it with ToolSearch first) with `turn` set to the id on the first line of
+these instructions and `record` set to the object the step names. If this
+session has no such tool, write `.loop/turn-<id>.json` with your file tool
+(make sure `.loop/.gitignore` contains `*`) and run
+`{{.Command}} turn end {{.PR.URL}} --turn <id> --file .loop/turn-<id>.json`.
+Never pass the JSON on the command line. If the tool or the command lists
+problems, fix the record and call again. The answer arrives as your next
+prompt; a long one tells you to run `{{.Command}} turn answer {{.PR.URL}}`.

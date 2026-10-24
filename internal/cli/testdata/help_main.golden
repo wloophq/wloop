@@ -1,0 +1,70 @@
+{{name}} dev
+A work loop for the reviews and pull requests that reach you.
+
+USAGE
+  {{command}} <command> [arguments]
+
+GET STARTED
+  init                   Set up from zero: config, agent homes, the app
+  doctor                 Diagnose the setup without changing anything
+
+PULL REQUESTS
+  review                 Review someone else's pull request in its own worktree
+  address                Triage the reviews and failing checks of yours
+  take-over              Make a pull request someone else opened yours
+  nudge                  Ask whoever it waits on for the next step
+  act                    Resolve a unit's open items, replies as drafts
+  remove                 Delete the workspace of a merged or closed one
+
+WHAT WAITS ON YOU
+  status                 Pull requests by view, those needing you first
+  tui                    The same views in the terminal, one-key actions
+  open                   The cockpit, a workspace or a pull request
+  outbox                 Drafts waiting for your approval, and yours
+  explore                Open pull requests of others to help on
+
+AUTOMATION
+  plan                   What the workflows would do now, and why
+  pause/resume           Stop or restart automatic rounds
+  track/untrack          Follow a pull request out of scope, or stop
+  mute/unmute            Leave or rejoin the pending views
+  workflows              The facts and steps a workflow can use
+
+PROFILE
+  profile show           The blocks that apply to a repository
+  profile where          The block a new rule goes in
+  profile add            Add a rule to the profile
+  profile check          Load the profile and list its problems
+  profile try            A review round that publishes nothing
+  profile schema         The JSON Schema of the manifests
+
+SLACK
+  slack login/logout     Connect to Slack, or disconnect
+  slack status           Who you are logged in to Slack as
+  slack send             Post as you to a thread, channel or person
+  slack follow/unfollow  Admit every message of a thread, or stop
+
+SETUP
+  install                Write the hooks, MCP and skills into agent homes
+  app install            macOS: the app, menu bar and the daemon at login
+  trust                  Trust a repository in an agent home
+  uninstall              Take out what install and app install set up
+  config get             Print a configuration value
+  version                Print the version
+
+TROUBLESHOOTING
+  timings                Review, merge and turn durations, waits, tokens
+  intake                 Follow, start or cancel an intake
+  brief refresh          Make a pull request's brief again
+  turn show              A pull request's turns and their records
+  probe                  Prove an agent home end to end
+
+FOR AGENTS AND SCRIPTS
+  instructions           Run a turn by hand from an agent session
+  turn end/answer        Record how a turn ended; read your answer
+  hook                   The agent hooks install writes
+  serve                  Run the daemon
+  app                    macOS: the menu bar and notifications
+
+Run '{{command}} <command> --help' for its flags and examples.
+Docs: https://{{name}}hq.github.io/{{name}}/

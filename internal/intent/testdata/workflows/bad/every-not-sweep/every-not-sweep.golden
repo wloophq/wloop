@@ -1,0 +1,1 @@
+testdata/workflows/bad/every-not-sweep/workflows/case-workflow/workflow.toml:6:9: trigger.every: "hourly" is not "sweep"; use on or schedule for other triggers

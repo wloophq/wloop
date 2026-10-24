@@ -1,0 +1,49 @@
+label   = "Review"
+summary = "Start or continue a review round on someone else's pull request, in a dedicated workspace"
+verb    = "delegate"
+key     = "V"
+workspace = "review"
+session   = { strategy = "reuse_live", title = "review" }
+intake    = true
+start_line = "starting the review"
+board     = "review"
+drives_row = true
+reconcile = "my_review"
+profile   = "review"
+dims      = ["round"]
+records   = '!turn.plain'
+on_sent   = ["mark_reviewed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
+
+[guidance]
+help = "what the round should look at"
+
+[headline]
+resumed = "review of {{.PR.Slug}}"
+[[headline.new]]
+when = 'turn.plain'
+text = "Dry-run review of {{.PR.Slug}}: trying a profile, nothing is published."
+[[headline.new]]
+when = 'turn.round == "follow-up"'
+text = "Follow-up review of {{.PR.Slug}}, {{.Who}}."
+[[headline.new]]
+text = "First review of {{.PR.Slug}}, {{.Who}}."
+
+[action]
+primary = "!row.question && !pr.mine && !row.adopted"
+note_when_question = "Starts a new round; the agent's open question is replaced"
+
+[record]
+states    = ["done", "settled", "asked", "failed"]
+artifacts = ["review-draft"]
+outcome   = ["verdict", "url"]
+outcome_doc = '''
+`outcome`: on `done`, the published `verdict`, the review's `url`,
+  `blocking` and `non_blocking`; on `asked` with a held draft, the `verdict`
+  the draft would publish and its counts.'''
+require = [
+  { state = "done", fields = ["verdict", "url"] },
+  { state = "asked", artifact = "review-draft", fields = ["verdict"] },
+]
+
+[resume]
+head_moved = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."

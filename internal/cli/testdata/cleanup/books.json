@@ -1,0 +1,332 @@
+[
+ {
+  "answers": [
+   {
+    "at": "2026-10-20T16:25:20.893855Z",
+    "route": "direct",
+    "turn_seq": 88
+   }
+  ],
+  "records": [
+   {
+    "at": "2026-10-20T16:25:20.893855Z",
+    "handle": "term_00000000-0000-4000-a000-000000000018",
+    "state": "settled",
+    "turn_seq": 88
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000040",
+    "EndedAt": "2026-10-20T16:25:20.893855Z",
+    "Intent": "review",
+    "Round": "round-1",
+    "SentAt": "2026-10-20T16:23:58.915302Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000018",
+    "Seq": 88,
+    "Session": "term_00000000-0000-4000-a000-000000000018",
+    "StartedAt": "2026-10-20T16:24:07.198185Z",
+    "State": "settled",
+    "Trigger": "by-hand"
+   }
+  ],
+  "unit": "acme/handbook#131"
+ },
+ {
+  "answers": [
+   {
+    "at": "2026-10-19T14:31:56.20294Z",
+    "route": "typed",
+    "turn_seq": 26
+   },
+   {
+    "at": "2026-10-19T14:32:15.935322Z",
+    "route": "direct",
+    "turn_seq": 26
+   },
+   {
+    "at": "2026-10-19T15:01:00.685757Z",
+    "route": "refused",
+    "turn_seq": 27
+   },
+   {
+    "at": "2026-10-19T15:04:02.43082Z",
+    "route": "direct",
+    "turn_seq": 27
+   }
+  ],
+  "records": [
+   {
+    "at": "2026-10-19T14:24:58.157207Z",
+    "handle": "term_00000000-0000-4000-a000-000000000006",
+    "state": "unrecorded",
+    "turn_seq": 26
+   },
+   {
+    "at": "2026-10-19T14:29:38.716506Z",
+    "handle": "term_00000000-0000-4000-a000-000000000006",
+    "state": "asked",
+    "turn_seq": 26
+   },
+   {
+    "at": "2026-10-19T14:32:15.935322Z",
+    "handle": "term_00000000-0000-4000-a000-000000000006",
+    "state": "done",
+    "turn_seq": 26
+   },
+   {
+    "at": "2026-10-19T14:58:18.839795Z",
+    "handle": "term_00000000-0000-4000-a000-000000000006",
+    "state": "asked",
+    "turn_seq": 27
+   },
+   {
+    "at": "2026-10-19T15:04:02.43082Z",
+    "handle": "term_00000000-0000-4000-a000-000000000006",
+    "state": "done",
+    "turn_seq": 27
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000030",
+    "EndedAt": "2026-10-19T14:32:15.935322Z",
+    "Intent": "review",
+    "Round": "round-2",
+    "SentAt": "2026-10-19T14:23:33.399129Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000006",
+    "Seq": 26,
+    "Session": "term_00000000-0000-4000-a000-000000000006",
+    "StartedAt": "2026-10-19T14:23:44.145306Z",
+    "State": "done",
+    "Trigger": "by-hand"
+   },
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000030",
+    "EndedAt": "2026-10-19T15:04:02.43082Z",
+    "Intent": "review",
+    "Round": "round-3",
+    "SentAt": "2026-10-19T14:55:28.318192Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000006",
+    "Seq": 27,
+    "Session": "term_00000000-0000-4000-a000-000000000006",
+    "StartedAt": "2026-10-19T14:55:34.084084Z",
+    "State": "done",
+    "Trigger": "automated"
+   }
+  ],
+  "unit": "acme/handbook#407"
+ },
+ {
+  "answers": [],
+  "records": [
+   {
+    "at": "2026-10-19T12:55:10.239288Z",
+    "handle": "term_00000000-0000-4000-a000-000000000008",
+    "state": "asked",
+    "turn_seq": 23
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000032",
+    "EndedAt": "0001-01-01T00:00:00Z",
+    "Intent": "address",
+    "Round": "round-4",
+    "SentAt": "2026-10-19T12:51:21.877037Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000008",
+    "Seq": 23,
+    "Session": "term_00000000-0000-4000-a000-000000000008",
+    "StartedAt": "2026-10-19T12:51:29.236537Z",
+    "State": "asked",
+    "Trigger": "automated"
+   }
+  ],
+  "unit": "acme/handbook#524"
+ },
+ {
+  "answers": [],
+  "records": [
+   {
+    "at": "2026-10-19T13:22:27.847401Z",
+    "handle": "term_00000000-0000-4000-a000-000000000020",
+    "state": "asked",
+    "turn_seq": 24
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000042",
+    "EndedAt": "0001-01-01T00:00:00Z",
+    "Intent": "review",
+    "Round": "round-5",
+    "SentAt": "2026-10-19T13:21:42.821541Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000020",
+    "Seq": 24,
+    "Session": "term_00000000-0000-4000-a000-000000000020",
+    "StartedAt": "2026-10-19T13:21:50.279057Z",
+    "State": "asked",
+    "Trigger": "automated"
+   }
+  ],
+  "unit": "acme/gadgets#123"
+ },
+ {
+  "answers": [
+   {
+    "at": "2026-10-20T13:07:53.844501Z",
+    "route": "direct",
+    "turn_seq": 77
+   }
+  ],
+  "records": [
+   {
+    "at": "2026-10-20T12:04:23.03189Z",
+    "handle": "term_00000000-0000-4000-a000-000000000014",
+    "state": "asked",
+    "turn_seq": 77
+   },
+   {
+    "at": "2026-10-20T13:07:53.844501Z",
+    "handle": "term_00000000-0000-4000-a000-000000000014",
+    "state": "done",
+    "turn_seq": 77
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000036",
+    "EndedAt": "2026-10-20T12:58:47.63525Z",
+    "Intent": "address",
+    "Round": "round-6",
+    "SentAt": "2026-10-20T12:02:52.850016Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000014",
+    "Seq": 77,
+    "Session": "term_00000000-0000-4000-a000-000000000014",
+    "StartedAt": "2026-10-20T12:03:00.817616Z",
+    "State": "dismissed",
+    "Trigger": "automated"
+   }
+  ],
+  "unit": "acme/widgets#5080"
+ },
+ {
+  "answers": [],
+  "records": [
+   {
+    "at": "2026-10-18T21:29:03.668846Z",
+    "handle": "term_00000000-0000-4000-a000-000000000012",
+    "state": "done",
+    "turn_seq": 22
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000034",
+    "EndedAt": "2026-10-18T21:29:03.668846Z",
+    "Intent": "address",
+    "Round": "round-7",
+    "SentAt": "2026-10-18T21:28:12.452171Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000012",
+    "Seq": 22,
+    "Session": "term_00000000-0000-4000-a000-000000000012",
+    "StartedAt": "2026-10-18T21:28:19.840361Z",
+    "State": "done",
+    "Trigger": "by-hand"
+   }
+  ],
+  "unit": "acme/widgets#5111"
+ },
+ {
+  "answers": [
+   {
+    "at": "2026-10-20T02:10:25.21373Z",
+    "route": "typed",
+    "turn_seq": 37
+   },
+   {
+    "at": "2026-10-20T02:11:28.549245Z",
+    "route": "direct",
+    "turn_seq": 37
+   }
+  ],
+  "records": [
+   {
+    "at": "2026-10-20T02:07:40.190412Z",
+    "handle": "term_00000000-0000-4000-a000-000000000022",
+    "state": "asked",
+    "turn_seq": 37
+   },
+   {
+    "at": "2026-10-20T02:09:31.500275Z",
+    "handle": "term_00000000-0000-4000-a000-000000000022",
+    "state": "asked",
+    "turn_seq": 37
+   },
+   {
+    "at": "2026-10-20T02:11:28.549245Z",
+    "handle": "term_00000000-0000-4000-a000-000000000022",
+    "state": "done",
+    "turn_seq": 37
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000044",
+    "EndedAt": "2026-10-20T02:11:28.549245Z",
+    "Intent": "review",
+    "Round": "round-8",
+    "SentAt": "2026-10-20T02:04:29.330446Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000022",
+    "Seq": 37,
+    "Session": "term_00000000-0000-4000-a000-000000000022",
+    "StartedAt": "2026-10-20T02:04:36.12283Z",
+    "State": "done",
+    "Trigger": "by-hand"
+   }
+  ],
+  "unit": "acme/widgets#5158"
+ },
+ {
+  "answers": [
+   {
+    "at": "2026-10-20T10:53:48Z",
+    "route": "queued",
+    "turn_seq": 38
+   }
+  ],
+  "records": [
+   {
+    "at": "2026-10-20T06:53:10Z",
+    "handle": "term_00000000-0000-4000-a000-000000000050",
+    "state": "asked",
+    "turn_seq": 38
+   }
+  ],
+  "turns": [
+   {
+    "Agent": "claude",
+    "AgentSession": "00000000-0000-4000-a000-000000000049",
+    "EndedAt": "0001-01-01T00:00:00Z",
+    "Intent": "probe",
+    "Round": "e2e-probe",
+    "SentAt": "2026-10-20T06:51:54Z",
+    "SentTo": "term_00000000-0000-4000-a000-000000000050",
+    "Seq": 38,
+    "Session": "term_00000000-0000-4000-a000-000000000050",
+    "StartedAt": "2026-10-20T06:52:01Z",
+    "State": "asked",
+    "Trigger": "automated"
+   }
+  ],
+  "unit": "acme/probe#1"
+ }
+]

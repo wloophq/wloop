@@ -1,0 +1,1 @@
+testdata/workflows/bad/bad-window/workflows/case-workflow/workflow.toml:12:10: approval.window: "soon" is not a duration such as 30s, 5m, 2h or 1d

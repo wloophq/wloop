@@ -1,0 +1,79 @@
+// Command factsdoc prints the generated tables of the facts reference page: the
+// intents' facts, one table per workflow slot, then the workflow steps.
+package main
+
+import (
+	"fmt"
+	"os"
+	"slices"
+	"strings"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
+)
+
+func main() {
+	fmt.Fprint(os.Stdout, strings.Join(tables(), "\n"))
+}
+
+func tables() []string {
+	out := []string{intentTable()}
+	for _, slot := range builtin.WorkflowSlots {
+		out = append(out, workflowTable(slot))
+	}
+	return append(out, stepTable())
+}
+
+func intentTable() string {
+	var b strings.Builder
+	b.WriteString("| Fact | Type | Slots | Meaning |\n|---|---|---|---|\n")
+	for _, f := range builtin.Facts {
+		if slices.Contains(f.Slots, builtin.WorkflowSlot) {
+			continue
+		}
+		slots := make([]string, len(f.Slots))
+		for i, s := range f.Slots {
+			slots[i] = string(s)
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", f.Name, f.Type, strings.Join(slots, ", "), cell(f.Doc))
+	}
+	return b.String()
+}
+
+func workflowTable(slot string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "| `%s` fact%s | Type | Meaning |\n|---|---|---|\n", slot, provider(slot))
+	for _, f := range builtin.Facts {
+		if f.Slot == slot {
+			fmt.Fprintf(&b, "| `%s` | %s | %s |\n", f.Name, f.Type, cell(f.Doc))
+		}
+	}
+	return b.String()
+}
+
+func stepTable() string {
+	var b strings.Builder
+	b.WriteString("| Step | Unit | Does |\n|---|---|---|\n")
+	for _, d := range builtin.Steps {
+		units := "any"
+		if len(d.Providers) > 0 {
+			names := make([]string, len(d.Providers))
+			for i, p := range d.Providers {
+				names[i] = string(p)
+			}
+			units = strings.Join(names, ", ")
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", d.Name, units, cell(d.Doc))
+	}
+	return b.String()
+}
+
+func provider(slot string) string {
+	for p, s := range builtin.Slots {
+		if s == slot {
+			return fmt.Sprintf(" (subject `%s`)", p)
+		}
+	}
+	return ""
+}
+
+func cell(s string) string { return strings.ReplaceAll(s, "|", `\|`) }

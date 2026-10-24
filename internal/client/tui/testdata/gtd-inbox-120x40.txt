@@ -1,0 +1,40 @@
+ Focus 1   [Inbox 2]   Outbox 1    Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12
+
+>• 5h  Deploy window tonight?
+   5h  Buy cables
+
+Deploy window tonight?
+  state      inbox · changed
+  asks       Which window?
+             1. Before six
+             2. After ten (recommended)
+  keys       x next  w waiting  s schedule  y someday  l reference  f focus  p project  e done  Backspace dismiss
+  not now    a approve · d delegate
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+x next  w waiting  s schedule  y someday  l reference  f focus  p project  e done  Backspace dismiss  ? keys  q quit

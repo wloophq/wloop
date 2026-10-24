@@ -1,0 +1,1 @@
+testdata/workflows/bad/unknown-step/workflows/case-workflow/workflow.toml:9:7: step[0].use: unknown step "session.shutdown"; the steps are "session.close", "workspace.remove", "workspace.unregister", "turn.dismiss", "answer.refuse", "session.mark_dormant", "turn.start", "classify", "notify.self"

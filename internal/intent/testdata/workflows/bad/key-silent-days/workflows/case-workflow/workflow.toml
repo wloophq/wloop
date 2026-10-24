@@ -1,0 +1,11 @@
+description = "Case"
+subject = "github"
+when = 'pr.review.action == "follow-up"'
+key = ["pr.silent_days"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "review"

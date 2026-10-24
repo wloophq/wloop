@@ -1,0 +1,1 @@
+testdata/workflows/bad/when-not-bool/workflows/case-workflow/workflow.toml:3:8: when: 1: predicate must be bool, got duration

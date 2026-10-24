@@ -1,0 +1,12 @@
+ Needs me 1    My PRs 1    In loop 0    Plan 0    │   [Board]
+
+fake board: 2 rows in 80x8
+  acme/api#7  Batch export
+  acme/api#9  Retry webhooks
+
+
+
+
+
+
+↑↓ move  g view  / filter  ^K actions  ? keys  q quit

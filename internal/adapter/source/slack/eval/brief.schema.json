@@ -1,0 +1,127 @@
+{
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "my_actions",
+  "my_decisions",
+  "chase",
+  "resolved",
+  "can_leave_list",
+  "missing_to_leave",
+  "urgency",
+  "urgency_why"
+ ],
+ "properties": {
+  "my_actions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "what",
+     "why_me",
+     "inputs",
+     "links",
+     "deadline"
+    ],
+    "properties": {
+     "what": {
+      "type": "string"
+     },
+     "why_me": {
+      "type": "string"
+     },
+     "inputs": {
+      "type": "string"
+     },
+     "links": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "deadline": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "my_decisions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "decision",
+     "options",
+     "known",
+     "unknown"
+    ],
+    "properties": {
+     "decision": {
+      "type": "string"
+     },
+     "options": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "known": {
+      "type": "string"
+     },
+     "unknown": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "chase": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "who",
+     "what",
+     "since"
+    ],
+    "properties": {
+     "who": {
+      "type": "string"
+     },
+     "what": {
+      "type": "string"
+     },
+     "since": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "resolved": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "can_leave_list": {
+   "type": "boolean"
+  },
+  "missing_to_leave": {
+   "type": "string"
+  },
+  "urgency": {
+   "type": "string",
+   "enum": [
+    "high",
+    "medium",
+    "low",
+    "none"
+   ]
+  },
+  "urgency_why": {
+   "type": "string"
+  }
+ }
+}

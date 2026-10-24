@@ -1,0 +1,1 @@
+testdata/bad/guidance-max-negative/intents/ask-author/intent.toml:5:20: guidance.max: must be 0 (no limit) or more

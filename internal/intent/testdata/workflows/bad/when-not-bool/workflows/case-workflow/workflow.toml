@@ -1,0 +1,10 @@
+description = "Case"
+subject = "session"
+when = "session.idle_for"
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+

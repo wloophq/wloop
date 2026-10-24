@@ -1,0 +1,49 @@
+label   = "Nudge"
+summary = "Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic"
+key     = "N"
+workspace = "pr_else_main"
+session   = { strategy = "new", title = "nudge", close_when_done = true }
+answerable = false
+profile   = "nudge"
+brief     = { render = false, wait = false }
+prepare   = "nudge.prepare"
+on_sent   = ["event.nudged"]
+
+[guidance]
+help  = "what to ask about"
+max   = 500
+
+[headline]
+resumed = "nudge on {{.PR.Slug}}"
+[[headline.new]]
+text = "Nudge on {{.PR.Slug}}, {{.Who}}."
+
+[inputs.situation]
+type    = "text"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[inputs.waits_on_maintainers]
+type    = "flag"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[inputs.who]
+type    = "list"
+from    = "prepare"
+persist = true
+hidden  = true
+
+[action]
+enabled    = 'row.nudge.refusal == ""'
+reason_off = "{{.row.nudge.refusal}}"
+hint       = "Nudge {{join .row.nudge.who \", \"}}"
+confirm    = "Nudge {{join .row.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+
+[record]
+states  = ["done", "failed"]
+outcome = ["url"]
+outcome_doc = "`outcome` (done): `url`, the comment's URL."
+require = [{ state = "done", fields = ["url"] }]

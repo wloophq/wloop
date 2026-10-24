@@ -1,0 +1,47 @@
+{
+ "id": "01-thread-release-checklist",
+ "kind": "thread",
+ "channel_id": "C0000000001",
+ "channel_name": "widget-team",
+ "channel_type": "channel",
+ "permalink": "https://example.com/archives/C0000000001/p1792500000000100",
+ "focus_ts": "",
+ "messages": [
+  {
+   "ts": "1792500000.000100",
+   "thread_ts": "1792500000.000100",
+   "user_id": "U0000000002",
+   "user_name": "Ann",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Release checklist for widget 2.0: <@U0000000001> please sign off the changelog by Friday; <@U0000000003> runs the smoke tests.",
+   "reactions": [],
+   "reply_count": 2,
+   "edited": false
+  },
+  {
+   "ts": "1792500600.000200",
+   "thread_ts": "1792500000.000100",
+   "user_id": "U0000000003",
+   "user_name": "Bob",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Smoke tests are green, report at https://example.com/ci/42",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  },
+  {
+   "ts": "1792501200.000300",
+   "thread_ts": "1792500000.000100",
+   "user_id": "U0000000002",
+   "user_name": "Ann",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Thanks Bob. Still waiting on the changelog sign-off.",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  }
+ ]
+}

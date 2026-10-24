@@ -1,0 +1,2 @@
+testdata/bad/provider-pr-fact/intents/ask-author/instructions.md.tmpl:3:7: .PR.Author reads the github pull request; a thread intent cannot read it
+testdata/bad/provider-pr-fact/intents/ask-author/intent.toml:6:11: records: pr.author is a github fact; a thread intent cannot read it

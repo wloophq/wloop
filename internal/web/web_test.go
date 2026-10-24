@@ -1,0 +1,330 @@
+package web
+
+import (
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+func TestServesIndexAndAssets(t *testing.T) {
+	h := Handler()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `id="rail"`) || !strings.Contains(rec.Body.String(), `/static/app.js`) {
+		t.Fatalf("%d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "EventSource") {
+		t.Fatalf("%d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/nope", nil))
+	if rec.Code != 404 {
+		t.Fatalf("%d", rec.Code)
+	}
+}
+
+func TestCockpitKnowsThePendingRound(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"/api/pause", "data-deadline"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitHasTheRecentView(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{`v.id === "recent"`, "/api/activity", "renderActivity"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitHasTheDoneView(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"/api/workspaces/remove-done", `removed: "workspace removed"`, "Remove all clean", `h("details"`, "out.detail", "k.detail"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitLabelsABlockedFirstRound(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{`blocked: "round blocked"`, `round_blocked: "round blocked"`, `round_unblocked: "round unblocked"`, `"round_blocked", "round_unblocked"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitListsTheFailingChecks(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	for _, want := range []string{"function checksBlock", `unitPath(keyUnit(pr), "checks")`, "c.steps", `if (d.row.kind === "checks") loadChecks(pr);`} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitNeverShowsTheCardCommentAsAQuestion(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	for _, gone := range []string{"function asksBlock", "workspace.comment"} {
+		if strings.Contains(rec.Body.String(), gone) {
+			t.Errorf("app.js still has %s", gone)
+		}
+	}
+}
+
+func TestCockpitShowsTheTurn(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"function questionBlock", "function artifactBlock", "function optionButton", "questionBlock(d)",
+		`"continue", "Continue"`, `"dismiss", "Dismiss"`, `source: "cockpit"`, "body.option_id",
+		`turn_sent: "turn sent"`, `turn_started: "turn started"`, `turn_ended: "turn ended"`, `turn_resumed: "turn resumed"`, "timelineEvents(d)"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	for _, want := range []string{".d-question", ".d-artifact", ".act-note"} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("app.css lacks %s", want)
+		}
+	}
+}
+
+func TestCockpitShowsTheBrief(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"function briefBlock", "briefBlock(d.brief, r, readLens())", "open_questions", "risk_why", `"Brief pending"`, "stale", `["low", "medium", "high"]`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("app.js lacks %s", want)
+		}
+	}
+	for _, raw := range []string{"innerHTML", "outerHTML", "insertAdjacentHTML"} {
+		if strings.Contains(body, raw) {
+			t.Errorf("app.js writes HTML through %s", raw)
+		}
+	}
+	rec = httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	css := rec.Body.String()
+	_, rule, _ := strings.Cut(css, ".d-brief {")
+	rule, _, _ = strings.Cut(rule, "}")
+	if !strings.Contains(rule, "overflow-wrap: anywhere") || !strings.Contains(css, ".risk-high {") || !strings.Contains(css, ".risk-medium {") {
+		t.Errorf("app.css: .d-brief {%s}", rule)
+	}
+}
+
+func TestCockpitHasTheStalledBoard(t *testing.T) {
+	h := Handler()
+	for path, wants := range map[string][]string{
+		"/static/app.js":  {"function renderBoard", `layout: p.get("layout") === "board"`, `f.id === "lane"`, `"aria-pressed"`},
+		"/":               {`id="board"`},
+		"/static/app.css": {".board", ".card", ".lane-head"},
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		for _, want := range wants {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s lacks %s", path, want)
+			}
+		}
+	}
+}
+
+func TestCockpitHasTheFilter(t *testing.T) {
+	h := Handler()
+	for path, wants := range map[string][]string{
+		"/static/app.js": {"function fold", "function terms", "function matches", "function marked", "function urlKey",
+			"function matchesActivity", `p.get("q")`, "history.replaceState", "function typing", "function emptyNote"},
+		"/static/keys.js": {`filter: () => {`, `getElementById("search")`},
+		"/":               {`id="search"`, `type="search"`, `aria-keyshortcuts="/"`},
+		"/static/app.css": {".search", "mark {", "--mark"},
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		for _, want := range wants {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s lacks %s", path, want)
+			}
+		}
+	}
+}
+
+func TestCockpitHasExplore(t *testing.T) {
+	h := Handler()
+	for path, wants := range map[string][]string{
+		"/static/app.js": {"function renderExplore", "function explore(", `"/api/explore"`, `"/api/explore/recent"`, "function actOnCandidate", `actionButtons(c, "explore"`, `"/api/actions"`, "function loadSpecs",
+			`"-reviewed-by:@me"`, `"draft:false"`, "function candidateItem", `p.get("x")`, "r.read", "r.empty", "EXPLORE_SORTS", "candidateWait(c, row,", "stalled_review_hours", "Active in the last 30 days"},
+		"/":               {`id="explore"`, `id="explore-form"`, `id="explore-q"`, `id="explore-guidance"`, `id="explore-results"`},
+		"/static/app.css": {".cand", ".chip", ".explore-act", ".cand .wait.late"},
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		for _, want := range wants {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s lacks %s", path, want)
+			}
+		}
+	}
+}
+
+func TestHiddenBeatsEveryDisplayRule(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.css", nil))
+	if !strings.Contains(rec.Body.String(), "[hidden] { display: none !important; }") {
+		t.Fatal("app.css lets a display rule show an element marked hidden")
+	}
+}
+
+func TestGuidanceSitsAboveTheActions(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/static/app.js", nil))
+	if !strings.Contains(rec.Body.String(), "box.replaceChildren(...[top, guidance, acts, log].filter(Boolean))") {
+		t.Fatal("the detail panel does not put guidance between the facts and the actions")
+	}
+}
+
+func TestRefusalDetailIsNamedAfterTheWorkspaceManager(t *testing.T) {
+	src := appJS(t)
+	if want := `t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details"`; !strings.Contains(src, want) {
+		t.Fatalf("app.js lacks %s", want)
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not on PATH")
+	}
+	script := `const label = (state, t) => t.source ? ((state.health && state.health.workspace_manager) || t.source) + "'s message" : "Details";
+process.stdout.write(JSON.stringify([label({ health: { workspace_manager: "Orca" } }, { source: "orca" }), label({}, { source: "orca" }), label({ health: {} }, {})]));`
+	out, err := exec.Command(node, "-e", script).Output()
+	if err != nil {
+		t.Fatalf("node: %v", err)
+	}
+	if got := string(out); got != `["Orca's message","orca's message","Details"]` {
+		t.Fatalf("labels %s", got)
+	}
+}
+
+func TestTheScriptsParse(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not on PATH")
+	}
+	for _, name := range []string{"app.js", "dash.js", "keys.js", "palette.js", "routes.js", "gtd.js", "detail.js"} {
+		if out, err := exec.Command(node, "--check", "static/"+name).CombinedOutput(); err != nil {
+			t.Errorf("%s: %v: %s", name, err, out)
+		}
+	}
+}
+
+func TestDetailWidthClamp(t *testing.T) {
+	type in struct {
+		Px       float64 `json:"px"`
+		Viewport float64 `json:"viewport"`
+	}
+	cases := []in{{380, 1600}, {100, 1600}, {5000, 1600}, {960, 1600}, {961, 1600}, {500, 400}, {299.6, 1600}}
+	want := []float64{380, 300, 960, 960, 960, 300, 300}
+	src := appJS(t)
+	prelude := jsConst(t, src, "DETAIL_WIDTH_DEFAULT") + jsConst(t, src, "DETAIL_WIDTH_MIN")
+	var got []float64
+	nodeRun(t, prelude, []string{"clampDetailWidth"},
+		`process.stdout.write(JSON.stringify(input.map((c) => clampDetailWidth(c.px, c.viewport))));`, cases, &got)
+	for i := range cases {
+		if got[i] != want[i] {
+			t.Errorf("%+v: got %v, want %v", cases[i], got[i], want[i])
+		}
+	}
+}
+
+func TestDetailWidthRestore(t *testing.T) {
+	type in struct {
+		Stored string `json:"stored"`
+		Throws bool   `json:"throws"`
+	}
+	cases := []in{{Stored: ""}, {Stored: "520"}, {Stored: "50"}, {Stored: "99999"}, {Stored: "junk"}, {Stored: "520", Throws: true}}
+	want := []float64{380, 520, 300, 960, 380, 380}
+	src := appJS(t)
+	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_DEFAULT") + jsConst(t, src, "DETAIL_WIDTH_MIN")
+	var got []float64
+	nodeRun(t, prelude, []string{"clampDetailWidth", "storedDetailWidth", "saveDetailWidth"}, `
+process.stdout.write(JSON.stringify(input.map((c) => {
+  globalThis.localStorage = {
+    getItem: () => { if (c.throws) throw new Error("denied"); return c.stored === "" ? null : c.stored; },
+    setItem: () => { throw new Error("denied"); },
+    removeItem: () => { throw new Error("denied"); },
+  };
+  saveDetailWidth(400);
+  saveDetailWidth(null);
+  return storedDetailWidth(1600);
+})));`, cases, &got)
+	for i := range cases {
+		if got[i] != want[i] {
+			t.Errorf("%+v: got %v, want %v", cases[i], got[i], want[i])
+		}
+	}
+}
+
+func TestDetailGridUsesWidthVariable(t *testing.T) {
+	raw, err := os.ReadFile("static/app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(raw)
+	if !strings.Contains(css, "body.has-detail #app { grid-template-columns: 188px minmax(0, 1fr) var(--detail-width, 380px); }") {
+		t.Error("the detail grid column does not come from --detail-width")
+	}
+	if !strings.Contains(css, "#detail-resize, body.has-detail #detail-resize { display: none; }") {
+		t.Error("the handle is not hidden in the stacked layout")
+	}
+}
+
+func TestDetailWidthSurvivesShrinkThenGrow(t *testing.T) {
+	src := appJS(t)
+	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_DEFAULT") +
+		jsConst(t, src, "DETAIL_WIDTH_MIN") + jsConst(t, src, "DETAIL_WIDTH_STEP") + `
+const listeners = {};
+const attrs = {};
+const style = {};
+const handle = {
+  addEventListener: (n, f) => { listeners[n] = f; },
+  setAttribute: (k, v) => { attrs[k] = v; },
+};
+globalThis.document = { getElementById: () => handle, documentElement: { style: { setProperty: (k, v) => { style[k] = v; } } } };
+const winListeners = {};
+globalThis.window = { innerWidth: 1600, addEventListener: (n, f) => { winListeners[n] = f; } };
+globalThis.localStorage = { getItem: () => "900", setItem: () => {}, removeItem: () => {} };
+`
+	var got []string
+	nodeRun(t, prelude, []string{"clampDetailWidth", "storedDetailWidth", "saveDetailWidth", "setupDetailResize"}, `
+setupDetailResize();
+const seen = [style["--detail-width"]];
+window.innerWidth = 700; winListeners.resize(); seen.push(style["--detail-width"]);
+window.innerWidth = 1600; winListeners.resize(); seen.push(style["--detail-width"]);
+process.stdout.write(JSON.stringify(seen));`, struct{}{}, &got)
+	want := []string{"900px", "420px", "900px"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+}

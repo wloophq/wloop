@@ -1,0 +1,24 @@
+label   = "Act"
+summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
+verb    = "delegate"
+workspace = "pr_else_main"
+provider  = "any"
+modes     = ["headless", "session"]
+session   = { strategy = "new", title = "act", close_when_done = true }
+brief     = { render = false, wait = false }
+
+[guidance]
+help = "what to do about the items"
+
+[headline]
+resumed = "act on {{.Wording.Ref}}"
+[[headline.new]]
+text = "Act on the open items of {{.Wording.Ref}}, {{.Who}}."
+
+[action]
+enabled    = "row.yours"
+reason_off = "Not yours: take it over first"
+hint = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+
+[record]
+states = ["done", "asked", "failed"]

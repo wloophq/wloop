@@ -1,0 +1,15 @@
+description = "Remove a workspace under a temporary directory"
+subject = "workspace"
+when = '!workspace.main && workspace.temporary && workspace.path_exists'
+mode = "observe"
+order = 23
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "workspace.remove"
+
+[limits]
+per_run = 5
+per_day = 30

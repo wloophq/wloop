@@ -1,0 +1,27 @@
+[link https://github.com/acme/docs/pull/407][bold]acme/docs#407[/][/]  [dim]2 turns[/]
+
+[bold]#26[/] review  [green]done[/]  [dim]by-hand[/]  [dim]sent 2026-10-19 14:23 · started 14:23 · ended 14:32[/]
+    [dim]round 7bd21eee5264 · session term_6ed72265 · claude c2d6396d[/]
+    guidance  Do we really want to delete these documents? Is the procedure safe and the most
+              efficient one for this kind of problem?
+    [dim]14:24[/]  [red]unrecorded[/]  The review goes on: four subagents run, and the record comes after their
+                       findings are merged.
+    [dim]14:29[/]  [yellow]asked[/]       The spec lags behind what shipped; request changes against 3 human approvals?
+                       [dim]REQUEST_CHANGES · 5 blocking · 11 non-blocking[/]
+                       [yellow]?[/] The deletion already ran and the monthly job is live. Publish the
+                         REQUEST_CHANGES (5 blocking, 11 non-blocking)?
+                         [green]request-changes[/]  Publish REQUEST_CHANGES: Publishes the draft as is,
+                                          against the human approvals.  [green]recommended[/]
+                         comment          Publish as COMMENT: Same comments, without blocking the
+                                          merge.
+                         hold             Do not publish: Nothing reaches GitHub.
+    [dim]14:31[/]  [cyan]answer[/]      typed via cockpit: Publish REQUEST_CHANGES (option request-changes)
+    [dim]14:32[/]  [green]done[/]        REQUEST_CHANGES published
+                       [link https://github.com/acme/docs/pull/407#pullrequestreview-1][dim]REQUEST_CHANGES · 5 blocking · 11 non-blocking[/][/]
+
+[bold]#27[/] review  [yellow]asked[/]  [dim]automated[/]  [dim]sent 2026-10-19 23:55 · started 10-20 00:01[/]
+    [dim]round bd39f565639b · session term_6ed72265 · claude[/]
+    [dim]10-20 00:08[/]  [yellow]asked[/]   The 5 blocking issues are fixed; approve?
+                         [yellow]?[/] Approve with no body and resolve the threads?
+                           [dim]yes or no, recommends yes[/]
+    [dim]10-20 00:09[/]  [cyan]answer[/]  refused via notification: yes

@@ -1,0 +1,35 @@
+{
+ "id": "02-dm-segment-budget",
+ "kind": "dm_segment",
+ "channel_id": "C0000000005",
+ "channel_name": "",
+ "channel_type": "im",
+ "permalink": "https://example.com/archives/C0000000005/p1792586400000100",
+ "focus_ts": "1792586400.000100",
+ "messages": [
+  {
+   "ts": "1792586400.000100",
+   "thread_ts": "1792586400.000100",
+   "user_id": "U0000000004",
+   "user_name": "Carol",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Can you send me the Q3 budget numbers for the widget project before the review on Monday?",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  },
+  {
+   "ts": "1792587000.000200",
+   "thread_ts": "1792587000.000200",
+   "user_id": "U0000000001",
+   "user_name": "Vera",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Sure, I will send them tomorrow morning.",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  }
+ ]
+}

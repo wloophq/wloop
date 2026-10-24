@@ -1,0 +1,7137 @@
+[
+ {
+  "q": "repo:acme/api",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-repo:acme/api",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "repo:acme/web",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-repo:acme/web",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "repo",
+  "result": {
+   "group": "repo",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "acme/api",
+     "label": "acme/api",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "acme/web",
+     "label": "acme/web",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "repo",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "repo-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "author:ana",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 18,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-author:ana",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 13,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "author:bob",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#3",
+      "acme/api#2"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-author:bob",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "author:erin",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-author:erin",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "author:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 9,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-author:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 22,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "author:me-login",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 9,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-author:me-login",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 22,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "author",
+  "result": {
+   "group": "author",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "me",
+     "label": "me",
+     "rows": [
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "ana",
+     "label": "ana",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "bob",
+     "label": "bob",
+     "rows": [
+      "acme/api#27",
+      "acme/api#3",
+      "acme/api#2"
+     ]
+    },
+    {
+     "key": "erin",
+     "label": "erin",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "author",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#27",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "author-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30",
+      "acme/api#27",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "wait:author",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 5,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-wait:author",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 26,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "wait:loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-wait:loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "wait:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 15,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-wait:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 16,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#15",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "wait:nobody",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#16",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-wait:nobody",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "wait:reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-wait:reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "wait",
+  "result": {
+   "group": "wait",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "me",
+     "label": "Waiting on me",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "loop",
+     "label": "In loop",
+     "rows": [
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "reviewer",
+     "label": "Waiting on a reviewer",
+     "rows": [
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3"
+     ]
+    },
+    {
+     "key": "author",
+     "label": "Waiting on the author",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28"
+     ]
+    },
+    {
+     "key": "nobody",
+     "label": "Waiting on nobody",
+     "rows": [
+      "acme/api#16",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "wait",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28",
+      "acme/api#16",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "wait-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#16",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#15",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28",
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:ana",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:ana",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:bob",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:bob",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:carol",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26",
+      "acme/api#3"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:carol",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:dave",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#12"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:dave",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 18,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 13,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "waits-on:team:acme/web",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-waits-on:team:acme/web",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:blocked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#19"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:blocked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:changes",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#7"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:changes",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:checks",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#6"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:checks",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:conflicts",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:conflicts",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:done",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#13",
+      "acme/api#14"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:done",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:draft",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#5"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:draft",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:held",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#18"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:held",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:loop_stopped",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#24"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:loop_stopped",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:loop_waiting",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:loop_waiting",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:loop_working",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:loop_working",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:merge",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#28",
+      "acme/api#8"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:merge",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:muted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#16",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:muted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:no_reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#4"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:no_reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#7",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:reply",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#10"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:reply",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:review",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 7,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:review",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 24,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:reviewer_back",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#12"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:reviewer_back",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:round_pending",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#21"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:round_pending",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "kind:to_address",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#20"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-kind:to_address",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "kind",
+  "result": {
+   "group": "kind",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "round_pending",
+     "label": "round soon",
+     "rows": [
+      "acme/api#21"
+     ]
+    },
+    {
+     "key": "loop_waiting",
+     "label": "agent asks",
+     "rows": [
+      "acme/api#25",
+      "acme/api#22"
+     ]
+    },
+    {
+     "key": "loop_stopped",
+     "label": "agent stopped",
+     "rows": [
+      "acme/api#24"
+     ]
+    },
+    {
+     "key": "blocked",
+     "label": "round blocked",
+     "rows": [
+      "acme/api#19"
+     ]
+    },
+    {
+     "key": "to_address",
+     "label": "to address",
+     "rows": [
+      "acme/api#20"
+     ]
+    },
+    {
+     "key": "held",
+     "label": "held (cap)",
+     "rows": [
+      "acme/api#18"
+     ]
+    },
+    {
+     "key": "loop_working",
+     "label": "agent working",
+     "rows": [
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "changes",
+     "label": "changes asked",
+     "rows": [
+      "acme/api#7"
+     ]
+    },
+    {
+     "key": "checks",
+     "label": "checks failing",
+     "rows": [
+      "acme/api#6"
+     ]
+    },
+    {
+     "key": "conflicts",
+     "label": "merge conflicts",
+     "rows": [
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "reply",
+     "label": "reply due",
+     "rows": [
+      "acme/api#10"
+     ]
+    },
+    {
+     "key": "reviewer_back",
+     "label": "reviewer due",
+     "rows": [
+      "acme/api#12"
+     ]
+    },
+    {
+     "key": "review",
+     "label": "review",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "no_reviewer",
+     "label": "no reviewer",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#4"
+     ]
+    },
+    {
+     "key": "merge",
+     "label": "can merge",
+     "rows": [
+      "acme/api#28",
+      "acme/api#8"
+     ]
+    },
+    {
+     "key": "draft",
+     "label": "draft",
+     "rows": [
+      "acme/api#5"
+     ]
+    },
+    {
+     "key": "muted",
+     "label": "muted",
+     "rows": [
+      "acme/api#16",
+      "acme/api#15"
+     ]
+    },
+    {
+     "key": "done",
+     "label": "closed",
+     "rows": [
+      "acme/api#13",
+      "acme/api#14"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "kind",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#21",
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#24",
+      "acme/api#19",
+      "acme/api#20",
+      "acme/api#18",
+      "acme/api#23",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#9",
+      "acme/api#10",
+      "acme/api#12",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#1",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#4",
+      "acme/api#28",
+      "acme/api#8",
+      "acme/api#5",
+      "acme/api#16",
+      "acme/api#15",
+      "acme/api#13",
+      "acme/api#14"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "kind-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#16",
+      "acme/api#15",
+      "acme/api#5",
+      "acme/api#28",
+      "acme/api#8",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#4",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#1",
+      "acme/api#12",
+      "acme/api#10",
+      "acme/api#9",
+      "acme/api#6",
+      "acme/api#7",
+      "acme/api#23",
+      "acme/api#18",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#24",
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#21"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "type:chore",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-type:chore",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "type:feature",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-type:feature",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "type:fix",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-type:fix",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "type:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-type:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#2",
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "type",
+  "result": {
+   "group": "type",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "chore",
+     "label": "chore",
+     "rows": [
+      "acme/api#31"
+     ]
+    },
+    {
+     "key": "feature",
+     "label": "feature",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "fix",
+     "label": "fix",
+     "rows": [
+      "acme/api#2"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no brief",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "type",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#1",
+      "acme/api#2",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "type-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2",
+      "acme/api#1",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "risk:high",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-risk:high",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "risk:low",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-risk:low",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "risk:medium",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-risk:medium",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "risk:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-risk:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#2",
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "risk",
+  "result": {
+   "group": "risk",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "high",
+     "label": "high",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "medium",
+     "label": "medium",
+     "rows": [
+      "acme/api#31"
+     ]
+    },
+    {
+     "key": "low",
+     "label": "low",
+     "rows": [
+      "acme/api#2"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no brief",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "risk",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1",
+      "acme/api#31",
+      "acme/api#2",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "risk-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2",
+      "acme/api#31",
+      "acme/api#1",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "size:m",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-size:m",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "size:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-size:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#2",
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "size:xl",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-size:xl",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "size:xs",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-size:xs",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "size",
+  "result": {
+   "group": "size",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "xs",
+     "label": "XS",
+     "rows": [
+      "acme/api#2"
+     ]
+    },
+    {
+     "key": "m",
+     "label": "M",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "xl",
+     "label": "XL",
+     "rows": [
+      "acme/api#31"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no brief",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "size",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#2",
+      "acme/api#1",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "size-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#1",
+      "acme/api#2",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "status:in-progress",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#8"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-status:in-progress",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "status:in-review",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 7,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-status:in-review",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 24,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "status:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 21,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-status:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 10,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#13",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "status",
+  "result": {
+   "group": "status",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "in-progress",
+     "label": "in-progress",
+     "rows": [
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#8"
+     ]
+    },
+    {
+     "key": "in-review",
+     "label": "in-review",
+     "rows": [
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no workspace",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "status",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#8",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "status-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23",
+      "acme/api#5",
+      "acme/api#24",
+      "acme/api#8",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "tag:area:api",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-tag:area:api",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "tag:lang:go",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-tag:lang:go",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "tag:lang:ts",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-tag:lang:ts",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:adopted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:adopted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:approved",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#28",
+      "acme/api#8"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:approved",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:due",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:due",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:paused",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:paused",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:in-loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 7,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:in-loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 24,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:muted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#16",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:muted",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:needs-me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 14,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:needs-me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 17,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:stalled",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 10,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:stalled",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 21,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "is:tracked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-is:tracked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "ci:failure",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#6"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-ci:failure",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "ci:lint",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#6"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-ci:lint",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "ci:pending",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-ci:pending",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "ci:success",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 29,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-ci:success",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 2,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#6",
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "ci:unit",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#6"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-ci:unit",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "ci",
+  "result": {
+   "group": "ci",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "failure",
+     "label": "failure",
+     "rows": [
+      "acme/api#6"
+     ]
+    },
+    {
+     "key": "pending",
+     "label": "pending",
+     "rows": [
+      "acme/web#30"
+     ]
+    },
+    {
+     "key": "success",
+     "label": "success",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:1d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#1"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:1d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:2w",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 13,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#17",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:2w",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 18,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:3d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#4",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:3d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:4w",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#28"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:4w",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:7d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 7,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#12",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:7d",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 24,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#4",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:none",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "opened:older",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-opened:older",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "opened",
+  "result": {
+   "group": "opened",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "1d",
+     "label": "0-1 days",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "3d",
+     "label": "1-3 days",
+     "rows": [
+      "acme/api#4",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2"
+     ]
+    },
+    {
+     "key": "7d",
+     "label": "3-7 days",
+     "rows": [
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#12",
+      "acme/api#8",
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "2w",
+     "label": "1-2 weeks",
+     "rows": [
+      "acme/api#17",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "4w",
+     "label": "2-4 weeks",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#28"
+     ]
+    },
+    {
+     "key": "older",
+     "label": "over 4 weeks",
+     "rows": [
+      "acme/api#31"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no opening date",
+     "rows": [
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "scope:involved",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-scope:involved",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "scope:tracked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-scope:tracked",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "age",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#21",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#5",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "sort": "age-desc",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#23",
+      "acme/api#22",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#20",
+      "acme/api#1",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#2",
+      "acme/api#3",
+      "acme/api#12",
+      "acme/api#4",
+      "acme/api#5",
+      "acme/api#6",
+      "acme/api#10",
+      "acme/api#11",
+      "acme/api#7",
+      "acme/api#17",
+      "acme/api#21",
+      "acme/api#26",
+      "acme/api#27",
+      "acme/api#29",
+      "acme/api#31",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "lane:author",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 7,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-lane:author",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 24,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#26",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "lane:loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 3,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-lane:loop",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 28,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "lane:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 16,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-lane:me",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 15,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/web#30",
+      "acme/api#3",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#28",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "lane:merge",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 1,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#8"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-lane:merge",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 30,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "lane:reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 4,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "q": "-lane:reviewer",
+  "result": {
+   "group": "",
+   "total": 31,
+   "shown": 27,
+   "groups": [
+    {
+     "key": "",
+     "label": "",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "lane",
+  "result": {
+   "group": "lane",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "me",
+     "label": "Needs me",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#25",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22"
+     ]
+    },
+    {
+     "key": "reviewer",
+     "label": "Waiting on reviewer",
+     "rows": [
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3"
+     ]
+    },
+    {
+     "key": "author",
+     "label": "Waiting on author",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#16",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    },
+    {
+     "key": "merge",
+     "label": "Can merge",
+     "rows": [
+      "acme/api#8"
+     ]
+    },
+    {
+     "key": "loop",
+     "label": "In loop",
+     "rows": [
+      "acme/api#13",
+      "acme/api#28",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "tag:area",
+  "result": {
+   "group": "tag:area",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "area:api",
+     "label": "area:api",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no area",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "group": "tag:lang",
+  "result": {
+   "group": "tag:lang",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "lang:go",
+     "label": "lang:go",
+     "rows": [
+      "acme/api#1"
+     ]
+    },
+    {
+     "key": "lang:ts",
+     "label": "lang:ts",
+     "rows": [
+      "acme/api#31"
+     ]
+    },
+    {
+     "key": "none",
+     "label": "no lang",
+     "rows": [
+      "acme/api#29",
+      "acme/api#27",
+      "acme/api#26",
+      "acme/api#17",
+      "acme/api#7",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#12",
+      "acme/api#16",
+      "acme/api#25",
+      "acme/web#30",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#3",
+      "acme/api#2",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#24",
+      "acme/api#28",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#15",
+      "acme/api#18",
+      "acme/api#9",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "layout": "board",
+  "result": {
+   "group": "wait",
+   "total": 31,
+   "shown": 31,
+   "groups": [
+    {
+     "key": "me",
+     "label": "Waiting on me",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4",
+      "acme/api#21",
+      "acme/api#5",
+      "acme/api#2",
+      "acme/api#24",
+      "acme/api#1",
+      "acme/api#20",
+      "acme/api#19",
+      "acme/api#8",
+      "acme/api#18",
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "loop",
+     "label": "In loop",
+     "rows": [
+      "acme/api#25",
+      "acme/api#22",
+      "acme/api#23"
+     ]
+    },
+    {
+     "key": "reviewer",
+     "label": "Waiting on a reviewer",
+     "rows": [
+      "acme/api#26",
+      "acme/api#12",
+      "acme/web#30",
+      "acme/api#3"
+     ]
+    },
+    {
+     "key": "author",
+     "label": "Waiting on the author",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10",
+      "acme/api#28"
+     ]
+    },
+    {
+     "key": "nobody",
+     "label": "Waiting on nobody",
+     "rows": [
+      "acme/api#16",
+      "acme/api#13",
+      "acme/api#14",
+      "acme/api#15"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "view": "stalled",
+  "layout": "board",
+  "result": {
+   "group": "lane",
+   "total": 10,
+   "shown": 10,
+   "groups": [
+    {
+     "key": "me",
+     "label": "Needs me",
+     "rows": [
+      "acme/api#31",
+      "acme/api#29",
+      "acme/api#7",
+      "acme/api#6",
+      "acme/api#4"
+     ]
+    },
+    {
+     "key": "reviewer",
+     "label": "Waiting on reviewer",
+     "rows": [
+      "acme/api#12"
+     ]
+    },
+    {
+     "key": "author",
+     "label": "Waiting on author",
+     "rows": [
+      "acme/api#27",
+      "acme/api#17",
+      "acme/api#11",
+      "acme/api#10"
+     ]
+    },
+    {
+     "key": "merge",
+     "label": "Can merge",
+     "rows": []
+    },
+    {
+     "key": "loop",
+     "label": "In loop",
+     "rows": []
+    }
+   ]
+  }
+ },
+ {
+  "q": "repo:api is:needs-me",
+  "group": "kind",
+  "sort": "age-desc",
+  "result": {
+   "group": "kind",
+   "total": 31,
+   "shown": 14,
+   "groups": [
+    {
+     "key": "round_pending",
+     "label": "round soon",
+     "rows": [
+      "acme/api#21"
+     ]
+    },
+    {
+     "key": "loop_waiting",
+     "label": "agent asks",
+     "rows": [
+      "acme/api#22",
+      "acme/api#25"
+     ]
+    },
+    {
+     "key": "loop_stopped",
+     "label": "agent stopped",
+     "rows": [
+      "acme/api#24"
+     ]
+    },
+    {
+     "key": "blocked",
+     "label": "round blocked",
+     "rows": [
+      "acme/api#19"
+     ]
+    },
+    {
+     "key": "to_address",
+     "label": "to address",
+     "rows": [
+      "acme/api#20"
+     ]
+    },
+    {
+     "key": "held",
+     "label": "held (cap)",
+     "rows": [
+      "acme/api#18"
+     ]
+    },
+    {
+     "key": "changes",
+     "label": "changes asked",
+     "rows": [
+      "acme/api#7"
+     ]
+    },
+    {
+     "key": "checks",
+     "label": "checks failing",
+     "rows": [
+      "acme/api#6"
+     ]
+    },
+    {
+     "key": "conflicts",
+     "label": "merge conflicts",
+     "rows": [
+      "acme/api#9"
+     ]
+    },
+    {
+     "key": "review",
+     "label": "review",
+     "rows": [
+      "acme/api#1",
+      "acme/api#2",
+      "acme/api#29",
+      "acme/api#31"
+     ]
+    }
+   ]
+  }
+ }
+]

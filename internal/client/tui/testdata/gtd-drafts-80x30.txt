@@ -1,0 +1,30 @@
+[Focus 1]   Inbox 2    Outbox 1    Next 4    Waiting 4    Projects 0
+
+>  5h  ★ Reply on the batch export review  @computer acme/api#7
+
+Reply on the batch export review
+  state      next · focus
+  where      @computer
+  asks       Publish the review?
+             1. Comment only
+             2. Publish APPROVE (recommended)
+             3. Hold the draft
+  drafts     › 1. reply · proposed · from turn
+             Thanks, the export now runs in batches. I will watch tonight's job.
+             2. react · sent · from user
+             :eyes:
+  keys       x next  w waiting  s schedule  y someday  l reference  f focus
+             p project  a approve  d delegate  e done  Backspace dismiss
+             G guide  V review  W answer  C continue  X dismiss  A take over
+             H pause  M mute  O open
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+x next  w waiting  s schedule  y someday  l reference  f focus  ? keys  q quit

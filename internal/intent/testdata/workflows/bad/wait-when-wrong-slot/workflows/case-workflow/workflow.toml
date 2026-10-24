@@ -1,0 +1,13 @@
+description = "Case"
+subject = "github"
+when = 'pr.review.action == "follow-up"'
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "review"
+
+[approval]
+wait_when = "session.managed"

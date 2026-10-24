@@ -1,0 +1,17 @@
+- goal: one sentence on what the change is for, in the reader's terms.
+- context: one or two sentences the reader needs to follow it: the problem, the area of the code, what it builds on.
+- kind: feature (new behavior), fix (wrong behavior corrected), refactor (same behavior, new shape), chore (dependencies, formatting, docs or tests only), infra (build, CI, deploy, configuration).
+- size: by changed lines, xs under 20, s under 100, m under 400, l under 1000, xl from 1000.
+- risk: low, medium or high, by what breaks and for whom if the change is wrong; risk_why names that in half a sentence.
+- open_questions: up to three questions the description and the diff leave open, one sentence each; empty when none.
+- tags: what the change touches, up to three values per key, short lowercase words joined by `-`. Leave a key empty rather than guess.
+  - lang: the programming or configuration languages of the changed files (python, go, typescript, sql, yaml).
+  - framework: the frameworks the changed code uses (django, react, rails).
+  - tool: the tools the change configures or depends on (docker, terraform, github-actions).
+  - area: the parts of the system it changes; only the values the schema lists.
+  - change: what kind of change it is; only the values the schema lists.
+  - concern: what a reviewer should watch for; only when the diff gives a reason.
+  - breaking: what it breaks for its users; only when it does.
+  - domain: the business area the change serves (billing, search, notifications, legal).
+  - audience: who notices the change.
+- Write in the language of the pull request's title and description.

@@ -1,0 +1,1 @@
+testdata/bad/also-profile-unknown/intents/ask-author/intent.toml:15:11: also_profiles[0].profile: probe is not an intent with judgment blocks

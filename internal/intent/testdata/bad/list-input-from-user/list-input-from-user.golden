@@ -1,0 +1,1 @@
+testdata/bad/list-input-from-user/intents/ask-author/intent.toml:15:8: inputs.files.type: a list input comes from prepare, not from the user

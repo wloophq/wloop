@@ -1,0 +1,1 @@
+testdata/workflows/bad/on-engine-kind/workflows/case-workflow/workflow.toml:6:7: trigger.on[0]: workflow_planned is an engine event; a workflow reacts to source events

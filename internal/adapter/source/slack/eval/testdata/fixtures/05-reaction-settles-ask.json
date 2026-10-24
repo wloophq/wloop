@@ -1,0 +1,42 @@
+{
+ "id": "05-reaction-settles-ask",
+ "kind": "thread",
+ "channel_id": "C0000000001",
+ "channel_name": "widget-team",
+ "channel_type": "channel",
+ "permalink": "https://example.com/archives/C0000000001/p1792845600000100",
+ "focus_ts": "",
+ "messages": [
+  {
+   "ts": "1792845600.000100",
+   "thread_ts": "1792845600.000100",
+   "user_id": "U0000000001",
+   "user_name": "Vera",
+   "is_bot": false,
+   "app_name": "",
+   "text": "<@U0000000002> can you merge the docs fix https://example.com/pr/7 today?",
+   "reactions": [
+    {
+     "name": "white_check_mark",
+     "users": [
+      "U0000000002"
+     ]
+    }
+   ],
+   "reply_count": 1,
+   "edited": false
+  },
+  {
+   "ts": "1792846200.000200",
+   "thread_ts": "1792845600.000100",
+   "user_id": "U0000000002",
+   "user_name": "Ann",
+   "is_bot": false,
+   "app_name": "",
+   "text": "Merged.",
+   "reactions": [],
+   "reply_count": 0,
+   "edited": false
+  }
+ ]
+}

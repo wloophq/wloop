@@ -1,0 +1,1 @@
+testdata/bad/enum-value/intents/ask-author/intent.toml:5:9: board: "side" is not one of "review", "author", "none"

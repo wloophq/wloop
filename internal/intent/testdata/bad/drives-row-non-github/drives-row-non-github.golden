@@ -1,0 +1,1 @@
+testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:5:14: drives_row: a held round drives a github row; a thread intent cannot drive one

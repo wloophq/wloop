@@ -1,0 +1,1 @@
+testdata/workflows/bad/two-triggers/workflows/case-workflow/workflow.toml:5:2: trigger: needs exactly one of every, on or schedule; it has 2

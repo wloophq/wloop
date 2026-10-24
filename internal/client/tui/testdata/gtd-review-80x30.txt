@@ -1,0 +1,30 @@
+ Next 4    Waiting 4    Projects 0    Someday 0    Logbook 12   [Review]
+
+ ▸ ○ Inbox to zero                                       2
+   ✓ Outbox                                              1
+   ○ Waiting: nudge?                                     4
+   ○ Projects without a next action or past their review 1
+   ✓ Someday                                             0
+   ✓ Prune Focus                                         1
+
+>  Inbox to zero (2)
+ • 5h  Deploy window tonight?
+   5h  Buy cables
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Enter step done  ] next step  [ previous step  ↑↓ move  g view  ? keys  q quit

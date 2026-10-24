@@ -1,0 +1,10 @@
+description = "Case"
+subject = "github"
+when = "true"
+
+[trigger]
+on = []
+
+[[step]]
+use = "turn.start"
+intent = "review"

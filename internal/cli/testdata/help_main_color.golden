@@ -1,0 +1,70 @@
+{{name}} dev
+A work loop for the reviews and pull requests that reach you.
+
+[bold]USAGE[/]
+  [cyan]{{command}}[/] [dim]<command>[/] [arguments]
+
+[bold]GET STARTED[/]
+  [cyan]init[/]                   Set up from zero: config, agent homes, the app
+  [cyan]doctor[/]                 Diagnose the setup without changing anything
+
+[bold]PULL REQUESTS[/]
+  [cyan]review[/]                 Review someone else's pull request in its own worktree
+  [cyan]address[/]                Triage the reviews and failing checks of yours
+  [cyan]take-over[/]              Make a pull request someone else opened yours
+  [cyan]nudge[/]                  Ask whoever it waits on for the next step
+  [cyan]act[/]                    Resolve a unit's open items, replies as drafts
+  [cyan]remove[/]                 Delete the workspace of a merged or closed one
+
+[bold]WHAT WAITS ON YOU[/]
+  [cyan]status[/]                 Pull requests by view, those needing you first
+  [cyan]tui[/]                    The same views in the terminal, one-key actions
+  [cyan]open[/]                   The cockpit, a workspace or a pull request
+  [cyan]outbox[/]                 Drafts waiting for your approval, and yours
+  [cyan]explore[/]                Open pull requests of others to help on
+
+[bold]AUTOMATION[/]
+  [cyan]plan[/]                   What the workflows would do now, and why
+  [cyan]pause/resume[/]           Stop or restart automatic rounds
+  [cyan]track/untrack[/]          Follow a pull request out of scope, or stop
+  [cyan]mute/unmute[/]            Leave or rejoin the pending views
+  [cyan]workflows[/]              The facts and steps a workflow can use
+
+[bold]PROFILE[/]
+  [cyan]profile show[/]           The blocks that apply to a repository
+  [cyan]profile where[/]          The block a new rule goes in
+  [cyan]profile add[/]            Add a rule to the profile
+  [cyan]profile check[/]          Load the profile and list its problems
+  [cyan]profile try[/]            A review round that publishes nothing
+  [cyan]profile schema[/]         The JSON Schema of the manifests
+
+[bold]SLACK[/]
+  [cyan]slack login/logout[/]     Connect to Slack, or disconnect
+  [cyan]slack status[/]           Who you are logged in to Slack as
+  [cyan]slack send[/]             Post as you to a thread, channel or person
+  [cyan]slack follow/unfollow[/]  Admit every message of a thread, or stop
+
+[bold]SETUP[/]
+  [cyan]install[/]                Write the hooks, MCP and skills into agent homes
+  [cyan]app install[/]            macOS: the app, menu bar and the daemon at login
+  [cyan]trust[/]                  Trust a repository in an agent home
+  [cyan]uninstall[/]              Take out what install and app install set up
+  [cyan]config get[/]             Print a configuration value
+  [cyan]version[/]                Print the version
+
+[bold]TROUBLESHOOTING[/]
+  [cyan]timings[/]                Review, merge and turn durations, waits, tokens
+  [cyan]intake[/]                 Follow, start or cancel an intake
+  [cyan]brief refresh[/]          Make a pull request's brief again
+  [cyan]turn show[/]              A pull request's turns and their records
+  [cyan]probe[/]                  Prove an agent home end to end
+
+[bold]FOR AGENTS AND SCRIPTS[/]
+  [cyan]instructions[/]           Run a turn by hand from an agent session
+  [cyan]turn end/answer[/]        Record how a turn ended; read your answer
+  [cyan]hook[/]                   The agent hooks install writes
+  [cyan]serve[/]                  Run the daemon
+  [cyan]app[/]                    macOS: the menu bar and notifications
+
+Run '{{command}} <command> --help' for its flags and examples.
+Docs: [link https://{{name}}hq.github.io/{{name}}/]https://{{name}}hq.github.io/{{name}}/[/]

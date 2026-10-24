@@ -1,0 +1,12 @@
+[bold]NEEDS ME[/] [dim]2[/]
+  [yellow]9d[/]  [link https://github.com/acme/web/pull/1365]acme/web#1365[/]  ✨ feat: 日本語のタイトルがとても長い and …  team:acme/reviewers, ca…
+      [dim]checks failing: build-py3 (ci-pipeline); reviewed by frankhopper1, erinsantos-qa, f…[/]
+  [dim]3h[/]  [link https://github.com/acme/api/pull/7]acme/api#7[/]     Batch export in chunks                       me
+      [dim]review requested, no review on the head[/]
+
+[bold]STALLED[/] [dim]1[/]
+  [red]51d[/]  [link https://github.com/initech-co/tracker/pull/7734]initech-co/tracker#7734[/]  fix(agentlog): bound container logs  author
+       [dim]no reviewer requested[/]
+
+[bold]TRACKED[/] [dim]1[/]
+  [dim]3h[/]  [link https://github.com/acme/api/pull/7]acme/api#7[/]  Batch export in chunks  me

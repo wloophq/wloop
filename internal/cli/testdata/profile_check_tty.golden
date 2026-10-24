@@ -1,0 +1,22 @@
+[bold]Intents[/] [dim]6[/]
+  act         [dim]bundled[/]                         Act on the open items of a unit: resolve what you can,
+                                              and propose the replies it needs as drafts for you to
+                                              approve
+  address     [dim]bundled[/]                         Triage the reviews and failing checks of a pull
+                                              request you develop, in its workspace
+  ask-author  [dim]intents/ask-author/intent.toml[/]  Ask the author one question
+  nudge       [dim]bundled[/]                         Ask whoever the pull request waits on for the next
+                                              step, in a comment; guidance is the topic
+  probe       [dim]bundled[/]                         Check that an agent home can read its turn, record it,
+                                              take an answer and be resumed
+  review      [dim]bundled[/]                         Start or continue a review round on someone else's
+                                              pull request, in a dedicated workspace
+
+[bold]Blocks[/] [dim]5[/]
+  [bold]address[/]  organization=acme/kind=fix/intent=address.md  [dim]organization acme, kind fix[/]
+  [bold]nudge[/]    user=ana/intent=nudge.md                      [dim]user ana[/]
+  [bold]review[/]   intent=review.md                              [dim]every pull request[/]
+           organization=acme/intent=review.md            [dim]organization acme[/]
+           organization=acme/repo=api/intent=review.md   [dim]organization acme, repo api, paths **/*.sql[/]
+
+~: 5 block(s), [green]no errors[/]

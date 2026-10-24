@@ -1,0 +1,37 @@
+[bold]GitHub and Orca[/]                                                                                 [dim]2 ok[/]
+  [green]✓[/] gh authenticated
+  [green]✓[/] orca reachable
+
+[bold]Config[/]                                                                                 [dim]1 ok[/][dim] · [/][dim]1 info[/]
+  [green]✓[/] config            [dim]~/.config/{{name}}/config.json[/]
+  [cyan]i[/] effective config  [dim]agent=claude review_prefix="REVIEW " views.orca.columns.working=reviewing[/]
+                      [dim]views.orca.columns.ready=ready-to-merge rounds.per_pr_per_day=5[/]
+                      [dim]automated_reviewers=[lintbot-ai] brief=true[/]
+
+[bold]Agent homes[/]                                                                [dim]4 ok[/][dim] · [/][dim]2 info[/][dim] · [/][red]1 missing[/]
+  [bold]~/.claude[/]
+    [green]✓[/] MCP server {{name}}  [green]✓[/] hook Stop  [green]✓[/] skills
+    [red]✗[/] hook SessionStart  absent
+        [yellow]fix:[/] {{command}} install --home /home/u/.claude
+    [cyan]i[/] Orca status hook   [dim]PreToolUse, Stop run Orca's status hook, which moves the workspace card on[/]
+                         [dim]every prompt and competes with {{name}}'s projection of the turn[/]
+  [bold]~/.codex[/]
+    [cyan]i[/] home               [dim]absent; {{name}} installs nothing there[/]
+  [bold]~/.agents[/]
+    [green]✓[/] skills
+
+[bold]Profile and intents[/]                                                                        [red]1 missing[/]
+  [red]✗[/] intent triage  does not load:
+                   when: unknown field pr.nope
+                   body: empty
+      [yellow]fix:[/] fix the manifest; '{{command}} profile check' lists every problem
+
+[bold]Daemon[/]                                                                              [dim]2 ok[/][dim] · [/][red]2 missing[/]
+  [green]✓[/] store                        [dim]~/.local/state/{{name}}/store.db, not /home/user2/x nor[/]
+                                 [dim]x/home/u/y/abc/def/ghi[/]
+  [green]✓[/] LaunchAgent                  [dim]~/Library/LaunchAgents/com.example.daemon.plist, runs serve, sweeps[/]
+                                 [dim]every 2m[/]
+  [red]✗[/] menu bar LaunchAgent loaded  loaded, last exit code 75
+      [yellow]fix:[/] {{command}} app install
+  [yellow]![/] daemon warning               fast: search author:me failed
+

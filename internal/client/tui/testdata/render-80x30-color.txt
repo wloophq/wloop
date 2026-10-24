@@ -1,0 +1,30 @@
+[7m[1m Needs me 5 [22m[27m   [2mMy PRs 1[22m    [2mIn loop 1[22m    [2mPlan 0[22m           [33mautomatic rounds paused[39m
+
+[7m>   [33m6d[39m  ]8;;https://github.com/acme/api/pull/7\acme/api#7]8;;\                 Batch export             me · agent asks     [27m
+   [36m42s[39m  acme/api#3                 Retry webhooks with ba…  me · round soon
+   [31m!9d[39m  ]8;;https://github.com/acme/billing-service/pull/1365\acme/billing-service#1365]8;;\  Remove hardcoded crede…  car… · changes asked
+    [33m2d[39m  acme/api#42                ✨ feat: export ⚡️ fas…  me · checks failing
+ * [2m12m[22m  acme/api#9                 Loop one                 me · agent working
+
+[1macme/api#7[22m  Batch export
+  [2mwaiting  [22m  me · agent asks · 6d
+  [2mwhy      [22m  publish?
+  [2mbrief    [22m  M · high risk · Export the ledger in batches of a thousand rows so
+             the nightly job stops timing out
+  [2mworkspace[22m  REVIEW batch-export · reviewing
+  [2masks     [22m  [33mPublish the review?[39m
+  [2m         [22m  [2mdrafted APPROVE, 0 blocking, 2 non-blocking[22m
+  [2m         [22m  1. Comment only
+  [2m         [22m  2. Publish APPROVE (recommended)
+  [2m         [22m  3. Hold the draft
+  [2mkeys     [22m  [1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mA[22m [2mtake over[22m
+             [1mH[22m [2mpause[22m  [1mM[22m [2mmute[22m  [1mO[22m [2mopen[22m
+  [2mnot now  [22m  [2mF address · N nudge[22m
+
+
+
+
+
+
+[33mwarning: app: notifications are off[39m
+[1mG[22m [2mguide[22m  [1mV[22m [2mreview[22m  [1mW[22m [2manswer[22m  [1mC[22m [2mcontinue[22m  [1mX[22m [2mdismiss[22m  [1mA[22m [2mtake over[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

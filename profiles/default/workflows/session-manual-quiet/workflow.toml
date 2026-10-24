@@ -1,0 +1,18 @@
+description = "Offer to close a session you started that stayed quiet for cleanup.manual_idle"
+subject = "session"
+when = '!session.managed && session.agent_state == "done" && session.idle_for > config.cleanup.manual_idle'
+mode = "apply"
+order = 16
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+
+[limits]
+per_run = 10
+per_day = 100
+
+[approval]
+default = "wait"

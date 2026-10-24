@@ -1,0 +1,1 @@
+testdata/bad/key-duplicate/intents/ask-author/intent.toml:5:7: key: F is the key of address on web; the intent loads without a key (palette only)

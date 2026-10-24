@@ -1,0 +1,29 @@
+label = "Nudge"
+summary = "Ask whoever a pull request waits on for the next step"
+key = "N"
+workspace = "pr_else_main"
+session = { strategy = "new", title = "nudge", close_when_done = true }
+answerable = false
+profile = "nudge"
+prepare = "nudge.prepare"
+
+[headline]
+resumed = "nudge on {{.PR.Slug}}"
+[[headline.new]]
+text = "Nudge on {{.PR.Slug}}."
+
+[inputs.situation]
+type = "text"
+from = "prepare"
+
+[inputs.who]
+type = "list"
+from = "prepare"
+
+[action]
+enabled = 'row.nudge.refusal == ""'
+reason_off = "{{.row.nudge.refusal}}"
+confirm = "Nudge {{join .row.nudge.who \", \"}} on {{.pr.slug}}?"
+
+[record]
+states = ["done", "failed"]

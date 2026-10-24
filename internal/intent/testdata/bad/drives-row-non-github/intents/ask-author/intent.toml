@@ -1,0 +1,14 @@
+label = "Ask author"
+summary = "Ask the author one question"
+workspace = "given"
+provider = "thread"
+drives_row = true
+session = { strategy = "new", title = "ask" }
+
+[headline]
+resumed = "ask round on {{.Wording.Ref}}"
+[[headline.new]]
+text = "Ask in {{.Wording.Ref}} one question."
+
+[record]
+states = ["done", "asked", "failed"]

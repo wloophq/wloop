@@ -1,0 +1,515 @@
+{
+  "bindings": [
+    {
+      "key": "j",
+      "action": "move:down",
+      "context": "list",
+      "owner": "core",
+      "help": "move down"
+    },
+    {
+      "key": "k",
+      "action": "move:up",
+      "context": "list",
+      "owner": "core",
+      "help": "move up"
+    },
+    {
+      "key": "Enter",
+      "action": "detail:open",
+      "context": "list",
+      "owner": "core",
+      "help": "open the detail"
+    },
+    {
+      "key": "Esc",
+      "action": "detail:close",
+      "context": "list",
+      "owner": "core",
+      "help": "close the detail"
+    },
+    {
+      "key": "x",
+      "action": "next",
+      "context": "list",
+      "owner": "core",
+      "help": "to Next"
+    },
+    {
+      "key": "w",
+      "action": "waiting",
+      "context": "list",
+      "owner": "core",
+      "help": "to Waiting"
+    },
+    {
+      "key": "s",
+      "action": "schedule",
+      "context": "list",
+      "owner": "core",
+      "help": "schedule or snooze"
+    },
+    {
+      "key": "y",
+      "action": "someday",
+      "context": "list",
+      "owner": "core",
+      "help": "to Someday"
+    },
+    {
+      "key": "l",
+      "action": "reference",
+      "context": "list",
+      "owner": "core",
+      "help": "to Reference"
+    },
+    {
+      "key": "f",
+      "action": "focus",
+      "context": "list",
+      "owner": "core",
+      "help": "toggle Focus"
+    },
+    {
+      "key": "p",
+      "action": "project",
+      "context": "list",
+      "owner": "core",
+      "help": "make a project or attach to one"
+    },
+    {
+      "key": "a",
+      "action": "approve",
+      "context": "list",
+      "owner": "core",
+      "help": "approve the draft or proposal"
+    },
+    {
+      "key": "d",
+      "action": "delegate",
+      "context": "list",
+      "owner": "core",
+      "help": "delegate to an agent"
+    },
+    {
+      "key": "e",
+      "action": "done",
+      "context": "list",
+      "owner": "core",
+      "help": "done"
+    },
+    {
+      "key": "Backspace",
+      "action": "dismiss",
+      "context": "list",
+      "owner": "core",
+      "help": "dismiss"
+    },
+    {
+      "key": "r",
+      "action": "reply",
+      "context": "list",
+      "owner": "core",
+      "help": "reply in the conversation"
+    },
+    {
+      "key": "o",
+      "action": "open-source",
+      "context": "list",
+      "owner": "core",
+      "help": "open the source"
+    },
+    {
+      "key": "n",
+      "action": "capture",
+      "context": "global",
+      "owner": "core",
+      "help": "capture"
+    },
+    {
+      "key": "g f",
+      "action": "nav:focus",
+      "context": "global",
+      "owner": "core",
+      "help": "Focus"
+    },
+    {
+      "key": "g i",
+      "action": "nav:inbox",
+      "context": "global",
+      "owner": "core",
+      "help": "Inbox"
+    },
+    {
+      "key": "g o",
+      "action": "nav:outbox",
+      "context": "global",
+      "owner": "core",
+      "help": "Outbox"
+    },
+    {
+      "key": "g n",
+      "action": "nav:next",
+      "context": "global",
+      "owner": "core",
+      "help": "Next"
+    },
+    {
+      "key": "g w",
+      "action": "nav:waiting",
+      "context": "global",
+      "owner": "core",
+      "help": "Waiting"
+    },
+    {
+      "key": "g p",
+      "action": "nav:projects",
+      "context": "global",
+      "owner": "core",
+      "help": "Projects"
+    },
+    {
+      "key": "g r",
+      "action": "nav:review",
+      "context": "global",
+      "owner": "core",
+      "help": "Review"
+    },
+    {
+      "key": "g g",
+      "action": "nav:github",
+      "context": "global",
+      "owner": "core",
+      "help": "the GitHub views"
+    },
+    {
+      "key": "/",
+      "action": "filter",
+      "context": "global",
+      "owner": "core",
+      "help": "filter"
+    },
+    {
+      "key": "Cmd+K",
+      "action": "palette",
+      "context": "global",
+      "owner": "core",
+      "help": "every action and its key"
+    },
+    {
+      "key": "?",
+      "action": "help",
+      "context": "global",
+      "owner": "core",
+      "help": "help"
+    },
+    {
+      "key": "Enter",
+      "action": "step:done",
+      "context": "review",
+      "owner": "core",
+      "help": "mark the step done"
+    },
+    {
+      "key": "]",
+      "action": "step:next",
+      "context": "review",
+      "owner": "core",
+      "help": "next step"
+    },
+    {
+      "key": "[",
+      "action": "step:prev",
+      "context": "review",
+      "owner": "core",
+      "help": "previous step"
+    },
+    {
+      "key": "Enter",
+      "action": "approve",
+      "context": "plan",
+      "owner": "core",
+      "help": "apply the selected plan step"
+    },
+    {
+      "key": "1",
+      "action": "answer:1",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 1"
+    },
+    {
+      "key": "Shift+1",
+      "action": "area:1",
+      "context": "global",
+      "owner": "core",
+      "help": "area 1"
+    },
+    {
+      "key": "2",
+      "action": "answer:2",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 2"
+    },
+    {
+      "key": "Shift+2",
+      "action": "area:2",
+      "context": "global",
+      "owner": "core",
+      "help": "area 2"
+    },
+    {
+      "key": "3",
+      "action": "answer:3",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 3"
+    },
+    {
+      "key": "Shift+3",
+      "action": "area:3",
+      "context": "global",
+      "owner": "core",
+      "help": "area 3"
+    },
+    {
+      "key": "4",
+      "action": "answer:4",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 4"
+    },
+    {
+      "key": "Shift+4",
+      "action": "area:4",
+      "context": "global",
+      "owner": "core",
+      "help": "area 4"
+    },
+    {
+      "key": "5",
+      "action": "answer:5",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 5"
+    },
+    {
+      "key": "Shift+5",
+      "action": "area:5",
+      "context": "global",
+      "owner": "core",
+      "help": "area 5"
+    },
+    {
+      "key": "6",
+      "action": "answer:6",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 6"
+    },
+    {
+      "key": "Shift+6",
+      "action": "area:6",
+      "context": "global",
+      "owner": "core",
+      "help": "area 6"
+    },
+    {
+      "key": "7",
+      "action": "answer:7",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 7"
+    },
+    {
+      "key": "Shift+7",
+      "action": "area:7",
+      "context": "global",
+      "owner": "core",
+      "help": "area 7"
+    },
+    {
+      "key": "8",
+      "action": "answer:8",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 8"
+    },
+    {
+      "key": "Shift+8",
+      "action": "area:8",
+      "context": "global",
+      "owner": "core",
+      "help": "area 8"
+    },
+    {
+      "key": "9",
+      "action": "answer:9",
+      "context": "question",
+      "owner": "core",
+      "help": "answer option 9"
+    },
+    {
+      "key": "Shift+9",
+      "action": "area:9",
+      "context": "global",
+      "owner": "core",
+      "help": "area 9"
+    },
+    {
+      "key": "R",
+      "action": "run_now",
+      "context": "list",
+      "owner": "core",
+      "help": "Run now"
+    },
+    {
+      "key": "S",
+      "action": "skip",
+      "context": "list",
+      "owner": "core",
+      "help": "Skip"
+    },
+    {
+      "key": "G",
+      "action": "guide",
+      "context": "list",
+      "owner": "core",
+      "help": "Guide"
+    },
+    {
+      "key": "T",
+      "action": "trust_run",
+      "context": "list",
+      "owner": "core",
+      "help": "Trust folder and run"
+    },
+    {
+      "key": "D",
+      "action": "unblock",
+      "context": "list",
+      "owner": "core",
+      "help": "Dismiss block"
+    },
+    {
+      "key": "V",
+      "action": "review",
+      "context": "list",
+      "owner": "intent:review",
+      "help": "Review"
+    },
+    {
+      "key": "F",
+      "action": "address",
+      "context": "list",
+      "owner": "intent:address",
+      "help": "Address"
+    },
+    {
+      "key": "N",
+      "action": "nudge",
+      "context": "list",
+      "owner": "intent:nudge",
+      "help": "Nudge"
+    },
+    {
+      "key": "W",
+      "action": "answer",
+      "context": "list",
+      "owner": "core",
+      "help": "Answer"
+    },
+    {
+      "key": "C",
+      "action": "continue",
+      "context": "list",
+      "owner": "core",
+      "help": "Continue"
+    },
+    {
+      "key": "X",
+      "action": "dismiss",
+      "context": "list",
+      "owner": "core",
+      "help": "Dismiss"
+    },
+    {
+      "key": "A",
+      "action": "take_over",
+      "context": "list",
+      "owner": "core",
+      "help": "Take over"
+    },
+    {
+      "key": "H",
+      "action": "hold",
+      "context": "list",
+      "owner": "core",
+      "help": "Hold"
+    },
+    {
+      "key": "H",
+      "action": "release",
+      "context": "list",
+      "owner": "core",
+      "help": "Release"
+    },
+    {
+      "key": "M",
+      "action": "mute",
+      "context": "list",
+      "owner": "core",
+      "help": "Mute"
+    },
+    {
+      "key": "M",
+      "action": "unmute",
+      "context": "list",
+      "owner": "core",
+      "help": "Unmute"
+    },
+    {
+      "key": "O",
+      "action": "open",
+      "context": "list",
+      "owner": "core",
+      "help": "Open"
+    },
+    {
+      "key": "Enter",
+      "action": "plan_apply",
+      "context": "plan",
+      "owner": "core",
+      "help": "Apply"
+    },
+    {
+      "key": "X",
+      "action": "plan_dismiss",
+      "context": "plan",
+      "owner": "core",
+      "help": "Dismiss"
+    },
+    {
+      "key": "G",
+      "action": "guide",
+      "context": "plan",
+      "owner": "core",
+      "help": "Guide"
+    },
+    {
+      "key": "T",
+      "action": "trust_run",
+      "context": "plan",
+      "owner": "core",
+      "help": "Trust folder and run"
+    },
+    {
+      "key": "D",
+      "action": "unblock",
+      "context": "plan",
+      "owner": "core",
+      "help": "Dismiss block"
+    }
+  ]
+}

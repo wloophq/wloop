@@ -1,0 +1,15 @@
+description = "Remove a second workspace of a pull request that the manager does not link to it"
+subject = "workspace"
+when = '!workspace.main && workspace.duplicate && workspace.path_exists'
+mode = "observe"
+order = 24
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "workspace.remove"
+
+[limits]
+per_run = 5
+per_day = 30

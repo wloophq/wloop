@@ -1,0 +1,653 @@
+{
+ "clock_a": "2026-10-20T18:20:00Z",
+ "clock_b": "2026-11-04T11:15:31Z",
+ "rows": [
+  {
+   "unit": "github:acme/gadgets#123",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "run"
+  },
+  {
+   "unit": "github:acme/gadgets#195",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"closed\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/gadgets#546",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/gadgets#718",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#131",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#407",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#524",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"asked\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/probe#1",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"asked\", pr.state \"\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5080",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5111",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5158",
+   "clock": "A",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000001",
+   "clock": "A",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_for 7h4m \u003c cleanup.manual_idle 24h"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000003",
+   "clock": "A",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_for 7h4m \u003c cleanup.manual_idle 24h"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000006",
+   "clock": "A",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000006",
+   "clock": "A",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000008",
+   "clock": "A",
+   "workflow": "session-asked-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:sid-1",
+   "clock": "A",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_for 7h4m \u003c cleanup.manual_idle 24h"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000012",
+   "clock": "A",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000014",
+   "clock": "A",
+   "workflow": "session-finished-quiet",
+   "decision": "not matched",
+   "threshold": "session.newest_state \"dismissed\""
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000016",
+   "clock": "A",
+   "workflow": "session-finished-quiet",
+   "decision": "not matched",
+   "threshold": "session.newest_state empty: no turn on it"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000018",
+   "clock": "A",
+   "workflow": "session-finished-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_for 1h52m \u003c cleanup.idle 2h"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000020",
+   "clock": "A",
+   "workflow": "session-asked-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000020",
+   "clock": "A",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000022",
+   "clock": "A",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:sid-2",
+   "clock": "A",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_since unknown: never seen idle"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000025",
+   "clock": "A",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.agent_state \"\" is not done"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000050",
+   "clock": "A",
+   "workflow": "session-worktree-gone",
+   "decision": "blocked",
+   "reason": "no agent"
+  },
+  {
+   "unit": "workspace:/home/user/src/widgets",
+   "clock": "A",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "clock": "A",
+   "workflow": "workspace-temporary",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_finished_for 22h7m \u003c cleanup.workspace_grace 24h"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_finished_for 3h45m \u003c cleanup.workspace_grace 24h"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/me-cache-tuning",
+   "clock": "A",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "not matched",
+   "threshold": "workspace.quiet_for 264h5m \u003c cleanup.stale_workspace 336h"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/me-runbook-command",
+   "clock": "A",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "not matched",
+   "threshold": "workspace.quiet_for 146h38m \u003c cleanup.stale_workspace 336h"
+  },
+  {
+   "unit": "workspace:/private/tmp/scratch/widgets-review",
+   "clock": "A",
+   "workflow": "workspace-temporary",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/src/handbook",
+   "clock": "A",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/handbook/catalog",
+   "clock": "A",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /home/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+  },
+  {
+   "unit": "workspace:/home/user/src/billing",
+   "clock": "A",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/billing/invoice-export",
+   "clock": "A",
+   "workflow": "workspace-author-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/src/gadgets",
+   "clock": "A",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_finished_for 22h3m \u003c cleanup.workspace_grace 24h"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_finished_for 22h7m \u003c cleanup.workspace_grace 24h"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "clock": "A",
+   "workflow": "workspace-duplicate",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "clock": "A",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_state \"open\""
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/scratch-notes",
+   "clock": "A",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "github:acme/gadgets#123",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "run"
+  },
+  {
+   "unit": "github:acme/gadgets#195",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"closed\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/gadgets#546",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/gadgets#718",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#131",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#407",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/handbook#524",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"asked\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/probe#1",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"asked\", pr.state \"\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5080",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5111",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "github:acme/widgets#5158",
+   "clock": "B",
+   "workflow": "hygiene-turn-on-finished-pr",
+   "decision": "not matched",
+   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000001",
+   "clock": "B",
+   "workflow": "session-manual-quiet",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000003",
+   "clock": "B",
+   "workflow": "session-manual-quiet",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000006",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000006",
+   "clock": "B",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000008",
+   "clock": "B",
+   "workflow": "session-asked-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:sid-1",
+   "clock": "B",
+   "workflow": "session-manual-quiet",
+   "decision": "blocked",
+   "reason": "cannot tell whether you typed in it"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000012",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000014",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "not matched",
+   "threshold": "session.newest_state \"dismissed\""
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000016",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "not matched",
+   "threshold": "session.newest_state empty: no turn on it"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000018",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000020",
+   "clock": "B",
+   "workflow": "session-asked-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000020",
+   "clock": "B",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000022",
+   "clock": "B",
+   "workflow": "session-finished-quiet",
+   "decision": "run"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000022",
+   "clock": "B",
+   "workflow": "session-pr-finished",
+   "decision": "run"
+  },
+  {
+   "unit": "session:sid-2",
+   "clock": "B",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.idle_since unknown: never seen idle"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000025",
+   "clock": "B",
+   "workflow": "session-manual-quiet",
+   "decision": "not matched",
+   "threshold": "session.agent_state \"\" is not done"
+  },
+  {
+   "unit": "session:term_00000000-0000-4000-a000-000000000050",
+   "clock": "B",
+   "workflow": "session-worktree-gone",
+   "decision": "blocked",
+   "reason": "no agent"
+  },
+  {
+   "unit": "workspace:/home/user/src/widgets",
+   "clock": "B",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "workspace:/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "clock": "B",
+   "workflow": "workspace-temporary",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "workspace.pendency [modified files, commits on no remote], workspace.dirty 1, workspace.unpushed 4: 4 commits not pushed in /home/user/worktrees/widgets/REVIEW-feat-batch-upload; back them up with: git push origin HEAD:refs/heads/me/backup-feat/batch-upload"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/me-cache-tuning",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/widgets/me-runbook-command",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "workspace.pendency [commits on no remote]: 3 commits not pushed in /home/user/worktrees/widgets/me-runbook-command; back them up with: git push origin HEAD:refs/heads/me/backup-chore/runbook-command"
+  },
+  {
+   "unit": "workspace:/private/tmp/scratch/widgets-review",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "waits for you"
+  },
+  {
+   "unit": "workspace:/private/tmp/scratch/widgets-review",
+   "clock": "B",
+   "workflow": "workspace-temporary",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/src/handbook",
+   "clock": "B",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "workspace.pendency [untracked files], workspace.untracked 1: untracked or ignored files outside the disposable list: threads.txt"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/handbook/catalog",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "workspace.pendency [modified files, commits on no remote]: 3 commits not pushed in /home/user/worktrees/handbook/catalog; back them up with: git push origin HEAD:refs/heads/me/backup-worktree-catalog"
+  },
+  {
+   "unit": "workspace:/home/user/src/billing",
+   "clock": "B",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/billing/invoice-export",
+   "clock": "B",
+   "workflow": "workspace-author-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/src/gadgets",
+   "clock": "B",
+   "workflow": "-",
+   "decision": "not matched",
+   "threshold": "workspace.main"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "clock": "B",
+   "workflow": "workspace-duplicate",
+   "decision": "pending",
+   "reason": "observe mode"
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "clock": "B",
+   "workflow": "workspace-review-finished",
+   "decision": "not matched",
+   "threshold": "workspace.pr_state \"open\""
+  },
+  {
+   "unit": "workspace:/home/user/worktrees/gadgets/scratch-notes",
+   "clock": "B",
+   "workflow": "workspace-idle-no-pr",
+   "decision": "pending",
+   "reason": "waits for you"
+  }
+ ]
+}

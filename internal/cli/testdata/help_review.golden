@@ -1,0 +1,17 @@
+USAGE
+  {{command}} review <url> [--no-wait] [--no-brief] [guidance...]
+
+Start or continue a review round on someone else's pull request, in a dedicated
+workspace. Words after the URL are guidance for the turn. It runs as an intake
+this command follows; Ctrl-C stops following, not the intake.
+
+FLAGS
+  --no-wait   Print the intake's number instead of following it
+  --no-brief  Start the round without its brief
+
+EXAMPLES
+  {{command}} review https://github.com/acme/api/pull/7
+  {{command}} review https://github.com/acme/api/pull/7 look at the migration first
+
+DOCS
+  https://{{name}}hq.github.io/{{name}}/guides/review/

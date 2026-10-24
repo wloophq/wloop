@@ -1,0 +1,12 @@
+{{define "why"}}
+## Why this turn started
+
+{{name}} started this turn from the workflow `{{.Why.Workflow}}`{{if eq .Why.Trigger "event"}}, on the event `{{.Why.Event}}`{{with .Why.EventData}} (`{{line .}}`){{end}}{{else if eq .Why.Trigger "schedule"}}, on its schedule{{else if eq .Why.Trigger "sweep"}}, because its condition held in a periodic sweep{{end}}.
+{{- with .Why.Matched}} The facts that condition read, with their values when it matched:
+{{range .}}
+- `{{.Name}}`: `{{line .Value}}`
+{{- end}}
+{{- end}}
+
+Use this to decide how much the situation calls for; it never overrides the rules below.
+{{end}}

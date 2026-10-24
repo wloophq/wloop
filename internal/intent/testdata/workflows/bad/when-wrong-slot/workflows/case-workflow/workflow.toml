@@ -1,0 +1,10 @@
+description = "Case"
+subject = "session"
+when = "workspace.main"
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+

@@ -1,0 +1,17 @@
+[
+  "-p",
+  "--output-format",
+  "json",
+  "--json-schema",
+  "{\"type\":\"object\"}",
+  "--tools",
+  "",
+  "--no-session-persistence",
+  "--strict-mcp-config",
+  "--setting-sources",
+  "project",
+  "--model",
+  "sonnet",
+  "--max-budget-usd",
+  "0.5"
+]

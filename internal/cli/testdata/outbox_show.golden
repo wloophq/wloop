@@ -1,0 +1,17 @@
+#12  nudge  proposed
+acme/api#7 · Batch export for large accounts
+https://github.com/acme/api/pull/7
+
+  @ana, any news on this?
+
+  - Review the schema change
+
+Asks about  Review the schema change (open)
+Mentions    @ana
+To          acme/api#7
+Origin      rule stalled-nudge, 26h ago
+Approval    always
+
+{{command}} outbox approve 12
+{{command}} outbox edit 12 <markdown>
+{{command}} outbox discard 12

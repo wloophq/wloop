@@ -1,0 +1,4547 @@
+{
+  "asked_choice": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "loop_waiting",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T09:30:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "publish?",
+      "line": "agent asks"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T09:30:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "loop_waiting"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "loop"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "note": "Starts a new round; the agent's open question is replaced"
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "hint": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "question": {
+      "record_id": 1,
+      "state": "asked",
+      "kind": "choice",
+      "text": "Publish the review?",
+      "options": [
+        {
+          "id": "comment",
+          "label": "Comment only",
+          "consequence": "posts a comment"
+        },
+        {
+          "id": "publish",
+          "label": "Publish APPROVE",
+          "consequence": "approves",
+          "publishes": true
+        },
+        {
+          "id": "hold",
+          "label": "Hold the draft",
+          "consequence": "nothing is posted"
+        }
+      ],
+      "recommend": "publish",
+      "verdict": "APPROVE",
+      "blocking": 0,
+      "non_blocking": 2
+    },
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 1,
+          "open": 1,
+          "last_intent": "review",
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "asked_confirm": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "loop_waiting",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T09:30:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "push?",
+      "line": "agent asks"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T09:30:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "loop_waiting"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "loop"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "note": "Starts a new round; the agent's open question is replaced"
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on the review loop (push?); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "hint": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "question": {
+      "record_id": 1,
+      "state": "asked",
+      "kind": "confirm",
+      "text": "Push?",
+      "recommend": "no",
+      "blocking": 0,
+      "non_blocking": 0
+    },
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 1,
+          "open": 1,
+          "last_intent": "review",
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "blocked": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "blocked",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T10:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "round blocked: no workspace",
+      "line": "round blocked"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "blocked"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (round blocked: no workspace); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "blocked_untrusted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "blocked",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T10:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "round blocked: could not start: /src/api is not trusted in /home/.claude-work",
+      "line": "round blocked"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "blocked"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "trust_run",
+        "enabled": true,
+        "hint": "Trust /src/api in /home/.claude-work, then run the round",
+        "primary": true
+      },
+      {
+        "id": "unblock",
+        "enabled": true,
+        "hint": "Lift the block without trusting; the round waits for a new trigger"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (round blocked: could not start: /src/api is not trusted in /home/.claude-work); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "blocked_untrusted_lifted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "blocked_untrusted_terminal_home": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "blocked",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T10:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal",
+      "line": "round blocked"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "blocked"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "trust_run",
+        "enabled": true,
+        "hint": "Trust /src/api in /home/.claude, /home/orca/profiles/p1/home, then run the round",
+        "primary": true
+      },
+      {
+        "id": "unblock",
+        "enabled": true,
+        "hint": "Lift the block without trusting; the round waits for a new trigger"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (round blocked: could not start: /src/api/wt is not trusted in the agent home of its terminal); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "brief_off": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": false,
+        "reason": "the brief is off; set brief.enabled in the config"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "done_muted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#8"
+    },
+    "link": "https://github.com/acme/api/pull/8",
+    "label": "acme/api#8",
+    "title": "Done",
+    "kind": "done",
+    "summary": {
+      "waits_on": "nobody",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "closed": true,
+      "open_items": 0,
+      "reason": "merged",
+      "line": "merged"
+    },
+    "views": [],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "me",
+        "me"
+      ],
+      "ci": [
+        "none"
+      ],
+      "due": [
+        "2026-10-08T11:00:00Z"
+      ],
+      "is": [
+        "muted"
+      ],
+      "kind": [
+        "done"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "author"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "actions": [
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "unmute",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "me",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "author"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "muted_until": "2026-10-08T11:00:00Z",
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_waiting_on": "",
+        "hold": false,
+        "adopted": false,
+        "tracked": false,
+        "next_guidance": ""
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        },
+        "next": [
+          {
+            "at": "2026-10-08T11:00:00Z",
+            "what": "unmute"
+          }
+        ]
+      },
+      "viewer": "me",
+      "mute": {
+        "until": "2026-10-08T11:00:00Z"
+      }
+    }
+  },
+  "done_with_workspace": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#8"
+    },
+    "link": "https://github.com/acme/api/pull/8",
+    "label": "acme/api#8",
+    "title": "Done",
+    "kind": "done",
+    "summary": {
+      "waits_on": "nobody",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "closed": true,
+      "open_items": 0,
+      "reason": "merged",
+      "line": "merged"
+    },
+    "views": [
+      "done"
+    ],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "me",
+        "me"
+      ],
+      "ci": [
+        "none"
+      ],
+      "kind": [
+        "done"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "author"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "actions": [
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "remove",
+        "enabled": true,
+        "confirm": "Remove the workspace of acme/api#8? Its checkout is deleted and its terminals are closed. It is refused while its agent works or waits, or when it holds uncommitted files, unpushed commits or ignored files outside build and dependency folders."
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "me",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "author"
+      ],
+      "workspace": {
+        "id": "w8",
+        "display_name": "feat-done",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me"
+    }
+  },
+  "explore_candidate_mine": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/web#4"
+    },
+    "link": "https://github.com/acme/web/pull/4",
+    "label": "acme/web#4",
+    "title": "Mine",
+    "kind": "",
+    "summary": {
+      "waits_on": "",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "",
+      "line": ""
+    },
+    "views": [],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "me",
+        "me"
+      ],
+      "ci": [
+        "none"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/web"
+      ],
+      "risk": [
+        "none"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "actions": [
+      {
+        "id": "review",
+        "enabled": true
+      },
+      {
+        "id": "address",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "act",
+        "enabled": true,
+        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/web#4 is not tracked; track it before a nudge"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/web#4"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/web#4"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/web#4"
+      },
+      {
+        "id": "take_over",
+        "enabled": false,
+        "reason": "It is yours already"
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "me",
+      "repo": "acme/web",
+      "head": "",
+      "approved": false,
+      "reasons": [],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "viewer": "me"
+    }
+  },
+  "forceable_refusal": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled",
+      "loop"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me",
+        "in-loop"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "remove",
+        "enabled": true,
+        "confirm": "Remove the workspace of acme/api#7? Its checkout is deleted and its terminals are closed. It is refused while its agent works or waits, or when it holds uncommitted files, unpushed commits or ignored files outside build and dependency folders. The pull request is still open: no automatic first round brings the workspace back; Review or Address does."
+      },
+      {
+        "id": "remove_force",
+        "enabled": true,
+        "hint": "Refused: the workspace holds uncommitted files",
+        "confirm": "Force remove the workspace of acme/api#7?\n\nIt was refused:\nthe workspace holds uncommitted files\n\nForcing deletes its checkout with what is named above, for good."
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "w7",
+        "display_name": "REVIEW batch",
+        "status": "",
+        "is_review": true,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "gate_off": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": false,
+        "reason": "the daemon plans no automatic round; see doctor"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "held": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "held",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T10:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "automatic round held: daily cap",
+      "line": "held (cap)"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "held"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "run_now",
+        "enabled": true,
+        "primary": true,
+        "confirm": "Run the held round on acme/api#7 now? It does not count against the cap.",
+        "basis": "held:automatic round held: daily cap"
+      },
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on the review loop (automatic round held: daily cap); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "intake_waiting_cli": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "briefing… (attempt 1)"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      },
+      {
+        "id": "intake_without",
+        "enabled": true
+      },
+      {
+        "id": "intake_cancel",
+        "enabled": true
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "intake": {
+        "seq": 1,
+        "pr": "https://github.com/acme/api/pull/7",
+        "intent": "review",
+        "source": "cli",
+        "state": "accepted",
+        "attempt": 1,
+        "log_len": 0
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "intake_waiting_session": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "briefing… (attempt 1)"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": false,
+        "reason": "intake 1 already asks for this pull request's review from an agent session; cancel it with {{command}} intake cancel 1"
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      },
+      {
+        "id": "intake_without",
+        "enabled": false,
+        "reason": "intake 1 is a turn by hand, which only its session starts; cancel it with {{command}} intake cancel 1"
+      },
+      {
+        "id": "intake_cancel",
+        "enabled": true
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "intake": {
+        "seq": 1,
+        "pr": "https://github.com/acme/api/pull/7",
+        "intent": "review",
+        "source": "session",
+        "state": "accepted",
+        "attempt": 1,
+        "log_len": 0
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "mine_no_reviewer": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#10"
+    },
+    "link": "https://github.com/acme/api/pull/10",
+    "label": "acme/api#10",
+    "title": "Mine",
+    "kind": "no_reviewer",
+    "summary": {
+      "waits_on": "author",
+      "since": "2026-10-05T10:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "no reviewer requested",
+      "line": "no reviewer requested"
+    },
+    "views": [
+      "stalled",
+      "mine"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-05T10:00:00Z"
+      ],
+      "author": [
+        "me",
+        "me"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled"
+      ],
+      "kind": [
+        "no_reviewer"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "author"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true
+      },
+      {
+        "id": "address",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "act",
+        "enabled": true,
+        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+      },
+      {
+        "id": "nudge",
+        "enabled": true,
+        "hint": "Nudge the maintainers (no reviewer requested)",
+        "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent posts one comment under your name."
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#10"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#10"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#10"
+      },
+      {
+        "id": "take_over",
+        "enabled": false,
+        "reason": "It is yours already"
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "me",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "author"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me"
+    }
+  },
+  "nudged_recently": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#9"
+    },
+    "link": "https://github.com/acme/api/pull/9",
+    "label": "acme/api#9",
+    "title": "Cache warmup",
+    "kind": "no_reviewer",
+    "summary": {
+      "waits_on": "author",
+      "since": "2026-10-05T10:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "no reviewer requested",
+      "line": "no reviewer requested"
+    },
+    "views": [
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-05T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled"
+      ],
+      "kind": [
+        "no_reviewer"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "repo"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "author"
+      ],
+      "waits-on": [
+        "ana"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#9: already nudged @ana at <local time>; again after <local time>"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#9"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#9"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#9"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#9? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "repo"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-05T10:00:00Z",
+        "link": "https://github.com/acme/api/pull/9"
+      }
+    }
+  },
+  "others_adopted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled",
+      "mine"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me",
+        "adopted"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true
+      },
+      {
+        "id": "address",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "act",
+        "enabled": true,
+        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "muted_until": "0001-01-01T00:00:00Z",
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_waiting_on": "",
+        "hold": false,
+        "adopted": true,
+        "tracked": false,
+        "next_guidance": ""
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "others_not_adopted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "pending": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "round_pending",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "follow-up waiting for your answer: ana replied",
+      "line": "round soon"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "due": [
+        "2026-10-08T10:01:00Z"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "round_pending"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "run_now",
+        "enabled": true,
+        "primary": true,
+        "basis": "pending:2026-10-08T10:00:00Z"
+      },
+      {
+        "id": "skip",
+        "enabled": true
+      },
+      {
+        "id": "guide",
+        "enabled": true
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "pending": {
+      "intent": "follow-up",
+      "reason": "ana replied",
+      "since": "2026-10-08T10:00:00Z",
+      "deadline": "2026-10-08T10:01:00Z"
+    },
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        },
+        "next": [
+          {
+            "at": "2026-10-08T10:01:00Z",
+            "what": "gate"
+          }
+        ]
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "pending_muted": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "muted",
+    "summary": {
+      "waits_on": "nobody",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "muted",
+      "line": "muted"
+    },
+    "views": [],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "due": [
+        "2026-10-08T10:01:00Z",
+        "2026-10-08T11:00:00Z"
+      ],
+      "is": [
+        "muted"
+      ],
+      "kind": [
+        "muted"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "actions": [
+      {
+        "id": "run_now",
+        "enabled": true,
+        "primary": true,
+        "basis": "pending:2026-10-08T10:00:00Z"
+      },
+      {
+        "id": "skip",
+        "enabled": true
+      },
+      {
+        "id": "guide",
+        "enabled": true
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "unmute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "pending": {
+      "intent": "follow-up",
+      "reason": "ana replied",
+      "since": "2026-10-08T10:00:00Z",
+      "deadline": "2026-10-08T10:01:00Z"
+    },
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "muted_until": "2026-10-08T11:00:00Z",
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_waiting_on": "",
+        "hold": false,
+        "adopted": false,
+        "tracked": false,
+        "next_guidance": ""
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        },
+        "next": [
+          {
+            "at": "2026-10-08T10:01:00Z",
+            "what": "gate"
+          },
+          {
+            "at": "2026-10-08T11:00:00Z",
+            "what": "unmute"
+          }
+        ]
+      },
+      "viewer": "me",
+      "unmuted_kind": "review",
+      "unmuted_waiting_on": "me",
+      "unmuted_reason": "review requested, no review on the head",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      },
+      "mute": {
+        "until": "2026-10-08T11:00:00Z"
+      }
+    }
+  },
+  "run_now_join_refused": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "held",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T10:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "automatic round held: daily cap",
+      "line": "briefing… (attempt 1)"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T10:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "held"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "run_now",
+        "enabled": false,
+        "reason": "intake 1 already asks for this pull request's review as a review; cancel it with {{command}} intake cancel 1"
+      },
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on the review loop (automatic round held: daily cap); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      },
+      {
+        "id": "intake_without",
+        "enabled": true
+      },
+      {
+        "id": "intake_cancel",
+        "enabled": true
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "intake": {
+        "seq": 1,
+        "pr": "https://github.com/acme/api/pull/7",
+        "intent": "review",
+        "source": "cli",
+        "state": "accepted",
+        "attempt": 1,
+        "log_len": 0
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "stopped": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "loop_stopped",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-08T09:30:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "the agent ended its turn without a record: stopped",
+      "line": "agent stopped"
+    },
+    "views": [
+      "needs-me"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-08T09:30:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "needs-me"
+      ],
+      "kind": [
+        "loop_stopped"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "note": "Starts a new round; the agent's open question is replaced"
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on the review loop (the agent ended its turn without a record: stopped); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": true
+      },
+      {
+        "id": "continue",
+        "enabled": true
+      },
+      {
+        "id": "dismiss",
+        "enabled": true,
+        "hint": "Close the question; the pull request goes back to whoever it waits on"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "question": {
+      "record_id": 1,
+      "state": "unrecorded",
+      "kind": "",
+      "text": "",
+      "blocking": 0,
+      "non_blocking": 0
+    },
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 1,
+          "open": 0,
+          "last_intent": "review",
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "tracked": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me",
+        "tracked"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested",
+        "tracked"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "pause",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "untrack",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested",
+        "tracked"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "muted_until": "0001-01-01T00:00:00Z",
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_waiting_on": "",
+        "hold": false,
+        "adopted": false,
+        "tracked": true,
+        "next_guidance": ""
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  },
+  "untracked_open_not_mine": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/web#3"
+    },
+    "link": "https://github.com/acme/web/pull/3",
+    "label": "acme/web#3",
+    "title": "Untracked",
+    "kind": "",
+    "summary": {
+      "waits_on": "",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "closed": false,
+      "open_items": 0,
+      "reason": "",
+      "line": ""
+    },
+    "views": [],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "zoe"
+      ],
+      "ci": [
+        "none"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/web"
+      ],
+      "risk": [
+        "none"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "actions": [
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/web#3 is not tracked; track it before a nudge"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/web#3"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/web#3"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/web#3"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/web#3? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "zoe",
+      "repo": "acme/web",
+      "head": "",
+      "approved": false,
+      "reasons": [],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "viewer": "me"
+    }
+  },
+  "user_hold": {
+    "unit": {
+      "provider": "github",
+      "key": "acme/api#7"
+    },
+    "link": "https://github.com/acme/api/pull/7",
+    "label": "acme/api#7",
+    "title": "Batch export",
+    "kind": "review",
+    "summary": {
+      "waits_on": "me",
+      "since": "2026-10-06T08:00:00Z",
+      "stalled": true,
+      "closed": false,
+      "open_items": 0,
+      "reason": "review requested, no review on the head",
+      "line": "review requested, no review on the head"
+    },
+    "views": [
+      "needs-me",
+      "stalled"
+    ],
+    "facets": {
+      "age": [
+        "2026-10-06T08:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "none"
+      ],
+      "is": [
+        "stalled",
+        "needs-me",
+        "paused"
+      ],
+      "kind": [
+        "review"
+      ],
+      "lane": [
+        "me"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "review-requested"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "me"
+      ],
+      "waits-on": [
+        "me"
+      ]
+    },
+    "actions": [
+      {
+        "id": "guide",
+        "enabled": true,
+        "hint": "Kept for the next automatic round"
+      },
+      {
+        "id": "review",
+        "enabled": true,
+        "primary": true
+      },
+      {
+        "id": "address",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "act",
+        "enabled": false,
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "id": "nudge",
+        "enabled": false,
+        "reason": "acme/api#7 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+      },
+      {
+        "id": "answer",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "continue",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "dismiss",
+        "enabled": false,
+        "reason": "no open question on acme/api#7"
+      },
+      {
+        "id": "take_over",
+        "enabled": true,
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace."
+      },
+      {
+        "id": "resume",
+        "enabled": true
+      },
+      {
+        "id": "mute",
+        "enabled": true
+      },
+      {
+        "id": "track",
+        "enabled": true
+      },
+      {
+        "id": "open",
+        "enabled": true
+      },
+      {
+        "id": "brief_refresh",
+        "enabled": true,
+        "hint": "Make this pull request's brief again now"
+      }
+    ],
+    "specs_version": "ac084b8d934b",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "",
+      "approved": false,
+      "reasons": [
+        "review-requested"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "muted_until": "0001-01-01T00:00:00Z",
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_waiting_on": "",
+        "hold": true,
+        "adopted": false,
+        "tracked": false,
+        "next_guidance": ""
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "count": 0,
+          "open": 0,
+          "tokens": 0,
+          "cost_usd": 0
+        }
+      },
+      "viewer": "me",
+      "last_human": {
+        "who": "ana",
+        "what": "push",
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    }
+  }
+}

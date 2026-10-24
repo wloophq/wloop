@@ -1,0 +1,17 @@
+---
+name: {{name}}-{{intent}}
+description: {{description}}
+---
+
+Run `{{command}} instructions {{intent}} <url> -- '<guidance>'` and follow what it
+prints: the instructions of this turn, written for it.
+
+- `<url>` is the pull request URL in the prompt; without one, the command
+  uses the pull request of the current worktree.
+- `<guidance>` is the rest of the prompt, in single quotes, with each `'`
+  written as `'\''`. Leave out `-- '<guidance>'` when there is none.
+{{flags}}
+End every turn with the record they describe, through the `turn_end` tool of
+the {{name}} MCP server, else `{{command}} turn end`. The user's answer comes as
+your next prompt; a long one says to run `{{command}} turn answer <url>`. If a
+command fails, report its error and stop; never run the turn without its instructions.

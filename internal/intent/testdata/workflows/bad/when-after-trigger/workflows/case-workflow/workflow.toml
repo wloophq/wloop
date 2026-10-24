@@ -1,0 +1,10 @@
+description = "Case"
+subject = "session"
+
+[trigger]
+every = "sweep"
+
+when = "session.managed"
+
+[[step]]
+use = "session.close"

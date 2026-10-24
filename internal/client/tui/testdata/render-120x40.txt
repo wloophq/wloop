@@ -1,0 +1,40 @@
+[Needs me 5]   My PRs 1    In loop 1    Plan 0                                                   automatic rounds paused
+
+>   6d  acme/api#7                 Batch export                                             M·hi   me · agent asks
+   42s  acme/api#3                 Retry webhooks with backoff                                     me · round soon
+   !9d  acme/billing-service#1365  Remove hardcoded credentials from the common constants…         carla · changes asked
+    2d  acme/api#42                ✨ feat: export ⚡️ faster 日本語のタイトル               XL·md  me · checks failing
+ * 12m  acme/api#9                 Loop one                                                        me · agent working
+
+acme/api#7  Batch export
+  waiting    me · agent asks · 6d
+  why        publish?
+  brief      M · high risk · Export the ledger in batches of a thousand rows so the nightly job stops timing out
+  workspace  REVIEW batch-export · reviewing
+  asks       Publish the review?
+             drafted APPROVE, 0 blocking, 2 non-blocking
+             1. Comment only
+             2. Publish APPROVE (recommended)
+             3. Hold the draft
+  keys       G guide  V review  W answer  C continue  X dismiss  A take over  H pause  M mute  O open
+  not now    F address · N nudge
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+G guide  V review  W answer  C continue  X dismiss  A take over  H pause  M mute  O open  ↑↓ move  ? keys  q quit

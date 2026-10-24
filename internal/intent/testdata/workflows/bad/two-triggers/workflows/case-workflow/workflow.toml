@@ -1,0 +1,11 @@
+description = "Case"
+subject = "session"
+when = 'session.managed && session.agent_state == "done"'
+
+[trigger]
+every = "sweep"
+on = ["merged"]
+
+[[step]]
+use = "session.close"
+

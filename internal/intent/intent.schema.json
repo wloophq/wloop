@@ -1,0 +1,536 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/wloophq/wloop/intent.schema.json",
+  "title": "Intent manifest (intent.toml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "label",
+    "summary",
+    "workspace",
+    "session",
+    "headline",
+    "record"
+  ],
+  "properties": {
+    "label": {
+      "type": "string",
+      "description": "The intent's name as people read it."
+    },
+    "summary": {
+      "type": "string",
+      "description": "One line on what the intent does."
+    },
+    "key": {
+      "type": "string",
+      "description": "The action's key: one uppercase letter, unique among intents and built-in actions; lowercase letters and digits are the core's.",
+      "pattern": "^[A-Z]$"
+    },
+    "verb": {
+      "type": "string",
+      "description": "The gtd verb the intent's action fulfills, so the entry verb reaches it.",
+      "enum": ["approve", "delegate", "dismiss"]
+    },
+    "user_facing": {
+      "type": "boolean",
+      "description": "Offered as a command and an action. Default true."
+    },
+    "provider": {
+      "type": "string",
+      "description": "The provider whose units the intent's turns run on, a registered provider id. Default \"github\".",
+      "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+    },
+    "workspace": {
+      "type": "string",
+      "description": "Where the turn runs.",
+      "enum": [
+        "review",
+        "author",
+        "pr_else_main",
+        "given"
+      ]
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "description": "Reuse a live session or start a new one.",
+          "enum": [
+            "reuse_live",
+            "new"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "The session title.",
+          "pattern": "^[a-z]{1,12}$"
+        },
+        "close_when_done": {
+          "type": "boolean",
+          "description": "Close the session when the turn ends done. Default false."
+        }
+      },
+      "required": [
+        "strategy",
+        "title"
+      ],
+      "description": "The agent session the turn runs in."
+    },
+    "intake": {
+      "type": "boolean",
+      "description": "Runs through the intake. Default false."
+    },
+    "start_line": {
+      "type": "string",
+      "description": "The intake's start line. Default \"starting the <label in lower case>\"."
+    },
+    "owner_only": {
+      "type": "boolean",
+      "description": "Needs the pull request to be yours or taken over. Default false."
+    },
+    "answerable": {
+      "type": "boolean",
+      "description": "A turn may stop on a question. Default true."
+    },
+    "board": {
+      "type": "string",
+      "description": "Default none.",
+      "enum": [
+        "review",
+        "author",
+        "none"
+      ]
+    },
+    "drives_row": {
+      "type": "boolean",
+      "description": "Default false."
+    },
+    "reports": {
+      "type": "boolean",
+      "description": "Default true."
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "render": {
+          "type": "boolean",
+          "description": "Default true."
+        },
+        "wait": {
+          "type": "boolean",
+          "description": "Default true."
+        }
+      }
+    },
+    "profile": {
+      "type": "string",
+      "description": "An intent name with judgment blocks, or none. Default none."
+    },
+    "dims": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "round"
+        ]
+      },
+      "description": "Profile dimensions valid under this intent."
+    },
+    "records": {
+      "type": "string",
+      "description": "Whether the turn records. Default \"true\". A predicate: a quoted CEL-subset expression."
+    },
+    "prepare": {
+      "type": "string",
+      "description": "Default \"\".",
+      "enum": [
+        "",
+        "nudge.prepare"
+      ]
+    },
+    "on_sent": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "plan.drop_pending",
+          "event.round_sent",
+          "event.nudged",
+          "record_round",
+          "keeps_guidance",
+          "mark_reviewed",
+          "mark_addressed"
+        ]
+      },
+      "description": "Effects the intent has."
+    },
+    "guidance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Default Guidance."
+        },
+        "help": {
+          "type": "string",
+          "description": "Default \"\"."
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Runes; 0 is no limit."
+        }
+      }
+    },
+    "headline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resumed": {
+          "type": "string",
+          "description": "Template over the turn context."
+        },
+        "new": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "Turn slot. A predicate: a quoted CEL-subset expression."
+              },
+              "text": {
+                "type": "string",
+                "description": "Template over the turn context."
+              }
+            },
+            "required": [
+              "text"
+            ]
+          },
+          "description": "Cases in order; the last has no when."
+        }
+      },
+      "required": [
+        "resumed",
+        "new"
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Inputs by name.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "flag",
+              "text",
+              "list"
+            ]
+          },
+          "flag": {
+            "type": "string",
+            "description": "Required for from = user.",
+            "pattern": "^--[a-z][a-z0-9-]*$"
+          },
+          "help": {
+            "type": "string",
+            "description": "Required for from = user."
+          },
+          "from": {
+            "type": "string",
+            "description": "Default user.",
+            "enum": [
+              "user",
+              "prepare"
+            ]
+          },
+          "persist": {
+            "type": "boolean",
+            "description": "Stored with the turn, restored on resume."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Not in help."
+          },
+          "by_hand_only": {
+            "type": "boolean",
+            "description": "Automatic rounds never set it."
+          },
+          "before": {
+            "type": "string",
+            "enum": [
+              "take_over"
+            ]
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Runes, text only."
+          },
+          "surfaces": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cli",
+                "instructions",
+                "try"
+              ]
+            },
+            "description": "Default [\"cli\", \"instructions\"]."
+          }
+        },
+        "required": [
+          "type"
+        ]
+      }
+    },
+    "also_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "type": "string",
+            "description": "An intent with judgment blocks."
+          },
+          "when": {
+            "type": "string",
+            "description": "Turn slot. A predicate: a quoted CEL-subset expression."
+          },
+          "round": {
+            "type": "string",
+            "enum": [
+              "first",
+              "follow-up"
+            ]
+          },
+          "define": {
+            "type": "string",
+            "description": "The template define that renders it."
+          },
+          "source_prefix": {
+            "type": "string",
+            "description": "Default \"<profile> guide: \"."
+          }
+        },
+        "required": [
+          "profile",
+          "when",
+          "define"
+        ]
+      },
+      "description": "Other profiles the turn reads."
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "type": "string",
+          "description": "Default round.",
+          "enum": [
+            "round",
+            "turn",
+            "control",
+            "workspace",
+            "brief",
+            "intake"
+          ]
+        },
+        "surfaces": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "row",
+              "detail",
+              "tui",
+              "menubar",
+              "notification",
+              "cli",
+              "explore"
+            ]
+          },
+          "description": "Default [\"row\", \"detail\", \"tui\", \"cli\", \"explore\"]."
+        },
+        "visible": {
+          "type": "string",
+          "description": "Action slot. Default \"row.open\". A predicate: a quoted CEL-subset expression."
+        },
+        "enabled": {
+          "type": "string",
+          "description": "Action slot. Default \"true\". A predicate: a quoted CEL-subset expression."
+        },
+        "reason_off": {
+          "type": "string",
+          "description": "Template over the action facts; required when enabled is not \"true\"."
+        },
+        "primary": {
+          "type": "string",
+          "description": "Action slot. Default \"false\". A predicate: a quoted CEL-subset expression."
+        },
+        "confirm": {
+          "type": "string",
+          "description": "Template over the action facts."
+        },
+        "hint": {
+          "type": "string",
+          "description": "Template over the action facts."
+        },
+        "note_when_question": {
+          "type": "string"
+        }
+      },
+      "description": "Absent: not offered anywhere."
+    },
+    "join": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "differs_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Persisted input names."
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "done",
+              "settled",
+              "asked",
+              "failed"
+            ]
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "review-draft",
+              "triage"
+            ]
+          }
+        },
+        "outcome": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "verdict",
+              "url"
+            ]
+          }
+        },
+        "outcome_doc": {
+          "type": "string"
+        },
+        "history_artifact": {
+          "type": "string",
+          "description": "One of artifacts."
+        },
+        "require": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string"
+              },
+              "artifact": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "verdict",
+                    "url"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        }
+      },
+      "required": [
+        "states"
+      ]
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "head_moved": {
+          "type": "string"
+        }
+      }
+    },
+    "modes": {
+      "type": "array",
+      "description": "How the intent's turns may run: session (an agent session in a workspace) and headless (one read-only call with no session). Default [\"session\"].",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "session",
+          "headless"
+        ]
+      }
+    },
+    "draft_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "When the drafts this proposes are sent without the user's click. Absent: always.",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "always: the user approves each draft; window: sent when the window ends unless the user discards or edits it first; none: sent at once; observe: recorded, never sent.",
+          "enum": [
+            "always",
+            "window",
+            "none",
+            "observe"
+          ]
+        },
+        "window": {
+          "type": "string",
+          "description": "With mode window only: how long the user has, such as 10m."
+        }
+      }
+    }
+  }
+}

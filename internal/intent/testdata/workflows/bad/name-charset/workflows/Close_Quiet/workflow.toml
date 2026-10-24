@@ -1,0 +1,10 @@
+description = "Case"
+subject = "session"
+when = 'session.managed && session.agent_state == "done"'
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+

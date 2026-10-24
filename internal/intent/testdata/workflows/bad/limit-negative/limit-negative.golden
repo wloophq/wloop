@@ -1,0 +1,1 @@
+testdata/workflows/bad/limit-negative/workflows/case-workflow/workflow.toml:12:11: limits.per_day: must be 0 (no limit) or more

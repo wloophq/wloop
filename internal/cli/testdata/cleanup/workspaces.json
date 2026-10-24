@@ -1,0 +1,481 @@
+{
+ "repos": [
+  {
+   "default_branch": "develop",
+   "gitignore": [
+    "credential.json"
+   ],
+   "id": "00000000-0000-4000-8000-000000000001",
+   "path": "/home/user/src/widgets",
+   "remote_key": "github.com/acme/widgets"
+  },
+  {
+   "default_branch": "main",
+   "id": "00000000-0000-4000-8000-000000000002",
+   "path": "/home/user/src/handbook",
+   "remote_key": "github.com/acme/handbook"
+  },
+  {
+   "default_branch": "main",
+   "id": "00000000-0000-4000-8000-000000000003",
+   "path": "/home/user/src/billing",
+   "remote_key": "github.com/acme/billing"
+  },
+  {
+   "default_branch": "master",
+   "id": "00000000-0000-4000-8000-000000000004",
+   "path": "/home/user/src/gadgets",
+   "remote_key": "github.com/acme/gadgets"
+  }
+ ],
+ "workspaces": [
+  {
+   "branch": "master",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": false,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "master",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/src/gadgets",
+   "linked_pr": 0,
+   "main": true,
+   "path": "/home/user/src/gadgets",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "main",
+   "touched": "2026-10-09T14:07:53Z"
+  },
+  {
+   "branch": "main",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": false,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "main",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000002::/home/user/src/handbook",
+   "linked_pr": 0,
+   "main": true,
+   "path": "/home/user/src/handbook",
+   "repo_id": "00000000-0000-4000-8000-000000000002",
+   "scope": "main",
+   "touched": "2026-10-19T20:00:40Z"
+  },
+  {
+   "branch": "main",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": false,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "main",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000003::/home/user/src/billing",
+   "linked_pr": 0,
+   "main": true,
+   "path": "/home/user/src/billing",
+   "repo_id": "00000000-0000-4000-8000-000000000003",
+   "scope": "main",
+   "touched": "2026-10-15T01:24:28Z"
+  },
+  {
+   "branch": "develop",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": false,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "develop",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/src/widgets",
+   "linked_pr": 0,
+   "main": true,
+   "path": "/home/user/src/widgets",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "main",
+   "touched": "2026-10-16T01:29:29Z"
+  },
+  {
+   "branch": "fix/login-timeout",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "fix/login-timeout",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/REVIEW-fix-login-timeout",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "cleaned",
+   "touched": "2026-08-29T16:07:56Z"
+  },
+  {
+   "branch": "me/REVIEW-fix-login-timeout-2",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "me/REVIEW-fix-login-timeout-2",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "linked_pr": 546,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/REVIEW-fix-login-timeout-2",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "context",
+   "touched": "2026-08-29T16:07:56Z"
+  },
+  {
+   "branch": "me/scratch-notes",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": false,
+    "pushed": false,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "me/scratch-notes",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/scratch-notes",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/scratch-notes",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "cleaned",
+   "touched": "2026-09-10T11:49:14Z"
+  },
+  {
+   "branch": "docs/style-guide",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": [
+     "threads.txt"
+    ]
+   },
+   "display_name": "docs/style-guide",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "linked_pr": 407,
+   "main": false,
+   "path": "/home/user/worktrees/handbook/REVIEW-docs-style-guide",
+   "repo_id": "00000000-0000-4000-8000-000000000002",
+   "scope": "cleaned",
+   "touched": "2026-10-19T14:42:40Z"
+  },
+  {
+   "branch": "worktree-catalog",
+   "checkout": {
+    "detached": false,
+    "modified": [
+     "catalog/README.md",
+     "mkdocs.yml"
+    ],
+    "pr_head": false,
+    "pushed": false,
+    "remote_branch": false,
+    "unpushed": 3,
+    "untracked": []
+   },
+   "display_name": "worktree-catalog",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000002::/home/user/worktrees/handbook/catalog",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/handbook/catalog",
+   "repo_id": "00000000-0000-4000-8000-000000000002",
+   "scope": "blocked",
+   "touched": "2026-09-16T22:38:23Z"
+  },
+  {
+   "branch": "me/invoice-export",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "me/invoice-export",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000003::/home/user/worktrees/billing/invoice-export",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/billing/invoice-export",
+   "repo_id": "00000000-0000-4000-8000-000000000003",
+   "scope": "cleaned",
+   "touched": "2026-10-17T02:31:13Z"
+  },
+  {
+   "branch": "docs/webhooks",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "docs/webhooks",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "linked_pr": 195,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/REVIEW-docs-webhooks",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "cleaned",
+   "touched": "2026-10-09T18:19:14Z"
+  },
+  {
+   "branch": "adr-queue-backend",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "adr-queue-backend",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "linked_pr": 123,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/REVIEW-adr-queue-backend",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "cleaned",
+   "touched": "2026-10-19T13:20:14Z"
+  },
+  {
+   "branch": "feat/dark-mode",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "feat/dark-mode",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "linked_pr": 5158,
+   "main": false,
+   "path": "/home/user/worktrees/widgets/REVIEW-feat-dark-mode",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "cleaned",
+   "touched": "2026-10-20T13:36:29Z"
+  },
+  {
+   "branch": "feat/batch-upload",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [
+     "tests/test_upload.py"
+    ],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": true,
+    "unpushed": 4,
+    "untracked": []
+   },
+   "display_name": "feat/batch-upload",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/widgets/REVIEW-feat-batch-upload",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "blocked",
+   "touched": "2026-10-18T18:37:16Z"
+  },
+  {
+   "branch": "me/cache-tuning",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": false,
+    "pushed": false,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "me/cache-tuning",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-cache-tuning",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/widgets/me-cache-tuning",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "cleaned",
+   "touched": "2026-10-09T18:15:08Z"
+  },
+  {
+   "branch": "chore/runbook-command",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": false,
+    "pushed": false,
+    "remote_branch": false,
+    "unpushed": 3,
+    "untracked": []
+   },
+   "display_name": "chore/runbook-command",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/worktrees/widgets/me-runbook-command",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/worktrees/widgets/me-runbook-command",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "blocked",
+   "touched": "2026-10-14T15:42:13Z"
+  },
+  {
+   "branch": "feat/search-filters",
+   "checkout": {
+    "detached": false,
+    "modified": [],
+    "pr_head": true,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "feat/search-filters",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000004::/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "linked_pr": 718,
+   "main": false,
+   "path": "/home/user/worktrees/gadgets/REVIEW-feat-search-filters",
+   "repo_id": "00000000-0000-4000-8000-000000000004",
+   "scope": "cleaned",
+   "touched": "2026-10-17T12:39:58Z"
+  },
+  {
+   "branch": "worktree-agent-0a1b2c3d",
+   "checkout": {
+    "detached": false,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": false,
+    "pushed": false,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "worktree-agent-0a1b2c3d",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/home/user/src/widgets/.claude/worktrees/agent-0a1b2c3d",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "cleaned",
+   "touched": "2026-10-15T14:36:46Z"
+  },
+  {
+   "branch": "",
+   "checkout": {
+    "detached": true,
+    "ignored": [
+     {
+      "path": "credential.json",
+      "same_as_main": true
+     }
+    ],
+    "modified": [],
+    "pr_head": false,
+    "pushed": true,
+    "remote_branch": false,
+    "unpushed": 0,
+    "untracked": []
+   },
+   "display_name": "widgets-review",
+   "host": "local",
+   "id": "00000000-0000-4000-8000-000000000001::/private/tmp/scratch/widgets-review",
+   "linked_pr": 0,
+   "main": false,
+   "path": "/private/tmp/scratch/widgets-review",
+   "repo_id": "00000000-0000-4000-8000-000000000001",
+   "scope": "cleaned",
+   "touched": "2026-10-20T13:27:07Z"
+  }
+ ]
+}

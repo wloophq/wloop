@@ -1,0 +1,16 @@
+description = "Follow up a review"
+subject = "github"
+when = 'pr.review.action == "follow-up"'
+order = 10
+key = ["pr.fingerprint"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "review"
+round = "follow-up"
+
+[approval]
+default = "run"

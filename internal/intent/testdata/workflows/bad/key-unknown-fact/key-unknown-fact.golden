@@ -1,0 +1,1 @@
+testdata/workflows/bad/key-unknown-fact/workflows/case-workflow/workflow.toml:3:8: key[0]: session.fingerprnt is not a fact of the session slot

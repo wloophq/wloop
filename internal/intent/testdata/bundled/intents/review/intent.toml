@@ -1,0 +1,24 @@
+label = "Review"
+summary = "Review a pull request"
+verb = "delegate"
+key = "V"
+workspace = "review"
+drives_row = true
+session = { strategy = "reuse_live", title = "review" }
+profile = "review"
+dims = ["round"]
+records = '!turn.plain'
+
+[headline]
+resumed = "review round on {{.PR.Slug}}"
+[[headline.new]]
+text = "Review {{.PR.Slug}}."
+
+[action]
+primary = "!row.question && !pr.mine"
+
+[record]
+states = ["done", "asked", "failed"]
+artifacts = ["review-draft"]
+outcome = ["verdict", "url"]
+history_artifact = "review-draft"

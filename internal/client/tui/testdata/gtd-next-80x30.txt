@@ -1,0 +1,30 @@
+ Inbox 2    Outbox 1   [Next 4]   Waiting 4    Projects 0    Someday 0
+
+ @computer
+>* 5h  Rename the export flag  @computer
+   5h  Write the runbook       @computer
+ @calls
+   5h  Call the bank           @calls
+ no context
+   5h  Sort the receipts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+x next  w waiting  s schedule  y someday  l reference  f focus  ? keys  q quit

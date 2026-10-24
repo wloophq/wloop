@@ -1,0 +1,68 @@
+package daemon
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/gtd"
+)
+
+// handleDigest serves the daily digest of the query parameter day: the counters, and the entries that moved
+// into Next or Waiting since the previous digest, at notifications.digest_at local time (midnight when off).
+func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
+	g, ok := s.gtd(w)
+	if !ok {
+		return
+	}
+	day := r.URL.Query().Get("day")
+	if day == "" {
+		day = s.deps.Now().Local().Format(time.DateOnly)
+	}
+	end, err := digestEnd(day, s.deps.Cfg.Notifications.DigestAt)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	start := end.AddDate(0, 0, -1)
+	ctx := r.Context()
+	d := api.Digest{Day: day, Title: "Daily digest"}
+	for _, v := range []gtd.View{gtd.ViewNext, gtd.ViewWaiting} {
+		es, err := g.Entries(ctx, gtd.Query{View: v})
+		if err != nil {
+			writeGTDError(w, err)
+			return
+		}
+		for _, e := range es {
+			if e.Updated.After(start) && !e.Updated.After(end) && s.unitsEnabled(e.Units) {
+				d.Entries = append(d.Entries, string(e.ID))
+			}
+		}
+	}
+	c, err := g.Counts(ctx, "")
+	if err != nil {
+		writeGTDError(w, err)
+		return
+	}
+	d.Counts = wireCounters(c)
+	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Entries),
+		d.Counts.Views[string(gtd.ViewInbox)], d.Counts.Views[string(gtd.ViewOutbox)], d.Counts.Views[string(gtd.ViewNext)], d.Counts.Views[string(gtd.ViewWaiting)])
+	writeJSON(w, d)
+}
+
+// digestEnd is day's digest instant: at, a local "HH:MM", that day; midnight when at is "".
+func digestEnd(day, at string) (time.Time, error) {
+	d, err := time.ParseInLocation(time.DateOnly, day, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("day %q is not YYYY-MM-DD", day)
+	}
+	if at == "" {
+		return d, nil
+	}
+	hm, err := time.Parse("15:04", at)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("notifications.digest_at %q is not HH:MM", at)
+	}
+	return time.Date(d.Year(), d.Month(), d.Day(), hm.Hour(), hm.Minute(), 0, 0, time.Local), nil
+}

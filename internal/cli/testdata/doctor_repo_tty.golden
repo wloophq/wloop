@@ -1,0 +1,27 @@
+[bold]Profile[/]  [dim]user ~/profile[/]
+
+[bold]address[/]                                                                   [dim]1 apply[/][dim] · [/][yellow]1 need the brief[/]
+  [green]✓[/] [dim]bundled[/]  [dim]intent=address.md[/]                    every pull request
+  [yellow]?[/] [dim]user[/]     [dim]organization=acme/intent=address.md[/]  organization acme, paths **/*.sql
+                                                  [yellow]needs the brief[/]
+
+[bold]nudge[/]                                                                           [dim]1 apply[/][dim] · [/][dim]1 not here[/]
+  [green]✓[/] [dim]bundled[/]  [dim]intent=nudge.md[/]                             every pull request
+  [dim]·[/] [dim]user[/]     [dim]organization=acme/repo=web/intent=nudge.md[/]  [dim]organization acme, repo web[/]
+                                                         [dim]not in this repository[/]
+
+[bold]review[/]                     [dim]2 apply[/][dim] · [/][yellow]1 depend on the PR[/][dim] · [/][yellow]1 need the brief[/][dim] · [/][dim]1 replaced[/][dim] · [/][dim]1 not here[/]
+  [dim]·[/] [dim]bundled[/]  [dim]intent=review.md[/]                     [dim]every pull request[/]
+                                                  [dim]replaced by an override[/]
+  [green]✓[/] [dim]user[/]     [dim]intent=review.md[/]                     every pull request
+                                                  [cyan]replaces the guidance above it[/]
+                                                  [yellow]bundled changed since the last round here[/]
+  [yellow]?[/] [dim]user[/]     [dim]kind=fix/intent=review.md[/]            kind fix
+                                                  [yellow]needs the brief[/]
+  [green]✓[/] [dim]user[/]     [dim]organization=acme/intent=review.md[/]   organization acme
+  [dim]·[/] [dim]user[/]     [dim]organization=other/intent=review.md[/]  [dim]organization other[/]
+                                                  [dim]not in this repository[/]
+  [yellow]?[/] [dim]user[/]     [dim]user=ana/intent=review.md[/]            user ana
+                                                  [yellow]depends on the pull request[/]
+    delegates claude: /code-review high
+      [dim]from ~/profile/intent=review.md[/]

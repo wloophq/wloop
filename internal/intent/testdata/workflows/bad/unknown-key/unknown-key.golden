@@ -1,0 +1,1 @@
+testdata/workflows/bad/unknown-key/workflows/case-workflow/workflow.toml:3:1: modd: unknown key; did you mean mode?

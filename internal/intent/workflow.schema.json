@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/wloophq/wloop/workflow.schema.json",
+  "title": "Workflow manifest (workflow.toml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subject", "trigger", "when", "step"],
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "One line on what the workflow does."
+    },
+    "subject": {
+      "type": "string",
+      "description": "The unit provider the workflow matches; its facts are in that provider's slot.",
+      "enum": ["github", "session", "workspace"]
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Exactly one of every, on or schedule.",
+      "properties": {
+        "every": {
+          "type": "string",
+          "description": "Evaluated on every sweep against every unit of the provider.",
+          "enum": ["sweep"]
+        },
+        "on": {
+          "type": "array",
+          "description": "Source event kinds; the workflow reads each event once.",
+          "items": {"type": "string"}
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Five-field cron in local time, such as \"0 9 * * 1-5\"."
+        }
+      }
+    },
+    "when": {
+      "type": "string",
+      "description": "A predicate over the subject's slot, trigger.* and config.*. Write it before the [trigger] table."
+    },
+    "step": {
+      "type": "array",
+      "description": "Builtins run in order on each matching unit; the other keys of a step are its arguments, all strings.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["use"],
+        "properties": {
+          "use": {"type": "string", "description": "A builtin step."}
+        },
+        "additionalProperties": {"type": "string"}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "per_run": {"type": "integer", "description": "Items that run in one evaluation; 0 is no limit."},
+        "per_day": {"type": "integer", "description": "Runs per day; 0 is no limit."},
+        "per_unit_per_day": {"type": "integer", "description": "Runs per unit per day; 0 is no limit."},
+        "cooldown": {"type": "string", "description": "The least time between runs, such as 30m or 1d."}
+      }
+    },
+    "mode": {
+      "type": "string",
+      "description": "observe writes only the plan; apply runs the steps. Default apply.",
+      "enum": ["observe", "apply"]
+    },
+    "allow_visible": {
+      "type": "boolean",
+      "description": "Opts the workflow's visible steps into automatic."
+    },
+    "order": {
+      "type": "integer",
+      "description": "Evaluation order among workflows on the same trigger, lower first. Default 100."
+    },
+    "key": {
+      "type": "array",
+      "description": "Stable facts of the subject's slot that make the idempotency key. Default is the slot's fingerprint.",
+      "items": {"type": "string"}
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string",
+          "description": "What happens when the window ends: run, or wait for the user. Default run.",
+          "enum": ["run", "wait"]
+        },
+        "window": {"type": "string", "description": "How long the user has to act, such as 5m. Without one, a default run item runs at once."},
+        "wait_when": {"type": "string", "description": "A predicate over the same slots as when; a match makes the item pending with default wait."}
+      }
+    },
+    "draft_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "When the drafts of the turns this workflow starts are sent without the user's click. Absent: always. The approval block above governs runs, never drafts.",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "always: the user approves each draft; window: sent when the window ends unless the user discards or edits it first; none: sent at once; observe: recorded, never sent.",
+          "enum": ["always", "window", "none", "observe"]
+        },
+        "window": {"type": "string", "description": "With mode window only: how long the user has, such as 10m."}
+      }
+    }
+  }
+}

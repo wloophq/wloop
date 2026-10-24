@@ -1,0 +1,12 @@
+description = "Refuse a queued answer whose route is gone"
+subject = "github"
+when = 'pr.orphan_answer_id != 0'
+mode = "apply"
+order = 31
+key = ["pr.orphan_answer_id"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "answer.refuse"

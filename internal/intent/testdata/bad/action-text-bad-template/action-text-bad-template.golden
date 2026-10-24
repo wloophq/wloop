@@ -1,0 +1,2 @@
+testdata/bad/action-text-bad-template/intents/ask-author/intent.toml:16:14: action.reason_off: <.pr.authr>: map has no entry for key "authr"
+testdata/bad/action-text-bad-template/intents/ask-author/intent.toml:17:11: action.confirm: unclosed action

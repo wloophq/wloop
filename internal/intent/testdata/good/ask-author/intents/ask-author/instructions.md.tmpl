@@ -1,0 +1,37 @@
+# {{.Headline}}
+
+Read {{.PR.URL}} and write the one question its author most needs to answer.
+{{- with .Inputs.topic}}
+About: {{.}}{{end}}
+
+Publish nothing: no comment, no review, no reply, no push. The user decides
+whether the question goes out; you ask the user.
+{{if .Resume}}{{template "resume" .}}
+
+Steps 1 to 3 are done: the last session read the pull request and asked the
+user to approve the question quoted above, the one it would send the author.
+The user's answer is their call on that question, not an answer to it: an
+approval, a rewrite (apply it to the question, for example narrowing it to
+the part they name), or a decline. Do not ask the user again, and re-read the
+pull request only when it moved since that head. Go to step 4: record `done`
+with the final question as the whole `summary`, or with `dropped` when they
+declined. Still publish nothing.
+{{end}}
+{{- if .Guidance}}
+## Guidance
+
+{{.Guidance}}
+{{end}}
+## Steps
+
+1. Read the pull request: `gh pr view {{.PR.URL}}` and `gh pr diff {{.PR.URL}}`.
+2. Write one question for the author: short, specific, answerable from what
+   they know, and not already answered in the description or the threads.
+3. Record `asked` with a `free` question whose `text` is the question you
+   would send, and whose `recommend` says why it matters.
+4. When the user answers, record `done` with the question as they approved
+   or rewrote it as the whole `summary`, or `done` with `dropped` as the
+   summary when they declined.
+
+{{template "history" .}}
+{{template "record" .}}

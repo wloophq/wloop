@@ -1,0 +1,1 @@
+testdata/bad/action-not-user-facing/intents/ask-author/intent.toml:15:2: action: applies to user-facing intents only

@@ -1,0 +1,15 @@
+#11  closing  proposed
+DM with Ana Lima: rollout
+
+  Closing this out:
+
+  - Rollout date: resolved
+  - Feature flag owner: answered
+
+To          destination unknown
+Origin      rule closure, 3h ago
+Approval    always
+
+{{command}} outbox approve 11
+{{command}} outbox edit 11 <markdown>
+{{command}} outbox discard 11

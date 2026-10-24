@@ -1,0 +1,18 @@
+label = "Ask author"
+summary = "Ask the author one question"
+workspace = "review"
+session = { strategy = "new", title = "ask" }
+
+[headline]
+resumed = "ask round on {{.PR.Slug}}"
+[[headline.new]]
+text = "Ask the author of {{.PR.Slug}} one question."
+
+[record]
+states = ["done", "asked", "failed"]
+
+[inputs.adopt]
+type = "flag"
+flag = "--adopt"
+help = "adopt first"
+before = "adopt"

@@ -1,0 +1,1 @@
+testdata/workflows/bad/unknown-provider/workflows/case-workflow/workflow.toml:2:11: subject: unknown provider slack; the providers are github, session, workspace

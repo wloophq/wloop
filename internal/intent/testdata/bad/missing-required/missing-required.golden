@@ -1,0 +1,2 @@
+testdata/bad/missing-required/intents/ask-author/intent.toml:1:1: label: is required
+testdata/bad/missing-required/intents/ask-author/intent.toml:3:11: session.title: is required

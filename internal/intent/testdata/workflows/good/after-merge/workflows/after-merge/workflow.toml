@@ -1,0 +1,13 @@
+subject = "github"
+when = 'trigger.event.kind == "merged" && pr.state == "merged"'
+
+[trigger]
+on = ["merged", "closed"]
+
+[[step]]
+use = "notify.self"
+text = "merged"
+
+[[step]]
+use = "turn.dismiss"
+reason = "merged"

@@ -1,0 +1,82 @@
+package cli
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/workspace/fake"
+)
+
+func TestWorkflowsFactsOfASubjectListItsSlotWithTheTriggerAndConfig(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("workflows", "facts", "session"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	out := te.out.String()
+	for _, f := range builtin.Facts {
+		listed := strings.Contains(out, f.Name+" ")
+		switch f.Slot {
+		case "session", "trigger", "config":
+			if !listed {
+				t.Errorf("lacks %s:\n%s", f.Name, out)
+			}
+		case "pr", "workspace":
+			if listed {
+				t.Errorf("lists %s, a fact of another subject", f.Name)
+			}
+		}
+	}
+}
+
+func TestWorkflowsFactsWithoutASubjectListEverySlot(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("workflows", "facts"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	for _, want := range []string{"pr.state ", "session.idle_for ", "workspace.unpushed ", "subject github"} {
+		if !strings.Contains(te.out.String(), want) {
+			t.Errorf("lacks %q", want)
+		}
+	}
+}
+
+func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("workflows", "facts", "slack"); code == 0 {
+		t.Fatal("exit 0")
+	}
+	if !strings.Contains(te.err.String(), "github, session, workspace") {
+		t.Fatal(te.err.String())
+	}
+}
+
+func TestWorkflowsStepsListTheVocabularyWithArguments(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("workflows", "steps"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	out := te.out.String()
+	for _, d := range builtin.Steps {
+		if !strings.Contains(out, d.Name+" ") {
+			t.Errorf("lacks %s", d.Name)
+		}
+		for _, a := range d.Args {
+			if !strings.Contains(out, a) {
+				t.Errorf("lacks %s's argument %s", d.Name, a)
+			}
+		}
+	}
+}
+
+func TestProfileSchemaPrintsTheWorkflowSchemaOnRequest(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	if code := te.run("profile", "schema", "--workflow"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if !bytes.Equal(te.out.Bytes(), intentload.WorkflowSchema) {
+		t.Fatal(te.out.String())
+	}
+}

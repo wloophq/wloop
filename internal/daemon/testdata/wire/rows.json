@@ -1,0 +1,330 @@
+[
+  {
+    "actions": [
+      {
+        "enabled": false,
+        "id": "guide",
+        "reason": "the daemon plans no automatic round; see doctor"
+      },
+      {
+        "enabled": true,
+        "id": "review",
+        "note": "Starts a new round; the agent's open question is replaced"
+      },
+      {
+        "enabled": false,
+        "id": "address",
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "enabled": false,
+        "id": "act",
+        "reason": "Not yours: take it over first"
+      },
+      {
+        "enabled": false,
+        "id": "nudge",
+        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step"
+      },
+      {
+        "enabled": true,
+        "id": "answer"
+      },
+      {
+        "enabled": true,
+        "id": "continue"
+      },
+      {
+        "enabled": true,
+        "hint": "Close the question; the pull request goes back to whoever it waits on",
+        "id": "dismiss"
+      },
+      {
+        "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace.",
+        "enabled": true,
+        "id": "take_over"
+      },
+      {
+        "enabled": true,
+        "id": "resume"
+      },
+      {
+        "enabled": true,
+        "id": "unmute"
+      },
+      {
+        "enabled": true,
+        "id": "untrack"
+      },
+      {
+        "enabled": true,
+        "id": "open"
+      },
+      {
+        "confirm": "Remove the workspace of acme/api#7? Its checkout is deleted and its terminals are closed. It is refused while its agent works or waits, or when it holds uncommitted files, unpushed commits or ignored files outside build and dependency folders. The pull request is still open: no automatic first round brings the workspace back; Review or Address does.",
+        "enabled": true,
+        "id": "remove"
+      },
+      {
+        "enabled": true,
+        "hint": "Make this pull request's brief again now",
+        "id": "brief_refresh"
+      }
+    ],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "ana"
+      ],
+      "ci": [
+        "success"
+      ],
+      "due": [
+        "2026-10-09T00:00:00Z"
+      ],
+      "is": [
+        "in-loop",
+        "paused",
+        "muted",
+        "tracked"
+      ],
+      "kind": [
+        "muted"
+      ],
+      "lane": [
+        "loop"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "low"
+      ],
+      "scope": [
+        "review-requested",
+        "tracked"
+      ],
+      "size": [
+        "m"
+      ],
+      "status": [
+        "reviewing"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "kind": "muted",
+    "label": "acme/api#7",
+    "link": "https://github.com/acme/api/pull/7",
+    "payload": {
+      "approved": false,
+      "author": "ana",
+      "brief": {
+        "goal": "Export in batches",
+        "kind": "",
+        "open_questions": 1,
+        "risk": "low",
+        "size": "m"
+      },
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": "SUCCESS"
+        },
+        "next": [
+          {
+            "at": "2026-10-09T00:00:00Z",
+            "what": "unmute"
+          }
+        ],
+        "turns": {
+          "cost_usd": 0,
+          "count": 0,
+          "open": 0,
+          "tokens": 0
+        }
+      },
+      "head": "",
+      "last_human": {
+        "at": "2026-10-06T08:00:00Z",
+        "link": "https://github.com/acme/api/pull/7",
+        "what": "push",
+        "who": "ana"
+      },
+      "mute": {
+        "until": "2026-10-09T00:00:00Z"
+      },
+      "override": {
+        "adopted": false,
+        "hold": true,
+        "mute_until_state_change": false,
+        "muted_kind": "",
+        "muted_until": "2026-10-09T00:00:00Z",
+        "muted_waiting_on": "",
+        "next_guidance": "",
+        "tracked": true
+      },
+      "reasons": [
+        "review-requested",
+        "tracked"
+      ],
+      "repo": "acme/api",
+      "unmuted_kind": "loop_waiting",
+      "unmuted_reason": "publish?",
+      "unmuted_waiting_on": "me",
+      "viewer": "me",
+      "workspace": {
+        "agent_states": [
+          "working"
+        ],
+        "comment": "r2 held",
+        "display_name": "REVIEW batch",
+        "id": "w1",
+        "is_main": false,
+        "is_review": true,
+        "status": "reviewing"
+      }
+    },
+    "specs_version": "ac084b8d934b",
+    "summary": {
+      "closed": false,
+      "line": "muted",
+      "open_items": 0,
+      "reason": "muted",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "waits_on": "nobody"
+    },
+    "title": "Batch export",
+    "unit": {
+      "key": "acme/api#7",
+      "provider": "github"
+    },
+    "views": [
+      "loop"
+    ]
+  },
+  {
+    "actions": [
+      {
+        "enabled": false,
+        "id": "answer",
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "enabled": false,
+        "id": "continue",
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "enabled": false,
+        "id": "dismiss",
+        "reason": "no open question on acme/api#8"
+      },
+      {
+        "enabled": true,
+        "id": "open"
+      },
+      {
+        "enabled": true,
+        "hint": "Make this pull request's brief again now",
+        "id": "brief_refresh"
+      }
+    ],
+    "facets": {
+      "age": [
+        "0001-01-01T00:00:00Z"
+      ],
+      "author": [
+        "me",
+        "me"
+      ],
+      "ci": [
+        "none"
+      ],
+      "kind": [
+        "done"
+      ],
+      "lane": [
+        "author"
+      ],
+      "repo": [
+        "acme/api"
+      ],
+      "risk": [
+        "none"
+      ],
+      "scope": [
+        "author"
+      ],
+      "size": [
+        "none"
+      ],
+      "status": [
+        "none"
+      ],
+      "type": [
+        "none"
+      ],
+      "wait": [
+        "nobody"
+      ]
+    },
+    "kind": "done",
+    "label": "acme/api#8",
+    "link": "https://github.com/acme/api/pull/8",
+    "payload": {
+      "approved": false,
+      "author": "me",
+      "facts": {
+        "changed_files": 0,
+        "checks": {
+          "state": ""
+        },
+        "turns": {
+          "cost_usd": 0,
+          "count": 0,
+          "open": 0,
+          "tokens": 0
+        }
+      },
+      "head": "",
+      "reasons": [
+        "author"
+      ],
+      "repo": "acme/api",
+      "viewer": "me",
+      "workspace": {
+        "agent_states": [],
+        "comment": "",
+        "display_name": "",
+        "id": "",
+        "is_main": false,
+        "is_review": false,
+        "status": ""
+      }
+    },
+    "specs_version": "ac084b8d934b",
+    "summary": {
+      "closed": true,
+      "line": "merged",
+      "open_items": 0,
+      "reason": "merged",
+      "since": "0001-01-01T00:00:00Z",
+      "stalled": false,
+      "waits_on": "nobody"
+    },
+    "title": "Done",
+    "unit": {
+      "key": "acme/api#8",
+      "provider": "github"
+    },
+    "views": []
+  }
+]

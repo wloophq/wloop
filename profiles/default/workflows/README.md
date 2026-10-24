@@ -1,0 +1,3 @@
+# Workflows
+
+Each workflow is a directory here holding `workflow.toml`; plain files such as this one are ignored. The bundled ones start review and address rounds (`review-*`, `address`), nudge whoever someone else's pull request silent for 30 days waits on (`nudge-silent-30d`, which waits for you), close finished or quiet agent sessions (`session-*`), remove or unregister finished, temporary, duplicate and idle workspaces (`workspace-*`; the removals ship in observe mode, and `workspace-idle-no-pr` waits for you), and keep the turn records consistent (`hygiene-*`). A profile cannot redefine a bundled workflow; `workflows.<name>` in the config sets its mode, turns it off or changes its approval.

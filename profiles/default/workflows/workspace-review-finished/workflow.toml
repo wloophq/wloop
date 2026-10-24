@@ -1,0 +1,18 @@
+description = "Remove a review workspace whose pull request ended more than cleanup.workspace_grace ago"
+subject = "workspace"
+when = '!workspace.main && workspace.role == "review" && workspace.pr_state in ["merged", "closed"] && workspace.pr_finished_for > config.cleanup.workspace_grace && workspace.path_exists'
+mode = "observe"
+order = 20
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "workspace.remove"
+
+[limits]
+per_run = 5
+per_day = 30
+
+[approval]
+wait_when = 'workspace.dirty > 0 || workspace.untracked > 0 || workspace.unpushed > 0 || "checkout unreadable" in workspace.pendency'

@@ -1,0 +1,1 @@
+testdata/bad/predicate-empty/intents/ask-author/intent.toml:15:11: action.enabled: 1: empty predicate

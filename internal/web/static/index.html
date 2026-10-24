@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{name}} cockpit</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header id="top">
+  <span class="mark">{{name}}</span>
+  <input id="search" class="search" type="search" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Filter the list" aria-keyshortcuts="/" placeholder="Filter: text, repo:, author:, wait:me, risk:high, tag:lang:go  ( / )" data-focus="top:search">
+  <span id="sync" class="sync">connecting</span>
+  <span id="notice" class="notice" role="status" aria-live="polite"></span>
+</header>
+<div id="warnings" class="warnings" role="alert" hidden></div>
+<main id="app">
+  <nav id="rail" aria-label="Views">
+    <ul id="views" class="views"></ul>
+    <h2 class="rail-head">Waiting on</h2>
+    <ul id="people" class="views people"></ul>
+  </nav>
+  <section id="list" aria-label="Pull requests">
+    <section id="explore" class="explore" aria-label="Explore pull requests" hidden>
+      <form id="explore-form" class="explore-form" role="search">
+        <input id="explore-q" type="search" maxlength="256" autocomplete="off" spellcheck="false" data-focus="explore:q" aria-label="Pull request URL, owner/repo, a repository or login, @org/team or a GitHub search" placeholder="PR URL, owner/repo, repo, login, @org/team or a search">
+        <button id="explore-go" type="submit" class="act primary" data-focus="explore:go">Search</button>
+      </form>
+      <div id="explore-chips" class="chips"></div>
+      <p id="explore-status" class="explore-status" role="status" aria-live="polite"></p>
+      <div id="explore-act" class="explore-act" hidden>
+        <div id="explore-act-head" class="meta"></div>
+        <textarea id="explore-guidance" rows="2" aria-label="Guidance" data-focus="explore:guidance" placeholder="Guidance for the action you pick (optional)"></textarea>
+        <div id="explore-act-buttons" class="d-actions"></div>
+      </div>
+      <ol id="explore-results" class="cands" aria-label="Candidates"></ol>
+    </section>
+    <section id="plan" class="plan" aria-label="The workflows' plan" hidden></section>
+    <section id="dash" class="dash" aria-label="Backlog dashboard" hidden></section>
+    <section id="gtd" class="gtd" aria-label="Entries" hidden></section>
+    <details id="list-box" class="list-box" open>
+      <summary id="list-sum" class="list-sum"></summary>
+      <div id="tools" class="tools" role="toolbar" aria-label="Filter, group and sort" hidden></div>
+      <table id="table">
+        <thead>
+          <tr>
+            <th scope="col" class="c-pr"><button type="button" class="th-sort" data-sort="repo" data-focus="th:repo" title="Sort by repo">Pull request</button></th>
+            <th scope="col" class="c-wait"><button type="button" class="th-sort" data-sort="wait" data-focus="th:wait" title="Sort by whom it waits on">Waiting on</button></th>
+            <th scope="col" class="c-for"><button type="button" class="th-sort" data-sort="age" data-focus="th:age" title="Sort by how long it waits">For</button></th>
+            <th scope="col" class="c-why"><button type="button" class="th-sort" data-sort="kind" data-focus="th:kind" title="Sort by situation">Why</button></th>
+            <th scope="col" class="c-where"><button type="button" class="th-sort" data-sort="status" data-focus="th:status" title="Sort by workspace column">Where</button></th>
+            <th scope="col" class="c-act"><span class="sr">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="board" class="board" hidden></div>
+      <ol id="activity" class="activity" aria-label="Recent activity" hidden></ol>
+      <p id="empty" class="empty" hidden></p>
+    </details>
+  </section>
+  <div id="detail-resize" role="separator" aria-orientation="vertical" aria-label="Resize the detail panel" tabindex="0"></div>
+  <aside id="detail" aria-label="Detail" hidden></aside>
+</main>
+<script src="/static/vendor/echarts.min.js"></script>
+<script src="/static/dash.js"></script>
+<script src="/static/plugins.js"></script>
+<script src="/static/routes.js"></script>
+<script src="/static/gtd.js"></script>
+<script src="/static/review.js"></script>
+<script src="/static/detail.js"></script>
+<script src="/static/app.js"></script>
+<script src="/static/palette.js"></script>
+<script src="/static/keys.js"></script>
+</body>
+</html>

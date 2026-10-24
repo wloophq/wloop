@@ -1,0 +1,2 @@
+testdata/bad/wrong-type/intents/ask-author/intent.toml:5:15: user_facing: must be true or false, not string
+testdata/bad/wrong-type/intents/ask-author/intent.toml:6:9: board: "side" is not one of "review", "author", "none"

@@ -1,0 +1,1321 @@
+{
+ "Viewer": "me",
+ "PRs": {
+  "acme/api#10": {
+   "Reviewer": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 10,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/me",
+    "BaseRefName": "main",
+    "HeadRefOid": "cme",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "me",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "CHANGES_REQUESTED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "cme",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "cme",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": [
+     {
+      "LastAuthor": "lint-bot",
+      "LastAt": "2026-10-08T10:15:00Z"
+     },
+     {
+      "LastAuthor": "bob",
+      "LastAt": "2026-10-08T12:15:00Z"
+     }
+    ],
+    "ThreadsTotal": 3,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   },
+   "Author": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 10,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/me",
+    "BaseRefName": "main",
+    "HeadRefOid": "cme",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "me",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "CHANGES_REQUESTED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "cme",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "cme",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": [
+     {
+      "LastAuthor": "lint-bot",
+      "LastAt": "2026-10-08T10:15:00Z"
+     },
+     {
+      "LastAuthor": "bob",
+      "LastAt": "2026-10-08T12:15:00Z"
+     }
+    ],
+    "ThreadsTotal": 3,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   }
+  },
+  "acme/api#11": {
+   "Reviewer": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 11,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/zoe",
+    "BaseRefName": "main",
+    "HeadRefOid": "czoe",
+    "HeadRepositoryOwner": "zoe",
+    "IsCrossRepository": true,
+    "Author": "zoe",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "czoe",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "czoe",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "czoe",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": null,
+    "ThreadsTotal": 0,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   },
+   "Author": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 11,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/zoe",
+    "BaseRefName": "main",
+    "HeadRefOid": "czoe",
+    "HeadRepositoryOwner": "zoe",
+    "IsCrossRepository": true,
+    "Author": "zoe",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "czoe",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "czoe",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "czoe",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "czoe",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": null,
+    "ThreadsTotal": 0,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   }
+  },
+  "acme/api#7": {
+   "Reviewer": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 7,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/alice",
+    "BaseRefName": "main",
+    "HeadRefOid": "calice",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "alice",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "REVIEW_REQUIRED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "calice",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "calice",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "calice",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": [
+     {
+      "LastAuthor": "lint-bot",
+      "LastAt": "2026-10-08T10:15:00Z"
+     }
+    ],
+    "ThreadsTotal": 2,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   },
+   "Author": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 7,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/alice",
+    "BaseRefName": "main",
+    "HeadRefOid": "calice",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "alice",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "REVIEW_REQUIRED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "calice",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "calice",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "calice",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "calice",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": [
+     {
+      "LastAuthor": "lint-bot",
+      "LastAt": "2026-10-08T10:15:00Z"
+     }
+    ],
+    "ThreadsTotal": 2,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   }
+  },
+  "acme/api#9": {
+   "Reviewer": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 9,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/me",
+    "BaseRefName": "main",
+    "HeadRefOid": "cme",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "me",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "APPROVED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "cme",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": null,
+    "ThreadsTotal": 0,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   },
+   "Author": {
+    "owner": "acme",
+    "repo": "api",
+    "number": 9,
+    "State": "OPEN",
+    "IsDraft": false,
+    "Title": "t",
+    "HeadRefName": "feat/me",
+    "BaseRefName": "main",
+    "HeadRefOid": "cme",
+    "HeadRepositoryOwner": "acme",
+    "IsCrossRepository": false,
+    "Author": "me",
+    "AuthorAssociation": "MEMBER",
+    "ReviewDecision": "APPROVED",
+    "Mergeable": "MERGEABLE",
+    "ChecksState": "FAILURE",
+    "NewestChangesRequestOid": "",
+    "Reviews": [
+     {
+      "ID": "r1",
+      "State": "COMMENTED",
+      "Author": "bob",
+      "SubmittedAt": "2026-10-08T09:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "LatestReviews": [
+     {
+      "ID": "r2",
+      "State": "APPROVED",
+      "Author": "carol",
+      "SubmittedAt": "2026-10-08T11:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     },
+     {
+      "ID": "r3",
+      "State": "CHANGES_REQUESTED",
+      "Author": "me",
+      "SubmittedAt": "2026-10-08T12:00:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": true
+     },
+     {
+      "ID": "r4",
+      "State": "APPROVED",
+      "Author": "dan",
+      "SubmittedAt": "2026-10-08T12:30:00Z",
+      "CommitOid": "cme",
+      "HasContent": false,
+      "ByViewer": false
+     },
+     {
+      "ID": "r5",
+      "State": "COMMENTED",
+      "Author": "lint-bot",
+      "SubmittedAt": "2026-10-08T12:40:00Z",
+      "CommitOid": "cme",
+      "HasContent": true,
+      "ByViewer": false
+     }
+    ],
+    "Comments": [
+     {
+      "ID": "c1",
+      "Author": "alice",
+      "CreatedAt": "2026-10-08T13:00:00Z"
+     },
+     {
+      "ID": "c2",
+      "Author": "lint-bot",
+      "CreatedAt": "2026-10-08T13:05:00Z"
+     }
+    ],
+    "ReviewRequests": [
+     "me",
+     "team:acme/core"
+    ],
+    "ViewerRequested": false,
+    "Commits": [
+     {
+      "Oid": "c0",
+      "Parents": 1
+     },
+     {
+      "Oid": "cme",
+      "Parents": 1
+     }
+    ],
+    "OpenThreads": null,
+    "ThreadsTotal": 0,
+    "Checks": [
+     {
+      "Name": "lint",
+      "Pending": false,
+      "Failed": true,
+      "URL": "https://ci/1",
+      "Summary": "2 errors"
+     },
+     {
+      "Name": "test",
+      "Pending": true,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     },
+     {
+      "Name": "deploy",
+      "Pending": false,
+      "Failed": false,
+      "URL": "",
+      "Summary": ""
+     }
+    ],
+    "Labels": [
+     "backend",
+     "needs-qa"
+    ]
+   }
+  }
+ }
+}

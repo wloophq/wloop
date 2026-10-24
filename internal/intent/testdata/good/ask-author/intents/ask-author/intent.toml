@@ -1,0 +1,29 @@
+#:schema ../intent.schema.json
+
+label = "Ask author"
+summary = "Ask the author one question"
+workspace = "review"
+session = { strategy = "new", title = "ask" }
+key = "Q"
+start_line = "asking the author"
+owner_only = false
+
+[inputs.topic]
+type = "text"
+flag = "--topic"
+help = "what to ask about"
+max = 200
+persist = true
+
+[action]
+surfaces = ["row", "detail", "tui", "cli"]
+visible = "row.open && !pr.mine"
+hint = "Ask {{.pr.author}} one question"
+
+[headline]
+resumed = "ask round on {{.PR.Slug}}"
+[[headline.new]]
+text = "Ask the author of {{.PR.Slug}} one question."
+
+[record]
+states = ["done", "asked", "failed"]

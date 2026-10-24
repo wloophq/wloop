@@ -1,0 +1,263 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/ingest"
+	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
+	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/card"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/source"
+	"github.com/wloophq/wloop/internal/workspace/fake"
+)
+
+// withRows is d with every inventory role on st and the sources' codecs and
+// rows; it reads nothing from GitHub: no ingestion, slow job or track.
+func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
+	mods, err := buildSources(plugins, d.Cfg, source.Deps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now)})
+	if err != nil {
+		panic(err)
+	}
+	d = withSources(withStore(d, st), plugins, mods)
+	d.Ingest, d.Collector, d.Track = nil, nil, nil
+	return d
+}
+
+// threadRows serves a row for each of units, titled by title or else by
+// its key.
+type threadRows struct {
+	units []unit.Unit
+	title func(unit.Unit) string
+}
+
+func (threadRows) Provider() unit.ProviderID { return ingesttest.Provider }
+
+func (p threadRows) Listed(context.Context) ([]unit.Unit, error) { return p.units, nil }
+
+func (p threadRows) Load(_ context.Context, units []unit.Unit) (map[unit.Unit]any, error) {
+	in := map[unit.Unit]any{}
+	for _, u := range units {
+		in[u] = u.Key
+		if p.title != nil {
+			in[u] = p.title(u)
+		}
+	}
+	return in, nil
+}
+
+func (threadRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
+	return api.Row{Title: in.(string)}, nil
+}
+
+// threadModule is a fake plugin of the thread provider serving th's row.
+func threadModule(th unit.Unit) source.Plugin {
+	return source.Plugin{ID: ingesttest.Provider, Codec: ingesttest.Codec(), Build: func(_ config.Config, d source.Deps) (source.Module, error) {
+		reg := ingest.Registration{Source: ingesttest.Source{C: ingesttest.NewClient(ingesttest.NewService("viewer"), 100)},
+			Store: ingesttest.NewStore(d.Changes), Codec: ingesttest.Codec()}
+		return source.Module{
+			ID:    ingesttest.Provider,
+			Codec: ingesttest.Codec(),
+			Ingest: ingest.Job{Every: time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
+				return ingest.Plan{Registration: reg}, "", nil
+			}},
+			Rows: func(readmodel.RowDeps) readmodel.Provider { return threadRows{units: []unit.Unit{th}} },
+		}, nil
+	}}
+}
+
+func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
+	th := unit.Unit{Provider: ingesttest.Provider, Key: "C1 0001"}
+	te := newTestEnv(t, &fake.Manager{})
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	serve := func(ps []source.Plugin) *daemon.Server {
+		saved := plugins
+		plugins = ps
+		defer func() { plugins = saved }()
+		d := serveDeps(context.Background(), te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+		d.Startup = nil
+		return daemon.New(d)
+	}
+	detail := func(s *daemon.Server) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("GET", api.UnitPath(th), nil)
+		req.Header.Set(api.Header, api.Version)
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		return rec
+	}
+
+	with := serve(append(slices.Clone(plugins), threadModule(th)))
+	if !with.RunJob("ingest:" + string(ingesttest.Provider)) {
+		t.Error("the thread module got no ingestion job")
+	}
+	if !with.RunJob("ingest:github") {
+		t.Error("the github module lost its ingestion job")
+	}
+	if rec := detail(with); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"title":"C1 0001"`) {
+		t.Errorf("the thread route: %d %s", rec.Code, rec.Body)
+	}
+
+	without := serve(plugins)
+	if without.RunJob("ingest:" + string(ingesttest.Provider)) {
+		t.Error("a removed module kept its ingestion job")
+	}
+	if rec := detail(without); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no pull request") {
+		t.Errorf("a removed module's route: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// carded is p's module with a card and a derived item per row.
+func carded(p source.Plugin) source.Plugin {
+	build := p.Build
+	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+		m, err := build(cfg, d)
+		m.Card = func(_ context.Context, r api.Row) (card.Card, error) {
+			return card.Card{Unit: r.Unit, Title: r.Title, State: "thread"}, nil
+		}
+		m.Items = func(r api.Row) []items.Item {
+			return []items.Item{{ID: "th:ask", Unit: r.Unit, Kind: items.Request, Summary: r.Title, Requester: items.Person{Key: "thread:U000AAA"},
+				Origin: unit.Anchor{Unit: r.Unit, Ref: "m:1"}, State: items.Open, Confidence: items.High, Basis: items.NoBasis}}
+		}
+		return m, err
+	}
+	return p
+}
+
+// liveThread is a fake thread plugin whose row title the test sets, with
+// the change log its module was built with.
+type liveThread struct {
+	title   atomic.Pointer[string]
+	changes atomic.Pointer[change.Log]
+}
+
+func (l *liveThread) plugin(th unit.Unit) source.Plugin {
+	p := threadModule(th)
+	build := p.Build
+	p.Build = func(cfg config.Config, d source.Deps) (source.Module, error) {
+		m, err := build(cfg, d)
+		l.changes.Store(d.Changes)
+		m.Rows = func(readmodel.RowDeps) readmodel.Provider {
+			return threadRows{units: []unit.Unit{th}, title: func(unit.Unit) string { return *l.title.Load() }}
+		}
+		return m, err
+	}
+	return carded(p)
+}
+
+func (l *liveThread) retitle(title string, u unit.Unit) {
+	l.title.Store(&title)
+	l.changes.Load().Note(port.TopicSourceEvents, u)
+}
+
+func serveNoJobs(t *testing.T, te *testEnv) (stop func()) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- runServe(ctx, te.Env, []string{"--no-jobs", "--mcp-port", strconv.Itoa(freePort(t))}) }()
+	waitHealth(t, te.Env, "the daemon up", func(api.Health) bool { return true })
+	return func() {
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				t.Fatalf("serve returned %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("serve did not stop")
+		}
+	}
+}
+
+func openStateDB(t *testing.T, te *testEnv) *sqlite.DB {
+	t.Helper()
+	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func TestCardsJobRunsUnderNoJobs(t *testing.T) {
+	th := unit.Unit{Provider: ingesttest.Provider, Key: "C1 0001"}
+	te := newServeEnv(t)
+	live := &liveThread{}
+	first := "first"
+	live.title.Store(&first)
+	saved := plugins
+	plugins = append(slices.Clone(plugins), live.plugin(th))
+	defer func() { plugins = saved }()
+	stop := serveNoJobs(t, te)
+	defer stop()
+	db := openStateDB(t, te)
+	ctx := context.Background()
+	follows := func(title string) func() bool {
+		return func() bool {
+			got, err := db.Cards().Get(ctx, []unit.Unit{th})
+			if err != nil || got[th].Card.Title != title {
+				return false
+			}
+			its, err := db.Items().Load(ctx, []unit.Unit{th})
+			return err == nil && len(its[th]) == 1 && its[th][0].Provenance == items.Derived && its[th][0].Summary == title
+		}
+	}
+	eventually(t, "the thread's card and item", follows("first"))
+	live.retitle("second", th)
+	eventually(t, "the card and item following the changed row", follows("second"))
+}
+
+func TestCardsJobResolvesTheItemsOfALapsedPR(t *testing.T) {
+	te := newServeEnv(t)
+	ctx := context.Background()
+	seed, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := inventory.New(seed).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL()}); err != nil {
+		t.Fatal(err)
+	}
+	stale := items.Item{ID: "th:ask", Unit: r7.Unit(), Kind: items.Request, Summary: "review", Requester: items.Person{Key: "github:ana"},
+		Origin: unit.Anchor{Unit: r7.Unit(), Ref: "review:1"}, State: items.Open, Confidence: items.High, Basis: items.NoBasis,
+		Provenance: items.Derived, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	if err := seed.Items().Commit(ctx, coreitems.Commit{Items: []items.Item{stale}}); err != nil {
+		t.Fatal(err)
+	}
+	seed.Close()
+	var builds atomic.Int32
+	saved := plugins
+	plugins = []source.Plugin{carded(countedGitHub(&builds))}
+	defer func() { plugins = saved }()
+	stop := serveNoJobs(t, te)
+	defer stop()
+	db := openStateDB(t, te)
+	eventually(t, "the lapsed PR's derived item resolved", func() bool {
+		its, err := db.Items().Load(ctx, []unit.Unit{r7.Unit()})
+		return err == nil && len(its[r7.Unit()]) == 1 && its[r7.Unit()][0].State == items.Resolved && its[r7.Unit()][0].Resolution == items.Superseded
+	})
+}

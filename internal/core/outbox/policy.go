@@ -1,0 +1,76 @@
+package outbox
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+// Manifests reads the [draft_approval] blocks of the loaded intents and
+// workflows, and the turns book.
+type Manifests interface {
+	// IntentApproval is the block of intent name, nil when it declares none; known is false for an unknown intent.
+	IntentApproval(name string) (a *draft.Approval, known bool)
+	// WorkflowApproval is the block of workflow name, nil when it declares none; known is false for an unknown workflow.
+	WorkflowApproval(name string) (a *draft.Approval, known bool)
+	// Turn is the intent of turn seq in u's book and the workflow that started it; ok is false when the book has no such turn.
+	Turn(ctx context.Context, u unit.Unit, seq int64) (intent, workflow string, ok bool, err error)
+}
+
+// ErrUnknownOrigin is a draft's proposing intent, workflow or turn that the manifests or the book do not know.
+var ErrUnknownOrigin = errors.New("unknown proposer")
+
+// Resolver is the Policies of the manifests, for turn and session drafts only:
+// the proposing turn's workflow block, then its intent's, else always. The
+// intent and workflow come from the turn in the book; an Origin that names
+// others than the book's resolves to always. Every other origin resolves to
+// always, so a rule's policy reaches a draft only through Proposal.Approval.
+type Resolver struct {
+	Manifests Manifests
+}
+
+var always = draft.Approval{Mode: draft.Always}
+
+func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Approval, error) {
+	switch {
+	case o.Kind != draft.OriginTurn && o.Kind != draft.OriginSession:
+		if o.Intent != "" || o.Workflow != "" {
+			return always, fmt.Errorf("a %s draft names a manifest: %w", o.Kind, ErrUnknownOrigin)
+		}
+		return always, nil
+	case o.TurnSeq <= 0:
+		if o.Intent != "" || o.Workflow != "" {
+			return always, fmt.Errorf("a %s draft with no turn names a manifest: %w", o.Kind, ErrUnknownOrigin)
+		}
+		return always, nil
+	}
+	intent, workflow, ok, err := r.Manifests.Turn(ctx, u, o.TurnSeq)
+	switch {
+	case err != nil:
+		return always, fmt.Errorf("reading turn %d of %s: %w", o.TurnSeq, u, err)
+	case !ok:
+		return always, fmt.Errorf("turn %d of %s: %w", o.TurnSeq, u, ErrUnknownOrigin)
+	case o.Intent != "" && o.Intent != intent, o.Workflow != "" && o.Workflow != workflow:
+		return always, fmt.Errorf("turn %d of %s is not the draft's intent and workflow: %w", o.TurnSeq, u, ErrUnknownOrigin)
+	}
+	if workflow != "" {
+		a, known := r.Manifests.WorkflowApproval(workflow)
+		if !known {
+			return always, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
+		}
+		if a != nil {
+			return *a, nil
+		}
+	}
+	a, known := r.Manifests.IntentApproval(intent)
+	if !known {
+		return always, fmt.Errorf("intent %s: %w", intent, ErrUnknownOrigin)
+	}
+	if a != nil {
+		return *a, nil
+	}
+	return always, nil
+}

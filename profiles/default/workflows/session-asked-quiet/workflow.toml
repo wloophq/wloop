@@ -1,0 +1,15 @@
+description = "Close a loop session whose newest turn asked and that stayed quiet for cleanup.asked_idle"
+subject = "session"
+when = 'session.managed && session.newest_state == "asked" && session.idle_for > config.cleanup.asked_idle'
+mode = "apply"
+order = 14
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+
+[limits]
+per_run = 10
+per_day = 100

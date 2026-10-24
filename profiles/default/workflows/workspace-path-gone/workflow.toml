@@ -1,0 +1,15 @@
+description = "Unregister a workspace whose path no longer exists"
+subject = "workspace"
+when = '!workspace.main && !workspace.path_exists'
+mode = "apply"
+order = 22
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "workspace.unregister"
+
+[limits]
+per_run = 5
+per_day = 30

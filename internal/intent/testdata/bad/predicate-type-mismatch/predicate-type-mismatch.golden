@@ -1,0 +1,1 @@
+testdata/bad/predicate-type-mismatch/intents/ask-author/intent.toml:6:11: records: 12: cannot compare string == bool

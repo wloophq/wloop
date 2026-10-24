@@ -1,0 +1,30 @@
+ [2mFocus 1[22m   [7m[1m Inbox 2 [22m[27m   [2mOutbox 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m
+
+[7m>• [2m5h[22m  Deploy window tonight?                                                   [27m
+   [2m5h[22m  Buy cables
+
+[1mDeploy window tonight?[22m
+  [2mstate    [22m  inbox · changed
+  [2masks     [22m  [33mWhich window?[39m
+  [2m         [22m  1. Before six
+  [2m         [22m  2. After ten (recommended)
+  [2mkeys     [22m  [1mx[22m [2mnext[22m  [1mw[22m [2mwaiting[22m  [1ms[22m [2mschedule[22m  [1my[22m [2msomeday[22m  [1ml[22m [2mreference[22m  [1mf[22m [2mfocus[22m
+             [1mp[22m [2mproject[22m  [1me[22m [2mdone[22m  [1mBackspace[22m [2mdismiss[22m
+  [2mnot now  [22m  [2ma approve · d delegate[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[33mwarning: app: notifications are off[39m
+[1mx[22m [2mnext[22m  [1mw[22m [2mwaiting[22m  [1ms[22m [2mschedule[22m  [1my[22m [2msomeday[22m  [1ml[22m [2mreference[22m  [1mf[22m [2mfocus[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

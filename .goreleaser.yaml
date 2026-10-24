@@ -1,0 +1,55 @@
+version: 2
+
+project_name: wloop
+
+builds:
+  - main: ./cmd/wloop
+    binary: "{{ .ProjectName }}"
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version=v{{ .Version }}"]
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "Merge pull request", "Merge branch"]
+
+homebrew_casks:
+  - binaries: ["{{ .ProjectName }}"]
+    homepage: "https://github.com/wloophq/{{ .ProjectName }}"
+    description: Closes the loop between GitHub pull requests and AI coding agents.
+    repository:
+      owner: wloophq
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    hooks:
+      post:
+        # The binary is not signed or notarized; without this, Gatekeeper blocks it and the app bundle built from it.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/{{ .ProjectName }}"]
+          end
+    caveats: |
+      Run `{{ .ProjectName }} install` now and after every upgrade.
+      On macOS, also run `{{ .ProjectName }} app install` now and after every upgrade.
+
+release:
+  github:
+    owner: wloophq
+    name: "{{ .ProjectName }}"
+  prerelease: auto

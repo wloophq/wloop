@@ -1,0 +1,1 @@
+testdata/workflows/bad/bad-cron/workflows/case-workflow/workflow.toml:6:12: trigger.schedule: schedule "every morning": want 5 fields (minute hour day-of-month month day-of-week), got 2

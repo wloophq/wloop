@@ -1,0 +1,15 @@
+description = "Close an agent session that finished and stayed quiet"
+subject = "session"
+when = 'session.managed && session.open_turn == "" && session.agent_state == "done" && !session.user_active && session.idle_for > config.cleanup.idle'
+mode = "observe"
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.close"
+
+[limits]
+per_run = 5
+per_day = 50
+cooldown = "1h"

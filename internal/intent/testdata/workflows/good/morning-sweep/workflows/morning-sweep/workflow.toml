@@ -1,0 +1,14 @@
+description = "Remove finished workspaces every weekday morning"
+subject = "workspace"
+when = 'workspace.pr_state == "merged" && workspace.pendency == []'
+
+[trigger]
+schedule = "0 9 * * 1-5"
+
+[[step]]
+use = "workspace.remove"
+
+[approval]
+default = "wait"
+window = "1d"
+wait_when = 'workspace.untracked > 0'

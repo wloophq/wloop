@@ -1,0 +1,74 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record", "drafts", "log"],
+  "properties": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "summary"],
+      "properties": {
+        "state": {"type": "string", "enum": ["done", "asked", "failed"], "description": "done when the work is finished, asked when you need the user, failed when it broke"},
+        "summary": {"type": "string", "maxLength": 200, "description": "one line of plain text"},
+        "question": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "description": "only with asked",
+          "properties": {
+            "kind": {"type": "string", "enum": ["choice", "confirm", "free"]},
+            "text": {"type": "string"},
+            "options": {
+              "type": "array", "minItems": 2, "maxItems": 5, "description": "only for choice",
+              "items": {
+                "type": "object", "additionalProperties": false, "required": ["id", "label", "consequence"],
+                "properties": {"id": {"type": "string", "maxLength": 20}, "label": {"type": "string"}, "consequence": {"type": "string"}}
+              }
+            },
+            "recommend": {"type": "string"}
+          }
+        },
+        "resume": {"type": "string", "description": "required with asked and failed: what is done and what is left"},
+        "next": {"type": "string", "description": "what the next turn must check"},
+        "ledger": {
+          "type": "array", "maxItems": 50,
+          "description": "items you created, assigned, resolved or reopened; each needs the anchor (the message or event) that justifies it",
+          "items": {
+            "type": "object",
+            "required": ["op", "anchor"],
+            "properties": {
+              "op": {"type": "string", "enum": ["create", "update", "assign", "resolve", "reopen", "link", "evidence"]},
+              "item": {"type": "string", "description": "the item id; required but on create"},
+              "anchor": {"type": "object", "required": ["ref"], "properties": {"ref": {"type": "string"}, "permalink": {"type": "string"}, "at": {"type": "string"}}},
+              "fields": {"type": "object", "description": "create and update: kind (request, question, decision, todo), summary, context, deadline"},
+              "assignees": {"type": "array", "items": {"type": "object", "required": ["key"], "properties": {"key": {"type": "string"}, "name": {"type": "string"}}}},
+              "basis": {"type": "string"},
+              "resolution": {"type": "string", "enum": ["done", "answered", "fixed", "delegated", "declined", "dismissed", "superseded", "moot"]},
+              "evidence": {"type": "object"},
+              "reason": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "drafts": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "posts to propose on this unit, at most 3; the user approves each before it is sent",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "text"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["reply", "nudge", "close", "react", "ask_owner", "comment"]},
+          "target": {"type": "string", "description": "empty: the unit itself"},
+          "text": {"type": "string", "description": "Markdown; empty only for react"},
+          "items": {"type": "array", "items": {"type": "string"}, "description": "the ids of the items it serves"},
+          "reaction": {"type": "string", "description": "react only: the emoji name without colons"},
+          "unit": {"type": "string", "description": "leave out: drafts go on this turn's unit only"}
+        }
+      }
+    },
+    "log": {"type": "string", "maxLength": 4000, "description": "a Markdown note for the unit's dossier; empty for none"}
+  }
+}

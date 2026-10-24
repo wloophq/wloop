@@ -1,0 +1,40 @@
+ [2mFocus 1[22m    [2mInbox 2[22m    [2mOutbox 1[22m    [2mNext 4[22m    [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m   [7m[1m Review [22m[27m
+
+ ▸ ○ Inbox to zero                                       [2m2[22m
+   [2m✓[22m [2mOutbox[22m                                              [2m1[22m
+   ○ Waiting: nudge?                                     [2m4[22m
+   ○ Projects without a next action or past their review [2m1[22m
+   [2m✓[22m [2mSomeday[22m                                             [2m0[22m
+   [2m✓[22m [2mPrune Focus[22m                                         [2m1[22m
+
+[7m>  [1mInbox to zero (2)[22m                                                                                                    [27m
+ • [2m5h[22m  Deploy window tonight?
+   [2m5h[22m  Buy cables
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1mEnter[22m [2mstep done[22m  [1m][22m [2mnext step[22m  [1m[[22m [2mprevious step[22m  [1m↑↓[22m [2mmove[22m  [1mg[22m [2mview[22m  [1m/[22m [2mfilter[22m  [1m^K[22m [2mactions[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

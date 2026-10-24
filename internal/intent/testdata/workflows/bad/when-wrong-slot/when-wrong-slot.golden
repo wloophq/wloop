@@ -1,0 +1,1 @@
+testdata/workflows/bad/when-wrong-slot/workflows/case-workflow/workflow.toml:3:8: when: 1: unknown field workspace.main

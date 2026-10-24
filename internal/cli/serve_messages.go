@@ -1,0 +1,31 @@
+package cli
+
+import (
+	"context"
+
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/daemon"
+)
+
+// serveMessages serves the Inbox messages on d and keeps them in step with the turn books and the ledger's
+// proposals until ctx ends; it also runs under --no-jobs, since it only reads and writes the local store.
+func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) daemon.Deps {
+	if e.Turns == nil {
+		return d
+	}
+	ledger := e.itemsLedger(db, cfg, logf)
+	entries := e.entries(db, cfg, ledger)
+	if e.messages == nil {
+		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), inventory.New(db)}, Turns: e.Turns,
+			Ledger: ledger, Entries: entries, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf}
+	}
+	d.GTD, d.Messages = entries, e.messages
+	if e.changes != nil {
+		go e.messages.Run(ctx, e.changes)
+		go reconcileEnded(ctx, e.messages, e.changes, logf)
+	}
+	return d
+}

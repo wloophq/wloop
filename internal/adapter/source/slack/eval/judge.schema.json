@@ -1,0 +1,268 @@
+{
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "same_actions",
+  "severity",
+  "sections",
+  "reference_errors",
+  "ledger_root_causes",
+  "prompt_fix_hints"
+ ],
+ "properties": {
+  "same_actions": {
+   "type": "boolean"
+  },
+  "severity": {
+   "type": "string",
+   "enum": [
+    "none",
+    "minor",
+    "major",
+    "critical"
+   ]
+  },
+  "sections": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "my_actions",
+    "my_decisions",
+    "chase",
+    "resolved",
+    "leave"
+   ],
+   "properties": {
+    "my_actions": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "reference_count",
+      "matched",
+      "missed",
+      "extra",
+      "contradicted"
+     ],
+     "properties": {
+      "reference_count": {
+       "type": "integer"
+      },
+      "matched": {
+       "type": "integer"
+      },
+      "missed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "extra": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "contradicted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "my_decisions": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "reference_count",
+      "matched",
+      "missed",
+      "extra",
+      "contradicted"
+     ],
+     "properties": {
+      "reference_count": {
+       "type": "integer"
+      },
+      "matched": {
+       "type": "integer"
+      },
+      "missed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "extra": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "contradicted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "chase": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "reference_count",
+      "matched",
+      "missed",
+      "extra",
+      "contradicted"
+     ],
+     "properties": {
+      "reference_count": {
+       "type": "integer"
+      },
+      "matched": {
+       "type": "integer"
+      },
+      "missed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "extra": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "contradicted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "resolved": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "reference_count",
+      "matched",
+      "missed",
+      "extra",
+      "contradicted"
+     ],
+     "properties": {
+      "reference_count": {
+       "type": "integer"
+      },
+      "matched": {
+       "type": "integer"
+      },
+      "missed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "extra": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "contradicted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "leave": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "reference_count",
+      "matched",
+      "missed",
+      "extra",
+      "contradicted"
+     ],
+     "properties": {
+      "reference_count": {
+       "type": "integer"
+      },
+      "matched": {
+       "type": "integer"
+      },
+      "missed": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "extra": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "contradicted": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  },
+  "reference_errors": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "ledger_root_causes": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "cause",
+     "detail"
+    ],
+    "properties": {
+     "cause": {
+      "type": "string",
+      "enum": [
+       "missing_item",
+       "spurious_item",
+       "wrong_assignee",
+       "wrong_waiting_on",
+       "wrong_state",
+       "wrong_resolution",
+       "missing_link",
+       "vague_summary",
+       "missing_context",
+       "wrong_verdict",
+       "other"
+      ]
+     },
+     "detail": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "prompt_fix_hints": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ }
+}

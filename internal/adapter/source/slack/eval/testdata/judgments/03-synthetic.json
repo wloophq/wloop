@@ -1,0 +1,77 @@
+{
+ "same_actions": true,
+ "severity": "none",
+ "sections": {
+  "my_actions": {
+   "reference_count": 3,
+   "matched": 2,
+   "missed": [
+    "missed point"
+   ],
+   "extra": [
+    "extra point"
+   ],
+   "contradicted": []
+  },
+  "my_decisions": {
+   "reference_count": 0,
+   "matched": 0,
+   "missed": [],
+   "extra": [
+    "extra point"
+   ],
+   "contradicted": []
+  },
+  "chase": {
+   "reference_count": 1,
+   "matched": 1,
+   "missed": [
+    "missed point"
+   ],
+   "extra": [
+    "extra point"
+   ],
+   "contradicted": [
+    "contradicted point"
+   ]
+  },
+  "resolved": {
+   "reference_count": 2,
+   "matched": 1,
+   "missed": [],
+   "extra": [
+    "extra point"
+   ],
+   "contradicted": []
+  },
+  "leave": {
+   "reference_count": 3,
+   "matched": 3,
+   "missed": [
+    "missed point"
+   ],
+   "extra": [
+    "extra point"
+   ],
+   "contradicted": []
+  }
+ },
+ "reference_errors": [],
+ "ledger_root_causes": [
+  {
+   "cause": "wrong_waiting_on",
+   "detail": "synthetic cause"
+  },
+  {
+   "cause": "missing_link",
+   "detail": "synthetic cause"
+  },
+  {
+   "cause": "wrong_verdict",
+   "detail": "synthetic cause"
+  }
+ ],
+ "prompt_fix_hints": [
+  "hint 3"
+ ]
+}

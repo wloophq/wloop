@@ -1,0 +1,30 @@
+[Focus 1]   Inbox 2    Outbox 1    Next 4    Waiting 4    Projects 0
+
+>  5h  ★ Reply on the batch export review  @computer acme/api#7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+x next  w waiting  s schedule  y someday  l reference  f focus  ? keys  q quit

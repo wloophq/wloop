@@ -1,0 +1,428 @@
+[
+  {
+    "id": "run_now",
+    "label": "Run now",
+    "group": "round",
+    "key": "R",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification",
+      "cli"
+    ],
+    "intake": true,
+    "source": "builtin"
+  },
+  {
+    "id": "skip",
+    "label": "Skip",
+    "group": "round",
+    "key": "S",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "guide",
+    "label": "Guide",
+    "group": "round",
+    "key": "G",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "input": {
+      "kind": "text",
+      "required": true,
+      "label": "Guidance",
+      "placeholder": "what the next round should look at"
+    },
+    "source": "builtin"
+  },
+  {
+    "id": "trust_run",
+    "label": "Trust folder and run",
+    "group": "round",
+    "key": "T",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "unblock",
+    "label": "Dismiss block",
+    "group": "round",
+    "key": "D",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "review",
+    "label": "Review",
+    "group": "round",
+    "key": "V",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli",
+      "explore"
+    ],
+    "input": {
+      "kind": "text",
+      "label": "Guidance",
+      "placeholder": "what the round should look at"
+    },
+    "intake": true,
+    "source": "intents/review/intent.toml"
+  },
+  {
+    "id": "address",
+    "label": "Address",
+    "group": "round",
+    "key": "F",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli",
+      "explore"
+    ],
+    "input": {
+      "kind": "text",
+      "label": "Guidance",
+      "placeholder": "what the round should look at"
+    },
+    "intake": true,
+    "source": "intents/address/intent.toml"
+  },
+  {
+    "id": "act",
+    "label": "Act",
+    "group": "round",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli",
+      "explore"
+    ],
+    "input": {
+      "kind": "text",
+      "label": "Guidance",
+      "placeholder": "what to do about the items"
+    },
+    "source": "intents/act/intent.toml"
+  },
+  {
+    "id": "nudge",
+    "label": "Nudge",
+    "group": "round",
+    "key": "N",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli",
+      "explore"
+    ],
+    "input": {
+      "kind": "text",
+      "label": "Guidance",
+      "placeholder": "what to ask about",
+      "max": 500
+    },
+    "source": "intents/nudge/intent.toml"
+  },
+  {
+    "id": "answer",
+    "label": "Answer",
+    "group": "turn",
+    "key": "W",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "input": {
+      "kind": "answer",
+      "required": true,
+      "label": "Answer"
+    },
+    "source": "builtin"
+  },
+  {
+    "id": "continue",
+    "label": "Continue",
+    "group": "turn",
+    "key": "C",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "dismiss",
+    "label": "Dismiss",
+    "group": "turn",
+    "key": "X",
+    "surfaces": [
+      "detail",
+      "tui",
+      "notification"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "take_over",
+    "label": "Take over",
+    "group": "control",
+    "key": "A",
+    "surfaces": [
+      "detail",
+      "tui",
+      "cli",
+      "explore"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "pause",
+    "label": "Pause",
+    "group": "control",
+    "key": "H",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification",
+      "cli"
+    ],
+    "toggle": "resume",
+    "source": "builtin"
+  },
+  {
+    "id": "resume",
+    "label": "Resume",
+    "group": "control",
+    "key": "H",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "cli"
+    ],
+    "toggle": "pause",
+    "source": "builtin"
+  },
+  {
+    "id": "mute",
+    "label": "Mute",
+    "group": "control",
+    "key": "M",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "input": {
+      "kind": "duration",
+      "required": true,
+      "label": "Mute for",
+      "placeholder": "2d, 36h",
+      "default": "2d",
+      "until_state": true
+    },
+    "toggle": "unmute",
+    "source": "builtin"
+  },
+  {
+    "id": "unmute",
+    "label": "Unmute",
+    "group": "control",
+    "key": "M",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "toggle": "mute",
+    "source": "builtin"
+  },
+  {
+    "id": "track",
+    "label": "Track",
+    "group": "control",
+    "surfaces": [
+      "detail",
+      "cli",
+      "explore"
+    ],
+    "toggle": "untrack",
+    "source": "builtin"
+  },
+  {
+    "id": "untrack",
+    "label": "Untrack",
+    "group": "control",
+    "surfaces": [
+      "detail",
+      "cli",
+      "explore"
+    ],
+    "toggle": "track",
+    "source": "builtin"
+  },
+  {
+    "id": "open",
+    "label": "Open",
+    "group": "workspace",
+    "key": "O",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "notification",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "remove",
+    "label": "Remove",
+    "group": "workspace",
+    "surfaces": [
+      "row",
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "remove_force",
+    "label": "Force remove",
+    "group": "workspace",
+    "surfaces": [
+      "row",
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "brief_refresh",
+    "label": "Refresh brief",
+    "group": "brief",
+    "surfaces": [
+      "detail",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "intake_without",
+    "label": "Start without brief",
+    "group": "intake",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "intake_cancel",
+    "label": "Cancel",
+    "group": "intake",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "menubar",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "draft.approve",
+    "label": "Approve",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "draft.edit",
+    "label": "Edit",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "input": {
+      "kind": "text",
+      "required": true,
+      "label": "Text"
+    },
+    "source": "builtin"
+  },
+  {
+    "id": "draft.discard",
+    "label": "Discard",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  },
+  {
+    "id": "draft.retry",
+    "label": "Retry",
+    "group": "draft",
+    "surfaces": [
+      "row",
+      "detail",
+      "tui",
+      "cli"
+    ],
+    "source": "builtin"
+  }
+]

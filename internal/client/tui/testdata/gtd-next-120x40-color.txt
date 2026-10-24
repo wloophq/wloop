@@ -1,0 +1,40 @@
+ [2mFocus 1[22m    [2mInbox 2[22m    [2mOutbox 1[22m   [7m[1m Next 4 [22m[27m   [2mWaiting 4[22m    [2mProjects 0[22m    [2mSomeday 0[22m    [2mLogbook 12[22m
+
+ [1m@computer[22m
+[7m>* [2m5h[22m  Rename the export flag  [2m@computer[22m                                                                                [27m
+   [2m5h[22m  Write the runbook       [2m@computer[22m
+ [1m@calls[22m
+   [2m5h[22m  Call the bank           [2m@calls[22m
+ [1mno context[22m
+   [2m5h[22m  Sort the receipts
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[33mwarning: app: notifications are off[39m
+[1mx[22m [2mnext[22m  [1mw[22m [2mwaiting[22m  [1ms[22m [2mschedule[22m  [1my[22m [2msomeday[22m  [1ml[22m [2mreference[22m  [1mf[22m [2mfocus[22m  [1mp[22m [2mproject[22m  [1ma[22m [2mapprove[22m  [1md[22m [2mdelegate[22m  [1me[22m [2mdone[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

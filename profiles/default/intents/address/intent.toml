@@ -1,0 +1,62 @@
+label   = "Address"
+summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace"
+verb    = "delegate"
+key     = "F"
+workspace = "author"
+session   = { strategy = "reuse_live", title = "triage" }
+intake    = true
+start_line = "starting the address round"
+owner_only = true
+board     = "author"
+drives_row = true
+profile   = "address"
+records   = '!turn.needs_take_over'
+on_sent   = ["mark_addressed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
+
+[guidance]
+help = "what the round should look at"
+
+[headline]
+resumed = "address round on {{.PR.Slug}}"
+[[headline.new]]
+when = 'turn.needs_take_over'
+text = "Address round on {{.PR.Slug}}, which someone else opened: ask before taking it over."
+[[headline.new]]
+when = 'inputs.take_over'
+text = "Take over {{.PR.Slug}} and address it, {{.Who}}."
+[[headline.new]]
+text = "Address round on {{.PR.Slug}}, {{.Who}}."
+
+[inputs.take_over]
+type   = "flag"
+flag   = "--take-over"
+help   = "takes it over first"
+before = "take_over"
+
+[inputs.self_review]
+type = "flag"
+flag = "--self-review"
+help = "reviews the change with the review profile first, against the guidance as its plan, and fixes what it finds; nothing of that review is published"
+persist = true
+by_hand_only = true
+
+[[also_profiles]]
+profile = "review"
+when    = "inputs.self_review && !turn.needs_take_over"
+round   = "first"
+define  = "review-judgment"
+source_prefix = "review guide: "
+
+[action]
+enabled    = "pr.mine || row.adopted || row.author_workspace"
+reason_off = "Not yours: take it over first"
+primary    = "!row.question && (pr.mine || row.adopted)"
+note_when_question = "Starts a new round; the agent's open question is replaced"
+
+[join]
+differs_on = ["self_review"]
+
+[record]
+states    = ["done", "asked", "failed"]
+artifacts = ["triage"]
+history_artifact = "triage"

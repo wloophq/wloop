@@ -1,0 +1,13 @@
+Outbox  4 drafts waiting on you
+
+NUDGES 1
+  #12  acme/api#7 · Batch export for large accoun…  @ana       26h  @ana, any news on this?
+
+CLOSINGS 1
+  #11  DM with Ana Lima: rollout                                3h  closes 2 items: Rollout date; Feature fla…
+
+REPLIES 2
+  #14  #ops · When does the export ship?                        5m  Friday, after the freeze.
+   #9  #ops · When does the export ship?            @Bob Reis   2d  cc @Bob Reis for the notes
+
+Next: {{command}} outbox show <id> · approve <id> · discard <id>

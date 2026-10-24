@@ -1,0 +1,1 @@
+testdata/workflows/bad/when-after-trigger/workflows/case-workflow/workflow.toml:7:1: trigger.when: when is a top-level key: write it before the [trigger] table

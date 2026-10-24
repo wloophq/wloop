@@ -1,0 +1,1 @@
+testdata/bad/headline-without-default-case/intents/ask-author/intent.toml:9:8: headline.new[0].when: the last case is the default: leave when out

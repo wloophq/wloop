@@ -1,0 +1,27 @@
+{{define "judgment"}}
+## Judgment
+
+Parts are in order; where they disagree, the later part wins.
+{{range .Guide.Parts}}
+{{heading .Level}} {{.Label}}
+
+{{trim .Text}}
+{{end}}
+{{- with index .Guide.Delegates .Agent}}
+### Delegates
+
+In the finding step, also run each of these and verify what it returns like any other finding:
+{{range .}}
+- {{.}}{{end}}
+{{end}}
+{{- end}}
+{{define "review-judgment"}}
+## Review judgment
+
+The reviewer's guide your own review applies. Parts are in order; where they disagree, the later part wins.
+{{range (index .Guides "review").Parts}}
+{{heading .Level}} {{.Label}}
+
+{{trim .Text}}
+{{end}}
+{{- end}}

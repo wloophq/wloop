@@ -1,0 +1,1 @@
+testdata/workflows/bad/classify-on-condition/workflows/case-workflow/workflow.toml:9:7: step[0].use: classify runs under an event trigger, not sweep

@@ -1,0 +1,9 @@
+bin/
+dist/
+*.tmp
+/wloop
+REPORT.md
+.superpowers/
+docs/node_modules/
+docs/dist/
+docs/.astro/

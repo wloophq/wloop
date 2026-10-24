@@ -1,0 +1,122 @@
+{
+ "prs": [
+  {
+   "author": "alice",
+   "closed_at": "",
+   "head": "worktree",
+   "head_branch": "fix/login-timeout",
+   "merged_at": "",
+   "ref": "acme/gadgets#546",
+   "state": "OPEN"
+  },
+  {
+   "author": "alice",
+   "closed_at": "",
+   "head": "",
+   "head_branch": "docs/api-intro",
+   "merged_at": "",
+   "ref": "acme/handbook#131",
+   "state": "OPEN"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-19T15:04:41.000000000Z",
+   "head": "worktree",
+   "head_branch": "docs/style-guide",
+   "merged_at": "2026-10-19T15:04:41.000000000Z",
+   "ref": "acme/handbook#407",
+   "state": "MERGED"
+  },
+  {
+   "author": "me",
+   "closed_at": "",
+   "head": "",
+   "head_branch": "me/delivery-limits",
+   "merged_at": "",
+   "ref": "acme/handbook#524",
+   "state": "OPEN"
+  },
+  {
+   "author": "me",
+   "closed_at": "2026-10-17T03:50:47Z",
+   "head": "worktree",
+   "head_branch": "me/invoice-export",
+   "merged_at": "2026-10-17T03:50:47Z",
+   "ref": "acme/billing#449",
+   "state": "MERGED"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-19T20:12:57Z",
+   "head": "worktree",
+   "head_branch": "docs/webhooks",
+   "merged_at": "",
+   "ref": "acme/gadgets#195",
+   "state": "CLOSED"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-19T20:16:56.000000000Z",
+   "head": "worktree",
+   "head_branch": "adr-queue-backend",
+   "merged_at": "2026-10-19T20:16:56.000000000Z",
+   "ref": "acme/gadgets#123",
+   "state": "MERGED"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-13T18:00:00Z",
+   "head": "",
+   "head_branch": "develop",
+   "merged_at": "",
+   "ref": "acme/widgets#5019",
+   "state": "CLOSED"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-19T20:13:01Z",
+   "head": "worktree",
+   "head_branch": "feat/batch-upload",
+   "merged_at": "",
+   "ref": "acme/widgets#5023",
+   "state": "CLOSED"
+  },
+  {
+   "author": "me",
+   "closed_at": "",
+   "head": "",
+   "head_branch": "me/event-ids",
+   "merged_at": "",
+   "ref": "acme/widgets#5080",
+   "state": "OPEN"
+  },
+  {
+   "author": "me",
+   "closed_at": "",
+   "head": "",
+   "head_branch": "me/lint-fixes",
+   "merged_at": "",
+   "ref": "acme/widgets#5111",
+   "state": "OPEN"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-20T14:35:26.000000000Z",
+   "head": "worktree",
+   "head_branch": "feat/dark-mode",
+   "merged_at": "2026-10-20T14:35:25.000000000Z",
+   "ref": "acme/widgets#5158",
+   "state": "MERGED"
+  },
+  {
+   "author": "alice",
+   "closed_at": "2026-10-19T11:23:22.000000000Z",
+   "head": "worktree",
+   "head_branch": "feat/search-filters",
+   "merged_at": "2026-10-19T11:23:22.000000000Z",
+   "ref": "acme/gadgets#718",
+   "state": "MERGED"
+  }
+ ],
+ "viewer": "me"
+}

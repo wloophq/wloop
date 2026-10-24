@@ -1,0 +1,42 @@
+{
+  "app": {
+    "notifications": "denied",
+    "state": "running"
+  },
+  "brief": {
+    "failed": 1,
+    "last_error": "claude timed out",
+    "paused_until": "2026-10-08T11:00:00Z",
+    "pending": 1,
+    "ready": 2
+  },
+  "briefs": {
+    "open": false
+  },
+  "jobs": [
+    {
+      "every": 3600000000000,
+      "last_error": "",
+      "last_ok": "0001-01-01T00:00:00Z",
+      "last_run": "0001-01-01T00:00:00Z",
+      "name": "brief",
+      "running": false
+    }
+  ],
+  "notifier": false,
+  "paused": false,
+  "rate_limit": {
+    "cost": 0,
+    "limit": 0,
+    "remaining": 0,
+    "reset_at": "0001-01-01T00:00:00Z"
+  },
+  "slow_sync": false,
+  "stalled_review_hours": 48,
+  "version": "test",
+  "viewer": "me",
+  "warnings": [
+    "app: notifications are off for {{name}}; turn them on in System Settings \u003e Notifications \u003e {{name}}",
+    "brief: claude timed out"
+  ]
+}

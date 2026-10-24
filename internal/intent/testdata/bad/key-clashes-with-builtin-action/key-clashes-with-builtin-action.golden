@@ -1,0 +1,1 @@
+testdata/bad/key-clashes-with-builtin-action/intents/ask-author/intent.toml:5:7: key: O is the key of the built-in action open on web; the intent loads without a key (palette only)

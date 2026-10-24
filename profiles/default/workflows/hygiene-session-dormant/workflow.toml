@@ -1,0 +1,11 @@
+description = "Mark dormant a session whose process two complete censuses of its manager no longer list"
+subject = "session"
+when = 'session.process_gone'
+mode = "apply"
+order = 32
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "session.mark_dormant"
