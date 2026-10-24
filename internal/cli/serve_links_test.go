@@ -43,7 +43,7 @@ func TestServeResolvesLinkedItems(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 	if built.Links == nil || built.Units == nil || built.Units() != d.Units {
 		t.Fatalf("source deps: links %v, units set %v", built.Links, built.Units != nil)
 	}

@@ -352,7 +352,7 @@ func TestEchoAgentRunsAThreadTurn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() { cancel(); <-te.served.done }()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)

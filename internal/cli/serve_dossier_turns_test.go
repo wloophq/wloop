@@ -48,12 +48,12 @@ func servedDossiersAfter(t *testing.T, degraded bool) (*testEnv, *sqlite.DB) {
 	t.Cleanup(func() { db.Close() })
 	if degraded {
 		dctx, stop := context.WithCancel(context.Background())
-		serveDeps(dctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+		serveDeps(dctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 		stop()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 	if te.dossierTurns == nil {
 		t.Fatal("the dossiers are not wired into the turns")
 	}
@@ -185,7 +185,7 @@ func serveDepsAgain(t *testing.T, te *testEnv, db *sqlite.DB) *headless.Service 
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	svc, ok := serveDeps(ctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil).Headless.(*headless.Service)
+	svc, ok := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil).Headless.(*headless.Service)
 	if !ok {
 		t.Fatal("no headless service")
 	}
@@ -274,7 +274,7 @@ func TestDossierSpendSurvivesARestart(t *testing.T) {
 	}
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	serveDeps(cctx, te.Env, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	serveDeps(cctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
 	if err := compactOnce(); !errors.Is(err, dossiers.ErrOverCap) {
 		t.Fatalf("a restarted daemon ran a call past the day's cap: %v", err)
 	}

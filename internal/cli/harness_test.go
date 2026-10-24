@@ -826,3 +826,22 @@ func (te *testEnv) agentCommand(ctx context.Context, cfg config.Config, worktree
 	}
 	return a.Command(s)
 }
+
+// serveLog logs to t until t ends: serve's loops outlive the test that
+// started them, and testing panics or races on a log after the end.
+func serveLog(t *testing.T) func(string, ...any) {
+	var mu sync.Mutex
+	ended := false
+	t.Cleanup(func() {
+		mu.Lock()
+		ended = true
+		mu.Unlock()
+	})
+	return func(format string, args ...any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if !ended {
+			t.Logf(format, args...)
+		}
+	}
+}
