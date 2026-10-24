@@ -682,7 +682,7 @@ func (s *Service) fail(w *worker, batch map[view.Key]entry, failedBy func(view.K
 
 func itemErrors(err error, out map[view.Key]error) {
 	var ie *ItemError
-	switch u := err.(type) {
+	switch u := err.(type) { //nolint:errorlint // walks the join tree one level at a time; each leaf goes through errors.As
 	case nil:
 	case interface{ Unwrap() []error }:
 		for _, e := range u.Unwrap() {

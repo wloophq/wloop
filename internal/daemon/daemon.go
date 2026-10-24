@@ -636,7 +636,7 @@ func (s *Server) AuthHandler() http.Handler {
 		}
 		q := r.URL.Query()
 		if t := q.Get("token"); t != "" && s.validToken(t) {
-			http.SetCookie(w, &http.Cookie{Name: tokenCookie, Value: t, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
+			http.SetCookie(w, &http.Cookie{Name: tokenCookie, Value: t, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode}) //nolint:gosec // G124: served over plain HTTP on loopback, where Secure would drop the cookie
 			q.Del("token")
 			u := url.URL{Path: "/" + strings.TrimLeft(r.URL.Path, `/\`), RawQuery: q.Encode()}
 			http.Redirect(w, r, u.RequestURI(), http.StatusSeeOther)
@@ -874,7 +874,7 @@ func (s *Server) listenMCP() (net.Listener, error) {
 	}
 	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(d.MCPPort)))
 	if err != nil {
-		return nil, fmt.Errorf("the MCP port 127.0.0.1:%d is taken (%v): stop what holds it, or set mcp.port in the configuration to a free port and run %s install again", d.MCPPort, err, brand.Command)
+		return nil, fmt.Errorf("the MCP port 127.0.0.1:%d is taken (%w): stop what holds it, or set mcp.port in the configuration to a free port and run %s install again", d.MCPPort, err, brand.Command)
 	}
 	s.logf("mcp on 127.0.0.1:%d", d.MCPPort)
 	return ln, nil

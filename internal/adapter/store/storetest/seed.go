@@ -2,7 +2,7 @@ package storetest
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // G505: derives fake commit ids for fixtures
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -142,7 +142,7 @@ func seed(ctx context.Context, f *Fixture, s Sizes, l layout) error {
 }
 
 func oid(parts ...int) string {
-	sum := sha1.Sum([]byte(fmt.Sprint(parts)))
+	sum := sha1.Sum([]byte(fmt.Sprint(parts))) //nolint:gosec // G401: derives fake commit ids for fixtures
 	return hex.EncodeToString(sum[:])
 }
 

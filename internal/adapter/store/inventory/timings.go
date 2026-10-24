@@ -197,6 +197,7 @@ func (s *Store) timedTurns(ctx context.Context, at string) ([]dinv.TimedTurn, er
 	return out, rows.Err()
 }
 
+//nolint:gosec // G101: a query that names token-count columns, not a credential
 const turnTokensSQL = `SELECT u.turn_seq, u.model, u.input_tokens, u.output_tokens, u.cache_read_tokens, u.cache_write_tokens, u.cost_usd
 	FROM turn_usage u JOIN turns t ON t.seq = u.turn_seq WHERE t.sent_at >= ? ORDER BY u.turn_seq, u.model`
 

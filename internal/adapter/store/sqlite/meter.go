@@ -256,7 +256,7 @@ func (r *meteredRows) Next(dest []driver.Value) error {
 	switch {
 	case err == nil:
 		r.rows++
-	case err != io.EOF:
+	case !errors.Is(err, io.EOF):
 		r.err = err
 	}
 	return err

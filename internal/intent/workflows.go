@@ -228,8 +228,8 @@ func providerNames() []string {
 func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(string) string) workflow.Workflow {
 	w := workflow.Workflow{Name: name, Description: m.Description, AllowVisible: m.AllowVisible, Order: 100, Mode: workflow.ModeApply}
 	slot := ""
-	switch {
-	case m.Subject == nil:
+	switch m.Subject {
+	case nil:
 		s.add("subject", "is required: the unit provider the workflow matches, one of %s", quoted(providerNames()))
 	default:
 		p := dunit.ProviderID(*m.Subject)

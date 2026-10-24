@@ -149,7 +149,7 @@ func (r *Runtime) call(ctx context.Context, method string, params any) ([]byte, 
 	if err != nil {
 		return nil, 0, err
 	}
-	line, err := json.Marshal(request{ID: id, AuthToken: meta.AuthToken, Method: method, Params: params})
+	line, err := json.Marshal(request{ID: id, AuthToken: meta.AuthToken, Method: method, Params: params}) //nolint:gosec // G117: the Orca runtime authenticates each request by this token
 	if err != nil {
 		return nil, 0, fmt.Errorf("orca runtime %s: encoding params: %w", method, err)
 	}

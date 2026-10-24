@@ -25,7 +25,7 @@ func TestLedgerOpsDefaultTheUnitAndNameCreates(t *testing.T) {
 	if len(got[0].Item) != 9 || got[3].Item != got[0].Item+".1" || later[0].Item != got[0].Item || next[0].Item == got[0].Item {
 		t.Fatalf("create ids %s %s %s %s", got[0].Item, got[3].Item, later[0].Item, next[0].Item)
 	}
-	if got[0].Unit != r7.Unit() || got[0].Unit != r7.Unit() || got[1].Item != "i2" || got[1].Unit != r7.Unit() ||
+	if got[0].Unit != r7.Unit() || got[3].Unit != r7.Unit() || got[1].Item != "i2" || got[1].Unit != r7.Unit() ||
 		got[2].Item != "mine" || got[2].Unit != other {
 		t.Fatalf("%+v", got)
 	}

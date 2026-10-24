@@ -48,8 +48,8 @@ func TestFitCutsAndPadsInWholeClusters(t *testing.T) {
 }
 
 func TestCleanDropsWhatReordersALine(t *testing.T) {
-	got := Clean("evil\x1b[2J \u009bname ‮olleh x‍")
-	if strings.ContainsAny(got, "\x1b\u009b‮ ") || !strings.Contains(got, "‍") {
+	got := Clean("evil\x1b[2J \u009bname \u202eolleh\u2028x\u200d")
+	if strings.ContainsAny(got, "\x1b\u009b\u202e\u2028") || !strings.Contains(got, "\u200d") {
 		t.Fatalf("%q", got)
 	}
 }
