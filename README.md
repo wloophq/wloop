@@ -1,5 +1,8 @@
 # wloop
 
+[![CI](https://github.com/wloophq/wloop/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/wloophq/wloop/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/wloophq/wloop/badge)](https://scorecard.dev/viewer/?uri=github.com/wloophq/wloop)
+
 A work loop for the reviews and pull requests that reach you, with AI coding agents doing the rounds in local worktrees.
 
 Handing a review to an agent is one command. Everything after it is manual: noticing that the author answered, finding the worktree again, moving it to the new head, asking the agent for the next round, keeping track of which of your own pull requests wait on you and which wait on someone else. With a dozen reviews and a few pull requests of your own in flight, that bookkeeping is most of the work. This tool does the bookkeeping and leaves you the decisions.
