@@ -218,6 +218,9 @@ func (c Context) facts(teams []string, round string) profile.Facts {
 	f := profile.Facts{Teams: teams, Round: round}
 	if pr := c.PR(); pr != nil {
 		f.Owner, f.Repo, f.Author, f.Association, f.Base, f.Labels = pr.Owner, pr.Repo, pr.Author, pr.Association, pr.Base, pr.Labels
+		if pr.Address != nil {
+			f.Reviewers = pr.Address.ReviewerLogins()
+		}
 	}
 	if br := c.Brief; br != nil {
 		f.Kind, f.Size, f.Risk, f.Tags, f.Files, f.HasBrief = br.Kind, br.Size, br.Risk, br.Tags, br.Files, true

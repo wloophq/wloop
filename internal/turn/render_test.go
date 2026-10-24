@@ -360,3 +360,29 @@ func TestQuoteIndentsEveryLineSeparator(t *testing.T) {
 		}
 	}
 }
+
+func TestACheckSummaryIsOneLineAndCut(t *testing.T) {
+	c := scenario(t, "address/automated/why-now").Context
+	c.PR().Address.Checks[0].Summary = strings.Repeat("x", 1000)
+	r, err := render(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(r.Text, "\n      "+strings.Repeat("x", 200)+"\n") || strings.Contains(r.Text, strings.Repeat("x", 201)) {
+		t.Errorf("the summary is not cut at 200:\n%s", r.Text)
+	}
+}
+
+func TestOnlyAnAddressRoundWithAReasonSaysWhyNow(t *testing.T) {
+	for _, s := range Scenarios() {
+		r, err := render(s.Context)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pr := s.Context.PR()
+		want := pr != nil && pr.Address != nil && !s.Context.NeedsTakeOver
+		if got := strings.Contains(r.Text, "## Why now"); got != want {
+			t.Errorf("%s: why now %v, want %v", s.Name, got, want)
+		}
+	}
+}

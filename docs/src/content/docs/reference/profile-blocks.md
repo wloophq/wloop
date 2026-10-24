@@ -23,8 +23,9 @@ The leaf is always `intent=<intent>.md`, for `review`, `address`, `nudge` or any
 | 6 | `label` | a label on the pull request |
 | 7 | `base` | the base branch |
 | 8 | `round` | `first` or `follow-up`, for intents whose manifest lists it in `dims` (review) |
-| 9 to 11 | `kind`, `size`, `risk` | the brief's values |
-| 12 | `tags/<key>=<value>` | a tag of the brief, sorted by key |
+| 9 | `reviewer` | a reviewer the round answers, for intents whose manifest lists it in `dims` (address); a bot matches with or without `[bot]` |
+| 10 to 12 | `kind`, `size`, `risk` | the brief's values |
+| 13 | `tags/<key>=<value>` | a tag of the brief, sorted by key |
 
 Values are compared without case and written lower-case; `/` and `%` in a value are written `%2F` and `%25`. A block with a brief condition, a tag or `paths` needs the brief: a turn without one leaves it out and lists it as skipped.
 
@@ -74,4 +75,4 @@ A block is at most 16 KiB with its includes. A turn's judgment over 48 KiB drops
 {{command}} profile show <owner/repo|url> [--kind <intent>] [--show]
 ```
 
-The conditions are `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--kind`, `--size`, `--risk` and `--tag <key>=<value>` (repeatable). `profile add` writes a tag in its one spelling (`lang=Golang` as `lang=go`).
+The conditions are `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` and `--tag <key>=<value>` (repeatable). `profile add` writes a tag in its one spelling (`lang=Golang` as `lang=go`).

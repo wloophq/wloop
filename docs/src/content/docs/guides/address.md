@@ -59,6 +59,21 @@ It can also go on a `projects` entry, for some repositories only.
 | `"rounds": {"per_pr_per_day": 5}` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
 | `"workflows": {"address": {"only_when": "pr.visibility == \"private\""}}` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
 
+## Rules for one reviewer
+
+The round's instructions open with why it runs now: the reviewers to answer and the failing checks, each with its summary and run link. A block under `reviewer=<login>/` applies when that reviewer is among them, such as a review bot whose findings you want verified one by one:
+
+```text
+reviewer=review-bot/intent=address.md
+```
+
+```markdown
+Verify each finding of @review-bot against the code. Fix the ones that hold;
+answer a wrong one with `@review-bot /dismiss <finding-id> <reason>`.
+```
+
+The match is membership: a round that answers a person and the bot gets the bot's block too. A login in `address_skip_reviewers` is never among them, so its block never applies. A round asked for by hand lists the reviewers of the current head, marking those an earlier round already covered; it lists none until {{name}} has read the pull request in full.
+
 ## How the guide reads
 
 The bundled `intent=address.md` sets the stance (a comment is a claim to verify), the risky surfaces, how to commit (the repository's conventions, one commit per item, tests for new behavior), how to reply (one or two sentences in the thread's language), and whom to ask again (never re-request a reviewer whose approval still stands). Change any of it in your [profile](/guides/review-profile/) with `intent=address.md` blocks.

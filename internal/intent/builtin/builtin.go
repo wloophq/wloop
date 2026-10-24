@@ -55,7 +55,7 @@ var ReservedNames = []string{
 
 	"eval", "intents", "settings", "tags", "try",
 
-	"association", "base", "kind", "label", "organization", "repo", "risk", "round", "size", "team", "user",
+	"association", "base", "kind", "label", "organization", "repo", "reviewer", "risk", "round", "size", "team", "user",
 }
 
 // ActionKeys are the keys of the built-in actions, by id; internal/keys
@@ -123,7 +123,7 @@ func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 var RecordStates = []string{string(record.Done), string(record.Settled), string(record.Asked), string(record.Failed)}
 
 // IntentDims are the profile dimensions a manifest's dims may list.
-var IntentDims = []string{dintent.DimRound}
+var IntentDims = []string{dintent.DimRound, dintent.DimReviewer}
 
 // ReservedFlags are flags the CLI owns; no input may declare them.
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}

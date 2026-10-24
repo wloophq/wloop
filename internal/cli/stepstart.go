@@ -25,6 +25,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -135,6 +136,14 @@ type startPlan struct {
 }
 
 func (p startPlan) observed() bool { return p.round && p.cand.Observed }
+
+// address is why the plan's address round runs now; nil for other rounds.
+func (p startPlan) address() *turn.RoundReason {
+	if p.args.kind() != stepAddress {
+		return nil
+	}
+	return automatedReason(p.facts, p.cand.Facts.Checks)
+}
 
 func (s *stepSet) candidate(ctx context.Context, u unit.Unit, r string) (roundCandidate, bool, error) {
 	if s.d.Candidates == nil {
@@ -464,7 +473,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	reason := cmp.Or(factString(p.facts, p.args.reasonFact()), p.args.kindName())
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
 		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, LastReviewAt: p.cand.LastReviewAt,
-		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why})
+		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why, Address: p.address()})
 	if !sent && guidance != "" {
 		s.e.keepGuidance(ctx, p.ref, guidance)
 	}

@@ -169,7 +169,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 	c := samples(d)[0]
 	want := map[string]any{
 		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo": "api",
-		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"},
+		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"}, "pr.address.reviewers": []string{}, "pr.address.checks": []string{},
 		"turn.trigger": "by-hand", "turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
 		"turn.plain": false, "turn.planned": "", "turn.round": "first",
 		"last_review.exists": true, "last_review.verdict": "", "last_review.decision": "APPROVED",
@@ -246,5 +246,27 @@ func TestAnAnyIntentBuildsOnEveryProvider(t *testing.T) {
 		if err != nil || c.Unit != u {
 			t.Errorf("%v: unit %v err %v", u, c.Unit, err)
 		}
+	}
+}
+
+func TestAddressFactsAreEmptyListsWithoutAReason(t *testing.T) {
+	for _, name := range []string{"pr.address.reviewers", "pr.address.checks"} {
+		v, ok := (&PR{}).Fact(name)
+		if l, isList := v.([]string); !ok || !isList || l == nil || len(l) != 0 {
+			t.Errorf("%s = %#v, %v", name, v, ok)
+		}
+	}
+}
+
+func TestAddressFactsListTheRoundsReviewersAndChecks(t *testing.T) {
+	p := &PR{Address: &RoundReason{
+		Reviewers: []RoundReviewer{{Login: "ana"}, {Login: "jussara-ai[bot]", Handled: true}},
+		Checks:    []FailingCheck{{Name: "ci/test", Summary: "3 failed"}},
+	}}
+	if v, _ := p.Fact("pr.address.reviewers"); !reflect.DeepEqual(v, []string{"ana", "jussara-ai[bot]"}) {
+		t.Errorf("reviewers %#v", v)
+	}
+	if v, _ := p.Fact("pr.address.checks"); !reflect.DeepEqual(v, []string{"ci/test"}) {
+		t.Errorf("checks %#v", v)
 	}
 }

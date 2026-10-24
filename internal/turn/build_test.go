@@ -280,3 +280,13 @@ func TestTheRecordedVerdictAnchorsOnlyAReviewNoNewerThanIt(t *testing.T) {
 func githubReads(prs PRReader) map[unit.ProviderID]PayloadReader {
 	return map[unit.ProviderID]PayloadReader{unit.GitHub: GitHub{PRs: prs}}
 }
+
+func TestAnAddressRoundComposesWithItsReviewers(t *testing.T) {
+	var seen profile.Facts
+	p := &PR{Address: &RoundReason{Reviewers: []RoundReviewer{{Login: "jussara-ai[bot]"}}}}
+	_, err := Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}}.Build(context.Background(),
+		Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: p})
+	if err != nil || !slices.Equal(seen.Reviewers, []string{"jussara-ai[bot]"}) {
+		t.Fatalf("%+v %v", seen, err)
+	}
+}

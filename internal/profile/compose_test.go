@@ -238,3 +238,21 @@ func TestOverTheJudgmentLimitDropsFromTheEnd(t *testing.T) {
 		t.Fatalf("a root block was dropped: %q", g.Dropped)
 	}
 }
+
+func TestAReviewerBlockAppliesWhenTheReviewerIsAmongTheRounds(t *testing.T) {
+	tr, _ := load(t, map[string]string{"reviewer=jussara-ai/intent=address.md": "Verify each finding; dismiss the wrong ones."})
+	has := func(f Facts) bool { return slices.Contains(labels(tr.Compose(Address, f)), "Reviewer jussara-ai") }
+	for name, c := range map[string]struct {
+		reviewers []string
+		want      bool
+	}{
+		"the bot by its app login":  {[]string{"ana", "jussara-ai[bot]"}, true},
+		"the bot by its bare login": {[]string{"Jussara-AI"}, true},
+		"someone else":              {[]string{"ana"}, false},
+		"no reviewer":               {nil, false},
+	} {
+		if got := has(Facts{Reviewers: c.reviewers}); got != c.want {
+			t.Errorf("%s: applies %v", name, got)
+		}
+	}
+}
