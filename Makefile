@@ -6,11 +6,17 @@ GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
-.PHONY: build test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand scan-real-data print-brand-ldflags docs-ref docs
+.PHONY: build dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand scan-real-data print-brand-ldflags docs-ref docs
 
 build: ## Build the binary into ./bin
 	@mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/$(BINARY)
+
+dev-install: build ## Run this checkout's build as the installed one: agent homes, app, LaunchAgents and ~/.local/bin
+	@mkdir -p $(HOME)/.local/bin
+	ln -sf $(CURDIR)/bin/$(BINARY) $(HOME)/.local/bin/$(BINARY)
+	bin/$(BINARY) install
+	bin/$(BINARY) app install
 
 test: ## Run the tests
 	go test -race -timeout 30m ./...
