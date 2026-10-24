@@ -373,7 +373,7 @@ func writerProblems(t *testing.T, dir string) []string {
 			continue
 		}
 		report := func(n ast.Node, what string) { out = append(out, fset.Position(n.Pos()).String()+": "+what) }
-		opens := name == "sqlite.go" || name == "meter.go"
+		opens := name == "sqlite.go" || name == "meter.go" || name == "migrate.go"
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.SelectorExpr:

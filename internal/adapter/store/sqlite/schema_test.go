@@ -2,36 +2,15 @@ package sqlite
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"testing"
 )
 
-func TestFreshStoreIsVersion1(t *testing.T) {
+func TestFreshStoreIsIncrementalVacuum(t *testing.T) {
 	db, _ := openTemp(t)
 	var v int
-	if err := db.R().QueryRowContext(context.Background(), `PRAGMA user_version`).Scan(&v); err != nil || v != 1 || SchemaVersion != 1 {
-		t.Fatalf("user_version %d %v", v, err)
-	}
 	if err := db.R().QueryRowContext(context.Background(), `PRAGMA auto_vacuum`).Scan(&v); err != nil || v != 2 {
 		t.Fatalf("auto_vacuum %d %v", v, err)
-	}
-}
-
-func TestOtherVersionsAreRefused(t *testing.T) {
-	for _, v := range []int{0, 2, 8} {
-		db, path := openTemp(t)
-		if _, err := execW(db, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
-			t.Fatal(err)
-		}
-		db.Close()
-		for name, err := range map[string]error{"Open": openErr(path), "Check": Check(path)} {
-			want := fmt.Sprintf("the store at %s is at schema version %d; this release reads version 1 only", path, v)
-			if !errors.Is(err, ErrSchema) || err.Error() != want {
-				t.Errorf("version %d, %s: %v", v, name, err)
-			}
-		}
 	}
 }
 

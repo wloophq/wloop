@@ -17,8 +17,11 @@ import (
 var schema string
 
 // SchemaVersion is the PRAGMA user_version of a store this release creates
-// and reads.
-const SchemaVersion = 1
+// and reads; Open migrates an older store to it.
+const SchemaVersion = 2
+
+// baseVersion is the version of schema.sql, the first of the migrations.
+const baseVersion = 1
 
 const TimeLayout = time.RFC3339Nano
 
@@ -30,52 +33,55 @@ type schemaError struct {
 }
 
 func (e schemaError) Error() string {
-	return fmt.Sprintf("the store at %s is at schema version %d; this release reads version %d only", e.path, e.version, SchemaVersion)
+	return fmt.Sprintf("the store at %s is at schema version %d; this release reads versions %d to %d", e.path, e.version, baseVersion, SchemaVersion)
 }
 
 func (e schemaError) Is(target error) bool { return target == ErrSchema }
 
+// versionError refuses a version this release cannot migrate from: none
+// set, or newer than SchemaVersion.
 func versionError(path string, v uint32) error {
-	if v == SchemaVersion {
+	if v >= baseVersion && v <= SchemaVersion {
 		return nil
 	}
 	return schemaError{path, v}
 }
 
-// createIfEmpty writes the schema into a store with no table, before the
-// store turns to WAL, so the file's header carries the version for Check.
-// auto_vacuum takes effect only on a file with no table yet, so it is set on
-// the connection, outside the transaction.
-func createIfEmpty(path string) error {
+// createIfEmpty writes schema.sql, at baseVersion, into a store with no
+// table, before the store turns to WAL, so the file's header carries the
+// version for Check; created says it did. auto_vacuum takes effect only on a
+// file with no table yet, so it is set on the connection, outside the
+// transaction.
+func createIfEmpty(path string) (created bool, err error) {
 	c, err := connector(path + "?_pragma=auto_vacuum(INCREMENTAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
-		return err
+		return false, err
 	}
 	db := sql.OpenDB(c)
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 	var n int
 	if err := tx.QueryRow(`SELECT count(*) FROM sqlite_master`).Scan(&n); err != nil {
-		return err
+		return false, err
 	}
 	if n > 0 {
-		return nil
+		return false, nil
 	}
 	if _, err := tx.Exec(schema); err != nil {
-		return fmt.Errorf("creating the store: %w", err)
+		return false, fmt.Errorf("creating the store: %w", err)
 	}
 	if _, err := tx.Exec(`INSERT INTO meta (key, value) VALUES ('timings_since', ?)`, eventTime(time.Now())); err != nil {
-		return err
+		return false, err
 	}
-	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, SchemaVersion)); err != nil {
-		return err
+	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, baseVersion)); err != nil {
+		return false, err
 	}
-	return tx.Commit()
+	return true, tx.Commit()
 }
 
 // Check reads the version from the header of the store at path without

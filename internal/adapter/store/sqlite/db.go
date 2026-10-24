@@ -47,14 +47,16 @@ type DB struct {
 	log    Noter
 }
 
-// Open opens the store at path, creating it at SchemaVersion when it holds
-// no table, and refuses a store at any other version with ErrSchema. Both
-// handles open through connector. A nil log gets a private change log.
+// Open opens the store at path, creating it when it holds no table and
+// migrating it to SchemaVersion, and refuses a store it cannot migrate with
+// ErrSchema. Both handles open through connector. A nil log gets a private
+// change log.
 func Open(path string, log Noter) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	if err := createIfEmpty(path); err != nil {
+	created, err := createIfEmpty(path)
+	if err != nil {
 		return nil, err
 	}
 	if err := tighten(path); err != nil {
@@ -70,6 +72,10 @@ func Open(path string, log Noter) (*DB, error) {
 		return nil, err
 	}
 	if err := versionError(path, v); err != nil {
+		w.Close()
+		return nil, err
+	}
+	if err := migrate(w, path, v, !created); err != nil {
 		w.Close()
 		return nil, err
 	}
