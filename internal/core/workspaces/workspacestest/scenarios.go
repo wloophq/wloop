@@ -349,6 +349,7 @@ var Removals = []Removal{
 func RunRemovals(t *testing.T, build Build) {
 	for _, r := range Removals {
 		t.Run(r.Name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 			w := build(t, r.Checkout)
 			ws := workspace.Workspace{ID: "ws-1", RepoID: "r1", Path: w.Dir, Branch: Branch, HostID: workspace.LocalHost}

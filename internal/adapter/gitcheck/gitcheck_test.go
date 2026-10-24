@@ -18,6 +18,14 @@ import (
 	"github.com/wloophq/wloop/internal/gitx"
 )
 
+// TestMain keeps the user's and the system's git config out of every git
+// the tests and the adapter run.
+func TestMain(m *testing.M) {
+	os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	os.Exit(m.Run())
+}
+
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"}, args...)...)
@@ -55,8 +63,6 @@ func realWorld(t *testing.T, c wt.Checkout) wt.World {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatal("git is required")
 	}
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root := t.TempDir()
 	main := repo(t, filepath.Join(root, "main"), filepath.Join(root, "origin.git"))
 	write(t, filepath.Join(main, ".gitignore"), strings.Join(c.IgnoreLines(), "\n")+"\n")
