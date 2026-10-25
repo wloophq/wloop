@@ -149,9 +149,10 @@ func (s *Set) List(ctx context.Context) ([]wsdomain.Workspace, error) {
 
 // settle keeps one workspace per worktree path, its owner's, and gives each
 // the pull request its custody links when its manager shows none. The owner
-// of a worktree several managers list is the one custody names, else one with
-// an agent there, else the first by priority. Custody that cannot be read
-// settles by priority alone.
+// of a worktree several managers list is the one that created it, as custody
+// or the manager says, else the one custody names, else one with an agent
+// there, else the first by priority. Custody that cannot be read settles
+// without it.
 func (s *Set) settle(ctx context.Context, ws []wsdomain.Workspace, panes []wsdomain.Pane) []wsdomain.Workspace {
 	byPath := map[string]wsdomain.Custody{}
 	if s.custody != nil {
@@ -161,31 +162,33 @@ func (s *Set) settle(ctx context.Context, ws []wsdomain.Workspace, panes []wsdom
 			}
 		}
 	}
-	rank := func(name string) int { return slices.Index(s.Names(), name) }
 	active := func(w wsdomain.Workspace) bool {
 		return slices.ContainsFunc(panes, func(p wsdomain.Pane) bool { return p.Manager == w.Manager && p.WorkspaceID == w.ID && p.Agent() })
+	}
+	claim := func(w wsdomain.Workspace) int {
+		c := byPath[w.Path]
+		var n int
+		for _, b := range []bool{c.CreatedBy == w.Manager, c.CreatedBy == "" && w.Created, c.Manager == w.Manager, active(w)} {
+			n <<= 1
+			if b {
+				n++
+			}
+		}
+		return n
+	}
+	rank := func(name string) int { return slices.Index(s.Names(), name) }
+	beats := func(w, cur wsdomain.Workspace) bool {
+		if a, b := claim(w), claim(cur); a != b {
+			return a > b
+		}
+		return rank(w.Manager) < rank(cur.Manager)
 	}
 	owner := map[string]int{}
 	for i, w := range ws {
 		if w.Path == "" {
 			continue
 		}
-		j, seen := owner[w.Path]
-		if !seen {
-			owner[w.Path] = i
-			continue
-		}
-		cur := ws[j]
-		c := byPath[w.Path]
-		switch {
-		case c.Manager == cur.Manager:
-		case c.Manager == w.Manager:
-			owner[w.Path] = i
-		case active(cur) != active(w):
-			if active(w) {
-				owner[w.Path] = i
-			}
-		case rank(w.Manager) < rank(cur.Manager):
+		if j, seen := owner[w.Path]; !seen || beats(w, ws[j]) {
 			owner[w.Path] = i
 		}
 	}
@@ -203,6 +206,26 @@ func (s *Set) settle(ctx context.Context, ws []wsdomain.Workspace, panes []wsdom
 			}
 		}
 		out = append(out, w)
+	}
+	return out
+}
+
+// Listings are every manager's rows of the worktree at path, in priority
+// order, before the set settles its owner; a manager that cannot be read has
+// none.
+func (s *Set) Listings(ctx context.Context, path string) []wsdomain.Workspace {
+	var out []wsdomain.Workspace
+	for _, m := range s.All() {
+		ws, err := m.List(ctx)
+		if err != nil {
+			continue
+		}
+		for _, w := range ws {
+			if w.Path == path {
+				w.Manager = m.Name()
+				out = append(out, w)
+			}
+		}
 	}
 	return out
 }

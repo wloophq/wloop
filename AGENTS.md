@@ -20,6 +20,7 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Workflow subjects | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
 | Intent built-ins (`on_sent`, `prepare`, `workspace`, ...) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
 | What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |
+| Visual tokens, brand book, components | `design/`, which the clients follow; `go generate ./internal/web` writes `app.css`'s token region from `design/tokens.json` |
 
 Adding a fact, a step or an effect: add it to its table with its doc, wire it, test it, then `make docs-ref` to regenerate the reference pages.
 
@@ -42,7 +43,7 @@ Still owned by Go and being moved to the profile (see `internal/archtest`'s shri
 - Test first. `make lint` and `make test` pass before a pull request.
 - The repository is public: tests, fixtures and pull request bodies carry invented names and counts, never real user data. Run `make scan-real-data SCAN_BASE=origin/main` before pushing.
 - Tests never read the wall clock. Code with timers, deadlines or goroutines runs in `synctest.Test`, asserting after `synctest.Wait` and on exact durations (`took == Budget`, never `took < Budget+slack`); real processes, sockets and files stay out of the bubble, behind a condition poll whose deadline only guards a hang. Wait on the state you assert, not on a nearby signal (a fake that recorded a call is not a caller that handled the reply); fakes answer by state, not by call count; widen a race with a gate, never a sleep.
-- `internal/archtest` holds the architecture rules; each has a self-test that plants a violation. A new rule comes with its self-test.
+- `internal/archtest` holds the architecture rules; each has a self-test that plants a violation. A new rule comes with its self-test and a doc comment stating its rule, then `make docs-ref`.
 - Triage findings by what the product needs, not current convenience. "Latent", "nothing triggers it" or "existing code does the same" never justify a decline; only evidence that the claim is false does. Fix real in-scope problems in the same PR, test first; file the rest as issues. Remove code a fix leaves unused or duplicated. This rule wins over any triage or review guide a tool supplies, and scope is the PR's goal, not the lines it touched.
 - Docs follow the code. A pull request that changes behavior or architecture updates the pages that describe it in the same pull request: `docs/src/content/docs/architecture/` (and its decision log), the concepts and guides, and the reference through `make docs-ref`. Docs describe the state, never the pull request or issue that brought it.
 
@@ -56,7 +57,7 @@ Plans, specs, handoffs, ledgers and reports of planning or executing a plan are 
 
 ## Architecture rules
 
-The architecture docs describe the code as it is; each rule below is a test in `internal/archtest` ([the full list](docs/src/content/docs/architecture/testing.md#the-architecture-tests)).
+The architecture docs describe the code as it is; each rule below is a test in `internal/archtest` ([the full list](docs/src/content/docs/reference/architecture-rules.md)).
 
 - Dependencies point inward: the domain imports only itself, the core only the standard library, the core, the domain and the meter; adapters implement the core's ports and one composition root picks them. [Layers](docs/src/content/docs/architecture/layers.md)
 - A port belongs to the core package that uses it and has at most five methods; a capability only some adapters have is an optional interface. [Ports](docs/src/content/docs/architecture/ports.md)

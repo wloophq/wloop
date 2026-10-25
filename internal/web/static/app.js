@@ -150,7 +150,6 @@ const EVENT_LABEL = {
 const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
-const DETAIL_WIDTH_DEFAULT = 380;
 const DETAIL_WIDTH_MIN = 300;
 const DETAIL_WIDTH_STEP = 16;
 
@@ -1822,19 +1821,24 @@ function timelineEvents(d) {
   return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
 
+function defaultDetailWidth() {
+  const px = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--detail-width"));
+  return Number.isFinite(px) ? px : DETAIL_WIDTH_MIN;
+}
+
 function clampDetailWidth(px, viewport) {
   const max = Math.max(DETAIL_WIDTH_MIN, Math.floor(viewport * 0.6));
-  const w = Number.isFinite(px) ? Math.round(px) : DETAIL_WIDTH_DEFAULT;
+  const w = Number.isFinite(px) ? Math.round(px) : defaultDetailWidth();
   return Math.min(max, Math.max(DETAIL_WIDTH_MIN, w));
 }
 
 function storedDetailWidth(viewport) {
   try {
     const raw = localStorage.getItem(DETAIL_WIDTH_KEY);
-    if (raw === null) return DETAIL_WIDTH_DEFAULT;
+    if (raw === null) return defaultDetailWidth();
     return clampDetailWidth(Number(raw), viewport);
   } catch {
-    return DETAIL_WIDTH_DEFAULT;
+    return defaultDetailWidth();
   }
 }
 
@@ -1888,7 +1892,8 @@ function setupDetailResize() {
     saveDetailWidth(preferred);
   });
   handle.addEventListener("dblclick", () => {
-    choose(DETAIL_WIDTH_DEFAULT);
+    root.style.removeProperty("--detail-width");
+    choose(defaultDetailWidth());
     saveDetailWidth(null);
   });
   window.addEventListener("resize", layout);

@@ -7,26 +7,18 @@ func TestR1KnowsEveryWorkspaceManager(t *testing.T) {
 	_, f := parse(t, `package cli
 import "github.com/wloophq/wloop/internal/workspace/zed"
 `)
-	if got := ruleR1("internal/cli/round.go", f); len(got) != 1 {
-		t.Fatalf("a second manager imported by cli: %q", got)
-	}
+	flagged(t, "a second manager imported by cli", ruleR1("internal/cli/round.go", f), 1, "")
 	for _, file := range []string{"internal/adapter/zed/zed.go", "internal/workspace/zed/zed_more.go", "internal/cli/root.go"} {
-		if got := ruleR1(file, f); len(got) != 0 {
-			t.Errorf("%s: %q", file, got)
-		}
+		flagged(t, file, ruleR1(file, f), 0, "")
 	}
 	_, fakeImport := parse(t, `package cli
 import "github.com/wloophq/wloop/internal/workspace/fake"
 `)
-	if got := ruleR1("internal/cli/round.go", fakeImport); len(got) != 0 {
-		t.Errorf("the fake manager is no provider: %q", got)
-	}
+	flagged(t, "the fake manager is no provider", ruleR1("internal/cli/round.go", fakeImport), 0, "")
 	_, port := parse(t, `package cli
 import "github.com/wloophq/wloop/internal/workspace"
 `)
-	if got := ruleR1("internal/cli/round.go", port); len(got) != 0 {
-		t.Errorf("the workspace port is no provider: %q", got)
-	}
+	flagged(t, "the workspace port is no provider", ruleR1("internal/cli/round.go", port), 0, "")
 }
 
 func TestR2FlagsTheManagersName(t *testing.T) {
@@ -37,13 +29,9 @@ const b = "open the Orca app"
 const c = "views.orca.columns.%s"
 const d = "orcas and torcal are fine"
 `)
-	if got := ruleR2(fset, "internal/cli/x.go", f, nil, map[int]bool{}); len(got) != 3 {
-		t.Fatalf("flagged %q", got)
-	}
+	flagged(t, "the cli", ruleR2(fset, "internal/cli/x.go", f, nil, map[int]bool{}), 3, "")
 	for _, file := range []string{"internal/workspace/zed/zed.go", "internal/adapter/zed/zed.go", "internal/core/turns/turnstest/sessions.go"} {
-		if got := ruleR2(fset, file, f, nil, map[int]bool{}); len(got) != 0 {
-			t.Errorf("%s flagged: %q", file, got)
-		}
+		flagged(t, file, ruleR2(fset, file, f, nil, map[int]bool{}), 0, "")
 	}
 }
 
@@ -52,12 +40,8 @@ func TestR2ExemptsTheFakesByPathNotByName(t *testing.T) {
 	fset, f := parse(t, `package latest
 const a = "claude"
 `)
-	if got := ruleR2(fset, "internal/latest/latest.go", f, nil, map[int]bool{}); len(got) != 1 {
-		t.Fatalf("a package named latest: %q", got)
-	}
-	if got := ruleR2(fset, "internal/workspace/fake/fake.go", f, nil, map[int]bool{}); len(got) != 1 {
-		t.Fatalf("the fake manager: %q", got)
-	}
+	flagged(t, "a package named latest", ruleR2(fset, "internal/latest/latest.go", f, nil, map[int]bool{}), 1, "")
+	flagged(t, "the fake manager", ruleR2(fset, "internal/workspace/fake/fake.go", f, nil, map[int]bool{}), 1, "")
 }
 
 func TestR3FlagsADotImportAndUnmarshalText(t *testing.T) {
@@ -66,19 +50,13 @@ func TestR3FlagsADotImportAndUnmarshalText(t *testing.T) {
 import . "github.com/wloophq/wloop/internal/domain/turn"
 var s = ParseAgentState("done")
 `)
-	if got := ruleR3("internal/cli/watch.go", dot); len(got) != 1 {
-		t.Fatalf("dot import: %q", got)
-	}
+	flagged(t, "dot import", ruleR3("internal/cli/watch.go", dot), 1, "")
 	_, text := parse(t, `package cli
 import "github.com/wloophq/wloop/internal/domain/turn"
 func f(s *turn.AgentState) error { return s.UnmarshalText([]byte("done")) }
 `)
-	if got := ruleR3("internal/cli/watch.go", text); len(got) != 1 {
-		t.Fatalf("UnmarshalText: %q", got)
-	}
+	flagged(t, "UnmarshalText", ruleR3("internal/cli/watch.go", text), 1, "")
 	for _, file := range []string{"internal/adapter/store/inventory/store.go", "internal/workspace/zed/zed.go"} {
-		if got := ruleR3(file, text); len(got) != 0 {
-			t.Errorf("%s: %q", file, got)
-		}
+		flagged(t, file, ruleR3(file, text), 0, "")
 	}
 }

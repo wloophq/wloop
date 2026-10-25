@@ -1,6 +1,6 @@
 // Package claudedesktop implements workspace.Manager over the Claude Desktop
-// app: git worktrees under a root the loop owns, and the Claude Code sessions
-// Desktop runs in them.
+// app: git worktrees under a root the loop owns and the ones the app made for
+// its sessions, and the Claude Code sessions Desktop runs in them.
 package claudedesktop
 
 import (
@@ -48,7 +48,7 @@ func ControlPaths(userHome string) []string {
 }
 
 type Manager struct {
-	// Root holds the worktrees, as <Root>/<repo name>/<name>, and the manager's own state.
+	// Root holds the worktrees the loop creates, as <Root>/<repo name>/<name>, and the manager's own state.
 	Root string
 	// SessionsDir is Claude Code's process registry.
 	SessionsDir string
