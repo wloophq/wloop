@@ -3,6 +3,8 @@ package gtd_test
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
@@ -69,8 +71,9 @@ func TestADisabledPluginsEntriesLeaveTheViewsAndCountsButStayDismissable(t *test
 	if res, err := r.svc.Do(ctx, "e-gh", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil || res.Entry.State != gtd.Trash {
 		t.Fatalf("dismiss: %+v %v", res, err)
 	}
-	if _, err := r.svc.Do(ctx, "e-both", coregtd.Request{Verb: gtd.VerbDismiss}); !errors.Is(err, coregtd.ErrPluginDisabled) {
-		t.Fatalf("dismiss of an entry with a unit of an enabled plugin: %v", err)
+	if res, err := r.svc.Do(ctx, "e-both", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil || res.Entry.State != gtd.Inbox ||
+		len(res.Entry.Units) != 1 || res.Entry.Units[0].Provider != "slack" {
+		t.Fatalf("dismiss of an entry with a unit of an enabled plugin detaches the disabled one: %+v %v", res, err)
 	}
 	if got := r.entry(t, "e-next"); got.State != gtd.Next {
 		t.Fatalf("data kept: %+v", got)
@@ -78,5 +81,97 @@ func TestADisabledPluginsEntriesLeaveTheViewsAndCountsButStayDismissable(t *test
 	off, r.facts.off[unit.GitHub] = nil, false
 	if got := ids(gtd.ViewNext); len(got) != 1 {
 		t.Fatalf("enabled again: %v", got)
+	}
+}
+
+func TestDismissDetachesADisabledPluginsUnitsFromAMixedEntry(t *testing.T) {
+	r := newRig()
+	off := []unit.ProviderID{"slack"}
+	r.svc = coregtd.New(coregtd.Deps{Store: r.store, Items: r.items, Facts: r.facts, Me: me, Clock: r.clock,
+		Disabled: func() []unit.ProviderID { return off }})
+	r.facts.off["slack"] = true
+	ctx := context.Background()
+	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Next, Units: []unit.Unit{unitU, slack},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "a"}, {Unit: slack, Item: "b"}}, Origin: gtd.OriginUser})
+	r.put(t, gtd.Entry{ID: "e-two", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{slack, unitV},
+		Origin: gtd.OriginUser})
+
+	_, err := r.svc.Do(ctx, "e-mixed", coregtd.Request{Verb: gtd.VerbDone})
+	if !errors.Is(err, coregtd.ErrPluginDisabled) || !strings.Contains(err.Error(), "slack") {
+		t.Fatalf("done names the disabled plugin: %v", err)
+	}
+	res, err := r.svc.Do(ctx, "e-mixed", coregtd.Request{Verb: gtd.VerbDismiss})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := r.entry(t, "e-mixed")
+	if got.State != gtd.Next || !slices.Equal(got.Units, []unit.Unit{unitU}) ||
+		!slices.Equal(got.Items, []gtd.ItemRef{{Unit: unitU, Item: "a"}}) || res.Entry.ID != got.ID || !slices.Equal(res.Entry.Units, got.Units) {
+		t.Fatalf("detached %+v, result %+v", got, res.Entry)
+	}
+	if res, err := r.svc.Do(ctx, "e-mixed", coregtd.Request{Verb: gtd.VerbDone}); err != nil || res.Entry.State != gtd.Done {
+		t.Fatalf("done once detached: %+v %v", res, err)
+	}
+	if _, err := r.svc.Do(ctx, "e-two", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, "e-two"); got.State != gtd.Inbox || !slices.Equal(got.Units, []unit.Unit{unitV}) {
+		t.Fatalf("e-two %+v", got)
+	}
+}
+
+func TestDismissTrashesAnEntryWithNoUnitOfAnEnabledPluginWhole(t *testing.T) {
+	r := newRig()
+	r.facts.off[unit.GitHub] = true
+	r.put(t, gtd.Entry{ID: "e-gh", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "a"}}, Origin: gtd.OriginUser})
+	res, err := r.svc.Do(context.Background(), "e-gh", coregtd.Request{Verb: gtd.VerbDismiss})
+	got := r.entry(t, "e-gh")
+	if err != nil || res.Entry.State != gtd.Trash || got.State != gtd.Trash || len(got.Units) != 1 || len(got.Items) != 1 {
+		t.Fatalf("trashed whole: %+v %+v %v", got, res, err)
+	}
+}
+
+func TestDismissTrashesADerivedMixedEntryWhole(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"] = true
+	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
+	id := gtd.DerivedID(gtd.KindAction, slack, "i1")
+	r.put(t, gtd.Entry{ID: id, Kind: gtd.KindAction, State: gtd.Next, Units: []unit.Unit{slack, unitU},
+		Items: []gtd.ItemRef{{Unit: slack, Item: "i1"}, {Unit: unitU, Item: "a"}}, Origin: gtd.OriginDerived})
+	if _, err := r.svc.Do(context.Background(), id, coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, id); got.State != gtd.Trash || len(got.Units) != 2 || len(got.Items) != 2 {
+		t.Fatalf("a derived entry keeps the unit its id names: %+v", got)
+	}
+}
+
+func TestDetachDropsItemsOnAnyUnitOfTheDisabledPlugin(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"] = true
+	a, b := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "slack", Key: "C1/2.2"}
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU, a},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "x"}, {Unit: b, Item: "y"}}, Origin: gtd.OriginUser})
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, "e-mixed"); !slices.Equal(got.Items, []gtd.ItemRef{{Unit: unitU, Item: "x"}}) {
+		t.Fatalf("items %+v", got.Items)
+	}
+}
+
+func TestDetachDropsItemsOfADisabledPluginWithNoUnitOnTheEntry(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"], r.facts.off["jira"] = true, true
+	slack, ticket := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "jira", Key: "T-1"}
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU, slack},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "x"}, {Unit: ticket, Item: "y"}}, Origin: gtd.OriginUser})
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, "e-mixed"); !slices.Equal(got.Units, []unit.Unit{unitU}) || !slices.Equal(got.Items, []gtd.ItemRef{{Unit: unitU, Item: "x"}}) {
+		t.Fatalf("%+v", got)
 	}
 }
