@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -643,7 +644,7 @@ func finishedFor(row dinv.PR, now time.Time) time.Duration {
 	if ended.IsZero() {
 		return 0
 	}
-	return situation.WorkingDuration(ended, now)
+	return workday.Between(ended, now)
 }
 
 // interactions are the events by anyone a nudge's silence counts from.

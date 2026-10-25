@@ -23,7 +23,7 @@ func newHolderEnv(t *testing.T, cfg map[string]any) *holderEnv {
 	t.Helper()
 	h := &holderEnv{T: t, e: &Env{Err: os.Stderr}, now: time.Unix(5000, 0)}
 	h.e.ConfigPath = filepath.Join(t.TempDir(), "config.json")
-	h.e.LoadConfig = func() (config.Config, error) { h.loads++; return config.LoadFile(h.e.ConfigPath) }
+	h.e.LoadConfig = func() (config.Config, error) { h.loads++; return config.LoadFile(h.e.ConfigPath, Defaults()) }
 	h.e.Now = func() time.Time { return h.now }
 	h.write(cfg)
 	start, err := h.e.readConfig()

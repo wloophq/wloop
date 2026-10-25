@@ -19,13 +19,13 @@ func TestLedgerOpsDefaultTheUnitAndNameCreates(t *testing.T) {
 		{Op: items.OpCreate, Item: "mine", Unit: other, Anchor: unit.Anchor{Ref: "c"}, Fields: &items.Fields{Kind: &kind, Summary: &sum}},
 	}}}
 	rec.Record.Ledger = append(rec.Record.Ledger, create)
-	got := LedgerOps(r7.Unit(), rec)
-	later := LedgerOps(r7.Unit(), Record{TurnSeq: 3, Hash: "fedcba9876543210", Record: record.Record{Ledger: []items.Op{create}}})
-	next := LedgerOps(r7.Unit(), Record{TurnSeq: 4, Hash: "0123456789abcdef", Record: record.Record{Ledger: []items.Op{create}}})
+	got := LedgerOps(r7, rec)
+	later := LedgerOps(r7, Record{TurnSeq: 3, Hash: "fedcba9876543210", Record: record.Record{Ledger: []items.Op{create}}})
+	next := LedgerOps(r7, Record{TurnSeq: 4, Hash: "0123456789abcdef", Record: record.Record{Ledger: []items.Op{create}}})
 	if len(got[0].Item) != 9 || got[3].Item != got[0].Item+".1" || later[0].Item != got[0].Item || next[0].Item == got[0].Item {
 		t.Fatalf("create ids %s %s %s %s", got[0].Item, got[3].Item, later[0].Item, next[0].Item)
 	}
-	if got[0].Unit != r7.Unit() || got[3].Unit != r7.Unit() || got[1].Item != "i2" || got[1].Unit != r7.Unit() ||
+	if got[0].Unit != r7 || got[3].Unit != r7 || got[1].Item != "i2" || got[1].Unit != r7 ||
 		got[2].Item != "mine" || got[2].Unit != other {
 		t.Fatalf("%+v", got)
 	}
@@ -38,14 +38,14 @@ func TestHistoryNamesEachOpWithItsOutcome(t *testing.T) {
 	resolve := items.Op{Op: items.OpResolve, Item: "i2", Anchor: unit.Anchor{Ref: "a"}, Resolution: items.Answered}
 	update := items.Op{Op: items.OpUpdate, Item: "i3", Anchor: unit.Anchor{Ref: "b"}, Fields: &items.Fields{}}
 	reopen := items.Op{Op: items.OpReopen, Item: "i4", Anchor: unit.Anchor{Ref: "c"}}
-	b := Book{Unit: r7.Unit(),
+	b := Book{Unit: r7,
 		Turns: []Turn{{Seq: 1, Intent: "review", State: Done, SentAt: at(0)}, {Seq: 2, Intent: "review", State: Done, SentAt: at(2)}},
 		Records: []Record{
 			{TurnSeq: 1, Hash: "aaaaaaaaaaaa", At: at(1), Record: record.Record{State: record.Done, Summary: "s", Ledger: []items.Op{resolve, update, reopen}}},
 			{TurnSeq: 2, Hash: "bbbbbbbbbbbb", At: at(3), Record: record.Record{State: record.Done, Summary: "s", Ledger: []items.Op{resolve}}},
 		},
 	}
-	at1 := func(o items.Op) items.Op { o.Unit = r7.Unit(); return o }
+	at1 := func(o items.Op) items.Op { o.Unit = r7; return o }
 	log := []OpOutcome{
 		{Op: at1(resolve), Outcome: "applied", At: at(1)},
 		{Op: at1(update), Outcome: "refused", Reason: "anchor: required", At: at(1)},
@@ -59,7 +59,7 @@ func TestHistoryNamesEachOpWithItsOutcome(t *testing.T) {
 	if want := []string{"resolve i2: no change"}; !slices.Equal(h[0].Ledger, want) {
 		t.Fatalf("the second turn: %q", h[0].Ledger)
 	}
-	if plain := b.History(10); plain[0].Ledger == nil || (&Book{Unit: r7.Unit(), Turns: b.Turns}).History(10)[0].Ledger != nil {
+	if plain := b.History(10); plain[0].Ledger == nil || (&Book{Unit: r7, Turns: b.Turns}).History(10)[0].Ledger != nil {
 		t.Fatal("a turn with no ops has no ledger lines")
 	}
 }

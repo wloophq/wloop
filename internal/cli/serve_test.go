@@ -101,7 +101,7 @@ func TestServeDegradedUntilTheConfigLoads(t *testing.T) {
 		if broken.Load() {
 			return config.Config{}, errors.New("config.json: unexpected end of JSON input")
 		}
-		return config.Defaults(), nil
+		return Defaults(), nil
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -159,7 +159,7 @@ func TestServeNoJobsDegradedRunsNoJob(t *testing.T) {
 		if broken.Load() {
 			return config.Config{}, errors.New("config.json: unexpected end of JSON input")
 		}
-		cfg := config.Defaults()
+		cfg := Defaults()
 		cfg = withoutWindows(cfg)
 		return cfg, nil
 	}
@@ -329,7 +329,7 @@ func TestServeNoJobsAnswersMCP(t *testing.T) {
 
 func TestServeMCPPortFlagOverridesTheConfig(t *testing.T) {
 	t.Parallel()
-	cfg := config.Defaults()
+	cfg := Defaults()
 	if d := (mcpEndpoint{}).wire(daemon.Deps{}, cfg); d.MCPPort != config.DefaultMCPPort || d.MCP == nil {
 		t.Fatalf("default: %d %v", d.MCPPort, d.MCP)
 	}
@@ -360,7 +360,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 	defer storeDB.Close()
 	var loop sync.Mutex
 	logf := func(string, ...any) {}
-	noWindows := withoutWindows(config.Defaults())
+	noWindows := withoutWindows(Defaults())
 	te.cfg = withoutWindows(te.cfg)
 	for _, cfg := range []config.Config{noWindows, te.cfg} {
 		if d := serveDeps(context.Background(), te.Env, storeDB, cfg, logf, &loop, nil); d.LoopMu != &loop {
@@ -488,7 +488,7 @@ func TestServeDepsBriefOnlyWhenEnabled(t *testing.T) {
 
 func TestBriefHomeFollowsTheProjectsProfile(t *testing.T) {
 	t.Parallel()
-	cfg := config.Defaults()
+	cfg := Defaults()
 	cfg.Projects = []config.Project{{Match: "me/*", AgentHome: "/home/me/.claude-personal"}}
 	home := briefHome(cfg)
 	if got := home(github.Ref{Owner: "me", Repo: "lib", Number: 1}); got != "/home/me/.claude-personal" {
@@ -863,7 +863,7 @@ func TestFailedStepsOneRequestPerJob(t *testing.T) {
 
 func TestBriefSkipsTheHomeOfAProjectOfAnotherAgent(t *testing.T) {
 	t.Parallel()
-	cfg := config.Defaults()
+	cfg := Defaults()
 	cfg.AgentHome = "/home/me/.claude-work"
 	cfg.Projects = []config.Project{
 		{Match: "me/*", AgentHome: "/home/me/.claude-personal"},

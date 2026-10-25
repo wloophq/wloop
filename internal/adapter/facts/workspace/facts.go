@@ -16,9 +16,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/situation"
 )
 
 // The roles of workspace.role.
@@ -274,7 +274,7 @@ func (p *Provider) facts(ctx context.Context, snap *workspace.Snapshot, ix *inde
 		if linked.State == dgh.StateMerged || linked.State == dgh.StateClosed {
 			ended = latest(linked.MergedAt, linked.ClosedAt)
 			if !ended.IsZero() {
-				finishedFor = situation.WorkingDuration(ended, now)
+				finishedFor = workday.Between(ended, now)
 			}
 		}
 		duplicate = ix.duplicate(w, linked.Ref)
@@ -467,7 +467,7 @@ func Temporary(p string) bool {
 }
 
 // workingEnd is when d of working time, weekends left out, has passed since
-// from, in UTC as situation.WorkingDuration counts it.
+// from, in UTC as workday.Between counts it.
 func workingEnd(from time.Time, d time.Duration) time.Time {
 	cur := from.UTC()
 	for d > 0 {

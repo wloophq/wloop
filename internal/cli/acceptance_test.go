@@ -1297,7 +1297,7 @@ func TestCredentialJSONIdenticalToMainIsRemovable(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.answers.forget()
-	f.now = f.now.Add(time.Duration(config.Defaults().Sweep.Slow))
+	f.now = f.now.Add(time.Duration(Defaults().Sweep.Slow))
 	if it := itemOf(t, evaluate(t, eng), workspaceUnit(w.Path), "workspace-review-finished"); it.Decision != workflow.DecisionBlocked || !strings.Contains(it.Reason, "credential.json") {
 		t.Fatalf("a differing credential.json: %s (%s)", it.Decision, it.Reason)
 	}

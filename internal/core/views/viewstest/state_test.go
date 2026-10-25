@@ -8,7 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/views"
-	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 )
 
@@ -32,7 +32,7 @@ func TestStrictFakesWantEvents(t *testing.T) {
 	rec := &recordingTB{}
 	s := NewState(Strict(rec))
 	at := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
-	a := view.Applied{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(), Role: view.ReviewRole, Status: view.Working, At: at}
+	a := view.Applied{Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, Role: view.ReviewRole, Status: view.Working, At: at}
 	s.Put("orca", a)
 	if err := s.SaveApplied(ctx, "orca", a, port.Event{Unit: a.Unit, Kind: views.KindViewApplied, At: at}); err != nil {
 		t.Fatal(err)

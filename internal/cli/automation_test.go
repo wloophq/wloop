@@ -45,7 +45,7 @@ func turnStartWorkflow(name string) workflow.Workflow {
 func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	t.Parallel()
 	off, window := false, config.Days(10*time.Minute)
-	cfg := config.Defaults()
+	cfg := Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"gone":    {Enabled: &off},
 		"watched": {Mode: "observe"},
@@ -81,7 +81,7 @@ func TestApplyConfigOnlyWhenNarrowsTheManifestsWhen(t *testing.T) {
 	address := turnStartWorkflow("address")
 	address.When = when
 	broken := turnStartWorkflow("broken")
-	cfg := config.Defaults()
+	cfg := Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"address": {OnlyWhen: `pr.visibility == "private"`},
 		"broken":  {OnlyWhen: "pr.nope"},
@@ -386,10 +386,10 @@ func TestThePlanEngineKeepsItsOwnSeen(t *testing.T) {
 
 func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
 	t.Parallel()
-	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, config.Defaults())[0]; w.Approval.Window != time.Minute {
+	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, Defaults())[0]; w.Approval.Window != time.Minute {
 		t.Fatalf("window %v", w.Approval.Window)
 	}
-	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(config.Defaults()))[0]; w.Approval.Window != 0 {
+	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; w.Approval.Window != 0 {
 		t.Fatalf("window with approval.window 0 %v", w.Approval.Window)
 	}
 }

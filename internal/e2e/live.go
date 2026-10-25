@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/cli"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -442,7 +443,7 @@ func homes(t *testing.T) []string {
 		return strings.Split(v, ":")
 	}
 	found := claude.FindHomes(config.Home(), os.Getenv("CLAUDE_CONFIG_DIR"), wsorca.New().ProfileHomes(config.Home(), "claude"))
-	if cfg, err := config.Load(); err == nil {
+	if cfg, err := config.Load(cli.Defaults()); err == nil {
 		found = append(found, cfg.AgentHomes()...)
 	}
 	var out []string

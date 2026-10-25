@@ -12,6 +12,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/workday"
 )
 
 type Kind string
@@ -312,7 +313,7 @@ func sameDay(t, now time.Time) bool {
 }
 
 func stalled(in Input, r Result, threshold time.Duration) Result {
-	if threshold > 0 && !r.Since.IsZero() && WorkingDuration(r.Since, in.Now) > threshold {
+	if threshold > 0 && !r.Since.IsZero() && workday.Between(r.Since, in.Now) > threshold {
 		r.Stalled = true
 	}
 	return r

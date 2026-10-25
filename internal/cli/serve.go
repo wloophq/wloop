@@ -869,7 +869,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	fast := time.Duration(cfg.Sweep.Fast)
 	if fast <= 0 {
-		fast = time.Duration(config.Defaults().Sweep.Fast)
+		fast = time.Duration(Defaults().Sweep.Fast)
 	}
 	e.Store, e.Views, e.served = store, v, served
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, GitHub: inventoryFacts{store},

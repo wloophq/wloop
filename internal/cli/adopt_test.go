@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -275,20 +274,20 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	} {
 		main := wsdomain.Workspace{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "feat/theirs"}
 		for _, all := range [][]wsdomain.Workspace{{main, worktree}, {worktree, main}} {
-			if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, all, pr.Ref, pr, yes); !ok || w.ID != "wt" {
+			if w, ok, _ := findAuthorWorkspace(Defaults(), repos, all, pr.Ref, pr, yes); !ok || w.ID != "wt" {
 				t.Fatalf("%s: got %+v %v", name, w, ok)
 			}
 		}
 	}
 	upstreamOnly := []wsdomain.Workspace{{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "wip", PushBranch: "feat/theirs"}}
-	if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, upstreamOnly, pr.Ref, pr, yes); ok {
+	if w, ok, _ := findAuthorWorkspace(Defaults(), repos, upstreamOnly, pr.Ref, pr, yes); ok {
 		t.Fatalf("took a main checkout by its push branch: %+v", w)
 	}
 	onBranch := []wsdomain.Workspace{{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "feat/theirs"}}
-	if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, onBranch, pr.Ref, pr, no); ok {
+	if w, ok, _ := findAuthorWorkspace(Defaults(), repos, onBranch, pr.Ref, pr, no); ok {
 		t.Fatalf("took a main checkout for someone else's PR: %+v", w)
 	}
-	if _, ok, _ := findAuthorWorkspace(config.Defaults(), repos, onBranch, pr.Ref, pr, yes); !ok {
+	if _, ok, _ := findAuthorWorkspace(Defaults(), repos, onBranch, pr.Ref, pr, yes); !ok {
 		t.Fatal("main checkout on my PR's branch not taken")
 	}
 }

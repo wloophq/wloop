@@ -508,7 +508,7 @@ func (e *Env) daemonHealthChecks(ctx context.Context, cfg config.Config, c *clie
 		out = append(out, check{markMissing, name + " version", "daemon runs " + h.Version + ", CLI is " + Version, restartHint()})
 	}
 
-	def := config.Defaults().Sweep
+	def := Defaults().Sweep
 	every := map[string]time.Duration{
 		"fast":  time.Duration(cmp.Or(cfg.Sweep.Fast, def.Fast)),
 		"sweep": time.Duration(cmp.Or(cfg.Sweep.Slow, def.Slow)),

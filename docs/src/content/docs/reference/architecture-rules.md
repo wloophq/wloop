@@ -54,16 +54,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/sweep` `internal/domain/inventory` | 🧾 | the Inputs port returns the stored pull request rows as inventory.PR |
 | `internal/core/sweep` `internal/domain/pr` | 🧾 | the sweep's Facts embed pr.Facts |
 | `internal/core/usage` `internal/domain/pr` | 🧾 | a Turn names its pull request as a pr.Ref |
-| `internal/core/views` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref, and a pause stub parses keys with pr.ParseKey |
-| `internal/core/views/viewstest` `internal/domain/pr` | 🔧 | the ViewSink and State contract suites build their units from pr.Ref |
-| `internal/domain/turn` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
-| `internal/domain/unit` `internal/domain/pr` | 🔧 | test only: the registry tests round-trip pr.Codec and pr.ParseKey, which unit.OpaqueCodec can stand in for |
-| `internal/domain/view` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
-| `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides |
-| `internal/readmodel` `internal/domain/pr` | 🔧 | test only: tests build pr.Ref units and parse row keys with pr.ParseKey |
-| `internal/readmodel` `internal/readmodel/prrow` | 🔧 | test only: tests build the GitHub row provider and read its payloads and renudge delay |
-| `internal/readmodel` `internal/situation` | 🔧 | test only: tests read the loop-waiting and muted row kinds and situation.WorkingDuration |
-| `internal/web` `internal/situation` | 🔧 | test only: the board and dashboard tests list situation kinds and use WorkingDuration |
+| `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord |
 
 ### `TestLoopCodeImportsNoPR`
 
@@ -114,9 +105,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/root.go` `Orca` | ✅ | the Orca manager entry's display name |
 | `internal/cli/root.go` `claude` | ✅ | the registry key of the Claude agent entry |
 | `internal/cli/root.go` `orca` | ✅ | the registry key and the sink name of the Orca manager entry |
-| `internal/config/config.go` `claude` | 🔧 | Defaults().Agent; a tool's name outside its adapter belongs in the composition root |
-| `internal/config/config.go` `claude-desktop` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
-| `internal/config/config.go` `orca` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
 | `internal/intent/builtin/facts.go` `The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop.` | ✅ | session.closed_by_manager's doc names the manager that keeps such a record |
 | `internal/intent/builtin/facts.go` `The workspace manager that owns the session, such as orca or claude-desktop.` | ✅ | session.manager's doc names the managers' keys |
 

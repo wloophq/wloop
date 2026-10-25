@@ -37,6 +37,15 @@ import (
 	wsorca "github.com/wloophq/wloop/internal/workspace/orca"
 )
 
+// Defaults is the config a file overrides: config's defaults with the agent
+// and the workspace managers this build picks.
+func Defaults() config.Config {
+	c := config.Defaults()
+	c.Agent = "claude"
+	c.WorkspaceManagers = []string{wscd.Name, "orca"}
+	return c
+}
+
 func defaultAgents() map[string]agentEntry {
 	return map[string]agentEntry{"claude": {
 		Kind:     claude.Agent{Sh: claude.Shell, AskSh: claude.Exec, UserHome: config.Home()},
@@ -94,7 +103,7 @@ func desktopManager(stateDir, userHome string) ManagerEntry {
 		Available: func(ctx context.Context) error { return wscd.New(root, userHome).Available(ctx) },
 		New: func() workspace.Manager {
 			m := wscd.New(root, userHome)
-			return workspace.NewCached(m, m, time.Duration(config.Defaults().Sweep.Fast))
+			return workspace.NewCached(m, m, time.Duration(Defaults().Sweep.Fast))
 		}}
 }
 
@@ -199,7 +208,7 @@ func orcaManager(identities map[string]string) ManagerEntry {
 		New: func() workspace.Manager {
 			m := wsorca.New()
 			m.Identities = identities
-			return workspace.NewCached(m, m, time.Duration(config.Defaults().Sweep.Fast))
+			return workspace.NewCached(m, m, time.Duration(Defaults().Sweep.Fast))
 		}}
 }
 

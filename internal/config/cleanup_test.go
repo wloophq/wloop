@@ -12,7 +12,7 @@ import (
 )
 
 func TestCleanupDefaults(t *testing.T) {
-	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"))
+	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"), tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestCleanupDefaults(t *testing.T) {
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		_, err := LoadFile(path)
+		_, err := LoadFile(path, tools())
 		if err == nil || err.Error() != path+": "+want {
 			t.Errorf("LoadFile(%s) err = %v, want %s", body, err, want)
 		}
@@ -52,13 +52,13 @@ func TestLoadRefusesAnOnlyWhenThatDoesNotCompile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"workflows":{"address":{"only_when":"pr.nope == 1"}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(path); err == nil || !strings.HasPrefix(err.Error(), path+": workflows.address.only_when: ") {
+	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": workflows.address.only_when: ") {
 		t.Errorf("err = %v", err)
 	}
 	if err := os.WriteFile(path, []byte(`{"workflows":{"address":{"only_when":"pr.visibility == \"private\""}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if c, err := LoadFile(path); err != nil || c.Workflows["address"].OnlyWhen == "" {
+	if c, err := LoadFile(path, tools()); err != nil || c.Workflows["address"].OnlyWhen == "" {
 		t.Errorf("config %+v, err %v", c.Workflows, err)
 	}
 }
@@ -72,7 +72,7 @@ func TestProjectSettingsFollowTheirPredicate(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"project_settings":{"review":"pr.nope"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(path); err == nil || !strings.HasPrefix(err.Error(), path+": project_settings.review: ") {
+	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": project_settings.review: ") {
 		t.Errorf("err = %v", err)
 	}
 	c := Config{ProjectSettings: map[string]string{"review": `pr.visibility == "private" && pr.owner != "acme"`, "nudge": "false"}}
@@ -103,7 +103,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(path)
+	c, err := LoadFile(path, tools())
 	if err != nil {
 		t.Fatal(err)
 	}

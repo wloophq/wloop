@@ -5,20 +5,20 @@ import (
 	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 var (
-	r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	t0 = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 )
 
 func at(m int) time.Time { return t0.Add(time.Duration(m) * time.Minute) }
 
 func book(intent turn.Intent, state turn.State, rec *record.Record) turn.Book {
-	b := turn.Book{Unit: r7.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: intent, State: state, Session: "term_1"}}}
+	b := turn.Book{Unit: r7, Turns: []turn.Turn{{Seq: 1, Intent: intent, State: state, Session: "term_1"}}}
 	if rec != nil {
 		b.Records = []turn.Record{{TurnSeq: 1, At: at(1), Record: *rec}}
 	}
@@ -52,7 +52,7 @@ func TestReviewTable(t *testing.T) {
 		{"dismissed", turn.Dismissed, asked, Reviewed, false, "publish?"},
 	} {
 		got := Review(book(turn.Intent(dintent.Review), c.state, c.rec), reviewBoard)
-		want := Item{Unit: r7.Unit(), Role: ReviewRole, Status: c.status, Unread: c.unread, Summary: c.summary}
+		want := Item{Unit: r7, Role: ReviewRole, Status: c.status, Unread: c.unread, Summary: c.summary}
 		if got != want {
 			t.Errorf("%s: %+v, want %+v", c.name, got, want)
 		}
@@ -69,7 +69,7 @@ func TestReviewTable(t *testing.T) {
 
 func TestAuthorNeedsMe(t *testing.T) {
 	addressed := &record.Record{State: record.Done, Summary: "fixed"}
-	if got := Author(book(turn.Intent(dintent.Address), turn.Asked, asked), authorBoard, None, nil); got != (Item{Unit: r7.Unit(), Role: AuthorRole, Status: NeedsMe, Unread: true, Summary: "asks: publish?"}) {
+	if got := Author(book(turn.Intent(dintent.Address), turn.Asked, asked), authorBoard, None, nil); got != (Item{Unit: r7, Role: AuthorRole, Status: NeedsMe, Unread: true, Summary: "asks: publish?"}) {
 		t.Errorf("asked: %+v", got)
 	}
 	if got := Author(book(turn.Intent(dintent.Address), turn.Done, addressed), authorBoard, NeedsMe, nil); got.Status != InProgress || got.Unread || got.Summary != "fixed" {
@@ -186,7 +186,7 @@ func TestAuthorTurnNeedsMeBeatsTheFacts(t *testing.T) {
 }
 
 func TestAnAuthorCardWithoutATurnFollowsItsFacts(t *testing.T) {
-	empty := turn.Book{Unit: r7.Unit()}
+	empty := turn.Book{Unit: r7}
 	merged := &AuthorFacts{State: StateMerged, AuthorWorkspace: true}
 	if got := Author(empty, authorBoard, InReview, merged); got.Status != Completed || got.Summary != "merged" {
 		t.Errorf("merged: %+v", got)

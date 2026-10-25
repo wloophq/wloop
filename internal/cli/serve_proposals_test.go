@@ -63,7 +63,7 @@ func TestServedProposalsNudgeAStaleWaitingOnTheRealStore(t *testing.T) {
 	th := unit.Unit{Provider: ingesttest.Provider, Key: "C1 0001"}
 	me, alice := items.Person{Key: "slack:U000ME"}, items.Person{Key: "slack:U000AAA", Name: "alice"}
 	pub := &proposalPublisher{now: te.Now}
-	cfg := config.Defaults()
+	cfg := Defaults()
 	build := func(cfg config.Config) []source.Module {
 		mods, err := buildSources([]source.Plugin{withPublisher(threadModule(th), pub)}, cfg, source.Deps{DB: db, Inventory: inventory.New(db), Clock: clockFunc(te.Now)})
 		if err != nil {

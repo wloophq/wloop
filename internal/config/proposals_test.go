@@ -64,7 +64,7 @@ func TestProposalsRefuseABadApproval(t *testing.T) {
 			if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "proposals") {
+			if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "proposals") {
 				t.Fatalf("err = %v", err)
 			}
 		})

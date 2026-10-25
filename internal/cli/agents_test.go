@@ -23,7 +23,7 @@ func TestTheConfigsPinsReachTheAgentsHeadlessCalls(t *testing.T) {
 			if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cfg, err := config.LoadFile(path)
+			cfg, err := config.LoadFile(path, Defaults())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,7 +50,7 @@ func TestTheConfigsPinsReachTheAgentsHeadlessCalls(t *testing.T) {
 func TestAKindWithoutAHeadlessShellIsRefusedAtStartup(t *testing.T) {
 	t.Parallel()
 	e := &Env{Agents: map[string]turns.Agent{"claude": claude.Agent{}}}
-	if _, err := e.asker(config.Defaults(), t.TempDir()); err == nil {
+	if _, err := e.asker(Defaults(), t.TempDir()); err == nil {
 		t.Fatal("an asker without a shell")
 	}
 }
