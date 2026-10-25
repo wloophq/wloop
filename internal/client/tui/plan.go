@@ -146,8 +146,15 @@ func itemState(it api.PlanItem, id string) (api.ActionState, bool) {
 	return api.ActionState{}, false
 }
 
-// itemLabel names an item on the status line: its workflow and unit.
-func itemLabel(it api.PlanItem) string { return it.Workflow + " " + it.UnitLabel() }
+// itemLabel names an item on the status line: its workflow, and its unit
+// by label and title.
+func itemLabel(it api.PlanItem) string {
+	label := it.Workflow + " " + oneLine(it.UnitLabel())
+	if title := oneLine(it.Title); title != "" {
+		label += " · " + title
+	}
+	return label
+}
 
 // timeLeft is the item's list column and its color: the time left on a
 // pending item's window, wait when it waits for the user, blocked.
@@ -200,11 +207,12 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 
 func (m *Model) planList(cur, width, height int, now time.Time) []string {
 	t := m.t
-	cols := []termfmt.Column{{Right: true}, {Max: 28}, {Max: min(max((width-2)*2/5, 14), 60)}, {Flex: true}}
+	unitMax := min(max((width-2)*2/5, 14), 60)
+	cols := []termfmt.Column{{Right: true}, {Max: 28}, {Max: unitMax}, {Flex: true}}
 	cells := make([][]termfmt.Cell, len(m.plan))
 	for i, it := range m.plan {
 		left, style := m.timeLeft(it, now)
-		name := shortRef(it.UnitLabel(), 40)
+		name := shortRef(it.UnitLabel(), min(unitMax, 40))
 		if it.Title != "" {
 			name += "  " + oneLine(it.Title)
 		}

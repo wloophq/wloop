@@ -156,8 +156,19 @@ func TestThePlanViewNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {
 	if strings.Count(screen, "Launch plan for the export") != 2 || strings.Contains(screen, "T1/C1") {
 		t.Fatalf("the item is not named by its label and title in the list and the detail:\n%s", screen)
 	}
-	if c, ok := press(m, Key{Rune: 'X'}); !ok || c.Label != "slack-follow-up #general" {
+	if c, ok := press(m, Key{Rune: 'X'}); !ok || c.Label != "slack-follow-up #general · Launch plan for the export" {
 		t.Fatalf("dismissed %+v", c)
+	}
+}
+
+func TestThePlanListKeepsAPullRequestsNumberInANarrowColumn(t *testing.T) {
+	m := newModel(t)
+	it := planOf("review-follow-up/github/acme%2Fbilling-service-v2-api%2313650/aa", "review-follow-up", unit.Unit{Provider: unit.GitHub, Key: "acme/billing-service-v2-api#13650"}, "pending", "new commits")
+	it.Label, it.Title = "acme/billing-service-v2-api#13650", "Retry webhooks with backoff"
+	m.SetPlan([]api.PlanItem{it}, nil)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	if screen := strings.Join(m.Render(80, 30, now), "\n"); !strings.Contains(screen, "#13650") {
+		t.Fatalf("the number is cut:\n%s", screen)
 	}
 }
 
