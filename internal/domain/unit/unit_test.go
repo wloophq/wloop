@@ -71,3 +71,14 @@ func TestUnitOrder(t *testing.T) {
 		t.Error("IsZero")
 	}
 }
+
+func TestValidProviderTakesALowercaseIDOfUpTo32Characters(t *testing.T) {
+	for id, want := range map[string]bool{
+		"github": true, "slack": true, "linear_v2": true, "a-b": true, "abcdefghijklmnopqrstuvwxyz012345": true,
+		"": false, "Slack": false, "1slack": false, "slack:x": false, "abcdefghijklmnopqrstuvwxyz01234567": false,
+	} {
+		if got := unit.ValidProvider(id); got != want {
+			t.Errorf("ValidProvider(%q) = %v, want %v", id, got, want)
+		}
+	}
+}
