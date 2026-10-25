@@ -13,7 +13,7 @@ description: The daemon, its clients, the ports to the outside tools, and the ru
 | GitHub | pull requests, reviews, checks and the rate budget, read over its API with the token of `gh` | the comments of drafts you approved, posted by the GitHub plugin |
 | Agents (Claude Code) | turn records and hook events | instructions; they publish reviews, push and reply on GitHub under your name |
 | Orca | the workspace list, terminals, agent activity, card placement | workspaces created, linked, renamed and removed; sessions started, woken and typed into; board writes |
-| Claude Desktop | the sessions it runs and their processes, the worktrees it made for them | sessions imported, woken and typed into; worktrees under a root {{name}} owns |
+| Claude Desktop | the sessions it runs and their processes, the worktrees it made for the sessions not archived | sessions imported, woken and typed into; worktrees under a root {{name}} owns; the app's own worktrees removed when you remove their workspace |
 | macOS | | the LaunchAgents, the app bundle, notifications |
 
 Each manager is both an actuator (workspaces, sessions, and Orca's board) and a source of live signals (processes, activity, focus), never of record.

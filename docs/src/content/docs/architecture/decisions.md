@@ -72,7 +72,7 @@ One entry per decision in force. A pull request that changes one of them changes
 
 - **Context**: Orca lists every git worktree of a repository it knows, including the ones Claude Desktop made, so the first manager to list a worktree is not its owner.
 - **Decision**: the owner of a worktree is the manager that created it, as the store's custody or the manager itself says; `workspace_managers` orders only managers that merely list it, and a round falls through to such a manager, with the reason logged, only when the owner cannot launch the session.
-- **Consequence**: a round on a pull request continues in the app it was developed in, and a manager that only lists a worktree never becomes its owner.
+- **Consequence**: a round on a pull request continues in the app it was developed in, and a manager that only lists a worktree never becomes its owner. A session a round started in such a manager is kept by the next round while it lives. Removing the workspace of a worktree Claude Desktop made removes it through Claude Desktop.
 - **Enforced by**: `TestSetListGivesAWorktreeToTheManagerThatCreatedIt`, `TestARoundContinuesInTheManagerThatCreatedTheWorktree`, `TestARoundFallsThroughWhenTheCreatorCannotHostIt`.
 
 ## Authority comes from you
