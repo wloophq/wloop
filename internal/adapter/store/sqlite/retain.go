@@ -158,7 +158,7 @@ var retainWorkflowEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.Tri
 	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))`
 
 // unitlessTables are the endedTables UnitlessLoopRows deletes from.
-var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items"}
+var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items", "unit_marks", "round_state"}
 
 // Session-keyed bookkeeping is stored under its session unit, the rest
 // under no unit; a pull request's events never match.
