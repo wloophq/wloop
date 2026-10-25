@@ -76,11 +76,17 @@ func (l Login) Run(ctx context.Context) (Token, error) {
 		}
 	})
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	go func() { _ = srv.Serve(ln) }()
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		_ = srv.Serve(ln)
+	}()
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
+		// Shutdown only closes the listeners Serve has registered; Serve closes ln itself on return.
+		<-served
 	}()
 
 	if err := l.Open(authorizeURL + "?" + q.Encode()); err != nil {

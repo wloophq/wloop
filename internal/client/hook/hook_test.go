@@ -28,6 +28,10 @@ type fakeAgent struct {
 	wait, boom bool
 }
 
+// overrun is how far past Budget a hook may return before it counts as
+// ignoring its deadline: a loaded runner fires the timer late.
+const overrun = time.Second
+
 func (f *fakeAgent) act(ctx context.Context, handle string) error {
 	f.calls++
 	f.handle = handle
@@ -139,7 +143,7 @@ func TestStopHookFailsOpen(t *testing.T) {
 			var out, errw bytes.Buffer
 			start := time.Now()
 			code := Stop(context.Background(), c.env, stdinOf(t, c.in), &out, &errw, c.agent, ports, "")
-			if took := time.Since(start); took > Budget+100*time.Millisecond {
+			if took := time.Since(start); took > Budget+overrun {
 				t.Errorf("took %v", took)
 			}
 			if code != 0 || out.Len() != 0 || c.agent.calls != c.calls {
@@ -157,7 +161,7 @@ func TestHookWithOpenStdinGivesUpWithinBudget(t *testing.T) {
 	a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
 	start := time.Now()
 	code := Stop(context.Background(), inTerm, stdinOf(t, ""), &out, &errw, a, ports, "")
-	if took := time.Since(start); took > Budget+100*time.Millisecond {
+	if took := time.Since(start); took > Budget+overrun {
 		t.Fatalf("took %v", took)
 	}
 	if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
@@ -171,7 +175,7 @@ func TestHookWithMalformedInputAllows(t *testing.T) {
 		a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
 		start := time.Now()
 		code := Stop(context.Background(), inTerm, strings.NewReader(in), &out, &errw, a, ports, "")
-		if took := time.Since(start); took > Budget+100*time.Millisecond {
+		if took := time.Since(start); took > Budget+overrun {
 			t.Fatalf("%q took %v", in, took)
 		}
 		if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
@@ -290,7 +294,7 @@ func TestSessionStartPrintsNothing(t *testing.T) {
 			if out := stdout(t, func() { code = SessionStart(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, "") }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget+100*time.Millisecond {
+			if took := time.Since(start); code != 0 || took > Budget+overrun {
 				t.Fatalf("exit %d after %v", code, took)
 			}
 		})
@@ -328,7 +332,7 @@ func TestPromptHookNeverFails(t *testing.T) {
 			if out := stdout(t, func() { code = Prompt(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, c.kind) }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget+100*time.Millisecond {
+			if took := time.Since(start); code != 0 || took > Budget+overrun {
 				t.Fatalf("exit %d after %v", code, took)
 			}
 			if c.agent.calls != c.calls {

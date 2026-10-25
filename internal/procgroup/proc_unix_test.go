@@ -167,9 +167,7 @@ func TestTrackListsTheLiveGroups(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done, pids := family(t, ctx, "wait")
-	if got := listed(t, path); !slices.Equal(got, pids[:1]) {
-		t.Fatalf("listed %v, want %v", got, pids[:1])
-	}
+	listedEventually(t, path, pids[:1])
 	if err := Track(path); err != nil {
 		t.Fatal(err)
 	}
@@ -180,6 +178,23 @@ func TestTrackListsTheLiveGroups(t *testing.T) {
 	wait(t, done)
 	if got := listed(t, path); len(got) != 0 {
 		t.Fatalf("listed %v after the run", got)
+	}
+}
+
+// listedEventually waits for path to list want: the child can write its pids
+// before Run, back from Start, has added its group.
+func listedEventually(t *testing.T, path string, want []int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got := listed(t, path)
+		if slices.Equal(got, want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("listed %v, want %v", got, want)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
