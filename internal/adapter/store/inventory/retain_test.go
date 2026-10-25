@@ -106,7 +106,7 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["pull_requests"] != 1 || got["turns"] != 1 || got["pr_tags"] != 2 {
+	if got["pull_requests"] != 1 || got["turns"] != 1 || got["unit_tags"] != 2 {
 		t.Fatalf("retained %v, want the pull request ended 401 days ago", got)
 	}
 	after, err := s.Timings(ctx, since)

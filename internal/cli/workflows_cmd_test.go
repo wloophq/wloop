@@ -48,10 +48,10 @@ func TestWorkflowsFactsWithoutASubjectListEverySlot(t *testing.T) {
 func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	if code := te.run("workflows", "facts", "slack"); code == 0 {
+	if code := te.run("workflows", "facts", "gmail"); code == 0 {
 		t.Fatal("exit 0")
 	}
-	if !strings.Contains(te.err.String(), "github, session, workspace") {
+	if !strings.Contains(te.err.String(), "entry, github, session, slack, workspace") {
 		t.Fatal(te.err.String())
 	}
 }

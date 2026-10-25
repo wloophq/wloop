@@ -81,7 +81,67 @@ type Module struct {
 	Payload           turn.PayloadReader
 	PlacementDefaults placement.Defaults
 	PlacementHints    placement.Hints
+	// OnPosted are the draft effects the plugin applies once a draft of its
+	// units is sent, by effect name (builtin.Effects), such as unit.closed.
+	OnPosted map[string]outbox.Effect
+	// Checkouts says which repository a unit's work checks out.
+	Checkouts Checkouts
+	// Briefs is how the brief queue reads the plugin's units; nil when the
+	// plugin's units are briefed by no queue.
+	Briefs brief.BriefSource
+	// Links resolves the units of other plugins the plugin's units link to.
+	Links LinkResolver
 }
+
+// Checkout is the repository a unit's work checks out.
+type Checkout struct {
+	Repo string // owner/name
+	// Branch is the unit's own branch; "" for the repository's default.
+	Branch string
+	// Head is the commit the unit's work is on; "" when unknown.
+	Head string
+}
+
+// Checkouts is an optional capability of a plugin: the repository of a unit,
+// which a worktree checks out; ok is false for a unit with none.
+type Checkouts interface {
+	Checkout(ctx context.Context, u unit.Unit) (c Checkout, ok bool, err error)
+}
+
+// LinkResolver is an optional capability of a plugin: the units of other
+// plugins a link of its units names, such as a pull request a thread links.
+type LinkResolver interface {
+	Resolve(ctx context.Context, url string) (u unit.Unit, ok bool, err error)
+}
+
+// Capabilities are what a plugin can do, as clients read them.
+func (m Module) Capabilities() []string {
+	var out []string
+	for _, c := range []struct {
+		name string
+		has  bool
+	}{
+		{CapabilityCheckouts, m.Checkouts != nil},
+		{CapabilityBriefs, m.Briefs != nil},
+		{CapabilityPublishes, m.Publisher != nil},
+		{CapabilityReacts, m.Reacts},
+		{CapabilityItems, m.Items != nil},
+	} {
+		if c.has {
+			out = append(out, c.name)
+		}
+	}
+	return out
+}
+
+// The capability names Module.Capabilities lists and api.Plugin serves.
+const (
+	CapabilityCheckouts = "checkouts"
+	CapabilityBriefs    = "briefs"
+	CapabilityPublishes = "publishes"
+	CapabilityReacts    = "reacts"
+	CapabilityItems     = "items"
+)
 
 // Plugin is a compiled-in plugin: its codec is registered even when it is disabled.
 type Plugin struct {

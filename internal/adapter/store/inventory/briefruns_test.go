@@ -107,7 +107,7 @@ func TestUnmeasuredDurationsStayNil(t *testing.T) {
 	}
 	var nulls int
 	if err := s.db.R().QueryRowContext(context.Background(), `SELECT count(*) FROM brief_runs WHERE input_ms IS NULL AND call_ms IS NULL AND agent_ms IS NULL AND cost_usd IS NULL
-		AND input_tokens IS NULL AND output_tokens IS NULL AND cache_read_tokens IS NULL AND cache_write_tokens IS NULL AND diff_bytes IS NULL`).Scan(&nulls); err != nil || nulls != 1 {
+		AND input_tokens IS NULL AND output_tokens IS NULL AND cache_read_tokens IS NULL AND cache_write_tokens IS NULL AND input_bytes IS NULL`).Scan(&nulls); err != nil || nulls != 1 {
 		t.Fatalf("NULL columns: %d %v", nulls, err)
 	}
 	if rec, _, _ := s.BriefRecord(ctx, ref); rec.Error != "gh: not logged in" || rec.Brief != "" || rec.Failures != 1 || rec.Run != 0 || rec.LastRun != id {
@@ -496,7 +496,7 @@ func TestEndBriefRunReusedIsOneTransaction(t *testing.T) {
 		t.Fatalf("run %+v", run)
 	}
 	var tagRuns int
-	if err := s.db.R().QueryRowContext(ctx, `SELECT COUNT(*) FROM pr_tags WHERE run = ?`, id).Scan(&tagRuns); err != nil || tagRuns != len(first.Tags) {
+	if err := s.db.R().QueryRowContext(ctx, `SELECT COUNT(*) FROM unit_tags WHERE run = ?`, id).Scan(&tagRuns); err != nil || tagRuns != len(first.Tags) {
 		t.Fatalf("%d tags point at the reused run: %v", tagRuns, err)
 	}
 	if evs := eventsOf(t, s, dinv.KindBriefEnded); len(evs) != 2 || evs[1].Data != "reused" {

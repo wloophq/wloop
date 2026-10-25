@@ -32,7 +32,7 @@ func TestActivitiesAggregatesTurnsUsageAndBriefRetries(t *testing.T) {
 	usage(1, "haiku", 10, 2, nil)
 	usage(2, "opus", 30, 5, 0.25)
 	retry := at.Add(time.Hour)
-	exec(`INSERT INTO pr_briefs (owner, repo, number, retry_at) VALUES ('acme', 'api', 9, ?), ('acme', 'api', 10, '')`, ts(retry))
+	exec(`INSERT INTO unit_briefs (provider, unit_key, retry_at) VALUES ('github', 'acme/api#9', ?), ('github', 'acme/api#10', '')`, ts(retry))
 
 	got, err := s.Activities(ctx)
 	if err != nil {

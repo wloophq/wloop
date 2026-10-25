@@ -31,8 +31,8 @@ type Retention struct {
 	ClosedSessions time.Duration
 	Stops          time.Duration // turn_stops
 	Instructions   time.Duration // turn_instructions, then the parts no row lists
-	// BriefBodies empties brief and files of the runs started that long ago
-	// that no pr_briefs row or turn references.
+	// BriefBodies empties brief and input of the runs started that long ago
+	// that no unit_briefs row or turn references.
 	BriefBodies time.Duration
 	ViewRows    time.Duration // view_applied rows of pull requests merged or closed that long ago
 	EndedPRs    time.Duration // a pull request merged or closed that long ago, with every row of it
@@ -127,9 +127,6 @@ const (
 	retainInstructionsSQL = `DELETE FROM turn_instructions WHERE created_at < ?`
 	retainPartsSQL        = `DELETE FROM instruction_parts WHERE sha NOT IN
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
-	retainBriefBodiesSQL = `UPDATE brief_runs SET brief = '', files = ''
-		WHERE started_at < ? AND (brief != '' OR files != '')
-		AND id NOT IN (SELECT run FROM pr_briefs UNION SELECT last_run FROM pr_briefs UNION SELECT brief_run FROM turns)`
 	retainViewRowsSQL = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN
 		(SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?)`
 	endedPRsSQL              = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
@@ -181,7 +178,7 @@ type endedTable struct {
 
 // endedTables is in delete order: turn_usage goes before the turns it hangs
 // from, pull_requests last.
-var endedTables = []endedTable{
+var endedTables = slices.Concat([]endedTable{
 	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits + `)`, false},
 	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
@@ -194,13 +191,11 @@ var endedTables = []endedTable{
 	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"pr_briefs", port.TopicBriefs, `DELETE FROM pr_briefs WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"brief_runs", port.TopicBriefs, `DELETE FROM brief_runs WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"pr_tags", port.TopicBriefs, `DELETE FROM pr_tags WHERE (owner, repo, number) IN ` + endedRefs, true},
+}, briefEndedTables, []endedTable{
 	{"pr_seen", 0, `DELETE FROM pr_seen WHERE (owner, repo, number) IN ` + endedRefs, true},
 	{"pr_details", port.TopicPRs, `DELETE FROM pr_details WHERE (owner, repo, number) IN ` + endedRefs, true},
 	{"pull_requests", port.TopicPRs | port.TopicFollow, `DELETE FROM pull_requests WHERE (owner, repo, number) IN ` + endedRefs, true},
-}
+})
 
 // Retain applies p as of now in one write transaction, noting Change.All
 // with the topics of the tables it changed, then runs incremental_vacuum and

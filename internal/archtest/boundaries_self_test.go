@@ -195,6 +195,17 @@ const d = "classify"
 	}
 }
 
+func TestBuiltinLiteralsFlagsAnEffectNameOutsideTheTables(t *testing.T) {
+	t.Parallel()
+	fset, f := parse(t, `package cli
+const a = "entry.nudged"
+const b = "unit.closed"
+const c = "draft.propose"
+`)
+	flagged(t, "cli", builtinLiterals(fset, "internal/cli/serve_outbox.go", f), 3, "a builtin's name lives in its table")
+	flagged(t, "the effects table", builtinLiterals(fset, "internal/cli/builtins_effects.go", f), 0, "")
+}
+
 func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()

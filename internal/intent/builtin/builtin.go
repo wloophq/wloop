@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -97,6 +98,12 @@ type Fact struct {
 	Slot  string // a workflow fact's slot: one of WorkflowSlots
 	// Provider is the provider whose intents alone may read the fact; "" for every provider.
 	Provider unit.ProviderID
+	// Subjects are the workflow slots besides Slot whose when reads the
+	// fact: the brief slot's facts are read on every unit that has a brief.
+	Subjects []string
+	// Dim makes the fact a profile dimension: a block path condition under
+	// the intents of its provider.
+	Dim bool
 }
 
 var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}
@@ -143,6 +150,27 @@ type StepDef struct {
 // StepTurnStart is the step that starts an agent turn: its reach is its intent's.
 const StepTurnStart = "turn.start"
 
+// StepDraftPropose is the step that proposes a draft in the Outbox.
+const StepDraftPropose = "draft.propose"
+
+// RoundProviders are the providers whose turn.start runs under the round
+// caps; a workflow starting turns on any other must set limits.per_day.
+var RoundProviders = []unit.ProviderID{unit.GitHub}
+
+// The values of draft.propose's arguments.
+var (
+	DraftDeliveries = []string{"message", "reaction", "comment"}
+	DraftItems      = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
+	DraftPer        = []string{"subject", "person"}
+	DraftTargets    = []string{"unit", "item"}
+	// HoldForever is hold_after_sent's value that never proposes again
+	// after a draft was sent.
+	HoldForever = "forever"
+)
+
+// TurnModes are the values of turn.start's mode.
+var TurnModes = []string{"session", "headless"}
+
 // Steps is the step vocabulary of workflow manifests.
 var Steps = []StepDef{
 	{"session.close", providers(unit.Session), workflow.ReachLocal, nil, nil,
@@ -157,8 +185,10 @@ var Steps = []StepDef{
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil, nil,
 		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
-	{StepTurnStart, providers(unit.GitHub), "", []string{"intent", "round"}, nil,
-		"Starts a turn: `intent`, and `round` (`first` or `follow-up`) for a review. Caps, the brief, busy and held checks apply as for any automatic round."},
+	{StepTurnStart, nil, "", []string{"intent", "round", "mode"}, nil,
+		"Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`."},
+	{StepDraftPropose, nil, workflow.ReachLocal, []string{"purpose", "delivery", "text", "reaction", "items", "per", "target", "on_posted", "hold", "hold_after_sent"}, nil,
+		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled) and `hold_after_sent` (a duration, or `forever`). Holds while a draft of the workflow, subject and person is open or failed."},
 	{"classify", nil, workflow.ReachLocal, []string{"prompt", "schema"}, []workflow.TriggerKind{workflow.TriggerEvent},
 		"A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`."},
 	{"notify.self", nil, workflow.ReachPrivate, []string{"text"}, nil,
@@ -168,4 +198,30 @@ var Steps = []StepDef{
 func providers(ps ...unit.ProviderID) []unit.ProviderID { return ps }
 
 // Slots name each provider's fact slot.
-var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace"}
+var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
+	unit.Entry: "entry", dslack.Provider: "slack"}
+
+// Effect is an effect a sent draft applies: the name a draft's effects, a
+// draft.propose's on_posted and an intent's draft_effects list.
+type Effect struct {
+	Name string
+	// Provider is the provider whose drafts alone may declare it; "" any.
+	Provider unit.ProviderID
+	Doc      string
+}
+
+// Effects is the effect vocabulary of drafts.
+var Effects = []Effect{
+	{"entry.nudged", "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none."},
+	{"unit.closed", "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin."},
+	{"pr.nudged", unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts."},
+}
+
+// EffectNames are the names of Effects.
+func EffectNames() []string {
+	out := make([]string, len(Effects))
+	for i, e := range Effects {
+		out[i] = e.Name
+	}
+	return out
+}

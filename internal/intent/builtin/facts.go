@@ -3,6 +3,8 @@ package builtin
 import (
 	"slices"
 
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -30,6 +32,24 @@ func wf(slot, name string, t expr.Type, doc string) Fact {
 	return Fact{Name: slot + "." + name, Type: t, Slots: []FactSlot{WorkflowSlot}, Slot: slot, Doc: doc}
 }
 
+// providerWF is a workflow fact of slot that the plugin of p computes.
+func providerWF(p unit.ProviderID, slot, name string, t expr.Type, doc string) Fact {
+	f := wf(slot, name, t, doc)
+	f.Provider = p
+	return f
+}
+
+// BriefSubjects are the workflow slots whose units may have a brief, which
+// read the brief slot's facts.
+var BriefSubjects = []string{"pr", "slack", "entry"}
+
+// briefWF is a fact of the unit's brief, read by every slot of BriefSubjects.
+func briefWF(name string, t expr.Type, doc string) Fact {
+	f := wf("brief", name, t, doc)
+	f.Subjects = BriefSubjects
+	return f
+}
+
 // Facts are the fields predicates read, by slot; inputs.<name> are added per
 // intent by Env. A workflow fact may share a name with an intent fact.
 var Facts = []Fact{
@@ -46,6 +66,7 @@ var Facts = []Fact{
 	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
 	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
 	prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read."),
+	prFact("pr.author_teams", expr.List, trn, "The viewer's organization teams the author belongs to, as org/team."),
 	prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn."),
 	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
 	prFact("pr.address.conflict", expr.Bool, trn, "The head conflicts with the base and the address round resolves it; false on any other turn."),
@@ -163,6 +184,44 @@ var Facts = []Fact{
 	wf("workspace", "quiet_for", expr.Duration, "Time since last_activity."),
 	wf("workspace", "fingerprint", expr.String, "The worktree path and its head."),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
+	wf("entry", "id", expr.String, "The entry's id."),
+	wf("entry", "kind", expr.String, "The entry's kind: action, waiting, close, owe or project."),
+	wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, someday, done or trash."),
+	wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123."),
+	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
+	wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them."),
+	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
+	wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled."),
+	wf("entry", "muted", expr.Bool, "The entry is muted."),
+	wf("entry", "unit", expr.String, "The entry's unit, <provider>:<key>; empty for an entry with none."),
+	wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."),
+	wf("entry", "unit_started_by_me", expr.Bool, "The viewer started the entry's unit, from the facts GTD receives."),
+	wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives."),
+	wf("entry", "items_open", expr.Int, "Open items of the entry whose unit is the entry's unit."),
+	wf("entry", "items_resolved", expr.Int, "Resolved items of the entry whose unit is the entry's unit."),
+	wf("entry", "items_held", expr.Int, "Items of the entry's unit the waited people hold: open, assigned to or waited on from them."),
+	wf("entry", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none."),
+	wf("entry", "fingerprint", expr.String, "The entry's id, state and update time."),
+	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
+	providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."),
+	providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread."),
+	providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed."),
+	providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "An entry of the unit is open: neither done nor in the trash."),
+	providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit."),
+	providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis."),
+	providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."),
+	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none."),
+	providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items."),
+	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
+	briefWF("risk", expr.String, "The brief's risk: low, medium or high."),
+	briefWF("kind", expr.String, "The brief's kind, from the provider's taxonomy."),
+	briefWF("size", expr.String, "The brief's size; GitHub briefs only."),
+	briefWF("tags", expr.List, "The brief's normalized key:value tags."),
+	briefWF("missing", expr.List, "The brief intent's extra fields the unit's brief lacks: new or changed since it was written."),
+	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its entry; true for a draft of no person."),
+	wf("draft", "items_held", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
+	wf("draft", "items_owned", expr.Int, "Items of the draft that gained an owner since it was proposed."),
+	wf("draft", "subject_open", expr.Bool, "The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored."),
 	wf("trigger", "kind", expr.String, "sweep, event or schedule."),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),
 	wf("trigger", "event.key", expr.String, "The event's key."),
@@ -174,20 +233,52 @@ var Facts = []Fact{
 	wf("config", "cleanup.manual_idle", expr.Duration, "The cleanup.manual_idle setting."),
 	wf("config", "cleanup.stale_workspace", expr.Duration, "The cleanup.stale_workspace setting."),
 	wf("config", "nudge.silent_days", expr.Int, "The nudge.silent_days setting, in calendar days."),
+	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
+	wf("config", "proposals.renudge_after", expr.Duration, "The proposals.renudge_after setting."),
+	wf("config", "turns.automated_per_day", expr.Int, "The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together."),
 }
 
-// WorkflowSlots are the slots of workflow facts: each provider's, then the trigger's and the config's.
-var WorkflowSlots = []string{"pr", "session", "workspace", "trigger", "config"}
+// WorkflowSlots are the slots of workflow facts: each provider's, then the
+// brief's, the draft's, the trigger's and the config's.
+var WorkflowSlots = []string{"pr", "session", "workspace", "entry", "slack", "brief", "draft", "trigger", "config"}
 
-// WorkflowEnv is the env of a workflow's when: the facts of slot, trigger.* and config.*.
+// DraftSlot is the slot of the facts a workflow's [withdraw] when reads of
+// each draft it proposed.
+const DraftSlot = "draft"
+
+// WorkflowEnv is the env of a workflow's when: the facts of slot, the
+// brief's when slot is one of BriefSubjects, trigger.* and config.*.
 func WorkflowEnv(slot string) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
-		if slices.Contains(f.Slots, WorkflowSlot) && (f.Slot == slot || f.Slot == "trigger" || f.Slot == "config") {
+		if slices.Contains(f.Slots, WorkflowSlot) && (f.Slot == slot || slices.Contains(f.Subjects, slot) || f.Slot == "trigger" || f.Slot == "config") {
 			env[f.Name] = f.Type
 		}
 	}
 	return env
+}
+
+// WithdrawEnv is the env of a workflow's [withdraw] when: WorkflowEnv(slot)
+// and the draft slot's facts.
+func WithdrawEnv(slot string) expr.Env {
+	env := WorkflowEnv(slot)
+	for _, f := range Facts {
+		if f.Slot == DraftSlot {
+			env[f.Name] = f.Type
+		}
+	}
+	return env
+}
+
+// ExtraFacts are the brief.extra.<name> facts the brief intent's extra
+// schema declares, typed from it: a string, a string with an enum, an
+// integer, a boolean or an array of strings with an enum. A predicate's env
+// is extended with them at load.
+func ExtraFacts(extra *jsonschema.Schema) expr.Env {
+	if extra == nil {
+		return expr.Env{}
+	}
+	return expr.Env{}
 }
 
 // PREnv is the pull request's own facts of the turn slot, the ones a turn

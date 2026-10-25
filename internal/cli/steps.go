@@ -149,15 +149,16 @@ type stepEntry struct {
 // stepRegistry adapts every step of builtin.Steps.
 func stepRegistry() map[string]stepEntry {
 	return map[string]stepEntry{
-		"session.close":        {check: (*stepSet).closeCheck, run: (*stepSet).closeRun},
-		"session.mark_dormant": {check: (*stepSet).markDormantCheck, run: (*stepSet).markDormantRun},
-		"turn.dismiss":         {check: (*stepSet).dismissTurnCheck, run: (*stepSet).dismissTurnRun},
-		"answer.refuse":        {check: (*stepSet).refuseAnswerCheck, run: (*stepSet).refuseAnswerRun},
-		"workspace.remove":     {check: (*stepSet).removeCheck, note: (*stepSet).removeNote, run: (*stepSet).removeRun},
-		"workspace.unregister": {check: (*stepSet).unregisterCheck, run: (*stepSet).unregisterRun},
-		builtin.StepTurnStart:  {check: (*stepSet).startCheck, note: (*stepSet).startNote, run: (*stepSet).startRun, dismiss: (*stepSet).startDismiss},
-		stepClassify:           {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
-		"notify.self":          {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
+		"session.close":          {check: (*stepSet).closeCheck, run: (*stepSet).closeRun},
+		"session.mark_dormant":   {check: (*stepSet).markDormantCheck, run: (*stepSet).markDormantRun},
+		"turn.dismiss":           {check: (*stepSet).dismissTurnCheck, run: (*stepSet).dismissTurnRun},
+		"answer.refuse":          {check: (*stepSet).refuseAnswerCheck, run: (*stepSet).refuseAnswerRun},
+		"workspace.remove":       {check: (*stepSet).removeCheck, note: (*stepSet).removeNote, run: (*stepSet).removeRun},
+		"workspace.unregister":   {check: (*stepSet).unregisterCheck, run: (*stepSet).unregisterRun},
+		builtin.StepTurnStart:    {check: (*stepSet).startCheck, note: (*stepSet).startNote, run: (*stepSet).startRun, dismiss: (*stepSet).startDismiss},
+		builtin.StepDraftPropose: draftProposeStep,
+		stepClassify:             {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
+		"notify.self":            {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
 	}
 }
 

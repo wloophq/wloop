@@ -188,12 +188,13 @@ func programReads(fset *token.FileSet, file string, info *types.Info, f *ast.Fil
 }
 
 // builtinTables are the files that may spell a builtin's dotted or snake name.
-var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
+var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
+	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
 
-// builtinNames are the on_sent, prepare, workspace and workflow step names
-// holding a . or _.
+// builtinNames are the on_sent, prepare, workspace, workflow step and draft
+// effect names holding a . or _.
 func builtinNames() map[string]bool {
-	var all []string
+	all := builtin.EffectNames()
 	for _, slot := range []builtin.Slot{builtin.SlotOnSent, builtin.SlotPrepare, builtin.SlotWorkspace} {
 		all = append(all, builtin.Names[slot]...)
 	}

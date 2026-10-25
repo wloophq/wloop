@@ -1,5 +1,5 @@
 description = "Case"
-subject = "slack"
+subject = "gmail"
 when = 'session.managed && session.agent_state == "done"'
 
 [trigger]

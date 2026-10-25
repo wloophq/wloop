@@ -16,6 +16,11 @@ const intro = {
     '',
     'The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints them with their arguments.',
   ],
+  '| Effect |': [
+    '## Draft effects',
+    '',
+    'What a sent draft applies, once: the names a `draft.propose` step lists in `on_posted` and an intent lists in `draft_effects`.',
+  ],
 };
 
 const out = [
@@ -36,7 +41,7 @@ for (const table of tables) {
       '',
       '## Workflow facts',
       '',
-      'A workflow\'s `when` reads the facts of its subject\'s slot, plus `trigger.*`, `config.*` and `now`. `{{command}} workflows facts [github|session|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; in an intent it is the repository name.',
+      'A workflow\'s `when` reads the facts of its subject\'s slot, plus `trigger.*`, `config.*` and `now`; a subject whose units have a brief also reads `brief.*`, and `[withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; in an intent it is the repository name.',
     );
     workflowHeading = true;
   }

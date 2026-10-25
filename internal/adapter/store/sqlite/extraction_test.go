@@ -18,7 +18,7 @@ func init() {
 		writeCase{method: "ExtractionStore.Save", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: {Brief: "b", At: noteAt}},
 				Hints: map[unit.Unit]map[string]ExtractionHint{u: {"e1": {Mode: "none"}}}})
-		}, topics: port.TopicSourceEvents, units: []unit.Unit{u}},
+		}, topics: port.TopicSourceEvents | port.TopicBriefs, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.SetWatched", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().SetWatched(ctx, u, true, noteAt)
 		}},

@@ -44,6 +44,12 @@ type wManifest struct {
 	Marks         map[string]string `toml:"marks"`
 	Approval      *wApproval        `toml:"approval"`
 	DraftApproval *mDraftApproval   `toml:"draft_approval"`
+	Withdraw      *wWithdraw        `toml:"withdraw"`
+	AutoSend      *bool             `toml:"auto_send"`
+}
+
+type wWithdraw struct {
+	When *string `toml:"when"`
 }
 
 type wTrigger struct {
@@ -315,7 +321,40 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
 	w.DraftApproval = s.draftApproval(m.DraftApproval)
+	s.defineWithdraw(&w, m.Withdraw, slot)
+	w.AutoSend = m.AutoSend
+	s.turnBudget(w, m.Limits)
 	return w
+}
+
+func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) {
+	if m == nil {
+		return
+	}
+	if m.When == nil {
+		s.add("withdraw.when", "is required: a predicate over the subject's facts and draft.* that withdraws an open draft the workflow proposed")
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepDraftPropose }) {
+		s.add("withdraw", "withdraws drafts the workflow proposed; it has no %s step", builtin.StepDraftPropose)
+	}
+	if slot != "" {
+		w.Withdraw = s.predicate("withdraw.when", *m.When, builtin.WithdrawEnv(slot))
+	}
+}
+
+// turnBudget refuses a workflow that starts turns on units outside
+// builtin.RoundProviders without limits.per_day.
+func (s *sheet) turnBudget(w workflow.Workflow, l *wLimits) {
+	if w.Provider == "" || slices.Contains(builtin.RoundProviders, w.Provider) {
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
+		return
+	}
+	if l == nil || l.PerDay <= 0 {
+		s.add("limits.per_day", "is required: a workflow starting turns on %s units caps them per day", w.Provider)
+	}
 }
 
 func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
@@ -444,8 +483,51 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 			if r, ok := raw["round"].(string); ok {
 				s.oneOf(p+".round", r, rounds[1:])
 			}
+			if m, ok := raw["mode"].(string); ok {
+				s.oneOf(p+".mode", m, builtin.TurnModes)
+			}
+		}
+		if use == builtin.StepDraftPropose {
+			s.draftPropose(p, st.Args)
 		}
 		w.Steps = append(w.Steps, st)
+	}
+}
+
+// draftPropose checks draft.propose's arguments, which are all strings.
+func (s *sheet) draftPropose(p string, args map[string]any) {
+	arg := func(k string) (string, bool) {
+		v, ok := args[k].(string)
+		return v, ok
+	}
+	if v, _ := arg("purpose"); strings.TrimSpace(v) == "" {
+		s.add(p+".purpose", "is required: what the draft is for, such as nudge or close")
+	}
+	delivery, ok := arg("delivery")
+	if !ok {
+		delivery = builtin.DraftDeliveries[0]
+	}
+	s.oneOf(p+".delivery", delivery, builtin.DraftDeliveries)
+	if r, _ := arg("reaction"); delivery == "reaction" && r == "" {
+		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
+	}
+	for k, allowed := range map[string][]string{"items": builtin.DraftItems, "per": builtin.DraftPer, "target": builtin.DraftTargets} {
+		if v, ok := arg(k); ok {
+			s.oneOf(p+"."+k, v, allowed)
+		}
+	}
+	if v, ok := arg("on_posted"); ok {
+		for _, e := range strings.Split(v, ",") {
+			if e = strings.TrimSpace(e); !slices.Contains(builtin.EffectNames(), e) {
+				s.add(p+".on_posted", "%q is not an effect; the effects are %s", e, quoted(builtin.EffectNames()))
+			}
+		}
+	}
+	if v, ok := arg("hold"); ok {
+		s.duration(p+".hold", v)
+	}
+	if v, ok := arg("hold_after_sent"); ok && v != builtin.HoldForever {
+		s.duration(p+".hold_after_sent", v)
 	}
 }
 

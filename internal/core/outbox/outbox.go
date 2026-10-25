@@ -24,6 +24,19 @@ type Proposal struct {
 	Target, Text, Reaction string
 	Origin                 draft.Origin
 	Approval               *draft.Approval // nil: resolved by Service.Policies from Origin
+	// Purpose and Delivery are the draft's shape; "" derives them from Kind
+	// (draft.ShapeOf), and a set Purpose with no Kind derives Kind
+	// (draft.KindOf).
+	Purpose  string
+	Delivery draft.Delivery
+	// Effects are applied once the draft is sent, names of builtin.Effects.
+	Effects []string
+	// ObservedFor is how long a settled draft of the same origin holds this
+	// proposal from being proposed again; zero keeps Service.ObservedFor.
+	ObservedFor time.Duration
+	// HoldAutoSend keeps the draft for a person's approval whatever its
+	// approval: its proposer's manifest sets auto_send = false.
+	HoldAutoSend bool
 }
 
 type Filter struct {
@@ -31,6 +44,20 @@ type Filter struct {
 	Unit      *unit.Unit
 	Entry     string
 	Rule, Key string
+	// Workflow keeps the drafts whose Origin.Workflow is it; "" any.
+	Workflow string
+}
+
+// Effect applies one declared effect of a sent draft.
+type Effect func(ctx context.Context, d draft.Draft) error
+
+// Applier applies the Effects of a sent draft exactly once: each by its
+// name, then the draft's EffectsAppliedAt, so a restart applies only those
+// of drafts sent and not yet applied.
+type Applier interface {
+	Apply(ctx context.Context, d draft.Draft) error
+	// Pending are the sent drafts whose effects are not applied yet.
+	Pending(ctx context.Context) ([]draft.Draft, error)
 }
 
 type Store interface {
@@ -73,6 +100,8 @@ type Service struct {
 	// ObservedFor is how long an observed draft keeps an auto proposal of its key from being observed again;
 	// zero keeps it for good.
 	ObservedFor time.Duration
+	// Applier applies a sent draft's Effects; nil applies none.
+	Applier Applier
 }
 
 var (
@@ -94,6 +123,10 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	d := draft.Draft{
 		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Proposed, CreatedAt: now, UpdatedAt: now,
+		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
+	}
+	if d.Kind == "" && d.Purpose != "" {
+		d.Kind = draft.KindOf(d.Purpose, d.Delivery)
 	}
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err

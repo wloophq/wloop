@@ -17,7 +17,11 @@ import (
 var engineBans = []string{"internal/domain/pr", "internal/domain/turn", "internal/domain/view",
 	"internal/domain/workspace", "internal/domain/round", "internal/adapter"}
 
-var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true, "slack": true}
+var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true,
+	string(unit.Entry): true, "slack": true}
+
+// providerConsts are the unit provider constants the core may not spell.
+var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Entry": true}
 
 // engineImports flags an import of engineBans by internal/core/automation;
 // its fakes, automationtest, are excluded.
@@ -37,6 +41,7 @@ func engineImports(self string, imports []string) []string {
 // coreProviderAllowlist are the core files that may still name a provider.
 var coreProviderAllowlist = []allowed{
 	{"internal/core/port/port.go", "unit.GitHub", "debt: PROf reads a pull request from a github event; a pluginDebt edge"},
+	{"internal/core/turns/headless.go", `"entry"`, "the headless turn's entry input, which shares the entry provider's spelling"},
 }
 
 // coreLiterals flags a provider id spelled in a non-test file of the
@@ -65,7 +70,7 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 				flag(n.Pos(), strconv.Quote(s))
 			}
 		case *ast.SelectorExpr:
-			if x, ok := n.X.(*ast.Ident); ok && x.Name == "unit" && (n.Sel.Name == "GitHub" || n.Sel.Name == "Session" || n.Sel.Name == "Workspace") {
+			if x, ok := n.X.(*ast.Ident); ok && x.Name == "unit" && providerConsts[n.Sel.Name] {
 				flag(n.Pos(), "unit."+n.Sel.Name)
 			}
 		}
@@ -124,15 +129,17 @@ var b = unit.Session
 var c = "sessions"
 var d = workflow.Session
 var e = unit.Unit{}
+var f = unit.Entry
+var g = "entry"
 `)
 	none := map[int]bool{}
-	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none), 2, "the core names no provider")
-	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none), 2, "the core names no provider")
+	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none), 4, "the core names no provider")
+	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none), 4, "the core names no provider")
 	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none), 0, "")
 	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none), 0, "")
 	flagged(t, "outside the core", coreLiterals(fset, "internal/daemon/x.go", f, nil, none), 0, "")
 	allow := []allowed{{"internal/core/gtd/x.go", "unit.Session", "planted"}, {"internal/core/gtd/x.go", `"slack"`, "stale"}}
 	used := map[int]bool{}
-	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 1, `"github"`)
+	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 3, "the core names no provider")
 	flagged(t, "stale", stale(allow, used), 1, "(stale)")
 }

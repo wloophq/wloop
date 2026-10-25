@@ -1,5 +1,5 @@
 // Command factsdoc prints the generated tables of the facts reference page: the
-// intents' facts, one table per workflow slot, then the workflow steps.
+// intents' facts, one table per workflow slot, the workflow steps, then the draft effects.
 package main
 
 import (
@@ -20,7 +20,7 @@ func tables() []string {
 	for _, slot := range builtin.WorkflowSlots {
 		out = append(out, workflowTable(slot))
 	}
-	return append(out, stepTable())
+	return append(out, stepTable(), effectTable())
 }
 
 func intentTable() string {
@@ -63,6 +63,19 @@ func stepTable() string {
 			units = strings.Join(names, ", ")
 		}
 		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", d.Name, units, cell(d.Doc))
+	}
+	return b.String()
+}
+
+func effectTable() string {
+	var b strings.Builder
+	b.WriteString("| Effect | Unit | Does |\n|---|---|---|\n")
+	for _, e := range builtin.Effects {
+		units := "any"
+		if e.Provider != "" {
+			units = string(e.Provider)
+		}
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", e.Name, units, cell(e.Doc))
 	}
 	return b.String()
 }

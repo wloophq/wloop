@@ -58,6 +58,8 @@ func init() {
 			want: []string{"drafts_unit (provider=? AND unit_key=?)"}},
 		hotPlan{name: "drafts of a rule key", query: draftSelect + ` WHERE rule = ? AND rule_key = ?` + draftOrder, args: 2,
 			want: []string{"drafts_rule (rule=? AND rule_key=?)"}},
+		hotPlan{name: "drafts of a workflow on a unit", query: draftSelect + ` WHERE workflow = ? AND provider = ? AND unit_key = ?` + draftOrder, args: 3,
+			want: []string{"drafts_workflow (workflow=? AND provider=? AND unit_key=?)"}},
 	)
 }
 

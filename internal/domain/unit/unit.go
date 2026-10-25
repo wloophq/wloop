@@ -20,6 +20,9 @@ const (
 	GitHub    ProviderID = "github"
 	Session   ProviderID = "session"
 	Workspace ProviderID = "workspace"
+	// Entry is the provider the core keeps for GTD entries: the key is the
+	// entry's id.
+	Entry ProviderID = "entry"
 )
 
 type Unit struct {
@@ -51,6 +54,21 @@ func (u Unit) Less(o Unit) bool {
 type Codec interface {
 	Provider() ProviderID
 	Valid(key string) error
+}
+
+// Equaler is an optional capability of a Codec: whether two keys of its
+// provider name the same thing, such as logins compared without case. A codec
+// without it compares keys byte for byte.
+type Equaler interface {
+	Equal(a, b string) bool
+}
+
+// KeysEqual says whether keys a and b of c's provider name the same thing.
+func KeysEqual(c Codec, a, b string) bool {
+	if e, ok := c.(Equaler); ok {
+		return e.Equal(a, b)
+	}
+	return a == b
 }
 
 type Registry struct{ codecs map[ProviderID]Codec }

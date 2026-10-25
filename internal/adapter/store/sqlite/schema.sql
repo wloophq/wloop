@@ -60,17 +60,6 @@ CREATE TABLE overrides (
 
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
--- run is the ok brief run in use and last_run the latest attempt; the
--- brief, its model, cost and times are that run's.
-CREATE TABLE pr_briefs (
-  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
-  failures INTEGER NOT NULL DEFAULT 0, attempt_of TEXT NOT NULL DEFAULT '',
-  run INTEGER NOT NULL DEFAULT 0, last_run INTEGER NOT NULL DEFAULT 0,
-  wanted_at TEXT NOT NULL DEFAULT '', retry_at TEXT NOT NULL DEFAULT '',
-  gave_up_at TEXT NOT NULL DEFAULT '', gave_up_reason TEXT NOT NULL DEFAULT '',
-  PRIMARY KEY (owner, repo, number)
-);
-
 CREATE TABLE turn_instructions (
   sha TEXT PRIMARY KEY, kind TEXT NOT NULL, repo TEXT NOT NULL,
   created_at TEXT NOT NULL,
@@ -138,7 +127,9 @@ CREATE TABLE turns (
   usage_source TEXT NOT NULL DEFAULT '', usage_read_at TEXT NOT NULL DEFAULT '', usage_attempts INTEGER NOT NULL DEFAULT 0,
   -- the intent's inputs as one JSON object with sorted keys
   inputs TEXT NOT NULL DEFAULT '{}',
-  mode TEXT NOT NULL DEFAULT '', workflow TEXT NOT NULL DEFAULT ''
+  mode TEXT NOT NULL DEFAULT '', workflow TEXT NOT NULL DEFAULT '',
+  -- the role of the turn's intent (round.review, round.address, nudge, probe, headless.default); '' none
+  role TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX turns_unit ON turns(provider, unit_key, seq);
 CREATE INDEX turns_sent_at ON turns(sent_at);
@@ -224,32 +215,46 @@ CREATE TABLE view_applied (
 
 CREATE TABLE brief_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
-  trigger TEXT NOT NULL, -- wanted, background, refresh, trial
+  trigger TEXT NOT NULL, -- wanted, background, refresh, trial, extraction, fields, legacy
   intake INTEGER NOT NULL DEFAULT 0,
   version TEXT NOT NULL, attempt_of TEXT NOT NULL,
-  head_oid TEXT NOT NULL DEFAULT '', body_edited_at TEXT NOT NULL DEFAULT '', changed_files INTEGER NOT NULL DEFAULT 0,
   started_at TEXT NOT NULL, ended_at TEXT NOT NULL DEFAULT '',
   input_ms INTEGER, call_ms INTEGER, agent_ms INTEGER,
   outcome TEXT NOT NULL DEFAULT 'running', -- running, ok, reused, failed, unfit, over-budget, too-long, timeout, unavailable, interrupted
   error TEXT NOT NULL DEFAULT '',
   model TEXT NOT NULL DEFAULT '', cost_usd REAL,
   input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER,
-  diff_bytes INTEGER, diff_cut INTEGER NOT NULL DEFAULT 0,
+  input_bytes INTEGER, input_cut INTEGER NOT NULL DEFAULT 0,
   brief TEXT NOT NULL DEFAULT '', -- the brief JSON, ok runs only
-  files TEXT NOT NULL DEFAULT '', -- JSON lists: changed paths, normalized key:value, what normalization refused
-  tags TEXT NOT NULL DEFAULT '',
+  tags TEXT NOT NULL DEFAULT '', -- JSON lists: normalized key:value, what normalization refused
   dropped_tags TEXT NOT NULL DEFAULT '',
   input_sha TEXT NOT NULL DEFAULT '',
-  reused_from INTEGER NOT NULL DEFAULT 0
+  reused_from INTEGER NOT NULL DEFAULT 0,
+  provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
+  -- what the unit was at when the run read it, in its provider's format
+  revision TEXT NOT NULL DEFAULT '',
+  -- the provider's own parts of what the run read, a JSON object
+  input TEXT NOT NULL DEFAULT '{}',
+  intent TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE pr_tags (
-  owner TEXT NOT NULL, repo TEXT NOT NULL, number INTEGER NOT NULL,
-  key TEXT NOT NULL, value TEXT NOT NULL, run INTEGER NOT NULL,
-  PRIMARY KEY (owner, repo, number, key, value)
+-- run is the ok brief run in use and last_run the latest attempt; the
+-- brief, its model, cost and times are that run's.
+CREATE TABLE unit_briefs (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  failures INTEGER NOT NULL DEFAULT 0, attempt_of TEXT NOT NULL DEFAULT '',
+  run INTEGER NOT NULL DEFAULT 0, last_run INTEGER NOT NULL DEFAULT 0,
+  wanted_at TEXT NOT NULL DEFAULT '', retry_at TEXT NOT NULL DEFAULT '',
+  gave_up_at TEXT NOT NULL DEFAULT '', gave_up_reason TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (provider, unit_key)
 );
-CREATE INDEX pr_tags_kv ON pr_tags(key, value);
+
+CREATE TABLE unit_tags (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  key TEXT NOT NULL, value TEXT NOT NULL, run INTEGER NOT NULL,
+  PRIMARY KEY (provider, unit_key, key, value)
+);
+CREATE INDEX unit_tags_kv ON unit_tags(key, value);
 
 CREATE TABLE intakes (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -419,12 +424,15 @@ CREATE TABLE drafts (
   would_policy TEXT NOT NULL DEFAULT '', would_reason TEXT NOT NULL DEFAULT '', would_outcome TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sending_at TEXT NOT NULL DEFAULT '',
   rev INTEGER NOT NULL DEFAULT 0,
-  purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]'
+  purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]',
+  -- when the effects of a sent draft were applied; '' while they are not
+  effects_applied_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
 CREATE INDEX drafts_entry ON drafts (entry, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
+CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
 
 CREATE TABLE projects (
   entry_id TEXT PRIMARY KEY REFERENCES entries (id) ON DELETE CASCADE,
@@ -489,10 +497,12 @@ CREATE TABLE segment_map (
 CREATE TABLE extraction_cursors (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
   last_ts TEXT NOT NULL DEFAULT '', last_seq INTEGER NOT NULL DEFAULT 0,
-  brief TEXT NOT NULL DEFAULT '', verdict TEXT NOT NULL DEFAULT '', verdict_why TEXT NOT NULL DEFAULT '',
+  verdict TEXT NOT NULL DEFAULT '', verdict_why TEXT NOT NULL DEFAULT '',
   viewer_role TEXT NOT NULL DEFAULT '', topic TEXT NOT NULL DEFAULT '',
   started_by_viewer INTEGER NOT NULL DEFAULT 0, closure_posted INTEGER NOT NULL DEFAULT 0,
   watched INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL,
+  -- a sent draft's unit.closed; the extraction never writes it, readers OR it with closure_posted
+  closure_marked INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (provider, unit_key)
 ) WITHOUT ROWID;
 

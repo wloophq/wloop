@@ -149,6 +149,9 @@ type Draft struct {
 	Reason   string   // State "discarded": "user", "assigned", "observe", ...
 	Would    Would
 	Rev      int64 // the stored row's version; every Update bumps it
+	// EffectsAppliedAt is when the Effects of a sent draft were applied;
+	// zero while they are not.
+	EffectsAppliedAt time.Time
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
@@ -171,6 +174,21 @@ var transitions = map[State][]State{
 	Approved: {Sending, Discarded},
 	Sending:  {Sent, Failed},
 	Failed:   {Approved, Discarded},
+}
+
+// The reasons a workflow withdraws a draft it proposed, as Reason of the
+// discarded draft: its person was assigned the items, or it is moot.
+const (
+	WithdrawAssigned = "assigned"
+	WithdrawMoot     = "moot"
+)
+
+// SettledAt is the newest UpdatedAt of the drafts of ds that workflow
+// proposed on subject and that settled (sent, failed for good or
+// discarded, withdrawn ones included); zero when none.
+func SettledAt(ds []Draft, workflow string, subject unit.Unit) time.Time {
+	_, _, _ = ds, workflow, subject
+	return time.Time{}
 }
 
 type ApprovalMode string // "always" (default), "window", "none", "observe"

@@ -35,6 +35,10 @@ type Brief struct {
 	OpenQuestions []string `json:"open_questions"`
 	// Tags are the normalized key:value tags.
 	Tags []string `json:"tags"`
+	// Extra are the brief intent's extra fields, by name, and the version
+	// of each field the brief holds.
+	Extra         map[string]any    `json:"extra,omitempty"`
+	ExtraVersions map[string]string `json:"extra_versions,omitempty"`
 }
 
 func (b Brief) validate() error {

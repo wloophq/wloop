@@ -13,7 +13,7 @@
     "subject": {
       "type": "string",
       "description": "The unit provider the workflow matches; its facts are in that provider's slot.",
-      "enum": ["github", "session", "workspace"]
+      "enum": ["entry", "github", "session", "slack", "workspace"]
     },
     "trigger": {
       "type": "object",
@@ -58,7 +58,7 @@
       "additionalProperties": false,
       "properties": {
         "per_run": {"type": "integer", "description": "Items that run in one evaluation; 0 is no limit."},
-        "per_day": {"type": "integer", "description": "Runs per day; 0 is no limit."},
+        "per_day": {"type": "integer", "description": "Runs per day; 0 is no limit. Required, above 0, for a workflow that starts turns on units other than pull requests."},
         "per_unit_per_day": {"type": "integer", "description": "Runs per unit per day; 0 is no limit."},
         "cooldown": {"type": "string", "description": "The least time between runs, such as 30m or 1d."}
       }
@@ -112,6 +112,16 @@
         },
         "window": {"type": "string", "description": "With mode window only: how long the user has, such as 10m."}
       }
-    }
+    },
+    "withdraw": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "When an open draft the workflow proposed is withdrawn.",
+      "required": ["when"],
+      "properties": {
+        "when": {"type": "string", "description": "A predicate over the subject's facts and draft.*; a match withdraws the draft."}
+      }
+    },
+    "auto_send": {"type": "boolean", "description": "false keeps the workflow's drafts for the user's approval whatever their draft approval."}
   }
 }

@@ -31,7 +31,7 @@ func (s *Store) Activities(ctx context.Context) (map[github.Ref]Activity, error)
 		SELECT t.unit_key, 'usage', 0, 0, '', sum(u.input_tokens + u.output_tokens), total(u.cost_usd), ''
 		FROM turn_usage u JOIN turns t ON t.seq = u.turn_seq WHERE t.provider = 'github' GROUP BY t.unit_key
 		UNION ALL
-		SELECT `+unitKeyOf("b")+`, 'brief', 0, 0, '', 0, 0.0, retry_at FROM pr_briefs b WHERE retry_at != ''`, func(scan scanRef) error {
+		SELECT unit_key, 'brief', 0, 0, '', 0, 0.0, retry_at FROM unit_briefs WHERE provider = 'github' AND retry_at != ''`, func(scan scanRef) error {
 		var part, intent, retry string
 		var turns, open int
 		var n int64
