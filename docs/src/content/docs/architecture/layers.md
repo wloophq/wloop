@@ -3,7 +3,7 @@ title: Layers and the dependency rule
 description: The packages of the code, what each layer may import, the composition root, and where a new piece of code goes.
 ---
 
-{{name}} is one Go module laid out as ports and adapters. The use cases and the values they work on know nothing of SQLite, GitHub, Slack, Orca or the coding agent; each outside tool is an adapter behind a small port, and one composition root picks the adapters. The rules below are tests in `internal/archtest`; [Testing](/architecture/testing/#the-architecture-tests) lists each one.
+{{name}} is one Go module laid out as ports and adapters. The use cases and the values they work on know nothing of SQLite, GitHub, Slack, Orca or the coding agent; each outside tool is an adapter behind a small port, and one composition root picks the adapters. The rules below are tests in `internal/archtest`; [Architecture rules](/reference/architecture-rules/) lists each one.
 
 ## The layers
 
