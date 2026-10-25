@@ -89,9 +89,19 @@ func header(in Input) string {
 	return h
 }
 
-var mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)>`)
+var (
+	mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)>`)
+	// markerLike is the dash run that opens a marker, in text that is not one.
+	markerLike = regexp.MustCompile(`(?i)-{2,}(\s*(?:end of )?(?:context|segment)\b)`)
+)
 
+// renderMessage writes m with the dashes of any marker look-alike split, so no text a
+// message carries reads as a marker.
 func renderMessage(in Input, m slack.Message, label string, isNew bool, index map[string]string) string {
+	return markerLike.ReplaceAllString(renderRaw(in, m, label, isNew, index), "- -$1")
+}
+
+func renderRaw(in Input, m slack.Message, label string, isNew bool, index map[string]string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[%s ts=%s %s] ", label, m.TS, tsTime(m.TS).In(zone(in)).Format("2006-01-02 15:04 MST"))
 	if in.Focus != "" && m.TS == in.Focus {

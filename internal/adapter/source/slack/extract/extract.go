@@ -49,7 +49,7 @@ type Result struct {
 	Items                                  []ItemOut
 	Segments                               []SegmentOut // DM conversations only
 	Links                                  []LinkOut
-	// Dropped counts the new items and links left out because they cite a message outside the window.
+	// Dropped counts the items and links left out because they cite a message outside the window.
 	Dropped int
 }
 
@@ -82,7 +82,8 @@ type ParseTarget func(target string) (unit.Unit, bool)
 
 // Extract asks for in's result; ask carries Tier and MaxCostUSD. An answer that does not fit
 // the schema, or names a ref, segment or link item in doesn't hold, fails with turns.ErrUnfit;
-// a new item or a link citing a message outside the window, the context's included, is dropped.
+// a new item, an item whose evidence or a link citing a message outside the window, the context's
+// included, is dropped.
 func Extract(ctx context.Context, a turns.Asker, ask turns.Ask, in Input) (Result, turns.Answer, error) {
 	prompt, err := Prompt(in)
 	if err != nil {
@@ -207,7 +208,7 @@ func decode(raw []byte, in Input) (Result, error) {
 		if !known[wi.Ref] && !isNewRef(wi.Ref) {
 			return Result{}, fmt.Errorf("item ref %q is neither in the ledger nor new", wi.Ref)
 		}
-		if isNewRef(wi.Ref) && !inWindow[wi.OriginTS] {
+		if isNewRef(wi.Ref) && !inWindow[wi.OriginTS] || wi.EvidenceTS != "" && !inWindow[wi.EvidenceTS] {
 			dropped[wi.Ref] = true
 			r.Dropped++
 			continue
