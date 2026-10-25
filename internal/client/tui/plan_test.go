@@ -131,3 +131,21 @@ func TestThePlanViewAppliesAndDismisses(t *testing.T) {
 	}
 	quit(t, term, done)
 }
+
+func TestThePlanViewNamesAnItemByItsRowsLabel(t *testing.T) {
+	m := newModel(t)
+	m.SetSpecs(servedSpecs(t).Specs)
+	m.SetPlanSpecs(servedSpecs(t).Plan)
+	m.SetData(oneRow(), api.Health{})
+	thread := planOf("slack-follow-up/slack/T1%2FC1%2F171.1/ee", "slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "pending", "")
+	thread.Label, thread.Default = "#general · launch plan", "wait"
+	m.SetPlan([]api.PlanItem{thread}, nil)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	screen := strings.Join(m.Render(100, 30, now), "\n")
+	if strings.Count(screen, "#general · launch plan") != 2 || strings.Contains(screen, "T1/C1") {
+		t.Fatalf("the item is not named by its label in the list and the detail:\n%s", screen)
+	}
+	if c, ok := press(m, Key{Rune: 'X'}); !ok || c.Label != "slack-follow-up #general · launch plan" {
+		t.Fatalf("dismissed %+v", c)
+	}
+}

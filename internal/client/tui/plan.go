@@ -147,7 +147,7 @@ func itemState(it api.PlanItem, id string) (api.ActionState, bool) {
 }
 
 // itemLabel names an item on the status line: its workflow and unit.
-func itemLabel(it api.PlanItem) string { return it.Workflow + " " + it.Unit.Label() }
+func itemLabel(it api.PlanItem) string { return it.Workflow + " " + it.UnitLabel() }
 
 // timeLeft is the item's list column and its color: the time left on a
 // pending item's window, wait when it waits for the user, blocked.
@@ -204,7 +204,7 @@ func (m *Model) planList(cur, width, height int, now time.Time) []string {
 	cells := make([][]termfmt.Cell, len(m.plan))
 	for i, it := range m.plan {
 		left, style := m.timeLeft(it, now)
-		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: shortRef(it.Unit.Label(), 40)}, {Text: oneLine(it.Reason)}}
+		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: shortRef(it.UnitLabel(), 40)}, {Text: oneLine(it.Reason)}}
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
 	start := max(0, cur-height+1)
@@ -230,7 +230,7 @@ func (m *Model) planList(cur, width, height int, now time.Time) []string {
 // the steps, the facts that matched, what it frees and the keys it offers.
 func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	t := m.t
-	label := termfmt.Cut(it.Unit.Label(), width)
+	label := termfmt.Cut(it.UnitLabel(), width)
 	head := t.Bold(label)
 	if room := width - termfmt.Cells(label) - 2; room > 0 {
 		head += "  " + termfmt.Cut(it.Workflow, room)

@@ -1,0 +1,40 @@
+ Needs me 5    My PRs 1    In loop 1   [Plan 4]                                                  automatic rounds paused
+
+>      42s  review-follow-up      acme/api#7              new commits since your review
+      wait  session-manual-quiet  session:term_3          session.idle_for = 30h0m0s
+      wait  slack-follow-up       #general · launch plan  asked you a question
+   blocked  workspace-temporary   workspace:wt-9          modified files
+
+acme/api#7  review-follow-up
+  decision   pending · runs in 42s
+  why        new commits since your review
+  steps      turn.start
+  keys       Enter apply  X dismiss  G guide
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+Enter apply  X dismiss  G guide  ↑↓ move  g view  / filter  ^K actions  ? keys  q quit

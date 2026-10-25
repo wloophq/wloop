@@ -12,6 +12,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -91,6 +92,18 @@ func draftsGolden(t *testing.T, color bool) *Model {
 	return m
 }
 
+// planGolden is the Plan view over planItems and a Slack thread named by
+// its row's label, the first item selected.
+func planGolden(t *testing.T, color bool) *Model {
+	m := goldenModel(t, color)
+	m.SetPlanSpecs(servedSpecs(t).Plan)
+	thread := planOf("slack-follow-up/slack/T1%2FC1%2F171.1/ee", "slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "pending", "asked you a question")
+	thread.Label, thread.Default = "#general · launch plan", "wait"
+	m.SetPlan(append(planItems(), thread), nil)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	return m
+}
+
 func TestRenderGolden(t *testing.T) {
 	models := map[string]func(*testing.T, bool) *Model{"render": goldenModel}
 	for _, v := range []string{"focus", "inbox", "outbox", "next", "waiting"} {
@@ -98,6 +111,7 @@ func TestRenderGolden(t *testing.T) {
 	}
 	models["gtd-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
 	models["gtd-drafts"] = draftsGolden
+	models["plan"] = planGolden
 	for prefix, model := range models {
 		for _, color := range []bool{false, true} {
 			for _, size := range [][2]int{{120, 40}, {80, 30}} {
