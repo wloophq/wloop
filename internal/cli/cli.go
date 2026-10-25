@@ -792,8 +792,9 @@ func (e *Env) fellThrough(name string, why []string) {
 
 // hostOf is the row of the worktree ws whose manager launches a round's new
 // session: its owner's when the owner can, else, by priority, that of another
-// manager listing the worktree that can. With none, it is ws, whose owner
-// then fails the round closed.
+// manager listing the worktree that can, linked to ws's pull request. With
+// none, it is ws: the owner may still launch it, as Claude Desktop starts its
+// app, and fails the round closed on a launch policy it cannot honor.
 func (e *Env) hostOf(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, opts roundOptions) (wsdomain.Workspace, error) {
 	owner, err := e.WS.For(ctx, ws)
 	if err != nil {
@@ -814,6 +815,7 @@ func (e *Env) hostOf(ctx context.Context, cfg config.Config, ws wsdomain.Workspa
 		if !ok || m.Name() == owner.Name() {
 			continue
 		}
+		w.LinkedPR = cmp.Or(w.LinkedPR, ws.LinkedPR)
 		if no := e.cannotHost(ctx, cfg, m, n); no != "" {
 			why = append(why, m.Name()+": "+no)
 			continue

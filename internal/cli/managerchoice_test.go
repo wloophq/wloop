@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -110,6 +111,24 @@ func TestARoundFallsThroughWhenTheCreatorCannotHostIt(t *testing.T) {
 	}
 	if !strings.Contains(te.err.String(), "Orca launches this session (desk: runs only the default home)") {
 		t.Fatalf("no reason logged: %s", te.err)
+	}
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code != 0 {
+		t.Fatalf("second round: exit %d: %s", code, te.err)
+	}
+	if !strings.Contains(te.out.String(), "prompt sent to the existing agent session") || slices.ContainsFunc(orca.Writes, func(w string) bool { return strings.HasPrefix(w, "wake ") }) {
+		t.Fatalf("the second round did not keep orca's live session: %s\nwrites %v", te.out, orca.Writes)
+	}
+}
+
+func TestTheFallThroughRowKeepsThePullRequestLink(t *testing.T) {
+	t.Parallel()
+	desk, _, te := madeByDesk(t)
+	desk.Refuses = errors.New("runs only the default home")
+	ws := desk.WorkspaceList[0]
+	ws.Manager, ws.LinkedPR = "desk", 9
+	host, err := te.hostOf(context.Background(), te.cfg, ws, roundOptions{trusted: false, pr: &github.PullRequest{}})
+	if err != nil || host.Manager != "orca" || host.LinkedPR != 9 {
+		t.Fatalf("hostOf = %+v, %v", host, err)
 	}
 }
 

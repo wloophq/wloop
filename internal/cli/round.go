@@ -222,8 +222,9 @@ type proc struct {
 // otherwise starts a fresh one beside it. A dormant session the manager can
 // wake is woken under the same rule. A live session without the loop's MCP
 // tool is never typed into. In a workspace u's placement shares with other
-// units, the live session is only one of u's own. A session the round starts
-// or wakes runs in hostOf's manager.
+// units, the live session is only one of u's own. Without a live session in
+// ws's owner, the one in hostOf's manager is kept under the same rule; a
+// session the round starts or wakes runs in hostOf's manager.
 func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, u unit.Unit, opts roundOptions) (proc, string, error) {
 	m, err := e.WS.For(ctx, ws)
 	if err != nil {
@@ -235,6 +236,26 @@ func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Worksp
 	live, ok, err := e.liveSession(ctx, cfg, m, ws, u)
 	if err != nil {
 		return proc{}, "", err
+	}
+	var host *wsdomain.Workspace
+	if !ok {
+		h, err := e.hostOf(ctx, cfg, ws, opts)
+		if err != nil {
+			return proc{}, "", err
+		}
+		host = &h
+		if h.Manager != ws.Manager {
+			hm, err := e.WS.For(ctx, h)
+			if err != nil {
+				return proc{}, "", err
+			}
+			if live, ok, err = e.liveSession(ctx, cfg, hm, h, u); err != nil {
+				return proc{}, "", err
+			}
+			if ok {
+				ws, m = h, hm
+			}
+		}
 	}
 	verb := verbNew
 	if ok && keep(live.LastOutput) {
@@ -255,9 +276,14 @@ func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Worksp
 		}
 		verb = verbNoMCP
 	}
-	if ws, err = e.hostOf(ctx, cfg, ws, opts); err != nil {
-		return proc{}, "", err
+	if host == nil {
+		h, err := e.hostOf(ctx, cfg, ws, opts)
+		if err != nil {
+			return proc{}, "", err
+		}
+		host = &h
 	}
+	ws = *host
 	if m, err = e.WS.For(ctx, ws); err != nil {
 		return proc{}, "", err
 	}
