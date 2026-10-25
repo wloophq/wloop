@@ -1,6 +1,8 @@
 package expr
 
 import (
+	"errors"
+	"slices"
 	"time"
 
 	"cel.dev/cel-go/cel"
@@ -36,12 +38,29 @@ func handledOptions() []cel.EnvOption {
 	}
 }
 
-func callsHandled(a *celast.AST) bool {
-	found := false
+// handledNames are the mark names a's handled() calls read, sorted; a name
+// must be a string literal, so a workflow's marks can be checked at load.
+func handledNames(a *celast.AST) ([]string, error) {
+	var names []string
+	var bad bool
 	celast.PostOrderVisit(a.Expr(), celast.NewExprVisitor(func(e celast.Expr) {
-		found = found || (e.Kind() == celast.CallKind && e.AsCall().FunctionName() == handledFn)
+		if e.Kind() != celast.CallKind || e.AsCall().FunctionName() != handledFn {
+			return
+		}
+		arg := e.AsCall().Args()[1]
+		if arg.Kind() != celast.LiteralKind {
+			bad = true
+			return
+		}
+		if s, ok := arg.AsLiteral().Value().(string); ok {
+			names = append(names, s)
+		}
 	}))
-	return found
+	if bad {
+		return nil, errors.New("handled names its mark with a string literal")
+	}
+	slices.Sort(names)
+	return slices.Compact(names), nil
 }
 
 func handled(args ...ref.Val) ref.Val {

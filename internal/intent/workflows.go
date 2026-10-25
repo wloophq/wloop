@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -72,6 +73,8 @@ type wUnit struct {
 	files    files
 	problems Problems
 	wf       workflow.Workflow
+	// whenAt is where the manifest's when is, for a problem found after it loaded.
+	whenAt dintent.Pos
 }
 
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
@@ -135,6 +138,19 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 			}
 			continue
 		}
+	}
+	readable := markNames(units)
+	for _, u := range units {
+		if len(u.problems) > 0 {
+			continue
+		}
+		if p := u.unknownMarks(readable); len(p) > 0 {
+			problems = append(problems, p...)
+			if !u.bundled {
+				broken[u.name] = p
+			}
+			continue
+		}
 		loaded = append(loaded, u.wf)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {
@@ -144,6 +160,34 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		return strings.Compare(a.Name, b.Name)
 	})
 	return loaded, broken, reverted, problems
+}
+
+// markNames are the marks a workflow may read: those the loaded workflows
+// record and the plugins' (builtin.Marks).
+func markNames(units []*wUnit) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range builtin.Marks {
+		out[m.Name] = true
+	}
+	for _, u := range units {
+		if len(u.problems) == 0 {
+			for name := range u.wf.Marks {
+				out[mark.Of(u.wf.Name, name)] = true
+			}
+		}
+	}
+	return out
+}
+
+func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
+	var out Problems
+	for _, name := range append(workflow.MarkNames(u.wf.When), workflow.MarkNames(u.wf.Approval.WaitWhen)...) {
+		if !readable[name] {
+			out = append(out, Problem{File: u.wf.Source, Line: u.whenAt.Line, Col: u.whenAt.Col, Field: "when",
+				Msg: fmt.Sprintf("handled(%q): no workflow records that mark and no plugin writes one a workflow can read", name)})
+		}
+	}
+	return out
 }
 
 func (u *wUnit) load(intentProblem func(string) string) {
@@ -174,6 +218,7 @@ func (u *wUnit) load(intentProblem func(string) string) {
 	}()
 	s.at = positions(src)
 	u.wf = s.defineWorkflow(u.name, m, intentProblem)
+	u.whenAt = s.pos("when")
 	u.wf.Source = file
 	u.wf.Bundled = u.bundled
 	u.wf.Overrides = overrides(u.files.overlay)

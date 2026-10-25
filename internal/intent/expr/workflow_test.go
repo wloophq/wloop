@@ -215,6 +215,9 @@ func TestAPredicateSaysWhetherItReadsMarks(t *testing.T) {
 		if got := workflow.ReadsMarks(p); got != want {
 			t.Errorf("%s reads marks: %v", src, got)
 		}
+		if want && !slices.Equal(workflow.MarkNames(p), []string{"w/head"}) {
+			t.Errorf("%s names %v", src, workflow.MarkNames(p))
+		}
 	}
 	both, _ := CompileWorkflow(`handled("w/head", pr.head)`, env)
 	if !workflow.ReadsMarks(workflow.All(nil, both)) {

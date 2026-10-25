@@ -44,7 +44,13 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	return &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env), marks: marks && callsHandled(ast.NativeRep())}, nil
+	p := &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env)}
+	if marks {
+		if p.marks, err = handledNames(ast.NativeRep()); err != nil {
+			return nil, &Error{Col: 1, Msg: err.Error()}
+		}
+	}
+	return p, nil
 }
 
 var envs sync.Map

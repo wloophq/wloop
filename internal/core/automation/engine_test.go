@@ -1640,7 +1640,7 @@ func TestADismissRecordsTheItemsMarks(t *testing.T) {
 
 type marksReading struct{ workflow.Predicate }
 
-func (marksReading) ReadsMarks() bool { return true }
+func (marksReading) MarkNames() []string { return []string{"once/head"} }
 
 func TestOnlyAWorkflowThatReadsMarksLoadsThem(t *testing.T) {
 	r := newRig(t, sweepWF("close", idle, "session.close"))

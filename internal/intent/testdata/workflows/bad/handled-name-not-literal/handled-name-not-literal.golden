@@ -1,0 +1,1 @@
+testdata/workflows/bad/handled-name-not-literal/workflows/case-workflow/workflow.toml:3:8: when: 1: handled names its mark with a string literal
