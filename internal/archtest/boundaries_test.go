@@ -289,13 +289,14 @@ func TestTheBoundaryAnchorsExist(t *testing.T) {
 	for _, tf := range files {
 		pkgs[tf.pkg.Path()] = tf.pkg
 	}
+	var missing []string
 	if pkgs[module+"internal/catalog"] == nil {
-		t.Error("internal/catalog is missing; R1, R4 and R5 guard it")
+		missing = append(missing, "internal/catalog is missing; R1, R4 and R5 guard it")
 	}
 	for _, name := range actionTypes {
 		dot := strings.LastIndex(name, ".")
 		if p := pkgs[name[:dot]]; p == nil || p.Scope().Lookup(name[dot+1:]) == nil {
-			t.Errorf("%s is missing; R4 would match nothing", name)
+			missing = append(missing, name+" is missing; R4 would match nothing")
 		}
 	}
 	loader := pkgs[module+"internal/intent"]
@@ -306,7 +307,8 @@ func TestTheBoundaryAnchorsExist(t *testing.T) {
 	for _, name := range programFields {
 		obj, _, _ := types.LookupFieldOrMethod(programs, false, loader, name)
 		if v, ok := obj.(*types.Var); !ok || !programField(v) {
-			t.Errorf("Programs.%s is missing; R5 would match nothing", name)
+			missing = append(missing, "Programs."+name+" is missing; R5 would match nothing")
 		}
 	}
+	flagged(t, "the boundary anchors", missing, 0, "")
 }

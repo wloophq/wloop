@@ -198,14 +198,17 @@ const d = "classify"
 func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
+	var missing, extra []string
 	for _, want := range []string{"record_round", "nudge.prepare", "pr_else_main", "mark_addressed"} {
 		if !names[want] {
-			t.Errorf("%s missing from %v", want, names)
+			missing = append(missing, want)
 		}
 	}
 	for _, not := range []string{"review", "author", "given", "", "take_over", "my_review"} {
 		if names[not] {
-			t.Errorf("%q is no on_sent, prepare or workspace name with . or _", not)
+			extra = append(extra, not)
 		}
 	}
+	flagged(t, "builtin names missing", missing, 0, "")
+	flagged(t, "no on_sent, prepare or workspace names with . or _", extra, 0, "")
 }

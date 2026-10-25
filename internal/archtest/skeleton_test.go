@@ -201,6 +201,7 @@ func TestContractSkeletonFlagsAMissingName(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := undeclared(pkg, []string{"Deps", "Deps.Plugins", "writePluginDisabled", "Server.refusePlugin", "Absent", "Deps.Absent", "Server.absent"})
+	flagged(t, "the missing names", got, 3, "bsent")
 	if strings.Join(got, ",") != "Absent,Deps.Absent,Server.absent" {
 		t.Errorf("%v", got)
 	}

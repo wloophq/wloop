@@ -228,5 +228,9 @@ func TestNothingImportsTheGate(t *testing.T) {
 			t.Error(b)
 		}
 	}
+}
+
+func TestNoGateFlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	flagged(t, "a planted import", ruleNoGate("internal/cli", []string{"context", module + "internal/gate"}), 1, "the workflows are the only automation")
 }

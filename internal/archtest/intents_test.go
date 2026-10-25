@@ -375,8 +375,5 @@ func f(n Name) (bool, bool) { return n == reviewName, n == Review }
 	if _, err := (&types.Config{}).Check(module+"internal/domain/intent", fset, []*ast.File{f}, info); err != nil {
 		t.Fatal(err)
 	}
-	hits := enumerations(fset, info, f)
-	if len(hits) != 1 || !strings.HasPrefix(hits[0], "8: ") {
-		t.Fatalf("hits %q", hits)
-	}
+	flagged(t, "the named constant", enumerations(fset, info, f), 1, "8: ")
 }
