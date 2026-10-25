@@ -1,10 +1,11 @@
-package situation
+// Package workday counts time in working days, Monday to Friday.
+package workday
 
 import "time"
 
-// WorkingDuration counts the time between from and to, leaving out Saturdays
+// Between counts the time between from and to, leaving out Saturdays
 // and Sundays. Both instants are taken in UTC so the day boundaries agree.
-func WorkingDuration(from, to time.Time) time.Duration {
+func Between(from, to time.Time) time.Duration {
 	from, to = from.UTC(), to.UTC()
 	if !to.After(from) {
 		return 0

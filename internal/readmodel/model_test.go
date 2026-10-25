@@ -27,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -682,7 +683,7 @@ func TestClockFlipsStalledAndRenudge(t *testing.T) {
 		}
 	}
 	asked := f.Now
-	for situation.WorkingDuration(asked, f.Now) < time.Duration(r.cfg.Stalled.Review) {
+	for workday.Between(asked, f.Now) < time.Duration(r.cfg.Stalled.Review) {
 		asked = asked.Add(-time.Minute)
 	}
 	asked = asked.Add(30 * time.Second)

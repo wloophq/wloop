@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/situation"
+	"github.com/wloophq/wloop/internal/domain/workday"
 )
 
 var dashFuncs = append(slices.Clone(lensFuncs), "toggledQualifier", "qualifierToken", "tagKeys", "stamp",
@@ -278,7 +278,7 @@ func TestWorkingMsLeavesWeekendsOut(t *testing.T) {
 	nodeRun(t, "", []string{"dashWorkingMs"}, `process.stdout.write(JSON.stringify(input.map(([a, b]) => dashWorkingMs(a, b))));`, in, &got)
 	want := []int64{(8*time.Hour + 30*time.Minute).Milliseconds(), 24 * time.Hour.Milliseconds(), 0, (7*24 + 12) * time.Hour.Milliseconds(), 0}
 	for i, s := range spans {
-		if w := situation.WorkingDuration(s[0], s[1]).Milliseconds(); w != want[i] {
+		if w := workday.Between(s[0], s[1]).Milliseconds(); w != want[i] {
 			t.Fatalf("case %d: Go says %d, the test wants %d", i, w, want[i])
 		}
 	}
@@ -308,7 +308,7 @@ process.stdout.write(JSON.stringify({ Kinds: o.xAxis[0].data, Points: o.series[0
 	for _, r := range dashRows(now) {
 		ref := r["ref"].(map[string]any)
 		since, _ := time.Parse(time.RFC3339, r["since"].(string))
-		days[fmt.Sprint("github:", ref["owner"], "/", ref["repo"], "#", ref["number"])] = max(1.0/24, situation.WorkingDuration(since, now).Hours()/24)
+		days[fmt.Sprint("github:", ref["owner"], "/", ref["repo"], "#", ref["number"])] = max(1.0/24, workday.Between(since, now).Hours()/24)
 	}
 	delete(days, "github:acme/api#7")
 	if len(got.Points) != len(days) {
