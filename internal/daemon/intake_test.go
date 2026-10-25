@@ -303,7 +303,7 @@ func (b *byHandCalls) list() []string {
 }
 
 func TestTurnByHandWaitsUpToSessionWait(t *testing.T) {
-	briefs := intaketest.NewBriefs(waitBriefing, intake.Readiness{Go: true})
+	briefs := intaketest.NewBriefs(waitBriefing)
 	hand := &byHandCalls{}
 	s, _ := newIntakeServer(t, briefs, func(d *Deps) {
 		d.TurnByHand = hand.run
@@ -328,6 +328,7 @@ func TestTurnByHandWaitsUpToSessionWait(t *testing.T) {
 	if len(hand.list()) != 0 {
 		t.Fatalf("started without its brief: %v", hand.list())
 	}
+	briefs.Answer(intake.Readiness{Go: true})
 	s.sessionWait = brief.SessionWait
 	rec = byHand()
 	var res api.ByHandResult

@@ -211,7 +211,7 @@ func TestGoGitHubSkipsOtherProviders(t *testing.T) {
 }
 
 func TestOutboxInTUI(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters(), doLag: 300 * time.Millisecond}
 	term, done := start(t, d)
 	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
 	term.press(Key{Rune: 'g'}, Key{Rune: 'o'})
@@ -232,7 +232,7 @@ func TestOutboxInTUI(t *testing.T) {
 		t.Fatalf("%d verbs sent before the y", n)
 	}
 	term.press(Key{Rune: 'y'})
-	eventually(t, "the approval", func() bool { return len(d.dos()) == 1 })
+	eventually(t, "the approval", func() bool { return len(d.dos()) == 1 && strings.Contains(term.screen(), "approve done") })
 	term.press(Key{Name: KeyBackspace})
 	eventually(t, "the discard confirm", func() bool { return strings.Contains(term.screen(), "y confirms") })
 	term.press(Key{Rune: 'y'})
