@@ -207,7 +207,7 @@ func firstLine(s string) string {
 // claude exits non-zero, since claude reports its own errors as JSON there.
 func Exec(ctx context.Context, dir string, env []string, stdin, name string, args ...string) (out []byte, err error) {
 	defer meterSpawn(ctx, "ask", time.Now(), &err)
-	cmd := procgroup.Command(ctx, killGrace, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = withoutCallingSession(os.Environ())
 	for _, kv := range env {
@@ -220,15 +220,12 @@ func Exec(ctx context.Context, dir string, env []string, stdin, name string, arg
 	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err = cmd.Run()
+	err = procgroup.Run(cmd)
 	if err != nil && stderr.Len() > 0 {
 		err = fmt.Errorf("%s: %w", firstLine(stderr.String()), err)
 	}
 	return stdout.Bytes(), err
 }
-
-// killGrace is how long a cancelled claude call has to exit after SIGTERM.
-const killGrace = 5 * time.Second
 
 // sessionEnv is what a Claude Code session that started the daemon would
 // hand down to claude -p: its session and its effort. Settings such as

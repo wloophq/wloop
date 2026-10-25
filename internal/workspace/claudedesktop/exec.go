@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -38,11 +39,11 @@ func (Exec) Run(ctx context.Context, c Cmd) ([]byte, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	cmd := procgroup.Command(ctx, 5*time.Second, c.Name, c.Args...)
+	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
 	cmd.Dir, cmd.Env = c.Dir, c.Env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procgroup.Run(cmd); err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()

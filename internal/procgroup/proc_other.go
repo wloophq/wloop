@@ -2,10 +2,16 @@
 
 package procgroup
 
-func group(*Cmd) {}
+import "os/exec"
 
-// Run runs the child; without process groups, cancellation kills the child alone.
-func (c *Cmd) Run() error { return c.Cmd.Run() }
+// Run runs cmd; without process groups, cancellation kills the child alone.
+func Run(cmd *exec.Cmd) error {
+	cmd.WaitDelay = grace
+	return cmd.Run()
+}
 
 // KillAll does nothing without process groups.
 func KillAll() {}
+
+// Track does nothing without process groups.
+func Track(string) error { return nil }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -15,7 +16,7 @@ import (
 // and returns its standard output and standard error together.
 func Shell(ctx context.Context, dir string, env []string, stdin, name string, args ...string) (out []byte, err error) {
 	defer meterSpawn(ctx, "shell", time.Now(), &err)
-	cmd := procgroup.Command(ctx, killGrace, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "CLAUDECODE=") })
 	for _, kv := range env {
@@ -28,6 +29,6 @@ func Shell(ctx context.Context, dir string, env []string, stdin, name string, ar
 	cmd.Stdin = strings.NewReader(stdin)
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
-	err = cmd.Run()
+	err = procgroup.Run(cmd)
 	return buf.Bytes(), err
 }
