@@ -232,6 +232,7 @@ func checksum(t *testing.T, db *sqlite.DB) string {
 }
 
 func TestPlanningThroughTheAPIChangesNoStoreRow(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	briefs := &countingBriefs{}
 	withBriefs(&r.s.deps, briefs)
@@ -276,6 +277,7 @@ func TestPlanningThroughTheAPIChangesNoStoreRow(t *testing.T) {
 }
 
 func TestAVersion1ClientWorks(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	for _, path := range []string{api.Plan, api.Rows} {
 		req := apiRequest(http.MethodGet, path, nil)
@@ -292,6 +294,7 @@ func TestAVersion1ClientWorks(t *testing.T) {
 }
 
 func TestThePlanFiltersByWorkflowAndProvider(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	for _, q := range []string{"?trigger=sweep&", "?"} {
@@ -312,6 +315,7 @@ func TestThePlanFiltersByWorkflowAndProvider(t *testing.T) {
 }
 
 func TestSkipOnAPendingRoundIsTerminal(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -333,6 +337,7 @@ func TestSkipOnAPendingRoundIsTerminal(t *testing.T) {
 }
 
 func TestGuideRunsThePendingItemWithGuidance(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	r.pending7(t)
@@ -350,6 +355,7 @@ func TestGuideRunsThePendingItemWithGuidance(t *testing.T) {
 }
 
 func TestGuideWithNoRoundPendingKeepsTheGuidance(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	rec := post(t, r.s, "/api/units/github/acme%2Fapi%237/guide", `{"guidance":"look at the retry"}`)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "goes with the next automatic round") {
@@ -361,6 +367,7 @@ func TestGuideWithNoRoundPendingKeepsTheGuidance(t *testing.T) {
 }
 
 func TestPlanActionsActOnItems(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	sess := r.items(t, r.sess, workflow.DecisionPending)
@@ -382,6 +389,7 @@ func TestPlanActionsActOnItems(t *testing.T) {
 }
 
 func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		name string
 		drop func(t *testing.T, r *planRig)
@@ -412,6 +420,7 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			r := newPlanRig(t)
 			r.sweep(t)
 			it := r.pending7(t)
@@ -430,6 +439,7 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 }
 
 func TestPauseStopsApplyButThePlanKeepsFilling(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	if rec := post(t, r.s, "/api/pause", `{"paused":true}`); rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -456,6 +466,7 @@ func TestPauseStopsApplyButThePlanKeepsFilling(t *testing.T) {
 }
 
 func TestAPendingItemSurvivesADaemonRestart(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	want := r.pending7(t)
@@ -490,6 +501,7 @@ func runDue(t *testing.T, s *Server) {
 }
 
 func TestTheDueJobRunsAnExpiredItemOnce(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -509,6 +521,7 @@ func TestTheDueJobRunsAnExpiredItemOnce(t *testing.T) {
 }
 
 func TestTheDueJobNeedsASweep(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	if _, ok := r.s.jobs["due"]; !ok {
 		t.Fatal("no due job beside the sweep")
@@ -520,6 +533,7 @@ func TestTheDueJobNeedsASweep(t *testing.T) {
 }
 
 func TestABlockedItemOffersApplyDisabledWithItsReason(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.steps.Refuse(builtin.StepTurnStart, u7, "held by you")
 	r.sweep(t)
@@ -539,6 +553,7 @@ func TestABlockedItemOffersApplyDisabledWithItsReason(t *testing.T) {
 }
 
 func TestPendingRoundsComeFromThePlan(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	deadline := time.Date(2026, 10, 8, 10, 5, 0, 0, time.UTC)
 	r.s = newServerOn(t, r.db, r.log, func(d *Deps) {
@@ -585,6 +600,7 @@ func (l *interleaved) Save(ctx context.Context, p automation.PlanWrite, evs ...p
 }
 
 func TestTheDueJobRunningAnItemDuringASweepRunsItOnce(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -601,6 +617,7 @@ func TestTheDueJobRunningAnItemDuringASweepRunsItOnce(t *testing.T) {
 }
 
 func TestADismissDuringASweepStaysDismissed(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -622,6 +639,7 @@ func TestADismissDuringASweepStaysDismissed(t *testing.T) {
 }
 
 func TestPauseKeepsObserveItems(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	if rec := post(t, r.s, "/api/pause", `{"paused":true}`); rec.Code != http.StatusOK {
@@ -648,6 +666,7 @@ type savedNothing struct{}
 func (savedNothing) Save(context.Context) error { return nil }
 
 func TestTheDueJobLoadsTheRoundStateOnlyForADueItem(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	st := &countingState{}
 	r.eng.State = st
@@ -667,6 +686,7 @@ func TestTheDueJobLoadsTheRoundStateOnlyForADueItem(t *testing.T) {
 }
 
 func TestThePlanServesTheSessionsClosedInTheLastDay(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	now := r.clock.Now()
 	ctx := context.Background()
@@ -708,6 +728,7 @@ func TestThePlanServesTheSessionsClosedInTheLastDay(t *testing.T) {
 }
 
 func TestTheActionsCarryThePlanSpecs(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	var res api.ActionsResponse
 	if code := get(t, r.s, api.Actions, &res); code != http.StatusOK {

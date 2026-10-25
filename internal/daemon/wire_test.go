@@ -52,6 +52,7 @@ func (wireBriefs) Briefed(context.Context) (map[github.Ref]brief.Summary, map[gi
 // TestWireShape pins the JSON the clients and app.js read: a row, a detail
 // and health, against the golden files the daemon's own types produced.
 func TestWireShape(t *testing.T) {
+	t.Parallel()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
 	books := turnstest.NewStore()
 	books.Put(turn.Book{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(),
@@ -119,6 +120,7 @@ func TestWireShape(t *testing.T) {
 // TestWireTypesCoverTheirSources fails when a field is added to a type the
 // daemon maps without adding it to its wire type.
 func TestWireTypesCoverTheirSources(t *testing.T) {
+	t.Parallel()
 	unwired := map[reflect.Type]int{reflect.TypeFor[turn.Turn](): 1, reflect.TypeFor[dinv.Override](): 1}
 	for _, c := range []struct{ from, to any }{
 		{dinv.Workspace{}, api.Workspace{}},
@@ -172,6 +174,7 @@ func kindConsts(t *testing.T, path string) map[string]string {
 }
 
 func TestWireKindsAreTheSituationKinds(t *testing.T) {
+	t.Parallel()
 	sit := kindConsts(t, filepath.Join("..", "situation", "situation.go"))
 	served := map[string]bool{}
 	for _, s := range newServer(t).readModel().Catalog().Situations {

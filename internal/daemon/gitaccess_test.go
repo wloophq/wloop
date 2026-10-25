@@ -8,6 +8,7 @@ import (
 )
 
 func TestGitAccessKeepsTheLastOutcomeAndTheLastSuccessPerHost(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for _, body := range []string{
 		`{"host":"github.com","at":"2026-10-20T10:00:00Z","op":"fetch of acme/api#7"}`,

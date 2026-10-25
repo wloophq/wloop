@@ -14,6 +14,7 @@ import (
 )
 
 func TestSyncLogsAnIdentityErrorOnce(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var lines []string
 	var calls atomic.Int32

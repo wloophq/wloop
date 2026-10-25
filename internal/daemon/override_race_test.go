@@ -10,6 +10,7 @@ import (
 )
 
 func TestMuteExpiryAndTakeOverKeepBothWrites(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	ctx := context.Background()
 	for n := 1; n <= 100; n++ {
@@ -44,6 +45,7 @@ func TestMuteExpiryAndTakeOverKeepBothWrites(t *testing.T) {
 }
 
 func TestOverrideActionAndTakeOverKeepBothWrites(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	ctx := context.Background()
 	for n := 1; n <= 100; n++ {

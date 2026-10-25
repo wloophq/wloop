@@ -13,6 +13,7 @@ import (
 )
 
 func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, unit.GitHub, "slack")
 	ctx := context.Background()
 	r.put(t, gtd.Entry{ID: "e-gh", Kind: gtd.KindAction, State: gtd.Inbox, Title: "reply", Units: []unit.Unit{r7u}})
@@ -65,6 +66,7 @@ func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *tes
 }
 
 func TestAMixedEntryIsNeitherHiddenNorDismissedWithoutItsPlugin(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
 	if got := entryIDs(r.page(t, "view=inbox").Entries); len(got) != 1 || got[0] != "e-mixed" {
@@ -85,6 +87,7 @@ func TestAMixedEntryIsNeitherHiddenNorDismissedWithoutItsPlugin(t *testing.T) {
 }
 
 func TestTheDraftsRouteDiscardsADisabledPluginsDraft(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 	var list api.DraftsResponse

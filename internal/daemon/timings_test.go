@@ -15,6 +15,7 @@ import (
 var t0 = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 
 func TestTimingsReportQuantiles(t *testing.T) {
+	t.Parallel()
 	var ds []time.Duration
 	for _, v := range []int64{14300, 6200, 18400, 11300, 13200} {
 		ds = append(ds, time.Duration(v)*time.Millisecond)
@@ -40,6 +41,7 @@ func TestTimingsReportQuantiles(t *testing.T) {
 }
 
 func TestTimingsMilestonesFromEvents(t *testing.T) {
+	t.Parallel()
 	theirs := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	mine := github.Ref{Owner: "acme", Repo: "api", Number: 9}
 	ev := func(ref github.Ref, kind, actor, data string, at time.Time) dinv.Event {
@@ -102,6 +104,7 @@ func TestTimingsMilestonesFromEvents(t *testing.T) {
 }
 
 func TestTimingsTokensByModel(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	d := dinv.TimingsData{
 		Turns: []dinv.TimedTurn{
@@ -127,6 +130,7 @@ func TestTimingsTokensByModel(t *testing.T) {
 }
 
 func TestTimingsEndpoint(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if err := s.store().SetMeta(context.Background(), inventory.MetaTimingsSince, "2026-10-01T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
@@ -148,6 +152,7 @@ func TestTimingsEndpoint(t *testing.T) {
 }
 
 func TestTimingsWaitingOnMeAndOthers(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	since := t0.Add(-24 * time.Hour)
 	sit := func(data string, at time.Time) dinv.Event {
@@ -177,6 +182,7 @@ func TestTimingsWaitingOnMeAndOthers(t *testing.T) {
 }
 
 func TestTimingsLeadTimeFromTheFirstPush(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	pushed := t0.Add(-5 * 24 * time.Hour)
 	d := dinv.TimingsData{PRs: []dinv.PR{{Ref: ref, CreatedAt: pushed.Add(time.Hour)}}, Events: map[github.Ref][]dinv.Event{ref: {
@@ -194,6 +200,7 @@ func TestTimingsLeadTimeFromTheFirstPush(t *testing.T) {
 }
 
 func TestTimingsChangeFailure(t *testing.T) {
+	t.Parallel()
 	pr := func(n int, created time.Time) dinv.PR {
 		return dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: n}, CreatedAt: created}
 	}
@@ -218,6 +225,7 @@ func TestTimingsChangeFailure(t *testing.T) {
 }
 
 func TestASpanThatBeganBeforeTheWindowIsLeftOut(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	asked := t0.Add(-90 * 24 * time.Hour)
 	d := dinv.TimingsData{PRs: []dinv.PR{{Ref: ref, Author: "ana", CreatedAt: asked.Add(-time.Hour)}}, Events: map[github.Ref][]dinv.Event{ref: {

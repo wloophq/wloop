@@ -270,6 +270,7 @@ func goldenJSON(t *testing.T, name string, v any) {
 }
 
 func TestActionsGolden(t *testing.T) {
+	t.Parallel()
 	specs := catalogOf(bundledActions())
 	goldenJSON(t, "specs.json", api.ActionsResponse{Version: catalog.Version(specs), Specs: specs, Plan: catalog.PlanSpecs()})
 	rows := map[string]api.Row{}
@@ -280,6 +281,7 @@ func TestActionsGolden(t *testing.T) {
 }
 
 func TestSelfReviewIsNeverACatalogFlag(t *testing.T) {
+	t.Parallel()
 	address, _ := (&Server{}).loaded().Registry.Get(dintent.Address)
 	if !slices.ContainsFunc(address.Inputs, func(in dintent.Input) bool { return in.Name == "self_review" }) {
 		t.Fatal("the bundled address declares no self_review")
@@ -296,6 +298,7 @@ func TestSelfReviewIsNeverACatalogFlag(t *testing.T) {
 }
 
 func TestTheServedSpecsAreTheGolden(t *testing.T) {
+	t.Parallel()
 	c := newCatalogRig(t)
 	var got api.ActionsResponse
 	if code := get(t, c.s, api.Actions, &got); code != 200 {
@@ -333,6 +336,7 @@ func requestFor(id string, st api.ActionState) string {
 }
 
 func TestEveryOfferAgreesWithTheHandler(t *testing.T) {
+	t.Parallel()
 	for _, f := range catalogFixtures {
 		for _, spec := range catalogOf(bundledActions()) {
 			if spec.Scope == catalog.ScopeDraft {
@@ -369,6 +373,7 @@ func TestEveryOfferAgreesWithTheHandler(t *testing.T) {
 }
 
 func TestAReviewOfAnUntrackedPullRequestIsAccepted(t *testing.T) {
+	t.Parallel()
 	fa := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions = fa })
 	if rec := post(t, s, "/api/units/github/acme%2Fweb%233/review", `{"source":"cli","guidance":"g"}`); rec.Code != 200 {
@@ -380,6 +385,7 @@ func TestAReviewOfAnUntrackedPullRequestIsAccepted(t *testing.T) {
 }
 
 func TestAnUntrackedPullRequestWithoutAnExplorerIs503(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Actions, d.Explorer = &fakeActions{}, nil })
 	rec := post(t, s, "/api/units/github/acme%2Fweb%233/review", `{"source":"cli"}`)
 	if rec.Code != 503 || !strings.Contains(rec.Body.String(), "cannot read acme/web#3 from GitHub") {
@@ -388,6 +394,7 @@ func TestAnUntrackedPullRequestWithoutAnExplorerIs503(t *testing.T) {
 }
 
 func TestEverySpecHasADispatchAndBack(t *testing.T) {
+	t.Parallel()
 	ids := map[string]bool{}
 	for _, spec := range catalogOf(bundledActions()) {
 		ids[spec.ID] = true
@@ -411,6 +418,7 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 }
 
 func TestAttentionActionsAreCatalogIds(t *testing.T) {
+	t.Parallel()
 	ids := map[string]bool{}
 	for _, s := range catalogOf(bundledActions()) {
 		ids[s.ID] = true
@@ -438,6 +446,7 @@ func TestAttentionActionsAreCatalogIds(t *testing.T) {
 }
 
 func TestRunNowWithAStaleBasisIs409(t *testing.T) {
+	t.Parallel()
 	c := newCatalogRig(t)
 	c.propose(t)
 	row, _ := c.s.currentRow(context.Background(), r7.Unit())
@@ -452,6 +461,7 @@ func TestRunNowWithAStaleBasisIs409(t *testing.T) {
 }
 
 func TestRunNowNeverFallsFromPendingToHeld(t *testing.T) {
+	t.Parallel()
 	c := newCatalogRig(t)
 	fa := &fakeActions{}
 	c.s.deps.Actions = fa
@@ -472,6 +482,7 @@ func TestRunNowNeverFallsFromPendingToHeld(t *testing.T) {
 }
 
 func TestSkipWithNothingPendingIsRefused(t *testing.T) {
+	t.Parallel()
 	c := newCatalogRig(t)
 	rec := post(t, c.s, "/api/units/github/acme%2Fapi%237/skip", `{}`)
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "no skip on acme/api#7") {
@@ -480,6 +491,7 @@ func TestSkipWithNothingPendingIsRefused(t *testing.T) {
 }
 
 func TestIntakeActionsNeedASource(t *testing.T) {
+	t.Parallel()
 	c := newCatalogRig(t)
 	c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	c.override(t, dinv.Override{PR: r7, Adopted: true})

@@ -123,6 +123,7 @@ func post(t *testing.T, s *Server, path, body string) *httptest.ResponseRecorder
 var r7 = github.Ref{Owner: "acme", Repo: "api", Number: 7}
 
 func TestMuteWritesOverrideAndEvent(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{}`); rec.Code != 400 {
 		t.Fatalf("mute without a duration: %d", rec.Code)
@@ -144,6 +145,7 @@ func TestMuteWritesOverrideAndEvent(t *testing.T) {
 }
 
 func TestPauseAndResumeOfAPullRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	post(t, s, "/api/units/github/acme%2Fapi%237/pause", `{}`)
 	o, _ := s.store().Override(context.Background(), r7)
@@ -158,6 +160,7 @@ func TestPauseAndResumeOfAPullRequest(t *testing.T) {
 }
 
 func TestPauseRequestNamesPullRequestsAndResumingEverythingResumesThem(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/pause", `{"paused":true,"prs":["acme/api#7"]}`); rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -182,6 +185,7 @@ func TestPauseRequestNamesPullRequestsAndResumingEverythingResumesThem(t *testin
 }
 
 func TestDelegatedActions(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -205,6 +209,7 @@ func TestDelegatedActions(t *testing.T) {
 }
 
 func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		action, call, kind, data string
 	}{
@@ -212,6 +217,7 @@ func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
 		{"unblock", "unblock acme/api#7", dinv.KindRoundUnblocked, "dismissed by you"},
 	} {
 		t.Run(c.action, func(t *testing.T) {
+			t.Parallel()
 			s := newServer(t)
 			fa := &fakeActions{}
 			s.deps.Actions = fa
@@ -247,6 +253,7 @@ func inputFlag(inputs map[string]any, name string) bool {
 }
 
 func TestAddressCarriesTheTakeOver(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -263,6 +270,7 @@ func TestAddressCarriesTheTakeOver(t *testing.T) {
 }
 
 func TestAddressCarriesTheSelfReview(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -282,6 +290,7 @@ func TestAddressCarriesTheSelfReview(t *testing.T) {
 }
 
 func TestActionsUnavailableIs503(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/review", `{"source":"cockpit"}`); rec.Code != 503 {
 		t.Fatalf("%d", rec.Code)
@@ -289,6 +298,7 @@ func TestActionsUnavailableIs503(t *testing.T) {
 }
 
 func TestUnknownActionIs404(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/explode", `{}`); rec.Code != 404 {
 		t.Fatalf("%d", rec.Code)
@@ -311,6 +321,7 @@ func countEvents(t *testing.T, s *Server, kind string) int {
 }
 
 func TestDelegateErrorIs500AndRecordsNothing(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	s.deps.Actions = &fakeActions{err: errors.New("orca is down")}
 	for _, action := range []string{"review", "take_over"} {
@@ -327,6 +338,7 @@ func TestDelegateErrorIs500AndRecordsNothing(t *testing.T) {
 }
 
 func TestAdoptMarksOverride(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -342,6 +354,7 @@ func TestAdoptMarksOverride(t *testing.T) {
 }
 
 func TestActionOutlivesTheRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -369,6 +382,7 @@ func TestActionOutlivesTheRequest(t *testing.T) {
 }
 
 func TestMuteWithBothFieldsIs400(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d","until_state":true}`); rec.Code != 400 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -376,6 +390,7 @@ func TestMuteWithBothFieldsIs400(t *testing.T) {
 }
 
 func TestMuteUntilStateChangeLastsUntilTheSituationChanges(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
@@ -409,6 +424,7 @@ func TestMuteUntilStateChangeLastsUntilTheSituationChanges(t *testing.T) {
 }
 
 func TestDelegatedActionGetsTheCallerProfileAndReportsItsOutput(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{out: "created feat/theirs\nwarning: acme/api#7 comes from a fork\n"}
 	s.deps.Actions = fa
@@ -433,6 +449,7 @@ func TestDelegatedActionGetsTheCallerProfileAndReportsItsOutput(t *testing.T) {
 }
 
 func TestQuickActionsSkipTheLoopMutex(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	s.deps.Actions = &fakeActions{}
 	s.deps.LoopMu.Lock()
@@ -454,6 +471,7 @@ func TestQuickActionsSkipTheLoopMutex(t *testing.T) {
 }
 
 func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
+	t.Parallel()
 	stDB, err := sqlitetest.Open(t.TempDir()+"/inv.db", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -479,6 +497,7 @@ func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 }
 
 func TestMuteUntilStateLapsesOnce(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
@@ -530,6 +549,7 @@ func TestMuteUntilStateLapsesOnce(t *testing.T) {
 }
 
 func TestExpireMutesClearsAnExpiredMute(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	s.store().SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "author"})
@@ -565,6 +585,7 @@ func seedWaitingOnAna(t *testing.T, s *Server) {
 }
 
 func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	fa := &fakeActions{}
@@ -586,6 +607,7 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 }
 
 func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	ctx := context.Background()
@@ -609,6 +631,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 }
 
 func TestNudgeRefusesWhenItWaitsOnMe(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -622,6 +645,7 @@ func TestNudgeRefusesWhenItWaitsOnMe(t *testing.T) {
 }
 
 func TestNudgeRefusesAClosedPullRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	fa := &fakeActions{}
 	s.deps.Actions = fa
@@ -638,12 +662,14 @@ func TestNudgeRefusesAClosedPullRequest(t *testing.T) {
 }
 
 func TestNudgeSituationWithoutATime(t *testing.T) {
+	t.Parallel()
 	if got := nudgeSituation([]string{"@ana"}, api.Row{Kind: "draft", Summary: api.Summary{Reason: "draft"}}); got != "Waiting on: @ana, draft." {
 		t.Fatalf("%q", got)
 	}
 }
 
 func TestNudgeSituationCarriesNoCIText(t *testing.T) {
+	t.Parallel()
 	r := api.Row{Kind: "checks", Summary: api.Summary{Reason: "checks failing: lint, @acme/everyone"}}
 	if got := nudgeSituation([]string{"@ana"}, r); got != "Waiting on: @ana, checks failing." {
 		t.Fatalf("%q", got)
@@ -651,6 +677,7 @@ func TestNudgeSituationCarriesNoCIText(t *testing.T) {
 }
 
 func TestNudgeRefusesABotAuthor(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	if err := s.store().UpsertPR(ctx, dinv.PR{Ref: r9, Title: "Bump x", Author: "dependabot[bot]", State: "OPEN", HeadOid: "h1", Reasons: []string{"repo"}}); err != nil {
@@ -665,6 +692,7 @@ func TestNudgeRefusesABotAuthor(t *testing.T) {
 }
 
 func TestNudgeOncePerWait(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	fa := &fakeActions{}
@@ -686,6 +714,7 @@ func TestNudgeOncePerWait(t *testing.T) {
 }
 
 func TestNudgeRefusesWhileTheLoopWorks(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	if err := s.store().SetWorkspace(context.Background(), r9, dinv.Workspace{ID: "w", IsReview: true, AgentStates: []turn.AgentState{turn.AgentWorking}}); err != nil {
@@ -700,6 +729,7 @@ func TestNudgeRefusesWhileTheLoopWorks(t *testing.T) {
 }
 
 func TestGuidanceIsCutAtItsMax(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	fa := &fakeActions{}
@@ -720,6 +750,7 @@ func TestGuidanceIsCutAtItsMax(t *testing.T) {
 }
 
 func TestNudgeIgnoresAMute(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
 	fa := &fakeActions{}
@@ -733,6 +764,7 @@ func TestNudgeIgnoresAMute(t *testing.T) {
 }
 
 func TestTrackAddsAReasonAndUntrackDropsOnlyThatOne(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	reasons := func() []string {
@@ -760,6 +792,7 @@ func TestTrackAddsAReasonAndUntrackDropsOnlyThatOne(t *testing.T) {
 }
 
 func TestTrackRefusesPastTheCap(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	for n := 1; n <= trackMax; n++ {
@@ -774,6 +807,7 @@ func TestTrackRefusesPastTheCap(t *testing.T) {
 }
 
 func TestActionsUseTheInventorysName(t *testing.T) {
+	t.Parallel()
 	fa := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions = fa })
 	s.track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
@@ -805,6 +839,7 @@ func TestActionsUseTheInventorysName(t *testing.T) {
 }
 
 func TestTrackAnswersWhyItCouldNotRead(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		err  error
 		code int
@@ -830,6 +865,7 @@ func TestTrackAnswersWhyItCouldNotRead(t *testing.T) {
 }
 
 func TestTrackRefusesAFinishedPullRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	s.track = func(context.Context, unit.Unit) (port.TrackRead, error) { return port.TrackRead{Unit: r8.Unit()}, nil }
@@ -839,6 +875,7 @@ func TestTrackRefusesAFinishedPullRequest(t *testing.T) {
 }
 
 func TestTrackAndUntrackRecordOnlyAChange(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
@@ -870,6 +907,7 @@ func TestTrackAndUntrackRecordOnlyAChange(t *testing.T) {
 }
 
 func TestOverrideWritersDoNotLoseUpdates(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	for range 20 {
@@ -886,6 +924,7 @@ func TestOverrideWritersDoNotLoseUpdates(t *testing.T) {
 }
 
 func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	for n := 1; n < trackMax; n++ {
@@ -904,6 +943,7 @@ func TestTheTrackCapHoldsUnderConcurrentTracks(t *testing.T) {
 }
 
 func TestAFinishedPullRequestIsUntracked(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
@@ -924,6 +964,7 @@ func TestAFinishedPullRequestIsUntracked(t *testing.T) {
 }
 
 func TestUntrackFinishedBudget(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx, sc := metertest.Start(t, context.Background())
 	for n := 1; n <= 7; n++ {
@@ -941,6 +982,7 @@ func TestUntrackFinishedBudget(t *testing.T) {
 }
 
 func TestASlowTrackReadDoesNotBlockTheRows(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	s.store().SetOverride(ctx, dinv.Override{PR: r7, MuteUntilStateChange: true, MutedKind: "changes", MutedWaitingOn: "ana"})
@@ -971,6 +1013,7 @@ func TestASlowTrackReadDoesNotBlockTheRows(t *testing.T) {
 }
 
 func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
+	t.Parallel()
 	fa := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions = fa })
 	ctx := context.Background()
@@ -1003,6 +1046,7 @@ func TestANudgeThatTracksAsksWhomTheFreshReadNames(t *testing.T) {
 }
 
 func TestARefusedTrackStoresNothing(t *testing.T) {
+	t.Parallel()
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
 	for _, c := range []struct {
 		name  string
@@ -1031,6 +1075,7 @@ func TestARefusedTrackStoresNothing(t *testing.T) {
 }
 
 func TestUntrackFindsTheTrackUnderAnyCase(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/track", `{}`); rec.Code != 200 {
@@ -1048,6 +1093,7 @@ func TestUntrackFindsTheTrackUnderAnyCase(t *testing.T) {
 }
 
 func TestUntrackingWhatOnlyTheTrackHeldTakesItOutOfAll(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	web := github.Ref{Owner: "acme", Repo: "web", Number: 3}
@@ -1136,6 +1182,7 @@ var publishQuestion = &record.Question{Kind: "choice", Text: "Publish?", Recomme
 }}
 
 func TestAnswerActionUsesTheTurn(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	b := r.asked(pr.Ref(r8), turn.Intent(dintent.Review), turn.Asked, publishQuestion)
@@ -1160,6 +1207,7 @@ func TestAnswerActionUsesTheTurn(t *testing.T) {
 }
 
 func TestAnswerTypesIntoAWarmCapableSession(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	now := r.s.deps.Now()
 	r.asked(pr.Ref{Owner: "acme", Repo: "api", Number: 8}, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
@@ -1199,6 +1247,7 @@ func (r *turnRig) routes(ref pr.Ref) []turn.Route {
 }
 
 func TestAnAnswerToABusyAgentIsQueuedAndTypedAtItsStop(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r8 := r.busyAsked(publishQuestion)
 	rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", `{"guidance":"publish it"}`)
@@ -1222,6 +1271,7 @@ func TestAnAnswerToABusyAgentIsQueuedAndTypedAtItsStop(t *testing.T) {
 }
 
 func TestTheFastJobDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r8 := r.busyAsked(&record.Question{Kind: "confirm", Text: "Publish?"})
 	if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", `{"no":true,"guidance":"the draft misreads the diff","source":"notification"}`); rec.Code != 200 {
@@ -1244,6 +1294,7 @@ func TestTheFastJobDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 }
 
 func TestAnswerWithoutATurnIsRefused(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	for _, body := range []string{`{"guidance":"yes"}`, `{"option_id":"publish"}`} {
 		rec := post(t, r.s, "/api/units/github/acme%2Fapi%237/answer", body)
@@ -1261,6 +1312,7 @@ func TestAnswerWithoutATurnIsRefused(t *testing.T) {
 }
 
 func TestAnswerRefusesWhatTheQuestionDoesNotTake(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r.asked(pr.Ref{Owner: "acme", Repo: "api", Number: 8}, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
 	for _, body := range []string{`{"guidance":"   "}`, `{"option_id":"merge"}`, `{"yes":true}`, `{"guidance":"x","source":"pager"}`} {
@@ -1274,6 +1326,7 @@ func TestAnswerRefusesWhatTheQuestionDoesNotTake(t *testing.T) {
 }
 
 func TestANoToAConfirmNeedsNoText(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r.asked(pr.Ref{Owner: "acme", Repo: "api", Number: 8}, turn.Intent(dintent.Review), turn.Asked, &record.Question{Kind: "confirm", Text: "Push?"})
 	if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", `{"source":"tui"}`); rec.Code != 200 {
@@ -1285,6 +1338,7 @@ func TestANoToAConfirmNeedsNoText(t *testing.T) {
 }
 
 func TestTurnActionsNeedNoInventoryRow(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	probe := pr.Ref{Owner: "acme", Repo: "sandbox", Number: 3}
 	r.asked(probe, turn.Intent(dintent.Probe), turn.Asked, &record.Question{Kind: "free", Text: "Which file?"})
@@ -1297,6 +1351,7 @@ func TestTurnActionsNeedNoInventoryRow(t *testing.T) {
 }
 
 func TestContinueAndDismissReachTheService(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	r8 := pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 	b := r.asked(r8, turn.Intent(dintent.Address), turn.Failed, nil)
@@ -1321,6 +1376,7 @@ func TestContinueAndDismissReachTheService(t *testing.T) {
 }
 
 func TestTurnActionsWithoutTurnsAreUnavailable(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/dismiss", `{}`); rec.Code != 503 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -1345,6 +1401,7 @@ func (a *aheadActions) ReadAhead(ctx context.Context, u unit.Unit, full bool) co
 }
 
 func TestLoopActionsReadAheadBeforeTheLoopMutex(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	a := &aheadActions{fakeActions: &fakeActions{}, loop: s.deps.LoopMu}
 	s.deps.Actions = a

@@ -119,11 +119,13 @@ func entryLines(t *testing.T, body []byte) []string {
 }
 
 func TestMessageAnswerDifferential(t *testing.T) {
+	t.Parallel()
 	sessions := map[string]func(*messageRig){"live idle": (*messageRig).idle, "busy": (*messageRig).busy, "gone": func(*messageRig) {}}
 	routes := map[string]turn.Route{"live idle": turn.Typed, "busy": turn.Queued, "gone": turn.Resumed}
 	for name, arrange := range sessions {
 		for _, source := range []string{"cockpit", "notification", "tui"} {
 			t.Run(name+"/"+source, func(t *testing.T) {
+				t.Parallel()
 				body := `{"option_id":"publish","guidance":"say thanks","source":"` + source + `"}`
 				byUnit := func(t *testing.T) outcome {
 					r := newMessageRig(t)
@@ -168,6 +170,7 @@ func TestMessageAnswerDifferential(t *testing.T) {
 }
 
 func TestMessageAnswerRefusesAnUnknownOption(t *testing.T) {
+	t.Parallel()
 	ref := newMessageRig(t)
 	ref.question(t)
 	want := post(t, ref.s, "/api/units/github/acme%2Fapi%238/answer", `{"option_id":"nope"}`)
@@ -183,8 +186,10 @@ func TestMessageAnswerRefusesAnUnknownOption(t *testing.T) {
 }
 
 func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	for _, via := range []string{"route", "entry"} {
 		t.Run(via, func(t *testing.T) {
+			t.Parallel()
 			r := newMessageRig(t)
 			m := r.question(t)
 			if via == "route" {
@@ -218,6 +223,7 @@ func getRaw(t *testing.T, s *Server, path string) string {
 }
 
 func TestEntryCarriesItsMessage(t *testing.T) {
+	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
 	got, err := r.s.entryMessage(context.Background(), m.EntryID)
@@ -234,10 +240,12 @@ func TestEntryCarriesItsMessage(t *testing.T) {
 }
 
 func TestMessageAnswerKeepsItsSource(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		via, source string
 	}{{"entry", "tui"}, {"route", "notification"}} {
 		t.Run(c.via, func(t *testing.T) {
+			t.Parallel()
 			r := newMessageRig(t)
 			m := r.question(t)
 			if c.via == "route" {
@@ -262,6 +270,7 @@ func TestMessageAnswerKeepsItsSource(t *testing.T) {
 }
 
 func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
+	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
 	r.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
@@ -280,6 +289,7 @@ func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
 }
 
 func TestApproveAnswersAConfirmWithYes(t *testing.T) {
+	t.Parallel()
 	r := newMessageRig(t)
 	ctx := context.Background()
 	r.asked(r8u, turn.Intent(dintent.Review), turn.Asked, &record.Question{Kind: "confirm", Text: "Publish?"})
@@ -304,6 +314,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 }
 
 func TestAClosedTurnAnswers409(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	writeGTDError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
 	if rec.Code != 409 {

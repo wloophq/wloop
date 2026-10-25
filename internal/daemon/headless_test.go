@@ -43,6 +43,7 @@ func newActServer(t *testing.T, enabled func(unit.ProviderID) bool) (*Server, *s
 const r7Act = "/api/units/github/acme%2Fapi%237/act"
 
 func TestActActionStartsHeadless(t *testing.T) {
+	t.Parallel()
 	s, h := newThreadActServer(t)
 	rec := post(t, s, threadAct, `{"items":["i1"],"guidance":"keep it short"}`)
 	if rec.Code != 202 {
@@ -62,6 +63,7 @@ func TestActActionStartsHeadless(t *testing.T) {
 }
 
 func TestActRefusedForDisabledPlugin(t *testing.T) {
+	t.Parallel()
 	s, h := newActServer(t, func(p unit.ProviderID) bool { return p != unit.GitHub })
 	rec := post(t, s, r7Act, `{"items":["i1"]}`)
 	if rec.Code != 409 || len(h.got) != 0 {
@@ -74,6 +76,7 @@ func TestActRefusedForDisabledPlugin(t *testing.T) {
 }
 
 func TestGitHubDelegateRunsReviewWithActLoaded(t *testing.T) {
+	t.Parallel()
 	c, _ := bridgeRig(t)
 	row, err := c.s.currentRow(context.Background(), r7u)
 	if err != nil {
@@ -96,6 +99,7 @@ type refusingHeadless struct{ err error }
 func (h refusingHeadless) Start(context.Context, headless.Request) (int64, error) { return 0, h.err }
 
 func TestActAnswers503WhenTheAgentCannotRunRestricted(t *testing.T) {
+	t.Parallel()
 	s, _ := newThreadActServer(t)
 	s.deps.Headless = refusingHeadless{turns.ErrNoRestricted}
 	if rec := post(t, s, threadAct, `{}`); rec.Code != 503 || !strings.Contains(rec.Body.String(), "restricted") {
@@ -122,6 +126,7 @@ func newThreadActServer(t *testing.T) (*Server, *startedHeadless) {
 }
 
 func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
+	t.Parallel()
 	s, h := newThreadActServer(t)
 	fa := s.deps.Actions.(*fakeActions)
 	if rec := post(t, s, threadAct, `{"items":["i1"]}`); rec.Code != 202 || len(h.got) != 1 || h.got[0].Intent != turn.Intent(dintent.Act) {
@@ -145,6 +150,7 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 }
 
 func TestTheBridgeDelegatesActHeadlessWithTheEntrysItems(t *testing.T) {
+	t.Parallel()
 	s, h := newThreadActServer(t)
 	store := gtdtest.New()
 	g := coregtd.New(coregtd.Deps{Store: store, Facts: coregtd.CardFacts{}, Clock: fixedClock(catalogNow)})

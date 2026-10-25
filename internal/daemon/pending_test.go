@@ -33,6 +33,7 @@ func withPending(t *testing.T) *Server {
 }
 
 func TestPendingRoundShowsInNeedsMe(t *testing.T) {
+	t.Parallel()
 	s := withPending(t)
 	row, ok := row7(t, s, api.ViewNeedsMe)
 	if !ok || row.Kind != "round_pending" || row.Pending == nil || row.Summary.WaitsOn != "me" {
@@ -44,6 +45,7 @@ func TestPendingRoundShowsInNeedsMe(t *testing.T) {
 }
 
 func TestRunActionWithNothingPendingRunsTheHeldRound(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	actions := &fakeActions{}
 	s.deps.Actions = actions
@@ -57,6 +59,7 @@ func TestRunActionWithNothingPendingRunsTheHeldRound(t *testing.T) {
 }
 
 func TestGuideWithoutAPlanIsRefused(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/guide", `{"guidance":"x"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "plans no automatic round") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -64,6 +67,7 @@ func TestGuideWithoutAPlanIsRefused(t *testing.T) {
 }
 
 func TestPauseShowsInHealth(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/pause", `{"paused":true}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -84,6 +88,7 @@ func TestPauseShowsInHealth(t *testing.T) {
 }
 
 func TestTheAppReportsOnlyRunning(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	if rec := post(t, s, "/api/app", `{"state":"unavailable"}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "state must be running") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -96,6 +101,7 @@ func TestTheAppReportsOnlyRunning(t *testing.T) {
 }
 
 func TestDeniedNotificationsAreAHealthWarning(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	post(t, s, "/api/app", `{"state":"running","notifications":"denied"}`)
 	var h api.Health
@@ -106,6 +112,7 @@ func TestDeniedNotificationsAreAHealthWarning(t *testing.T) {
 }
 
 func TestMuteUntilStateSurvivesAPendingRound(t *testing.T) {
+	t.Parallel()
 	s := withPending(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until_state":true}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -121,6 +128,7 @@ func TestMuteUntilStateSurvivesAPendingRound(t *testing.T) {
 }
 
 func TestMutedPullRequestWithAPendingRoundStaysOutOfNeedsMe(t *testing.T) {
+	t.Parallel()
 	s := withPending(t)
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/mute", `{"until":"2d"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -135,6 +143,7 @@ func TestMutedPullRequestWithAPendingRoundStaysOutOfNeedsMe(t *testing.T) {
 }
 
 func TestAppStatusOutsideTheKnownValuesIs400(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for _, body := range []string{`{"state":"sleeping"}`, `{"state":"running","notifications":"maybe"}`} {
 		if rec := post(t, s, "/api/app", body); rec.Code != 400 {
