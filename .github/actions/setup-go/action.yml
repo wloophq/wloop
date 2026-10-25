@@ -14,7 +14,7 @@ outputs:
     value: ${{ steps.dirs.outputs.paths }}
   key:
     description: The key this commit's cache is saved under
-    value: go-${{ runner.os }}-${{ inputs.cache }}-${{ github.sha }}
+    value: go-${{ runner.os }}-${{ inputs.cache }}@${{ github.sha }}
 
 runs:
   using: composite
@@ -34,5 +34,5 @@ runs:
     - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.dirs.outputs.paths }}
-        key: go-${{ runner.os }}-${{ inputs.cache }}-${{ github.sha }}
-        restore-keys: go-${{ runner.os }}-${{ inputs.cache }}-
+        key: go-${{ runner.os }}-${{ inputs.cache }}@${{ github.sha }}
+        restore-keys: go-${{ runner.os }}-${{ inputs.cache }}@

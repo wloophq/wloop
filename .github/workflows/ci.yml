@@ -19,6 +19,7 @@ jobs:
         with:
           cache: build
       - run: make fmt-check
+      - run: scripts/test-shard.sh check
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - run: GOOS=darwin CGO_ENABLED=0 go vet ./...
       - name: Build every release target
@@ -76,6 +77,7 @@ jobs:
         with:
           cache: macos
       - run: go test -timeout 30m ./...
+      - run: go test -race ./cmd/... ./internal/client/menubar/macos/
       - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
 
   lint:

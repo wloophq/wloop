@@ -23,7 +23,7 @@ jobs:
         uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
           cache: build
-      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
       - run: GOOS=darwin CGO_ENABLED=0 go vet ./...
       - run: |
           for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
@@ -36,6 +36,7 @@ jobs:
 
   test-shard:
     strategy:
+      fail-fast: false
       matrix:
         shard: [daemon, store, cli, sources, rest]
     runs-on: ubuntu-latest
@@ -73,6 +74,7 @@ jobs:
         with:
           cache: macos
       - run: go test -run '^$' ./...
+      - run: go test -race -run '^$' ./cmd/... ./internal/client/menubar/macos/
       - run: CGO_ENABLED=0 go test -run '^$' ./internal/client/menubar/macos/
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -81,15 +83,16 @@ jobs:
 
   prune:
     needs: [build, test-shard, test-macos]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - name: Delete the Go caches older commits of main saved
+      - name: Keep only the newest Go cache of each name on main
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
         run: |
-          gh cache list --ref refs/heads/main --key go- --limit 1000 --json id,key --jq '.[] | select(.key | endswith("-" + env.SHA) | not) | .id' |
+          gh cache list --ref refs/heads/main --key go- --limit 1000 --json id,key,createdAt \
+            --jq 'group_by(.key | split("@")[0]) | .[] | sort_by(.createdAt) | .[:-1][] | .id' |
             while read -r id; do gh cache delete "$id"; done
