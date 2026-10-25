@@ -649,6 +649,13 @@ func TestAStartBlockAnOlderReleaseWroteReadsWithoutAConflictHead(t *testing.T) {
 	}
 }
 
+func TestAStartBlockWithoutAConflictHeadKeepsTheKeyAnOlderReleaseReads(t *testing.T) {
+	at := time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC)
+	if n := len(strings.Split(StartBlock{Round: "triage", ChecksHead: "c2"}.Key(at), "\n")); n != 9 {
+		t.Fatalf("%d parts", n)
+	}
+}
+
 func TestStoredStartBlocksReadByUnit(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()

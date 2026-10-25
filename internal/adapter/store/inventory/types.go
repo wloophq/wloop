@@ -129,7 +129,12 @@ type StartBlock struct {
 
 // Key keeps each block its own event: a keyed event is recorded once.
 func (b StartBlock) Key(at time.Time) string {
-	return strings.Join([]string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, b.Fingerprint, b.ChecksHead, b.ConflictHead}, "\n")
+	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, b.Fingerprint, b.ChecksHead}
+	// A schema version 2 release reads a key of nine parts only.
+	if b.ConflictHead != "" {
+		parts = append(parts, b.ConflictHead)
+	}
+	return strings.Join(parts, "\n")
 }
 
 // StartBlockOf is the StartBlock a round_blocked event's key names.
