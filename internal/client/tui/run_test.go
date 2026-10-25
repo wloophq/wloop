@@ -53,14 +53,16 @@ type fakeDaemon struct {
 	gtd *api.GTDCatalog
 	// entries are each view's entries; a page since the fake's position
 	// carries entryDelta of its view instead, once.
-	entries      map[string][]api.EntryView
-	entryRev     uint64
-	entryDelta   map[string][]api.EntryView
-	counters     api.Counters
-	entryAsks    []entryAsk
-	counterAsks  [][]string
-	drafts       []api.Draft
-	entryDos     []entryDo
+	entries     map[string][]api.EntryView
+	entryRev    uint64
+	entryDelta  map[string][]api.EntryView
+	counters    api.Counters
+	entryAsks   []entryAsk
+	counterAsks [][]string
+	drafts      []api.Draft
+	entryDos    []entryDo
+	// doLag holds EntryDo's reply after the verb is recorded, as a slow daemon does.
+	doLag        time.Duration
 	captures     []string
 	entryReads   []string
 	keysFetched  int
@@ -148,8 +150,10 @@ func (f *fakeDaemon) Entry(_ context.Context, id string) (api.EntryView, error) 
 
 func (f *fakeDaemon) EntryDo(_ context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.entryDos = append(f.entryDos, entryDo{id, verb, req.Source, req.Args})
+	lag := f.doLag
+	f.mu.Unlock()
+	time.Sleep(lag)
 	return api.EntryResult{Lines: []string{verb + " done"}}, nil
 }
 
@@ -342,6 +346,12 @@ func (f *fakeDaemon) calls() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.actions)
+}
+
+func (f *fakeDaemon) planCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.planReads
 }
 
 func (f *fakeDaemon) times(which *[]time.Time) []time.Time {
@@ -561,9 +571,13 @@ func TestTUIResumesFromRev(t *testing.T) {
 	d := &fakeDaemon{rows: oneRow()}
 	term, done := start(t, d, func(c *Config) { c.Reconnect = 10 * time.Millisecond })
 	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+	// The first load pulls after the stream opens; a change before it would
+	// fold into that pull and leave nothing to resume from.
+	eventually(t, "the first load", func() bool { return d.planCount() == 1 })
 	d.change(nil)
 	d.announce()
-	eventually(t, "the second pull", func() bool { return len(d.times(&d.rowsAt)) == 2 })
+	// The load asks for the plan after it holds the pulled revision.
+	eventually(t, "the second load", func() bool { return len(d.times(&d.rowsAt)) == 2 && d.planCount() == 2 })
 	d.endStream()
 	eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
 	d.mu.Lock()
