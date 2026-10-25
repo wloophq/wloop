@@ -18,7 +18,7 @@ Each round waits in the [approval window](/concepts/approval/) first. A round wa
 
 For failing checks, the procedure fixes what the pull request broke, reruns a flaky or infrastructure failure once, and verifies a quality gate's findings like review comments. It never gets a check green by disabling it, editing CI or dismissing a finding; a check that fails again after its rerun comes to you.
 
-For a conflict, the procedure merges the base into the branch (never a rebase or a force-push), resolves each conflict, runs the tests that cover what it touched, pushes and says so in the report. A conflict it cannot resolve with confidence comes to you, with the merge aborted. A round that only merged the base in posts no comment: the push speaks for itself.
+For a conflict, the procedure merges the base of the repository the pull request targets into the branch (never a rebase or a force-push), resolves each conflict, runs the tests that cover what it touched, pushes and says so in the report. A conflict it cannot resolve with confidence comes to you, with the merge aborted, and so does a checkout with local work it does not know. A round that only merged the base in posts no comment: the push speaks for itself.
 
 ## Text from other people
 
@@ -59,7 +59,7 @@ It can also go on a `projects` entry, for some repositories only.
 | `"address_skip_reviewers": ["some-bot"]` | reviews by these logins never start one |
 | `"address_checks": false` | no round for failing checks |
 | `"ignore_checks": ["codecov/patch"]` | these checks never start one |
-| `"workflows": {"address": {"only_when": "!pr.address.conflict \|\| pr.address.reviewers != [] \|\| pr.address.checks != []"}}` | a conflict alone starts no round |
+| `"address_conflicts": false` | no round for a conflict with the base |
 | `"rounds": {"per_pr_per_day": 5}` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
 | `"workflows": {"address": {"only_when": "pr.visibility == \"private\""}}` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
 

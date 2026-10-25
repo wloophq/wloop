@@ -21,12 +21,14 @@ unsure goes to the user first.
   updated in the same round.
 - Run the tests and linters that cover what you changed before pushing.
 - When GitHub reports conflicts with the base, resolve them in the round:
-  merge the base into the branch (`git fetch origin`, then
-  `git merge origin/<base>`), never rebase it or force-push. Resolve each
+  fetch the base from the repository the pull request targets (`origin`,
+  or the remote that points at it when the branch lives in a fork) and
+  merge it into the branch, never rebase it or force-push. Resolve each
   conflict keeping what both sides meant, run the tests that cover the
   touched code, commit the merge and push. Say in the report that the base
-  was merged in and which conflicts it resolved. A conflict you cannot
-  resolve with confidence goes to the user first.
+  was merged in and which conflicts it resolved. Merge only on a clean
+  checkout with no local commits you do not know; otherwise, and for a
+  conflict you cannot resolve with confidence, go to the user first.
 - Otherwise leave the branch's relation to the base alone: do not merge or
   rebase the base in on your own.
 
