@@ -82,6 +82,13 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Consequence**: a new behavior is a profile change; Go grows only by a fact, a step or a gate.
 - **Enforced by**: `TestNoIntentEnumerations`, `TestProseIsEmbeddedOnlyFromProfiles`, the boundary rules, `TestBuiltinNamesLiveInTheirTables`. See [Profile first](/architecture/profile-first/).
 
+## The core owns what a trigger handled
+
+- **Context**: each trigger that must fire once per signal (a review, a head's failing checks, a head's conflict) needed its own column and migration, and a source other than GitHub or a profile's own trigger had nowhere to keep it.
+- **Decision**: what a trigger handled is a mark: a value per unit and name in `unit_marks`, keyed by `unit.Unit`, written in the transaction of the write that handled it and retained with the unit. The core owns the encoding and the comparison (`internal/domain/mark`: a string is a version, a time or an int a watermark); a plugin owns its signal's meaning, exposes it as a fact and names its own marks; a workflow records its marks with `[marks]`, under its name, and reads any with `handled()`.
+- **Consequence**: a new trigger needs no schema change, and a profile can define one that fires once per signal; a signal that does not fit a version or a watermark stays in its plugin's planner.
+- **Enforced by**: the `internal/domain/mark` tests, the ledger contract (`ADoneOrDismissedRunSetsTheItemsMarks`), the manifest goldens in `internal/intent/testdata/workflows`.
+
 ## One engine plans automatic work, and planning writes nothing
 
 - **Context**: two automation mechanisms side by side disagree, and a plan that writes while it is read changes under the reader.
