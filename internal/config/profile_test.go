@@ -31,7 +31,7 @@ func TestLoadResolvesProfilesAndAgentHome(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "config.json")
 	os.WriteFile(file, []byte(`{"profile":"personal","agent_home":"~/.claude-personal",
 		"projects":[{"match":"acme/*","agent_home":"/h"}]}`), 0o600)
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}

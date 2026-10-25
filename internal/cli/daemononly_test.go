@@ -196,7 +196,7 @@ func TestDoctorListsAHomeOnlyASessionReported(t *testing.T) {
 	home := filepath.Join(root, "session-home")
 	writeFile(t, filepath.Join(home, "settings.json"), `{}`)
 	te.cfg.Projects = []config.Project{{Match: "acme/*", AgentHome: home}}
-	te.LoadConfig = func() (config.Config, error) { return config.Defaults(), nil }
+	te.LoadConfig = func() (config.Config, error) { return Defaults(), nil }
 	startDaemonOf(t, te)
 	te.out.Reset()
 	te.run("doctor")

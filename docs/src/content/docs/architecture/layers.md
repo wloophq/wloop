@@ -58,7 +58,7 @@ A port is an interface declared by the core package that uses it, with at most f
 
 `internal/cli` builds the binary's commands, and three of its files choose what runs:
 
-- `root.go` holds the registries of agents and workspace managers: one entry per agent kind and per manager, the only place outside the adapters that names one;
+- `root.go` holds the registries of agents and workspace managers: one entry per agent kind and per manager, the only place outside the adapters that names one, and `Defaults`, the agent and managers a config file that names none picks;
 - `sources.go` lists the compiled-in plugins, the only file that names a source (`slack*.go` wire the Slack source's commands);
 - `storecmd.go` opens the store for the daemon, migrating it when it is older, and `serve.go` wires every port of the daemon.
 

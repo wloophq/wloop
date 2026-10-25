@@ -15,15 +15,40 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 )
 
+// tools is Defaults with the agent and workspace managers the composition
+// root supplies.
+func tools() Config {
+	c := Defaults()
+	c.Agent = "claude"
+	c.WorkspaceManagers = []string{"claude-desktop", "orca"}
+	return c
+}
+
 func TestDefaults(t *testing.T) {
-	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"))
+	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"), tools())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Defaults()
 	if c.ProjectsDir != "" || c.Profile != "" || c.ReviewPrefix != "REVIEW " || len(c.Views) != 0 ||
-		c.Rounds.PerPRPerDay != 5 || c.Agent != "claude" || c.Agent != want.Agent {
+		c.Rounds.PerPRPerDay != 5 || c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, tools().WorkspaceManagers) {
 		t.Fatalf("defaults = %+v", c)
+	}
+}
+
+func TestDefaultsNameNoTool(t *testing.T) {
+	if d := Defaults(); d.Agent != "" || d.WorkspaceManagers != nil {
+		t.Fatalf("agent %q, managers %q", d.Agent, d.WorkspaceManagers)
+	}
+}
+
+func TestARefusedFileFallsBackToTheBase(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(file, []byte(`{"workspace_managers":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(file, tools())
+	if err == nil || !strings.Contains(err.Error(), `["claude-desktop" "orca"]`) || c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, tools().WorkspaceManagers) {
+		t.Fatalf("loaded agent %q, managers %q, %v", c.Agent, c.WorkspaceManagers, err)
 	}
 }
 
@@ -32,7 +57,7 @@ func TestLoadOverridesAndExpandsHome(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"projects_dir":"~/projects/work","rounds":{"per_pr_per_day":2},"owners":["acme"]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(path)
+	c, err := LoadFile(path, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +71,7 @@ func TestLoadRejectsBrokenJSON(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(path); err == nil {
+	if _, err := LoadFile(path, tools()); err == nil {
 		t.Fatal("expected an error")
 	}
 }
@@ -74,7 +99,7 @@ func TestProjectsOverrideByFirstMatch(t *testing.T) {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +121,7 @@ func TestProjectsOverrideByFirstMatch(t *testing.T) {
 	if err := os.WriteFile(file, []byte(`{"projects":[{"match":""}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(file); err == nil {
+	if _, err := LoadFile(file, tools()); err == nil {
 		t.Error("accepted a project without match")
 	}
 }
@@ -112,7 +137,7 @@ func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +164,7 @@ func TestAddressWithoutWorkspaceIsPerProject(t *testing.T) {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +207,7 @@ func TestLoadCockpitKeys(t *testing.T) {
 	  "http": {"port": 4242},
 	  "mcp": {"port": 47899}
 	}`), 0o644)
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +250,7 @@ func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 		if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := LoadFile(file); err == nil {
+		if _, err := LoadFile(file, tools()); err == nil {
 			t.Fatalf("%s: expected an error", body)
 		}
 	}
@@ -237,7 +262,7 @@ func loadJSON(t *testing.T, raw string) Config {
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(path)
+	c, err := LoadFile(path, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +283,7 @@ func TestBriefDefaultsAndValidation(t *testing.T) {
 	for _, bad := range []string{`{"brief": {"max_diff_bytes": 10}}`, `{"brief": {"max_diff_bytes": 200001}}`, `{"brief": {"tier": "haiku"}}`} {
 		path := filepath.Join(t.TempDir(), "config.json")
 		os.WriteFile(path, []byte(bad), 0o600)
-		if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "brief.") {
+		if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "brief.") {
 			t.Errorf("%s: err %v", bad, err)
 		}
 	}
@@ -272,7 +297,7 @@ func TestAgentModelsPinTiersOpaquely(t *testing.T) {
 	for _, bad := range []string{`{"agent_models": {"claude": {"huge": "x"}}}`, `{"agent_models": {"claude": {"fast": " "}}}`} {
 		path := filepath.Join(t.TempDir(), "config.json")
 		os.WriteFile(path, []byte(bad), 0o600)
-		if _, err := LoadFile(path); err == nil || !strings.Contains(err.Error(), "agent_models.claude") {
+		if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "agent_models.claude") {
 			t.Errorf("%s: err %v", bad, err)
 		}
 	}
@@ -288,7 +313,7 @@ func TestTrustedAuthorsPerProject(t *testing.T) {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +336,7 @@ func TestEmptyTrustedAuthorIsRefused(t *testing.T) {
 		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := LoadFile(file); err == nil || !strings.Contains(err.Error(), "trusted_authors") {
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "trusted_authors") {
 			t.Errorf("%s: %v", raw, err)
 		}
 	}
@@ -324,7 +349,7 @@ func TestProjectAgentOverridesTheTopLevel(t *testing.T) {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,15 +364,12 @@ func TestProjectAgentOverridesTheTopLevel(t *testing.T) {
 	}
 }
 
-func TestWorkspaceManagersDefaultToDesktopThenOrca(t *testing.T) {
-	if got := Defaults().WorkspaceManagers; !slices.Equal(got, []string{"claude-desktop", "orca"}) {
-		t.Fatalf("default %q", got)
-	}
+func TestWorkspaceManagersOverrideTheBase(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(file, []byte(`{"workspace_managers":["orca"],"projects":[{"match":"acme/*","workspace_managers":["claude-desktop"]}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil || !slices.Equal(c.WorkspaceManagers, []string{"orca"}) {
 		t.Fatalf("loaded %q, %v", c.WorkspaceManagers, err)
 	}
@@ -366,7 +388,7 @@ func TestWorkspaceManagersRefusesTheOldKeyAndAnEmptyList(t *testing.T) {
 		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := LoadFile(file); err == nil {
+		if _, err := LoadFile(file, tools()); err == nil {
 			t.Errorf("%s: %s loaded", name, raw)
 		}
 	}
@@ -378,7 +400,7 @@ func loadRaw(t *testing.T, raw string) Config {
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,7 +445,7 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(path)
+	c, err := LoadFile(path, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,7 +461,7 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := LoadFile(path)
+	_, err := LoadFile(path, tools())
 	var unknown *UnknownKeysError
 	if !errors.As(err, &unknown) || unknown.File != path {
 		t.Fatalf("err %v", err)
@@ -451,7 +473,7 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 }
 
 func TestEveryDefaultKeyIsKnown(t *testing.T) {
-	raw, err := json.Marshal(Defaults())
+	raw, err := json.Marshal(tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +481,7 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(path); err != nil {
+	if _, err := LoadFile(path, tools()); err != nil {
 		t.Fatal(err)
 	}
 }

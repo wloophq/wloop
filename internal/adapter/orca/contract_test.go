@@ -83,10 +83,9 @@ func contractWorkspace(t *testing.T, m *wsorca.Manager) wsdomain.Workspace {
 }
 
 func boardColumns() orca.Columns {
-	cfg, err := config.Load()
-	if err != nil {
-		cfg = config.Defaults()
-	}
+	base := config.Defaults()
+	base.WorkspaceManagers = []string{"orca"}
+	cfg, _ := config.Load(base)
 	col := func(status string) string { return cfg.Column("orca", status) }
 	return orca.Columns{ReviewStatus: col(config.ColumnWorking), ReviewFallbackStatus: col(config.ColumnWorkingFallback), NeedsMeStatus: col(config.ColumnNeedsMe), ReviewedStatus: col(config.ColumnReviewed), InProgressStatus: col(config.ColumnInProgress), InReviewStatus: col(config.ColumnInReview), ReadyStatus: col(config.ColumnReady), CompletedStatus: col(config.ColumnCompleted)}
 }

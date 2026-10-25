@@ -46,7 +46,7 @@ func TestConfigGetViewColumn(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	file := filepath.Join(t.TempDir(), "config.json")
 	writeFile(t, file, `{"views":{"orca":{"columns":{"needs-me":"x"}}}}`)
-	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(file) }
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(file, Defaults()) }
 	if code := te.run("config", "get", "views.orca.columns.needs-me"); code != 0 || te.out.String() != "x\n" {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}

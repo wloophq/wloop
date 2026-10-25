@@ -134,7 +134,7 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"brief": {"enabled": false}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := config.LoadFile(path)
+	cfg, err := config.LoadFile(path, Defaults())
 	if err != nil {
 		t.Fatal(err)
 	}

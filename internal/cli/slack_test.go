@@ -98,7 +98,7 @@ type slackTestEnv struct {
 
 func newSlackTestEnv(t *testing.T) *slackTestEnv {
 	t.Helper()
-	te := &slackTestEnv{out: &bytes.Buffer{}, err: &bytes.Buffer{}, kc: newFakeKeychain(), srv: slacktest.New(t), cfg: config.Defaults()}
+	te := &slackTestEnv{out: &bytes.Buffer{}, err: &bytes.Buffer{}, kc: newFakeKeychain(), srv: slacktest.New(t), cfg: Defaults()}
 	te.cfg.Slack.ClientID = testClientID
 	te.cfg.Slack.KeychainService = "loop-test-slack"
 	port := 0

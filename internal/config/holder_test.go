@@ -22,14 +22,14 @@ func newHolderRig(t *testing.T) *holderRig {
 	t.Helper()
 	r := &holderRig{t: t, file: filepath.Join(t.TempDir(), "config.json"), now: time.Unix(1000, 0)}
 	r.write(`{"sweep":{"fast":"2m"}}`)
-	cfg, err := LoadFile(r.file)
+	cfg, err := LoadFile(r.file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.h = NewHolder(cfg, HolderOptions{
 		Path:            r.file,
 		Stat:            func(p string) (os.FileInfo, error) { r.stats++; return os.Stat(p) },
-		Load:            func() (Config, error) { r.loads++; return LoadFile(r.file) },
+		Load:            func() (Config, error) { r.loads++; return LoadFile(r.file, tools()) },
 		Now:             func() time.Time { return r.now },
 		OnProfileChange: func(p string) { r.notes = append(r.notes, p) },
 		OnWarningChange: func() { r.flips++ },

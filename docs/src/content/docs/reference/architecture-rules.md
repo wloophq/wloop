@@ -114,9 +114,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/root.go` `Orca` | ✅ | the Orca manager entry's display name |
 | `internal/cli/root.go` `claude` | ✅ | the registry key of the Claude agent entry |
 | `internal/cli/root.go` `orca` | ✅ | the registry key and the sink name of the Orca manager entry |
-| `internal/config/config.go` `claude` | 🔧 | Defaults().Agent; a tool's name outside its adapter belongs in the composition root |
-| `internal/config/config.go` `claude-desktop` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
-| `internal/config/config.go` `orca` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
 | `internal/intent/builtin/facts.go` `The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop.` | ✅ | session.closed_by_manager's doc names the manager that keeps such a record |
 | `internal/intent/builtin/facts.go` `The workspace manager that owns the session, such as orca or claude-desktop.` | ✅ | session.manager's doc names the managers' keys |
 

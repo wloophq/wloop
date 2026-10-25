@@ -373,10 +373,10 @@ func projectHomes(ps []Project) []string {
 
 const DefaultPRDailyCap = 5
 
+// Defaults is the config without a file. It names no agent and no workspace
+// manager: the composition root picks those.
 func Defaults() Config {
 	return Config{
-		Agent:              "claude",
-		WorkspaceManagers:  []string{"claude-desktop", "orca"},
 		AddressReviews:     true,
 		AddressChecks:      true,
 		AddressConflicts:   true,
@@ -448,12 +448,14 @@ func Home() string {
 	return h
 }
 
-func Load() (Config, error) {
-	return LoadFile(Path())
+// Load reads the config file over base, falling back to base when the file
+// is refused.
+func Load(base Config) (Config, error) {
+	return LoadFile(Path(), base)
 }
 
-func LoadFile(file string) (Config, error) {
-	c := Defaults()
+func LoadFile(file string, base Config) (Config, error) {
+	c := base
 	raw, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
 		return c, nil
@@ -462,38 +464,38 @@ func LoadFile(file string) (Config, error) {
 		return c, fmt.Errorf("reading %s: %w", file, err)
 	}
 	if err := decodeStrict(file, raw, &c); err != nil {
-		return Defaults(), err
+		return base, err
 	}
 	c.ProjectsDir = ExpandHome(c.ProjectsDir)
 	if len(c.WorkspaceManagers) == 0 {
-		return Defaults(), fmt.Errorf("%s: workspace_managers is empty; list at least one, such as %q", file, Defaults().WorkspaceManagers)
+		return base, fmt.Errorf("%s: workspace_managers is empty; list at least one, such as %q", file, base.WorkspaceManagers)
 	}
 	c.AgentHome = ExpandHome(c.AgentHome)
 	c.Profile = ResolveProfile(c.Profile)
 	for i, p := range c.Projects {
 		if _, err := path.Match(p.Match, ""); p.Match == "" || err != nil {
-			return Defaults(), fmt.Errorf("%s: projects[%d]: invalid match %q; use owner/repo, owner/*", file, i, p.Match)
+			return base, fmt.Errorf("%s: projects[%d]: invalid match %q; use owner/repo, owner/*", file, i, p.Match)
 		}
 		c.Projects[i].ProjectsDir = ExpandHome(p.ProjectsDir)
 		c.Projects[i].AgentHome = ExpandHome(p.AgentHome)
 	}
 	if err := c.validateTrustedAuthors(); err != nil {
-		return Defaults(), fmt.Errorf("%s: %w", file, err)
+		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	if c.Rounds.PerPRPerDay <= 0 {
 		c.Rounds.PerPRPerDay = DefaultPRDailyCap
 	}
 	if err := c.validateCockpit(); err != nil {
-		return Defaults(), fmt.Errorf("%s: %w", file, err)
+		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	if err := c.validateWorkflows(); err != nil {
-		return Defaults(), fmt.Errorf("%s: %w", file, err)
+		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	if err := c.validatePlacement(); err != nil {
-		return Defaults(), fmt.Errorf("%s: %w", file, err)
+		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	if err := c.Proposals.validate(); err != nil {
-		return Defaults(), fmt.Errorf("%s: %w", file, err)
+		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	return c, nil
 }

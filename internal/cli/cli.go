@@ -245,10 +245,10 @@ func NewEnv() *Env {
 		GH:            gh,
 		GitHub:        github.NewClient(github.Options{}),
 		Git:           gitx.New(),
-		WS:            newSet(managers, config.Defaults().WorkspaceManagers),
+		WS:            newSet(managers, Defaults().WorkspaceManagers),
 		Sh:            execSh,
 		Stdout:        execStdout,
-		LoadConfig:    config.Load,
+		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
 		IntentRecheck: intentRecheck,
 		ConfigPath:    config.Path(),
 		StateDir:      stateDir,
@@ -299,7 +299,7 @@ func harnessOf(agents map[string]harness.Protocol, managers map[string]ManagerEn
 			sessions[name] = m.Session
 		}
 	}
-	return harness.Set{SessionEnvs: sessions, Agents: agents, DefaultAgent: config.Defaults().Agent, Cwd: func() string {
+	return harness.Set{SessionEnvs: sessions, Agents: agents, DefaultAgent: Defaults().Agent, Cwd: func() string {
 		wd, _ := os.Getwd()
 		return wd
 	}}
@@ -438,7 +438,7 @@ func (e *Env) readConfig() (config.Config, error) {
 	return cfg.WithColumns(e.sinkColumns()), err
 }
 
-func (e *Env) defaultConfig() config.Config { return config.Defaults().WithColumns(e.sinkColumns()) }
+func (e *Env) defaultConfig() config.Config { return Defaults().WithColumns(e.sinkColumns()) }
 
 func (e *Env) sinkColumns() map[string]map[string]string {
 	out := map[string]map[string]string{}
