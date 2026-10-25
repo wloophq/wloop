@@ -1,4 +1,4 @@
-package readmodel_test
+package prrow_test
 
 import (
 	"context"

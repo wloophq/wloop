@@ -68,11 +68,7 @@ var pluginDebt = []debt{
 	{"internal/core/sweep", "internal/domain/inventory", "debt: the Inputs port returns the stored pull request rows as inventory.PR"},
 	{"internal/core/sweep", "internal/domain/pr", "debt: the sweep's Facts embed pr.Facts"},
 	{"internal/core/usage", "internal/domain/pr", "debt: a Turn names its pull request as a pr.Ref"},
-	{"internal/readmodel", "internal/domain/inventory", "debt: the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides"},
-	{"internal/readmodel", "internal/domain/pr", "fix: test only: tests build pr.Ref units and parse row keys with pr.ParseKey"},
-	{"internal/readmodel", "internal/readmodel/prrow", "fix: test only: tests build the GitHub row provider and read its payloads and renudge delay"},
-	{"internal/readmodel", "internal/situation", "fix: test only: tests read the loop-waiting and muted row kinds and situation.WorkingDuration"},
-	{"internal/web", "internal/situation", "fix: test only: the board and dashboard tests list situation kinds and use WorkingDuration"},
+	{"internal/readmodel", "internal/domain/inventory", "debt: the RowDeps.Intake hook takes an inventory.BriefRecord"},
 }
 
 // ruleR16 flags an import of a plugin package by a core package, or by a

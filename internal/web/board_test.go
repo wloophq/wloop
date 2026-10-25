@@ -18,7 +18,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
-	"github.com/wloophq/wloop/internal/situation"
 )
 
 func appJS(t *testing.T) string {
@@ -54,8 +53,7 @@ func jsFunction(t *testing.T, src, name string) string {
 	return src[start : start+end+3]
 }
 
-var stalledKinds = []situation.Kind{situation.KindDraft, situation.KindChecks, situation.KindChanges, situation.KindMerge,
-	situation.KindReply, situation.KindReviewerBack, situation.KindReview, situation.KindNoReviewer, situation.KindConflicts}
+var stalledKinds = []string{"draft", "checks", "changes", "merge", "reply", "reviewer_back", "review", "no_reviewer", "conflicts"}
 
 // nodeRun runs app.js's named functions with prelude, then main, which
 // writes JSON to stdout; in is its stdin.
@@ -538,11 +536,11 @@ func lensPrelude(t *testing.T) string {
 
 func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
 	var cases []map[string]any
-	kinds := append([]situation.Kind{situation.KindLoopWorking, situation.KindLoopWaiting, situation.KindDone}, stalledKinds...)
+	kinds := append([]string{"loop_working", "loop_waiting", "done"}, stalledKinds...)
 	for _, kind := range kinds {
 		for _, waiting := range []string{"me", "author", "alice", "team:o/t", "author, alice", "nobody", ""} {
 			for _, author := range []string{"me", "ana"} {
-				cases = append(cases, wireRow("me", time.Now(), map[string]any{"ref": map[string]any{"owner": "o", "repo": "r", "number": 1}, "unit": map[string]any{"provider": "github", "key": "o/r#1"}, "kind": string(kind), "waiting_on": waiting, "author": author}))
+				cases = append(cases, wireRow("me", time.Now(), map[string]any{"ref": map[string]any{"owner": "o", "repo": "r", "number": 1}, "unit": map[string]any{"provider": "github", "key": "o/r#1"}, "kind": kind, "waiting_on": waiting, "author": author}))
 			}
 		}
 	}
@@ -556,7 +554,7 @@ func TestWaitCatIsTheStripAndAgreesWithTheLabel(t *testing.T) {
 		if len(wait["wait"]) > 0 {
 			want = wait["wait"][0]
 		}
-		loop := c["kind"] == string(situation.KindLoopWorking) || c["kind"] == string(situation.KindLoopWaiting)
+		loop := c["kind"] == "loop_working" || c["kind"] == "loop_waiting"
 		says := slices.Contains(strings.Split(g.Label, ", "), "me")
 		switch {
 		case g.Cat != want || g.Class != "w-"+g.Cat:
