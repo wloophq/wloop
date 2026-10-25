@@ -22,6 +22,7 @@ func TestVersion4MovesWhatRoundsHandledIntoMarks(t *testing.T) {
 		`INSERT INTO round_state (provider, unit_key, fingerprint, checks_head, conflict_head, agent_home) VALUES ('github', 'acme/api#1', '2026-10-08T10:00:00Z@h1', 'h1', '', '/h')`,
 		`INSERT INTO round_state (provider, unit_key, fingerprint, checks_head, conflict_head) VALUES ('github', 'acme/api#2', '', '', 'h2')`,
 		`INSERT INTO round_state (provider, unit_key, sent_at) VALUES ('github', 'acme/api#3', 'x')`,
+		`INSERT INTO round_state (provider, unit_key, fingerprint) VALUES ('github', 'acme/api#4', '2026-10-08T10:00:00Z')`,
 	)
 	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
 		t.Fatal(err)
@@ -46,9 +47,10 @@ func TestVersion4MovesWhatRoundsHandledIntoMarks(t *testing.T) {
 	rows.Close()
 	want := []string{
 		"acme/api#1 addressed.checks h1",
-		"acme/api#1 addressed.reviews 2026-10-08T10:00:00Z@h1",
 		"acme/api#1 reviewed 2026-10-08T10:00:00Z@h1",
 		"acme/api#2 addressed.conflict h2",
+		"acme/api#4 addressed.reviews 2026-10-08T10:00:00Z",
+		"acme/api#4 reviewed 2026-10-08T10:00:00Z",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s", strings.Join(got, "\n"))

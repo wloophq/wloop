@@ -57,7 +57,8 @@ var migrations = []migration{
 		WITH m(mark) AS (VALUES ('reviewed'), ('addressed.reviews'), ('addressed.checks'), ('addressed.conflict'))
 		SELECT r.provider, r.unit_key, m.mark, CASE m.mark WHEN 'addressed.checks' THEN r.checks_head
 			WHEN 'addressed.conflict' THEN r.conflict_head ELSE r.fingerprint END AS value
-		FROM round_state r CROSS JOIN m WHERE value != ''`,
+		FROM round_state r CROSS JOIN m WHERE value != ''
+		AND NOT (m.mark = 'addressed.reviews' AND instr(r.fingerprint, '@') > 0)`,
 		`ALTER TABLE round_state DROP COLUMN fingerprint`,
 		`ALTER TABLE round_state DROP COLUMN checks_head`,
 		`ALTER TABLE round_state DROP COLUMN conflict_head`,
