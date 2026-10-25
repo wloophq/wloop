@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -53,11 +51,6 @@ func writePluginDisabled(w http.ResponseWriter, p unit.ProviderID) {
 
 func (s *Server) pluginEnabled(p unit.ProviderID) bool {
 	return s.deps.PluginEnabled == nil || s.deps.PluginEnabled(p)
-}
-
-// pluginOff says one of e's units is of a disabled plugin: only dismiss runs on e, as core/gtd's.
-func (s *Server) pluginOff(e gtd.Entry) bool {
-	return slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !s.pluginEnabled(u.Provider) })
 }
 
 // refusePlugin writes the 409 and reports true when u's plugin is disabled.

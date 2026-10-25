@@ -262,13 +262,8 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	v := gtd.Verb(verb)
-	if v == gtd.VerbDismiss && s.pluginOff(e) {
-		res, err := g.Do(ctx, e.ID, coregtd.Request{Verb: v, Args: req.Args, Source: req.Source})
-		s.writeEntryResult(ctx, w, g, res, err)
-		return
-	}
 	for _, u := range e.Units {
-		if s.refusePlugin(w, u) {
+		if v != gtd.VerbDismiss && s.refusePlugin(w, u) {
 			return
 		}
 	}
@@ -343,7 +338,7 @@ func (b bridgeAction) reason() string {
 // bridge is what verb runs on e as its unit's action: ok false when a handler takes the verb or bridges says
 // it does not run as one. A dismiss the row offers no action for is the state change.
 func (s *Server) bridge(ctx context.Context, g *coregtd.Service, e gtd.Entry, verb gtd.Verb) (bridgeAction, bool) {
-	if !bridges(e, verb) || g.Handles(e.Kind, verb) {
+	if !bridges(e, verb) || g.Handles(e.Kind, verb) || !s.pluginEnabled(e.Units[0].Provider) {
 		return bridgeAction{}, false
 	}
 	u := e.Units[0]
@@ -735,20 +730,14 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 	for _, x := range gtdVerbs {
 		st := api.VerbState{Verb: string(x.verb)}
 		switch {
-		case off != "" && x.verb == gtd.VerbDismiss:
-			if err := coregtd.Accepts(e, x.verb); err != nil {
-				st.Reason = err.Error()
-			} else {
-				st.Enabled = true
-			}
-		case off != "":
+		case off != "" && x.verb != gtd.VerbDismiss:
 			st.Reason = off
 		case ev.g.Handles(e.Kind, x.verb):
 			st.Enabled = true
 		case x.verb == gtd.VerbReply:
 			st.Reason = ev.s.replyRefusal(e)
 			st.Enabled = st.Reason == ""
-		case bridges(e, x.verb) && (x.verb != gtd.VerbDismiss || len(offered(row, x.verb).top) > 0):
+		case bridges(e, x.verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (x.verb != gtd.VerbDismiss || len(offered(row, x.verb).top) > 0):
 			b := offered(row, x.verb)
 			b.unit = e.Units[0]
 			var runs api.ActionState

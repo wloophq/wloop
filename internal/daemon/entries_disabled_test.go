@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -66,7 +67,7 @@ func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *tes
 
 func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 	r := newOutboxRig(t, "slack")
-	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Title: "both", Units: []unit.Unit{slackUnit, r7u}})
 	if got := entryIDs(r.page(t, "view=inbox").Entries); len(got) != 1 || got[0] != "e-mixed" {
 		t.Fatalf("inbox %v", got)
 	}
@@ -86,7 +87,7 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"inbox"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
-	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || len(got.Units) != 1 || got.Units[0] != r7u || got.State != gtd.Inbox {
+	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || !slices.Equal(got.Units, []unit.Unit{r7u}) || got.State != gtd.Inbox {
 		t.Fatalf("detached %+v %v", got, err)
 	}
 	var after api.EntryView
@@ -107,6 +108,26 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 		if vs.Verb == "dismiss" && (vs.Enabled || vs.Reason == "") {
 			t.Errorf("dismiss on a trashed entry: %+v", vs)
 		}
+	}
+}
+
+func TestDismissOnAMixedEntryRunsItsEnabledUnitsAction(t *testing.T) {
+	r := newOutboxRig(t, "slack")
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
+	var v api.EntryView
+	if code := get(t, r.s, api.EntryPath("e-mixed"), &v); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	for _, vs := range v.Verbs {
+		if vs.Verb == "dismiss" && (vs.Enabled || vs.Reason == "" || vs.Reason == "slack is disabled") {
+			t.Errorf("dismiss follows the row of %s: %+v", r7u.Label(), vs)
+		}
+	}
+	if rec := post(t, r.s, api.EntryPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 || strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
+	}
+	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || len(got.Units) != 2 || got.State != gtd.Inbox {
+		t.Fatalf("untouched %+v %v", got, err)
 	}
 }
 
