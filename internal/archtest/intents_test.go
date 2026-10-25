@@ -63,6 +63,7 @@ type exportPkg struct {
 }
 
 func TestNoIntentEnumerations(t *testing.T) {
+	t.Parallel()
 	fset, files := typedFiles(t)
 	var hits []string
 	used := map[string]bool{}
@@ -355,6 +356,7 @@ func constUses(info *types.Info, f *ast.File) []token.Pos {
 }
 
 func TestAnIntentComparedWithANamedConstantIsCaught(t *testing.T) {
+	t.Parallel()
 	const src = `package intent
 
 type Name string

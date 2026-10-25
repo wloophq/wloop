@@ -1,8 +1,6 @@
 package archtest
 
 import (
-	"go/parser"
-	"go/token"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -37,6 +35,7 @@ func loopPRImports(file string, imports []string, allowed map[string]string) []s
 }
 
 func TestLoopCodeImportsNoPR(t *testing.T) {
+	t.Parallel()
 	used := map[string]bool{}
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -45,10 +44,7 @@ func TestLoopCodeImportsNoPR(t *testing.T) {
 		}
 		for _, name := range p.GoFiles {
 			rel := filepath.ToSlash(filepath.Join(self, name))
-			f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(p.Dir, name), nil, parser.ImportsOnly)
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, f := parseFile(t, filepath.Join(p.Dir, name))
 			var imports []string
 			for _, imp := range f.Imports {
 				path, _ := strconv.Unquote(imp.Path.Value)
@@ -70,6 +66,7 @@ func TestLoopCodeImportsNoPR(t *testing.T) {
 }
 
 func TestLoopCodeImportsNoPRFlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	imports := []string{"context", prDomain}
 	flagged(t, "a daemon file", loopPRImports("internal/daemon/rows.go", imports, nil), 1, "keyed by unit")
 	flagged(t, "a turns subpackage", loopPRImports("internal/core/turns/turnstest/store.go", imports, nil), 1, "keyed by unit")

@@ -24,6 +24,7 @@ func flagged(t *testing.T, what string, got []string, n int, want string) {
 }
 
 func TestCatalogImportsFlagsTheDaemon(t *testing.T) {
+	t.Parallel()
 	imports := []string{
 		"fmt", "slices",
 		module + "internal/api",
@@ -41,6 +42,7 @@ func TestCatalogImportsFlagsTheDaemon(t *testing.T) {
 }
 
 func TestLeafImportsFlagsEachLeaf(t *testing.T) {
+	t.Parallel()
 	flagged(t, "expr allowed", leafImports(module+"internal/intent/expr", []string{"fmt", "cel.dev/cel-go/cel", "cel.dev/cel-go/common/ast", module + "internal/domain/workflow"}), 0, "")
 	flagged(t, "expr above the domain", leafImports(module+"internal/intent/expr", []string{module + "internal/intent", module + "internal/profile", "cel.dev/cel-gox", "github.com/google/cel-go/cel"}), 4, "internal/intent/expr")
 
@@ -56,6 +58,7 @@ func TestLeafImportsFlagsEachLeaf(t *testing.T) {
 }
 
 func TestTermfmtImportsFlagsLoopAndOtherModules(t *testing.T) {
+	t.Parallel()
 	ok := []string{"io", "regexp", "golang.org/x/term", "github.com/mattn/go-runewidth", "github.com/clipperhouse/uax29/v2/graphemes"}
 	flagged(t, "allowed", termfmtImports(module+"internal/termfmt", ok), 0, "")
 	bad := append(ok, module+"internal/api", "github.com/fatih/color", "golang.org/x/sys/windows", "github.com/mattn/go-runewidthx")
@@ -64,6 +67,7 @@ func TestTermfmtImportsFlagsLoopAndOtherModules(t *testing.T) {
 }
 
 func TestLoaderImportsFlagsTurnAndTheDaemon(t *testing.T) {
+	t.Parallel()
 	ok := []string{
 		"text/template",
 		"github.com/pelletier/go-toml/v2", "github.com/pelletier/go-toml/v2/unstable",
@@ -109,6 +113,7 @@ type ActionsResponse struct { Specs []ActionSpec }
 `
 
 func TestActionLiteralsFlagsAStateBuiltOutsideTheCatalog(t *testing.T) {
+	t.Parallel()
 	fset := token.NewFileSet()
 	_, _, api := planted(t, fset, module+"internal/api", "api.go", plantedAPI, nil)
 	deps := map[string]*types.Package{module + "internal/api": api}
@@ -129,6 +134,7 @@ func mutate(s api.ActionState) api.ActionState { s.Enabled = false; return s }
 }
 
 func TestProgramReadsFlagsAPredicateEvaluatedOutsideTheCatalog(t *testing.T) {
+	t.Parallel()
 	fset := token.NewFileSet()
 	_, _, loader := planted(t, fset, module+"internal/intent", "load.go", `package intent
 type Program struct{}
@@ -158,6 +164,7 @@ func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
 }
 
 func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
 const a = "record_round"
@@ -175,6 +182,7 @@ var _ = builtin.Names
 }
 
 func TestBuiltinLiteralsFlagsAStepNameOutsideTheTables(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package cli
 const a = "session.close"
 const b = "workspace.remove"
@@ -188,6 +196,7 @@ const d = "classify"
 }
 
 func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
+	t.Parallel()
 	names := builtinNames()
 	for _, want := range []string{"record_round", "nudge.prepare", "pr_else_main", "mark_addressed"} {
 		if !names[want] {
