@@ -203,11 +203,11 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "What the workflows would do now, and why",
 				Usage: []string{
 					"plan [--workflow <name>] [--provider <id>] [--stored]",
-					"plan --unit <url|owner/repo#n|session:<session-id>|workspace:<worktree-path>>",
+					"plan --unit <url|owner/repo#n|provider:key|id>",
 					"plan apply <id|url>...", "plan dismiss <id|url>...",
 				},
-				About: "Print what the workflows would do now, grouped by decision, with each item's id, reason, window and gain; it changes nothing. " +
-					"--unit tells why nothing happens to a unit: its items, then every workflow that gives it none, with the facts it read. " +
+				About: "Print what the workflows would do now, grouped by decision, with each item's id, unit as its row names it, reason, window and gain; it changes nothing. " +
+					"--unit tells why nothing happens to a unit, such as session:<session-id>, or to the unit of an item by the id plan printed: its items, then every workflow that gives it none, with the facts it read. " +
 					"apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.",
 				Flags: []helpFlag{
 					{"--workflow <name>", "Only this workflow's items"},

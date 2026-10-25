@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/termfmt"
 )
 
 func planOf(id, wf string, u unit.Unit, decision, reason string) api.PlanItem {
@@ -133,4 +134,54 @@ func TestThePlanViewAppliesAndDismisses(t *testing.T) {
 		}
 		quit(t, term, done)
 	})
+}
+
+func TestThePlanViewNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {
+	m := newModel(t)
+	m.SetSpecs(servedSpecs(t).Specs)
+	m.SetPlanSpecs(servedSpecs(t).Plan)
+	m.SetData(oneRow(), api.Health{})
+	launch := planOf("slack-follow-up/slack/T1%2FC1%2F171.1/ee", "slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "pending", "")
+	launch.Label, launch.Title, launch.Default = "#general", "Launch plan for the export", "wait"
+	retro := planOf("slack-follow-up/slack/T1%2FC1%2F172.4/ff", "slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/172.4"}, "pending", "")
+	retro.Label, retro.Title, retro.Default = "#general", "Retro notes", "wait"
+	m.SetPlan([]api.PlanItem{launch, retro}, nil)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	screen := strings.Join(m.Render(100, 30, now), "\n")
+	for _, want := range []string{"#general  Launch plan for the export", "#general  Retro notes", "workflow   slack-follow-up"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("missing %q in:\n%s", want, screen)
+		}
+	}
+	if strings.Count(screen, "Launch plan for the export") != 2 || strings.Contains(screen, "T1/C1") {
+		t.Fatalf("the item is not named by its label and title in the list and the detail:\n%s", screen)
+	}
+	if c, ok := press(m, Key{Rune: 'X'}); !ok || c.Label != "slack-follow-up #general · Launch plan for the export" {
+		t.Fatalf("dismissed %+v", c)
+	}
+}
+
+func TestThePlanListKeepsAPullRequestsNumberInANarrowColumn(t *testing.T) {
+	m := newModel(t)
+	it := planOf("review-follow-up/github/acme%2Fbilling-service-v2-api%2313650/aa", "review-follow-up", unit.Unit{Provider: unit.GitHub, Key: "acme/billing-service-v2-api#13650"}, "pending", "new commits")
+	it.Label, it.Title = "acme/billing-service-v2-api#13650", "Retry webhooks with backoff"
+	m.SetPlan([]api.PlanItem{it}, nil)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	if screen := strings.Join(m.Render(80, 30, now), "\n"); !strings.Contains(screen, "#13650") {
+		t.Fatalf("the number is cut:\n%s", screen)
+	}
+}
+
+func TestShortRefShortensOnlyAPullRequest(t *testing.T) {
+	for label, want := range map[string]string{
+		"acme/billing-service#1365":          "billing-service#1365",
+		"acme/a-billing-service-api#1365":    "a-billing-serv…#1365",
+		"team/infra · deploy #42 follow-up":  termfmt.Cut("team/infra · deploy #42 follow-up", 20),
+		"#general":                           "#general",
+		"#a-channel-name-longer-than-twenty": termfmt.Cut("#a-channel-name-longer-than-twenty", 20),
+	} {
+		if got := shortRef(label, 20); got != want {
+			t.Errorf("shortRef(%q) = %q, want %q", label, got, want)
+		}
+	}
 }

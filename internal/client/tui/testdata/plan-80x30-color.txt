@@ -1,0 +1,30 @@
+ [2mNeeds me 5[22m    [2mMy PRs 1[22m    [2mIn loop 1[22m   [7m[1m Plan 4 [22m[27m          [33mautomatic rounds paused[39m
+
+[7m>      [36m42s[39m  [2mreview-follow-up[22m      ]8;;https://github.com/acme/api/pull/7\acme/api#7  Batch export]8;;\         new commits …[27m
+      [33mwait[39m  [2msession-manual-quiet[22m  session:term_3                   session.idle…
+      [33mwait[39m  [2mslack-follow-up[22m       #general  Launch plan for the …  asked you a …
+   [31mblocked[39m  [2mworkspace-temporary[22m   workspace:wt-9                   modified fil…
+
+[1macme/api#7[22m  Batch export
+  [2mworkflow [22m  review-follow-up
+  [2mdecision [22m  pending · runs in 42s
+  [2mwhy      [22m  new commits since your review
+  [2msteps    [22m  turn.start
+  [2mkeys     [22m  [1mEnter[22m [2mapply[22m  [1mX[22m [2mdismiss[22m  [1mG[22m [2mguide[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[33mwarning: app: notifications are off[39m
+[1mEnter[22m [2mapply[22m  [1mX[22m [2mdismiss[22m  [1mG[22m [2mguide[22m  [1m↑↓[22m [2mmove[22m  [1mg[22m [2mview[22m  [1m/[22m [2mfilter[22m  [1m?[22m [2mkeys[22m  [1mq[22m [2mquit[22m

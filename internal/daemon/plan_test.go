@@ -32,6 +32,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // enginePlan is an engine as the daemon's Plan.
@@ -87,7 +88,7 @@ type planRig struct {
 	sess  unit.Unit
 }
 
-func newPlanRig(t *testing.T) *planRig {
+func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), log)
@@ -105,6 +106,9 @@ func newPlanRig(t *testing.T) *planRig {
 		d.Now = r.clock.Now
 		r.eng = r.engine(d)
 		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
+		for _, o := range opts {
+			o(d)
+		}
 	})
 	return r
 }
@@ -750,5 +754,42 @@ func TestTheActionsCarryThePlanSpecs(t *testing.T) {
 	}
 	if len(res.Plan) != len(catalog.PlanSpecs()) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
 		t.Fatalf("plan specs %+v", res.Plan)
+	}
+}
+
+// labeledRows serves a session row labeled apart from its unit key.
+type labeledRows struct{ threadRows }
+
+func (labeledRows) Provider() unit.ProviderID { return unit.Session }
+
+func (labeledRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
+	return api.Row{Title: "idle since Monday", Label: "quiet terminal", Link: "https://term.example/" + in.(string), Views: []string{}}, nil
+}
+
+func TestPlanItemsCarryTheirRowsLabel(t *testing.T) {
+	r := newPlanRig(t, func(d *Deps) {
+		d.RowProviders = append(d.RowProviders, func(readmodel.RowDeps) readmodel.Provider {
+			return labeledRows{threadRows{units: []unit.Unit{{Provider: unit.Session, Key: "term_1"}}}}
+		})
+	})
+	r.sweep(t)
+	if _, err := r.s.readModel().Current(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"?trigger=sweep", "", "?unit=session:term_1"} {
+		res := r.plan(t, q)
+		i := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == r.sess })
+		if i < 0 || res.Items[i].Label != "quiet terminal" || res.Items[i].Title != "idle since Monday" || res.Items[i].Link != "https://term.example/term_1" {
+			t.Fatalf("%q: %+v", q, res.Items)
+		}
+		if j := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == u7 }); j >= 0 && res.Items[j].Label != "acme/api#7" {
+			t.Fatalf("%q: the pull request is labeled %q", q, res.Items[j].Label)
+		}
+	}
+	if res := r.plan(t, "?unit=session:term_1"); res.Label != "quiet terminal" || res.Title != "idle since Monday" {
+		t.Fatalf("the explained unit is presented as %q %q", res.Label, res.Title)
+	}
+	if res := r.plan(t, "?unit=session:term_9"); res.Label != "session:term_9" || res.Title != "" {
+		t.Fatalf("a unit without a row is presented as %q %q", res.Label, res.Title)
 	}
 }

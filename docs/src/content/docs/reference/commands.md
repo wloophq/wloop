@@ -333,12 +333,12 @@ What the workflows would do now, and why.
 
 ```sh
 {{command}} plan [--workflow <name>] [--provider <id>] [--stored]
-{{command}} plan --unit <url|owner/repo#n|session:<session-id>|workspace:<worktree-path>>
+{{command}} plan --unit <url|owner/repo#n|provider:key|id>
 {{command}} plan apply <id|url>...
 {{command}} plan dismiss <id|url>...
 ```
 
-Print what the workflows would do now, grouped by decision, with each item's id, reason, window and gain; it changes nothing. `--unit` tells why nothing happens to a unit: its items, then every workflow that gives it none, with the facts it read. apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.
+Print what the workflows would do now, grouped by decision, with each item's id, unit as its row names it, reason, window and gain; it changes nothing. `--unit` tells why nothing happens to a unit, such as session:&lt;session-id&gt;, or to the unit of an item by the id plan printed: its items, then every workflow that gives it none, with the facts it read. apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.
 
 | Flag | Description |
 | --- | --- |

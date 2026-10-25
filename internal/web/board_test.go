@@ -1662,7 +1662,7 @@ func TestCockpitPlanActionsPostToThePlanOrActOnTheUnit(t *testing.T) {
 		Acts  []string          `json:"acts"`
 	}
 	src := appJS(t)
-	prelude := jsConst(t, src, "PLAN_ACTS") + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
+	prelude := jsConst(t, src, "PLAN_ACTS") + jsConst(t, src, "itemLabel") + jsConst(t, src, "planName") + jsConst(t, src, "unitKey") + `
 const API_VERSION = "1";
 const state = { busy: new Set() };
 const posts = [], acts = [];
@@ -1679,6 +1679,7 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
   await actOnPlan(it, "guide");
   await actOnPlan(it, "unblock");
   await actOnPlan({ ...it, unit: { provider: "session", key: "term_1" }, label: "session:term_1" }, "trust_run");
+  await actOnPlan({ ...it, unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan" }, "trust_run");
   process.stdout.write(JSON.stringify({ posts, acts }));
 })();`, nil, &got)
 	want := []string{
@@ -1694,7 +1695,29 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
 			t.Errorf("post %d: %s, want %s", i, p, want[i])
 		}
 	}
-	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1"}) {
+	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1", "trust_run #general · Launch plan"}) {
 		t.Errorf("acts %q", got.Acts)
+	}
+}
+
+func TestCockpitPlanItemNamesItsUnitByLabelAndTitle(t *testing.T) {
+	var got struct {
+		Unit  string `json:"unit"`
+		Title string `json:"title"`
+		Href  string `json:"href"`
+	}
+	src := appJS(t)
+	prelude := treeJS + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
+const state = { busy: new Set(), planSpecs: {} };
+const planWhen = () => "waits for you", actOnPlan = () => {}, actionTitle = () => "";
+`
+	nodeRun(t, prelude, []string{"planButtons", "planItem"}, `
+const li = planItem({ id: "slack-follow-up/slack/T1%2FC1%2F171.1/ee", workflow: "slack-follow-up", decision: "pending", default: "wait",
+  unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan for the export", link: "https://chat.example/T1/C1/171.1", actions: [] });
+const unit = byClass(li, "plan-unit")[0];
+const link = all(unit, (x) => x.tag === "a")[0];
+process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "" }));`, nil, &got)
+	if got.Unit != "#general" || got.Title != "Launch plan for the export" || got.Href != "https://chat.example/T1/C1/171.1" {
+		t.Fatalf("%+v", got)
 	}
 }

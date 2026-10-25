@@ -1,0 +1,30 @@
+ Needs me 5    My PRs 1    In loop 1   [Plan 4]          automatic rounds paused
+
+>      42s  review-follow-up      acme/api#7  Batch export         new commits …
+      wait  session-manual-quiet  session:term_3                   session.idle…
+      wait  slack-follow-up       #general  Launch plan for the …  asked you a …
+   blocked  workspace-temporary   workspace:wt-9                   modified fil…
+
+acme/api#7  Batch export
+  workflow   review-follow-up
+  decision   pending · runs in 42s
+  why        new commits since your review
+  steps      turn.start
+  keys       Enter apply  X dismiss  G guide
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+warning: app: notifications are off
+Enter apply  X dismiss  G guide  ↑↓ move  g view  / filter  ? keys  q quit

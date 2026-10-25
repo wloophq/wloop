@@ -952,20 +952,20 @@ func overrideOf(r api.Row) api.Override {
 	return p.Override
 }
 
-func TestLabelsComeFromTheLatestSnapshot(t *testing.T) {
+func TestPresentationsComeFromTheLatestSnapshot(t *testing.T) {
 	log := change.NewLog(change.DefaultWindow, nil)
 	p := &threads{}
 	p.set(threadUnits(0, 2))
 	m := readmodel.New(log, nil, nil, nil, nil, p)
 	gone := unit.Unit{Provider: "thread", Key: "gone"}
-	if got := m.Labels(threadUnits(0, 1)); len(got) != 0 {
-		t.Fatalf("labels before any snapshot %v", got)
+	if got := m.Presentations(threadUnits(0, 1)); len(got) != 0 {
+		t.Fatalf("presentations before any snapshot %v", got)
 	}
 	if _, err := m.Rows(context.Background(), api.ViewAll, api.Since{}); err != nil {
 		t.Fatal(err)
 	}
-	got := m.Labels(append(threadUnits(0, 2), gone))
-	if len(got) != 2 || got[threadUnits(0, 1)[0]] == "" || got[gone] != "" {
-		t.Fatalf("labels %v", got)
+	got := m.Presentations(append(threadUnits(0, 2), gone))
+	if _, listed := got[gone]; len(got) != 2 || got[threadUnits(0, 1)[0]].Label == "" || listed {
+		t.Fatalf("presentations %v", got)
 	}
 }
