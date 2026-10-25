@@ -10,7 +10,7 @@ description: The daemon, its clients, the ports to the outside tools, and the ru
 | Actor | Gives {{name}} | Gets from {{name}} |
 |---|---|---|
 | You | answers, guidance, holds, review and take-over requests | questions, drafts, counts, notifications, the cockpit |
-| GitHub | pull requests, reviews, checks and the rate budget, read through `gh` | nothing: {{name}} only reads GitHub |
+| GitHub | pull requests, reviews, checks and the rate budget, read over its API with the token of `gh` | the comments of drafts you approved, posted by the GitHub plugin |
 | Agents (Claude Code) | turn records and hook events | instructions; they publish reviews, push and reply on GitHub under your name |
 | Orca | the workspace list, terminals, agent activity, card placement | workspaces created, linked, renamed and removed; sessions started, woken and typed into; board writes |
 | Claude Desktop | the sessions it runs and their processes | sessions imported, woken and typed into; worktrees under a root {{name}} owns |
@@ -38,29 +38,19 @@ The daemon also spawns headless agent calls (the brief, headless turns, the Slac
 
 ## Inside the daemon
 
-```text
-transports (socket, HTTP, MCP)
-  -> API (user, agent and admin operations, one versioned schema)
-    -> core use cases (inventory, sweep, automation, turns, instructions,
-       intake, views, workspaces, gtd, items, outbox, dossiers, setup, usage)
-      -> domain (pure: pull request facts, turn states, records, round rules,
-         situations, workflows, tags)
-      -> ports, declared by the use case that needs them
-        <- adapters (GitHub, Orca, Claude Desktop, Claude Code, git, SQLite store,
-           Slack, launchd)
-```
+The daemon is laid out as ports and adapters: transports call the API, the API calls the core's use cases, the use cases work on the domain and reach every outside tool through a port, and adapters implement the ports. The pages below hold the detail:
 
-Dependencies point inward. Adapters import ports and the domain; the core imports the domain and its own ports; the domain imports nothing of {{name}}'s. A new agent, workspace manager or view sink is a new adapter plus one entry in the composition root. What only some managers offer (a board, screen reading, closing a terminal, waking a session) is an optional capability the core asks for and does without.
+- [Layers and the dependency rule](/architecture/layers/): the packages, what each may import, the composition root and where a new piece of code goes;
+- [Ports and adapters](/architecture/ports/): each outside tool, its port, its adapters and its fake;
+- [The daemon and its clients](/architecture/daemon-and-clients/): the single writer of the store, the API roles and the transports;
+- [Plugins](/architecture/plugins/): how a source of units plugs into the GTD core;
+- [Profile first](/architecture/profile-first/): what the profile decides and what Go provides;
+- [Testing](/architecture/testing/): fakes, goldens and the architecture tests;
+- [Decision log](/architecture/decisions/): each decision in force and the test that keeps it.
+
+Four properties hold across them:
 
 - **The store is the truth.** Turn state, questions, answers and history live only in the store. Orca's board is a view sink: it receives the same projection as every other view, fails alone and is reconciled on start. Any workspace or session can be recreated from stored context, in any manager that hosts its agent.
 - **Every change leaves a trail.** Each command writes its domain events in the same transaction as its state change, so a turn's timeline can be read from events alone.
-- **Authority comes from you.** Agents report facts; only your surfaces endorse a verdict, choose an option that publishes, take over or remove a workspace.
-- **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients. Each `claude -p` the daemon runs leads its own process group. A cancelled call sends the group SIGTERM, then SIGKILL after five seconds; once the call ends, whatever it left in the group is stopped the same way, and a stopping daemon kills every group still running. The daemon lists the live groups in its state directory, so after a crash the next start kills what the crashed one left.
-
-## Plugins
-
-The GTD core (entries, the Inbox, the Outbox, projects, the Review) does not know where units come from. Each source is a compiled-in plugin, `github` or `slack`, which brings an ingestion job and the cards of its units, and may bring items, actions, filter qualifiers, views for the cockpit and the terminal, menu bar sections, notification templates, a publisher for approved drafts and a long-running stream. The core never imports a plugin package and no plugin imports another; an architecture test enforces it.
-
-## Automation
-
-Workflows are data: TOML manifests evaluated by one engine on every sweep, over facts that the `github`, `session` and `workspace` providers compute from the store. Evaluating the plan is pure (no writes, no GitHub reads, no model calls); only the sweep's apply step and your actions write. Intents are data in the same way: the CLI commands, the cockpit's actions and the turn's instructions all come from the manifests.
+- **Authority comes from you.** Agents report facts; only your surfaces endorse a verdict, approve a draft, take over or remove a workspace.
+- **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients.
