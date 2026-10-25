@@ -89,7 +89,8 @@ func (h Home) fix(home string) string { return setup.InstallCommand(h.Command, h
 func (h Home) headersHelper() string { return h.Command + " hook mcp-headers" }
 
 // sameCommand reports whether got is want, or want run by another absolute
-// path to the same binary, such as a symlink and its target.
+// path to the same binary, such as a symlink and its target. Check accepts
+// either; install writes the path it runs by.
 func sameCommand(got, want string) bool {
 	if got == want {
 		return true
@@ -165,8 +166,10 @@ func object(parent map[string]any, key string) map[string]any {
 	return m
 }
 
+func exactCommand(got, want string) bool { return got == want }
+
 // registrationProblem is "" when the entry is the loop's, right.
-func (h Home) registrationProblem(doc map[string]any) string {
+func (h Home) registrationProblem(doc map[string]any, same func(got, want string) bool) string {
 	entry, ok := object(doc, "mcpServers")[brand.MCPServer()]
 	if !ok {
 		return "missing"
@@ -186,7 +189,7 @@ func (h Home) registrationProblem(doc map[string]any) string {
 		return fmt.Sprintf("type is %q, want http", got.Type)
 	case got.URL != h.MCPURL:
 		return fmt.Sprintf("url is %s, want %s", got.URL, h.MCPURL)
-	case !sameCommand(got.HeadersHelper, h.headersHelper()):
+	case !same(got.HeadersHelper, h.headersHelper()):
 		return fmt.Sprintf("headersHelper is %q, want %q", got.HeadersHelper, h.headersHelper())
 	case h.MCPKey == "":
 		return "no MCP key in " + brand.Name + "'s state"
@@ -227,8 +230,8 @@ func commandOf(hook map[string]any) string {
 	return s
 }
 
-func (h Home) rightHook(hook map[string]any, sub string) bool {
-	return hook["type"] == "command" && sameCommand(commandOf(hook), h.hookCommand(sub)) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
+func (h Home) rightHook(hook map[string]any, sub string, same func(got, want string) bool) bool {
+	return hook["type"] == "command" && same(commandOf(hook), h.hookCommand(sub)) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
 }
 
 func (h Home) hookProblem(settings map[string]any, event, sub string) string {
@@ -245,7 +248,7 @@ func (h Home) hookProblem(settings map[string]any, event, sub string) string {
 		return fmt.Sprintf("%d "+brand.Name+" entries, want one", len(found))
 	case !strings.HasSuffix(strings.TrimSpace(commandOf(found[0])), "|| true"):
 		return fmt.Sprintf("%q has no `|| true`, so a failing "+brand.Name+" blocks the agent", commandOf(found[0]))
-	case !h.rightHook(found[0], sub):
+	case !h.rightHook(found[0], sub, sameCommand):
 		return fmt.Sprintf("runs %q with timeout %v, want %q with timeout %d", commandOf(found[0]), found[0]["timeout"], h.hookCommand(sub), hookTimeout)
 	}
 	return ""
@@ -319,7 +322,7 @@ func (h Home) Check(_ context.Context, home string) ([]setup.Finding, error) {
 		}
 		return f
 	}
-	out := []setup.Finding{finding("MCP server "+brand.MCPServer(), h.registrationProblem(mcp.doc))}
+	out := []setup.Finding{finding("MCP server "+brand.MCPServer(), h.registrationProblem(mcp.doc, sameCommand))}
 	for _, hk := range loopHooks {
 		out = append(out, finding("hook "+hk.event, h.hookProblem(settings.doc, hk.event, hk.sub)))
 	}
@@ -446,7 +449,7 @@ func (h Home) ensureHook(doc map[string]any, event, sub string) string {
 			switch {
 			case hm == nil || !ours(commandOf(hm), sub):
 				keep = append(keep, hk)
-			case !found && h.rightHook(hm, sub):
+			case !found && h.rightHook(hm, sub, exactCommand):
 				found = true
 				keep = append(keep, hk)
 			case !found:
@@ -701,7 +704,7 @@ func (h Home) Install(ctx context.Context, home string, dryRun bool) ([]string, 
 		return nil, errors.New("no MCP key to register")
 	}
 	return h.apply(ctx, home, dryRun, false, h.installSettings, func(r *run, mcp jsonFile) (string, func() error) {
-		switch problem := h.registrationProblem(mcp.doc); problem {
+		switch problem := h.registrationProblem(mcp.doc, exactCommand); problem {
 		case "":
 			return "", nil
 		case "missing":
@@ -730,7 +733,7 @@ func (h Home) Remove(ctx context.Context, home string, dryRun bool) ([]string, e
 func (r *run) addServer(ctx context.Context, mcp jsonFile) error {
 	entry := r.h.registration()
 	return rewriteMode(ctx, mcp.path, mcp.raw, 0o600, func(doc map[string]any) []string {
-		if r.h.registrationProblem(doc) == "" {
+		if r.h.registrationProblem(doc, exactCommand) == "" {
 			return nil
 		}
 		servers := object(doc, "mcpServers")

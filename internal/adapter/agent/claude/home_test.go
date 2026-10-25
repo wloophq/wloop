@@ -619,19 +619,59 @@ func TestABinaryThroughASymlinkJudgesTheHooksOfItsTargetRight(t *testing.T) {
 		if _, err := h.Install(context.Background(), home, false); err != nil {
 			t.Fatal(err)
 		}
-		before, _ := os.ReadFile(filepath.Join(home, "settings.json"))
 		h.Command = c.checking
 		for entry, p := range problems(t, h, home) {
 			if p != "" {
 				t.Errorf("installed by %s, checked by %s: %s: %s", c.installed, c.checking, entry, p)
 			}
 		}
-		if lines, err := h.Install(context.Background(), home, false); err != nil || len(lines) != 0 {
-			t.Errorf("install by %s over %s: %q %v", c.checking, c.installed, lines, err)
+	}
+}
+
+func TestInstallWritesThePathItRunsByOverTheSameBinarysOther(t *testing.T) {
+	direct, linked, _ := linkedBinaries(t)
+	h, home := testHome(t, nil)
+	h.Command = direct
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	h.Command = linked
+	lines, err := h.Install(context.Background(), home, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"changed MCP server", "changed hook Stop", "changed hook SessionStart", "changed hook UserPromptSubmit"} {
+		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
+			t.Errorf("no %q in %q", want, lines)
 		}
-		if after, _ := os.ReadFile(filepath.Join(home, "settings.json")); string(after) != string(before) {
-			t.Errorf("settings changed:\n%s\n%s", before, after)
+	}
+	for _, f := range h.Files(home) {
+		raw, _ := os.ReadFile(f)
+		if strings.Contains(string(raw), strings.Trim(direct, "'")) {
+			t.Errorf("%s still runs %s:\n%s", f, direct, raw)
 		}
+	}
+}
+
+func TestTheSameBinaryRunningAnotherCommandIsWrong(t *testing.T) {
+	direct, linked, _ := linkedBinaries(t)
+	h, home := testHome(t, nil)
+	h.Command = direct
+	write(t, filepath.Join(home, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"`+linked+` hook stop --agent x || true","timeout":10}]}]}}`)
+	if p := problems(t, h, home)["hook Stop"]; !strings.Contains(p, "--agent x") {
+		t.Errorf("stop: %q", p)
+	}
+}
+
+func TestARelativePathToTheSameBinaryIsWrong(t *testing.T) {
+	direct, _, _ := linkedBinaries(t)
+	bin := strings.Trim(direct, "'")
+	t.Chdir(filepath.Dir(bin))
+	h, home := testHome(t, nil)
+	h.Command = direct
+	write(t, filepath.Join(home, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"./`+brand.Command+` hook stop || true","timeout":10}]}]}}`)
+	if p := problems(t, h, home)["hook Stop"]; !strings.Contains(p, "./"+brand.Command) {
+		t.Errorf("stop: %q", p)
 	}
 }
 
