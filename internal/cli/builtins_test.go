@@ -9,6 +9,7 @@ import (
 )
 
 func TestEveryOnSentEffectRunsOnARoute(t *testing.T) {
+	t.Parallel()
 	for _, e := range onSent {
 		runs := false
 		for _, c := range e.on {

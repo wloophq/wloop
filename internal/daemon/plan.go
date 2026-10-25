@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -107,9 +108,7 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	for _, it := range items {
-		res.Items = append(res.Items, s.wirePlanItem(ctx, it))
-	}
+	res.Items = append(res.Items, s.wirePlanItems(ctx, items, s.presentations(itemUnits(items)))...)
 	if q.Trigger == "" && v.Get("closed") == "1" {
 		closed, err := s.closedSessions(ctx)
 		if err != nil {
@@ -175,15 +174,17 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}}
+	var acted []workflow.Item
 	for _, id := range req.IDs {
 		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance)
 		if err != nil {
 			res.Errors = append(res.Errors, id+": "+err.Error())
 		}
 		if kept {
-			res.Items = append(res.Items, s.wirePlanItem(ctx, it))
+			acted = append(acted, it)
 		}
 	}
+	res.Items = append(res.Items, s.wirePlanItems(ctx, acted, s.presentations(itemUnits(acted)))...)
 	writeJSON(w, res)
 }
 
@@ -211,7 +212,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 		}
 		return left[0], true, nil
 	}
-	wire := s.wirePlanItem(ctx, it)
+	wire := s.wirePlanItem(ctx, it, s.presentations([]unit.Unit{it.Unit})[it.Unit])
 	i := slices.IndexFunc(wire.Actions, func(st api.ActionState) bool { return st.ID == planOffers[action] })
 	switch {
 	case i < 0:
@@ -228,12 +229,32 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	return done, true, err
 }
 
-// wirePlanItem is it as the API serves it, with the actions it offers. A
+// wirePlanItems are items as the API serves them, each unit presented as
+// known, from presentations, presents it.
+func (s *Server) wirePlanItems(ctx context.Context, items []workflow.Item, known map[unit.Unit]readmodel.Presentation) []api.PlanItem {
+	out := make([]api.PlanItem, len(items))
+	for i, it := range items {
+		out[i] = s.wirePlanItem(ctx, it, known[it.Unit])
+	}
+	return out
+}
+
+// itemUnits are the units of items, in order.
+func itemUnits(items []workflow.Item) []unit.Unit {
+	out := make([]unit.Unit, len(items))
+	for i, it := range items {
+		out[i] = it.Unit
+	}
+	return out
+}
+
+// wirePlanItem is it as the API serves it, its unit presented as shown, with
+// the actions it offers. A
 // turn.start item a start block holds offers its row's trust_run and
 // unblock, so only that item reads its row.
-func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item) api.PlanItem {
+func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
-		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Steps: []string{}, Deadline: it.Deadline,
+		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
 	for _, st := range it.Steps {

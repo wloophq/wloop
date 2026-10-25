@@ -18,6 +18,7 @@ import (
 )
 
 func TestAConfigThatStopsLoadingKeepsTheLastProfileIntents(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	at := filepath.Join(dir, "intents", "ask-author")
 	if err := os.MkdirAll(at, 0o700); err != nil {
@@ -52,6 +53,7 @@ func TestAConfigThatStopsLoadingKeepsTheLastProfileIntents(t *testing.T) {
 }
 
 func TestATurnParsesTheProfileAtMostOnce(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	dir := userProfile(t, te, map[string]string{"intent=review.md": "Be kind.\n"})
 	te.cfg.Profile = dir
@@ -96,6 +98,7 @@ func TestATurnParsesTheProfileAtMostOnce(t *testing.T) {
 }
 
 func TestABrokenBlockStillStopsTheRound(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	te.cfg.Profile = userProfile(t, te, map[string]string{"intent=review.md": "\n+++\noverride = true\n+++\nX"})
 	if err := te.roundReady(); err == nil {

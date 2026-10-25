@@ -18,7 +18,7 @@ var golden = []string{
 	"classifications: provider, unit_key, fingerprint, workflow, output, at",
 	"classify_days: day, total",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
-	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev",
+	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects",
 	"entries: id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential, snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated, rev",
 	"entry_contexts: entry_id, context, ord",
 	"entry_items: entry_id, provider, unit_key, item",
@@ -124,6 +124,7 @@ func tableList(t *testing.T, db *sql.DB, schema string) []string {
 }
 
 func TestSchemaIsOneVersion(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	if got := tableList(t, db.r, "main"); !slices.Equal(got, golden) {
 		t.Fatalf("tables of a new store:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(golden, "\n"))
@@ -135,6 +136,7 @@ func TestSchemaIsOneVersion(t *testing.T) {
 }
 
 func TestOpenKeepsAStoreOfThisVersion(t *testing.T) {
+	t.Parallel()
 	db, path := openTemp(t)
 	if _, err := execW(db, `INSERT INTO meta (key, value) VALUES ('k', 'v')`); err != nil {
 		t.Fatal(err)
@@ -163,6 +165,7 @@ func openErr(path string) error {
 }
 
 func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	r := NewRounds(db)
@@ -227,6 +230,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 }
 
 func TestRoundsSaveRefusesAKeyThatDoesNotParse(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	r := NewRounds(db)
 	st := round.New()
@@ -237,6 +241,7 @@ func TestRoundsSaveRefusesAKeyThatDoesNotParse(t *testing.T) {
 }
 
 func TestPauseLeavesAnEvent(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	r := NewRounds(db)
@@ -282,6 +287,7 @@ func TestPauseLeavesAnEvent(t *testing.T) {
 }
 
 func TestParseKey(t *testing.T) {
+	t.Parallel()
 	for key, ok := range map[string]bool{"acme/api#7": true, "acme/api": false, "acme#7": false, "acme/a/b#7": false, "/api#7": false, "acme/api#0": false, "acme/api#x": false} {
 		if _, err := ParseKey(key); (err == nil) != ok {
 			t.Errorf("%q: %v", key, err)

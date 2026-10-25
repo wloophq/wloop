@@ -9,6 +9,7 @@ import (
 )
 
 func TestActionsOmitDisabledPlugin(t *testing.T) {
+	t.Parallel()
 	var on, off api.ActionsResponse
 	if code := get(t, newServer(t), api.Actions, &on); code != http.StatusOK {
 		t.Fatalf("GET %s: %d", api.Actions, code)

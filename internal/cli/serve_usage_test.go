@@ -126,6 +126,7 @@ func TestServeInterruptsRunningBriefRuns(t *testing.T) {
 }
 
 func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	te.cfg.Brief.Enabled = true
@@ -170,6 +171,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 }
 
 func TestEchoTurnsAreUnavailable(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	te.Usage = map[string]coreusage.Reader{"claude": &fakeUsage{}}
@@ -192,6 +194,7 @@ func TestEchoTurnsAreUnavailable(t *testing.T) {
 }
 
 func TestServeKeepsTheAgentSessionsTheHooksReport(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)

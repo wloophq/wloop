@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api/client"
@@ -67,6 +69,7 @@ func runAppClient(ctx context.Context, e *Env) error {
 			OpenURL:    func(u string) error { return e.openInBrowser(context.Background(), u) },
 			CockpitURL: func(route string) (string, error) { return cockpitURL(e.StateDir, route) },
 			Quit:       cancel,
+			Copy:       copyToClipboard,
 			Now:        e.Now,
 			Log:        logf,
 			SentPath:   filepath.Join(e.StateDir, "notified.json"),
@@ -115,4 +118,10 @@ func waitForDaemon(ctx context.Context, c *client.Client) error {
 
 func bundleHint(exe string) string {
 	return fmt.Sprintf("not running from "+brand.App+".app (%s); run '"+brand.Command+" app install'", filepath.Base(exe))
+}
+
+func copyToClipboard(text string) error {
+	cmd := exec.Command("pbcopy")
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
 }

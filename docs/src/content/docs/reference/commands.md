@@ -333,12 +333,12 @@ What the workflows would do now, and why.
 
 ```sh
 {{command}} plan [--workflow <name>] [--provider <id>] [--stored]
-{{command}} plan --unit <url|owner/repo#n|session:<session-id>|workspace:<worktree-path>>
+{{command}} plan --unit <url|owner/repo#n|provider:key|id>
 {{command}} plan apply <id|url>...
 {{command}} plan dismiss <id|url>...
 ```
 
-Print what the workflows would do now, grouped by decision, with each item's id, reason, window and gain; it changes nothing. `--unit` tells why nothing happens to a unit: its items, then every workflow that gives it none, with the facts it read. apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.
+Print what the workflows would do now, grouped by decision, with each item's id, unit as its row names it, reason, window and gain; it changes nothing. `--unit` tells why nothing happens to a unit, such as session:&lt;session-id&gt;, or to the unit of an item by the id plan printed: its items, then every workflow that gives it none, with the facts it read. apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.
 
 | Flag | Description |
 | --- | --- |
@@ -758,7 +758,7 @@ Take out the daemon's and the menu bar's LaunchAgents, {{name}}.app, the agent h
 
 | Flag | Description |
 | --- | --- |
-| `--purge` | Also delete the state and config directories: the store, MCP key, dossiers, logs, config and review profiles |
+| `--purge` | Also delete the state and config directories: the store and its backups, MCP key, dossiers, logs, config and review profiles |
 | `--dry-run` | Print what would be removed and change nothing |
 | `--yes` | Remove without asking |
 
@@ -770,6 +770,54 @@ Examples:
 ```
 
 See [Uninstall](/guides/uninstall/).
+
+### store migrate
+
+Migrate the store to this release's schema.
+
+```sh
+{{command}} store migrate [--dry-run] [--yes]
+```
+
+Take the store to this release's schema version: copy it into &lt;state&gt;/backups, run each migration in its own transaction and check the result. A release's daemon does this on its own when it starts; run it when a build that is not a release asks for it, or to retry a migration that failed and see each step. It asks first unless `--yes`.
+
+| Flag | Description |
+| --- | --- |
+| `--dry-run` | Print the migrations, the backup and the space it needs, and change nothing |
+| `--yes` | Migrate without asking |
+
+Examples:
+
+```sh
+{{command}} store migrate --dry-run
+{{command}} store migrate
+```
+
+See [Upgrade](/guides/upgrade/).
+
+### store restore
+
+Put a backup of the store back.
+
+```sh
+{{command}} store restore [--list] [<backup>] [--yes]
+```
+
+Replace the store with a backup from &lt;state&gt;/backups, by default the newest this release reads, keeping the replaced store there as a pre-restore copy. What changed since the backup is lost. A backup older than this release is migrated after. It asks first unless `--yes`.
+
+| Flag | Description |
+| --- | --- |
+| `--list` | List the backups with their schema versions and dates |
+| `--yes` | Restore without asking |
+
+Examples:
+
+```sh
+{{command}} store restore --list
+{{command}} store restore
+```
+
+See [Upgrade](/guides/upgrade/).
 
 ### config get
 

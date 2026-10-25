@@ -44,6 +44,7 @@ func ruleNoAPIKinds(rel, src string) []string {
 }
 
 func TestNoProviderKindsInAPI(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join("..", "..")
 	err := filepath.WalkDir(filepath.Join(root, "internal"), func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") {
@@ -65,6 +66,7 @@ func TestNoProviderKindsInAPI(t *testing.T) {
 }
 
 func TestNoAPIKindsFlagsAPlantedKind(t *testing.T) {
+	t.Parallel()
 	use := "package x\nimport \"m/internal/api\"\nvar _ = api.KindDone\nvar _ = api.Kind(\"done\")\n"
 	flagged(t, "a use", ruleNoAPIKinds("internal/x/x.go", use), 1, "api.KindDone")
 	decl := "package api\nconst KindDone Kind = \"done\"\n"

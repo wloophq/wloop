@@ -36,6 +36,7 @@ func outboxFixture() []api.Draft {
 }
 
 func TestOutboxListReadsByKind(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		golden string
 		term   termfmt.Term
@@ -54,6 +55,7 @@ func TestOutboxListReadsByKind(t *testing.T) {
 }
 
 func TestOutboxListShowsTheColumnsThatDiffer(t *testing.T) {
+	t.Parallel()
 	ds := outboxFixture()
 	ds[2].State, ds[2].Error, ds[2].Target = "failed", "may have been posted: timeout", "#general"
 	var out bytes.Buffer
@@ -62,6 +64,7 @@ func TestOutboxListShowsTheColumnsThatDiffer(t *testing.T) {
 }
 
 func TestOutboxShowReadsTheDraft(t *testing.T) {
+	t.Parallel()
 	d := outboxFixture()[1]
 	d.Where = "acme/api#7"
 	for _, tc := range []struct {

@@ -39,6 +39,7 @@ func (r *startRig) count(kind string) int {
 }
 
 func TestAnObservedFollowupRecordsWouldReviewOncePerHead(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	r.observed(roundFollowup)
@@ -57,6 +58,7 @@ func TestAnObservedFollowupRecordsWouldReviewOncePerHead(t *testing.T) {
 }
 
 func TestAnObservedAddressRecordsWouldAddressOncePerFingerprint(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), "")
 	r.observed(roundAddress)
@@ -75,6 +77,7 @@ func TestAnObservedAddressRecordsWouldAddressOncePerFingerprint(t *testing.T) {
 }
 
 func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	sc.ws.Sessions = nil
 	sc.ws.Blocked = workspace.ReasonTrust
@@ -106,6 +109,7 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 }
 
 func TestARoundWaitsWhileItsTurnAsksTheUser(t *testing.T) {
+	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.rec.questions = map[github.Ref]map[string]bool{r.sc.ref: {string(dintent.Review): true}}
 	if got := r.check(t, automation.CheckOpts{}); got != "its review turn asks you something" {
@@ -118,6 +122,7 @@ func TestARoundWaitsWhileItsTurnAsksTheUser(t *testing.T) {
 }
 
 func TestOpenQuestionsAreTheIntentsWhoseNewestTurnAsks(t *testing.T) {
+	t.Parallel()
 	asked := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	answered := unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
 	books := map[unit.Unit]dturn.Book{
@@ -138,6 +143,7 @@ func TestOpenQuestionsAreTheIntentsWhoseNewestTurnAsks(t *testing.T) {
 }
 
 func TestABriefThatGaveUpLetsTheRoundGoWithoutIt(t *testing.T) {
+	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Go: true, Without: true, Note: "the intake gave up"}
 	var p startPlan

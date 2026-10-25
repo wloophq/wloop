@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,6 +93,7 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 }
 
 func TestPluginsRoute(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -127,6 +129,7 @@ func TestPluginsRoute(t *testing.T) {
 }
 
 func TestPluginsDefaultEnabled(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{"brief": {"enabled": false}}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -160,6 +163,7 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 }
 
 func TestStatusNamesDisabledPlugins(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}},
 		"GET " + api.Plugins: []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true}}})
@@ -226,8 +230,24 @@ func TestDaemonRunsWithNoPluginEnabled(t *testing.T) {
 }
 
 func TestRuntimeCarriesJobTimeout(t *testing.T) {
+	t.Parallel()
 	rt := runtimeOf(source.Module{ID: unit.GitHub, Jobs: []source.Job{{Name: "j", Every: time.Minute, Timeout: 25 * time.Minute}}})
 	if len(rt.Jobs) != 1 || rt.Jobs[0].Timeout != 25*time.Minute {
 		t.Fatalf("jobs %+v", rt.Jobs)
+	}
+}
+
+func TestPluginsServeWhetherTheyReact(t *testing.T) {
+	const linear, wiki unit.ProviderID = "linear", "wiki"
+	ps := []source.Plugin{{ID: linear, Name: "Linear"}, {ID: wiki, Name: "Wiki"}, {ID: unit.GitHub, Name: "GitHub"}}
+	mods := []source.Module{{ID: linear, Reacts: true}, {ID: unit.GitHub}}
+	off := false
+	cfg := config.Config{Plugins: map[string]config.Plugin{string(wiki): {Enabled: &off}}}
+	got := map[unit.ProviderID]bool{}
+	for _, p := range pluginList(ps, mods, cfg) {
+		got[p.ID] = p.Reacts
+	}
+	if want := map[unit.ProviderID]bool{linear: true, wiki: false, unit.GitHub: false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("reacts %v, want %v", got, want)
 	}
 }

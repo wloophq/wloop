@@ -190,6 +190,7 @@ func trustBlockEvent(ref github.Ref, at time.Time) dinv.Event {
 }
 
 func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	ref := sc.ref
@@ -225,6 +226,7 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 }
 
 func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), "")
 	cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, roundAddress)
@@ -244,6 +246,7 @@ func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
 }
 
 func TestReviewRefusesBusyAndUserActive(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	for name, c := range map[string]struct {
@@ -265,6 +268,7 @@ func TestReviewRefusesBusyAndUserActive(t *testing.T) {
 }
 
 func TestAStaleDetailRefuses(t *testing.T) {
+	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.units.Set(r.u, "pr.stale", true)
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "its stored detail is stale" {
@@ -273,6 +277,7 @@ func TestAStaleDetailRefuses(t *testing.T) {
 }
 
 func TestCheckNeverStartsABrief(t *testing.T) {
+	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); !strings.HasPrefix(got, "brief not ready") {
@@ -287,6 +292,7 @@ func TestCheckNeverStartsABrief(t *testing.T) {
 }
 
 func TestNoteStartsTheBriefAndRecordsBriefWaiting(t *testing.T) {
+	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
 	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
@@ -304,6 +310,7 @@ func TestNoteStartsTheBriefAndRecordsBriefWaiting(t *testing.T) {
 }
 
 func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.te.cfg.Rounds.PerPRPerDay = 1
@@ -334,6 +341,7 @@ func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
 }
 
 func TestDismissWritesSweepSkipsRecords(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		sc            func(*testing.T) sweepCase
 		intent, round string
@@ -371,6 +379,7 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 }
 
 func TestASkippedFollowupDoesNotComeBack(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	r.load(t)
@@ -384,6 +393,7 @@ func TestASkippedFollowupDoesNotComeBack(t *testing.T) {
 }
 
 func TestRunTakesTheStoredGuidance(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	if err := r.rec.KeepNextGuidance(context.Background(), sc.ref, "check the migration"); err != nil {
@@ -401,6 +411,7 @@ func TestRunTakesTheStoredGuidance(t *testing.T) {
 }
 
 func TestRunGuidanceKeepsTheStoredOne(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	if err := r.rec.KeepNextGuidance(context.Background(), sc.ref, "check the migration"); err != nil {
@@ -418,6 +429,7 @@ func TestRunGuidanceKeepsTheStoredOne(t *testing.T) {
 }
 
 func TestRunReadsCurrentFacts(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	r.why.Matched = []workflow.Fact{{Name: "pr.held", Value: false}}
@@ -433,6 +445,7 @@ func TestRunReadsCurrentFacts(t *testing.T) {
 }
 
 func TestAWorkflowStartedTurnCarriesItsWhy(t *testing.T) {
+	t.Parallel()
 	t.Run("a round", func(t *testing.T) {
 		sc := followupScenario(t)
 		r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
@@ -458,6 +471,7 @@ func TestAWorkflowStartedTurnCarriesItsWhy(t *testing.T) {
 }
 
 func TestATriggerStaysAutomatedWhenAppliedByHand(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	if _, err := r.run(t, automation.RunOpts{ByHand: true, Confirmed: true}); err != nil {
@@ -480,6 +494,7 @@ func TestATriggerStaysAutomatedWhenAppliedByHand(t *testing.T) {
 }
 
 func TestAStartBlockIsABlockedItemNeverTrusted(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	r.rec.events = append(r.rec.events, trustBlockEvent(sc.ref, testNow.Add(-time.Hour)))
@@ -516,6 +531,7 @@ func TestAStartBlockIsABlockedItemNeverTrusted(t *testing.T) {
 }
 
 func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), "")
 	cands := r.steps.d.Candidates.(fakeCandidates)
@@ -557,6 +573,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 }
 
 func TestAnAddressRoundTellsTheLiveSessionAboutLocalWork(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		setup func(te *testEnv)
 		local string
@@ -587,6 +604,7 @@ func TestAnAddressRoundTellsTheLiveSessionAboutLocalWork(t *testing.T) {
 }
 
 func TestTurnRecordsItsWorkflow(t *testing.T) {
+	t.Parallel()
 	newestWorkflow := func(t *testing.T, sc sweepCase, u unit.Unit) string {
 		t.Helper()
 		books, err := sc.te.Turns.Store.Books(context.Background(), u)
@@ -633,6 +651,7 @@ func TestTurnRecordsItsWorkflow(t *testing.T) {
 }
 
 func TestAnAddressRoundSaysWhyNow(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
 	r.units.Set(r.u, "pr.address.reviewers", []string{"bob", "jussara-ai"})

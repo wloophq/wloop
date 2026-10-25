@@ -10,6 +10,7 @@ import (
 )
 
 func TestServedKeysPassTheCoreRule(t *testing.T) {
+	t.Parallel()
 	check := func(specs []api.ActionSpec, ctx keys.Context) {
 		toggles := map[string]string{}
 		for _, s := range specs {
@@ -58,6 +59,7 @@ func coreBinding(key, verb string, ctx keys.Context, s keys.Surface) bool {
 }
 
 func TestKeysEndpoint(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var got api.KeysResponse
 	if code := get(t, s, api.Keys+"?surface=web", &got); code != 200 {

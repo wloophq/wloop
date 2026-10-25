@@ -32,6 +32,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 // enginePlan is an engine as the daemon's Plan.
@@ -87,7 +88,7 @@ type planRig struct {
 	sess  unit.Unit
 }
 
-func newPlanRig(t *testing.T) *planRig {
+func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 	t.Helper()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), log)
@@ -105,6 +106,9 @@ func newPlanRig(t *testing.T) *planRig {
 		d.Now = r.clock.Now
 		r.eng = r.engine(d)
 		d.Plan, d.Sweep, d.Pending = enginePlan{r.eng}, r.eng, planPending{r.eng}
+		for _, o := range opts {
+			o(d)
+		}
 	})
 	return r
 }
@@ -232,6 +236,7 @@ func checksum(t *testing.T, db *sqlite.DB) string {
 }
 
 func TestPlanningThroughTheAPIChangesNoStoreRow(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	briefs := &countingBriefs{}
 	withBriefs(&r.s.deps, briefs)
@@ -276,6 +281,7 @@ func TestPlanningThroughTheAPIChangesNoStoreRow(t *testing.T) {
 }
 
 func TestAVersion1ClientWorks(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	for _, path := range []string{api.Plan, api.Rows} {
 		req := apiRequest(http.MethodGet, path, nil)
@@ -292,6 +298,7 @@ func TestAVersion1ClientWorks(t *testing.T) {
 }
 
 func TestThePlanFiltersByWorkflowAndProvider(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	for _, q := range []string{"?trigger=sweep&", "?"} {
@@ -311,7 +318,22 @@ func TestThePlanFiltersByWorkflowAndProvider(t *testing.T) {
 	}
 }
 
+func TestPlanItemsCarryTheirUnitsLabel(t *testing.T) {
+	r := newPlanRig(t)
+	r.sweep(t)
+	res := r.plan(t, "?")
+	if len(res.Items) == 0 {
+		t.Fatal("no plan items")
+	}
+	for _, it := range res.Items {
+		if want := r.s.unitLabel(it.Unit); it.Label == "" || it.Label != want {
+			t.Fatalf("%s: label %q, want %q", it.Unit, it.Label, want)
+		}
+	}
+}
+
 func TestSkipOnAPendingRoundIsTerminal(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -333,6 +355,7 @@ func TestSkipOnAPendingRoundIsTerminal(t *testing.T) {
 }
 
 func TestGuideRunsThePendingItemWithGuidance(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	r.pending7(t)
@@ -350,6 +373,7 @@ func TestGuideRunsThePendingItemWithGuidance(t *testing.T) {
 }
 
 func TestGuideWithNoRoundPendingKeepsTheGuidance(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	rec := post(t, r.s, "/api/units/github/acme%2Fapi%237/guide", `{"guidance":"look at the retry"}`)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "goes with the next automatic round") {
@@ -361,6 +385,7 @@ func TestGuideWithNoRoundPendingKeepsTheGuidance(t *testing.T) {
 }
 
 func TestPlanActionsActOnItems(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	sess := r.items(t, r.sess, workflow.DecisionPending)
@@ -382,6 +407,7 @@ func TestPlanActionsActOnItems(t *testing.T) {
 }
 
 func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		name string
 		drop func(t *testing.T, r *planRig)
@@ -412,6 +438,7 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			r := newPlanRig(t)
 			r.sweep(t)
 			it := r.pending7(t)
@@ -430,6 +457,7 @@ func TestHoldPauseAndByHandDropWithoutMarking(t *testing.T) {
 }
 
 func TestPauseStopsApplyButThePlanKeepsFilling(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	if rec := post(t, r.s, "/api/pause", `{"paused":true}`); rec.Code != http.StatusOK {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -456,6 +484,7 @@ func TestPauseStopsApplyButThePlanKeepsFilling(t *testing.T) {
 }
 
 func TestAPendingItemSurvivesADaemonRestart(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	want := r.pending7(t)
@@ -490,6 +519,7 @@ func runDue(t *testing.T, s *Server) {
 }
 
 func TestTheDueJobRunsAnExpiredItemOnce(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -509,6 +539,7 @@ func TestTheDueJobRunsAnExpiredItemOnce(t *testing.T) {
 }
 
 func TestTheDueJobNeedsASweep(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	if _, ok := r.s.jobs["due"]; !ok {
 		t.Fatal("no due job beside the sweep")
@@ -520,6 +551,7 @@ func TestTheDueJobNeedsASweep(t *testing.T) {
 }
 
 func TestABlockedItemOffersApplyDisabledWithItsReason(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.steps.Refuse(builtin.StepTurnStart, u7, "held by you")
 	r.sweep(t)
@@ -539,6 +571,7 @@ func TestABlockedItemOffersApplyDisabledWithItsReason(t *testing.T) {
 }
 
 func TestPendingRoundsComeFromThePlan(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	deadline := time.Date(2026, 10, 8, 10, 5, 0, 0, time.UTC)
 	r.s = newServerOn(t, r.db, r.log, func(d *Deps) {
@@ -585,6 +618,7 @@ func (l *interleaved) Save(ctx context.Context, p automation.PlanWrite, evs ...p
 }
 
 func TestTheDueJobRunningAnItemDuringASweepRunsItOnce(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -601,6 +635,7 @@ func TestTheDueJobRunningAnItemDuringASweepRunsItOnce(t *testing.T) {
 }
 
 func TestADismissDuringASweepStaysDismissed(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	it := r.pending7(t)
@@ -622,6 +657,7 @@ func TestADismissDuringASweepStaysDismissed(t *testing.T) {
 }
 
 func TestPauseKeepsObserveItems(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.sweep(t)
 	if rec := post(t, r.s, "/api/pause", `{"paused":true}`); rec.Code != http.StatusOK {
@@ -648,6 +684,7 @@ type savedNothing struct{}
 func (savedNothing) Save(context.Context) error { return nil }
 
 func TestTheDueJobLoadsTheRoundStateOnlyForADueItem(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	st := &countingState{}
 	r.eng.State = st
@@ -667,6 +704,7 @@ func TestTheDueJobLoadsTheRoundStateOnlyForADueItem(t *testing.T) {
 }
 
 func TestThePlanServesTheSessionsClosedInTheLastDay(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	now := r.clock.Now()
 	ctx := context.Background()
@@ -708,6 +746,7 @@ func TestThePlanServesTheSessionsClosedInTheLastDay(t *testing.T) {
 }
 
 func TestTheActionsCarryThePlanSpecs(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	var res api.ActionsResponse
 	if code := get(t, r.s, api.Actions, &res); code != http.StatusOK {
@@ -715,5 +754,42 @@ func TestTheActionsCarryThePlanSpecs(t *testing.T) {
 	}
 	if len(res.Plan) != len(catalog.PlanSpecs()) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
 		t.Fatalf("plan specs %+v", res.Plan)
+	}
+}
+
+// labeledRows serves a session row labeled apart from its unit key.
+type labeledRows struct{ threadRows }
+
+func (labeledRows) Provider() unit.ProviderID { return unit.Session }
+
+func (labeledRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
+	return api.Row{Title: "idle since Monday", Label: "quiet terminal", Link: "https://term.example/" + in.(string), Views: []string{}}, nil
+}
+
+func TestPlanItemsCarryTheirRowsLabel(t *testing.T) {
+	r := newPlanRig(t, func(d *Deps) {
+		d.RowProviders = append(d.RowProviders, func(readmodel.RowDeps) readmodel.Provider {
+			return labeledRows{threadRows{units: []unit.Unit{{Provider: unit.Session, Key: "term_1"}}}}
+		})
+	})
+	r.sweep(t)
+	if _, err := r.s.readModel().Current(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"?trigger=sweep", "", "?unit=session:term_1"} {
+		res := r.plan(t, q)
+		i := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == r.sess })
+		if i < 0 || res.Items[i].Label != "quiet terminal" || res.Items[i].Title != "idle since Monday" || res.Items[i].Link != "https://term.example/term_1" {
+			t.Fatalf("%q: %+v", q, res.Items)
+		}
+		if j := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == u7 }); j >= 0 && res.Items[j].Label != "acme/api#7" {
+			t.Fatalf("%q: the pull request is labeled %q", q, res.Items[j].Label)
+		}
+	}
+	if res := r.plan(t, "?unit=session:term_1"); res.Label != "quiet terminal" || res.Title != "idle since Monday" {
+		t.Fatalf("the explained unit is presented as %q %q", res.Label, res.Title)
+	}
+	if res := r.plan(t, "?unit=session:term_9"); res.Label != "session:term_9" || res.Title != "" {
+		t.Fatalf("a unit without a row is presented as %q %q", res.Label, res.Title)
 	}
 }

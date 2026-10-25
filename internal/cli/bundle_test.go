@@ -53,6 +53,7 @@ func mustBuild(t *testing.T, te *testEnv) {
 }
 
 func TestBuildBundleLaysOutSignsAndRegisters(t *testing.T) {
+	t.Parallel()
 	te, calls := bundleEnv(t)
 	if err := te.buildBundle(context.Background(), te.Executable); err != nil {
 		t.Fatal(err)
@@ -90,6 +91,7 @@ func TestBuildBundleLaysOutSignsAndRegisters(t *testing.T) {
 }
 
 func TestBuildBundleReplacesTheExecutableAtomically(t *testing.T) {
+	t.Parallel()
 	te, _ := bundleEnv(t)
 	mustBuild(t, te)
 	before, err := os.Stat(bundleExe(te.Home))
@@ -117,6 +119,7 @@ func TestBuildBundleReplacesTheExecutableAtomically(t *testing.T) {
 }
 
 func TestSyncBundleRebuildsWhenTheSourceMovedOn(t *testing.T) {
+	t.Parallel()
 	te, calls := bundleEnv(t)
 	mustBuild(t, te)
 	te.Executable = bundleExe(te.Home)
@@ -144,6 +147,7 @@ func TestSyncBundleLeavesACurrentBundleAlone(t *testing.T) {
 }
 
 func TestSyncBundleIgnoresAnotherBundle(t *testing.T) {
+	t.Parallel()
 	te, _ := bundleEnv(t)
 	mustBuild(t, te)
 	te.Executable = "/Applications/" + brand.App + ".app/Contents/MacOS/" + brand.Name
@@ -154,6 +158,7 @@ func TestSyncBundleIgnoresAnotherBundle(t *testing.T) {
 }
 
 func TestSyncBundleRetriesAfterAFailedSignature(t *testing.T) {
+	t.Parallel()
 	te, _ := bundleEnv(t)
 	te.Sh = func(_ context.Context, name string, _ ...string) ([]byte, error) {
 		if name == "codesign" {
@@ -185,6 +190,7 @@ func TestSourceVersionGivesUpOnAHungBinary(t *testing.T) {
 }
 
 func TestInfoPlistVersionsAreNumeric(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{"v0.16.0": "0.16.0", "dev": "0.0.0", "v0.16.0-3-gabc123-dirty": "0.16.0", "1.2": "1.2", "": "0.0.0"}
 	for raw, want := range cases {
 		p := []byte(infoPlist(raw, "/bin/"+brand.Name))
@@ -201,6 +207,7 @@ func TestInfoPlistVersionsAreNumeric(t *testing.T) {
 }
 
 func TestSyncBundleIgnoresAMissingSource(t *testing.T) {
+	t.Parallel()
 	te, _ := bundleEnv(t)
 	mustBuild(t, te)
 	os.Remove(te.Executable)
@@ -252,6 +259,7 @@ func TestDoctorReportsTheBundle(t *testing.T) {
 }
 
 func TestAppRebuildsAStaleBundleAndRestartsInPlace(t *testing.T) {
+	t.Parallel()
 	te, _ := bundleEnv(t)
 	mustBuild(t, te)
 	te.Executable = bundleExe(te.Home)

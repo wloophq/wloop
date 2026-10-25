@@ -11,6 +11,7 @@ import (
 )
 
 func TestFactsOfAPullRequest(t *testing.T) {
+	t.Parallel()
 	var asked []github.Ref
 	s := newServerWith(t, func(d *Deps) {
 		d.Facts = func(_ context.Context, u unit.Unit) (api.Facts, error) {

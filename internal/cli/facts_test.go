@@ -14,6 +14,7 @@ import (
 )
 
 func TestInventoryFactsAreMyReviewsSince(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	facts := inventoryFacts{te.Store}

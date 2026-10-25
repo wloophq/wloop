@@ -265,6 +265,7 @@ func runAppInstall(ctx context.Context, e *Env, args []string) error {
 	fmt.Fprintf(e.Out, "Installed %s from %s, and the LaunchAgents that run '%s serve' and the menu bar at login.\n", bundlePath(e.Home), source, source)
 	fmt.Fprintln(e.Out, "The menu bar item appears in a few seconds; allow notifications when macOS asks.")
 	fmt.Fprintf(e.Out, "To remove: %s && rm -r %s\n", strings.Join(remove, " && "), bundlePath(e.Home))
+	e.reportStore(ctx)
 	return nil
 }
 
@@ -277,5 +278,6 @@ func (e *Env) installDaemonAgent(ctx context.Context) error {
 	fmt.Fprintf(e.Out, "Daemon installed: %s\n", path)
 	fmt.Fprintf(e.Out, "Runs '%s serve' at login and keeps it running. Logs in %s.\n", e.Executable, e.StateDir)
 	fmt.Fprintf(e.Out, "To remove: %s uninstall\n", brand.Command)
+	e.reportStore(ctx)
 	return nil
 }

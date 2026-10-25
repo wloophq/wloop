@@ -74,6 +74,8 @@ type Module struct {
 	// Jobs are extra daemon jobs of the plugin.
 	Jobs      []Job
 	Publisher port.Effects
+	// Reacts says Publisher posts drafts of kind react.
+	Reacts bool
 	// Proposals is called by the proposals job; a provider with Proposals gets no generic stalled nudge.
 	Proposals         func(ctx context.Context, now time.Time) ([]outbox.Proposal, error)
 	Payload           turn.PayloadReader

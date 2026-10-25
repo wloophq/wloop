@@ -4,11 +4,13 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -139,23 +141,23 @@ func (m *Model) tabs(width int) string {
 			shown = append(shown, g...)
 		}
 	}
-	var plain, styled []string
+	var styled []string
 	cur := ""
 	for _, x := range shown {
 		switch {
 		case x.view != m.view:
-			plain, styled = append(plain, " "+x.label+" "), append(styled, " "+t.Dim(x.label)+" ")
+			styled = append(styled, " "+t.Dim(x.label)+" ")
 		case t.Color:
 			cur = x.label
-			plain, styled = append(plain, " "+x.label+" "), append(styled, t.Reverse(t.Bold(" "+x.label+" ")))
+			styled = append(styled, t.Reverse(t.Bold(" "+x.label+" ")))
 		default:
 			cur = x.label
-			plain, styled = append(plain, "["+x.label+"]"), append(styled, "["+x.label+"]")
+			styled = append(styled, "["+x.label+"]")
 		}
 	}
-	left := strings.TrimRight(strings.Join(plain, "  "), " ")
 	line := strings.TrimRight(strings.Join(styled, "  "), " ")
-	if termfmt.Cells(left) > width {
+	cells := termfmt.Cells(termfmt.Plain(line))
+	if cells > width {
 		return t.Bold(termfmt.Cut(cur, width))
 	}
 	var flags []string
@@ -169,7 +171,7 @@ func (m *Model) tabs(width int) string {
 		flags = append(flags, "slow sync")
 	}
 	if right := strings.Join(flags, " · "); right != "" {
-		if gap := width - termfmt.Cells(left) - termfmt.Cells(right); gap >= 3 {
+		if gap := width - cells - termfmt.Cells(right); gap >= 3 {
 			line += strings.Repeat(" ", gap) + t.Yellow(right)
 		}
 	}
@@ -277,22 +279,19 @@ func (m *Model) list(rows []api.Row, cur, width, height int, now time.Time) []st
 
 // shortRef is a unit's label within w cells: a label of the form
 // owner/repo#n loses the owner when it does not fit, then has the
-// repository cut, never the number.
+// repository cut, never the number; any other label is cut at its end.
 func shortRef(label string, w int) string {
 	label = termfmt.Clean(label)
 	if termfmt.Cells(label) <= w {
 		return label
 	}
-	i := strings.LastIndex(label, "#")
-	if i < 0 {
+	ref, err := pr.ParseKey(label)
+	if err != nil {
 		return termfmt.Cut(label, w)
 	}
-	repo, num := label[:i], label[i:]
-	if _, name, ok := strings.Cut(repo, "/"); ok {
-		repo = name
-	}
+	num := "#" + strconv.Itoa(ref.Number)
 	if room := w - termfmt.Cells(num); room >= 2 {
-		return termfmt.Cut(repo, room) + num
+		return termfmt.Cut(ref.Repo, room) + num
 	}
 	return termfmt.Cut(num, w)
 }

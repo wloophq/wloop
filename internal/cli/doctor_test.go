@@ -187,6 +187,7 @@ func doctorWithApp(t *testing.T, st api.AppStatus) string {
 }
 
 func TestDoctorReportsDeniedNotifications(t *testing.T) {
+	t.Parallel()
 	out := doctorWithApp(t, api.AppStatus{State: "running", Notifications: "denied"})
 	if !strings.Contains(out, "notifications") || !strings.Contains(out, "System Settings") {
 		t.Fatalf("%s", out)
@@ -197,6 +198,7 @@ func TestDoctorReportsDeniedNotifications(t *testing.T) {
 }
 
 func TestDoctorNamesTheBundleOfTheNotifications(t *testing.T) {
+	t.Parallel()
 	out := doctorWithApp(t, api.AppStatus{State: "running", Notifications: "not-determined"})
 	line := ""
 	for _, l := range strings.Split(out, "\n") {
@@ -287,6 +289,7 @@ func TestDoctorSkillDiffersFromRendered(t *testing.T) {
 }
 
 func TestBriefCheck(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if c := te.briefCheck(te.cfg, nil, nil); c.mark != markInfo || !strings.Contains(c.info, "off") {
 		t.Fatalf("off: %+v", c)
@@ -317,6 +320,7 @@ func TestBriefCheck(t *testing.T) {
 }
 
 func TestPathChecksLookOnlyForTheConfiguredAgentWithBriefsOn(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	var script string
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
@@ -332,6 +336,7 @@ func TestPathChecksLookOnlyForTheConfiguredAgentWithBriefsOn(t *testing.T) {
 }
 
 func TestDoctorNamesAgentModelsOfNoSupportedAgent(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.AgentModels = map[string]map[turns.Tier]string{"claude": {turns.TierFast: "x"}, "cluade": {turns.TierFast: "y"}}
 	cs := te.agentModelChecks(te.cfg)
@@ -348,6 +353,7 @@ type binKind struct {
 func (k binKind) Binary() string { return k.bin }
 
 func TestPathChecksAskTheKindForItsBinary(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	var script string
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
@@ -364,6 +370,7 @@ func TestPathChecksAskTheKindForItsBinary(t *testing.T) {
 }
 
 func TestUnknownProjectAgentIsNamed(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.withEcho()
 	te.cfg.Projects = []config.Project{{Match: "acme/*", Agent: "nope"}, {Match: "oss/*", Agent: "echo"}}
@@ -379,6 +386,7 @@ func TestUnknownProjectAgentIsNamed(t *testing.T) {
 }
 
 func TestAgentHomeOfAnotherKindIsNamed(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.withEcho()
 	claudeHome, echoHome := filepath.Join(t.TempDir(), "claude-home"), t.TempDir()
@@ -398,6 +406,7 @@ func TestAgentHomeOfAnotherKindIsNamed(t *testing.T) {
 }
 
 func TestDoctorLooksUpTheManagersBinary(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	var script string
 	te.Sh = func(_ context.Context, _ string, args ...string) ([]byte, error) {
@@ -419,6 +428,7 @@ func TestDoctorLooksUpTheManagersBinary(t *testing.T) {
 }
 
 func TestDoctorNamesTheManagerItReaches(t *testing.T) {
+	t.Parallel()
 	for name, want := range map[string]string{"orca": "  [ok     ] orca reachable\n", "zed": "  [missing] zed reachable: down\n            fix with: open the Zed app\n"} {
 		m := &fake.Manager{ManagerName: name}
 		if name == "zed" {
@@ -435,6 +445,7 @@ func TestDoctorNamesTheManagerItReaches(t *testing.T) {
 }
 
 func TestDoctorPrintsOrcasColumns(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	te.run("doctor")
 	for _, want := range []string{
@@ -448,6 +459,7 @@ func TestDoctorPrintsOrcasColumns(t *testing.T) {
 }
 
 func TestDoctorLoadJSON(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	want := api.MeterReport{
 		Since:  time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC),
@@ -479,6 +491,7 @@ func TestDoctorLoadJSON(t *testing.T) {
 }
 
 func TestDoctorLoadForAPersonGroupsScopesAndNestsChildren(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	rep := api.MeterReport{
 		Since: time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC),
@@ -516,6 +529,7 @@ func TestDoctorLoadForAPersonGroupsScopesAndNestsChildren(t *testing.T) {
 }
 
 func TestDoctorFlagsMissingRestricted(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		help string
 		want int
@@ -537,6 +551,7 @@ func TestDoctorFlagsMissingRestricted(t *testing.T) {
 }
 
 func TestDoctorNamesTheUnknownConfigKeys(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	writeFile(t, te.ConfigPath, `{"gate": {"timeout": "60s"}}`)
 	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath) }

@@ -129,6 +129,7 @@ func (r *runs) wait(t *testing.T, n int) [][]unit.Unit {
 }
 
 func TestResolverCatchesUpOnStart(t *testing.T) {
+	t.Parallel()
 	log := change.NewLog(change.DefaultWindow, t.Logf)
 	pull := r7.Unit()
 	log.Note(port.TopicSourceEvents, pull)

@@ -192,6 +192,13 @@ func (b *Briefs) Ready(ctx context.Context, _ unit.Unit, first bool) (intake.Rea
 	return rd, nil
 }
 
+// Answer replaces the script Ready answers from.
+func (b *Briefs) Answer(answers ...intake.Readiness) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.answers = answers
+}
+
 func (b *Briefs) Changed(ref unit.Unit) (<-chan struct{}, func()) {
 	b.mu.Lock()
 	ch, ok := b.changed[ref]

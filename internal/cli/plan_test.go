@@ -25,6 +25,7 @@ func planItem(wf string, u unit.Unit, value, decision, reason string) api.PlanIt
 func planFixture() []api.PlanItem {
 	followup := planItem("review-follow-up", unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, "1f2e3d4c5b6a7980", "pending", "new commits since your review")
 	followup.Default, followup.Deadline, followup.Steps = "run", testNow.Add(4*time.Minute+10*time.Second), []string{"turn.start"}
+	followup.Label, followup.Title = "acme/api#12", "Retry webhooks with backoff"
 	manual := planItem("session-manual-quiet", unit.Unit{Provider: unit.Session, Key: "term_3"}, "aa00bb11cc22dd33", "pending", "!session.managed, session.agent_state = done, session.idle_for = 30h0m0s")
 	manual.Default, manual.Steps, manual.Gain = "wait", []string{"session.close"}, api.Gain{MemoryBytes: 300 << 20}
 	temp := planItem("workspace-temporary", unit.Unit{Provider: unit.Workspace, Key: "wt-9"}, "0099887766554433", "pending", "workspace.temporary = true")
@@ -80,6 +81,7 @@ func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *
 }
 
 func TestPlanGroupsByDecision(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, planFixture(), nil)
 	if code := te.run("plan"); code != 0 {
@@ -93,6 +95,7 @@ func TestPlanGroupsByDecision(t *testing.T) {
 }
 
 func TestPlanFiltersAndReadsTheStoredPlan(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, nil, nil)
 	if code := te.run("plan", "--workflow", "address", "--provider", "github", "--stored"); code != 0 {
@@ -104,6 +107,7 @@ func TestPlanFiltersAndReadsTheStoredPlan(t *testing.T) {
 }
 
 func TestPlanPrintsItsErrorsAndFails(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	servePlan(t, te, planFixture()[:1], []string{"address: github:acme/api#5: boom"})
 	if code := te.run("plan"); code == 0 || !strings.Contains(te.err.String(), "error: address: github:acme/api#5: boom") || !strings.Contains(te.out.String(), "review-first-round") {
@@ -112,6 +116,7 @@ func TestPlanPrintsItsErrorsAndFails(t *testing.T) {
 }
 
 func TestPlanApplyAndDismiss(t *testing.T) {
+	t.Parallel()
 	items := planFixture()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, items, nil)
@@ -121,7 +126,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 	if !slices.Equal(d.queries, []string{""}) || len(d.acts) != 1 || d.acts[0].Action != "apply" || !slices.Equal(d.acts[0].IDs, []string{items[2].ID, items[4].ID}) {
 		t.Fatalf("queries %q, acts %+v", d.queries, d.acts)
 	}
-	if want := "1f2e3d4c  review-follow-up  github:acme/api#12: run applied by you\naa00bb11  session-manual-quiet  session:term_3: run applied by you\n"; te.out.String() != want {
+	if want := "1f2e3d4c  review-follow-up  acme/api#12: run applied by you\naa00bb11  session-manual-quiet  session:term_3: run applied by you\n"; te.out.String() != want {
 		t.Fatalf("printed %q", te.out)
 	}
 
@@ -147,6 +152,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 }
 
 func TestPlanApplyRefusesAShortAmbiguousOrUnknownID(t *testing.T) {
+	t.Parallel()
 	a := planItem("session-duplicate", unit.Unit{Provider: unit.Session, Key: "term_1"}, "abcd1234000000000", "pending", "")
 	b := planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_1"}, "abcd1234111111111", "pending", "")
 	c := planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_2"}, "abcd9999000000000", "pending", "")
@@ -169,6 +175,7 @@ func TestPlanApplyRefusesAShortAmbiguousOrUnknownID(t *testing.T) {
 }
 
 func TestPlanApplyAndDismissTakeAPullRequestsPendingItem(t *testing.T) {
+	t.Parallel()
 	items := planFixture()
 	second := planItem("nudge-silent", unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, "2e2e2e2e2e2e2e2e", "pending", "silent for 30 days")
 	te := newTestEnv(t, &fake.Manager{})
@@ -195,15 +202,17 @@ func TestPlanApplyAndDismissTakeAPullRequestsPendingItem(t *testing.T) {
 }
 
 func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
+	t.Parallel()
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	followup := planItem("review-follow-up", u, "1f2e3d4c5b6a7980", "pending", "new commits since your review")
 	followup.Default, followup.Deadline, followup.Steps = "run", testNow.Add(4*time.Minute), []string{"turn.start"}
+	followup.Label, followup.Title = "acme/api#7", "Batch export"
 	var queries []string
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) { json.NewEncoder(w).Encode(api.Health{}) })
 	mux.HandleFunc("GET "+api.Plan, func(w http.ResponseWriter, r *http.Request) {
 		queries = append(queries, r.URL.Query().Get("unit"))
-		json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{followup}, Errors: []string{}, Unit: "github:acme/api#7", Workflows: []api.UnitWorkflow{
+		json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{followup}, Errors: []string{}, Unit: "github:acme/api#7", Label: "acme/api#7", Title: "Batch export", Workflows: []api.UnitWorkflow{
 			{Workflow: "after-merge", Trigger: "event", Outcome: "waits", Reason: "decides when a merged or closed event arrives"},
 			{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not matched",
 				Facts: []api.Fact{{Name: "pr.first.due", Value: "false"}, {Name: "pr.first.reason", Value: "the author is a bot"}}},
@@ -220,10 +229,10 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	if !slices.Equal(queries, []string{"github:acme/api#7", "github:acme/api#7", "github:acme/api#7"}) {
 		t.Fatalf("queries %q", queries)
 	}
-	want := "github:acme/api#7\n" +
+	want := "acme/api#7  Batch export\n" +
 		"pending (1)\n" +
-		"  1f2e3d4c  review-follow-up  github:acme/api#7: new commits since your review\n" +
-		"            runs in 4m0s · steps turn.start\n" +
+		"  1f2e3d4c  review-follow-up  acme/api#7: new commits since your review\n" +
+		"            Batch export · runs in 4m0s · steps turn.start\n" +
 		"no item (2)\n" +
 		"  after-merge  event, waits: decides when a merged or closed event arrives\n" +
 		"  review-first-round  sweep, not matched\n" +
@@ -239,9 +248,104 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 }
 
 func TestPlanPrintsNoColonForAnItemWithoutReason(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	writePlan(&b, []api.PlanItem{planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_1"}, "0011223344556677", "run", "")}, testNow)
 	if want := "run (1)\n  00112233  session-pr-finished  session:term_1\n"; b.String() != want {
+		t.Fatalf("%q, want %q", b.String(), want)
+	}
+}
+
+func TestPlanNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {
+	var b strings.Builder
+	thread := planItem("slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "ee00ff11ee00ff11", "run", "")
+	thread.Label, thread.Title = "#general", "Launch plan for the export"
+	writePlan(&b, []api.PlanItem{thread}, testNow)
+	if want := "run (1)\n  ee00ff11  slack-follow-up  #general\n            Launch plan for the export\n"; b.String() != want {
+		t.Fatalf("%q, want %q", b.String(), want)
+	}
+}
+
+// TestPlanOfAUnitTakesAnyProviderOrAnItemID names a Slack thread by
+// provider:key, then by the ids of its item: the short one plan printed,
+// found in the daemon's plan with no sweep, the whole one, and one only a
+// sweep plans.
+func TestPlanOfAUnitTakesAnyProviderOrAnItemID(t *testing.T) {
+	th := unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}
+	thread := planItem("slack-follow-up", th, "ee00ff11ee00ff11", "pending", "asked you a question")
+	thread.Label, thread.Title = "#general", "Launch plan for the export"
+	later := planItem("slack-follow-up", th, "aa11bb22aa11bb22", "pending", "asked you a question")
+	later.Label, later.Title = thread.Label, thread.Title
+	var queries []string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) { json.NewEncoder(w).Encode(api.Health{}) })
+	mux.HandleFunc("GET "+api.Plan, func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.RawQuery)
+		switch {
+		case r.URL.Query().Get("unit") != "":
+			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread}, Errors: []string{}, Unit: th.String(), Label: "#general", Title: "Launch plan for the export"})
+		case r.URL.Query().Get("trigger") == "sweep":
+			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread, later}, Errors: []string{}})
+		default:
+			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread}, Errors: []string{}})
+		}
+	})
+	te := newTestEnv(t, &fake.Manager{})
+	te.Socket = serveSocket(t, mux)
+	want := "#general  Launch plan for the export  (slack:T1/C1/171.1)\n" +
+		"pending (1)\n" +
+		"  ee00ff11  slack-follow-up  #general: asked you a question\n" +
+		"            Launch plan for the export · waits for you\n"
+	asked := "unit=slack%3AT1%2FC1%2F171.1"
+	for arg, sent := range map[string][]string{
+		"slack:T1/C1/171.1": {asked},
+		"ee00ff11":          {"", asked},
+		thread.ID:           {"", asked},
+		"aa11bb22":          {"", "trigger=sweep", asked},
+	} {
+		te.out.Reset()
+		queries = nil
+		if code := te.run("plan", "--unit", arg); code != 0 {
+			t.Fatalf("%s: exit %d: %s", arg, code, te.err)
+		}
+		if te.out.String() != want || !slices.Equal(queries, sent) {
+			t.Fatalf("%s: queries %q, printed\n%s\nwant\n%s", arg, queries, te.out, want)
+		}
+	}
+	for arg, says := range map[string]string{"ffffffff": "no item ffffffff", "term_3": "term_3 names no unit"} {
+		te.err.Reset()
+		queries = nil
+		if code := te.run("plan", "--unit", arg); code == 0 || !strings.Contains(te.err.String(), says) {
+			t.Fatalf("%s: exit %d: %s", arg, code, te.err)
+		}
+		if arg == "term_3" && len(queries) != 0 {
+			t.Fatalf("a word that is no id asked the daemon %q", queries)
+		}
+	}
+}
+
+func TestThePlanHeaderComparesTheLabelWithTheExplainedUnit(t *testing.T) {
+	for _, c := range []struct {
+		res  api.PlanResponse
+		want string
+	}{
+		{api.PlanResponse{Unit: "github:acme/api#7", Label: "acme/api#7", Title: "Batch export"}, "acme/api#7  Batch export"},
+		{api.PlanResponse{Unit: "session:term_1", Label: "session:term_1"}, "session:term_1"},
+		{api.PlanResponse{Unit: "slack:T1/C1/171.1", Label: "#general\x1b[31m\n", Title: "Launch\nplan"}, "#general [31m  Launch plan  (slack:T1/C1/171.1)"},
+		{api.PlanResponse{Unit: "github:acme/api#7"}, "github:acme/api#7"},
+	} {
+		if got := unitHeader(c.res); got != c.want {
+			t.Errorf("unitHeader(%+v) = %q, want %q", c.res, got, c.want)
+		}
+	}
+}
+
+func TestPlanCleansARowsLabel(t *testing.T) {
+	var b strings.Builder
+	it := planItem("slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "ee00ff11ee00ff11", "run", "")
+	it.Label = "DM with ana\npending (9)"
+	writePlan(&b, []api.PlanItem{it}, testNow)
+	if want := "run (1)\n  ee00ff11  slack-follow-up  DM with ana pending (9)\n"; b.String() != want {
 		t.Fatalf("%q, want %q", b.String(), want)
 	}
 }

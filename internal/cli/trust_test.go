@@ -88,6 +88,7 @@ func newRepo() *fake.Manager {
 }
 
 func TestAnUntrustedWorktreeFailsBeforeItsSessionStarts(t *testing.T) {
+	t.Parallel()
 	m := newRepo()
 	te := newTestEnv(t, m)
 	home, file := untrustedHome(t)
@@ -219,6 +220,7 @@ func TestABlockedStartExplainsWhatTheUserAnswers(t *testing.T) {
 }
 
 func TestTrustCommandTrustsTheRepositoryOnlyWhenTheUserRunsIt(t *testing.T) {
+	t.Parallel()
 	root := gitRepo(t)
 	wt := filepath.Join(t.TempDir(), "wt")
 	if out, err := exec.Command(gitx.Binary(), "-C", root, "worktree", "add", "-q", "-b", "feature", wt).CombinedOutput(); err != nil {
@@ -303,6 +305,7 @@ func blockedTriage(t *testing.T) (*fake.Manager, *testEnv, *memRecorder, string)
 }
 
 func TestTrustAndRunTrustsTheBlockedFolderAndStartsTheRound(t *testing.T) {
+	t.Parallel()
 	m, te, rec, file := blockedTriage(t)
 	var out strings.Builder
 	if err := (envActions{e: te.Env}).TrustAndRun(context.Background(), pr9.Unit(), daemon.Call{Out: &out}); err != nil {
@@ -322,6 +325,7 @@ func TestTrustAndRunTrustsTheBlockedFolderAndStartsTheRound(t *testing.T) {
 }
 
 func TestTrustBlockedExactTrustsTheWorktreeAlone(t *testing.T) {
+	t.Parallel()
 	_, te, _, file := blockedTriage(t)
 	home := te.cfg.AgentHome
 	b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/repo/api", Folder: "/wt/review-api-9", Home: home, Homes: []string{home}, Round: "first round"}
@@ -344,6 +348,7 @@ func TestTrustBlockedExactTrustsTheWorktreeAlone(t *testing.T) {
 }
 
 func TestTrustAndRunInTheTerminalsOwnHomeTrustsTheHomesTheBlockNames(t *testing.T) {
+	t.Parallel()
 	m, te := reviewedAuthorScenario(t)
 	def, profile, project := blindHomes(t, te)
 	te.gh.basics = pr9Basics
@@ -386,6 +391,7 @@ func TestARoundByHandPastTheBlockedQuestionLiftsTheBlock(t *testing.T) {
 }
 
 func TestARoundByHandStoppedOnTheBlockedQuestionKeepsTheBlock(t *testing.T) {
+	t.Parallel()
 	m, te, rec, _ := blockedTriage(t)
 	m.Blocked = workspace.ReasonTrust
 	if err := (envActions{e: te.Env}).Run(context.Background(), pr9.Unit(), daemon.Call{Out: &strings.Builder{}}); err == nil {

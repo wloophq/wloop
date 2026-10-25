@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -16,6 +17,9 @@ type PlanItem struct {
 	Mode     string        `json:"mode"`
 	Error    string        `json:"error,omitempty"`
 	Unit     unit.Unit     `json:"unit"`
+	Label    string        `json:"label"`           // Unit as a person reads it
+	Title    string        `json:"title,omitempty"` // Unit's row title
+	Link     string        `json:"link,omitempty"`  // Unit's row link
 	Steps    []string      `json:"steps"`
 	Deadline time.Time     `json:"deadline,omitzero"`
 	Gain     Gain          `json:"gain"`
@@ -23,6 +27,9 @@ type PlanItem struct {
 	Attempts int           `json:"attempts,omitempty"`
 	Actions  []ActionState `json:"actions"` // built by internal/catalog only
 }
+
+// UnitLabel is the item's unit as a person reads it.
+func (it PlanItem) UnitLabel() string { return cmp.Or(it.Label, it.Unit.Label()) }
 
 type Gain struct {
 	MemoryBytes int64 `json:"memory_bytes"`
@@ -58,6 +65,8 @@ type PlanResponse struct {
 	Closed []ClosedSession `json:"closed,omitempty"`
 	// Unit is the unit a Unit query explained, as its provider lists it.
 	Unit      string         `json:"unit,omitempty"`
+	Label     string         `json:"label,omitempty"` // Unit as a person reads it
+	Title     string         `json:"title,omitempty"` // Unit's row title
 	Workflows []UnitWorkflow `json:"workflows,omitempty"`
 }
 

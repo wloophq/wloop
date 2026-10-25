@@ -77,6 +77,7 @@ func outcomesOf(log []coreitems.LogEntry) []string {
 }
 
 func TestRetriedTurnEndAppliesOnce(t *testing.T) {
+	t.Parallel()
 	te, u := ledgerTurn(t, "abc")
 	ctx := context.Background()
 	kind, sum := items.Todo, "Add a test for the backoff"
@@ -120,6 +121,7 @@ func TestRetriedTurnEndAppliesOnce(t *testing.T) {
 }
 
 func TestHistoryShowsLedgerOps(t *testing.T) {
+	t.Parallel()
 	te, u := ledgerTurn(t, "abc")
 	ctx := context.Background()
 	other := "x"
@@ -145,6 +147,7 @@ func TestHistoryShowsLedgerOps(t *testing.T) {
 }
 
 func TestTurnsWithoutALedgerListNoItems(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if te.Env.itemsReader() != nil {
 		t.Fatal("a reader without a ledger")
@@ -165,6 +168,7 @@ func (te *testEnv) unitBook(t *testing.T, u unit.Unit) dturn.Book {
 }
 
 func TestTheMCPEndpointAppliesTurnLedgerOnARealStore(t *testing.T) {
+	t.Parallel()
 	te, u := ledgerTurn(t, "abc")
 	d := mcpEndpoint{port: 47801}.wire(daemon.Deps{Turns: te.Turns}, te.cfg)
 	rpc := func(handle, sid, body string) *httptest.ResponseRecorder {
@@ -202,6 +206,7 @@ func TestTheMCPEndpointAppliesTurnLedgerOnARealStore(t *testing.T) {
 }
 
 func TestTurnLedgerCostOnARealStore(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("measures")
 	}
@@ -253,6 +258,7 @@ func TestTurnLedgerCostOnARealStore(t *testing.T) {
 }
 
 func TestTurnOpsStayOnTheTurnsUnit(t *testing.T) {
+	t.Parallel()
 	te, u := ledgerTurn(t, "abc")
 	ctx := context.Background()
 	other := ghUnit(8)
@@ -279,6 +285,7 @@ func TestTurnOpsStayOnTheTurnsUnit(t *testing.T) {
 }
 
 func TestRestatedCreateInALaterRecordIsANoop(t *testing.T) {
+	t.Parallel()
 	te, u := ledgerTurn(t, "abc")
 	ctx := context.Background()
 	kind, sum := items.Todo, "Add a test for the backoff"

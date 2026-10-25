@@ -26,7 +26,7 @@ func TestModuleIsValid(t *testing.T) {
 	if err := f.mod.Valid(); err != nil {
 		t.Fatal(err)
 	}
-	if f.mod.ID != dslack.Provider || f.mod.Ingest.Every != time.Minute || f.mod.Run == nil || f.mod.Track == nil {
+	if f.mod.ID != dslack.Provider || f.mod.Ingest.Every != time.Minute || f.mod.Run == nil || f.mod.Track == nil || !f.mod.Reacts {
 		t.Fatalf("module %+v", f.mod)
 	}
 	bare, err := Module(f.cfg, sourcereg.Deps{}, Slack{})

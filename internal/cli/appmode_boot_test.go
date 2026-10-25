@@ -12,6 +12,7 @@ func (a *bootApp) Refresh(context.Context)   { a.calls = append(a.calls, "refres
 func (a *bootApp) Run(context.Context) error { a.calls = append(a.calls, "run"); return nil }
 
 func TestBootMenubarLoadsOnceWithTheDaemonUp(t *testing.T) {
+	t.Parallel()
 	app := &bootApp{}
 	waited := false
 	err := bootMenubar(context.Background(), func(context.Context) error { return nil },
@@ -22,6 +23,7 @@ func TestBootMenubarLoadsOnceWithTheDaemonUp(t *testing.T) {
 }
 
 func TestBootMenubarPaintsTheErrorMenuWithTheDaemonDown(t *testing.T) {
+	t.Parallel()
 	app := &bootApp{}
 	err := bootMenubar(context.Background(), func(context.Context) error { return errors.New("down") },
 		func(context.Context) error { return nil }, app)

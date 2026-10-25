@@ -16,7 +16,7 @@ import (
 
 // noPlugins stands in for plugins.js where a test runs app.js's functions
 // alone.
-const noPlugins = "const pluginViews = new Map();\nconst applyPlugins = () => {};\nconst providerName = (id) => id;\n"
+const noPlugins = "const pluginViews = new Map();\nconst applyPlugins = () => {};\nconst providerName = (id) => id;\nconst providerReacts = () => false;\n"
 
 func pluginsJS(t *testing.T) string {
 	t.Helper()

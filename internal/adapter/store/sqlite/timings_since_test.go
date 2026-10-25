@@ -10,6 +10,7 @@ import (
 )
 
 func TestAFreshStoreRecordsWhenTimingsBegin(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "inv.db")
 	before := time.Now().Add(-time.Second)
 	db, err := Open(path, nil)

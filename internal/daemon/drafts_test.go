@@ -180,6 +180,7 @@ func (r *outboxRig) act(t *testing.T, id draft.ID, action, body string) (int, ap
 }
 
 func TestDraftsListByState(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	first := r.propose(t, r7u, "first", draft.Always)
 	r.clock.set(entriesNow.Add(time.Minute))
@@ -209,6 +210,7 @@ func TestDraftsListByState(t *testing.T) {
 }
 
 func TestApproveWithEditedText(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "Thanks, merging", draft.Always)
 	code, got, body := r.act(t, d.ID, "approve", `{"rev":0,"text":"Thanks! Merging now."}`)
@@ -224,6 +226,7 @@ func TestApproveWithEditedText(t *testing.T) {
 }
 
 func TestApproveAnswers409WhenPluginDisabled(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 	code, _, body := r.act(t, d.ID, "approve", `{}`)
@@ -238,6 +241,7 @@ func TestApproveAnswers409WhenPluginDisabled(t *testing.T) {
 }
 
 func TestDraftActionStatuses(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "hello", draft.Always)
 	cases := []struct {
@@ -273,6 +277,7 @@ func TestDraftActionStatuses(t *testing.T) {
 }
 
 func TestEnabledPluginWithoutPublisherAnswers409(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 	code, _, body := r.act(t, d.ID, "approve", `{"rev":0}`)
@@ -319,6 +324,7 @@ func (c draftClock) next(t *testing.T) time.Duration {
 }
 
 func TestApprovedDraftPublishesOnWake(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.posted = make(chan draft.ID, 4)
 	d := r.propose(t, r7u, "ship it", draft.Always)
@@ -347,6 +353,7 @@ func TestApprovedDraftPublishesOnWake(t *testing.T) {
 }
 
 func TestSenderWakesAtTheDeadline(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "auto", draft.Window)
 	clock := r.startSender(t)
@@ -368,6 +375,7 @@ func TestSenderWakesAtTheDeadline(t *testing.T) {
 }
 
 func TestSenderClampsAPastDeadline(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "auto", draft.Window)
 	r.fx.refuse = errors.New("unknown person")
@@ -385,6 +393,7 @@ func TestSenderClampsAPastDeadline(t *testing.T) {
 }
 
 func TestSenderRecoversBeforePublishing(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.found = true
 	stuck := r.stored(t, draft.Draft{Unit: r7u, Text: "was sending", State: draft.Sending, SendingAt: entriesNow})
@@ -401,6 +410,7 @@ func TestSenderRecoversBeforePublishing(t *testing.T) {
 }
 
 func TestOutboxViewListsOpenDrafts(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	a := r.propose(t, r7u, "one", draft.Always)
 	b := r.propose(t, r7u, "two\nsecond line", draft.Always)
@@ -444,6 +454,7 @@ func TestOutboxViewListsOpenDrafts(t *testing.T) {
 }
 
 func TestSendingDraftStaysVisibleBeforeRecovery(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: r7u, Text: "in flight", State: draft.Sending, SendingAt: entriesNow})
 	p := r.page(t, "view=outbox")
@@ -464,6 +475,7 @@ func (r *outboxRig) verb(t *testing.T, id draft.ID, verb, args string) (int, str
 }
 
 func TestOutboxVerbsActOnTheDraft(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	ctx := context.Background()
 	a := r.propose(t, r7u, "approve me", draft.Always)
@@ -503,6 +515,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 }
 
 func TestOutboxVerbsRefuseADisabledPlugin(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 	code, body := r.verb(t, d.ID, "approve", `{}`)
@@ -512,6 +525,7 @@ func TestOutboxVerbsRefuseADisabledPlugin(t *testing.T) {
 }
 
 func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.propose(t, r7u, "watch only", draft.Observe)
 	p := r.page(t, "view=outbox")
@@ -521,6 +535,7 @@ func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
 }
 
 func TestCatalogServesDraftActions(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	var res api.ActionsResponse
 	if code := get(t, r.s, api.Actions, &res); code != 200 {
@@ -554,6 +569,7 @@ func TestCatalogServesDraftActions(t *testing.T) {
 }
 
 func TestDraftActionsDisabledWithPlugin(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, "slack")
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 	var got api.Draft
@@ -574,8 +590,10 @@ func TestDraftActionsDisabledWithPlugin(t *testing.T) {
 }
 
 func TestApproveRefusesAStaleRev(t *testing.T) {
+	t.Parallel()
 	for _, path := range []string{"route", "entry verb"} {
 		t.Run(path, func(t *testing.T) {
+			t.Parallel()
 			r := newOutboxRig(t)
 			d := r.propose(t, r7u, "as seen", draft.Always)
 			var seen api.Draft
@@ -601,6 +619,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 }
 
 func TestApproveWithRevPostsTheTextAtThatRev(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "as seen", draft.Always)
 	var seen api.Draft
@@ -612,6 +631,7 @@ func TestApproveWithRevPostsTheTextAtThatRev(t *testing.T) {
 }
 
 func TestApproveNeedsTheRev(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.propose(t, r7u, "x", draft.Always)
 	if code, _, body := r.act(t, d.ID, "approve", `{}`); code != 400 || !strings.Contains(body, "takes the rev") {
@@ -626,6 +646,7 @@ func TestApproveNeedsTheRev(t *testing.T) {
 }
 
 func TestRetryRefusesAStaleRev(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: r7u, Text: "failed once", State: draft.Failed, Error: "refused"})
 	if code, _, body := r.act(t, d.ID, "retry", `{}`); code != 400 || !strings.Contains(body, "rev") {
@@ -646,6 +667,7 @@ func TestRetryRefusesAStaleRev(t *testing.T) {
 }
 
 func TestDraftsShowWhereTheyPost(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.whereErr = errors.New("not logged in")
 	failed := r.propose(t, r7u, "hi", draft.Always)
@@ -708,6 +730,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 }
 
 func TestDraftTitleNamesWhereItGoes(t *testing.T) {
+	t.Parallel()
 	u := unit.Unit{Provider: "slack", Key: "T0001/C0001/1700000000.000100"}
 	if got := draftTitle(draft.Draft{Unit: u, Kind: draft.Reply, Text: "on it\nmore"}, "#general"); got != "reply on #general: on it" {
 		t.Errorf("title %q", got)
@@ -722,6 +745,7 @@ type unitItems map[unit.Unit][]items.Item
 func (u unitItems) Items(_ context.Context, x unit.Unit) ([]items.Item, error) { return u[x], nil }
 
 func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.s.deps.Items = unitItems{r7u: {{ID: "i1", Summary: "Ship the export", State: items.Open, Kind: items.Request,
 		WaitingOn: []items.Person{{Key: "slack:U0ANA", Name: "Ana Lima", Aliases: []string{"github:ana"}}}}}}

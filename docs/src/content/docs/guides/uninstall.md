@@ -23,7 +23,7 @@ It asks before it removes anything; `--yes` skips the question.
 {{command}} uninstall --purge
 ```
 
-`--purge` also deletes the state directory (`~/.local/state/{{name}}/`: the store, the MCP key, the dossiers and the logs) and the configuration directory (`~/.config/{{name}}/`: `config.json` and the profiles in it). A profile directory outside the configuration directory is never deleted; `uninstall` prints its path so you can remove it yourself. It asks for confirmation unless `--yes`.
+`--purge` also deletes the state directory (`~/.local/state/{{name}}/`: the store and its backups, the MCP key, the dossiers and the logs) and the configuration directory (`~/.config/{{name}}/`: `config.json` and the profiles in it). A profile directory outside the configuration directory is never deleted; `uninstall` prints its path so you can remove it yourself. It asks for confirmation unless `--yes`.
 
 ## Remove the package
 

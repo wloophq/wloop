@@ -358,23 +358,6 @@ func (m *Model) Row(ctx context.Context, u unit.Unit, asked catalog.Asked) (api.
 	return cloneRow(r), err == nil, err
 }
 
-// Labels are the labels of units in the latest snapshot, such as
-// "owner/repo#12" or "#channel"; a unit it does not list has none. It never
-// rebuilds the rows.
-func (m *Model) Labels(units []unit.Unit) map[unit.Unit]string {
-	s := m.cur.Load()
-	if s == nil {
-		return nil
-	}
-	out := make(map[unit.Unit]string, len(units))
-	for _, u := range units {
-		if e, ok := s.byUnit[u]; ok && e.Row.Label != "" {
-			out[u] = e.Row.Label
-		}
-	}
-	return out
-}
-
 // Presentation is a unit's label, title and link as its row shows them.
 type Presentation struct{ Label, Title, Link string }
 

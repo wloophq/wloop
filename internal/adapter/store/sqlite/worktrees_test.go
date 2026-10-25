@@ -20,6 +20,7 @@ func worktreeOf(t *testing.T, w Worktrees, path string) (wsdomain.Custody, bool)
 }
 
 func TestWorktreesKeep(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	w := newStore(t).db.Worktrees()
 	pr7 := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
@@ -57,6 +58,7 @@ func TestWorktreesKeep(t *testing.T) {
 }
 
 func TestWorktreesLinkUnitNeedsTheWorktree(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	w := s.db.Worktrees()
@@ -84,6 +86,7 @@ func TestWorktreesLinkUnitNeedsTheWorktree(t *testing.T) {
 }
 
 func TestWorktreesDropAndList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	w := s.db.Worktrees()

@@ -45,6 +45,7 @@ func writes() metertest.Budget {
 }
 
 func TestGetPathWritesNothing(t *testing.T) {
+	t.Parallel()
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ref := f.Open[0]
@@ -78,6 +79,7 @@ func TestGetPathWritesNothing(t *testing.T) {
 }
 
 func TestNoMuteNoWork(t *testing.T) {
+	t.Parallel()
 	s, _ := newLiveServer(t)
 	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
 		t.Fatal(err)
@@ -90,6 +92,7 @@ func TestNoMuteNoWork(t *testing.T) {
 }
 
 func TestQuietCycleRecordsNoSituation(t *testing.T) {
+	t.Parallel()
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	if err := s.readModel().Refresh(ctx); err != nil {
@@ -111,6 +114,7 @@ func TestQuietCycleRecordsNoSituation(t *testing.T) {
 }
 
 func TestChangedSituationsOneTx(t *testing.T) {
+	t.Parallel()
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	m := s.readModel()
@@ -141,6 +145,7 @@ func TestChangedSituationsOneTx(t *testing.T) {
 }
 
 func TestCheckReportsAStaleRowInDoctorAndHealth(t *testing.T) {
+	t.Parallel()
 	s, f := newLiveServer(t)
 	log := &lineLog{}
 	s.deps.Log = log.logf

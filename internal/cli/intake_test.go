@@ -101,6 +101,7 @@ func seedBrief(t *testing.T, st *inventory.Store) {
 }
 
 func TestReviewFollowsTheIntake(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	briefs := intaketest.NewBriefs(waitBriefing, intake.Readiness{Go: true})
 	d := startIntakeDaemon(t, fa, briefs)
@@ -128,6 +129,7 @@ review acme/api#7: done by the daemon
 }
 
 func TestReviewNoWait(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	d := startIntakeDaemon(t, fa, nil)
 	te := newTestEnv(t, &fake.Manager{})
@@ -143,6 +145,7 @@ func TestReviewNoWait(t *testing.T) {
 }
 
 func TestReviewNoBriefStartsAtOnce(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	briefs := intaketest.NewBriefs(waitBriefing)
 	d := startIntakeDaemon(t, fa, briefs)
@@ -164,6 +167,7 @@ func TestReviewNoBriefStartsAtOnce(t *testing.T) {
 }
 
 func TestInterruptDetaches(t *testing.T) {
+	t.Parallel()
 	d := startIntakeDaemon(t, &recordingActions{}, intaketest.NewBriefs(waitBriefing))
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
@@ -186,6 +190,7 @@ func TestInterruptDetaches(t *testing.T) {
 }
 
 func TestIntakeCommands(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	d := startIntakeDaemon(t, fa, intaketest.NewBriefs(waitBriefing))
 	te := newTestEnv(t, &fake.Manager{})
@@ -226,6 +231,7 @@ func TestIntakeCommands(t *testing.T) {
 }
 
 func TestInstructionsPrintsTheNotReadyText(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "intakes.db"), nil)
 	if err != nil {
@@ -250,6 +256,7 @@ func TestInstructionsPrintsTheNotReadyText(t *testing.T) {
 }
 
 func TestATurnByHandStartsUnderTheHeldLoopMutex(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "intakes.db"), nil)
 	if err != nil {

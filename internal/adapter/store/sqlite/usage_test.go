@@ -37,6 +37,7 @@ func usageEvent(seq int64, source string) port.Event {
 }
 
 func TestTurnAgentRoundTrip(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	b := saveTurns(t, s, turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Sent, SentAt: hours(-2), Agent: "echo", BriefRun: 7})
 	b.Turns[0].State, b.Turns[0].StartedAt, b.Turns[0].AgentSession = turn.Started, hours(-1), "a1"
@@ -51,6 +52,7 @@ func TestTurnAgentRoundTrip(t *testing.T) {
 }
 
 func TestBookSaveKeepsTheUsageColumns(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	ctx := context.Background()
 	b := saveTurns(t, s, turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, SentAt: hours(-2), EndedAt: hours(-1), Agent: "claude", AgentSession: "a1"})
@@ -78,6 +80,7 @@ func TestBookSaveKeepsTheUsageColumns(t *testing.T) {
 }
 
 func TestAgentSessionUpsertKeepsTheTranscript(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	if err := db.SaveAgentSession(ctx, AgentSession{ID: "a1", Kind: "claude", Handle: "term_1", Home: "/h", Worktree: "/w", Transcript: "/h/projects/-w/a1.jsonl", FirstSeen: hours(-3), LastSeen: hours(-2)}); err != nil {
@@ -100,6 +103,7 @@ func TestAgentSessionUpsertKeepsTheTranscript(t *testing.T) {
 }
 
 func TestAgentTranscriptReadsWhatTheHooksStored(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	if err := db.SaveAgentSession(ctx, AgentSession{ID: "a1", Kind: "claude", Transcript: "/h/projects/-w/a1.jsonl", FirstSeen: hours(-1)}); err != nil {
@@ -114,6 +118,7 @@ func TestAgentTranscriptReadsWhatTheHooksStored(t *testing.T) {
 }
 
 func TestPendingJoinsTheAgentSession(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	ctx := context.Background()
 	b := saveTurns(t, s,
@@ -148,6 +153,7 @@ func TestPendingJoinsTheAgentSession(t *testing.T) {
 }
 
 func TestUnavailableLeavesNoUsageRow(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	ctx := context.Background()
 	b := saveTurns(t, s, turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, SentAt: hours(-2), EndedAt: hours(-1), Agent: "echo"})
@@ -170,6 +176,7 @@ func TestUnavailableLeavesNoUsageRow(t *testing.T) {
 }
 
 func TestPendingPutsFailedReadsLast(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	ctx := context.Background()
 	b := saveTurns(t, s,

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -18,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 const (
@@ -121,8 +121,6 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	return 0
 }
 
-var providerArg = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}:\S`)
-
 // unitArg reads the unit a turn command names: a pull request URL, sent as
 // its canonical URL, or "<provider>:<key>", sent as given; label is how the
 // command's output names it.
@@ -131,7 +129,7 @@ func unitArg(raw string) (arg, label string, err error) {
 	if err == nil {
 		return ref.URL(), ref.String(), nil
 	}
-	if providerArg.MatchString(raw) && !strings.HasPrefix(raw, "http") {
+	if p, key, ok := strings.Cut(raw, ":"); ok && unit.ValidProvider(p) && key != "" && strings.IndexByte(" \t\n\f\r", key[0]) < 0 && !strings.HasPrefix(raw, "http") {
 		return raw, raw, nil
 	}
 	return "", "", err

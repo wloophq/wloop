@@ -16,6 +16,7 @@ func (r *entriesRig) serveProjects() {
 }
 
 func TestReviewViewIsServedOnceRegistered(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	var cat api.GTDCatalog
 	get(t, r.s, api.GTDPath, &cat)
@@ -75,6 +76,7 @@ func TestReviewViewIsServedOnceRegistered(t *testing.T) {
 }
 
 func TestProjectEntryViews(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.serveProjects()
 	old := entriesNow.Add(-10 * 24 * time.Hour)

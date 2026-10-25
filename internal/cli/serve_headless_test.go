@@ -21,6 +21,7 @@ import (
 var headlessThread = unit.Unit{Provider: "thread", Key: "C1/1"}
 
 func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)
@@ -61,6 +62,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 }
 
 func TestHeadlessPlacerReadsExistingCheckoutsOnly(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := t.TempDir()
 	cfg := te.cfg
@@ -86,6 +88,7 @@ func TestHeadlessPlacerReadsExistingCheckoutsOnly(t *testing.T) {
 }
 
 func TestHeadlessBuilderRendersActOnAUnitWithNoPayloadReader(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), []string{"i1"})
 	if err != nil {
@@ -99,6 +102,7 @@ func TestHeadlessBuilderRendersActOnAUnitWithNoPayloadReader(t *testing.T) {
 }
 
 func TestTheServedAskerTellsWhenARestrictedCallCannotRun(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Agent = "nobody"
 	a := lazyAsker{e: te.Env, cfg: te.cfg, dir: t.TempDir()}

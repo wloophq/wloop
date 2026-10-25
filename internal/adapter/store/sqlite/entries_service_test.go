@@ -60,6 +60,7 @@ func prUnit(n int) unit.Unit {
 }
 
 func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
+	t.Parallel()
 	r := newEntryRig(t)
 	ctx := context.Background()
 	u := prUnit(1)
@@ -94,6 +95,7 @@ func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
 
 // TestEntriesCost logs what Sync and the reads cost at a realistic scale; it gates nothing.
 func TestEntriesCost(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("cost measurement")
 	}

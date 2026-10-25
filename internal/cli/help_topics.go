@@ -203,11 +203,11 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "What the workflows would do now, and why",
 				Usage: []string{
 					"plan [--workflow <name>] [--provider <id>] [--stored]",
-					"plan --unit <url|owner/repo#n|session:<session-id>|workspace:<worktree-path>>",
+					"plan --unit <url|owner/repo#n|provider:key|id>",
 					"plan apply <id|url>...", "plan dismiss <id|url>...",
 				},
-				About: "Print what the workflows would do now, grouped by decision, with each item's id, reason, window and gain; it changes nothing. " +
-					"--unit tells why nothing happens to a unit: its items, then every workflow that gives it none, with the facts it read. " +
+				About: "Print what the workflows would do now, grouped by decision, with each item's id, unit as its row names it, reason, window and gain; it changes nothing. " +
+					"--unit tells why nothing happens to a unit, such as session:<session-id>, or to the unit of an item by the id plan printed: its items, then every workflow that gives it none, with the facts it read. " +
 					"apply runs pending items now, with the same guards, and dismiss drops them for good; a pull request's URL names its one pending item.",
 				Flags: []helpFlag{
 					{"--workflow <name>", "Only this workflow's items"},
@@ -417,12 +417,39 @@ func helpGroups(manager string) []helpGroup {
 				About: "Take out the daemon's and the menu bar's LaunchAgents, " + app + ".app, the agent homes' entries, the unchanged bundled skills and the Slack tokens. " +
 					"It keeps the config and the data unless --purge, and asks first unless --yes.",
 				Flags: []helpFlag{
-					{"--purge", "Also delete the state and config directories: the store, MCP key, dossiers, logs, config and review profiles"},
+					{"--purge", "Also delete the state and config directories: the store and its backups, MCP key, dossiers, logs, config and review profiles"},
 					{"--dry-run", "Print what would be removed and change nothing"},
 					{"--yes", "Remove without asking"},
 				},
 				Examples: []string{"uninstall --dry-run", "uninstall"},
 				Docs:     "guides/uninstall",
+			},
+			{
+				Names:   []string{"store migrate"},
+				Summary: "Migrate the store to this release's schema",
+				Usage:   []string{"store migrate [--dry-run] [--yes]"},
+				About: "Take the store to this release's schema version: copy it into <state>/backups, run each migration in its own transaction and check the result. " +
+					"A release's daemon does this on its own when it starts; run it when a build that is not a release asks for it, or to retry a migration that failed and see each step. " +
+					"It asks first unless --yes.",
+				Flags: []helpFlag{
+					{"--dry-run", "Print the migrations, the backup and the space it needs, and change nothing"},
+					{"--yes", "Migrate without asking"},
+				},
+				Examples: []string{"store migrate --dry-run", "store migrate"},
+				Docs:     "guides/upgrade",
+			},
+			{
+				Names:   []string{"store restore"},
+				Summary: "Put a backup of the store back",
+				Usage:   []string{"store restore [--list] [<backup>] [--yes]"},
+				About: "Replace the store with a backup from <state>/backups, by default the newest this release reads, keeping the replaced store there as a pre-restore copy. " +
+					"What changed since the backup is lost. A backup older than this release is migrated after. It asks first unless --yes.",
+				Flags: []helpFlag{
+					{"--list", "List the backups with their schema versions and dates"},
+					{"--yes", "Restore without asking"},
+				},
+				Examples: []string{"store restore --list", "store restore"},
+				Docs:     "guides/upgrade",
 			},
 			{
 				Names:    []string{"config get"},

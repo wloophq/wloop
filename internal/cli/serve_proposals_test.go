@@ -50,6 +50,7 @@ func withPublisher(p source.Plugin, pub *proposalPublisher) source.Plugin {
 }
 
 func TestServedProposalsNudgeAStaleWaitingOnTheRealStore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	te := newTestEnv(t, &fake.Manager{})
 	now := testNow

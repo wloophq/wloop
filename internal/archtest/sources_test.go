@@ -1,8 +1,6 @@
 package archtest
 
 import (
-	"go/parser"
-	"go/token"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -39,6 +37,7 @@ func sourceImports(file string, imports []string) []string {
 }
 
 func TestOnlySourcesGoNamesASource(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -48,10 +47,7 @@ func TestOnlySourcesGoNamesASource(t *testing.T) {
 		for _, name := range p.GoFiles {
 			rel := filepath.ToSlash(filepath.Join(self, name))
 			seen = seen || rel == sourcesFile
-			f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(p.Dir, name), nil, parser.ImportsOnly)
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, f := parseFile(t, filepath.Join(p.Dir, name))
 			var imports []string
 			for _, imp := range f.Imports {
 				path, _ := strconv.Unquote(imp.Path.Value)
@@ -68,6 +64,7 @@ func TestOnlySourcesGoNamesASource(t *testing.T) {
 }
 
 func TestOnlySourcesGoNamesASourceFlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	gh, reg := module+"internal/adapter/source/github", module+"internal/source"
 	imports := []string{"context", gh, reg}
 	flagged(t, "sources.go", sourceImports(sourcesFile, imports), 0, "")
@@ -83,6 +80,7 @@ func TestOnlySourcesGoNamesASourceFlagsAPlantedImport(t *testing.T) {
 }
 
 func TestSlackWiringFilesMayNameSlack(t *testing.T) {
+	t.Parallel()
 	eval := module + "internal/adapter/source/slack/eval"
 	_, f := parse(t, `package cli
 import "`+eval+`"

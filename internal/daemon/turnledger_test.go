@@ -12,6 +12,7 @@ import (
 )
 
 func TestTurnEndHTTPReportsLedger(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	l := &turnstest.Ledger{Refuse: map[int]string{2: "item: unknown \"i9\""}, Propose: map[int]bool{1: true}}
 	svc.Items = l

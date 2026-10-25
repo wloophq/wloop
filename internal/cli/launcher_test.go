@@ -50,6 +50,7 @@ func myPRManager() *fake.Manager {
 }
 
 func TestResumeRecreatesTheAuthorWorkspace(t *testing.T) {
+	t.Parallel()
 	m := myPRManager()
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
@@ -84,6 +85,7 @@ func TestResumeRecreatesTheAuthorWorkspace(t *testing.T) {
 }
 
 func TestAResumeKeepsTheSelfReview(t *testing.T) {
+	t.Parallel()
 	m := myPRManager()
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
@@ -110,6 +112,7 @@ func TestAResumeKeepsTheSelfReview(t *testing.T) {
 }
 
 func TestResumeRefusesUnpushedCommits(t *testing.T) {
+	t.Parallel()
 	m := myPRManager()
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
@@ -129,6 +132,7 @@ func TestResumeRefusesUnpushedCommits(t *testing.T) {
 }
 
 func TestResumeOfAReviewRunsInTheReviewWorkspace(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics

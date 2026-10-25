@@ -9,6 +9,7 @@ import (
 )
 
 func TestSessionKeepsItsUnit(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	u := unit.Unit{Provider: "slack", Key: "T000/C001/1.1"}

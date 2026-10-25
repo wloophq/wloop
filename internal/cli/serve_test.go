@@ -185,6 +185,7 @@ func TestServeNoJobsDegradedRunsNoJob(t *testing.T) {
 }
 
 func TestServeNoJobsRegistersNone(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -203,8 +204,10 @@ func TestServeNoJobsRegistersNone(t *testing.T) {
 }
 
 func TestServeNoJobsWritesNoCard(t *testing.T) {
+	t.Parallel()
 	for _, noJobs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("no-jobs=%v", noJobs), func(t *testing.T) {
+			t.Parallel()
 			te := newTestEnv(t, &fake.Manager{})
 			storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 			if err != nil {
@@ -325,6 +328,7 @@ func TestServeNoJobsAnswersMCP(t *testing.T) {
 }
 
 func TestServeMCPPortFlagOverridesTheConfig(t *testing.T) {
+	t.Parallel()
 	cfg := config.Defaults()
 	if d := (mcpEndpoint{}).wire(daemon.Deps{}, cfg); d.MCPPort != config.DefaultMCPPort || d.MCP == nil {
 		t.Fatalf("default: %d %v", d.MCPPort, d.MCP)
@@ -347,6 +351,7 @@ func jobNames(h api.Health) []string {
 }
 
 func TestServeDepsShareTheLoopMutex(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -365,6 +370,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 }
 
 func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Scope.Teams = []string{"acme/platform", "acme/search"}
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
@@ -383,6 +389,7 @@ func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 }
 
 func TestViewerReadsNoGitHub(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -450,6 +457,7 @@ func waitHealth(t *testing.T, e *Env, what string, cond func(api.Health) bool) a
 }
 
 func TestServeRefusesApp(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	err := runServe(context.Background(), te.Env, []string{"--app"})
 	if err == nil || !strings.Contains(err.Error(), "-app") {
@@ -461,6 +469,7 @@ func TestServeRefusesApp(t *testing.T) {
 }
 
 func TestServeDepsBriefOnlyWhenEnabled(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -478,6 +487,7 @@ func TestServeDepsBriefOnlyWhenEnabled(t *testing.T) {
 }
 
 func TestBriefHomeFollowsTheProjectsProfile(t *testing.T) {
+	t.Parallel()
 	cfg := config.Defaults()
 	cfg.Projects = []config.Project{{Match: "me/*", AgentHome: "/home/me/.claude-personal"}}
 	home := briefHome(cfg)
@@ -490,6 +500,7 @@ func TestBriefHomeFollowsTheProjectsProfile(t *testing.T) {
 }
 
 func TestNoBriefsForAnAgentWithoutHeadlessCalls(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -539,6 +550,7 @@ func shownDone(s *testsink.Sink) bool {
 }
 
 func TestEverySinkIsWired(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -556,6 +568,7 @@ func TestEverySinkIsWired(t *testing.T) {
 }
 
 func TestReloadUpdatesEverySink(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -591,6 +604,7 @@ func TestReloadUpdatesEverySink(t *testing.T) {
 }
 
 func TestAReloadOntoAnotherManagerSaysToRestart(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -629,8 +643,10 @@ func TestAReloadOntoAnotherManagerSaysToRestart(t *testing.T) {
 }
 
 func TestASinkNewSinceAStartWithoutSinksIsLogged(t *testing.T) {
+	t.Parallel()
 	for _, noJobs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("no-jobs=%v", noJobs), func(t *testing.T) {
+			t.Parallel()
 			te := newTestEnv(t, &fake.Manager{})
 			storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 			if err != nil {
@@ -663,6 +679,7 @@ func TestASinkNewSinceAStartWithoutSinksIsLogged(t *testing.T) {
 }
 
 func TestUnknownManagerIsLoggedNotSilent(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{ManagerName: "zed"})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -709,6 +726,7 @@ type resumeKind struct {
 func (k resumeKind) Resume(string, string) string { return k.line }
 
 func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -756,6 +774,7 @@ func (spentBudget) SearchStubsFirst(_ context.Context, qs []string, _ int) ([]gi
 }
 
 func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	at := te.Now()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
@@ -789,6 +808,7 @@ type ghFunc func(args ...string) ([]byte, error)
 func (f ghFunc) Run(_ context.Context, args ...string) ([]byte, error) { return f(args...) }
 
 func TestFailedStepsReadsTheJobOnce(t *testing.T) {
+	t.Parallel()
 	var asked [][]string
 	steps := failedSteps(githubtest.Runner(ghFunc(func(args ...string) ([]byte, error) {
 		asked = append(asked, args)
@@ -812,6 +832,7 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestFailedStepsOneRequestPerJob(t *testing.T) {
+	t.Parallel()
 	var paths []string
 	gh := githubtest.Client(roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		paths = append(paths, r.URL.Path)
@@ -841,6 +862,7 @@ func TestFailedStepsOneRequestPerJob(t *testing.T) {
 }
 
 func TestBriefSkipsTheHomeOfAProjectOfAnotherAgent(t *testing.T) {
+	t.Parallel()
 	cfg := config.Defaults()
 	cfg.AgentHome = "/home/me/.claude-work"
 	cfg.Projects = []config.Project{
@@ -861,6 +883,7 @@ func TestBriefSkipsTheHomeOfAProjectOfAnotherAgent(t *testing.T) {
 }
 
 func TestSessionHomesAreCheckedByTheirProjectsKind(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.withEcho()
 	te.cfg.Projects = []config.Project{{Match: "acme/*", Agent: "echo"}}
@@ -897,6 +920,7 @@ func TestSessionHomesAreCheckedByTheirProjectsKind(t *testing.T) {
 }
 
 func TestTheResumeLineOfAnEchoProjectNamesEchosCommand(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.withEcho()
 	te.cfg.Projects = []config.Project{{Match: "acme/*", Agent: "echo"}}
@@ -910,6 +934,7 @@ func TestTheResumeLineOfAnEchoProjectNamesEchosCommand(t *testing.T) {
 }
 
 func TestOrcaSinkGetsTheSectionsColumns(t *testing.T) {
+	t.Parallel()
 	cfg := (&Env{}).defaultConfig()
 	cfg.Views["orca"].Columns["needs-me"] = "waiting-me"
 	cfg.Views["orca"].Columns["working"] = "doing"
@@ -926,6 +951,7 @@ func TestOrcaSinkGetsTheSectionsColumns(t *testing.T) {
 }
 
 func TestHealthNamesTheEnabledManagers(t *testing.T) {
+	t.Parallel()
 	for name, want := range map[string]string{"orca": "Orca", "zed": "zed"} {
 		te := newTestEnv(t, &fake.Manager{ManagerName: name})
 		storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
@@ -944,6 +970,7 @@ func TestHealthNamesTheEnabledManagers(t *testing.T) {
 }
 
 func TestSessionHomesKeepTheRegistryOrder(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	root := t.TempDir()
@@ -990,6 +1017,7 @@ func (g noGH) Run(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func TestATypeOnlyManagerCannotListTerminals(t *testing.T) {
+	t.Parallel()
 	reg := turnstest.NewRegistry()
 	reg.Put(dturn.Session{ID: "term_1", Manager: "fake", Handle: "term_1", WorkspaceID: "ws", Managed: true})
 	var s turns.Sessions = turns.NewRouter(reg, typeOnly{&fake.Manager{}})
@@ -1006,6 +1034,7 @@ func TestATypeOnlyManagerCannotListTerminals(t *testing.T) {
 }
 
 func TestServeNotesOneLogFromStoreAndDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	log := change.NewLog(change.DefaultWindow, nil)
 	te.changes = log
@@ -1031,6 +1060,7 @@ func TestServeNotesOneLogFromStoreAndDaemon(t *testing.T) {
 }
 
 func TestSessionHomesBudget(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	cfg := te.cfg
@@ -1072,6 +1102,7 @@ func TestSessionHomesBudget(t *testing.T) {
 }
 
 func TestServedAgentsComeFromTheSessionsSnapshot(t *testing.T) {
+	t.Parallel()
 	if agents, ok := lastAgents(turns.NewRouter(turnstest.NewRegistry(), typeOnly{&fake.Manager{}})).Agents(); !ok || agents != nil {
 		t.Fatalf("a manager with no agents: %+v %v, want none, known", agents, ok)
 	}
@@ -1081,6 +1112,7 @@ func TestServedAgentsComeFromTheSessionsSnapshot(t *testing.T) {
 }
 
 func TestServeRetainsTheStore(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)
@@ -1147,6 +1179,7 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 }
 
 func TestPendingRoundsReachTheReadModel(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -1182,6 +1215,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 }
 
 func TestThePlanAPIIsServedFromAnEngineOfItsOwn(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -1237,6 +1271,7 @@ func tableSums(t *testing.T, db *sqlite.DB) string {
 }
 
 func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.changes = change.NewLog(change.DefaultWindow, nil)
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), te.changes)
@@ -1280,6 +1315,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 }
 
 func TestDaemonReadsSpawnNoGh(t *testing.T) {
+	t.Parallel()
 	_, te := scenario(t)
 	te.GH = noGH{t}
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)

@@ -3,11 +3,18 @@ package unit
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 )
 
 type ProviderID string
+
+var providerRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
+
+// ValidProvider says whether id has a provider id's shape: a lowercase
+// letter, then up to 31 lowercase letters, digits, dashes or underscores.
+func ValidProvider(id string) bool { return providerRe.MatchString(id) }
 
 const (
 	GitHub    ProviderID = "github"

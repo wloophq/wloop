@@ -40,6 +40,7 @@ func eventually(t *testing.T, what string, ok func() bool) {
 }
 
 func TestOpenMetersEveryHandle(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	for name, h := range map[string]*sql.DB{"writer": db.w, "reader": db.r} {
 		if _, ok := h.Driver().(meteredDriver); !ok {
@@ -78,6 +79,7 @@ func TestOpenMetersEveryHandle(t *testing.T) {
 }
 
 func TestQuerySampleCarriesRows(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx := context.Background()
 	if _, err := db.w.ExecContext(ctx, `CREATE TABLE n (i INTEGER)`); err != nil {
@@ -105,6 +107,7 @@ func TestQuerySampleCarriesRows(t *testing.T) {
 }
 
 func TestReadTxIsRead(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	tx, err := db.r.BeginTx(ctx, nil)
@@ -127,6 +130,7 @@ func TestReadTxIsRead(t *testing.T) {
 }
 
 func TestWriteTxIsWrite(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	tx, err := db.w.BeginTx(ctx, nil)
@@ -162,6 +166,7 @@ func TestWriteTxIsWrite(t *testing.T) {
 }
 
 func TestPreparedStatementsAreMetered(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	tx, err := db.w.BeginTx(ctx, nil)
@@ -190,6 +195,7 @@ func TestPreparedStatementsAreMetered(t *testing.T) {
 }
 
 func TestMeteredRowsKeepColumnTypes(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "types.db")
 	db, err := Open(path, nil)
 	if err != nil {
@@ -227,6 +233,7 @@ func TestMeteredRowsKeepColumnTypes(t *testing.T) {
 }
 
 func TestCanceledIsNotError(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	if _, err := db.w.ExecContext(ctx, `SELECT * FROM no_such_table`); err == nil {
@@ -248,6 +255,7 @@ func TestCanceledIsNotError(t *testing.T) {
 }
 
 func TestRowsClosedEarly(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	rows, err := db.r.QueryContext(ctx, `WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM c WHERE i < 100) SELECT i FROM c`)
@@ -267,6 +275,7 @@ func TestRowsClosedEarly(t *testing.T) {
 }
 
 func TestCanceledRowsAreNotError(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	cctx, cancel := context.WithCancel(ctx)
@@ -288,6 +297,7 @@ func TestCanceledRowsAreNotError(t *testing.T) {
 }
 
 func TestCanceledTxIsNotError(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	cctx, cancel := context.WithCancel(ctx)
@@ -345,6 +355,7 @@ func BenchmarkPointQuery(b *testing.B) {
 }
 
 func TestAgentHomeOneQuery(t *testing.T) {
+	t.Parallel()
 	db := openMetered(t)
 	ctx, s := metertest.Start(t, context.Background())
 	r := NewRounds(db)

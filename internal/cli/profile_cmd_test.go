@@ -26,6 +26,7 @@ func profileEnv(t *testing.T, files map[string]string) (*testEnv, string) {
 }
 
 func TestProfileAddIsADryRunByDefault(t *testing.T) {
+	t.Parallel()
 	te, d := profileEnv(t, nil)
 	if code := te.run("profile", "add", "review,address", "--org", "globex", "--", "Every", "PR", "follows", "xyz."); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -51,6 +52,7 @@ func TestProfileAddIsADryRunByDefault(t *testing.T) {
 }
 
 func TestProfileAddKeepsABackupOutsideGit(t *testing.T) {
+	t.Parallel()
 	te, d := profileEnv(t, map[string]string{"intent=review.md": "OLD"})
 	if code := te.run("profile", "add", "review", "--apply", "--", "NEW"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -65,6 +67,7 @@ func TestProfileAddKeepsABackupOutsideGit(t *testing.T) {
 }
 
 func TestAddNormalizesTheTag(t *testing.T) {
+	t.Parallel()
 	te, _ := profileEnv(t, nil)
 	if code := te.run("profile", "add", "review", "--tag", "lang=Golang", "--", "x"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -91,6 +94,7 @@ func TestAddNormalizesTheTag(t *testing.T) {
 }
 
 func TestProfileWithoutAProfile(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Profile = ""
 	if code := te.run("profile", "add", "review", "--", "x"); code != 1 || !strings.Contains(te.err.String(), "no review profile is configured; set profile in "+te.ConfigPath+" to a directory") {
@@ -99,6 +103,7 @@ func TestProfileWithoutAProfile(t *testing.T) {
 }
 
 func TestProfileWhere(t *testing.T) {
+	t.Parallel()
 	te, d := profileEnv(t, map[string]string{"intent=review.md": "ROOT", "organization=acme/intent=review.md": "ACME", "user=ana/intent=review.md": "ANA"})
 	if code := te.run("profile", "where", "review", "--org", "acme", "--repo", "api"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -116,6 +121,7 @@ func TestProfileWhere(t *testing.T) {
 }
 
 func TestProfileCheckExitsOneOnAnError(t *testing.T) {
+	t.Parallel()
 	te, _ := profileEnv(t, map[string]string{"intent=review.md": "R", "organization=acme/kind=fix/intent=address.md": "A"})
 	if code := te.run("profile", "check"); code != 0 || !strings.Contains(te.out.String(), "address  organization=acme/kind=fix/intent=address.md   organization acme, kind fix") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
@@ -129,6 +135,7 @@ func TestProfileCheckExitsOneOnAnError(t *testing.T) {
 }
 
 func TestProfileCheckPrintsASortedProblemForABrokenIntent(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, nil)
 	src := filepath.Join("..", "intent", "testdata", "bad", "predicate-typo", "intents", "ask-author")
@@ -176,6 +183,7 @@ func TestProfileCheckPrintsASortedProblemForABrokenIntent(t *testing.T) {
 }
 
 func TestAddFoldsTheAssociationAndRefusesASlash(t *testing.T) {
+	t.Parallel()
 	te, _ := profileEnv(t, nil)
 	if code := te.run("profile", "add", "review", "--association", "FIRST_TIME_CONTRIBUTOR", "--", "Welcome them."); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -193,6 +201,7 @@ func TestAddFoldsTheAssociationAndRefusesASlash(t *testing.T) {
 }
 
 func TestAddOnAnExistingBlockNamesWhyFrontMatterIsRefused(t *testing.T) {
+	t.Parallel()
 	te, _ := profileEnv(t, map[string]string{"intent=review.md": "R"})
 	if code := te.run("profile", "add", "review", "--paths", "src/**", "--", "x"); code != 1 || !strings.Contains(te.err.String(), "applies to every rule in a block") {
 		t.Fatalf("exit %d: %s", code, te.err)

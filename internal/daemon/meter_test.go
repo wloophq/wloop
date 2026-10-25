@@ -28,6 +28,7 @@ func meteredRegistry(t *testing.T, now *time.Time) (*meter.Registry, context.Con
 }
 
 func TestTheMeterLoadIsByResource(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 	reg, ctx := meteredRegistry(t, &now)
 	_, scope := meter.Start(ctx, meter.Job("fast"))
@@ -71,6 +72,7 @@ func getHealthRaw(t *testing.T, s *Server, raw *[]byte) api.Health {
 }
 
 func TestHealthGrowsAtMost2KB(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 	names := []string{"fast", "slow", "sweep", "brief", "usage"}
 	build := func(metered bool) []byte {
@@ -110,6 +112,7 @@ func TestHealthGrowsAtMost2KB(t *testing.T) {
 }
 
 func TestAdminMeterListsScopes(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 	reg, ctx := meteredRegistry(t, &now)
 	jctx, job := meter.Start(ctx, meter.Job("fast"))
@@ -156,6 +159,7 @@ func TestAdminMeterListsScopes(t *testing.T) {
 }
 
 func TestDoctorLoadChecks(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 	reg, ctx := meteredRegistry(t, &now)
 	jctx, job := meter.Start(ctx, meter.Job("fast"))
@@ -184,6 +188,7 @@ func TestDoctorLoadChecks(t *testing.T) {
 }
 
 func TestLoadCarriesFallbacksAndCLIOps(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 	reg, ctx := meteredRegistry(t, &now)
 	spend(ctx, meter.Workspace, "rpc terminal.list", 5, false)
@@ -202,6 +207,7 @@ func TestLoadCarriesFallbacksAndCLIOps(t *testing.T) {
 }
 
 func TestDoctorLoadChecksNameAWindowOfAtLeastAMinute(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	reg := meter.NewRegistry(func() time.Time { return now })
 	meter.Add(meter.WithRegistry(context.Background(), reg), meter.Sample{Res: meter.Git, Op: "status", Spawn: true})
