@@ -369,6 +369,7 @@ func TestInstallSkipsAnAbsentHome(t *testing.T) {
 }
 
 func TestInstallPrintsABundledSkill(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("install", "--print-skill", brand.Name+"-review"); code != 0 || te.out.String() != string(te.renderSkill(bundledSkill(t, brand.Name+"-review"))) {
 		t.Fatalf("exit %d: %s", code, te.err)

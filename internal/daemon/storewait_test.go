@@ -15,6 +15,7 @@ import (
 )
 
 func TestStoreWaitAnswersItsHealthAndRefusesTheRestUntilReady(t *testing.T) {
+	t.Parallel()
 	dir, err := os.MkdirTemp("", "sw")
 	if err != nil {
 		t.Fatal(err)

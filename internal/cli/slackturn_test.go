@@ -120,6 +120,7 @@ func withSlackTurns(t *testing.T, te *testEnv) {
 }
 
 func TestSharedWorkspaceKeepsSlackSessionsApart(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList:      []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-main", RepoID: "r1", Path: "/src/api", DisplayName: "api", HostID: wsdomain.LocalHost, IsMain: true}},
@@ -318,6 +319,7 @@ func (a *promptAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) 
 }
 
 func TestHeadlessPromptCarriesFacts(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	checkout := t.TempDir()

@@ -86,6 +86,7 @@ func userProfile(t *testing.T, te *testEnv, files map[string]string) string {
 var askAuthorFixture, _ = filepath.Abs(filepath.Join("..", "intent", "testdata", "good", "ask-author", "intents", "ask-author"))
 
 func TestCommandLinesParse(t *testing.T) {
+	t.Parallel()
 	reg := turnBundled(t).Registry
 	for _, c := range []struct {
 		intent dintent.Name
@@ -118,6 +119,7 @@ func TestCommandLinesParse(t *testing.T) {
 }
 
 func TestAFlagOfAnotherIntentIsRefusedBeforeGuidance(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		args []string
 		want string
@@ -138,6 +140,7 @@ func TestAFlagOfAnotherIntentIsRefusedBeforeGuidance(t *testing.T) {
 }
 
 func TestHelpListsTheRegistrysIntents(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, nil)
 	if code := te.run("help"); code != 0 {
@@ -174,6 +177,7 @@ func TestHelpListsTheRegistrysIntents(t *testing.T) {
 }
 
 func TestReservedNamesCoverEveryCommand(t *testing.T) {
+	t.Parallel()
 	bundled := turnBundled(t).Registry
 	for name := range commands() {
 		if strings.HasPrefix(name, "-") {
@@ -189,6 +193,7 @@ func TestReservedNamesCoverEveryCommand(t *testing.T) {
 }
 
 func TestInstructionsTakesTheIntentsFlags(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	userProfile(t, te, nil)
 	inSession(te, "term_1")
@@ -209,6 +214,7 @@ func TestInstructionsTakesTheIntentsFlags(t *testing.T) {
 }
 
 func TestInstructionsRefusesFlagsWithTheSpecTexts(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	userProfile(t, te, nil)
 	inSession(te, "term_1")
@@ -226,6 +232,7 @@ func TestInstructionsRefusesFlagsWithTheSpecTexts(t *testing.T) {
 }
 
 func TestARoundTakesNoInputs(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("instructions", "address", "--turn", "abc123abc123", "--take-over", r7.URL()); code == 0 || !strings.Contains(te.err.String(), "--turn prints a stored turn; it takes no --take-over and no guidance") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -233,6 +240,7 @@ func TestARoundTakesNoInputs(t *testing.T) {
 }
 
 func TestARoundReadsAnyRegistryIntent(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	userProfile(t, te, nil)
@@ -255,6 +263,7 @@ func TestARoundReadsAnyRegistryIntent(t *testing.T) {
 }
 
 func TestRoundPolicyAllowsEveryIntentsStoredTurn(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Executable = "/Apps/" + brand.Name
 	userProfile(t, te, nil)
@@ -274,6 +283,7 @@ func TestRoundPolicyAllowsEveryIntentsStoredTurn(t *testing.T) {
 }
 
 func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.ProjectSettings = map[string]string{"review": `pr.visibility == "private"`}
 	pr := func(visibility string) *github.PullRequest {
@@ -302,6 +312,7 @@ func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) 
 }
 
 func TestEvalInstructionsFiltersScenarios(t *testing.T) {
+	t.Parallel()
 	names := func(args ...string) []string {
 		t.Helper()
 		got, err := evalScenarios(args)
@@ -335,6 +346,7 @@ func TestEvalInstructionsFiltersScenarios(t *testing.T) {
 }
 
 func TestABrokenUserIntentsCommandPrintsItsProblems(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{
 		"intents/ask-later/intent.toml":          "label = \"Ask later\"\nnope = 1\n",
@@ -350,6 +362,7 @@ func TestABrokenUserIntentsCommandPrintsItsProblems(t *testing.T) {
 }
 
 func TestTheNotOwnedErrorCarriesTheRequestsFlags(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
@@ -366,6 +379,7 @@ func TestTheNotOwnedErrorCarriesTheRequestsFlags(t *testing.T) {
 }
 
 func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
+	t.Parallel()
 	ours, theirs := cliBuiltins(), daemon.Builtins()
 	for slot, names := range builtin.Names {
 		for _, name := range names {
@@ -395,6 +409,7 @@ func turnBundled(t *testing.T) *intentload.Loaded {
 }
 
 func TestProfileSchemaPrintsTheManifestSchema(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	if code := te.run("profile", "schema"); code != 0 || te.out.String() != string(intentload.Schema) {
@@ -403,6 +418,7 @@ func TestProfileSchemaPrintsTheManifestSchema(t *testing.T) {
 }
 
 func TestDoctorLoadsTheIntents(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if got := te.intentChecks(); len(got) != 1 || got[0].mark != markOK || got[0].info != "act address nudge review" {
 		t.Fatalf("checks %+v", got)
@@ -418,6 +434,7 @@ func TestDoctorLoadsTheIntents(t *testing.T) {
 }
 
 func TestDoctorNamesARevertedOverride(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, map[string]string{"intents/nudge/instructions.md.tmpl": "{{\n"})
 	got := te.intentChecks()
@@ -427,6 +444,7 @@ func TestDoctorNamesARevertedOverride(t *testing.T) {
 }
 
 func TestASessionRunsUnderItsManifestsPolicy(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Executable = "/Apps/" + brand.Name
 	opts := intentOptions(dintent.Def{Name: "ask-author", Policy: "probe"}, roundOptions{trusted: true})
@@ -441,6 +459,7 @@ func TestASessionRunsUnderItsManifestsPolicy(t *testing.T) {
 }
 
 func TestAddressByHandSelfReviewRendersTheOwnReview(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-5", DisplayName: "feat-x"})
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
 	if code := te.run("instructions", "address", "https://github.com/acme/api/pull/21", "--self-review", "--", "plan", "text"); code != 0 {
@@ -455,6 +474,7 @@ func TestAddressByHandSelfReviewRendersTheOwnReview(t *testing.T) {
 }
 
 func TestSelfReviewAppliesOnlyToAddress(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{
 		{"instructions", "review", r7.URL(), "--self-review"},
 		{"review", r7.URL(), "--self-review"},
@@ -469,6 +489,7 @@ func TestSelfReviewAppliesOnlyToAddress(t *testing.T) {
 }
 
 func TestARoundTakesNoSelfReview(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("instructions", "address", "--turn", "abc123abc123", "--self-review"); code == 0 || !strings.Contains(te.err.String(), "it takes no --self-review") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -476,6 +497,7 @@ func TestARoundTakesNoSelfReview(t *testing.T) {
 }
 
 func TestAddressSelfReviewThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	te, calls := daemonForActions(t)
 	if code := te.run("address", "https://github.com/acme/api/pull/20", "--self-review", "fix", "the", "plan"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)

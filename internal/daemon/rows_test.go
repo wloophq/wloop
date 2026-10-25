@@ -128,6 +128,7 @@ func requests(logins ...string) func(*dinv.PR) {
 }
 
 func TestPRsSortStalledFirstThenOldest(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	// The store lists by updated_at desc, so it never returns this order by
 	// itself; #5 (checks, 24h threshold) is stalled yet newer than #6.
@@ -143,6 +144,7 @@ func TestPRsSortStalledFirstThenOldest(t *testing.T) {
 }
 
 func TestPRsIgnoreAutomatedAndSkippedReviewers(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	pushed := fixtureNow.Add(-2 * time.Hour)
 	f.open(20, "ana", pushed, requests("fer"),
@@ -157,6 +159,7 @@ func TestPRsIgnoreAutomatedAndSkippedReviewers(t *testing.T) {
 }
 
 func TestPRsViews(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	at := fixtureNow.Add(-time.Hour)
@@ -185,6 +188,7 @@ func TestPRsViews(t *testing.T) {
 }
 
 func TestMyConflictingPullRequestNeedsMe(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
 	conflicting := func(pr *dinv.PR) {
@@ -204,6 +208,7 @@ func TestMyConflictingPullRequestNeedsMe(t *testing.T) {
 }
 
 func TestClosedAndMergedPullRequestsAreInNoOpenView(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	at := fixtureNow.Add(-time.Hour)
@@ -224,6 +229,7 @@ func TestClosedAndMergedPullRequestsAreInNoOpenView(t *testing.T) {
 }
 
 func TestPRsJSONHasEmptyArraysAndSnakeCase(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(33, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons, pr.State = nil, dgh.StateMerged })
 	rec := httptest.NewRecorder()
@@ -240,6 +246,7 @@ func TestPRsJSONHasEmptyArraysAndSnakeCase(t *testing.T) {
 }
 
 func TestViewerCachedForTTLAndStaleOnFailure(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(12, "bob", fixtureNow.Add(-time.Hour), requests("fer"))
 	var calls int
@@ -275,6 +282,7 @@ func TestViewerCachedForTTLAndStaleOnFailure(t *testing.T) {
 }
 
 func TestViewerFailureAtStartupIsCachedBriefly(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	var calls int
 	f.s.deps.Viewer = func(context.Context) (string, []string, error) {
@@ -297,6 +305,7 @@ func TestViewerFailureAtStartupIsCachedBriefly(t *testing.T) {
 }
 
 func TestPostJobs(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.s.jobs["fast"] = newJob("fast", time.Hour, time.Minute, func(context.Context) (string, string, error) { return "", "", nil })
 	for path, want := range map[string]int{"/api/jobs/fast": http.StatusAccepted, "/api/jobs/nope": http.StatusNotFound} {
@@ -314,6 +323,7 @@ func TestPostJobs(t *testing.T) {
 }
 
 func TestLoopAndMineViewsDoNotNeedAScopeReason(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	at := fixtureNow.Add(-time.Hour)
@@ -378,6 +388,7 @@ func (f *fixture) turn(repo *sqlite.Store, n int, intent turn.Intent, state turn
 }
 
 func TestATurnThatWaitsOnMeIsInNeedsMe(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	repo := f.withTurns(turns.AgentObservation{WorkspaceID: "w3", Pane: "t:1", State: turn.AgentWaiting})
@@ -412,6 +423,7 @@ func TestATurnThatWaitsOnMeIsInNeedsMe(t *testing.T) {
 }
 
 func TestAnAskedReviewOutsideTheScopeIsInNeedsMe(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	repo := f.withTurns()
@@ -431,6 +443,7 @@ func TestAnAskedReviewOutsideTheScopeIsInNeedsMe(t *testing.T) {
 }
 
 func TestRowCarriesTheHeadBranch(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(50, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.HeadBranch = "ana/batch-export" })
 	rows := f.rows("?view=all")
@@ -445,6 +458,7 @@ func TestRowCarriesTheHeadBranch(t *testing.T) {
 }
 
 func TestATrackedPullRequestIsInScopeLikeAnyOther(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	old := fixtureNow.Add(-5 * 24 * time.Hour)
@@ -460,6 +474,7 @@ func TestATrackedPullRequestIsInScopeLikeAnyOther(t *testing.T) {
 }
 
 func TestRowHeadIsOneLineOfText(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(51, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.HeadBranch = "ana/\u202efix\u200b-\u2066x" })
 	if rows := f.rows("?view=all"); len(rows) != 1 || payload(rows[0]).Head != "ana/fix-x" {
@@ -468,6 +483,7 @@ func TestRowHeadIsOneLineOfText(t *testing.T) {
 }
 
 func TestRowIsStableAcrossAMinute(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	old := fixtureNow.Add(-3 * time.Hour)
@@ -510,6 +526,7 @@ func (c *countingSessions) Agents(ctx context.Context) ([]turns.AgentObservation
 }
 
 func TestReadPathSpawnsNothing(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	log := change.NewLog(change.DefaultWindow, nil)
@@ -558,6 +575,7 @@ func TestReadPathSpawnsNothing(t *testing.T) {
 }
 
 func TestNoSnapshotMarksWaitingUnread(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	repo := f.withTurns(turns.AgentObservation{WorkspaceID: "w3", Pane: "t:1", State: turn.AgentWaiting})
@@ -580,6 +598,7 @@ func TestNoSnapshotMarksWaitingUnread(t *testing.T) {
 }
 
 func TestUnknownAgentsKeepAMuteUntilStateChange(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	repo := f.withTurns()
@@ -675,6 +694,7 @@ func rowNumber(r api.Row) int {
 }
 
 func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
+	t.Parallel()
 	log := change.NewLog(change.DefaultWindow, nil)
 	stDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "inv.db"), log)
 	if err != nil {

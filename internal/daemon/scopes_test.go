@@ -39,6 +39,7 @@ func serve(t *testing.T, s *Server, ctx context.Context, method, path string) {
 }
 
 func TestRouteScopeNamesPattern(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	reg := meter.NewRegistry(nil)
 	serve(t, s, meter.WithRegistry(context.Background(), reg), http.MethodGet, "/api/units/github/o%2Fr%231")
@@ -48,6 +49,7 @@ func TestRouteScopeNamesPattern(t *testing.T) {
 }
 
 func TestEveryRouteIsScoped(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for _, op := range api.Operations {
 		reg := meter.NewRegistry(nil)
@@ -65,6 +67,7 @@ func TestEveryRouteIsScoped(t *testing.T) {
 }
 
 func TestRequestUnderTestScopeNests(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
 		d.Viewer = func(ctx context.Context) (string, []string, error) {
 			meter.Add(ctx, meter.Sample{Res: meter.GitHub, Op: "viewer"})
@@ -77,6 +80,7 @@ func TestRequestUnderTestScopeNests(t *testing.T) {
 }
 
 func TestIntakeDrivesReachTheRegistry(t *testing.T) {
+	t.Parallel()
 	reg := meter.NewRegistry(nil)
 	s, _ := newIntakeServer(t, nil, func(d *Deps) { d.Meter = reg })
 	ctx := context.Background()
@@ -98,6 +102,7 @@ func TestIntakeDrivesReachTheRegistry(t *testing.T) {
 }
 
 func TestFastPhasesNest(t *testing.T) {
+	t.Parallel()
 	reg := meter.NewRegistry(nil)
 	s := newServerWith(t, func(d *Deps) {
 		d.Meter = reg
@@ -131,6 +136,7 @@ func TestFastPhasesNest(t *testing.T) {
 }
 
 func TestAnIngestJobRunsUnderItsScope(t *testing.T) {
+	t.Parallel()
 	reg := meter.NewRegistry(nil)
 	job := ingest.Job{Every: time.Minute, Prepare: func(ctx context.Context, _ time.Time) (ingest.Plan, string, error) {
 		meter.Add(ctx, meter.Sample{Res: meter.SQL, Op: "query"})
@@ -161,6 +167,7 @@ func (p meteredRows) Listed(ctx context.Context) ([]unit.Unit, error) {
 }
 
 func TestRowFeedRebuildsUnderItsScope(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	log := withLog(t, s)
 	m := readmodel.New(log, nil, nil, nil, nil, meteredRows{&fakeRows{}})
@@ -208,6 +215,7 @@ func drain(t *testing.T, j *job) int {
 }
 
 func TestTheFastJobRunsOncePerIngestion(t *testing.T) {
+	t.Parallel()
 	clock := &stepClock{now: wakeStart}
 	job := ingest.Job{Every: 2 * time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
 		return ingest.Plan{}, "nothing to read", nil

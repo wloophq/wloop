@@ -74,6 +74,7 @@ func rowAttention(t *testing.T, s *Server, row api.Row) *api.Attention {
 }
 
 func TestRowsCarryNoAttention(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	repo := f.withTurns()
 	f.open(30, "ana", fixtureNow.Add(-time.Hour), requests("fer"))
@@ -99,6 +100,7 @@ func actionsOf(a *api.Attention) []string {
 }
 
 func TestAttentionForAQuestion(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	repo := f.withTurns()
 	f.open(30, "ana", fixtureNow.Add(-time.Hour), requests("fer"))
@@ -130,6 +132,7 @@ func TestAttentionForAQuestion(t *testing.T) {
 }
 
 func TestAttentionForAConfirmAndAStop(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	repo := f.withTurns()
 	f.open(31, "ana", fixtureNow.Add(-time.Hour), requests("fer"))
@@ -156,6 +159,7 @@ func TestAttentionForAConfirmAndAStop(t *testing.T) {
 }
 
 func TestAPermissionPromptOffersNoAnswer(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	repo := f.withTurns(turns.AgentObservation{WorkspaceID: "w3", Pane: "t:1", State: turn.AgentWaiting})
@@ -174,6 +178,7 @@ func TestAPermissionPromptOffersNoAnswer(t *testing.T) {
 }
 
 func TestOnlyNeedsMeRowsCarryAnAttentionItem(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	f.open(40, "ana", fixtureNow.Add(-time.Hour), func(pr *dinv.PR) { pr.Reasons = nil })
@@ -193,6 +198,7 @@ func TestOnlyNeedsMeRowsCarryAnAttentionItem(t *testing.T) {
 }
 
 func TestNudgeComputedOnce(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
 	f.open(50, "fer", at, requests("ana", "robo"))
@@ -221,6 +227,7 @@ func TestNudgeComputedOnce(t *testing.T) {
 }
 
 func TestTheRowShowsTheQuestionAnAnswerReaches(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	repo := f.withTurns()
 	f.open(33, "ana", fixtureNow.Add(-time.Hour), requests("fer"))

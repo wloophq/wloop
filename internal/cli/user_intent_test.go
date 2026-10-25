@@ -18,6 +18,7 @@ import (
 )
 
 func TestAUserIntentGoesThroughTheWholeTurn(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
@@ -126,6 +127,7 @@ func storedText(t *testing.T, te *testEnv, round string) string {
 }
 
 func TestABrokenUserIntentsBlocksLeaveEveryOtherRoundAlone(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics

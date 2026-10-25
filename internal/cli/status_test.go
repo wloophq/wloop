@@ -16,6 +16,7 @@ import (
 )
 
 func TestStatusUsesDaemonWhenUp(t *testing.T) {
+	t.Parallel()
 	web := pr.Ref{Owner: "acme", Repo: "web", Number: 12}
 	rows := []api.Row{
 		{Unit: r7.Unit(), Label: r7.String(), Title: "Batch export", Views: []string{api.ViewNeedsMe}, Payload: rowPayload(prrow.Payload{Repo: "acme/api"}), Summary: api.Summary{WaitsOn: "me", Since: testNow.Add(-3 * time.Hour), Reason: "review requested"}},
@@ -36,6 +37,7 @@ func TestStatusUsesDaemonWhenUp(t *testing.T) {
 }
 
 func TestStatusPipedStaysTabSeparatedUnderCLICOLOR_FORCE(t *testing.T) {
+	t.Parallel()
 	rows := []api.Row{{Unit: r7.Unit(), Label: r7.String(), Title: "Batch export", Views: []string{api.ViewNeedsMe}, Payload: rowPayload(prrow.Payload{Repo: "acme/api"}), Summary: api.Summary{WaitsOn: "me", Since: testNow.Add(-3 * time.Hour), Reason: "review requested"}}}
 	te := newTestEnv(t, &fake.Manager{})
 	te.Getenv = func(k string) string { return map[string]string{"CLICOLOR_FORCE": "1"}[k] }
@@ -49,6 +51,7 @@ func TestStatusPipedStaysTabSeparatedUnderCLICOLOR_FORCE(t *testing.T) {
 }
 
 func TestStatusSaysWhenTheViewsAreEmpty(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}}})
 	if code := te.run("status"); code != 0 {
@@ -65,6 +68,7 @@ func TestStatusSaysWhenTheViewsAreEmpty(t *testing.T) {
 }
 
 func TestStatusListsTheTrackedPullRequests(t *testing.T) {
+	t.Parallel()
 	web := pr.Ref{Owner: "acme", Repo: "web", Number: 12}
 	rows := []api.Row{
 		{Unit: r7.Unit(), Label: r7.String(), Title: "Batch export", Views: []string{}, Payload: rowPayload(prrow.Payload{Repo: "acme/api", Override: api.Override{Tracked: true}}), Summary: api.Summary{WaitsOn: "bob", Since: testNow.Add(-3 * time.Hour)}},
@@ -92,6 +96,7 @@ func statusFixture() []statusSection {
 }
 
 func TestStatusReadsAsAlignedSectionsOnATerminal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	writeStatus(te.Env, termfmt.Term{TTY: true, Color: true, Width: 90}, statusFixture(), testNow)
 	got := te.out.String()
@@ -104,6 +109,7 @@ func TestStatusReadsAsAlignedSectionsOnATerminal(t *testing.T) {
 }
 
 func TestStatusPipedIsTabSeparatedAndWhole(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	writeStatusTSV(te.Env, statusFixture(), testNow)
 	want := "needs-me\tteam:acme/reviewers, carla, bob\t9d\tacme/web#1365\t✨ feat: 日本語のタイトルがとても長い and a title that goes on past the width\tchecks failing: build-py3 (ci-pipeline); reviewed by frankhopper1, erinsantos-qa, frankoliveira\n" +

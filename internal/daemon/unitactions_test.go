@@ -10,6 +10,7 @@ import (
 )
 
 func TestAUnitIntentRefusesWhatOnlyPullRequestsTake(t *testing.T) {
+	t.Parallel()
 	th := unit.Unit{Provider: "thread", Key: "1700000000.1"}
 	offered := dintent.Def{Name: "discuss", Provider: "thread", Action: &dintent.Action{}}
 	if err := unitIntent(offered, th); err != nil {

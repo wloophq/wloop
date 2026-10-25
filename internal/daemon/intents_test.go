@@ -80,6 +80,7 @@ func rowOf(t *testing.T, s *Server, ref github.Ref) api.Row {
 }
 
 func TestIntentActionsComeFromManifests(t *testing.T) {
+	t.Parallel()
 	dir, err := filepath.Abs(askAuthorFixture)
 	if err != nil {
 		t.Fatal(err)
@@ -130,6 +131,7 @@ func (p cachePort) Reconcile(i string) string                   { return p.get()
 func (p cachePort) SessionTitles() []string                     { return p.get().Registry.SessionTitles() }
 
 func TestAProfileEditReachesTheCatalogWithoutARestart(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cache := cacheOver(t, dir)
 	r := newTurnRig(t)
@@ -160,6 +162,7 @@ func TestAProfileEditReachesTheCatalogWithoutARestart(t *testing.T) {
 }
 
 func TestPrepareRunsOnBothRoutes(t *testing.T) {
+	t.Parallel()
 	wantInputs := func(t *testing.T, in map[string]any) {
 		t.Helper()
 		situation, _ := in["situation"].(string)
@@ -211,6 +214,7 @@ func TestPrepareRunsOnBothRoutes(t *testing.T) {
 }
 
 func TestAClientCannotSendAPrepareInput(t *testing.T) {
+	t.Parallel()
 	s, _, _ := newByHandServer(t, intaketest.NewBriefs(intake.Readiness{Go: true}), time.Hour)
 	seedWaitingOnAna(t, s)
 	want := "inputs.situation is filled by " + brand.Name + ", not by the request"
@@ -227,6 +231,7 @@ func TestAClientCannotSendAPrepareInput(t *testing.T) {
 }
 
 func TestAnActionAskWithADifferentInputDoesNotJoin(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	adopt(t, s, r7)
 	first := ask(t, s, "address", `{"source":"cli","inputs":{"self_review":true}}`)
@@ -245,6 +250,7 @@ func TestAnActionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 }
 
 func TestAnActionAskWithTheSameInputJoins(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	adopt(t, s, r7)
 	first := ask(t, s, "address", `{"source":"cli","inputs":{"self_review":true}}`)
@@ -259,6 +265,7 @@ func TestAnActionAskWithTheSameInputJoins(t *testing.T) {
 }
 
 func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	plan := newPendingPlan(s.deps.Now())
 	s.deps.Plan, s.deps.Pending = plan, plan
@@ -277,6 +284,7 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 }
 
 func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
+	t.Parallel()
 	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
 	byHand := func(body string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
@@ -303,6 +311,7 @@ func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 }
 
 func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
+	t.Parallel()
 	books := turnstest.NewStore()
 	mu := &sync.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) {
@@ -323,6 +332,7 @@ func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
 }
 
 func TestInputsAreValidatedAgainstTheDefinition(t *testing.T) {
+	t.Parallel()
 	dir, _ := filepath.Abs(askAuthorFixture)
 	s := newServerWith(t, func(d *Deps) { d.Intents = cacheOver(t, dir).Get; d.Actions = &fakeActions{} })
 	adopt(t, s, r7)
@@ -345,6 +355,7 @@ func TestInputsAreValidatedAgainstTheDefinition(t *testing.T) {
 }
 
 func TestByHandRefusesAFlagOfAnotherIntent(t *testing.T) {
+	t.Parallel()
 	s, _, hand := newByHandServer(t, intaketest.NewBriefs(intake.Readiness{Go: true}), time.Hour)
 	rec := httptest.NewRecorder()
 	req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"review","cwd":"/w","inputs":{"self_review":true}}`))
@@ -356,6 +367,7 @@ func TestByHandRefusesAFlagOfAnotherIntent(t *testing.T) {
 }
 
 func TestByHandRefusesAnIntentThatIsNotUserFacing(t *testing.T) {
+	t.Parallel()
 	s, _, hand := newByHandServer(t, intaketest.NewBriefs(intake.Readiness{Go: true}), time.Hour)
 	rec := httptest.NewRecorder()
 	req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"probe","cwd":"/w","url":"https://github.com/acme/api/pull/7"}`))
@@ -384,6 +396,7 @@ func brokenAskAuthor(t *testing.T) (*intentload.Cache, string) {
 }
 
 func TestTurnStartRefusesABrokenIntentWithItsProblems(t *testing.T) {
+	t.Parallel()
 	cache, _ := brokenAskAuthor(t)
 	s, _, _ := newByHandServer(t, intaketest.NewBriefs(intake.Readiness{Go: true}), time.Hour)
 	s.deps.Intents = cache.Get
@@ -394,6 +407,7 @@ func TestTurnStartRefusesABrokenIntentWithItsProblems(t *testing.T) {
 }
 
 func TestHeldRunNowPicksTheIntentByTheWorkspaceRule(t *testing.T) {
+	t.Parallel()
 	reg := (&Server{}).loaded().Registry
 	for _, c := range []struct {
 		name string
@@ -423,6 +437,7 @@ func TestHeldRunNowPicksTheIntentByTheWorkspaceRule(t *testing.T) {
 }
 
 func TestAnInvalidUserIntentDisablesOnlyItself(t *testing.T) {
+	t.Parallel()
 	cache, manifest := brokenAskAuthor(t)
 	l := cache.Get()
 	if _, ok := l.Broken["ask-author"]; !ok {
@@ -464,6 +479,7 @@ func TestAnInvalidUserIntentDisablesOnlyItself(t *testing.T) {
 }
 
 func TestProbeIsExcludedFromReportsByItsManifest(t *testing.T) {
+	t.Parallel()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	d := dinv.TimingsData{Turns: []dinv.TimedTurn{
@@ -477,6 +493,7 @@ func TestProbeIsExcludedFromReportsByItsManifest(t *testing.T) {
 }
 
 func TestNudgeRecordsOnlyDoneOrFailed(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	svc.Intents = s.loaded().Registry
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Nudge), "nudge1nudge1")
@@ -495,6 +512,7 @@ func TestNudgeRecordsOnlyDoneOrFailed(t *testing.T) {
 }
 
 func TestActionRouteRunsTodaysEffects(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		intent    string
 		ref       github.Ref
@@ -507,6 +525,7 @@ func TestActionRouteRunsTodaysEffects(t *testing.T) {
 		{"nudge", r9, false, dinv.KindNudged, "@ana"},
 	} {
 		t.Run(c.intent, func(t *testing.T) {
+			t.Parallel()
 			rig := newCatalogRig(t)
 			rig.s.intakes = nil
 			fa := &fakeActions{}
@@ -533,6 +552,7 @@ func TestActionRouteRunsTodaysEffects(t *testing.T) {
 }
 
 func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
+	t.Parallel()
 	r := newTurnRig(t)
 	at := r.s.deps.Now().Add(-time.Hour)
 	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{
@@ -558,6 +578,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 }
 
 func TestASessionTurnThatWaitsForNoBriefTakesNoIntake(t *testing.T) {
+	t.Parallel()
 	b := (&Server{}).loaded()
 	var defs []dintent.Def
 	for _, d := range b.Registry.All() {

@@ -47,6 +47,7 @@ func firstRoundCase(t *testing.T) sweepCase {
 }
 
 func TestAFirstRoundCreatesItsReviewWorkspace(t *testing.T) {
+	t.Parallel()
 	sc := firstRoundCase(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFirst)
 	if _, err := r.run(t, automation.RunOpts{}); err != nil {
@@ -64,6 +65,7 @@ func TestAFirstRoundCreatesItsReviewWorkspace(t *testing.T) {
 }
 
 func TestAFirstRoundWhoseSubmissionWasNotObservedRecordsNoRound(t *testing.T) {
+	t.Parallel()
 	sc := firstRoundCase(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFirst)
 	sc.ws.NotSubmitted = true
@@ -76,6 +78,7 @@ func TestAFirstRoundWhoseSubmissionWasNotObservedRecordsNoRound(t *testing.T) {
 }
 
 func TestAFollowUpWhoseSubmissionWasNotObservedStoresNothing(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.ws.NotSubmitted = true
@@ -92,6 +95,7 @@ func TestAFollowUpWhoseSubmissionWasNotObservedStoresNothing(t *testing.T) {
 }
 
 func TestAnAddressRoundQueuesInABusySession(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
 	sc.ws.Activity = map[string]wsdomain.Activity{"ws-auth": {Busy: true, UserActive: true}}
@@ -108,6 +112,7 @@ func TestAnAddressRoundQueuesInABusySession(t *testing.T) {
 }
 
 func TestAnAddressRoundStartsNoSessionBesideABusyOneWithoutTheTool(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
 	sc.ws.Activity = map[string]wsdomain.Activity{"ws-auth": {Busy: true}}

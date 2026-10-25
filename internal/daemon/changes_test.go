@@ -25,6 +25,7 @@ func noted(t *testing.T, log *change.Log, from port.Generation) port.Change {
 }
 
 func TestJobEndNotesJobsOnly(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	log := withLog(t, s)
 	j := newJob("t", time.Hour, time.Minute, func(context.Context) (string, string, error) { return "ok", "", nil })
@@ -37,6 +38,7 @@ func TestJobEndNotesJobsOnly(t *testing.T) {
 }
 
 func TestFailedJobRunNotesJobsWithoutHoldingItsLock(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	log := withLog(t, s)
 	j := newJob("t", time.Hour, time.Minute, func(context.Context) (string, string, error) { return "", "", errors.New("boom") })
@@ -57,6 +59,7 @@ func TestFailedJobRunNotesJobsWithoutHoldingItsLock(t *testing.T) {
 }
 
 func TestForceableNotesRefusals(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	log := withLog(t, s)
 	refusal := Refusal{Reason: "dirty", Forceable: true}
@@ -77,6 +80,7 @@ func TestForceableNotesRefusals(t *testing.T) {
 }
 
 func TestAppStatusNotesApp(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	log := withLog(t, s)
 	if rec := post(t, s, "/api/app", `{"state":"running","notifications":"denied"}`); rec.Code != 200 {

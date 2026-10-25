@@ -14,6 +14,7 @@ import (
 )
 
 func TestConfiguredManagerReplacesTheDefault(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	te.noDaemon(t)
 	selected := &fake.Manager{}
@@ -40,6 +41,7 @@ func TestConfiguredManagerReplacesTheDefault(t *testing.T) {
 }
 
 func TestUnknownManagerStopsCommandsButNotDoctor(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Managers = map[string]ManagerEntry{"fake": {Display: "Fake", New: func() workspace.Manager { return &fake.Manager{} }}}
 	te.cfg.WorkspaceManagers = []string{"zed"}
@@ -61,6 +63,7 @@ func TestUnknownManagerStopsCommandsButNotDoctor(t *testing.T) {
 }
 
 func TestDoctorNamesAnUnknownManager(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.WorkspaceManagers = []string{"zed"}
 	te.run("doctor")
@@ -83,6 +86,7 @@ func TestDoctorNamesAnUnknownManager(t *testing.T) {
 }
 
 func TestHomeSpecFollowsTheEnabledManagers(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Home = "/u"
 	te.cfg.WorkspaceManagers = []string{"orca"}
@@ -137,6 +141,7 @@ func TestOrcaManagerGetsTheRegisteredIdentities(t *testing.T) {
 }
 
 func TestTheCachedOrcaManagerKeepsItsFallbackCounter(t *testing.T) {
+	t.Parallel()
 	ws := orcaManager(nil).New()
 	if _, ok := ws.(*workspace.Cached); !ok {
 		t.Fatal("the orca entry builds no cached manager")

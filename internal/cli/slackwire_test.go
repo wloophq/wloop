@@ -39,6 +39,7 @@ func wiredSlack(t *testing.T, te *slackTestEnv, logf func(string, ...any)) *slac
 }
 
 func TestServeWiresSlack(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.fakeChannel()
 	sender := wiredSlack(t, te, nil)
@@ -77,6 +78,7 @@ func TestServeWiresSlack(t *testing.T) {
 }
 
 func TestServeLeavesSlackNilWhenDisabled(t *testing.T) {
+	t.Parallel()
 	off := false
 	for name, tc := range map[string]struct {
 		cfg     func(*config.Config)
@@ -131,6 +133,7 @@ func toolNames(t *testing.T, srv *mcp.Server) string {
 }
 
 func TestServeWiresSlackRead(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	st := newSlackTestEnv(t)
 	te.cfg.Slack = st.cfg.Slack

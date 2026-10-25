@@ -17,6 +17,7 @@ func (p enginePlan) Explain(ctx context.Context, u unit.Unit) (Explained, error)
 }
 
 func TestThePlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
+	t.Parallel()
 	r := newPlanRig(t)
 	r.units.Put(u7, workflow.Facts{"pr.repo": "acme/api", "pr.fingerprint": "h2", "pr.first.due": false, "pr.first.reason": "the author is a bot"})
 	base := r.eng.Workflows

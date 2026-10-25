@@ -40,6 +40,7 @@ func getAsset(s *Server, path string, auth bool) *httptest.ResponseRecorder {
 }
 
 func TestPluginAssetsOnlyWhenEnabled(t *testing.T) {
+	t.Parallel()
 	on := assetServer(t, true)
 	rec := getAsset(on, "/plugins/fake/view.js", false)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "export function mount") {

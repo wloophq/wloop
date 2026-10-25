@@ -69,6 +69,7 @@ func openLogged(t *testing.T, path string) (*DB, *change.Log) {
 }
 
 func TestLedgerContract(t *testing.T) {
+	t.Parallel()
 	automationtest.RunLedger(t, func(t *testing.T) automationtest.LedgerBackend {
 		db, log := openLogged(t, filepath.Join(t.TempDir(), "ledger.db"))
 		return ledgerBackend{db.Ledger(), log}
@@ -76,6 +77,7 @@ func TestLedgerContract(t *testing.T) {
 }
 
 func TestEventsContract(t *testing.T) {
+	t.Parallel()
 	automationtest.RunEvents(t, func(t *testing.T) automationtest.EventsBackend {
 		db, _ := openTemp(t)
 		return eventsBackend{db.Events(), t, db}
@@ -104,6 +106,7 @@ func pendingItem(wf string, u unit.Unit) workflow.Item {
 }
 
 func TestAPlanSurvivesReopeningTheStore(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "plan.db")
 	ctx := context.Background()
 	want := pendingItem("session-idle", wfUnit)
@@ -165,6 +168,7 @@ func mustJSON(t *testing.T, v any) string {
 }
 
 func TestCursorAndLastFireSurviveReopening(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "cursor.db")
 	ctx := context.Background()
 	db, err := Open(path, nil)
@@ -193,6 +197,7 @@ func TestCursorAndLastFireSurviveReopening(t *testing.T) {
 }
 
 func TestClassificationIsCachedByFingerprint(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	c := db.Classifications()
@@ -244,6 +249,7 @@ func TestClassificationIsCachedByFingerprint(t *testing.T) {
 }
 
 func TestTheClassifyCapHoldsUnderConcurrentSpends(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	c := db.Classifications()
 	var wg sync.WaitGroup
@@ -271,6 +277,7 @@ func TestTheClassifyCapHoldsUnderConcurrentSpends(t *testing.T) {
 }
 
 func TestStepArgsReadBackAsStrings(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	it := pendingItem("w", wfUnit)
@@ -293,6 +300,7 @@ func TestStepArgsReadBackAsStrings(t *testing.T) {
 }
 
 func TestFetchesMarkTheLastFetch(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	f := db.Fetches()
@@ -313,6 +321,7 @@ func TestFetchesMarkTheLastFetch(t *testing.T) {
 }
 
 func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
+	t.Parallel()
 	db, log := openLogged(t, filepath.Join(t.TempDir(), "gate.db"))
 	ctx := context.Background()
 	l := db.Ledger()
@@ -347,6 +356,7 @@ func TestPlanWritesNoteGateOnlyWhenPendingChanges(t *testing.T) {
 }
 
 func TestAnUnchangedPlanNotesNothing(t *testing.T) {
+	t.Parallel()
 	db, log := openLogged(t, filepath.Join(t.TempDir(), "same.db"))
 	ctx := context.Background()
 	l := db.Ledger()
@@ -374,6 +384,7 @@ func TestAnUnchangedPlanNotesNothing(t *testing.T) {
 }
 
 func TestEngineEventsShareTheSaveTransaction(t *testing.T) {
+	t.Parallel()
 	db, log := openLogged(t, filepath.Join(t.TempDir(), "tx.db"))
 	ctx := context.Background()
 	l := db.Ledger()
@@ -439,6 +450,7 @@ func recordRun(t *testing.T, l automation.Ledger, wf string, u unit.Unit, value 
 }
 
 func TestRetentionPrunesWorkflowRows(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	exec(t, db, `INSERT INTO sessions (session_id) VALUES (?)`, wfUnit.Key)
@@ -491,6 +503,7 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 // for a key whose run is dismissed (automation's evaluate), so the run must
 // outlive every retention pass while its unit lives.
 func TestADismissedKeyIsNotPlannedAgainAfter31Days(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	live, ws := unit.Unit{Provider: unit.Session, Key: "term_live"}, unit.Unit{Provider: unit.Workspace, Key: "ws1"}
@@ -515,6 +528,7 @@ func TestADismissedKeyIsNotPlannedAgainAfter31Days(t *testing.T) {
 }
 
 func TestRetentionPrunesTheRunsOfClosedSessions(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	exec(t, db, `INSERT INTO sessions (session_id) VALUES ('term_live')`)
 	l := savedAt(db, past)
@@ -531,6 +545,7 @@ func TestRetentionPrunesTheRunsOfClosedSessions(t *testing.T) {
 }
 
 func TestRetentionPrunesUnitsWithoutAPullRequestRow(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	probe, touched, tracked, held, overrideOnly := "acme/probe#1", "acme/probe#2", "acme/api#3", "acme/probe#4", "acme/probe#5"
 	insertPR(t, db, pr.Ref{Owner: "acme", Repo: "api", Number: 3}, "OPEN", "", "")
@@ -578,6 +593,7 @@ func TestRetentionPrunesUnitsWithoutAPullRequestRow(t *testing.T) {
 }
 
 func TestRetentionPrunesClassificationsAndFetches(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	c, f := db.Classifications(), db.Fetches()

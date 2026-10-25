@@ -74,6 +74,7 @@ func fakeKindEnv(t *testing.T, k fakeKind, env map[string]string) *testEnv {
 }
 
 func TestDefaultAgentHomeIsPinned(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Home = "/u"
 	if got := te.agentHome(te.cfg); got != filepath.Join("/u", ".claude") {
@@ -86,6 +87,7 @@ func TestDefaultAgentHomeIsPinned(t *testing.T) {
 }
 
 func TestAgentHomeIsTheKindsDefault(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{}, nil)
 	te.Home = "/u"
 	if got := te.agentHome(te.cfg); got != "/u/.fake" {
@@ -94,6 +96,7 @@ func TestAgentHomeIsTheKindsDefault(t *testing.T) {
 }
 
 func TestCallerHomeComesFromTheKind(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{}, map[string]string{"FAKE_HOME": "/p/home", "CLAUDE_CONFIG_DIR": "/claude/home"})
 	if got := te.callerHome(te.cfg, te.cfg.Agent); got != "/p/home" {
 		t.Fatalf("caller home %q", got)
@@ -133,6 +136,7 @@ func TestCallerHomeEqualToTheDefaultIsNoHome(t *testing.T) {
 }
 
 func TestHandRoundOverridesTheCallerHome(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.withCallerHome("/daemon/home")
 	if got := te.callerAgentHome(te.cfg); got != "/daemon/home" {
@@ -151,6 +155,7 @@ func TestHandRoundOverridesTheCallerHome(t *testing.T) {
 }
 
 func TestHandNudgeNeverReentersTheAction(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	te.Rec = storeRecorder{te.Store}
@@ -169,6 +174,7 @@ func TestHandNudgeNeverReentersTheAction(t *testing.T) {
 }
 
 func TestHandRoundHomeEqualToAnyKindsDefaultIsNoHome(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{}, map[string]string{"FAKE_HOME": "/p/home"})
 	te.cfg.Agent = "claude"
 	for brought, want := range map[string]string{te.Home + "/.fake": "", te.Home + "/.claude/": "", "/p/home": "/p/home"} {
@@ -181,6 +187,7 @@ func TestHandRoundHomeEqualToAnyKindsDefaultIsNoHome(t *testing.T) {
 }
 
 func TestEveryAgentKindHasAHomeKind(t *testing.T) {
+	t.Parallel()
 	e := NewEnv()
 	for name := range e.Agents {
 		if _, ok := e.Homes[name]; !ok {
@@ -190,6 +197,7 @@ func TestEveryAgentKindHasAHomeKind(t *testing.T) {
 }
 
 func TestAHandRoundsHomeReachesOnlyItsKindsHomes(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	echoKind := echo.HomeKind{Root: t.TempDir()}
 	te.Homes["echo"] = echoKind
@@ -207,6 +215,7 @@ func TestAHandRoundsHomeReachesOnlyItsKindsHomes(t *testing.T) {
 }
 
 func TestDelegatedCallsFindTheKindWhoseSessionIsSet(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{}, map[string]string{"FAKE_SESSION": "s-1", "FAKE_HOME": "/p/home"})
 	te.cfg.Agent = "claude"
 	if got := te.callerKind(); got != "fake" {
@@ -223,6 +232,7 @@ func TestDelegatedCallsFindTheKindWhoseSessionIsSet(t *testing.T) {
 }
 
 func TestSkillsGoToTheKindsRoot(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{skills: "agent-config"}, nil)
 	home := filepath.Join(t.TempDir(), "home")
 	mkdir(t, home)
@@ -244,6 +254,7 @@ func TestSkillsGoToTheKindsRoot(t *testing.T) {
 }
 
 func TestKindWithoutSkillsGetsOnlyTheSharedDir(t *testing.T) {
+	t.Parallel()
 	te := fakeKindEnv(t, fakeKind{}, nil)
 	home := filepath.Join(t.TempDir(), "home")
 	mkdir(t, home)
@@ -302,6 +313,7 @@ func (te *testEnv) withEcho() {
 }
 
 func TestHandTakeOverRunsWithTheHomeItBrings(t *testing.T) {
+	t.Parallel()
 	for brought, want := range map[string]string{"/session/home": "/session/home", "": ""} {
 		m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 		te := newTestEnv(t, m)

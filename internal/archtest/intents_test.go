@@ -63,6 +63,7 @@ type exportPkg struct {
 }
 
 func TestNoIntentEnumerations(t *testing.T) {
+	t.Parallel()
 	fset, files := typedFiles(t)
 	var hits []string
 	used := map[string]bool{}
@@ -130,7 +131,7 @@ func typeCheck() (*token.FileSet, []typedFile, error) {
 	for _, p := range pkgs {
 		exports[p.ImportPath] = p.Export
 	}
-	fset := token.NewFileSet()
+	fset := fileSet
 	imp := importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
 		f, ok := exports[path]
 		if !ok || f == "" {
@@ -150,7 +151,7 @@ func typeCheck() (*token.FileSet, []typedFile, error) {
 		}
 		var files []*ast.File
 		for _, name := range p.GoFiles {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
+			f, err := parseOnce(filepath.Join(p.Dir, name))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -355,6 +356,7 @@ func constUses(info *types.Info, f *ast.File) []token.Pos {
 }
 
 func TestAnIntentComparedWithANamedConstantIsCaught(t *testing.T) {
+	t.Parallel()
 	const src = `package intent
 
 type Name string

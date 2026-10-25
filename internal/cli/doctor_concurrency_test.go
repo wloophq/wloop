@@ -75,6 +75,7 @@ func (m slowManager) Reachable(ctx context.Context) error {
 }
 
 func TestDoctorWaitsOnItsSlowChecksAtOnce(t *testing.T) {
+	t.Parallel()
 	b := newBarrier(4)
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/widget", RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, slowManager{m, b})
@@ -97,6 +98,7 @@ func TestDoctorWaitsOnItsSlowChecksAtOnce(t *testing.T) {
 }
 
 func TestDoctorSkipsTheGitFetchWhenTheManagerIsDown(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{Unreachable: context.DeadlineExceeded, RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/widget", RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, m)
 	te.Socket = startDaemon(t, nil).socket

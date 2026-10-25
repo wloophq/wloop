@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -156,9 +157,16 @@ func rawActions(acts []api.AttentionAction) []string {
 }
 
 func TestEntryAttentionMatchesRowAttention(t *testing.T) {
-	compared := 0
+	t.Parallel()
+	var compared atomic.Int32
+	t.Cleanup(func() {
+		if n := compared.Load(); n < 6 {
+			t.Errorf("only %d fixtures notify", n)
+		}
+	})
 	for _, f := range slices.Concat(catalogFixtures, waitFixtures) {
 		t.Run(f.name, func(t *testing.T) {
+			t.Parallel()
 			r := newNotifyRig(t)
 			f.seed(t, r.catalogRig)
 			row := r.settle(t, f.ref.Unit())
@@ -176,7 +184,7 @@ func TestEntryAttentionMatchesRowAttention(t *testing.T) {
 				}
 				return
 			}
-			compared++
+			compared.Add(1)
 			t.Logf("%s -> %v", old.ID, func() (ids []string) {
 				for _, e := range got {
 					ids = append(ids, e.Attention.ID)
@@ -200,9 +208,6 @@ func TestEntryAttentionMatchesRowAttention(t *testing.T) {
 				}
 			}
 		})
-	}
-	if compared < 6 {
-		t.Fatalf("only %d fixtures notify", compared)
 	}
 }
 
@@ -287,6 +292,7 @@ func actionIDs(a *api.Attention) []string {
 }
 
 func TestInboxEntriesCarryAttention(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, gtd.Entry{ID: "e-in", State: gtd.Inbox, Title: "ask ana about the export"})
 	got := attentions(t, r)
@@ -305,6 +311,7 @@ func TestInboxEntriesCarryAttention(t *testing.T) {
 }
 
 func TestOnlyInboxAndOutboxNotify(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t,
 		gtd.Entry{ID: "e-in", State: gtd.Inbox, Units: []unit.Unit{r7u}},
@@ -321,6 +328,7 @@ func TestOnlyInboxAndOutboxNotify(t *testing.T) {
 }
 
 func TestOutboxDraftNotifiesOnce(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, gtd.Entry{ID: "e-next", State: gtd.Next, Units: []unit.Unit{r7u}})
 	failed := proposed(3, "")
@@ -346,6 +354,7 @@ func TestOutboxDraftNotifiesOnce(t *testing.T) {
 }
 
 func TestProposalAndDraftNotifyOnce(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, gtd.Entry{ID: "e-prop", Kind: gtd.KindMessage, State: gtd.Inbox, Title: "nudge ana?", Units: []unit.Unit{r7u}, Origin: gtd.OriginMessage})
 	before := attentions(t, r)["e-prop"]
@@ -361,6 +370,7 @@ func TestProposalAndDraftNotifyOnce(t *testing.T) {
 }
 
 func TestNoNotificationForADisabledPlugin(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub } })
 	r.put(t,
 		gtd.Entry{ID: "e-gh", State: gtd.Inbox, Units: []unit.Unit{r7u}},
@@ -375,6 +385,7 @@ func TestNoNotificationForADisabledPlugin(t *testing.T) {
 }
 
 func TestAskedTurnNotifiesOnce(t *testing.T) {
+	t.Parallel()
 	r := newNotifyRig(t)
 	r.settle(t, r7u)
 	if es, _ := r.db.Entries().EntriesOf(context.Background(), r7u); len(es) != 1 || es[0].State != gtd.Next {
@@ -397,6 +408,7 @@ func TestAskedTurnNotifiesOnce(t *testing.T) {
 }
 
 func TestHeldEntryIdStableAcrossRestart(t *testing.T) {
+	t.Parallel()
 	r := newNotifyRig(t)
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	r.settle(t, r7u)
@@ -422,6 +434,7 @@ func TestHeldEntryIdStableAcrossRestart(t *testing.T) {
 // TestLiveEntriesNotifyAsTheRows checks over the seeded live-size store that every row notification
 // is one entry notification of the same unit, and no entry notifies where no row did.
 func TestLiveEntriesNotifyAsTheRows(t *testing.T) {
+	t.Parallel()
 	s, f := newLiveServer(t)
 	ctx := context.Background()
 	ledger := &coreitems.Ledger{Store: f.DB.Items(), Clock: fixedClock(f.Now)}
@@ -525,6 +538,7 @@ func answerWaits(ctx context.Context, t *testing.T, f *storetest.Fixture, u unit
 }
 
 func TestADraftOfASilentInboxEntryNotifiesItself(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, func(d *Deps) { d.PluginEnabled = func(p unit.ProviderID) bool { return p != "slack" } })
 	slack := unit.Unit{Provider: "slack", Key: "T000/C000/1.2"}
 	r.put(t, gtd.Entry{ID: "e-off", State: gtd.Inbox, Units: []unit.Unit{slack}}, gtd.Entry{ID: "e-in", State: gtd.Inbox})
@@ -537,6 +551,7 @@ func TestADraftOfASilentInboxEntryNotifiesItself(t *testing.T) {
 }
 
 func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
+	t.Parallel()
 	r := newNotifyRig(t)
 	r.asks(t, turn.Asked, draftQuestion("publish?"))
 	r.settle(t, r7u)
@@ -556,6 +571,7 @@ func TestAStaleQuestionMessageDoesNotNotifyTwice(t *testing.T) {
 }
 
 func TestAnotherDerivedEntryOfANotifyingRowStaysSilent(t *testing.T) {
+	t.Parallel()
 	r := newNotifyRig(t)
 	r.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundHeld, Key: "cap", At: catalogNow, Data: "daily cap"})
 	r.settle(t, r7u)

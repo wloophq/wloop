@@ -144,6 +144,7 @@ func mixedEntries() []gtd.Entry {
 }
 
 func TestEntriesPageMatchesTheQuery(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, mixedEntries()...)
 	ctx := context.Background()
@@ -180,6 +181,7 @@ func TestEntriesPageMatchesTheQuery(t *testing.T) {
 }
 
 func TestEntriesSinceIsIncremental(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, mixedEntries()...)
 	inbox := r.page(t, "view=inbox")
@@ -210,7 +212,31 @@ func (r *entriesRig) subscribe(t *testing.T) *subscriber {
 	t.Cleanup(func() { cancel(); wg.Wait() })
 	sub := r.s.hub.subscribe("test")
 	t.Cleanup(func() { r.s.hub.unsubscribe(sub) })
+	waitFeedListening(t, r.log, sub)
 	return sub
+}
+
+// waitFeedListening notes changes until the feed publishes one, so a change
+// the test makes next cannot land before the feed subscribed to the log.
+func waitFeedListening(t *testing.T, log *change.Log, sub *subscriber) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		log.NoteAll(entryInputs)
+		retry := time.After(4 * syncQuiet)
+		for waiting := true; waiting; {
+			select {
+			case <-sub.signal:
+				if c, ok := sub.take(); ok && c.Counters != nil {
+					return
+				}
+			case <-retry:
+				waiting = false
+			case <-deadline:
+				t.Fatal("the entries feed never published")
+			}
+		}
+	}
 }
 
 // nextChange is the first change of sub that carries counters.
@@ -230,6 +256,7 @@ func nextChange(t *testing.T, sub *subscriber) api.Change {
 }
 
 func TestVerbPostMovesAndStreams(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, gtd.Entry{ID: "e-1", State: gtd.Inbox, Units: []unit.Unit{r7u}})
 	sub := r.subscribe(t)
@@ -245,6 +272,7 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 }
 
 func TestVerbErrors(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, gtd.Entry{ID: "e-1", State: gtd.Inbox})
 	rec := post(t, r.s, api.EntryPath("e-1", "bogus"), `{}`)
@@ -267,6 +295,7 @@ func TestVerbErrors(t *testing.T) {
 }
 
 func TestCaptureLandsInInbox(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	rec := post(t, r.s, api.EntriesPath, `{"title":"call the bank","notes":"before 5"}`)
 	var v api.EntryView
@@ -289,6 +318,7 @@ func TestCaptureLandsInInbox(t *testing.T) {
 }
 
 func TestCatalogServesViewsAndVerbs(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	var cat api.GTDCatalog
 	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
@@ -329,6 +359,7 @@ func (reviewSource) Entry(context.Context, gtd.ID) (gtd.Entry, bool, error) {
 func (reviewSource) Count(context.Context, string) (int, error) { return 0, nil }
 
 func TestCountersShipWithChanges(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, mixedEntries()...)
 	sub := r.subscribe(t)
@@ -368,6 +399,7 @@ func owedToMe(u unit.Unit, id string) items.Op {
 }
 
 func TestItemsNoteSyncsEntries(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	sub := r.subscribe(t)
 	r.startSync(t)
@@ -385,6 +417,7 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 }
 
 func TestSourceActivityReinboxes(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	ctx := context.Background()
 	r.put(t, gtd.Entry{ID: "e-s", State: gtd.Scheduled, Units: []unit.Unit{r7u}, Snooze: gtd.Snooze{OnActivity: true, Return: gtd.Next},
@@ -420,6 +453,7 @@ func (b *blockingItems) Items(ctx context.Context, u unit.Unit) ([]items.Item, e
 }
 
 func TestSyncRunsOffTheSubscriber(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	b := &blockingItems{entered: make(chan struct{}), release: make(chan struct{})}
 	r.s.deps.GTD = coregtd.New(coregtd.Deps{Store: gtdtest.New(), Items: b, Facts: coregtd.CardFacts{}, Clock: fixedClock(entriesNow)})
@@ -457,6 +491,7 @@ func bridgeRig(t *testing.T) (catalogRig, *coregtd.Service) {
 }
 
 func TestApproveRunsThePendingRound(t *testing.T) {
+	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
 	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"cockpit"}`)
@@ -477,6 +512,7 @@ func TestApproveRunsThePendingRound(t *testing.T) {
 }
 
 func TestDelegateRunsTheIntent(t *testing.T) {
+	t.Parallel()
 	c, _ := bridgeRig(t)
 	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
@@ -489,6 +525,7 @@ func TestDelegateRunsTheIntent(t *testing.T) {
 }
 
 func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
+	t.Parallel()
 	c, g := bridgeRig(t)
 	fa := &fakeActions{}
 	c.s.deps.Actions = fa
@@ -510,6 +547,7 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 }
 
 func TestBridgeRunsOnlyForActionEntries(t *testing.T) {
+	t.Parallel()
 	c, g := bridgeRig(t)
 	c.propose(t)
 	capture, err := g.Capture(context.Background(), "ask ana about the export", "", &r7u)
@@ -528,6 +566,7 @@ func TestBridgeRunsOnlyForActionEntries(t *testing.T) {
 }
 
 func TestBridgeRefusesADisabledPlugin(t *testing.T) {
+	t.Parallel()
 	c, _ := bridgeRig(t)
 	c.propose(t)
 	c.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
@@ -550,6 +589,7 @@ func TestBridgeRefusesADisabledPlugin(t *testing.T) {
 }
 
 func TestRegisteredHandlerWins(t *testing.T) {
+	t.Parallel()
 	c, g := bridgeRig(t)
 	c.propose(t)
 	var got []string
@@ -567,6 +607,7 @@ func TestRegisteredHandlerWins(t *testing.T) {
 }
 
 func TestBridgePicksOneActionPerVerb(t *testing.T) {
+	t.Parallel()
 	user := func(id, verb string) api.ActionSpec {
 		return api.ActionSpec{ID: id, Verb: verb, Source: "/home/u/intents/" + id + "/intent.toml", Plugin: "github"}
 	}
@@ -601,6 +642,7 @@ func TestBridgePicksOneActionPerVerb(t *testing.T) {
 }
 
 func TestBridgeRanksAProviderIntentOverBundledAct(t *testing.T) {
+	t.Parallel()
 	slackUnit := unit.Unit{Provider: "slack", Key: "T1/C1/1.1"}
 	specs := []api.ActionSpec{
 		{ID: "act", Verb: "delegate", Source: "intents/act/intent.toml"},
@@ -630,6 +672,7 @@ func TestBridgeRanksAProviderIntentOverBundledAct(t *testing.T) {
 }
 
 func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
+	t.Parallel()
 	body := `{"option_id":"publish","guidance":"say thanks","source":"cockpit"}`
 	unitRig := newMessageRig(t)
 	unitRig.question(t)
@@ -655,6 +698,7 @@ func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 }
 
 func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
+	t.Parallel()
 	r := newEntriesRig(t, nil)
 	r.put(t, mixedEntries()...)
 	for _, area := range []string{"", "OSS"} {

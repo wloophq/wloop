@@ -26,6 +26,7 @@ func at(e gtd.Entry, t time.Time) gtd.Entry {
 }
 
 func TestDigestContents(t *testing.T) {
+	t.Parallel()
 	r, end := digestRig(t)
 	r.put(t,
 		at(gtd.Entry{ID: "e-next", State: gtd.Next}, end.Add(-time.Hour)),
@@ -49,6 +50,7 @@ func TestDigestContents(t *testing.T) {
 }
 
 func TestEmptyDigest(t *testing.T) {
+	t.Parallel()
 	r, end := digestRig(t)
 	r.put(t, at(gtd.Entry{ID: "e-old", State: gtd.Next}, end.Add(-30*time.Hour)))
 	raw := getRaw(t, r.s, api.DigestPath+"?day=2026-10-08")

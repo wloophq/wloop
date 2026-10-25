@@ -57,6 +57,7 @@ func TestOrcasProfileHomesFollowTheRegisteredIdentities(t *testing.T) {
 }
 
 func TestOrcaKeepsTodaysColumns(t *testing.T) {
+	t.Parallel()
 	want := map[string]string{"working": "reviewing", "working-fallback": "in-review", "needs-me": "needs-me", "reviewed": "reviewed", "ready": "ready-to-merge", "in-progress": "in-progress", "in-review": "in-review", "completed": "completed"}
 	e := &Env{LoadConfig: func() (config.Config, error) { return config.LoadFile(filepath.Join(t.TempDir(), "absent.json")) }}
 	loaded, err := e.loadConfig()
@@ -74,6 +75,7 @@ func TestOrcaKeepsTodaysColumns(t *testing.T) {
 }
 
 func TestStatusesGoToTheSelectedManagersSink(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{ManagerName: "zed"}
 	te := newTestEnv(t, m)
 	te.Managers = map[string]ManagerEntry{"orca": orcaManager(nil), "zed": {Display: "Zed", Sink: "zed",

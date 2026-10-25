@@ -21,6 +21,7 @@ func init() {
 }
 
 func TestProjectStoreContract(t *testing.T) {
+	t.Parallel()
 	gtdtest.ProjectsContract(t, func(t *testing.T) (coregtd.Store, coregtd.ProjectStore) {
 		db, _ := openTemp(t)
 		return db.Entries(), db.Projects()
@@ -28,6 +29,7 @@ func TestProjectStoreContract(t *testing.T) {
 }
 
 func TestProjectRowsFollowTheirEntries(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)

@@ -18,6 +18,7 @@ import (
 )
 
 func TestTimingsPrintsRecordedSince(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	if code := te.run("timings", "--since", "7"); code != 0 {
@@ -86,6 +87,7 @@ func timingsFixture() api.TimingsReport {
 }
 
 func TestTimingsPrintsTheSummary(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	printTimings(&b, timingsFixture(), timingsView{days: 30})
 	out := b.String()
@@ -116,6 +118,7 @@ func TestTimingsPrintsTheSummary(t *testing.T) {
 }
 
 func TestTimingsListsPullRequestsTurnsAndTags(t *testing.T) {
+	t.Parallel()
 	rep := timingsFixture()
 	opened := rep.PRs[0].Opened
 	var b strings.Builder
@@ -134,6 +137,7 @@ func TestTimingsListsPullRequestsTurnsAndTags(t *testing.T) {
 }
 
 func TestTimingsSaysWhenTheViewerIsUnknown(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	printTimings(&b, api.TimingsReport{Since: testNow}, timingsView{days: 30})
 	out := b.String()
@@ -151,6 +155,7 @@ func TestTimingsSaysWhenTheViewerIsUnknown(t *testing.T) {
 }
 
 func TestDoctorRepoWithAPullRequestUsesItsTags(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	user := t.TempDir()
 	block := filepath.Join(user, "tags", "change=refac", "intent=review.md")
@@ -181,6 +186,7 @@ func TestDoctorRepoWithAPullRequestUsesItsTags(t *testing.T) {
 }
 
 func TestTheDaemonsFactsCarryTheBriefTextToTheCommandLine(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Brief.Enabled = true
 	ctx := context.Background()
@@ -204,6 +210,7 @@ func TestTheDaemonsFactsCarryTheBriefTextToTheCommandLine(t *testing.T) {
 }
 
 func TestDoctorRepoWithAPullRequestWithoutTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	if code := te.run("profile", "show", r7.URL(), "--kind", "review"); code != 0 {

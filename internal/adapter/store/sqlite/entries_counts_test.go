@@ -61,52 +61,58 @@ func randomEntries(r *rand.Rand, n int) []gtd.Entry {
 }
 
 func TestCountersEqualTheirLists(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewPCG(15, 2))
 	ctx := context.Background()
 	for round := range 20 {
-		db, err := sqlite.Open(filepath.Join(t.TempDir(), fmt.Sprintf("counts%d.db", round)), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := db.Entries()
-		applyEntries(t, store, randomEntries(r, 20+r.IntN(80))...)
-		svc := coregtd.New(coregtd.Deps{Store: store, Clock: fixedNow{entryAt}})
-		svc.RegisterView(gtd.ViewOutbox, "draft:", outboxSource{drafts: make([]gtd.Entry, r.IntN(4))})
-		for _, area := range countAreas {
-			c, err := svc.Counts(ctx, area)
+		entries := randomEntries(r, 20+r.IntN(80))
+		drafts := make([]gtd.Entry, r.IntN(4))
+		t.Run(fmt.Sprint("round", round), func(t *testing.T) {
+			t.Parallel()
+			db, err := sqlite.Open(filepath.Join(t.TempDir(), "counts.db"), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, v := range append([]gtd.View{gtd.ViewOutbox}, gtd.StoredViews...) {
-				list, err := svc.Entries(ctx, gtd.Query{View: v, Area: area})
+			defer db.Close()
+			store := db.Entries()
+			applyEntries(t, store, entries...)
+			svc := coregtd.New(coregtd.Deps{Store: store, Clock: fixedNow{entryAt}})
+			svc.RegisterView(gtd.ViewOutbox, "draft:", outboxSource{drafts: drafts})
+			for _, area := range countAreas {
+				c, err := svc.Counts(ctx, area)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if got, ok := c.Views[v]; !ok || got != len(list) {
-					t.Errorf("round %d area %q view %s: counter %d (%v), list %d", round, area, v, got, ok, len(list))
+				for _, v := range append([]gtd.View{gtd.ViewOutbox}, gtd.StoredViews...) {
+					list, err := svc.Entries(ctx, gtd.Query{View: v, Area: area})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if got, ok := c.Views[v]; !ok || got != len(list) {
+						t.Errorf("round %d area %q view %s: counter %d (%v), list %d", round, area, v, got, ok, len(list))
+					}
+				}
+				if c.Badge != c.Views[gtd.ViewInbox]+c.Views[gtd.ViewOutbox] {
+					t.Errorf("round %d area %q: badge %d", round, area, c.Badge)
+				}
+				next, err := svc.Entries(ctx, gtd.Query{View: gtd.ViewNext})
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, a := range countAreas[1:] {
+					n := len(gtd.Select(next, gtd.Query{View: gtd.ViewNext, Area: a}))
+					if c.Areas[a] != n {
+						t.Errorf("round %d area %q: Areas[%s] %d, list %d", round, area, a, c.Areas[a], n)
+					}
+				}
+				for _, cx := range countContexts {
+					n := len(gtd.Select(next, gtd.Query{View: gtd.ViewNext, Area: area, Contexts: []string{cx}}))
+					if c.Contexts[cx] != n {
+						t.Errorf("round %d area %q: Contexts[%s] %d, list %d", round, area, cx, c.Contexts[cx], n)
+					}
 				}
 			}
-			if c.Badge != c.Views[gtd.ViewInbox]+c.Views[gtd.ViewOutbox] {
-				t.Errorf("round %d area %q: badge %d", round, area, c.Badge)
-			}
-			next, err := svc.Entries(ctx, gtd.Query{View: gtd.ViewNext})
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, a := range countAreas[1:] {
-				n := len(gtd.Select(next, gtd.Query{View: gtd.ViewNext, Area: a}))
-				if c.Areas[a] != n {
-					t.Errorf("round %d area %q: Areas[%s] %d, list %d", round, area, a, c.Areas[a], n)
-				}
-			}
-			for _, cx := range countContexts {
-				n := len(gtd.Select(next, gtd.Query{View: gtd.ViewNext, Area: area, Contexts: []string{cx}}))
-				if c.Contexts[cx] != n {
-					t.Errorf("round %d area %q: Contexts[%s] %d, list %d", round, area, cx, c.Contexts[cx], n)
-				}
-			}
-		}
-		db.Close()
+		})
 	}
 }
 

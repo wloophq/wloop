@@ -41,6 +41,7 @@ func newCardsServer(t *testing.T, enabled func(unit.ProviderID) bool) (*Server, 
 }
 
 func TestDisabledUnitDetailReadOnly(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	off := func(p unit.ProviderID) bool { return p != unit.GitHub }
 	s, db, l := newCardsServer(t, off)
@@ -75,6 +76,7 @@ func TestDisabledUnitDetailReadOnly(t *testing.T) {
 }
 
 func TestEnabledUnitDetailCarriesCardAndItems(t *testing.T) {
+	t.Parallel()
 	s, db, _ := newCardsServer(t, nil)
 	r7u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	var raw map[string]json.RawMessage
@@ -107,6 +109,7 @@ func (f *fakeCardsJob) Changed(c api.Change) {
 func (f *fakeCardsJob) Run(ctx context.Context, _ cards.Rows) { <-ctx.Done() }
 
 func TestRowChangesFanOutToTheCardsJob(t *testing.T) {
+	t.Parallel()
 	job := &fakeCardsJob{}
 	s := newServerWith(t, func(d *Deps) { d.CardsJob = job })
 	s.fanOutRows(api.Change{Type: "changed", Rev: 3, Units: []unit.Unit{{Provider: unit.GitHub, Key: "acme/api#7"}}})
@@ -118,6 +121,7 @@ func TestRowChangesFanOutToTheCardsJob(t *testing.T) {
 }
 
 func TestEnabledUnitWithOnlyACardIsNotFound(t *testing.T) {
+	t.Parallel()
 	s, db, _ := newCardsServer(t, nil)
 	r9u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
 	if _, err := db.Cards().Save(context.Background(), card.Card{Unit: r9u, Title: "lapsed"}, time.Now()); err != nil {

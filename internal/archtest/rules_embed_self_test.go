@@ -3,6 +3,7 @@ package archtest
 import "testing"
 
 func TestREmbedFlagsProseEmbeddedOutsideProfiles(t *testing.T) {
+	t.Parallel()
 	used := map[int]bool{}
 	flagged(t, "prose", ruleEmbed("internal/x", []string{"a.md", "t/b.tmpl", "n.txt", "schema.json", "img/i.png"}, nil, used), 3, "(R-embed)")
 	flagged(t, "the profile", ruleEmbed("profiles", []string{"default/intents/x/instructions.md.tmpl"}, nil, used), 0, "")

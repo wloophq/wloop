@@ -11,6 +11,7 @@ import (
 )
 
 func TestWorkflowsFactsOfASubjectListItsSlotWithTheTriggerAndConfig(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("workflows", "facts", "session"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -32,6 +33,7 @@ func TestWorkflowsFactsOfASubjectListItsSlotWithTheTriggerAndConfig(t *testing.T
 }
 
 func TestWorkflowsFactsWithoutASubjectListEverySlot(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("workflows", "facts"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -44,6 +46,7 @@ func TestWorkflowsFactsWithoutASubjectListEverySlot(t *testing.T) {
 }
 
 func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("workflows", "facts", "slack"); code == 0 {
 		t.Fatal("exit 0")
@@ -54,6 +57,7 @@ func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
 }
 
 func TestWorkflowsStepsListTheVocabularyWithArguments(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("workflows", "steps"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -72,6 +76,7 @@ func TestWorkflowsStepsListTheVocabularyWithArguments(t *testing.T) {
 }
 
 func TestProfileSchemaPrintsTheWorkflowSchemaOnRequest(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("profile", "schema", "--workflow"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)

@@ -29,6 +29,7 @@ var (
 )
 
 func TestNudgeRunsInANewSessionOfTheReviewWorkspace(t *testing.T) {
+	t.Parallel()
 	m := nudgeManager(reviewWS)
 	m.Sessions = map[string]string{"ws-rev": "term-live"}
 	te := newTestEnv(t, m)
@@ -54,6 +55,7 @@ func TestNudgeRunsInANewSessionOfTheReviewWorkspace(t *testing.T) {
 }
 
 func TestOnlyANudgeOnTheMaintainersReadsTheirSection(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		situation   string
 		maintainers bool
@@ -77,6 +79,7 @@ func TestOnlyANudgeOnTheMaintainersReadsTheirSection(t *testing.T) {
 }
 
 func TestNudgeWorkspaceOrder(t *testing.T) {
+	t.Parallel()
 	cfg := config.Defaults()
 	repos := nudgeManager().RepoList
 	pr := &github.PullRequest{Facts: pr.Facts{HeadRefName: "feat/x", State: dgh.StateOpen}}
@@ -126,6 +129,7 @@ func TestNudgeWorkspaceOrder(t *testing.T) {
 }
 
 func TestNudgeRefusesAClosedPullRequestBeforeStartingAnything(t *testing.T) {
+	t.Parallel()
 	m := nudgeManager(mainWS)
 	te := newTestEnv(t, m)
 	te.gh.basics = strings.Replace(openBasics, `"state":"OPEN"`, `"state":"MERGED"`, 1)
@@ -139,6 +143,7 @@ func TestNudgeRefusesAClosedPullRequestBeforeStartingAnything(t *testing.T) {
 }
 
 func TestNudgeFallsBackToTheMainCheckout(t *testing.T) {
+	t.Parallel()
 	m := nudgeManager(mainWS)
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -157,6 +162,7 @@ func TestNudgeFallsBackToTheMainCheckout(t *testing.T) {
 }
 
 func TestNudgeWithoutACheckoutStartsNothing(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{ManagerName: "orca"}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -170,6 +176,7 @@ func TestNudgeWithoutACheckoutStartsNothing(t *testing.T) {
 }
 
 func TestNudgeStartsTheAgentInTheProjectsProfile(t *testing.T) {
+	t.Parallel()
 	m := nudgeManager(mainWS)
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics

@@ -99,6 +99,7 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 }
 
 func TestClientTalksToTheDaemon(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	ctx := context.Background()
 	c := client.New(d.socket)

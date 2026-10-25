@@ -36,6 +36,7 @@ func projectEntry(id gtd.ID) gtd.Entry {
 }
 
 func TestDeletingAParentCascades(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
@@ -71,6 +72,7 @@ func TestDeletingAParentCascades(t *testing.T) {
 }
 
 func TestRewritingAnEntryKeepsItsProjectRow(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	p := projectEntry("e-p")
@@ -91,6 +93,7 @@ func TestRewritingAnEntryKeepsItsProjectRow(t *testing.T) {
 }
 
 func TestAChildWithoutItsParentIsRefused(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	for _, insert := range []string{
 		`INSERT INTO worktree_units (path, provider, unit_key, at) VALUES ('/wt/none', 'github', 'acme/api#7', '')`,

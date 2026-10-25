@@ -25,6 +25,7 @@ func (noItems) Items(context.Context, unit.Unit) ([]items.Item, error) { return 
 // dossier is a 0700 git directory under the state directory, kept while the project is open, archived 30 days
 // after it is done.
 func TestProjectDossierOnDisk(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	root := t.TempDir()
 	home := filepath.Join(root, "home")

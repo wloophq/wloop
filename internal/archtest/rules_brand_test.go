@@ -51,6 +51,7 @@ func slicesAny(res []*regexp.Regexp, f func(*regexp.Regexp) bool) bool {
 }
 
 func TestBrandLiteralOnlyInBrand(t *testing.T) {
+	t.Parallel()
 	for _, b := range scanBrand(t, filepath.Join("..", ".."), fixedNames) {
 		t.Error(b)
 	}
@@ -89,6 +90,7 @@ func scanBrand(t *testing.T, root string, allowed []*regexp.Regexp) []string {
 }
 
 func TestR14ReadsTheBrandConstant(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	plant := func(rel, content string) {
 		t.Helper()
@@ -117,6 +119,7 @@ func TestR14ReadsTheBrandConstant(t *testing.T) {
 }
 
 func TestR14FlagsAPlantedLiteral(t *testing.T) {
+	t.Parallel()
 	allowed := []*regexp.Regexp{regexp.MustCompile(`by_` + brandtest.DefaultName)}
 	src := "package x\n\nvar a = \"run " + brandtest.DefaultName + "\"\nvar b = \"by_" + brandtest.DefaultName + "\"\nvar c = \"" + module + "\"\n// " + strings.ToUpper(brandtest.DefaultName) + " in capitals\n"
 	got := ruleR14("internal/x/x.go", src, allowed)

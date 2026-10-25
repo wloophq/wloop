@@ -52,6 +52,7 @@ func tryEnv(t *testing.T, a *tryAgent) *testEnv {
 }
 
 func TestTrySettingsDenyEveryWrite(t *testing.T) {
+	t.Parallel()
 	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()).Denied(turns.Control{Commands: [][]string{{"orca"}}}))
 	for _, want := range []string{"Bash(gh api * --method*)", "Bash(gh api * -X*)", "Bash(gh api * -f*)", "Bash(gh api * --input*)",
 		"Bash(gh pr comment *)", "Bash(gh pr review *)", "Bash(git push *)", "Bash(orca *)", "Bash('/bin/" + brand.Name + "' settle *)", "Bash(curl *)"} {
@@ -65,6 +66,7 @@ func TestTrySettingsDenyEveryWrite(t *testing.T) {
 }
 
 func TestTryPromptIsADryRunTurn(t *testing.T) {
+	t.Parallel()
 	a := &tryAgent{publish: `{"event":"APPROVE","body":"","comments":[]}`}
 	te := tryEnv(t, a)
 	if code := te.run("profile", "try", r7.URL()); code != 0 {
@@ -82,6 +84,7 @@ func TestTryPromptIsADryRunTurn(t *testing.T) {
 }
 
 func TestTryRunsHeadlessInTheThrowawayWorktree(t *testing.T) {
+	t.Parallel()
 	a := &tryAgent{publish: `{"event":"APPROVE"}`}
 	te := tryEnv(t, a)
 	te.cfg.Projects = []config.Project{{Match: "acme/*", AgentHome: "/home/me/.claude-p"}}
@@ -101,6 +104,7 @@ func TestTryRunsHeadlessInTheThrowawayWorktree(t *testing.T) {
 }
 
 func TestTryRemovesTheWorktree(t *testing.T) {
+	t.Parallel()
 	a := &tryAgent{publish: `{"event":"COMMENT","body":"b","comments":[{"path":"a.go","line":3,"body":"**note:** x"}]}`}
 	te := tryEnv(t, a)
 	if code := te.run("profile", "try", r7.URL()); code != 0 {
@@ -116,6 +120,7 @@ func TestTryRemovesTheWorktree(t *testing.T) {
 }
 
 func TestTryWithoutDryRunOutputFails(t *testing.T) {
+	t.Parallel()
 	te := tryEnv(t, &tryAgent{})
 	code := te.run("profile", "try", r7.URL())
 	if code == 0 || !strings.Contains(te.err.String(), "the agent's last words") {
@@ -127,6 +132,7 @@ func TestTryWithoutDryRunOutputFails(t *testing.T) {
 }
 
 func TestTryPolicyCoversFlagFirstAndAttachedForms(t *testing.T) {
+	t.Parallel()
 	raw := claude.Agent{}.Settings(tryPolicy("'/bin/"+brand.Name+"'", bundledStored()))
 	for _, want := range []string{"Bash(gh api -X*)", "Bash(gh api --method*)", "Bash(gh api * --method*)", "Bash(gh api -f*)", "Bash(gh issue *)",
 		"Bash(gh release *)", "Bash(gh workflow *)", "Bash(git -C *)", "Bash(git -c *)", "Bash(git config *)", "Edit(./.loop/**)", `"disableAllHooks":true`} {
@@ -140,6 +146,7 @@ func TestTryPolicyCoversFlagFirstAndAttachedForms(t *testing.T) {
 }
 
 func TestRoundSessionsMayRunLoop(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Executable = "/Apps/" + brand.Name
 	raw, err := te.agentCommand(context.Background(), te.cfg, "/wt", roundOptions{trusted: true})
@@ -155,6 +162,7 @@ func TestRoundSessionsMayRunLoop(t *testing.T) {
 }
 
 func TestRoundSessionsReadOnlyStoredTurns(t *testing.T) {
+	t.Parallel()
 	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored())} {
 		raw := claude.Agent{}.Settings(policy)
 		var want []string
@@ -174,6 +182,7 @@ func TestRoundSessionsReadOnlyStoredTurns(t *testing.T) {
 }
 
 func TestNoAllowRuleLetsARoundSessionRunATurnByHand(t *testing.T) {
+	t.Parallel()
 	url := "https://github.com/acme/api/pull/7"
 	for name, policy := range map[string]turns.Policy{"round": roundPolicy("'/bin/"+brand.Name+"'", bundledStored()), "try": tryPolicy("'/bin/"+brand.Name+"'", bundledStored())} {
 		rules := allowRules(t, claude.Agent{}.Settings(policy))
@@ -221,6 +230,7 @@ func matchesRule(cmd string) func(string) bool {
 }
 
 func TestRoundPolicyAllowsTheTurnCommands(t *testing.T) {
+	t.Parallel()
 	rules := allowRules(t, claude.Agent{}.Settings(roundPolicy("'/bin/"+brand.Name+"'", bundledStored())))
 	for _, want := range []string{"Bash('/bin/" + brand.Name + "' turn end *)", "Bash('/bin/" + brand.Name + "' turn answer *)", brand.ToolPrefix() + "turn_end", "Edit(./.loop/**)"} {
 		if !slices.Contains(rules, want) {
@@ -230,6 +240,7 @@ func TestRoundPolicyAllowsTheTurnCommands(t *testing.T) {
 }
 
 func TestSessionPoliciesDenyEveryManagersControl(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Managers = map[string]ManagerEntry{"zed": {Binary: "zed-cli", Control: [][]string{{"zed", "ctl"}}, ControlPaths: []string{"/zed/sock"}}, "none": {}, "orca": orcaManager(nil)}
 	has := func(p turns.Policy, rule ...string) bool {
@@ -252,6 +263,7 @@ func TestSessionPoliciesDenyEveryManagersControl(t *testing.T) {
 }
 
 func TestTryUsageExitsTwo(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"profile"}, {"profile", "frob"}, {"profile", "try"}, {"profile", "try", r7.URL(), "extra"}} {
 		te := newTestEnv(t, &fake.Manager{})
 		want := tryUsage
@@ -276,6 +288,7 @@ func bundledStored() []string {
 var probeStored = []string{"probe"}
 
 func TestProfileTryShowsTheWhy(t *testing.T) {
+	t.Parallel()
 	a := &tryAgent{publish: `{"event":"APPROVE","body":"","comments":[]}`}
 	te := tryEnv(t, a)
 	file := filepath.Join(t.TempDir(), "why.json")
@@ -303,6 +316,7 @@ func TestProfileTryShowsTheWhy(t *testing.T) {
 }
 
 func TestProfileTryWithoutAWhyRendersNone(t *testing.T) {
+	t.Parallel()
 	a := &tryAgent{publish: `{"event":"APPROVE","body":"","comments":[]}`}
 	te := tryEnv(t, a)
 	if code := te.run("profile", "try", r7.URL()); code != 0 {
@@ -314,6 +328,7 @@ func TestProfileTryWithoutAWhyRendersNone(t *testing.T) {
 }
 
 func TestProfileTryRefusesABadWhy(t *testing.T) {
+	t.Parallel()
 	te := tryEnv(t, &tryAgent{})
 	file := filepath.Join(t.TempDir(), "why.json")
 	os.WriteFile(file, []byte("not json"), 0o600)

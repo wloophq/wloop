@@ -70,6 +70,7 @@ func keepOnce(t *testing.T, s *Server) error {
 }
 
 func TestSituationsAreRecordedOnChange(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for range 2 {
 		if err := keepOnce(t, s); err != nil {
@@ -94,6 +95,7 @@ func TestSituationsAreRecordedOnChange(t *testing.T) {
 }
 
 func TestAFailedViewerRecordsNoSituation(t *testing.T) {
+	t.Parallel()
 	var down sync.Mutex
 	failing := true
 	s := newServerWith(t, func(d *Deps) {
@@ -127,6 +129,7 @@ func TestAFailedViewerRecordsNoSituation(t *testing.T) {
 }
 
 func TestWaitingUnreadSkipsSituation(t *testing.T) {
+	t.Parallel()
 	store := turnstest.NewStore()
 	store.Put(turn.Book{Unit: pr.Ref(situationR7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Started, Session: "term_1",
 		SentAt: time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC), StartedAt: time.Date(2026, 10, 8, 9, 1, 0, 0, time.UTC)}}})

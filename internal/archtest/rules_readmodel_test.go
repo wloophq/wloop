@@ -27,6 +27,7 @@ func ruleR15(self string, imports []string) []string {
 }
 
 func TestReadModelImports(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -44,6 +45,7 @@ func TestReadModelImports(t *testing.T) {
 }
 
 func TestR15FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	ok := []string{"context", "time", module + "internal/api", module + "internal/catalog", module + "internal/core/port",
 		module + "internal/domain/round", module + "internal/domain/unit"}
 	flagged(t, "allowed", ruleR15("internal/readmodel", ok), 0, "")

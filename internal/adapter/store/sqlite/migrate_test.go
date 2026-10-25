@@ -177,6 +177,7 @@ func shape(t *testing.T, path string) string {
 }
 
 func TestMigrateTakesEveryPastVersionToTheShapeOfANewStore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	v3 := synthetic(t, 3)
 	want := shape(t, storeAt(t, v3))
@@ -211,6 +212,7 @@ func mustInspect(t *testing.T, set schemaSet, path string) Status {
 // of each released version, frozen in testdata, migrates it with this
 // release and compares it with a store schema.sql creates.
 func TestEveryReleasedSchemaMigratesToSchemaSQL(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	want := shape(t, storeAt(t, current))
 	for v := uint32(1); v <= SchemaVersion; v++ {
@@ -230,6 +232,7 @@ func TestEveryReleasedSchemaMigratesToSchemaSQL(t *testing.T) {
 }
 
 func TestSchemaSQLIsFrozenAtSchemaVersion(t *testing.T) {
+	t.Parallel()
 	frozen, err := os.ReadFile(filepath.Join("testdata", fmt.Sprintf("schema-v%d.sql", SchemaVersion)))
 	if err != nil {
 		t.Fatalf("copy schema.sql to testdata/schema-v%d.sql: %v", SchemaVersion, err)
@@ -240,6 +243,7 @@ func TestSchemaSQLIsFrozenAtSchemaVersion(t *testing.T) {
 }
 
 func TestMigrationsAreOneVersionEachUpToSchemaVersion(t *testing.T) {
+	t.Parallel()
 	if got := len(migrations); got != SchemaVersion-1 {
 		t.Fatalf("%d migrations for schema version %d", got, SchemaVersion)
 	}
@@ -257,6 +261,7 @@ func TestMigrationsAreOneVersionEachUpToSchemaVersion(t *testing.T) {
 }
 
 func TestMigrateKeepsRowsAndForeignKeysThroughARebuild(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := storeAt(t, synthetic(t, 1))
 	rawExec(t, path,
@@ -287,6 +292,7 @@ func TestMigrateKeepsRowsAndForeignKeysThroughARebuild(t *testing.T) {
 }
 
 func TestAFailedMigrationLeavesTheStoreAtTheLastVersionItReached(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	set := synthetic(t, 3)
 	set.migrations = append([]migration{}, set.migrations...)
@@ -317,6 +323,7 @@ func TestAFailedMigrationLeavesTheStoreAtTheLastVersionItReached(t *testing.T) {
 }
 
 func TestARebuildThatBreaksAForeignKeyFails(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	set := synthetic(t, 3)
 	set.migrations = append([]migration{}, set.migrations...)
@@ -332,6 +339,7 @@ func TestARebuildThatBreaksAForeignKeyFails(t *testing.T) {
 }
 
 func TestPlanChangesNothing(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, synthetic(t, 1))
 	o := migrateOpts(path)
 	p, err := synthetic(t, 3).plan(path, o.Backups, o.Now())
@@ -351,6 +359,7 @@ func TestPlanChangesNothing(t *testing.T) {
 }
 
 func TestAStoreAtTheCurrentVersionIsLeftAlone(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, current)
 	o := migrateOpts(path)
 	p, err := Migrate(context.Background(), path, o)
@@ -363,6 +372,7 @@ func TestAStoreAtTheCurrentVersionIsLeftAlone(t *testing.T) {
 }
 
 func TestNewerStores(t *testing.T) {
+	t.Parallel()
 	v1 := synthetic(t, 1)
 	compatible := storeAt(t, synthetic(t, 2))
 	s := mustInspect(t, v1, compatible)
@@ -393,6 +403,7 @@ func TestNewerStores(t *testing.T) {
 }
 
 func TestAnOlderStoreIsRefusedUntilMigrated(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, synthetic(t, 1))
 	_, err := synthetic(t, 2).open(path, nil)
 	want := fmt.Sprintf("the store at %s is at schema version 1; this release migrates it to version 2 before opening it", path)
@@ -403,6 +414,7 @@ func TestAnOlderStoreIsRefusedUntilMigrated(t *testing.T) {
 }
 
 func TestBackupsArePrunedToTheNewest(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
 	touch := func(name string) {
@@ -437,6 +449,7 @@ func TestBackupsArePrunedToTheNewest(t *testing.T) {
 }
 
 func TestBackupNamesNeverCollide(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
 	first, _ := backupName(dir, 1, now, false)
@@ -454,6 +467,7 @@ func TestBackupNamesNeverCollide(t *testing.T) {
 }
 
 func TestRestorePutsABackupBackAndKeepsTheStoreItReplaced(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := storeAt(t, synthetic(t, 1))
 	rawExec(t, path, `INSERT INTO meta (key, value) VALUES ('mark', 'before')`)
@@ -491,6 +505,7 @@ func TestRestorePutsABackupBackAndKeepsTheStoreItReplaced(t *testing.T) {
 }
 
 func TestRestoreRefusesABackupThisReleaseCannotRead(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, synthetic(t, 1))
 	newer := storeAt(t, synthetic(t, 3))
 	_, err := synthetic(t, 1).restore(context.Background(), path, newer, t.TempDir(), time.Now())
@@ -503,6 +518,7 @@ func TestRestoreRefusesABackupThisReleaseCannotRead(t *testing.T) {
 }
 
 func TestRestorableSkipsNewerAndPreRestoreCopies(t *testing.T) {
+	t.Parallel()
 	all := []Backup{
 		{Path: "a", Version: SchemaVersion + 1},
 		{Path: "b", Version: SchemaVersion, PreRestore: true},
@@ -514,6 +530,7 @@ func TestRestorableSkipsNewerAndPreRestoreCopies(t *testing.T) {
 }
 
 func TestLockStoreIsHeldOnce(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "store.db")
 	unlock, err := LockStore(path)
 	if err != nil {
@@ -573,6 +590,7 @@ func TestAnOldBackupThatStaysIsAWarningNotAFailure(t *testing.T) {
 }
 
 func TestFailedMigrationsDoNotPileUpBackups(t *testing.T) {
+	t.Parallel()
 	set := synthetic(t, 2)
 	set.migrations = []migration{{to: 2, name: "broken", up: execAll(`SELECT no_such_function()`)}}
 	path := storeAt(t, synthetic(t, 1))
@@ -590,6 +608,7 @@ func TestFailedMigrationsDoNotPileUpBackups(t *testing.T) {
 }
 
 func TestRestoreCarriesWhatTheBackupHoldsInItsWAL(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, synthetic(t, 1))
 	src := storeAt(t, synthetic(t, 1))
 	db, err := synthetic(t, 1).open(src, nil)
@@ -615,6 +634,7 @@ func TestRestoreCarriesWhatTheBackupHoldsInItsWAL(t *testing.T) {
 }
 
 func TestRestoreOverAnUnreadableStoreKeepsItsBytes(t *testing.T) {
+	t.Parallel()
 	path := storeAt(t, synthetic(t, 1))
 	backup := storeAt(t, synthetic(t, 1))
 	garbage := []byte("not a database, and long enough to have a header of sorts: " + strings.Repeat("x", 100))
@@ -634,6 +654,7 @@ func TestRestoreOverAnUnreadableStoreKeepsItsBytes(t *testing.T) {
 }
 
 func TestBackupsOfTheSameSecondListNewestFirst(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	for _, n := range []string{"store-v1-20261102T120000Z.db", "store-v1-20261102T120000Z-2.db", "store-v1-20261102T120000Z-10.db"} {
 		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o600); err != nil {
@@ -651,6 +672,7 @@ func TestBackupsOfTheSameSecondListNewestFirst(t *testing.T) {
 }
 
 func TestRefuseNamesTheVersionsThisReleaseReads(t *testing.T) {
+	t.Parallel()
 	err := Refuse("/s.db", Status{Version: 0})
 	if err == nil || err.Error() != fmt.Sprintf("the store at /s.db is at schema version 0; this release reads versions 1 to %d only", SchemaVersion) {
 		t.Fatalf("%v", err)

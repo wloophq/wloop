@@ -3,7 +3,6 @@ package archtest
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"path"
 	"path/filepath"
@@ -265,18 +264,15 @@ func ruleSpawn(self string, imports []string, files []*ast.File) []string {
 }
 
 func TestSpawningPackagesImportMeter(t *testing.T) {
+	t.Parallel()
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
 		if !ok {
 			continue
 		}
-		fset := token.NewFileSet()
 		var files []*ast.File
 		for _, name := range p.GoFiles {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			_, f := parseFile(t, filepath.Join(p.Dir, name))
 			files = append(files, f)
 		}
 		for _, b := range ruleSpawn(self, p.Imports, files) {

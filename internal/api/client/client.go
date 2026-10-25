@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	pingTimeout = time.Second
+	pingTimeout = 5 * time.Second
 	// ReadTimeout outlasts the daemon's start-up reconcile, which holds
 	// UserAPI for up to 30 seconds.
 	ReadTimeout = 45 * time.Second

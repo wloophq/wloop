@@ -98,6 +98,7 @@ func kindsOf(evs []port.Event, kind string) []port.Event {
 }
 
 func TestIntakeStoreContract(t *testing.T) {
+	t.Parallel()
 	stores := map[string]func(t *testing.T) intake.Store{
 		"fake":   func(*testing.T) intake.Store { return intaketest.NewStore() },
 		"sqlite": func(t *testing.T) intake.Store { return newIntakeBackend(t) },
@@ -311,7 +312,10 @@ func TestIntakeStoreContract(t *testing.T) {
 	}
 	for sname, mk := range stores {
 		for cname, run := range cases {
-			t.Run(sname+"/"+cname, func(t *testing.T) { run(t, mk(t)) })
+			t.Run(sname+"/"+cname, func(t *testing.T) {
+				t.Parallel()
+				run(t, mk(t))
+			})
 		}
 	}
 }
@@ -324,10 +328,12 @@ func sameIntake(a, b intake.Intake) bool {
 }
 
 func TestIntakeServiceOnSqlite(t *testing.T) {
+	t.Parallel()
 	intaketest.Service(t, func(t *testing.T) intake.Store { return newIntakeBackend(t) })
 }
 
 func TestAnIntakeSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "inv.db")
 	db, err := Open(path, nil)
 	if err != nil {
@@ -360,6 +366,7 @@ func TestAnIntakeSurvivesARestart(t *testing.T) {
 }
 
 func TestAcceptRefusesAnIntakeWithoutAcceptedTime(t *testing.T) {
+	t.Parallel()
 	db := newIntakeDB(t)
 	i := newIntake(intakeRef, turn.Intent(dintent.Review))
 	i.AcceptedAt = time.Time{}
@@ -369,6 +376,7 @@ func TestAcceptRefusesAnIntakeWithoutAcceptedTime(t *testing.T) {
 }
 
 func TestACorruptTimeFailsTheRead(t *testing.T) {
+	t.Parallel()
 	db := newIntakeDB(t)
 	ctx := context.Background()
 	got, _, err := db.Intakes().Accept(ctx, newIntake(intakeRef, turn.Intent(dintent.Review)))
@@ -384,6 +392,7 @@ func TestACorruptTimeFailsTheRead(t *testing.T) {
 }
 
 func TestAFailedAcceptWritesNeitherRowNorEvent(t *testing.T) {
+	t.Parallel()
 	b := newIntakeBackend(t)
 	i := newIntake(intakeRef, turn.Intent(dintent.Review))
 	if _, _, err := b.Accept(context.Background(), i, port.Event{Unit: i.Unit, Kind: intake.KindAccepted}); err == nil {

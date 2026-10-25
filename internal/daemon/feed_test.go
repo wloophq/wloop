@@ -207,6 +207,7 @@ func collectFor(msgs <-chan message, d time.Duration) []message {
 }
 
 func TestIdleCyclePublishesNoRowChange(t *testing.T) {
+	t.Parallel()
 	s, _, _ := feedServer(t)
 	runFeeds(t, s)
 	msgs := listen(t, s, nil)
@@ -262,6 +263,7 @@ func TestTurnEndPublishesItsUnit(t *testing.T) {
 }
 
 func TestBurstCoalesces(t *testing.T) {
+	t.Parallel()
 	u := agentRef.Unit()
 	p := &fakeRows{units: []unit.Unit{u}}
 	s, log, _ := fakeServer(t, p)
@@ -278,6 +280,7 @@ func TestBurstCoalesces(t *testing.T) {
 }
 
 func TestResumeFromLastEventID(t *testing.T) {
+	t.Parallel()
 	u := agentRef.Unit()
 	p := &fakeRows{units: []unit.Unit{u}}
 	s, log, m := fakeServer(t, p)
@@ -302,6 +305,7 @@ func TestResumeFromLastEventID(t *testing.T) {
 }
 
 func TestResumePastWindowIsAll(t *testing.T) {
+	t.Parallel()
 	units := make([]unit.Unit, 1100)
 	for i := range units {
 		units[i] = github.Ref{Owner: "acme", Repo: "api", Number: i + 1}.Unit()
@@ -335,6 +339,7 @@ func TestResumePastWindowIsAll(t *testing.T) {
 }
 
 func TestFailedResumeReadIsAll(t *testing.T) {
+	t.Parallel()
 	u := agentRef.Unit()
 	p := &fakeRows{units: []unit.Unit{u}}
 	s, log, m := fakeServer(t, p)
@@ -355,6 +360,7 @@ func TestFailedResumeReadIsAll(t *testing.T) {
 }
 
 func TestNoChangedCallSitesLeft(t *testing.T) {
+	t.Parallel()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
@@ -374,6 +380,7 @@ func TestNoChangedCallSitesLeft(t *testing.T) {
 }
 
 func TestMergedChangesSayWhatBothSaid(t *testing.T) {
+	t.Parallel()
 	a, b := github.Ref{Owner: "o", Repo: "r", Number: 1}.Unit(), github.Ref{Owner: "o", Repo: "r", Number: 2}.Unit()
 	c := api.Change{Type: "changed", Epoch: "e", Rev: 2, Units: []unit.Unit{b}}
 	c.Merge(api.Change{Type: "changed", Health: true})

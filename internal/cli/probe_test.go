@@ -26,6 +26,7 @@ func probeManager() *fake.Manager {
 }
 
 func TestProbeResumesInItsWorkspace(t *testing.T) {
+	t.Parallel()
 	m := probeManager()
 	te := newTestEnv(t, m)
 	ctx := context.Background()
@@ -62,6 +63,7 @@ func TestProbeResumesInItsWorkspace(t *testing.T) {
 }
 
 func TestProbeRefusesAnUnknownWorkspace(t *testing.T) {
+	t.Parallel()
 	m := probeManager()
 	te := newTestEnv(t, m)
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000002}
@@ -72,6 +74,7 @@ func TestProbeRefusesAnUnknownWorkspace(t *testing.T) {
 }
 
 func TestProbeWritesNoView(t *testing.T) {
+	t.Parallel()
 	m := probeManager()
 	te := newTestEnv(t, m)
 	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000003}
@@ -93,6 +96,7 @@ func TestProbeWritesNoView(t *testing.T) {
 }
 
 func TestProbePolicyDeniesWrites(t *testing.T) {
+	t.Parallel()
 	raw := claude.Agent{}.Settings(probePolicy("'/bin/"+brand.Name+"'", probeStored).Denied(turns.Control{Commands: [][]string{{"orca"}}}))
 	for _, want := range []string{"Bash(gh *)", "Bash(git push *)", "Bash(git commit *)", "Bash(orca *)", "Bash(curl *)"} {
 		if !strings.Contains(raw, want) {
@@ -118,6 +122,7 @@ func TestProbePolicyDeniesWrites(t *testing.T) {
 }
 
 func TestProbeCommandNeedsAWorkspaceAndTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("probe"); code == 0 || !strings.Contains(te.err.String(), "usage: probe --workspace") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -140,10 +145,11 @@ func (k *preparedKind) Preflight(ctx context.Context, s turns.AgentSession) erro
 }
 
 func TestAProbeSessionIsTrusted(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, probeManager())
 	k := &preparedKind{Agent: te.Agents["claude"]}
 	te.Agents = map[string]turns.Agent{"claude": k}
-	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000001}
+	ref := pr.Ref{Owner: "loop-e2e", Repo: "probe", Number: 1760000004}
 	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Probe), Trigger: dturn.Automated, WorkspaceID: "ws-e2e", Home: t.TempDir()}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}

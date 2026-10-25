@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -30,25 +31,58 @@ type pkg struct {
 
 var forbidden = []string{"os/exec", "net/http", "database/sql"}
 
+var listed = sync.OnceValues(listPackages)
+
+// packages lists the module's packages once per test binary.
 func packages(t *testing.T) []pkg {
 	t.Helper()
+	all, err := listed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return all
+}
+
+func listPackages() ([]pkg, error) {
 	cmd := exec.Command("go", "list", "-json", "./...")
 	cmd.Dir = filepath.Join("..", "..")
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	var all []pkg
 	dec := json.NewDecoder(strings.NewReader(string(out)))
 	for dec.More() {
 		var p pkg
 		if err := dec.Decode(&p); err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
 		p.Imports = slices.DeleteFunc(p.Imports, func(imp string) bool { return imp == module+"internal/brand" })
 		all = append(all, p)
 	}
-	return all
+	return all, nil
+}
+
+var (
+	fileSet = token.NewFileSet()
+	parsed  sync.Map
+)
+
+// parseFile parses the Go file at path once per test binary, into fileSet.
+func parseFile(t *testing.T, path string) (*token.FileSet, *ast.File) {
+	t.Helper()
+	f, err := parseOnce(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fileSet, f
+}
+
+func parseOnce(path string) (*ast.File, error) {
+	parse, _ := parsed.LoadOrStore(path, sync.OnceValues(func() (*ast.File, error) {
+		return parser.ParseFile(fileSet, path, nil, 0)
+	}))
+	return parse.(func() (*ast.File, error))()
 }
 
 func local(path string) (string, bool) { return strings.CutPrefix(path, module) }
@@ -60,6 +94,7 @@ func under(path string, roots ...string) bool {
 }
 
 func TestArchitecture(t *testing.T) {
+	t.Parallel()
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
 		if !ok {
@@ -111,6 +146,7 @@ func ruleR12(self string, imports []string) []string {
 }
 
 func TestMeterIsALeaf(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -128,6 +164,7 @@ func TestMeterIsALeaf(t *testing.T) {
 }
 
 func TestProvidersStayInAdaptersAndTheRoot(t *testing.T) {
+	t.Parallel()
 	used := map[int]bool{}
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -137,12 +174,8 @@ func TestProvidersStayInAdaptersAndTheRoot(t *testing.T) {
 		if self == "internal/brand" {
 			continue
 		}
-		fset := token.NewFileSet()
 		for _, name := range p.GoFiles {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			fset, f := parseFile(t, filepath.Join(p.Dir, name))
 			path := self + "/" + name
 			for _, b := range slices.Concat(ruleR1(path, f), ruleR2(fset, path, f, allowlist, used), ruleR3(path, f)) {
 				t.Error(b)
@@ -155,12 +188,8 @@ func TestProvidersStayInAdaptersAndTheRoot(t *testing.T) {
 }
 
 func checkCoreFiles(t *testing.T, self string, p pkg) {
-	fset := token.NewFileSet()
 	for _, name := range p.GoFiles {
-		f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
+		_, f := parseFile(t, filepath.Join(p.Dir, name))
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.TypeSpec:
@@ -186,6 +215,7 @@ func ruleNoGate(self string, imports []string) []string {
 }
 
 func TestNothingImportsTheGate(t *testing.T) {
+	t.Parallel()
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
 		if !ok {
