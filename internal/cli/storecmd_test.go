@@ -234,6 +234,9 @@ func TestTheDaemonWaitsOnANewerStoreUntilItChanges(t *testing.T) {
 
 func TestTheDaemonWaitsWhileAStoreCommandHoldsTheLock(t *testing.T) {
 	te := storeEnv(t, "a")
+	prev := storeLockWait
+	storeLockWait = 50 * time.Millisecond
+	t.Cleanup(func() { storeLockWait = prev })
 	unlock, err := sqlite.LockStore(te.storePath())
 	if err != nil {
 		t.Fatal(err)

@@ -125,7 +125,7 @@ func (set schemaSet) plan(path, backups string, now time.Time) (Plan, error) {
 	if p.Backup, err = backupName(backups, s.Version, now, false); err != nil {
 		return p, err
 	}
-	p.Free = freeBytes(backups)
+	p.Free = freeSpace(backups)
 	return p, nil
 }
 
@@ -136,8 +136,13 @@ type MigrateOptions struct {
 	// Keep is how many backups taken before a migration stay; 0 keeps
 	// DefaultKeep.
 	Keep int
+	// Backup, when set, is the backup's path, as a Plan named it.
+	Backup string
 	// Step, when set, hears of each migration as it commits.
 	Step func(label string, took time.Duration)
+	// Warn, when set, hears of what failed after the migrations committed
+	// without undoing them, such as removing an old backup.
+	Warn func(error)
 }
 
 // DefaultKeep is how many pre-migration backups stay.
@@ -160,6 +165,9 @@ func (e *MigrationError) Error() string {
 
 func (e *MigrationError) Unwrap() error { return e.Err }
 
+// freeSpace is freeBytes, which tests replace.
+var freeSpace = freeBytes
+
 // ErrNoSpace is too little free space for the backup a migration takes.
 var ErrNoSpace = errors.New("not enough free space for the store's backup")
 
@@ -180,11 +188,23 @@ func (set schemaSet) migrate(ctx context.Context, path string, o MigrateOptions)
 	if err != nil || !p.Pending() {
 		return p, err
 	}
+	if o.Backup != "" {
+		p.Backup = o.Backup
+	}
+	keep := o.Keep
+	if keep == 0 {
+		keep = DefaultKeep
+	}
+	warn := func(err error) {
+		if err != nil && o.Warn != nil {
+			o.Warn(err)
+		}
+	}
 	fail := func(err error) (Plan, error) {
 		return p, &MigrationError{From: p.From, Reached: p.From, Err: err}
 	}
 	if p.Short() {
-		return fail(fmt.Errorf("%w: it needs about %s free in %s, and %s is free", ErrNoSpace, megabytes(2*p.Size), o.Backups, megabytes(p.Free)))
+		return fail(fmt.Errorf("%w: it needs about %s free in %s, and %s is free", ErrNoSpace, Megabytes(2*p.Size), o.Backups, Megabytes(p.Free)))
 	}
 	c, err := connector(path + "?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_txlock=immediate")
 	if err != nil {
@@ -204,6 +224,7 @@ func (set schemaSet) migrate(ctx context.Context, path string, o MigrateOptions)
 	if err := backupTo(ctx, conn, p.Backup); err != nil {
 		return fail(err)
 	}
+	defer func() { warn(prune(o.Backups, keep, now(), p.Backup)) }()
 	reached := p.From
 	for _, m := range set.pending(p.From) {
 		start := time.Now()
@@ -218,14 +239,9 @@ func (set schemaSet) migrate(ctx context.Context, path string, o MigrateOptions)
 	if err := check(ctx, conn, "integrity_check"); err != nil {
 		return p, &MigrationError{From: p.From, Reached: reached, Step: "the final check", Backup: p.Backup, Err: err}
 	}
-	if _, err := conn.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
-		return p, err
-	}
-	keep := o.Keep
-	if keep == 0 {
-		keep = DefaultKeep
-	}
-	return p, prune(o.Backups, keep, now(), p.Backup)
+	_, err = conn.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+	warn(err)
+	return p, nil
 }
 
 // step runs m on conn. Foreign key enforcement can change only outside a
@@ -344,6 +360,7 @@ func backupTo(ctx context.Context, conn *sql.Conn, dst string) error {
 	return os.Rename(tmp, dst)
 }
 
-func megabytes(n int64) string {
+// Megabytes is n bytes as whole megabytes, rounded up.
+func Megabytes(n int64) string {
 	return fmt.Sprintf("%d MB", (n+999_999)/1_000_000)
 }

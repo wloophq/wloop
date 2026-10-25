@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -532,14 +531,85 @@ func TestLockStoreIsHeldOnce(t *testing.T) {
 }
 
 func TestMigrateRefusesWithoutRoomForTheBackup(t *testing.T) {
-	p := Plan{Size: 10_000_000, Free: 15_000_000}
-	if !p.Short() || (Plan{Size: 10, Free: -1}).Short() {
-		t.Fatal("Short")
+	prev := freeSpace
+	freeSpace = func(string) int64 { return 1000 }
+	t.Cleanup(func() { freeSpace = prev })
+	path := storeAt(t, synthetic(t, 1))
+	o := migrateOpts(path)
+	_, err := synthetic(t, 2).migrate(context.Background(), path, o)
+	if !errors.Is(err, ErrNoSpace) || !strings.Contains(err.Error(), "and 1 MB is free") {
+		t.Fatalf("%v", err)
 	}
-	if got := megabytes(15_000_000); got != "15 MB" {
-		t.Fatal(got)
+	if v := versionOf(t, path); v != 1 {
+		t.Fatalf("version %d", v)
 	}
-	if strconv.Itoa(int(DefaultKeep)) != "3" {
-		t.Fatal("DefaultKeep")
+	if _, err := os.Stat(o.Backups); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a backup without room: %v", err)
+	}
+}
+
+func TestAnOldBackupThatStaysIsAWarningNotAFailure(t *testing.T) {
+	path := storeAt(t, synthetic(t, 1))
+	o := migrateOpts(path)
+	if err := os.MkdirAll(o.Backups, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for d := 1; d <= 3; d++ {
+		if err := os.WriteFile(filepath.Join(o.Backups, fmt.Sprintf("store-v1-202610%02dT120000Z.db", d)), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prev := removeFile
+	removeFile = func(string) error { return os.ErrPermission }
+	t.Cleanup(func() { removeFile = prev })
+	var warned []error
+	o.Warn = func(err error) { warned = append(warned, err) }
+	if _, err := synthetic(t, 2).migrate(context.Background(), path, o); err != nil {
+		t.Fatal(err)
+	}
+	if v := versionOf(t, path); v != 2 || len(warned) != 1 || !errors.Is(warned[0], os.ErrPermission) {
+		t.Fatalf("version %d, warnings %v", v, warned)
+	}
+}
+
+func TestFailedMigrationsDoNotPileUpBackups(t *testing.T) {
+	set := synthetic(t, 2)
+	set.migrations = []migration{{to: 2, name: "broken", up: execAll(`SELECT no_such_function()`)}}
+	path := storeAt(t, synthetic(t, 1))
+	for i := range 3 {
+		o := migrateOpts(path)
+		o.Keep = 1
+		o.Now = func() time.Time { return time.Date(2026, 11, 2, 21, 30, i, 0, time.UTC) }
+		if _, err := set.migrate(context.Background(), path, o); err == nil {
+			t.Fatal("the broken migration passed")
+		}
+	}
+	if b, _ := Backups(migrateOpts(path).Backups); len(b) != 1 || filepath.Base(b[0].Path) != "store-v1-20261102T213002Z.db" {
+		t.Fatalf("backups %+v", b)
+	}
+}
+
+func TestRestoreCarriesWhatTheBackupHoldsInItsWAL(t *testing.T) {
+	path := storeAt(t, synthetic(t, 1))
+	src := storeAt(t, synthetic(t, 1))
+	db, err := synthetic(t, 1).open(src, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := execW(db, `INSERT INTO meta (key, value) VALUES ('mark', 'in the wal')`); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Stat(src + "-wal"); err != nil || fi.Size() == 0 {
+		t.Fatalf("the source has no WAL to carry: %v", err)
+	}
+	if _, err := synthetic(t, 1).restore(context.Background(), path, src, t.TempDir(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := handle(path+"?_pragma=query_only(1)", 1)
+	defer r.Close()
+	var v string
+	if err := r.QueryRow(`SELECT value FROM meta WHERE key = 'mark'`).Scan(&v); err != nil || v != "in the wal" {
+		t.Fatalf("%q %v", v, err)
 	}
 }

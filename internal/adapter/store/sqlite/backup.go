@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -91,20 +91,13 @@ func Backups(dir string) ([]Backup, error) {
 		if c := b.Taken.Compare(a.Taken); c != 0 {
 			return c
 		}
-		return compareStrings(b.Path, a.Path)
+		return strings.Compare(b.Path, a.Path)
 	})
 	return out, nil
 }
 
-func compareStrings(a, b string) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
-}
+// removeFile is os.Remove, which tests replace.
+var removeFile = os.Remove
 
 // prune keeps the keep newest pre-migration backups in dir and the
 // pre-restore copies younger than PreRestoreDays; keepPath always stays.
@@ -126,8 +119,11 @@ func prune(dir string, keep int, now time.Time, keepPath string) error {
 		if !b.PreRestore && stays {
 			kept++
 		}
-		if !stays {
-			if err := os.Remove(b.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if stays {
+			continue
+		}
+		for _, f := range []string{b.Path, b.Path + "-wal", b.Path + "-shm"} {
+			if err := removeFile(f); err != nil && !errors.Is(err, os.ErrNotExist) {
 				errs = append(errs, err)
 			}
 		}
@@ -175,13 +171,13 @@ func (set schemaSet) restore(ctx context.Context, path, from, backups string, no
 	case StateNewer, StateUnknown:
 		return Restored{}, SchemaError{from, s, set.version}
 	}
-	src, err := handle(from+"?_pragma=query_only(1)", 1)
+	// Not query_only: SQLite refuses VACUUM INTO on such a connection.
+	src, err := handle(from+"?_pragma=busy_timeout(5000)", 1)
 	if err != nil {
 		return Restored{}, err
 	}
-	err = check(ctx, src, "quick_check")
-	src.Close()
-	if err != nil {
+	defer src.Close()
+	if err := check(ctx, src, "quick_check"); err != nil {
 		return Restored{}, fmt.Errorf("%s: %w", from, err)
 	}
 	out := Restored{From: s}
@@ -195,9 +191,15 @@ func (set schemaSet) restore(ctx context.Context, path, from, backups string, no
 			return out, err
 		}
 	}
-	tmp := path + ".restore.tmp"
-	if err := copyFile(from, tmp); err != nil {
-		_ = os.Remove(tmp)
+	// A copy through SQLite carries what the source still holds in its WAL.
+	tmp := path + ".restore"
+	conn, err := src.Conn(ctx)
+	if err != nil {
+		return out, err
+	}
+	err = backupTo(ctx, conn, tmp)
+	conn.Close()
+	if err != nil {
 		return out, err
 	}
 	for _, f := range []string{path + "-wal", path + "-shm"} {
@@ -235,25 +237,4 @@ func keepAside(ctx context.Context, path, dst string) error {
 		return err
 	}
 	return nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, storeMode)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
-	}
-	if err := out.Sync(); err != nil {
-		out.Close()
-		return err
-	}
-	return out.Close()
 }

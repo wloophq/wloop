@@ -169,15 +169,22 @@ func (set schemaSet) inspect(path string) (Status, error) {
 		return Status{Empty: !ok}, err
 	}
 	s := Status{Version: v, Compatible: v}
-	if v <= set.version {
+	if v == set.version {
 		return s, nil
 	}
+	// The header lags a version change still in the WAL.
 	db, err := handle(path+"?_pragma=query_only(1)&_pragma=busy_timeout(5000)", 1)
 	if err != nil {
 		return s, err
 	}
 	defer db.Close()
-	s.Compatible, err = readCompatible(context.Background(), db, v)
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&s.Version); err != nil {
+		return s, err
+	}
+	s.Compatible = s.Version
+	if s.Version > set.version {
+		s.Compatible, err = readCompatible(context.Background(), db, s.Version)
+	}
 	return s, err
 }
 

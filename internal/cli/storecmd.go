@@ -60,6 +60,12 @@ type storeWaiting struct {
 // returns it with the release of its lock. Until the store can open, the
 // daemon serves daemon.StoreWait; a nil store with no error is ctx ending.
 func (e *Env) openStore(ctx context.Context, logf func(string, ...any)) (*sqlite.DB, func(), error) {
+	// A second serve must not migrate the store under the daemon that runs.
+	running, err := daemon.LockFile(filepath.Join(e.StateDir, daemonLock), daemon.ErrAlreadyRunning)
+	if err != nil {
+		return nil, nil, err
+	}
+	running()
 	for {
 		db, unlock, wait, err := e.tryStore(ctx, logf)
 		if err != nil || db != nil {
@@ -74,7 +80,7 @@ func (e *Env) openStore(ctx context.Context, logf func(string, ...any)) (*sqlite
 
 func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.DB, func(), storeWaiting, error) {
 	path := e.storePath()
-	unlock, err := sqlite.LockStore(path)
+	unlock, err := e.waitStoreLock(ctx, path)
 	if errors.Is(err, sqlite.ErrStoreBusy) {
 		return nil, nil, storeWaiting{
 			status: api.StoreStatus{Reads: sqlite.SchemaVersion, State: api.StoreBusy, Message: "a " + brand.Command + " store command has the store open"},
@@ -108,7 +114,10 @@ func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.
 		if err := e.migrateInDaemon(ctx, path, logf); err != nil {
 			unlock()
 			logf("store: %v", err)
-			after, _ := sqlite.Inspect(path)
+			after, ierr := sqlite.Inspect(path)
+			if ierr != nil {
+				after = s
+			}
 			return nil, nil, e.storeFailed(path, after, err), nil
 		}
 	case sqlite.StateNewer, sqlite.StateUnknown:
@@ -136,9 +145,10 @@ func (e *Env) migrateInDaemon(ctx context.Context, path string, logf func(string
 		return err
 	}
 	logf("store: migrating from version %d to %d; backup at %s", p.From, p.To, p.Backup)
-	if _, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Step: func(label string, took time.Duration) {
-		logf("store: %s ok (%s)", label, took.Round(time.Millisecond))
-	}}); err != nil {
+	if _, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: p.Backup,
+		Step: func(label string, took time.Duration) { logf("store: %s ok (%s)", label, took.Round(time.Millisecond)) },
+		Warn: func(err error) { logf("store: %v", err) },
+	}); err != nil {
 		return err
 	}
 	logf("store: at version %d", p.To)
@@ -156,7 +166,11 @@ func tooNewStatus(path string, s sqlite.Status) api.StoreStatus {
 }
 
 func (e *Env) storeFailed(path string, s sqlite.Status, err error) storeWaiting {
-	return e.waitFor(path, s, api.StoreStatus{State: api.StoreFailed, Message: err.Error(), Fix: migrateCommand})
+	fix := migrateCommand
+	if s.Opens() {
+		fix = restoreCommand
+	}
+	return e.waitFor(path, s, api.StoreStatus{State: api.StoreFailed, Message: err.Error(), Fix: fix})
 }
 
 // waitFor waits until the store's version moves or the store is gone,
@@ -247,12 +261,12 @@ func (e *Env) storeMigrate(ctx context.Context, args []string) error {
 	if !releaseBuild(Version) {
 		fmt.Fprintf(e.Out, "this build (%s) is not a release: a release at version %d will not read the store afterwards; `%s` goes back\n", Version, p.From, restoreCommand)
 	}
-	fmt.Fprintf(e.Out, "backup: %s (%s)\n", p.Backup, megabytes(p.Size))
+	fmt.Fprintf(e.Out, "backup: %s (%s)\n", p.Backup, sqlite.Megabytes(p.Size))
 	for _, s := range p.Steps {
 		fmt.Fprintf(e.Out, "  %s\n", s)
 	}
 	if p.Short() {
-		return fmt.Errorf("the backup needs about %s free in %s, and %s is free; free some space and run `%s` again", megabytes(2*p.Size), e.backupsPath(), megabytes(p.Free), migrateCommand)
+		return fmt.Errorf("the backup needs about %s free in %s, and %s is free; free some space and run `%s` again", sqlite.Megabytes(2*p.Size), e.backupsPath(), sqlite.Megabytes(p.Free), migrateCommand)
 	}
 	if *dryRun {
 		fmt.Fprintln(e.Out, "dry run: nothing changed")
@@ -261,13 +275,16 @@ func (e *Env) storeMigrate(ctx context.Context, args []string) error {
 	if err := e.confirmStore("migrate", *yes); err != nil {
 		return err
 	}
-	return e.withStoreLock(ctx, func() error { return e.migrateStore(ctx, path) })
+	return e.withStoreLock(ctx, func() error { return e.migrateStore(ctx, path, p.Backup) })
 }
 
-func (e *Env) migrateStore(ctx context.Context, path string) error {
-	p, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Step: func(label string, took time.Duration) {
-		fmt.Fprintf(e.Out, "  %s ... ok (%s)\n", label, took.Round(time.Millisecond))
-	}})
+func (e *Env) migrateStore(ctx context.Context, path, backup string) error {
+	p, err := sqlite.Migrate(ctx, path, sqlite.MigrateOptions{Backups: e.backupsPath(), Now: e.Now, Backup: backup,
+		Step: func(label string, took time.Duration) {
+			fmt.Fprintf(e.Out, "  %s ... ok (%s)\n", label, took.Round(time.Millisecond))
+		},
+		Warn: func(err error) { fmt.Fprintf(e.Err, "warning: %v\n", err) },
+	})
 	if err != nil {
 		return err
 	}
@@ -340,7 +357,7 @@ func (e *Env) storeRestore(ctx context.Context, args []string) error {
 		}
 		fmt.Fprintf(e.Out, "store: restored at version %d\n", got.From.Version)
 		if got.From.Version < sqlite.SchemaVersion {
-			return e.migrateStore(ctx, path)
+			return e.migrateStore(ctx, path, "")
 		}
 		return nil
 	})
@@ -388,7 +405,7 @@ func (e *Env) printBackups(all []sqlite.Backup) {
 		if len(notes) > 0 {
 			note = "  (" + strings.Join(notes, ", ") + ")"
 		}
-		fmt.Fprintf(e.Out, "%s  version %d  %s  %s%s\n", filepath.Base(b.Path), b.Version, b.Taken.Local().Format("2006-01-02 15:04"), megabytes(b.Size), note)
+		fmt.Fprintf(e.Out, "%s  version %d  %s  %s%s\n", filepath.Base(b.Path), b.Version, b.Taken.Local().Format("2006-01-02 15:04"), sqlite.Megabytes(b.Size), note)
 	}
 }
 
@@ -445,15 +462,13 @@ func storeCommandError(path string, err error) error {
 	return errors.New(tooNewStatus(path, se.Status).Message + "; `" + restoreCommand + "` restores it")
 }
 
-func megabytes(n int64) string { return fmt.Sprintf("%d MB", (n+999_999)/1_000_000) }
-
 // reportStore prints the store's state once the daemon answers, which on a
 // release follows any migration it ran at start.
 func (e *Env) reportStore(ctx context.Context) {
 	deadline := time.Now().Add(storeReportWait)
 	for {
 		if c, err := e.daemonClient(ctx); err == nil {
-			if h, err := c.Health(ctx); err == nil && h.Store != nil {
+			if h, err := c.Health(ctx); err == nil && h.Store != nil && (h.Store.State != api.StoreBusy || !time.Now().Before(deadline)) {
 				if h.Store.State == api.StoreOK {
 					fmt.Fprintf(e.Out, "store: schema version %d.\n", h.Store.Version)
 				} else {

@@ -2493,7 +2493,7 @@ async function load() {
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
   // A daemon that cannot open its store says why in its health's warnings.
-  const storeClosed = state.health && state.health.store && state.health.store.state !== "ok";
+  const storeClosed = health.status === "fulfilled" && health.value.store && health.value.store.state !== "ok";
   if (failed.length && !storeClosed) {
     state.error = `Could not reach the daemon: ${[...new Set(failed.map((r) => r.reason.message))].join("; ")}`;
   } else {
