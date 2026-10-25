@@ -60,14 +60,15 @@ type storeWaiting struct {
 // returns it with the release of its lock. Until the store can open, the
 // daemon serves daemon.StoreWait; a nil store with no error is ctx ending.
 func (e *Env) openStore(ctx context.Context, logf func(string, ...any)) (*sqlite.DB, func(), error) {
-	// A second serve must not migrate the store under the daemon that runs.
-	running, err := daemon.LockFile(filepath.Join(e.StateDir, daemonLock), daemon.ErrAlreadyRunning)
-	if err != nil {
-		return nil, nil, err
-	}
-	running()
 	for {
+		// The daemon's lock, held while the store opens, keeps a second serve
+		// from migrating it; Server.Run and StoreWait take it again.
+		running, err := daemon.LockFile(filepath.Join(e.StateDir, daemonLock), daemon.ErrAlreadyRunning)
+		if err != nil {
+			return nil, nil, err
+		}
 		db, unlock, wait, err := e.tryStore(ctx, logf)
+		running()
 		if err != nil || db != nil {
 			return db, unlock, err
 		}
@@ -84,13 +85,7 @@ func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.
 	if errors.Is(err, sqlite.ErrStoreBusy) {
 		return nil, nil, storeWaiting{
 			status: api.StoreStatus{Reads: sqlite.SchemaVersion, State: api.StoreBusy, Message: "a " + brand.Command + " store command has the store open"},
-			ready: func() bool {
-				u, err := sqlite.LockStore(path)
-				if err == nil {
-					u()
-				}
-				return err == nil
-			},
+			ready:  func() bool { return storeLockFree(path) },
 		}, nil
 	}
 	if err != nil {
@@ -127,7 +122,11 @@ func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.
 	db, err := sqlite.Open(path, e.changes)
 	if err != nil {
 		unlock()
-		return nil, nil, storeWaiting{}, err
+		var se sqlite.SchemaError
+		if errors.As(err, &se) {
+			return nil, nil, e.waitFor(path, se.Status, tooNewStatus(path, se.Status)), nil
+		}
+		return nil, nil, e.storeFailed(path, s, err), nil
 	}
 	if s, err = sqlite.Inspect(path); err != nil {
 		db.Close()
@@ -157,17 +156,19 @@ func (e *Env) migrateInDaemon(ctx context.Context, path string, logf func(string
 
 func tooNewStatus(path string, s sqlite.Status) api.StoreStatus {
 	st := api.StoreStatus{State: api.StoreTooNew, Fix: restoreCommand}
-	if s.State() == sqlite.StateUnknown {
-		st.Message = sqlite.SchemaError{Path: path, Status: s}.Error()
+	if s.State() != sqlite.StateNewer {
+		st.Message = sqlite.Refuse(path, s).Error()
 		return st
 	}
 	st.Message = fmt.Sprintf("the store at %s is at schema version %d, newer than this release reads (%d); upgrade %s with `brew upgrade %s`, or go back to the store from before that upgrade", path, s.Version, sqlite.SchemaVersion, brand.Name, brand.Name)
 	return st
 }
 
+// storeFailed waits on a store that failed to migrate or open. A store that
+// opens as it is, or is damaged, gets past it only by a restore.
 func (e *Env) storeFailed(path string, s sqlite.Status, err error) storeWaiting {
 	fix := migrateCommand
-	if s.Opens() {
+	if s.Opens() || errors.Is(err, sqlite.ErrDamaged) || s.Version == 0 {
 		fix = restoreCommand
 	}
 	return e.waitFor(path, s, api.StoreStatus{State: api.StoreFailed, Message: err.Error(), Fix: fix})
@@ -179,16 +180,20 @@ func (e *Env) waitFor(path string, s sqlite.Status, st api.StoreStatus) storeWai
 	st.Version, st.Reads = s.Version, sqlite.SchemaVersion
 	e.addBackup(&st)
 	return storeWaiting{status: st, ready: func() bool {
-		now, err := sqlite.Inspect(path)
-		if err != nil || now == s {
+		if !storeLockFree(path) {
 			return false
 		}
-		u, err := sqlite.LockStore(path)
-		if err == nil {
-			u()
-		}
-		return err == nil
+		now, err := sqlite.Inspect(path)
+		return err == nil && now != s
 	}}
+}
+
+func storeLockFree(path string) bool {
+	unlock, err := sqlite.LockStore(path)
+	if err == nil {
+		unlock()
+	}
+	return err == nil
 }
 
 func (e *Env) storeOK(s sqlite.Status) api.StoreStatus {
@@ -414,7 +419,11 @@ func (e *Env) printBackups(all []sqlite.Backup) {
 // started again after fn.
 func (e *Env) withStoreLock(ctx context.Context, fn func() error) error {
 	path := e.storePath()
-	unlock, err := e.waitStoreLock(ctx, path)
+	wait := storeLockWait
+	if e.daemonServing(ctx) {
+		wait = 0
+	}
+	unlock, err := e.waitStoreLockFor(ctx, path, wait)
 	if err == nil {
 		defer unlock()
 		return fn()
@@ -428,7 +437,7 @@ func (e *Env) withStoreLock(ctx context.Context, fn func() error) error {
 	}
 	fmt.Fprintln(e.Out, "stopping the daemon, which has the store open")
 	e.bootOut(ctx, launchAgentLabel)
-	unlock, err = e.waitStoreLock(ctx, path)
+	unlock, err = e.waitStoreLockFor(ctx, path, storeLockWait)
 	if err == nil {
 		err = fn()
 		unlock()
@@ -437,8 +446,23 @@ func (e *Env) withStoreLock(ctx context.Context, fn func() error) error {
 	return errors.Join(err, e.bootstrap(ctx, plist))
 }
 
+// daemonServing says a daemon answers with its store open, a store it
+// keeps until it stops.
+func (e *Env) daemonServing(ctx context.Context) bool {
+	c, err := e.daemonClient(ctx)
+	if err != nil {
+		return false
+	}
+	h, err := c.Health(ctx)
+	return err == nil && h.Store != nil && h.Store.State == api.StoreOK
+}
+
 func (e *Env) waitStoreLock(ctx context.Context, path string) (func(), error) {
-	deadline := time.Now().Add(storeLockWait)
+	return e.waitStoreLockFor(ctx, path, storeLockWait)
+}
+
+func (e *Env) waitStoreLockFor(ctx context.Context, path string, wait time.Duration) (func(), error) {
+	deadline := time.Now().Add(wait)
 	for {
 		unlock, err := sqlite.LockStore(path)
 		if !errors.Is(err, sqlite.ErrStoreBusy) || !time.Now().Before(deadline) {

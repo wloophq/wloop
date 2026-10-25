@@ -51,7 +51,7 @@ The menu bar shows `PR !` and the daemon serves only its health when it cannot o
 
 | State | Why | Fix |
 |---|---|---|
-| migration failed | a migration failed; the store stays at the version it reached and a backup holds the one before | `{{command}} store migrate` retries with each step shown |
+| migration failed | a migration failed; the store stays at the version it reached and a backup holds the one before | `{{command}} store migrate` retries with each step shown; a store that fails SQLite's integrity check names `{{command}} store restore` |
 | needs a migration | a build that is not a release found an older store | `{{command}} store migrate` |
 | written by a newer release | the store is at a schema version this release does not read | `brew upgrade {{name}}`, or `{{command}} store restore` |
 | a store command is running | `store migrate` or `store restore` holds the store | wait for it to finish |

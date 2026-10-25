@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -274,8 +275,21 @@ func TestAFailedStorePointsAtTheCommandThatGetsPastIt(t *testing.T) {
 	if st := te.storeFailed(te.storePath(), opens, errors.New("the final check failed")).status; st.State != api.StoreFailed || st.Fix != restoreCommand {
 		t.Fatalf("a migrated store that failed its check: %+v", st)
 	}
-	stuck := sqlite.Status{Version: 0}
-	if st := te.storeFailed(te.storePath(), stuck, errors.New("unreadable")).status; st.Fix != migrateCommand || st.Message != "unreadable" {
-		t.Fatalf("%+v", st)
+	if st := te.storeFailed(te.storePath(), sqlite.Status{}, errors.New("unreadable")).status; st.Fix != restoreCommand || st.Message != "unreadable" {
+		t.Fatalf("an unreadable store: %+v", st)
+	}
+	behind := sqlite.Status{Version: sqlite.SchemaVersion + 1, Compatible: sqlite.SchemaVersion + 1}
+	if st := te.storeFailed(te.storePath(), behind, fmt.Errorf("checking: %w", sqlite.ErrDamaged)).status; st.Fix != restoreCommand {
+		t.Fatalf("a damaged store: %+v", st)
+	}
+	if st := te.storeFailed(te.storePath(), behind, errors.New("a step failed")).status; st.Fix != migrateCommand {
+		t.Fatalf("a failed step: %+v", st)
+	}
+}
+
+func TestAnUnknownStoreNamesTheVersionsThisReleaseReads(t *testing.T) {
+	st := tooNewStatus("/s.db", sqlite.Status{Version: 0})
+	if st.Message != fmt.Sprintf("the store at /s.db is at schema version 0; this release reads versions 1 to %d only", sqlite.SchemaVersion) {
+		t.Fatalf("%q", st.Message)
 	}
 }
