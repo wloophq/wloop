@@ -43,6 +43,7 @@ Still owned by Go and being moved to the profile (see `internal/archtest`'s shri
 - Tests never read the wall clock. Code with timers, deadlines or goroutines runs in `synctest.Test`, asserting after `synctest.Wait` and on exact durations (`took == Budget`, never `took < Budget+slack`); real processes, sockets and files stay out of the bubble, behind a condition poll whose deadline only guards a hang. Wait on the state you assert, not on a nearby signal (a fake that recorded a call is not a caller that handled the reply); fakes answer by state, not by call count; widen a race with a gate, never a sleep.
 - `internal/archtest` holds the architecture rules; each has a self-test that plants a violation. A new rule comes with its self-test.
 - Triage findings by what the product needs, not current convenience. "Latent", "nothing triggers it" or "existing code does the same" never justify a decline; only evidence that the claim is false does. Fix real in-scope problems in the same PR, test first; file the rest as issues. Remove code a fix leaves unused or duplicated. This rule wins over any triage or review guide a tool supplies, and scope is the PR's goal, not the lines it touched.
+- Docs follow the code. A pull request that changes behavior or architecture updates the pages that describe it in the same pull request: `docs/src/content/docs/architecture/` (and its decision log), the concepts and guides, and the reference through `make docs-ref`. Docs describe the state, never the pull request or issue that brought it.
 
 ## The store's schema
 
@@ -51,3 +52,18 @@ A change to `internal/adapter/store/sqlite/schema.sql` is a new schema version w
 ## Planning artifacts
 
 Plans, specs, handoffs, ledgers and reports of planning or executing a plan are ephemeral and never committed, whatever skill or tool produced them. Write them under `docs/plans/`, which `.gitignore` excludes along with `docs/superpowers/` and `.superpowers/`.
+
+## Architecture rules
+
+The architecture docs describe the code as it is; each rule below is a test in `internal/archtest` ([the full list](docs/src/content/docs/architecture/testing.md#the-architecture-tests)).
+
+- Dependencies point inward: the domain imports only itself, the core only the standard library, the core, the domain and the meter; adapters implement the core's ports and one composition root picks them. [Layers](docs/src/content/docs/architecture/layers.md)
+- A port belongs to the core package that uses it and has at most five methods; a capability only some adapters have is an optional interface. [Ports](docs/src/content/docs/architecture/ports.md)
+- One adapter reaches each outside tool: the store, GitHub, Orca, Claude Desktop, the agent. Outside it, a tool's name appears only in the composition root.
+- Only the daemon, and the `store` commands under the store's lock, write the store; clients speak `internal/api` and decide nothing. [The daemon and its clients](docs/src/content/docs/architecture/daemon-and-clients.md)
+- The core is keyed by `unit.Unit`, names no provider and imports no plugin; a source is a plugin registered in `internal/cli/sources.go`. [Plugins](docs/src/content/docs/architecture/plugins.md)
+- Go never enumerates intents; facts, steps and builtins live in their tables in `internal/intent/builtin`. [Profile first](docs/src/content/docs/architecture/profile-first.md)
+- Every outbound post is a draft that a person, or their approval policy, approves; authority never comes from an agent.
+- Every user-visible name derives from `internal/brand`.
+
+Where a new fact, step, intent, workflow, use case, adapter, plugin, API route, command, view or table goes: [Layers](docs/src/content/docs/architecture/layers.md#where-a-change-goes).

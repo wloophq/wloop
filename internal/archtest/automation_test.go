@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -16,7 +17,7 @@ import (
 var engineBans = []string{"internal/domain/pr", "internal/domain/turn", "internal/domain/view",
 	"internal/domain/workspace", "internal/domain/round", "internal/adapter"}
 
-var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true}
+var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true, "slack": true}
 
 // engineImports flags an import of engineBans by internal/core/automation;
 // its fakes, automationtest, are excluded.
@@ -33,27 +34,57 @@ func engineImports(self string, imports []string) []string {
 	return out
 }
 
-// engineLiterals flags a provider id spelled in a non-test file of the
-// engine, as a string literal or as a unit provider constant.
-func engineLiterals(fset *token.FileSet, file string, f *ast.File) []string {
-	if testFile(file) || filepath.Dir(file) != "internal/core/automation" {
+// coreProviderAllowlist are the core files that may still name a provider.
+var coreProviderAllowlist = []allowed{
+	{"internal/core/port/port.go", "unit.GitHub", "PROf reads a pull request from a github event; a pluginDebt edge"},
+}
+
+// coreLiterals flags a provider id spelled in a non-test file of the
+// core, as a string literal or as a unit provider constant; the core's fakes,
+// packages named <x>test, are excluded. used marks the allowlist entries that
+// matched.
+func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed, used map[int]bool) []string {
+	dir := filepath.Dir(file)
+	if testFile(file) || !under(dir, "internal/core") || strings.HasSuffix(filepath.Base(dir), "test") {
 		return nil
 	}
 	var out []string
+	flag := func(pos token.Pos, spelled string) {
+		for i, a := range allow {
+			if a.file == file && a.literal == spelled {
+				used[i] = true
+				return
+			}
+		}
+		out = append(out, fmt.Sprintf("%s: %s; the core names no provider", fset.Position(pos), spelled))
+	}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.BasicLit:
 			if s, err := strconv.Unquote(n.Value); err == nil && n.Kind == token.STRING && providerIDs[s] {
-				out = append(out, fmt.Sprintf("%s: %q; the engine names no provider", fset.Position(n.Pos()), s))
+				flag(n.Pos(), strconv.Quote(s))
 			}
 		case *ast.SelectorExpr:
 			if x, ok := n.X.(*ast.Ident); ok && x.Name == "unit" && (n.Sel.Name == "GitHub" || n.Sel.Name == "Session" || n.Sel.Name == "Workspace") {
-				out = append(out, fmt.Sprintf("%s: unit.%s; the engine names no provider", fset.Position(n.Pos()), n.Sel.Name))
+				flag(n.Pos(), "unit."+n.Sel.Name)
 			}
 		}
 		return true
 	})
 	return out
+}
+
+func TestTheCoreNamesNoProvider(t *testing.T) {
+	t.Parallel()
+	used := map[int]bool{}
+	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
+		for _, b := range coreLiterals(fset, file, f, coreProviderAllowlist, used) {
+			t.Error(b)
+		}
+	})
+	for _, s := range stale(coreProviderAllowlist, used) {
+		t.Error(s)
+	}
 }
 
 func TestTheEngineImportsNoProvider(t *testing.T) {
@@ -67,15 +98,6 @@ func TestTheEngineImportsNoProvider(t *testing.T) {
 		seen = seen || self == "internal/core/automation"
 		for _, b := range engineImports(self, p.Imports) {
 			t.Error(b)
-		}
-		for _, name := range p.GoFiles {
-			if self != "internal/core/automation" {
-				continue
-			}
-			fset, f := parseFile(t, filepath.Join(p.Dir, name))
-			for _, b := range engineLiterals(fset, self+"/"+name, f) {
-				t.Error(b)
-			}
 		}
 	}
 	if !seen {
@@ -100,7 +122,14 @@ var c = "sessions"
 var d = workflow.Session
 var e = unit.Unit{}
 `)
-	flagged(t, "literals", engineLiterals(fset, "internal/core/automation/x.go", f), 2, "names no provider")
-	flagged(t, "a test file", engineLiterals(fset, "internal/core/automation/x_test.go", f), 0, "")
-	flagged(t, "the fakes", engineLiterals(fset, "internal/core/automation/automationtest/x.go", f), 0, "")
+	none := map[int]bool{}
+	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none), 2, "the core names no provider")
+	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none), 2, "the core names no provider")
+	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none), 0, "")
+	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none), 0, "")
+	flagged(t, "outside the core", coreLiterals(fset, "internal/daemon/x.go", f, nil, none), 0, "")
+	allow := []allowed{{"internal/core/gtd/x.go", "unit.Session", "planted"}, {"internal/core/gtd/x.go", `"slack"`, "stale"}}
+	used := map[int]bool{}
+	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 1, `"github"`)
+	flagged(t, "stale", stale(allow, used), 1, "(stale)")
 }

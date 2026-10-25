@@ -1,5 +1,5 @@
 // Package profiles embeds the bundled profile, the lowest layer of every
-// profile: the judgment blocks and the intents' manifests.
+// profile: the judgment blocks, the intents and the workflows.
 package profiles
 
 import "embed"
