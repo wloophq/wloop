@@ -18,6 +18,8 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 )
 
+//go:generate go run ../designtokens/cmd/gencss ../../design/tokens.json static/app.css ../../design/components/preview.css ../../design/components/bundle.css
+
 //go:embed static
 var files embed.FS
 

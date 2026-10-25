@@ -3,7 +3,7 @@ title: Layers and the dependency rule
 description: The packages of the code, what each layer may import, the composition root, and where a new piece of code goes.
 ---
 
-{{name}} is one Go module laid out as ports and adapters. The use cases and the values they work on know nothing of SQLite, GitHub, Slack, Orca or the coding agent; each outside tool is an adapter behind a small port, and one composition root picks the adapters. The rules below are tests in `internal/archtest`; [Testing](/architecture/testing/#the-architecture-tests) lists each one.
+{{name}} is one Go module laid out as ports and adapters. The use cases and the values they work on know nothing of SQLite, GitHub, Slack, Orca or the coding agent; each outside tool is an adapter behind a small port, and one composition root picks the adapters. The rules below are tests in `internal/archtest`; [Architecture rules](/reference/architecture-rules/) lists each one.
 
 ## The layers
 
@@ -58,7 +58,7 @@ A port is an interface declared by the core package that uses it, with at most f
 
 `internal/cli` builds the binary's commands, and three of its files choose what runs:
 
-- `root.go` holds the registries of agents and workspace managers: one entry per agent kind and per manager, the only place outside the adapters that names one;
+- `root.go` holds the registries of agents and workspace managers: one entry per agent kind and per manager, the only place outside the adapters that names one, and `Defaults`, the agent and managers a config file that names none picks;
 - `sources.go` lists the compiled-in plugins, the only file that names a source (`slack*.go` wire the Slack source's commands);
 - `storecmd.go` opens the store for the daemon, migrating it when it is older, and `serve.go` wires every port of the daemon.
 
@@ -70,6 +70,7 @@ The commands call the daemon through `internal/api/client`. Those that work with
 |---|---|---|
 | A behavior: when something happens, on which units, with which text | the profile: a workflow under `profiles/default/workflows/<name>/` or an intent under `profiles/default/intents/<name>/` | see [Profile first](/architecture/profile-first/) |
 | A fact a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go`, computed by the provider's facts adapter (`internal/adapter/facts/<provider>`) | `make docs-ref` |
+| A trigger that fires once per signal | a workflow with `[marks]` and `handled()` in its `when`; the signal as a fact of its provider if it is not one yet | see [Marks](/reference/workflow-manifest/#marks) |
 | A workflow step or an intent builtin | its name in `internal/intent/builtin/builtin.go`, its implementation in `internal/cli/steps.go` or `internal/cli/builtins.go` (`internal/daemon/builtins.go` for the daemon's routes) | `make docs-ref` |
 | A use case | a package under `internal/core`, with the ports it needs declared there and a fake in `<name>test` | |
 | A value or a pure rule | `internal/domain/<name>` | |

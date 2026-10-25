@@ -169,7 +169,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 	c := samples(d)[0]
 	want := map[string]any{
 		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo": "api",
-		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"}, "pr.address.reviewers": []string{}, "pr.address.checks": []string{},
+		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"}, "pr.address.reviewers": []string{}, "pr.address.checks": []string{}, "pr.address.conflict": false,
 		"turn.trigger": "by-hand", "turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
 		"turn.plain": false, "turn.planned": "", "turn.round": "first",
 		"last_review.exists": true, "last_review.verdict": "", "last_review.decision": "APPROVED",
@@ -268,5 +268,12 @@ func TestAddressFactsListTheRoundsReviewersAndChecks(t *testing.T) {
 	}
 	if v, _ := p.Fact("pr.address.checks"); !reflect.DeepEqual(v, []string{"ci/test"}) {
 		t.Errorf("checks %#v", v)
+	}
+	if v, _ := p.Fact("pr.address.conflict"); v != false {
+		t.Errorf("conflict %#v", v)
+	}
+	p.Address.Conflict = &RoundConflict{Base: "main"}
+	if v, _ := p.Fact("pr.address.conflict"); v != true {
+		t.Errorf("conflict %#v", v)
 	}
 }

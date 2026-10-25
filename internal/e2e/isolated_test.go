@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/cli"
 	"github.com/wloophq/wloop/internal/config"
 )
 
@@ -142,7 +143,7 @@ func waitGone(t *testing.T, pid int) {
 func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	dir := setupIsolated(t, shortDir(t), "acceptance", 2)
 	file := filepath.Join(dir, "config", brand.StateDir(), "config.json")
-	c, err := config.LoadFile(file)
+	c, err := config.LoadFile(file, cli.Defaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +199,7 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 		t.Errorf("a second setup on the same directory: %s", out)
 	}
 	withSlack := setupIsolated(t, shortDir(t), "s", 3, "--slack")
-	if c, err := config.LoadFile(filepath.Join(withSlack, "config", brand.StateDir(), "config.json")); err != nil || !c.PluginEnabled("slack") || c.PluginEnabled("github") {
+	if c, err := config.LoadFile(filepath.Join(withSlack, "config", brand.StateDir(), "config.json"), cli.Defaults()); err != nil || !c.PluginEnabled("slack") || c.PluginEnabled("github") {
 		t.Errorf("--slack: %v", err)
 	}
 }

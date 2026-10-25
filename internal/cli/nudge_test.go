@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/config"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -80,7 +79,7 @@ func TestOnlyANudgeOnTheMaintainersReadsTheirSection(t *testing.T) {
 
 func TestNudgeWorkspaceOrder(t *testing.T) {
 	t.Parallel()
-	cfg := config.Defaults()
+	cfg := Defaults()
 	repos := nudgeManager().RepoList
 	pr := &github.PullRequest{Facts: pr.Facts{HeadRefName: "feat/x", State: dgh.StateOpen}}
 	onHead := mainWS

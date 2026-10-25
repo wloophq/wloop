@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -274,20 +274,20 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	} {
 		main := wsdomain.Workspace{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "feat/theirs"}
 		for _, all := range [][]wsdomain.Workspace{{main, worktree}, {worktree, main}} {
-			if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, all, pr.Ref, pr, yes); !ok || w.ID != "wt" {
+			if w, ok, _ := findAuthorWorkspace(Defaults(), repos, all, pr.Ref, pr, yes); !ok || w.ID != "wt" {
 				t.Fatalf("%s: got %+v %v", name, w, ok)
 			}
 		}
 	}
 	upstreamOnly := []wsdomain.Workspace{{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "wip", PushBranch: "feat/theirs"}}
-	if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, upstreamOnly, pr.Ref, pr, yes); ok {
+	if w, ok, _ := findAuthorWorkspace(Defaults(), repos, upstreamOnly, pr.Ref, pr, yes); ok {
 		t.Fatalf("took a main checkout by its push branch: %+v", w)
 	}
 	onBranch := []wsdomain.Workspace{{ID: "main", RepoID: "r1", HostID: "local", IsMain: true, Branch: "feat/theirs"}}
-	if w, ok, _ := findAuthorWorkspace(config.Defaults(), repos, onBranch, pr.Ref, pr, no); ok {
+	if w, ok, _ := findAuthorWorkspace(Defaults(), repos, onBranch, pr.Ref, pr, no); ok {
 		t.Fatalf("took a main checkout for someone else's PR: %+v", w)
 	}
-	if _, ok, _ := findAuthorWorkspace(config.Defaults(), repos, onBranch, pr.Ref, pr, yes); !ok {
+	if _, ok, _ := findAuthorWorkspace(Defaults(), repos, onBranch, pr.Ref, pr, yes); !ok {
 		t.Fatal("main checkout on my PR's branch not taken")
 	}
 }
@@ -306,7 +306,7 @@ func TestTakeOverIsTheVerb(t *testing.T) {
 	}
 }
 
-func TestTakeOverClearsTheFingerprint(t *testing.T) {
+func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
@@ -314,12 +314,17 @@ func TestTakeOverClearsTheFingerprint(t *testing.T) {
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
-	st.SetFingerprint(ref.String(), "2026-10-18T10:00:00Z@c9")
+	st.SetMark(ref.String(), round.AddressedReviews, "2026-10-18T10:00:00Z")
+	st.SetMark(ref.String(), round.Reviewed, "2026-10-18T10:00:00Z@c9")
 	te.saveRounds(t, st)
 	if code := te.run("take-over", ref.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := te.loadRounds(t).Fingerprint(ref.String()); got != "" {
-		t.Fatalf("fingerprint %q survived the take-over", got)
+	st = te.loadRounds(t)
+	if got := st.Mark(ref.String(), round.AddressedReviews); got != "" {
+		t.Fatalf("the reviews addressed, %q, survived the take-over", got)
+	}
+	if got := st.Mark(ref.String(), round.Reviewed); got == "" {
+		t.Fatal("the take-over forgot my own review")
 	}
 }

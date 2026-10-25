@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -67,6 +68,19 @@ type Predicate interface {
 	Reads() []string
 }
 
+// MarkNames are the marks p reads with handled(); a predicate lists them
+// through a MarkNames() []string method.
+func MarkNames(p Predicate) []string {
+	if r, ok := p.(interface{ MarkNames() []string }); ok {
+		return r.MarkNames()
+	}
+	return nil
+}
+
+// ReadsMarks says whether p reads the unit's marks, so a caller loads them
+// only then.
+func ReadsMarks(p Predicate) bool { return len(MarkNames(p)) > 0 }
+
 // All is a predicate that matches when every one of ps does; a nil one
 // matches.
 func All(ps ...Predicate) Predicate { return all(ps) }
@@ -83,6 +97,14 @@ func (a all) Match(v Vars) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+func (a all) MarkNames() []string {
+	var out []string
+	for _, p := range a {
+		out = append(out, MarkNames(p)...)
+	}
+	return out
 }
 
 func (a all) Reads() []string {
@@ -102,9 +124,10 @@ func (r Refused) Match(Vars) (bool, error) { return false, r.Err }
 func (Refused) Reads() []string            { return nil }
 
 type Vars struct {
-	Facts   Facts // the unit's slot ("pr.state", "session.idle_for")
-	Trigger Facts // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
-	Config  Facts // "config.cleanup.idle", ...
+	Facts   Facts             // the unit's slot ("pr.state", "session.idle_for")
+	Trigger Facts             // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
+	Config  Facts             // "config.cleanup.idle", ...
+	Marks   map[string]string // the unit's handled marks by name, which handled() reads
 	Now     time.Time
 }
 
@@ -142,9 +165,12 @@ type Workflow struct {
 	AllowVisible      bool
 	Order             int
 	Key               []string // fact names; empty means the slot's fingerprint fact
-	Approval          Approval
-	Source            string // manifest path
-	Bundled           bool
+	// Marks are the facts whose values a done or dismissed item records as
+	// the unit's marks, by the mark's name under the workflow (mark.Of).
+	Marks    map[string]string
+	Approval Approval
+	Source   string // manifest path
+	Bundled  bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
@@ -232,6 +258,9 @@ type Item struct {
 	Default  Outcome
 	Deadline time.Time
 	Guidance string // set by Act(guide) only
+	// Marks are the marks a done or dismissed run records, by full name, from
+	// the facts the item was planned with.
+	Marks    map[string]mark.Value
 	Attempts int
 	Error    string
 	Mode     Mode

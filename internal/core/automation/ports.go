@@ -129,7 +129,14 @@ type Deferred struct{ Reason string }
 
 func (d Deferred) Error() string { return d.Reason }
 
-// Ledger stores the plan and the runs.
+// Marks are what a unit's triggers already handled, by mark name, which a
+// workflow's handled() reads.
+type Marks interface {
+	Marks(ctx context.Context, u unit.Unit) (map[string]string, error)
+}
+
+// Ledger stores the plan and the runs. Recording a done or dismissed run
+// also sets the item's Marks on its unit, in the same write.
 type Ledger interface {
 	// Save replaces the items of p's workflows, leaving out, in the same
 	// write, an item whose key is done or dismissed: a writer that planned

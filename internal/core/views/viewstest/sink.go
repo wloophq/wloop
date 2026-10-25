@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/views"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/view"
 )
 
@@ -30,7 +29,7 @@ type Board interface {
 // flow.
 func RunSink(t *testing.T, newSink func(t *testing.T) (views.ViewSink, views.PlacementReader, Board)) {
 	ctx := context.Background()
-	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
+	ref := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	asks := view.Item{Unit: ref, Role: view.ReviewRole, Status: view.NeedsMe, Unread: true, Summary: "asks: keep both columns?"}
 
 	apply := func(t *testing.T, s views.ViewSink, force map[unit.Unit]bool, items ...view.Item) []view.Applied {

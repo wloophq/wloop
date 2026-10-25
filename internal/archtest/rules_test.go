@@ -97,9 +97,6 @@ var allowlist = []allowed{
 	{"internal/cli/root.go", "orca", "the registry key and the sink name of the Orca manager entry"},
 	{"internal/cli/root.go", "Orca", "the Orca manager entry's display name"},
 	{"internal/cli/root.go", "Claude Desktop", "the Claude Desktop manager entry's display name"},
-	{"internal/config/config.go", "claude", "Defaults().Agent"},
-	{"internal/config/config.go", "claude-desktop", "Defaults().WorkspaceManagers"},
-	{"internal/config/config.go", "orca", "Defaults().WorkspaceManagers"},
 	{"internal/intent/builtin/facts.go", "The workspace manager that owns the session, such as orca or claude-desktop.", "session.manager's doc names the managers' keys"},
 	{"internal/intent/builtin/facts.go", "The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop.", "session.closed_by_manager's doc names the manager that keeps such a record"},
 }
@@ -263,6 +260,8 @@ func ruleSpawn(self string, imports []string, files []*ast.File) []string {
 	return nil
 }
 
+// TestSpawningPackagesImportMeter checks that a package that spawns a process
+// imports the meter.
 func TestSpawningPackagesImportMeter(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

@@ -236,7 +236,7 @@ func runInit(ctx context.Context, e *Env, args []string) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	cur, err := config.LoadFile(e.ConfigPath)
+	cur, err := config.LoadFile(e.ConfigPath, Defaults())
 	if err != nil {
 		return fmt.Errorf("%w; fix it, then run '%s init' again", err, brand.Command)
 	}

@@ -26,6 +26,8 @@ func ruleR15(self string, imports []string) []string {
 	return out
 }
 
+// TestReadModelImports checks that the read model reaches its inputs only
+// through ports.
 func TestReadModelImports(t *testing.T) {
 	t.Parallel()
 	seen := false

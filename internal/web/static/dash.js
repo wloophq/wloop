@@ -261,7 +261,7 @@ function dashShapeOption(rows, lens, pal) {
   };
 }
 
-// dashWorkingMs mirrors situation.WorkingDuration: the time from from to to
+// dashWorkingMs mirrors workday.Between: the time from from to to
 // in UTC, Saturdays and Sundays left out.
 function dashWorkingMs(from, to) {
   let total = 0;

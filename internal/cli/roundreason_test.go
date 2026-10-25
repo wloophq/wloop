@@ -20,11 +20,30 @@ func TestAutomatedReasonJoinsThePlannersNamesWithTheRead(t *testing.T) {
 		Reviewers: []turn.RoundReviewer{{Login: "ana"}, {Login: "jussara-ai"}},
 		Checks:    []turn.FailingCheck{{Name: "ci/test", Summary: "3 failed", URL: "https://ci/9"}, {Name: "gone"}},
 	}
-	if got := automatedReason(f, checks); !reflect.DeepEqual(got, want) {
+	if got := automatedReason(f, dpr.Facts{Checks: checks}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v", got)
 	}
-	if got := automatedReason(workflow.Facts{}, checks); got != nil {
+	if got := automatedReason(workflow.Facts{}, dpr.Facts{Checks: checks}); got != nil {
 		t.Errorf("nothing due gave %+v", got)
+	}
+}
+
+func TestAutomatedReasonNamesTheBaseOfAConflict(t *testing.T) {
+	t.Parallel()
+	got := automatedReason(workflow.Facts{"pr.address.conflict": true}, dpr.Facts{BaseRefName: "main"})
+	if want := (&turn.RoundReason{Conflict: &turn.RoundConflict{Base: "main"}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestHandReasonShowsAConflictMarkedWhenAnEarlierRoundCoveredItsHead(t *testing.T) {
+	t.Parallel()
+	f := dpr.Facts{State: dgh.StateOpen, HeadRefOid: "h2", BaseRefName: "main", Mergeable: "CONFLICTING"}
+	if got := handReason(f, "me", time.Time{}, "", "h1", config.Config{}); got == nil || !reflect.DeepEqual(got.Conflict, &turn.RoundConflict{Base: "main"}) {
+		t.Errorf("got %+v", got)
+	}
+	if got := handReason(f, "me", time.Time{}, "", "h2", config.Config{}); got == nil || !reflect.DeepEqual(got.Conflict, &turn.RoundConflict{Base: "main", Handled: true}) {
+		t.Errorf("got %+v", got)
 	}
 }
 
@@ -44,7 +63,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 	base := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	at := func(h int) time.Time { return base.Add(time.Duration(h) * time.Hour) }
 	cfg := config.Config{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}
-	got := handReason(handFacts(at), "me", at(2), "h2", cfg)
+	got := handReason(handFacts(at), "me", at(2), "h2", "", cfg)
 	want := &turn.RoundReason{
 		Reviewers: []turn.RoundReviewer{{Login: "ana", Handled: true}, {Login: "bob"}},
 		Checks:    []turn.FailingCheck{{Name: "lint", Summary: "unused x", Handled: true}},
@@ -52,7 +71,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v", got)
 	}
-	got = handReason(handFacts(at), "me", time.Time{}, "h1", cfg)
+	got = handReason(handFacts(at), "me", time.Time{}, "h1", "", cfg)
 	if got.Reviewers[0].Handled || got.Checks[0].Handled {
 		t.Errorf("without an earlier round nothing is handled: %+v", got)
 	}
@@ -60,7 +79,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 
 func TestHandReasonIsNilWithNothingToShow(t *testing.T) {
 	t.Parallel()
-	if got := handReason(dpr.Facts{State: dgh.StateOpen, HeadRefOid: "h"}, "me", time.Time{}, "", config.Config{}); got != nil {
+	if got := handReason(dpr.Facts{State: dgh.StateOpen, HeadRefOid: "h"}, "me", time.Time{}, "", "", config.Config{}); got != nil {
 		t.Errorf("got %+v", got)
 	}
 }

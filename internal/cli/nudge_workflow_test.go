@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -175,8 +174,8 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		}, func() { r.rec.overrides = nil }},
 		{"per-PR daily cap reached (1)", func() {
 			sc.te.cfg.Rounds.PerPRPerDay = 1
-			st.RecordFollowup(sc.ref.String(), "", testNow)
-		}, func() { sc.te.cfg.Rounds = config.Defaults().Rounds }},
+			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+		}, func() { sc.te.cfg.Rounds = Defaults().Rounds }},
 	}
 	for _, g := range guards {
 		g.set()

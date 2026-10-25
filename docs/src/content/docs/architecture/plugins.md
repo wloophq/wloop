@@ -16,7 +16,8 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Units and their changes | `Ingest` (an `ingest.Job` over its `port.Source` and `port.SourceStore`), `Slow`, `Run` (a long-running stream, restarted after 30 s), `Jobs` | runs them as daemon jobs; a source never writes, ingest saves through the source's store |
 | Rows | `Rows`, a read model provider | serves them to every surface with the rest of the read model |
 | Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into GTD entries; renders the card on every surface; resolves linked items from unit events |
-| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units |
+| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records |
+| Marks | its planner's own mark names, written through the store | stores them per unit, retains them with the unit, and lets `handled()` read them |
 | What a turn reads about a unit | `Payload`, a `turn.PayloadReader` | renders it into the turn's instructions |
 | Where its work runs | `PlacementDefaults`, `PlacementHints` | the placement service decides the repository and checkout |
 | Publishing | `Publisher`, a `port.Effects` | sends an approved draft once, with no automatic retry; `Verify` settles a draft a crash left in `sending` |
@@ -39,7 +40,7 @@ The core never imports a plugin package, and no plugin imports another. The core
 | `github` | `internal/adapter/source/github`, `internal/adapter/facts/github`, `internal/readmodel/prrow`, `internal/situation`, `internal/domain/github`, `internal/domain/pr`, `internal/domain/inventory`, `internal/domain/change`, `internal/github` |
 | `slack` | `internal/adapter/source/slack`, `internal/domain/slack`, `internal/slack` |
 
-Test imports count too, except a plugin's own test fake. The cockpit's scripts never quote a plugin's id either: they read the provider from the data the daemon serves. The edges that break the rule today are listed in `pluginDebt` in `internal/archtest/rules_plugins_test.go`, mostly core packages that still name `domain/pr`. The list only shrinks: an entry that no longer matches an import fails the test. Loop code outside the GitHub plugin is keyed by `unit.Unit`, and the few daemon files that name a pull request by nature are listed with their reason (`TestLoopCodeImportsNoPR`).
+Test imports count too, except a plugin's own test fake: a core test builds its units as `unit.Unit` values, and a test that exercises a plugin's behavior lives with the plugin, such as the read model's tests over GitHub rows in `internal/readmodel/prrow`. The cockpit's scripts never quote a plugin's id either: they read the provider from the data the daemon serves. The edges that break the rule today are listed in `pluginDebt` in `internal/archtest/rules_plugins_test.go`, mostly core packages that still name `domain/pr`. The list only shrinks: an entry that no longer matches an import fails the test. Loop code outside the GitHub plugin is keyed by `unit.Unit`, and the daemon files that still name a pull request are listed with their reason (`TestLoopCodeImportsNoPR`).
 
 `session` and `workspace` are providers the core keeps for its own units. They have no plugin: their facts come from the turn registry and the workspace managers, through `internal/adapter/facts/session` and `internal/adapter/facts/workspace`.
 

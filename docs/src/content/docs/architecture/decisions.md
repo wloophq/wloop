@@ -68,6 +68,13 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Consequence**: approval policies decide what goes out unattended; agents never hold a source's token.
 - **Enforced by**: `internal/core/outbox` tests.
 
+## A worktree belongs to the manager that created it
+
+- **Context**: Orca lists every git worktree of a repository it knows, including the ones Claude Desktop made, so the first manager to list a worktree is not its owner.
+- **Decision**: the owner of a worktree is the manager that created it, as the store's custody or the manager itself says; `workspace_managers` orders only managers that merely list it, and a round falls through to such a manager, with the reason logged, only when the owner cannot launch the session.
+- **Consequence**: a round on a pull request continues in the app it was developed in, and a manager that only lists a worktree never becomes its owner. A session a round started in such a manager is kept by the next round while it lives. Removing the workspace of a worktree Claude Desktop made removes it through Claude Desktop.
+- **Enforced by**: `TestSetListGivesAWorktreeToTheManagerThatCreatedIt`, `TestARoundContinuesInTheManagerThatCreatedTheWorktree`, `TestARoundFallsThroughWhenTheCreatorCannotHostIt`.
+
 ## Authority comes from you
 
 - **Context**: an agent reads text written by others and can be steered by it.
@@ -81,6 +88,13 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Decision**: intents, workflows and judgment blocks are profile files, and a user profile overrides any bundled one; Go provides a closed vocabulary of facts, steps, builtins and gates, and never enumerates intents.
 - **Consequence**: a new behavior is a profile change; Go grows only by a fact, a step or a gate.
 - **Enforced by**: `TestNoIntentEnumerations`, `TestProseIsEmbeddedOnlyFromProfiles`, the boundary rules, `TestBuiltinNamesLiveInTheirTables`. See [Profile first](/architecture/profile-first/).
+
+## The core owns what a trigger handled
+
+- **Context**: each trigger that must fire once per signal (a review, a head's failing checks, a head's conflict) needed its own column and migration, and a source other than GitHub or a profile's own trigger had nowhere to keep it.
+- **Decision**: what a trigger handled is a mark: a value per unit and name in `unit_marks`, keyed by `unit.Unit`, written in the transaction of the write that handled it, and deleted with an ended pull request, a pull request gone from the inventory, or a session no longer stored. The core owns the encoding and the comparison (`internal/domain/mark`: a string is a version, a time or an int a watermark); a plugin owns its signal's meaning, exposes it as a fact and names its own marks; a workflow records its marks with `[marks]`, under its name, and reads any with `handled()`.
+- **Consequence**: a new trigger needs no schema change, and a profile can define one that fires once per signal; a signal that does not fit a version or a watermark stays in its plugin's planner.
+- **Enforced by**: the `internal/domain/mark` tests, the ledger contract (`ADoneOrDismissedRunSetsTheItemsMarks`), the manifest goldens in `internal/intent/testdata/workflows`.
 
 ## One engine plans automatic work, and planning writes nothing
 
@@ -120,6 +134,6 @@ One entry per decision in force. A pull request that changes one of them changes
 ## Architecture rules are tests
 
 - **Context**: a rule only in prose is broken by the next change that does not read it.
-- **Decision**: each rule is a test in `internal/archtest` with a self-test that plants a violation; allowlists name their reason and fail when stale.
-- **Consequence**: exceptions are visible and only shrink.
-- **Enforced by**: the self-tests. See [Testing](/architecture/testing/#the-architecture-tests).
+- **Decision**: each rule is a test in `internal/archtest` with a self-test that plants a violation and a doc comment that states the rule; allowlists name their reason and fail when stale. The rules reference page is generated from those sources.
+- **Consequence**: exceptions are visible and only shrink, and the list of rules cannot drift from the tests.
+- **Enforced by**: the self-tests, `TestEveryRuleTestStatesItsRule`, `TestRulesDocIsCurrent`. See [Testing](/architecture/testing/#the-architecture-tests) and [Architecture rules](/reference/architecture-rules/).

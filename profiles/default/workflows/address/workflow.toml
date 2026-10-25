@@ -1,4 +1,4 @@
-description = "Address the reviews and failing checks of my pull request"
+description = "Address the reviews, failing checks and conflicts of my pull request"
 subject = "github"
 when = 'pr.address.due'
 order = 30

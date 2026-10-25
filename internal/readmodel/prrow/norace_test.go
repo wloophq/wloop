@@ -1,5 +1,5 @@
 //go:build !race
 
-package readmodel_test
+package prrow_test
 
 const race = false

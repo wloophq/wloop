@@ -1,0 +1,1 @@
+`favicon.svg` is wloop's mark: an open loop with an arrowhead, in `me` (`#1f5fd6`, `#6b9cff` in the dark theme). It is the only drawn mark wloop has; the cockpit sets the name in the `brand` style instead. Use it as a favicon or at 16 to 32px. The file lives at `docs/public/favicon.svg` for the docs site and at `internal/web/static/favicon.svg` for the cockpit.

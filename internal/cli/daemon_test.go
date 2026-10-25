@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
-	"github.com/wloophq/wloop/internal/config"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -74,7 +73,7 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 	}
 	d := &testDaemon{socket: filepath.Join(dir, "daemon.sock"), store: st}
 	srv := daemon.New(withRows(daemon.Deps{
-		Cfg: config.Defaults(), Version: "test", Actions: actions,
+		Cfg: Defaults(), Version: "test", Actions: actions,
 		Now:    func() time.Time { return daemonNow },
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Sweep:  daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),

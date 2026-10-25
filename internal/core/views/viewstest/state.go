@@ -12,7 +12,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/views"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/view"
 )
 
@@ -124,8 +123,8 @@ func (s *State) add(evs []port.Event) {
 func RunState(t *testing.T, newState func(t *testing.T) views.State, events func(t *testing.T, s views.State) []port.Event) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 17, 12, 0, 0, 123456789, time.UTC)
-	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
-	r8 := pr.Ref{Owner: "acme", Repo: "web", Number: 8}.Unit()
+	r7 := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	r8 := unit.Unit{Provider: unit.GitHub, Key: "acme/web#8"}
 	review := func(ref unit.Unit) view.Key { return view.Key{Unit: ref, Role: view.ReviewRole} }
 	save := func(t *testing.T, s views.State, sink string, a view.Applied) {
 		t.Helper()

@@ -121,23 +121,32 @@ type StartBlock struct {
 	// Homes are the agent homes trusting the folder writes in: Home, or
 	// the homes the terminal's own one may be.
 	Homes []string
-	// Round, Fingerprint and ChecksHead name the round the block holds and
-	// the trigger it answered, which dismissing the block marks handled.
-	Round, Fingerprint, ChecksHead string
+	// Round, Fingerprint, ChecksHead and ConflictHead name the round the
+	// block holds and the trigger it answered, which dismissing the block
+	// marks handled.
+	Round, Fingerprint, ChecksHead, ConflictHead string
 }
 
 // Key keeps each block its own event: a keyed event is recorded once.
 func (b StartBlock) Key(at time.Time) string {
-	return strings.Join([]string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, b.Fingerprint, b.ChecksHead}, "\n")
+	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, b.Fingerprint, b.ChecksHead}
+	// A schema version 2 release reads a key of nine parts only.
+	if b.ConflictHead != "" {
+		parts = append(parts, b.ConflictHead)
+	}
+	return strings.Join(parts, "\n")
 }
 
 // StartBlockOf is the StartBlock a round_blocked event's key names.
 func StartBlockOf(e port.Event) (StartBlock, bool) {
 	parts := strings.Split(e.Key, "\n")
-	if e.Kind != dinv.KindRoundBlocked || len(parts) != 9 {
+	if e.Kind != dinv.KindRoundBlocked || (len(parts) != 9 && len(parts) != 10) {
 		return StartBlock{}, false
 	}
 	b := StartBlock{Question: parts[1], Root: parts[2], Folder: parts[3], Home: parts[4], Round: parts[6], Fingerprint: parts[7], ChecksHead: parts[8]}
+	if len(parts) == 10 {
+		b.ConflictHead = parts[9]
+	}
 	if parts[5] != "" {
 		b.Homes = strings.Split(parts[5], "\t")
 	}

@@ -75,6 +75,7 @@ export default defineConfig({
             'reference/intent-manifest',
             'reference/workflow-manifest',
             'reference/facts',
+            'reference/architecture-rules',
             'reference/keys',
             'reference/cockpit-filter',
             'reference/files',

@@ -54,30 +54,21 @@ func pluginTestFake(pkgPath string) bool {
 	return pluginOf(pkgPath) != "" && strings.HasSuffix(path.Base(pkgPath), "test")
 }
 
-// debt is an import edge R16 forbids and lets pass.
+// debt is an import edge R16 forbids and lets pass, with why it exists.
 type debt struct {
-	from, to string
+	from, to, reason string
 }
 
 var pluginDebt = []debt{
-	{"internal/api", "internal/domain/pr"},
-	{"internal/api/client", "internal/domain/pr"},
-	{"internal/client/tui", "internal/domain/pr"},
-	{"internal/client/turncli", "internal/domain/pr"},
-	{"internal/core/port", "internal/domain/pr"},
-	{"internal/core/sweep", "internal/domain/inventory"},
-	{"internal/core/sweep", "internal/domain/pr"},
-	{"internal/core/usage", "internal/domain/pr"},
-	{"internal/core/views", "internal/domain/pr"},
-	{"internal/core/views/viewstest", "internal/domain/pr"},
-	{"internal/domain/turn", "internal/domain/pr"},
-	{"internal/domain/unit", "internal/domain/pr"},
-	{"internal/domain/view", "internal/domain/pr"},
-	{"internal/readmodel", "internal/domain/inventory"},
-	{"internal/readmodel", "internal/domain/pr"},
-	{"internal/readmodel", "internal/readmodel/prrow"},
-	{"internal/readmodel", "internal/situation"},
-	{"internal/web", "internal/situation"},
+	{"internal/api", "internal/domain/pr", "debt: the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref where the API should carry a unit.Unit"},
+	{"internal/api/client", "internal/domain/pr", "debt: TurnBook and Facts take a pr.Ref, following the API"},
+	{"internal/client/tui", "internal/domain/pr", "debt: the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey; a client parses what the daemon should resolve"},
+	{"internal/client/turncli", "internal/domain/pr", "debt: unitArg parses a pull request URL argument with pr.ParseURL; a client parses what the daemon should resolve"},
+	{"internal/core/port", "internal/domain/pr", "debt: PROf reads a pull request from a github event"},
+	{"internal/core/sweep", "internal/domain/inventory", "debt: the Inputs port returns the stored pull request rows as inventory.PR"},
+	{"internal/core/sweep", "internal/domain/pr", "debt: the sweep's Facts embed pr.Facts"},
+	{"internal/core/usage", "internal/domain/pr", "debt: a Turn names its pull request as a pr.Ref"},
+	{"internal/readmodel", "internal/domain/inventory", "debt: the RowDeps.Intake hook takes an inventory.BriefRecord"},
 }
 
 // ruleR16 flags an import of a plugin package by a core package, or by a
@@ -124,12 +115,14 @@ func staleDebt(debts []debt, used map[int]bool) []string {
 	var out []string
 	for i, d := range debts {
 		if !used[i] {
-			out = append(out, fmt.Sprintf("pluginDebt entry %s -> %s matches no import; remove it (R16)", d.from, d.to))
+			out = append(out, fmt.Sprintf("pluginDebt entry %s -> %s (%s) matches no import; remove it (R16)", d.from, d.to, d.reason))
 		}
 	}
 	return out
 }
 
+// TestCoreImportsNoPlugin checks that the core imports no plugin, no plugin
+// imports another, and `pluginDebt` only shrinks.
 func TestCoreImportsNoPlugin(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
@@ -189,11 +182,11 @@ func TestR16FlagsStaleDebt(t *testing.T) {
 	t.Parallel()
 	slack := module + "internal/domain/slack"
 	debts := []debt{
-		{"internal/core/turns", "internal/domain/slack"},
-		{"internal/core/links", "internal/domain/slack"},
+		{"internal/core/turns", "internal/domain/slack", "planted"},
+		{"internal/core/links", "internal/domain/slack", "gone"},
 	}
 	used := map[int]bool{}
 	flagged(t, "a debt edge", ruleR16("internal/core/turns", []string{slack}, nil, debts, used), 0, "")
 	flagged(t, "a debt edge is per importer", ruleR16("internal/core/items", []string{slack}, nil, debts, used), 1, "(R16)")
-	flagged(t, "stale", staleDebt(debts, used), 1, "internal/core/links -> internal/domain/slack matches no import")
+	flagged(t, "stale", staleDebt(debts, used), 1, "internal/core/links -> internal/domain/slack (gone) matches no import")
 }

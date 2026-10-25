@@ -52,7 +52,7 @@ var golden = []string{
 	"round_day_notes: day, kind, note",
 	"round_day_prs: day, provider, unit_key, rounds",
 	"round_days: day, total",
-	"round_state: provider, unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped",
+	"round_state: provider, unit_key, sent_at, round_at, agent_home, first_round_skipped",
 	"segment_map: provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at, closed",
 	"session_handles: session_id, manager, handle, runtime, from_at, to_at",
 	"sessions: session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed, started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key",
@@ -70,6 +70,7 @@ var golden = []string{
 	"turn_usage: turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, first_at, last_at",
 	"turns: seq, provider, unit_key, intent, turn_id, trigger, guidance, head, sent_to, session, state, sent_at, started_at, ended_at, resume_of, replaced_by, prior_state, agent, brief_run, agent_session, usage_source, usage_read_at, usage_attempts, inputs, mode, workflow",
 	"unit_cards: provider, unit_key, card, at",
+	"unit_marks: provider, unit_key, mark, value",
 	"view_applied: sink, provider, unit_key, role, status, unread, summary, col, override, at",
 	"workflow_cursors: workflow, cursor, last_fire",
 	"workflow_runs: workflow, provider, unit_key, key_value, status, attempts, error, at",
@@ -179,8 +180,8 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.SetChecksHead(key, "abc")
-	b.RecordFollowup(key, "fp", now)
+	a.SetHeads(key, "abc", "def")
+	b.RecordFollowup(key, round.Reviewed, "fp", now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)
@@ -193,28 +194,29 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.PRs[key]
-	if p.ChecksHead != "abc" || p.Fingerprint != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) || !p.RoundAt.Equal(now) {
+	if p.Marks[round.AddressedChecks] != "abc" || p.Marks[round.AddressedConflict] != "def" || p.Marks[round.Reviewed] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) || !p.RoundAt.Equal(now) {
 		t.Fatalf("%+v", p)
 	}
 	if d := c.Days[round.DayKey(now)]; d.Total != 1 || d.PerPR[key] != 1 {
 		t.Fatalf("day %+v", d)
 	}
 
-	c.RecordFollowup(key, "", now)
+	c.RecordFollowup(key, round.Reviewed, "", now)
+	c.SetMark(key, round.AddressedConflict, "")
 	c.FirstCapHit("acme/api#8", now)
 	other, _ := r.Load(ctx)
-	other.RecordFollowup("acme/web#1", "", now)
+	other.RecordFollowup("acme/web#1", round.Reviewed, "", now)
 	for _, st := range []*round.Store{c, other} {
 		if err := r.Save(ctx, st); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if len(c.Changes().PRs)+len(c.Changes().Counts)+len(c.Changes().Notes) != 0 {
+	if len(c.Changes().PRs)+len(c.Changes().Marks)+len(c.Changes().Counts)+len(c.Changes().Notes) != 0 {
 		t.Fatal("a saved store kept its changes")
 	}
 	d, _ := r.Load(ctx)
 	day := d.Days[round.DayKey(now)]
-	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Fingerprint != "fp" {
+	if day.Total != 3 || day.PerPR[key] != 2 || day.PerPR["acme/web#1"] != 1 || !slices.Equal(day.CapLogged, []string{"acme/api#8"}) || d.PRs[key].Marks[round.Reviewed] != "fp" || d.PRs[key].Marks[round.AddressedConflict] != "" {
 		t.Fatalf("day %+v, pr %+v", day, d.PRs[key])
 	}
 
@@ -234,7 +236,7 @@ func TestRoundsSaveRefusesAKeyThatDoesNotParse(t *testing.T) {
 	db, _ := openTemp(t)
 	r := NewRounds(db)
 	st := round.New()
-	st.SetFingerprint("not a key", "x")
+	st.SetMark("not a key", round.Reviewed, "x")
 	if err := r.Save(context.Background(), st); err == nil {
 		t.Fatal("saved a key that does not parse")
 	}

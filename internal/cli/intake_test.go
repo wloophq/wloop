@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -60,7 +59,7 @@ func startIntakeDaemon(t *testing.T, actions daemon.Actions, briefs intake.Brief
 		ReviewRequests: []string{"me"}, Reasons: []string{"review-requested"}, URL: r7.URL()}); err != nil {
 		t.Fatal(err)
 	}
-	srv := daemon.New(withRows(daemon.Deps{Cfg: config.Defaults(), Version: "test", Actions: actions, Intakes: db.Intakes(), IntakeBriefs: briefs,
+	srv := daemon.New(withRows(daemon.Deps{Cfg: Defaults(), Version: "test", Actions: actions, Intakes: db.Intakes(), IntakeBriefs: briefs,
 		Now:    func() time.Time { return daemonNow },
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Log:    t.Logf}, st))

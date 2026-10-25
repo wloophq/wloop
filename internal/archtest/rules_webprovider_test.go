@@ -35,6 +35,8 @@ func pluginIDs() []string {
 	return ids
 }
 
+// TestCockpitScriptsNameNoPlugin checks that the cockpit's scripts quote no
+// plugin's id.
 func TestCockpitScriptsNameNoPlugin(t *testing.T) {
 	dir := filepath.Join("..", "..", webStatic)
 	files, err := filepath.Glob(filepath.Join(dir, "*.js"))

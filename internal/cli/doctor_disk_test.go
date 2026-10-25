@@ -10,7 +10,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -77,7 +76,7 @@ func TestDoctorDiskGolden(t *testing.T) {
 	writeSized(t, filepath.Join(project, "s1", "subagents", "agent-1.jsonl"), 1000)
 	writeSized(t, filepath.Join(e.transcriptDir("", filepath.Join(home, "elsewhere")), "x.jsonl"), 7000)
 
-	cfg := config.Defaults()
+	cfg := Defaults()
 	cfg.Dossiers.SoftCapMB = 1
 	var out bytes.Buffer
 	writeDoctorPlain(&out, []checkSection{{"Disk", e.diskChecks(ctx, cfg)}})
@@ -103,7 +102,7 @@ func TestDoctorDiskNamesACheckout(t *testing.T) {
 	}
 	for _, state := range []string{filepath.Join(repo, "state"), filepath.Join(linked, "loop")} {
 		e := &Env{StateDir: state, Home: home, Now: time.Now}
-		got := e.diskChecks(context.Background(), config.Defaults())
+		got := e.diskChecks(context.Background(), Defaults())
 		if len(got) == 0 || got[0].mark != markMissing || !bytes.Contains([]byte(got[0].info), []byte("src")) {
 			t.Errorf("state %s: checks %+v, want the checkout named first", state, got)
 		}

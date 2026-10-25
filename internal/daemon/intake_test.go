@@ -430,17 +430,19 @@ func TestATurnByHandDoesNotJoinADaemonRequest(t *testing.T) {
 
 func TestAnotherSessionDoesNotJoin(t *testing.T) {
 	t.Parallel()
-	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
-	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	rec := byHandAs(t, s, "term-2", "review")
-	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "already asks for this pull request's review from another session") {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if len(hand.list()) != 0 {
-		t.Fatalf("calls %v", hand.list())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
+		if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		rec := byHandAs(t, s, "term-2", "review")
+		if rec.Code != 409 || !strings.Contains(rec.Body.String(), "already asks for this pull request's review from another session") {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		if len(hand.list()) != 0 {
+			t.Fatalf("calls %v", hand.list())
+		}
+	})
 }
 
 func TestARunDoesNotJoinAReview(t *testing.T) {
@@ -457,59 +459,63 @@ func TestARunDoesNotJoinAReview(t *testing.T) {
 
 func TestStaleSessionIntakeExpiresOnTick(t *testing.T) {
 	t.Parallel()
-	briefs := intaketest.NewBriefs(waitBriefing)
-	s, _, _ := newByHandServer(t, briefs, 30*time.Millisecond)
-	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	open, _ := s.deps.Intakes.Open(context.Background())
-	if len(open) != 1 {
-		t.Fatalf("open %+v", open)
-	}
-	seq := open[0].Seq
-	var rows []api.Row
-	if get(t, s, "/api/rows", &rows); len(rows) != 1 || payload(rows[0]).Intake == nil {
-		t.Fatalf("a fresh session intake left the rows: %+v", rows)
-	}
-	time.Sleep(80 * time.Millisecond)
-	get(t, s, "/api/rows", nil)
-	if got := intakeOf(t, s, seq); got.State == intake.Canceled {
-		t.Fatalf("a read canceled the intake: %+v", got)
-	}
-	if err := s.readModel().Refresh(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	rows = nil
-	if get(t, s, "/api/rows", &rows); len(rows) != 1 || payload(rows[0]).Intake != nil {
-		t.Fatalf("a canceled session intake shows: %+v", payload(rows[0]).Intake)
-	}
-	got := intakeOf(t, s, seq)
-	if got.State != intake.Canceled || got.Note != noteSessionStopped {
-		t.Fatalf("intake %+v", got)
-	}
-	if !slices.Contains(briefs.Unwanted(), r7.Unit()) {
-		t.Fatalf("the want stays: %v", briefs.Unwanted())
-	}
-	in := ask(t, s, "review", `{"source":"cli"}`)
-	if in.Seq == seq || in.Joined {
-		t.Fatalf("joined the expired intake: %+v", in)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		briefs := intaketest.NewBriefs(waitBriefing)
+		s, _, _ := newByHandServer(t, briefs, 30*time.Millisecond)
+		if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		open, _ := s.deps.Intakes.Open(context.Background())
+		if len(open) != 1 {
+			t.Fatalf("open %+v", open)
+		}
+		seq := open[0].Seq
+		var rows []api.Row
+		if get(t, s, "/api/rows", &rows); len(rows) != 1 || payload(rows[0]).Intake == nil {
+			t.Fatalf("a fresh session intake left the rows: %+v", rows)
+		}
+		time.Sleep(80 * time.Millisecond)
+		get(t, s, "/api/rows", nil)
+		if got := intakeOf(t, s, seq); got.State == intake.Canceled {
+			t.Fatalf("a read canceled the intake: %+v", got)
+		}
+		if err := s.readModel().Refresh(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		rows = nil
+		if get(t, s, "/api/rows", &rows); len(rows) != 1 || payload(rows[0]).Intake != nil {
+			t.Fatalf("a canceled session intake shows: %+v", payload(rows[0]).Intake)
+		}
+		got := intakeOf(t, s, seq)
+		if got.State != intake.Canceled || got.Note != noteSessionStopped {
+			t.Fatalf("intake %+v", got)
+		}
+		if !slices.Contains(briefs.Unwanted(), r7.Unit()) {
+			t.Fatalf("the want stays: %v", briefs.Unwanted())
+		}
+		in := ask(t, s, "review", `{"source":"cli"}`)
+		if in.Seq == seq || in.Joined {
+			t.Fatalf("joined the expired intake: %+v", in)
+		}
+	})
 }
 
 func TestStaleSessionIntakesAreCanceledOnAccept(t *testing.T) {
 	t.Parallel()
-	s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 30*time.Millisecond)
-	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	time.Sleep(80 * time.Millisecond)
-	in := ask(t, s, "review", `{"source":"cli"}`)
-	if in.Joined {
-		t.Fatalf("joined %+v", in)
-	}
-	if got := intakeOf(t, s, 1); got.State != intake.Canceled {
-		t.Fatalf("intake 1 %+v", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 30*time.Millisecond)
+		if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		time.Sleep(80 * time.Millisecond)
+		in := ask(t, s, "review", `{"source":"cli"}`)
+		if in.Joined {
+			t.Fatalf("joined %+v", in)
+		}
+		if got := intakeOf(t, s, 1); got.State != intake.Canceled {
+			t.Fatalf("intake 1 %+v", got)
+		}
+	})
 }
 
 func TestStartUpCancelsSessionIntakes(t *testing.T) {

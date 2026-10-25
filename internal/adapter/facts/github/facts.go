@@ -16,9 +16,12 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
@@ -85,7 +88,10 @@ type addressResult struct {
 	reason                  string
 	reviewers, checks       []string
 	fingerprint, checksHead string
-	observed                bool
+	// conflictHead is the head whose lasting conflict with the base the
+	// round resolves.
+	conflictHead string
+	observed     bool
 }
 
 // runs says whether a round of r would run without the user: due and not
@@ -252,7 +258,7 @@ func (pl *planner) review(ref pr.Ref, r *result) error {
 		CompletedStatus: pl.completed,
 		TrustedOwners:   pl.owners,
 		TrustedAuthors:  pl.cfg.For(ref.Owner, ref.Repo).TrustedAuthors,
-		LastFingerprint: pl.v.rounds.Fingerprint(ref.String()),
+		LastFingerprint: pl.v.rounds.Mark(ref.String(), round.Reviewed),
 		Recorded:        pl.recorded(ref),
 	})
 	r.review.reason, r.review.settle = d.Reason, !r.stale
@@ -447,8 +453,8 @@ func (pl *planner) first(ref pr.Ref, r *result) {
 func (pl *planner) address(ref pr.Ref, r *result) {
 	if ws, ok := pl.targets.author[ref]; ok {
 		r.address.target, r.address.ws = true, ws
-		if row := pl.v.byRef[ref]; row.Mergeable == "CONFLICTING" && !row.MergeableAt.IsZero() {
-			r.dueAt("conflict", row.MergeableAt.Add(pl.v.conflictWindow()))
+		if since, ok := pl.v.byRef[ref].ConflictingSince(); ok {
+			r.dueAt("conflict", since.Add(pl.v.conflictWindow()))
 		}
 		f, why := pl.prOf(ref, true, r)
 		if why != "" {
@@ -479,7 +485,7 @@ func (pl *planner) address(ref pr.Ref, r *result) {
 	}
 	pl.addressStep(wsdomain.Workspace{}, f, r)
 	if r.address.due && r.address.fingerprint == "" {
-		r.address.due, r.address.reason = false, "failing checks alone start no round without a workspace"
+		r.address.due, r.address.reason = false, "failing checks or a conflict alone start no round without a workspace"
 		return
 	}
 	r.address.observed = r.address.due && !pl.cfg.For(ref.Owner, ref.Repo).AddressWithoutWorkspace
@@ -496,7 +502,8 @@ func (pl *planner) developed(p dinv.PR) bool {
 }
 
 // addressStep decides a triage round when others reviewed a pull request I
-// develop since the last one, or its checks failed on a new head.
+// develop since the last one, its checks failed on a new head, or a new head
+// has conflicted with the base past the conflict window.
 func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	if f.State != dgh.StateOpen || (pl.completed != "" && w.Status == pl.completed) {
 		r.address.reason = "nothing to address"
@@ -507,13 +514,13 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	var fp string
 	if pl.cfg.AddressReviews {
 		var handled time.Time
-		if prev := pl.v.rounds.Fingerprint(key); prev != "" {
-			handled, _ = time.Parse(time.RFC3339, prev)
+		if prev := pl.v.rounds.Mark(key, round.AddressedReviews); prev != "" {
+			handled, _ = time.Parse(time.RFC3339Nano, prev)
 		}
 		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.AddressSkipReviewers})
 	}
 	if pl.cfg.AddressChecks {
-		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.ChecksHead(key), pl.cfg.IgnoreChecks)
+		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.Mark(key, round.AddressedChecks), pl.cfg.IgnoreChecks)
 	}
 	var reasons []string
 	if len(who) > 0 {
@@ -523,11 +530,23 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
+	if pl.cfg.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.v.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
+		reasons = append(reasons, "conflicts with "+f.BaseRefName)
+		r.address.conflictHead = f.HeadRefOid
+	}
 	if len(reasons) == 0 {
 		r.address.reason = "nothing to address"
 		return
 	}
 	r.address.due, r.address.reason, r.address.reviewers, r.address.checks, r.address.fingerprint = true, strings.Join(reasons, "; "), who, failed, fp
+}
+
+// conflicts says whether f's head conflicts with its base and the pull
+// request has for the conflict window. The row keeps a conflict through
+// GitHub's UNKNOWN after a push, so the head's own read must confirm it.
+func (pl *planner) conflicts(f sweep.Facts) bool {
+	since, ok := pl.v.byRef[f.Ref].ConflictingSince()
+	return ok && f.Mergeable == "CONFLICTING" && pl.now.Sub(since) >= pl.v.conflictWindow()
 }
 
 // facts are ref's pr facts from r at now.
@@ -549,6 +568,11 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 		}
 		f["pr.finished_for"] = finishedFor(row, now)
 		f["pr.draft"] = row.IsDraft
+		f["pr.head"] = row.HeadOid
+		f["pr.conflicting_for"] = time.Duration(0)
+		if since, ok := row.ConflictingSince(); ok {
+			f["pr.conflicting_for"] = now.Sub(since)
+		}
 		f["pr.author"] = row.Author
 		f["pr.mine"] = v.viewer != "" && strings.EqualFold(row.Author, v.viewer)
 		f["pr.checks"] = strings.ToLower(row.ChecksState)
@@ -581,6 +605,7 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 	f["pr.first.due"], f["pr.first.reason"] = r.first.due, r.first.reason
 	f["pr.address.due"], f["pr.address.reason"], f["pr.address.observed"] = r.address.due, r.address.reason, r.address.observed
 	f["pr.address.reviewers"], f["pr.address.checks"] = nonNil(r.address.reviewers), nonNil(r.address.checks)
+	f["pr.address.conflict"] = r.address.due && r.address.conflictHead != ""
 	f["pr.fingerprint"] = fingerprint(r, row)
 	return f
 }
@@ -597,7 +622,11 @@ func fingerprint(r result, row dinv.PR) string {
 		parts = append(parts, "first:"+row.HeadOid)
 	}
 	if r.address.due {
-		parts = append(parts, "address:"+r.address.fingerprint+"@"+r.address.checksHead)
+		a := "address:" + r.address.fingerprint + "@" + r.address.checksHead
+		if r.address.conflictHead != "" {
+			a += "!conflict@" + r.address.conflictHead
+		}
+		parts = append(parts, a)
 	}
 	return strings.Join(parts, ";")
 }
@@ -615,7 +644,7 @@ func finishedFor(row dinv.PR, now time.Time) time.Duration {
 	if ended.IsZero() {
 		return 0
 	}
-	return situation.WorkingDuration(ended, now)
+	return workday.Between(ended, now)
 }
 
 // interactions are the events by anyone a nudge's silence counts from.

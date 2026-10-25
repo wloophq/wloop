@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/cli"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -320,9 +321,9 @@ type liveBook struct {
 	Events []storetest.Event
 }
 
-func (b liveBook) instructions(round string) string {
+func (b liveBook) instructions(id string) string {
 	for _, s := range b.shown.Turns {
-		if s.Turn.Round == round {
+		if s.Turn.ID == id {
 			return s.Instructions
 		}
 	}
@@ -442,7 +443,7 @@ func homes(t *testing.T) []string {
 		return strings.Split(v, ":")
 	}
 	found := claude.FindHomes(config.Home(), os.Getenv("CLAUDE_CONFIG_DIR"), wsorca.New().ProfileHomes(config.Home(), "claude"))
-	if cfg, err := config.Load(); err == nil {
+	if cfg, err := config.Load(cli.Defaults()); err == nil {
 		found = append(found, cfg.AgentHomes()...)
 	}
 	var out []string

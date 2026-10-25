@@ -24,6 +24,7 @@ Manifests name Go through a closed vocabulary, listed in `internal/intent/builti
 - **Facts**: named, typed values a provider computes for a unit, in `builtin.Facts` (`internal/intent/builtin/facts.go`). Predicates are CEL over the facts of a slot, compiled at load by `internal/intent/expr`; an evaluation error reads as false.
 - **Steps**: the actions a workflow runs, in `builtin.Steps`, each with its reach and its guards. A profile cannot lower a guard or force a step.
 - **Builtins by slot**: what an intent's `prepare`, `workspace`, `on_sent` and the other slots may name, in `builtin.Names`.
+- **Marks**: what a unit's triggers handled. A workflow records its own with `[marks]` and reads any with `handled()` in a predicate; the core stores and compares them (`internal/domain/mark`), and a plugin exposes the signal a mark holds as a fact.
 - **Gates**: the approval of plan items and drafts, the Outbox, the record a turn must end with, the caps and budgets, the cleanup guards.
 
 Some decisions stay in Go as mechanism and are exposed as facts for the profile to act on:

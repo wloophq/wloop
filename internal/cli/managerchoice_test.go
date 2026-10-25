@@ -3,9 +3,11 @@ package cli
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -51,5 +53,97 @@ func TestAnUnreachableManagerTakesNoNewSession(t *testing.T) {
 	m, err := te.chooseManager(context.Background(), te.cfg, roundOptions{})
 	if err != nil || m.Name() != "orca" {
 		t.Fatalf("with the first manager down the session went to %v, %v", m, err)
+	}
+}
+
+// madeByDesk is an address round's pull request whose worktree desk created
+// and orca, configured first, also lists.
+func madeByDesk(t *testing.T) (desk, orca *fake.Manager, te *testEnv) {
+	t.Helper()
+	const repo, path = "/src/api", "/src/api/.claude/worktrees/brave-lovelace"
+	desk = desktopLike()
+	desk.Refuses = nil
+	desk.RepoList = []wsdomain.Repo{{ID: repo, Path: repo, RemoteKey: "github.com/acme/api"}}
+	desk.WorkspaceList = []wsdomain.Workspace{{ID: path, RepoID: repo, Path: path, DisplayName: "brave-lovelace", Branch: "feat/z", HostID: "local", Created: true}}
+	orca = &fake.Manager{ManagerName: "orca",
+		RepoList:      []wsdomain.Repo{{ID: "r1", Path: repo, RemoteKey: "github.com/acme/api"}},
+		WorkspaceList: []wsdomain.Workspace{{ID: "r1::" + path, RepoID: "r1", Path: path, DisplayName: "brave-lovelace", Branch: "feat/z", HostID: "local"}},
+	}
+	te = newTestEnv(t, orca)
+	te.WS = workspace.NewSet(orca, desk)
+	te.cfg.WorkspaceManagers = []string{"orca", "desk"}
+	te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"},"author":{"__typename":"User","login":"me"}}}}}`
+	te.git.head[path] = "hfeat/z"
+	te.git.ancestor[path] = true
+	return desk, orca, te
+}
+
+func sessionsStarted(m *fake.Manager) []string {
+	var out []string
+	for _, w := range m.Writes {
+		if strings.HasPrefix(w, "session ") {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func TestARoundContinuesInTheManagerThatCreatedTheWorktree(t *testing.T) {
+	t.Parallel()
+	desk, orca, te := madeByDesk(t)
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if got := sessionsStarted(desk); len(got) != 1 || len(sessionsStarted(orca)) != 0 {
+		t.Fatalf("desk started %v, orca %v", got, sessionsStarted(orca))
+	}
+}
+
+func TestARoundFallsThroughWhenTheCreatorCannotHostIt(t *testing.T) {
+	t.Parallel()
+	desk, orca, te := madeByDesk(t)
+	desk.Refuses = errors.New("runs only the default home")
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if got := sessionsStarted(orca); len(got) != 1 || got[0] != "session r1::/src/api/.claude/worktrees/brave-lovelace" || len(sessionsStarted(desk)) != 0 {
+		t.Fatalf("orca started %v, desk %v", got, sessionsStarted(desk))
+	}
+	if !strings.Contains(te.err.String(), "Orca launches this session (desk: runs only the default home)") {
+		t.Fatalf("no reason logged: %s", te.err)
+	}
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code != 0 {
+		t.Fatalf("second round: exit %d: %s", code, te.err)
+	}
+	if !strings.Contains(te.out.String(), "prompt sent to the existing agent session") || slices.ContainsFunc(orca.Writes, func(w string) bool { return strings.HasPrefix(w, "wake ") }) {
+		t.Fatalf("the second round did not keep orca's live session: %s\nwrites %v", te.out, orca.Writes)
+	}
+}
+
+func TestTheFallThroughRowKeepsThePullRequestLink(t *testing.T) {
+	t.Parallel()
+	desk, _, te := madeByDesk(t)
+	desk.Refuses = errors.New("runs only the default home")
+	ws := desk.WorkspaceList[0]
+	ws.Manager, ws.LinkedPR = "desk", 9
+	host, err := te.hostOf(context.Background(), te.cfg, ws, roundOptions{trusted: false, pr: &github.PullRequest{}})
+	if err != nil || host.Manager != "orca" || host.LinkedPR != 9 {
+		t.Fatalf("hostOf = %+v, %v", host, err)
+	}
+}
+
+func TestARoundNoManagerCanHostFailsClosedInTheOwner(t *testing.T) {
+	t.Parallel()
+	desk, orca, te := madeByDesk(t)
+	desk.Refuses = errors.New("runs only the default home")
+	orca.OnlyAgents = []string{"another-agent"}
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code == 0 {
+		t.Fatalf("a round no manager can host went out: %s", te.out)
+	}
+	if !strings.Contains(te.err.String(), "desk owns brave-lovelace and cannot launch this session") {
+		t.Fatalf("err: %s", te.err)
+	}
+	if len(sessionsStarted(desk)) != 0 || len(sessionsStarted(orca)) != 0 {
+		t.Fatalf("desk started %v, orca %v", sessionsStarted(desk), sessionsStarted(orca))
 	}
 }

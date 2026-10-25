@@ -77,3 +77,53 @@ func TestLongUnitEscalatesToFrontierWithinTheCaps(t *testing.T) {
 		t.Errorf("the escalation is not logged: %v", r.logs)
 	}
 }
+
+func TestEscalationOverTheCallCapFallsBackToTheBaseTier(t *testing.T) {
+	r := newRig(t)
+	r.cfg.Slack.Extraction.EscalateOverChars = 1
+	r.asker.reply = func(_ int, q turns.Ask) ([]byte, error) {
+		if q.Tier == turns.TierFrontier {
+			return nil, turns.ErrOverBudget
+		}
+		return answerJSON(t, nil, nil, nil, nil), nil
+	}
+	postUnits(r, 6)
+	summary, skipped := r.run(jT0.Add(2 * time.Minute))
+	if !strings.HasPrefix(summary, "extracted 6 of 6") || skipped != "" {
+		t.Fatalf("summary %q, skipped %q; want every unit extracted on the fast tier", summary, skipped)
+	}
+	tiers := map[turns.Tier]int{}
+	for _, a := range r.asker.asks {
+		tiers[a.Tier]++
+	}
+	if tiers[turns.TierFrontier] != 6 || tiers[turns.TierFast] != 6 {
+		t.Fatalf("tiers %v, want each unit escalated once and then fast", tiers)
+	}
+	if w := r.job.Warnings(); len(w) != 0 {
+		t.Fatalf("an escalated call over the cap fed the breaker: %v", w)
+	}
+}
+
+func TestEscalationFallbackRespectsTheDailyCap(t *testing.T) {
+	r := newRig(t)
+	r.cfg.Slack.Extraction.EscalateOverChars = 1
+	r.cfg.Slack.Extraction.MaxCalls = 1
+	r.asker.reply = func(_ int, q turns.Ask) ([]byte, error) {
+		if q.Tier == turns.TierFrontier {
+			return nil, turns.ErrOverBudget
+		}
+		return answerJSON(t, nil, nil, nil, nil), nil
+	}
+	postUnits(r, 1)
+	r.run(jT0.Add(2 * time.Minute))
+	if n := r.asker.calls(); n != 1 {
+		t.Fatalf("%d calls, want the fallback held by the daily call cap", n)
+	}
+	if w := r.job.Warnings(); len(w) != 0 {
+		t.Fatalf("a held fallback fed the breaker: %v", w)
+	}
+	summary, _ := r.run(jT0.Add(25 * time.Hour))
+	if !strings.HasPrefix(summary, "extracted 1 of 1") || r.asker.asks[1].Tier != turns.TierFast {
+		t.Fatalf("summary %q, asks %+v; want the unit extracted the next day on the fast tier only", summary, r.asker.asks)
+	}
+}

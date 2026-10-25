@@ -17,7 +17,7 @@ func TestPlacementRuleIsValidated(t *testing.T) {
 		if err := os.WriteFile(file, []byte(`{"placement": `+c.rules+`}`), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := LoadFile(file); err == nil || !strings.Contains(err.Error(), c.want) {
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", c.rules, err, c.want)
 		}
 	}
@@ -26,7 +26,7 @@ func TestPlacementRuleIsValidated(t *testing.T) {
 	if err := os.WriteFile(file, []byte(ok), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := LoadFile(file)
+	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}

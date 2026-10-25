@@ -245,10 +245,10 @@ func NewEnv() *Env {
 		GH:            gh,
 		GitHub:        github.NewClient(github.Options{}),
 		Git:           gitx.New(),
-		WS:            newSet(managers, config.Defaults().WorkspaceManagers),
+		WS:            newSet(managers, Defaults().WorkspaceManagers),
 		Sh:            execSh,
 		Stdout:        execStdout,
-		LoadConfig:    config.Load,
+		LoadConfig:    func() (config.Config, error) { return config.Load(Defaults()) },
 		IntentRecheck: intentRecheck,
 		ConfigPath:    config.Path(),
 		StateDir:      stateDir,
@@ -299,7 +299,7 @@ func harnessOf(agents map[string]harness.Protocol, managers map[string]ManagerEn
 			sessions[name] = m.Session
 		}
 	}
-	return harness.Set{SessionEnvs: sessions, Agents: agents, DefaultAgent: config.Defaults().Agent, Cwd: func() string {
+	return harness.Set{SessionEnvs: sessions, Agents: agents, DefaultAgent: Defaults().Agent, Cwd: func() string {
 		wd, _ := os.Getwd()
 		return wd
 	}}
@@ -438,7 +438,7 @@ func (e *Env) readConfig() (config.Config, error) {
 	return cfg.WithColumns(e.sinkColumns()), err
 }
 
-func (e *Env) defaultConfig() config.Config { return config.Defaults().WithColumns(e.sinkColumns()) }
+func (e *Env) defaultConfig() config.Config { return Defaults().WithColumns(e.sinkColumns()) }
 
 func (e *Env) sinkColumns() map[string]map[string]string {
 	out := map[string]map[string]string{}
@@ -752,30 +752,78 @@ func (e *Env) chooseManager(ctx context.Context, cfg config.Config, opts roundOp
 			why = append(why, name+": not enabled")
 			continue
 		}
-		if k, ok := e.managers()[name]; ok && k.Available != nil {
-			if err := k.Available(ctx); err != nil {
-				why = append(why, name+": "+err.Error())
-				continue
-			}
-		}
-		if err := m.Reachable(ctx); err != nil {
-			why = append(why, name+": not running")
+		if no := e.cannotHost(ctx, cfg, m, n); no != "" {
+			why = append(why, name+": "+no)
 			continue
 		}
-		if !m.Hosts(cfg.Agent) {
-			why = append(why, name+": does not run "+cfg.Agent)
-			continue
-		}
-		if err := workspace.Honors(m, n); err != nil {
-			why = append(why, name+": "+err.Error())
-			continue
-		}
-		if len(why) > 0 {
-			fmt.Fprintf(e.Err, "%s %s launches this session (%s)\n", e.stamp(), e.displayOf([]string{name}), strings.Join(why, "; "))
-		}
+		e.fellThrough(name, why)
 		return m, nil
 	}
 	return nil, fmt.Errorf("no workspace manager can launch this session (%s)", strings.Join(why, "; "))
+}
+
+// cannotHost says why m cannot launch a session of cfg's agent with needs n,
+// "" when it can.
+func (e *Env) cannotHost(ctx context.Context, cfg config.Config, m workspace.Manager, n workspace.LaunchNeeds) string {
+	if k, ok := e.managers()[m.Name()]; ok && k.Available != nil {
+		if err := k.Available(ctx); err != nil {
+			return err.Error()
+		}
+	}
+	if err := m.Reachable(ctx); err != nil {
+		return "not running"
+	}
+	if !m.Hosts(cfg.Agent) {
+		return "does not run " + cfg.Agent
+	}
+	if err := workspace.Honors(m, n); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// fellThrough logs that name launches the session because the managers before
+// it could not, for why.
+func (e *Env) fellThrough(name string, why []string) {
+	if len(why) > 0 {
+		fmt.Fprintf(e.Err, "%s %s launches this session (%s)\n", e.stamp(), e.displayOf([]string{name}), strings.Join(why, "; "))
+	}
+}
+
+// hostOf is the row of the worktree ws whose manager launches a round's new
+// session: its owner's when the owner can, else, by priority, that of another
+// manager listing the worktree that can, linked to ws's pull request. With
+// none, it is ws: the owner may still launch it, as Claude Desktop starts its
+// app, and fails the round closed on a launch policy it cannot honor.
+func (e *Env) hostOf(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, opts roundOptions) (wsdomain.Workspace, error) {
+	owner, err := e.WS.For(ctx, ws)
+	if err != nil {
+		return ws, err
+	}
+	a, err := e.agent(cfg.Agent)
+	if err != nil {
+		return ws, err
+	}
+	n := needs(a, cfg, e.launchPolicy(ctx, cfg, opts))
+	no := e.cannotHost(ctx, cfg, owner, n)
+	if no == "" || ws.Path == "" {
+		return ws, nil
+	}
+	why := []string{owner.Name() + ": " + no}
+	for _, w := range e.WS.Listings(ctx, ws.Path) {
+		m, ok := e.WS.Named(w.Manager)
+		if !ok || m.Name() == owner.Name() {
+			continue
+		}
+		w.LinkedPR = cmp.Or(w.LinkedPR, ws.LinkedPR)
+		if no := e.cannotHost(ctx, cfg, m, n); no != "" {
+			why = append(why, m.Name()+": "+no)
+			continue
+		}
+		e.fellThrough(m.Name(), why)
+		return w, nil
+	}
+	return ws, nil
 }
 
 // preflight runs the agent's preflight and names the command that fixes an

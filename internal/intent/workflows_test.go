@@ -3,6 +3,7 @@ package intent
 import (
 	"encoding/json"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -353,5 +354,15 @@ intent = "` + intent + `"
 	want := `step[0].intent: the intent "ask-twice" does not load`
 	if len(got) != 1 || !strings.Contains(got.Error(), want) {
 		t.Errorf("ask-broken problems %v; want one with %q", got, want)
+	}
+}
+
+func TestAWorkflowsMarksNameTheFactsTheyRecord(t *testing.T) {
+	l, problems := Load(userLayer("testdata/workflows/good/conflict-once"), bundledFS(), testBase(), nil)
+	if len(problems) > 0 || len(l.Workflows) != 1 {
+		t.Fatalf("%d workflows; %v", len(l.Workflows), problems)
+	}
+	if got := l.Workflows[0].Marks; !maps.Equal(got, map[string]string{"head": "pr.head"}) {
+		t.Fatalf("marks %v", got)
 	}
 }

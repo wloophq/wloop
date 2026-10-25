@@ -86,14 +86,18 @@ CREATE TABLE instruction_parts (
 
 CREATE TABLE round_state (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
-  fingerprint TEXT NOT NULL DEFAULT '',
   sent_at TEXT NOT NULL DEFAULT '',
   round_at TEXT NOT NULL DEFAULT '',
-  checks_head TEXT NOT NULL DEFAULT '',
   agent_home TEXT NOT NULL DEFAULT '',
   first_round_skipped INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (provider, unit_key)
 );
+CREATE TABLE unit_marks (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  mark TEXT NOT NULL CHECK (mark != ''),
+  value TEXT NOT NULL CHECK (value != ''),
+  PRIMARY KEY (provider, unit_key, mark)
+) WITHOUT ROWID;
 CREATE TABLE round_days (
   day TEXT PRIMARY KEY,
   total INTEGER NOT NULL DEFAULT 0

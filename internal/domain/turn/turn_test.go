@@ -8,12 +8,12 @@ import (
 	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 var (
-	r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	t0 = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 )
 
@@ -27,7 +27,7 @@ func askedRecord(publishes bool) record.Record {
 var approved = record.Record{State: record.Done, Summary: "approved", Outcome: &record.Outcome{Verdict: "APPROVE", URL: "u"}}
 
 func TestABookFromSendToEnd(t *testing.T) {
-	b := Book{Unit: r7.Unit()}
+	b := Book{Unit: r7}
 	b.Send(Turn{Intent: "review", ID: "abc", Trigger: "automated", Head: "h1", SentAt: at(0)}).Seq = 1
 	// The book's pointers do not survive an append: read the turn afresh.
 	first := func() *Turn { t, _ := b.ByID("abc"); return t }
@@ -63,7 +63,7 @@ func TestABookFromSendToEnd(t *testing.T) {
 
 func TestOnlyARetryOfTheLastRecordIsDropped(t *testing.T) {
 	rec := askedRecord(false)
-	b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Started, Session: "term_1", StartedAt: at(1)}}}
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Started, Session: "term_1", StartedAt: at(1)}}}
 	add := func(id int64, m int) bool {
 		added := b.Record(Record{TurnSeq: 1, Session: "term_1", Hash: b.RecordHash(1, rec), At: at(m), Record: rec})
 		if added {
@@ -90,7 +90,7 @@ func TestOnlyARetryOfTheLastRecordIsDropped(t *testing.T) {
 }
 
 func TestOwesRecord(t *testing.T) {
-	b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Asked, Session: "term_1", StartedAt: at(1)}},
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Asked, Session: "term_1", StartedAt: at(1)}},
 		Records: []Record{{ID: 1, TurnSeq: 1, Session: "term_1", At: at(2), Record: askedRecord(false)}}}
 	refused := b.Answer(Answer{TurnSeq: 1, Text: "go", Source: Cockpit, At: at(3)})
 	refused.Route = Refused
@@ -109,7 +109,7 @@ func TestOwesRecord(t *testing.T) {
 
 func TestQuestionIsTheOpenOneAmongTheAnswerable(t *testing.T) {
 	answerable := []string{"review", "address", "probe"}
-	b := Book{Unit: r7.Unit(), Turns: []Turn{
+	b := Book{Unit: r7, Turns: []Turn{
 		{Seq: 1, Intent: Intent(dintent.Review), ID: "r", State: Asked},
 		{Seq: 2, Intent: Intent(dintent.Address), ID: "a", State: Done},
 		{Seq: 3, Intent: Intent(dintent.Nudge), ID: "n", State: Asked},
@@ -134,7 +134,7 @@ func TestQuestionIsTheOpenOneAmongTheAnswerable(t *testing.T) {
 }
 
 func TestOpenQuestion(t *testing.T) {
-	b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "address", State: Asked}}, Answers: []Answer{{TurnSeq: 1, Route: Typed, At: at(5)}}}
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "address", State: Asked}}, Answers: []Answer{{TurnSeq: 1, Route: Typed, At: at(5)}}}
 	if !b.OpenQuestion("address") {
 		t.Fatal("an answered question still holds while the turn is asked (F7)")
 	}
@@ -167,7 +167,7 @@ func TestEndorsedBelongsToTheVerdict(t *testing.T) {
 		for i := range c.answers {
 			c.answers[i].At = at(2) // after the asked record, before the done one
 		}
-		b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "review", Trigger: c.trigger, State: Asked}},
+		b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", Trigger: c.trigger, State: Asked}},
 			Records: []Record{{TurnSeq: 1, At: at(1), Record: c.asked}}, Answers: c.answers}
 		done := int64(1)
 		if c.resume {
@@ -201,14 +201,14 @@ func TestAnAnswerEndorsesOnlyTheQuestionItAnswered(t *testing.T) {
 	} {
 		c.a1.TurnSeq, c.a1.Source, c.a1.Route, c.a1.At = 1, Cockpit, Typed, at(2)
 		c.a2.TurnSeq, c.a2.Source, c.a2.Route, c.a2.At = 1, Cockpit, Typed, at(4)
-		b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "review", Trigger: "automated", State: Done}},
+		b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", Trigger: "automated", State: Done}},
 			Records: []Record{{TurnSeq: 1, At: at(1), Record: c.q1}, {TurnSeq: 1, At: at(3), Record: c.q2}, {TurnSeq: 1, At: at(5), Record: approved}},
 			Answers: []Answer{c.a1, c.a2}}
 		if got := b.Endorsed(1); got != "no" {
 			t.Errorf("%s: %q", c.name, got)
 		}
 	}
-	b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: "review", Trigger: "by-hand", State: Asked}}, Records: []Record{{TurnSeq: 1, At: at(1), Record: askedRecord(true)}}}
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", Trigger: "by-hand", State: Asked}}, Records: []Record{{TurnSeq: 1, At: at(1), Record: askedRecord(true)}}}
 	if got := b.Endorsed(1); got != "no" {
 		t.Errorf("a by-hand turn that published nothing: %q", got)
 	}
@@ -251,7 +251,7 @@ func TestDecideStop(t *testing.T) {
 
 func TestHistory(t *testing.T) {
 	triage := record.Record{State: record.Done, Summary: "fixed two", Next: "watch CI", Artifact: &record.Artifact{Kind: "triage", Body: strings.Repeat("x", 2000)}}
-	b := Book{Unit: r7.Unit(),
+	b := Book{Unit: r7,
 		Turns: []Turn{
 			{Seq: 1, Intent: "review", Trigger: "by-hand", Head: "h0", State: Asked, SentAt: at(0)},
 			{Seq: 2, Intent: "review", Trigger: "by-hand", Head: "h1", ResumeOf: 1, State: Done, SentAt: at(10), Guidance: "be brief"},
@@ -300,7 +300,7 @@ func TestHistory(t *testing.T) {
 }
 
 func TestSaid(t *testing.T) {
-	b := Book{Unit: r7.Unit(), Records: []Record{{TurnSeq: 1, At: at(1), Record: askedRecord(true)}}}
+	b := Book{Unit: r7, Records: []Record{{TurnSeq: 1, At: at(1), Record: askedRecord(true)}}}
 	for _, c := range []struct {
 		a    Answer
 		want string
@@ -323,7 +323,7 @@ func TestSaid(t *testing.T) {
 }
 
 func TestStartAndDismiss(t *testing.T) {
-	b := Book{Unit: r7.Unit()}
+	b := Book{Unit: r7}
 	if _, err := b.Start("abc", "term_1", at(0)); !errors.Is(err, ErrNoTurn) {
 		t.Fatal(err)
 	}
@@ -367,7 +367,7 @@ func TestStartAndDismiss(t *testing.T) {
 }
 
 func TestWithdrawUndoesASendThatReplacedAQuestion(t *testing.T) {
-	b := Book{Unit: r7.Unit(), Turns: []Turn{{Seq: 1, Intent: Intent(dintent.Review), ID: "q", State: Asked, Session: "term_1", SentAt: at(0)}}}
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: Intent(dintent.Review), ID: "q", State: Asked, Session: "term_1", SentAt: at(0)}}}
 	b.Records = []Record{{ID: 1, TurnSeq: 1, Hash: "h", At: at(1), Record: record.Record{State: record.Asked, Summary: "publish?"}}}
 	b.Send(Turn{Intent: Intent(dintent.Review), ID: "r", ResumeOf: 1, SentAt: at(2)})
 	b.Turns[1].Seq = 2

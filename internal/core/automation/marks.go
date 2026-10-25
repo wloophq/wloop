@@ -1,0 +1,39 @@
+package automation
+
+import (
+	"context"
+
+	"github.com/wloophq/wloop/internal/domain/mark"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+)
+
+// readsMarks says whether w's predicates read the unit's marks.
+func readsMarks(w workflow.Workflow) bool {
+	return workflow.ReadsMarks(w.When) || workflow.ReadsMarks(w.Approval.WaitWhen)
+}
+
+// unitMarks are u's marks; none without a Marks port.
+func (e *Engine) unitMarks(ctx context.Context, u unit.Unit) (map[string]string, error) {
+	if e.Marks == nil {
+		return nil, nil
+	}
+	return e.Marks.Marks(ctx, u)
+}
+
+// marksOf are the marks an item of w records, from the facts it is planned
+// with; a fact with no value a mark can hold records nothing.
+func marksOf(w workflow.Workflow, facts workflow.Facts) map[string]mark.Value {
+	var out map[string]mark.Value
+	for name, fact := range w.Marks {
+		v, ok := mark.New(facts[fact])
+		if !ok {
+			continue
+		}
+		if out == nil {
+			out = map[string]mark.Value{}
+		}
+		out[mark.Of(w.Name, name)] = v
+	}
+	return out
+}

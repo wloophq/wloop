@@ -98,7 +98,7 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 			}
 			return nil, errors.New("no shell in tests")
 		},
-		LoadConfig: func() (config.Config, error) { return config.LoadFile(cfgPath) },
+		LoadConfig: func() (config.Config, error) { return config.LoadFile(cfgPath, Defaults()) },
 		ConfigPath: cfgPath,
 		StateDir:   t.TempDir(),
 		Home:       t.TempDir(),
@@ -124,7 +124,7 @@ func (te *initTestEnv) run(args ...string) int {
 
 func (te *initTestEnv) config(t *testing.T) config.Config {
 	t.Helper()
-	cfg, err := config.LoadFile(te.ConfigPath)
+	cfg, err := config.LoadFile(te.ConfigPath, Defaults())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func (te *initTestEnv) writeConfig(t *testing.T, raw string) {
 
 func TestInitDefaults(t *testing.T) {
 	t.Parallel()
-	cur := config.Defaults()
+	cur := Defaults()
 	cur.ProjectsDir, cur.Profile = "/p", "/prof"
 	cur.Scope.Repos = []string{"acme/api"}
 	for _, c := range []struct {
@@ -155,11 +155,11 @@ func TestInitDefaults(t *testing.T) {
 		err     string
 	}{
 		{name: "first run asks for the directory and the profile",
-			facts:   initFacts{cur: config.Defaults(), agents: []string{"claude"}, installed: []string{"claude"}, dirSuggestion: "/src"},
+			facts:   initFacts{cur: Defaults(), agents: []string{"claude"}, installed: []string{"claude"}, dirSuggestion: "/src"},
 			want:    initAnswers{Agent: "claude"},
 			missing: []string{"profile", "projects_dir"}},
 		{name: "flags answer everything",
-			facts: initFacts{cur: config.Defaults(), agents: []string{"claude"}, installed: []string{"claude"}},
+			facts: initFacts{cur: Defaults(), agents: []string{"claude"}, installed: []string{"claude"}},
 			flags: []string{"--projects-dir", "/x", "--profile-default", "--scope-repo", "a/b,c/d", "--scope-repo", "a/b", "--scope-team", "acme/x"},
 			want:  initAnswers{ProjectsDir: "/x", Agent: "claude", Repos: []string{"a/b", "c/d"}, Teams: []string{"acme/x"}}},
 		{name: "a rerun defaults to the current values",
@@ -170,16 +170,16 @@ func TestInitDefaults(t *testing.T) {
 			flags: []string{"--scope-person", "octo"},
 			want:  initAnswers{ProjectsDir: "/p", Agent: "claude", Profile: "/prof", People: []string{"octo"}}},
 		{name: "several agents installed and none chosen",
-			facts:   initFacts{cur: config.Defaults(), agents: []string{"claude", "codex"}, installed: []string{"claude", "codex"}},
+			facts:   initFacts{cur: Defaults(), agents: []string{"claude", "codex"}, installed: []string{"claude", "codex"}},
 			flags:   []string{"--projects-dir", "/x", "--profile", "/prof"},
 			want:    initAnswers{ProjectsDir: "/x", Profile: "/prof"},
 			missing: []string{"agent"}},
 		{name: "an unsupported agent",
-			facts: initFacts{cur: config.Defaults(), agents: []string{"claude"}, installed: []string{"claude"}},
+			facts: initFacts{cur: Defaults(), agents: []string{"claude"}, installed: []string{"claude"}},
 			flags: []string{"--agent", "vim"},
 			err:   "not supported"},
 		{name: "an agent not installed",
-			facts: initFacts{cur: config.Defaults(), agents: []string{"claude", "codex"}, installed: []string{"claude"}},
+			facts: initFacts{cur: Defaults(), agents: []string{"claude", "codex"}, installed: []string{"claude"}},
 			flags: []string{"--agent", "codex"},
 			err:   "not installed"},
 	} {

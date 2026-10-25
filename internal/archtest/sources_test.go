@@ -36,6 +36,8 @@ func sourceImports(file string, imports []string) []string {
 	return out
 }
 
+// TestOnlySourcesGoNamesASource checks that only `cli/sources.go`, and
+// `cli/slack*.go` for Slack, imports a source.
 func TestOnlySourcesGoNamesASource(t *testing.T) {
 	t.Parallel()
 	seen := false

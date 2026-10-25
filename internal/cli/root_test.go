@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -25,7 +26,7 @@ func TestTheRootsRegistriesAgree(t *testing.T) {
 	if !slices.Equal(kinds, slices.Sorted(maps.Keys(e.Homes))) || !slices.Equal(kinds, slices.Sorted(maps.Keys(e.Harness.Agents))) {
 		t.Fatalf("agents %v, homes %v, protocols %v", kinds, slices.Sorted(maps.Keys(e.Homes)), slices.Sorted(maps.Keys(e.Harness.Agents)))
 	}
-	def := config.Defaults()
+	def := Defaults()
 	if _, ok := e.Agents[def.Agent]; !ok || e.Harness.DefaultAgent != def.Agent {
 		t.Fatalf("default agent %q, harness %q, kinds %v", def.Agent, e.Harness.DefaultAgent, kinds)
 	}
@@ -46,6 +47,22 @@ func TestTheRootsRegistriesAgree(t *testing.T) {
 	}
 }
 
+func TestTheRootPicksClaudeAndDesktopThenOrca(t *testing.T) {
+	t.Parallel()
+	d := Defaults()
+	if d.Agent != "claude" || !slices.Equal(d.WorkspaceManagers, []string{"claude-desktop", "orca"}) {
+		t.Fatalf("agent %q, managers %q", d.Agent, d.WorkspaceManagers)
+	}
+	file := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(file, []byte(`{"review_prefix":"R "}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.LoadFile(file, d)
+	if err != nil || c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, d.WorkspaceManagers) {
+		t.Fatalf("loaded agent %q, managers %q, %v", c.Agent, c.WorkspaceManagers, err)
+	}
+}
+
 func TestOrcasProfileHomesFollowTheRegisteredIdentities(t *testing.T) {
 	user := t.TempDir()
 	t.Setenv("ORCA_USER_DATA_PATH", filepath.Join(user, "orca"))
@@ -59,7 +76,9 @@ func TestOrcasProfileHomesFollowTheRegisteredIdentities(t *testing.T) {
 func TestOrcaKeepsTodaysColumns(t *testing.T) {
 	t.Parallel()
 	want := map[string]string{"working": "reviewing", "working-fallback": "in-review", "needs-me": "needs-me", "reviewed": "reviewed", "ready": "ready-to-merge", "in-progress": "in-progress", "in-review": "in-review", "completed": "completed"}
-	e := &Env{LoadConfig: func() (config.Config, error) { return config.LoadFile(filepath.Join(t.TempDir(), "absent.json")) }}
+	e := &Env{LoadConfig: func() (config.Config, error) {
+		return config.LoadFile(filepath.Join(t.TempDir(), "absent.json"), Defaults())
+	}}
 	loaded, err := e.loadConfig()
 	if err != nil {
 		t.Fatal(err)

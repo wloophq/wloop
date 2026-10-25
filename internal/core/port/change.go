@@ -36,6 +36,7 @@ const (
 	TopicCards                          // unit_cards
 	TopicEntries                        // entries and their tables
 	TopicDrafts                         // drafts
+	TopicMarks                          // unit_marks of units other than pull requests, whose are TopicRounds
 )
 
 // pr_seen notes nothing. A write that inserts events notes SourceEvents or

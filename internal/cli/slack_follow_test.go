@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/source"
 )
@@ -42,7 +41,7 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
 		t.Fatal(err)
 	}
 	st := inventory.New(db)
-	d := withSources(withStore(daemon.Deps{Cfg: config.Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []source.Module{mod})
+	d := withSources(withStore(daemon.Deps{Cfg: Defaults(), Version: "test", Now: time.Now, Log: t.Logf}, st), plugins, []source.Module{mod})
 	d.Ingest = nil
 	sock := filepath.Join(dir, "daemon.sock")
 	l, err := net.Listen("unix", sock)

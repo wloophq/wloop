@@ -554,7 +554,7 @@ func TestDoctorNamesTheUnknownConfigKeys(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	writeFile(t, te.ConfigPath, `{"gate": {"timeout": "60s"}}`)
-	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath) }
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
 	te.run("doctor")
 	if out := te.out.String(); !strings.Contains(out, te.ConfigPath+": unknown key gate") || !strings.Contains(out, "remove or rename those keys") {
 		t.Fatalf("%s", out)

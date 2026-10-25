@@ -230,6 +230,8 @@ func builtinLiterals(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestBoundaryImports checks that the catalog, the intent vocabulary's leaves,
+// the loader and `termfmt` import only their allowed sets.
 func TestBoundaryImports(t *testing.T) {
 	t.Parallel()
 	termfmt := false
@@ -244,6 +246,8 @@ func TestBoundaryImports(t *testing.T) {
 	}
 }
 
+// TestOnlyTheCatalogBuildsActions checks that only the catalog builds action
+// specs.
 func TestOnlyTheCatalogBuildsActions(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -254,6 +258,8 @@ func TestOnlyTheCatalogBuildsActions(t *testing.T) {
 	}
 }
 
+// TestOnlyTheCatalogEvaluatesIntentPredicates checks that only the loader and
+// the catalog read an intent's predicates.
 func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -264,6 +270,8 @@ func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 	}
 }
 
+// TestBuiltinNamesLiveInTheirTables checks that builtin names appear only in
+// their table files.
 func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {
@@ -289,13 +297,14 @@ func TestTheBoundaryAnchorsExist(t *testing.T) {
 	for _, tf := range files {
 		pkgs[tf.pkg.Path()] = tf.pkg
 	}
+	var missing []string
 	if pkgs[module+"internal/catalog"] == nil {
-		t.Error("internal/catalog is missing; R1, R4 and R5 guard it")
+		missing = append(missing, "internal/catalog is missing; R1, R4 and R5 guard it")
 	}
 	for _, name := range actionTypes {
 		dot := strings.LastIndex(name, ".")
 		if p := pkgs[name[:dot]]; p == nil || p.Scope().Lookup(name[dot+1:]) == nil {
-			t.Errorf("%s is missing; R4 would match nothing", name)
+			missing = append(missing, name+" is missing; R4 would match nothing")
 		}
 	}
 	loader := pkgs[module+"internal/intent"]
@@ -306,7 +315,8 @@ func TestTheBoundaryAnchorsExist(t *testing.T) {
 	for _, name := range programFields {
 		obj, _, _ := types.LookupFieldOrMethod(programs, false, loader, name)
 		if v, ok := obj.(*types.Var); !ok || !programField(v) {
-			t.Errorf("Programs.%s is missing; R5 would match nothing", name)
+			missing = append(missing, "Programs."+name+" is missing; R5 would match nothing")
 		}
 	}
+	flagged(t, "the boundary anchors", missing, 0, "")
 }

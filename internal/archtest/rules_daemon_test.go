@@ -45,6 +45,8 @@ func portMethods(pkg *types.Package) map[string]int {
 	return out
 }
 
+// TestDaemonImports checks that the daemon reaches adapters, GitHub and Orca
+// only through ports.
 func TestDaemonImports(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -142,6 +144,8 @@ func ruleR10Literals(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestOnlyGitHubReachesGitHub checks that only `internal/github` reaches
+// GitHub's API, and only it and the composition root import `ghcli`.
 func TestOnlyGitHubReachesGitHub(t *testing.T) {
 	t.Parallel()
 	seen := false
