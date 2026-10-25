@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -182,7 +183,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 			Gain:  workflow.Gain{MemoryBytes: 1, DiskBytes: 2},
 			Why: workflow.Why{Workflow: wf, Trigger: workflow.TriggerEvent, Event: &ev,
 				Matched: []workflow.Fact{{Name: "session.state", Value: "done"}}},
-			Mode: workflow.ModeApply, Marks: map[string]string{wf + "/head": "h1"}, Attempts: 1, Error: "e", At: at0}
+			Mode: workflow.ModeApply, Marks: map[string]mark.Value{wf + "/head": {Value: "h1"}}, Attempts: 1, Error: "e", At: at0}
 		if d == workflow.DecisionPending {
 			it.Default, it.Deadline = workflow.OutcomeRun, at0.Add(5*time.Minute)
 		}
@@ -213,7 +214,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 			g.Error != "e" || g.Mode != want.Mode || !g.At.Equal(want.At) || g.Gain != want.Gain || len(g.Steps) != 1 ||
 			g.Steps[0].Use != "some.step" || g.Steps[0].Args["reason"] != "done" || g.Why.Event == nil ||
 			g.Why.Event.ID != 3 || g.Why.Event.Kind != "merged" || g.Why.Trigger != workflow.TriggerEvent ||
-			len(g.Why.Matched) != 1 || g.Why.Matched[0].Value != "done" || g.Marks[want.Workflow+"/head"] != "h1" {
+			len(g.Why.Matched) != 1 || g.Why.Matched[0].Value != "done" || g.Marks[want.Workflow+"/head"] != (mark.Value{Value: "h1"}) {
 			t.Errorf("Items = %+v\nwant %+v", g, want)
 		}
 	})
@@ -233,6 +234,17 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 		}
 		if got, err := l.Marks(ctx, b); err != nil || got["z/head"] != "h1" {
 			t.Errorf("marks of %s = %v, %v", b, got, err)
+		}
+		later, earlier := item("w", b, workflow.DecisionRun), item("v", b, workflow.DecisionRun)
+		later.Marks = map[string]mark.Value{"w/at": {Value: "2026-10-08T11:00:00.000000000Z", Watermark: true}}
+		earlier.Marks = map[string]mark.Value{"w/at": {Value: "2026-10-08T10:00:00.000000000Z", Watermark: true}}
+		for _, it := range []workflow.Item{later, earlier} {
+			if err := l.Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDismissed, At: at0}, it); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got, _ := l.Marks(ctx, b); got["w/at"] != later.Marks["w/at"].Value {
+			t.Errorf("a watermark moved back to %q", got["w/at"])
 		}
 	})
 	t.Run("SaveReplacesOnlyTheNamedWorkflows", func(t *testing.T) {

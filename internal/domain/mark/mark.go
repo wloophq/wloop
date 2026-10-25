@@ -14,38 +14,59 @@ import (
 	"github.com/wloophq/wloop/internal/domain/event"
 )
 
-// Encode is v's canonical value: a string as is (a version), a time in
-// event.TimeLayout, which sorts as text, or an int in decimal (a
-// watermark). False for a value that cannot be a mark: empty, zero time, or
-// another type.
-func Encode(v any) (string, bool) {
+// Value is a mark's canonical value and its kind: a version is replaced by
+// any new value, a watermark only by a later one.
+type Value struct {
+	Value     string
+	Watermark bool
+}
+
+// New is v's mark: a string as is (a version), a time in event.TimeLayout,
+// which sorts as text, or an int in decimal (a watermark). False for a
+// value that cannot be a mark: empty, zero time, or another type.
+func New(v any) (Value, bool) {
 	switch x := v.(type) {
 	case string:
-		return x, x != ""
+		return Value{Value: x}, x != ""
 	case time.Time:
 		if x.IsZero() {
-			return "", false
+			return Value{}, false
 		}
-		return x.UTC().Format(event.TimeLayout), true
+		return Value{Value: x.UTC().Format(event.TimeLayout), Watermark: true}, true
 	case int:
-		return strconv.Itoa(x), true
+		return Value{Value: strconv.Itoa(x), Watermark: true}, true
 	case int64:
-		return strconv.FormatInt(x, 10), true
+		return Value{Value: strconv.FormatInt(x, 10), Watermark: true}, true
 	}
-	return "", false
+	return Value{}, false
+}
+
+// Merge is what a unit keeps when v is recorded over stored: v, unless v is
+// a watermark stored already covers.
+func Merge(stored string, v Value) string {
+	if !v.Watermark || stored == "" {
+		return v.Value
+	}
+	if t, err := time.Parse(time.RFC3339Nano, v.Value); err == nil && Handled(stored, t) {
+		return stored
+	}
+	if n, err := strconv.ParseInt(v.Value, 10, 64); err == nil && Handled(stored, n) {
+		return stored
+	}
+	return v.Value
 }
 
 // Handled says whether stored covers current: a string is a version, handled
 // by the same value; a time or an int is a watermark, handled up to stored.
-// No mark handles nothing.
+// An empty signal is handled: there is nothing to handle.
 func Handled(stored string, current any) bool {
-	if stored == "" {
-		return false
-	}
 	switch x := current.(type) {
 	case string:
-		return x == stored
+		return x == "" || x == stored
 	case time.Time:
+		if x.IsZero() {
+			return true
+		}
 		t, err := time.Parse(time.RFC3339Nano, stored)
 		return err == nil && !x.After(t)
 	case int:

@@ -2,8 +2,11 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -20,6 +23,19 @@ func saveMark(ctx context.Context, tx *Tx, u unit.Unit, name, value string) erro
 		tx.Touch(port.TopicRounds, u)
 	}
 	return err
+}
+
+// recordMark sets u's mark name to v, keeping a stored watermark v does
+// not pass (mark.Merge).
+func recordMark(ctx context.Context, tx *Tx, u unit.Unit, name string, v mark.Value) error {
+	stored := ""
+	if v.Watermark {
+		err := tx.QueryRowContext(ctx, `SELECT value FROM unit_marks WHERE provider = ? AND unit_key = ? AND mark = ?`, string(u.Provider), u.Key, name).Scan(&stored)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	return saveMark(ctx, tx, u, name, mark.Merge(stored, v))
 }
 
 // Marks are u's handled marks by name.

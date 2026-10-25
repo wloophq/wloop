@@ -23,15 +23,15 @@ func (e *Engine) unitMarks(ctx context.Context, u unit.Unit) (map[string]string,
 
 // marksOf are the marks an item of w records, from the facts it is planned
 // with; a fact with no value a mark can hold records nothing.
-func marksOf(w workflow.Workflow, facts workflow.Facts) map[string]string {
-	var out map[string]string
+func marksOf(w workflow.Workflow, facts workflow.Facts) map[string]mark.Value {
+	var out map[string]mark.Value
 	for name, fact := range w.Marks {
-		v, ok := mark.Encode(facts[fact])
+		v, ok := mark.New(facts[fact])
 		if !ok {
 			continue
 		}
 		if out == nil {
-			out = map[string]string{}
+			out = map[string]mark.Value{}
 		}
 		out[mark.Of(w.Name, name)] = v
 	}

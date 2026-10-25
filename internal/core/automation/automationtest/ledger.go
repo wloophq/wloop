@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -147,7 +148,7 @@ func (l *Ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, e
 				if l.marks[it.Unit] == nil {
 					l.marks[it.Unit] = map[string]string{}
 				}
-				l.marks[it.Unit][name] = v
+				l.marks[it.Unit][name] = mark.Merge(l.marks[it.Unit][name], v)
 			}
 			return
 		}

@@ -13,10 +13,11 @@ func TestAVersionIsHandledOnlyByTheSameValue(t *testing.T) {
 
 func TestAWatermarkIsHandledUpToItsPosition(t *testing.T) {
 	at := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
-	stored, ok := Encode(at)
-	if !ok {
-		t.Fatal("a time encodes")
+	v, ok := New(at)
+	if !ok || !v.Watermark {
+		t.Fatal("a time is a watermark")
 	}
+	stored := v.Value
 	for _, c := range []struct {
 		current any
 		want    bool
@@ -24,7 +25,6 @@ func TestAWatermarkIsHandledUpToItsPosition(t *testing.T) {
 		{at, true},
 		{at.Add(-time.Second), true},
 		{at.Add(time.Nanosecond), false},
-		{time.Time{}, true},
 	} {
 		if got := Handled(stored, c.current); got != c.want {
 			t.Errorf("Handled(%q, %v) = %v", stored, c.current, got)
@@ -39,17 +39,21 @@ func TestAWatermarkIsHandledUpToItsPosition(t *testing.T) {
 }
 
 func TestASequenceIsAWatermark(t *testing.T) {
-	stored, _ := Encode(42)
+	v, _ := New(42)
+	stored := v.Value
 	if !Handled(stored, 41) || !Handled(stored, 42) || Handled(stored, 43) {
 		t.Fatal("a sequence compares by order")
 	}
 }
 
-func TestEncodeRefusesWhatCannotBeAMark(t *testing.T) {
+func TestNewRefusesWhatCannotBeAMark(t *testing.T) {
 	for _, v := range []any{"", time.Time{}, nil, true, []string{"x"}} {
-		if s, ok := Encode(v); ok {
-			t.Errorf("Encode(%#v) = %q", v, s)
+		if m, ok := New(v); ok {
+			t.Errorf("New(%#v) = %+v", v, m)
 		}
+	}
+	if v, _ := New("h1"); v.Watermark {
+		t.Error("a string is a version")
 	}
 }
 
@@ -70,5 +74,36 @@ func TestAWorkflowMarkLivesUnderItsWorkflow(t *testing.T) {
 		if err := ValidName(c.name); (err == nil) != c.ok {
 			t.Errorf("ValidName(%q) = %v", c.name, err)
 		}
+	}
+}
+
+func TestAnEmptySignalIsHandled(t *testing.T) {
+	for _, current := range []any{"", time.Time{}} {
+		if !Handled("", current) {
+			t.Errorf("Handled(no mark, %#v) = false; nothing to handle is handled", current)
+		}
+	}
+}
+
+func TestAWatermarkNeverMovesBack(t *testing.T) {
+	at := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	later, _ := New(at.Add(time.Hour))
+	earlier, _ := New(at)
+	if got := Merge(later.Value, earlier); got != later.Value {
+		t.Errorf("an earlier time replaced %q with %q", later.Value, got)
+	}
+	if got := Merge(earlier.Value, later); got != later.Value {
+		t.Errorf("a later time kept %q", got)
+	}
+	nine, _ := New(9)
+	if got := Merge("10", nine); got != "10" {
+		t.Errorf("9 replaced 10: %q", got)
+	}
+	v, _ := New("h2")
+	if got := Merge("h1", v); got != "h2" {
+		t.Errorf("a version is replaced: %q", got)
+	}
+	if got := Merge("", nine); got != "9" {
+		t.Errorf("no mark takes the value: %q", got)
 	}
 }

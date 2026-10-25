@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -247,7 +248,7 @@ type Item struct {
 	Guidance string // set by Act(guide) only
 	// Marks are the marks a done or dismissed run records, by full name, from
 	// the facts the item was planned with.
-	Marks    map[string]string
+	Marks    map[string]mark.Value
 	Attempts int
 	Error    string
 	Mode     Mode

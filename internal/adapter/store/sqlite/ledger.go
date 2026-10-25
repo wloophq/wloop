@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -84,8 +85,8 @@ func (l ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, ev
 			return err
 		}
 		if terminal {
-			for name, value := range it.Marks {
-				if err := saveMark(ctx, tx, it.Unit, name, value); err != nil {
+			for name, v := range it.Marks {
+				if err := recordMark(ctx, tx, it.Unit, name, v); err != nil {
 					return err
 				}
 			}
@@ -260,7 +261,7 @@ type storedWhy struct {
 	Matched  []storedValue `json:"matched,omitempty"`
 	// Marks are the item's, kept with its why since both come from the
 	// facts it was planned with.
-	Marks map[string]string `json:"marks,omitempty"`
+	Marks map[string]mark.Value `json:"marks,omitempty"`
 }
 
 // storedValue keeps a fact's Go type, which JSON alone loses.

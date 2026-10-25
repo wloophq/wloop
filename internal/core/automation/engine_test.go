@@ -1627,7 +1627,7 @@ func TestADismissRecordsTheItemsMarks(t *testing.T) {
 	r.put(s1, "a", "session.head", "h1")
 	r.sweep()
 	it := r.mustItem("once", s1)
-	if it.Marks["once/head"] != "h1" {
+	if it.Marks["once/head"].Value != "h1" {
 		t.Fatalf("the item's marks %v", it.Marks)
 	}
 	if _, err := r.e.Act(context.Background(), it.ID, workflow.ActionDismiss, ""); err != nil {
