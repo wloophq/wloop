@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/fsx"
 )
 
 // TurnEndTool is the turn_end tool of the loop's MCP server as Claude Code
@@ -101,12 +102,7 @@ func sameCommand(got, want string) bool {
 }
 
 func sameBinary(a, b string) bool {
-	if !filepath.IsAbs(a) || !filepath.IsAbs(b) {
-		return false
-	}
-	fa, errA := os.Stat(a)
-	fb, errB := os.Stat(b)
-	return errA == nil && errB == nil && os.SameFile(fa, fb)
+	return filepath.IsAbs(a) && filepath.IsAbs(b) && fsx.SameFile(a, b)
 }
 
 func (h Home) registration() map[string]any {
