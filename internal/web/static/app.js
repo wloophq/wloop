@@ -233,9 +233,7 @@ function writeHash(change, replace) {
 const unitKey = (u) => `${u.provider}:${u.key}`;
 const keyUnit = (k) => ({ provider: k.slice(0, k.indexOf(":")), key: k.slice(k.indexOf(":") + 1) });
 const unitPath = (u, ...rest) => "/api/units/" + [u.provider, u.key, ...rest].map(encodeURIComponent).join("/");
-const refKey = (ref) => unitKey({ provider: "github", key: refLabel(ref) });
-// A row names its unit; an explore candidate or an event names a pull request.
-const unitOf = (x) => x.unit || { provider: "github", key: refLabel(x.ref) };
+const unitOf = (x) => x.unit;
 const keyOf = (x) => unitKey(unitOf(x));
 const labelOf = (x) => x.label || refLabel(x.ref);
 const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
@@ -404,9 +402,12 @@ function marked(text, ts) {
   return nodes;
 }
 
-function urlKey(q) {
-  const m = PR_URL.exec(String(q || "").trim());
-  return m && !/^\.\.?$/.test(m[2]) ? refKey({ owner: m[1], repo: m[2], number: Number(m[3]) }) : "";
+// rowByURL is the row whose link q is, or a page under that link such as
+// its files or one comment.
+function rowByURL(q) {
+  const u = String(q || "").trim();
+  if (!u.startsWith("https://")) return null;
+  return state.rows.find((r) => r.link && (u === r.link || (u.startsWith(r.link) && "/?#".includes(u[r.link.length])))) || null;
 }
 
 function rowByKey(key) {
@@ -499,7 +500,7 @@ function isMuted(o) {
 // The backlog is every pull request still open; done joins it on request.
 function inView(row, view, withDone) {
   if (view === "recent" || view === "explore" || view === "plan") return false;
-  if (view === "dash") return (row.unit || {}).provider === "github" && (withDone || !sm(row).closed);
+  if (view === "dash") return (row.unit || {}).provider === (catalog.views.find((v) => v.id === view) || {}).provider && (withDone || !sm(row).closed);
   return view === "all" || (row.views || []).includes(view);
 }
 
@@ -781,7 +782,7 @@ function candidatesYAML(meta, cands) {
   if (meta.read) out.push(`read_as: ${yamlString(meta.read)}`);
   out.push(`copied_at: ${yamlString(meta.at)}`, `count: ${cands.length}`, "pull_requests:");
   for (const c of cands) {
-    const row = rowByKey(refKey(c.ref));
+    const row = rowByKey(keyOf(c));
     const b = c.brief && c.brief.brief;
     const asks = (c.review_requests || []).map((w) => w.replace(/^team:/, ""));
     const fields = [
@@ -1338,15 +1339,15 @@ function renderRows() {
 function emptyNote(view, q) {
   if (!state.loaded) return ["Loading the inventory."];
   const label = (catalog.views.find((v) => v.id === view) || {}).label;
-  const key = urlKey(q);
-  if (key) {
-    const row = rowByKey(key);
-    if (row) {
-      return [`${labelOf(row)} is in the inventory. `, h("button", {
-        type: "button", class: "act", "data-focus": "empty:open", onclick: () => writeHash({ q: "", pr: keyOf(row) }),
-      }, "Open it")];
-    }
-    const [, owner, repo, number] = PR_URL.exec(q.trim());
+  const row = rowByURL(q);
+  if (row) {
+    return [`${labelOf(row)} is in the inventory. `, h("button", {
+      type: "button", class: "act", "data-focus": "empty:open", onclick: () => writeHash({ q: "", pr: keyOf(row) }),
+    }, "Open it")];
+  }
+  const pull = PR_URL.exec(String(q || "").trim());
+  if (pull && !/^\.\.?$/.test(pull[2])) {
+    const [, owner, repo, number] = pull;
     const typed = q.trim();
     return [`${refLabel({ owner, repo, number })} is not in the inventory. `,
       h("button", { type: "button", class: "act", "data-focus": "empty:explore", onclick: () => { writeHash({ view: "explore", q: "", x: q.trim() }); explore(q); } }, "Explore it"),
@@ -1461,7 +1462,7 @@ function renderActivity(lens) {
       day = label;
       out.push(h("li", { class: "a-day" }, label));
     }
-    const key = refKey(e.pr);
+    const key = keyOf(e);
     const id = `activity:${key}:${e.kind}:${e.key}:${e.at}`;
     const open = () => {
       activitySelected = id;
@@ -2081,7 +2082,7 @@ async function explore(query) {
     if (!res.ok || out.error) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
     state.explore.result = out;
     state.explore.recent = out.recent || state.explore.recent;
-    state.explore.sel = out.candidates.length === 1 ? refKey(out.candidates[0].ref) : "";
+    state.explore.sel = out.candidates.length === 1 ? keyOf(out.candidates[0]) : "";
   } catch (err) {
     state.explore.error = `Explore failed: ${err.message}`;
   }
@@ -2105,7 +2106,7 @@ function exploreStatus() {
 }
 
 function candidateItem(c, sel) {
-  const key = refKey(c.ref);
+  const key = keyOf(c);
   const row = rowByKey(key);
   const facts = [
     `+${c.additions} -${c.deletions} · ${c.changed_files} file${c.changed_files === 1 ? "" : "s"}`,
@@ -2143,7 +2144,7 @@ function candidateStatus(key) {
 // card shows it in the loop while the action runs, then reports the outcome on
 // the card itself.
 async function actOnCandidate(c, name, extra = {}) {
-  const key = refKey(c.ref);
+  const key = keyOf(c);
   const status = (text, more = {}) => { state.explore.status[key] = { text, ...more }; render(); };
   const implicit = !rowByKey(key);
   if (implicit) {
@@ -2175,10 +2176,10 @@ function selectCandidate(key) {
 function renderExploreActions() {
   const ex = state.explore;
   const panel = document.getElementById("explore-act");
-  const c = ex.result && ex.result.candidates.find((x) => refKey(x.ref) === ex.sel);
+  const c = ex.result && ex.result.candidates.find((x) => keyOf(x) === ex.sel);
   panel.hidden = !c;
   if (!c) return;
-  const key = refKey(c.ref);
+  const key = keyOf(c);
   const row = rowByKey(key);
   const guidance = document.getElementById("explore-guidance");
   if (guidance.dataset.key !== key) {
@@ -2261,6 +2262,7 @@ function planCount() {
   return state.plan.loaded ? planGroups(state.plan.items).reduce((n, g) => n + g.items.length, 0) : "";
 }
 
+const itemLabel = (it) => it.label || unitKey(it.unit);
 
 async function loadPlan() {
   const view = readHash().view;
@@ -2273,10 +2275,10 @@ async function loadPlan() {
 }
 
 async function actOnPlan(it, id) {
-  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: it.label }, id);
+  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: itemLabel(it) }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(`Guidance for ${it.workflow} on ${it.label}`, "");
+    const guidance = prompt(`Guidance for ${it.workflow} on ${itemLabel(it)}`, "");
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2291,9 +2293,9 @@ async function actOnPlan(it, id) {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
     if ((out.errors || []).length) throw new Error(out.errors.join("; "));
-    setNotice(`${body.action}: ${it.workflow} ${it.label}`);
+    setNotice(`${body.action}: ${it.workflow} ${itemLabel(it)}`);
   } catch (err) {
-    setNotice(`${body.action} ${it.workflow} ${it.label} failed: ${err.message}`, true);
+    setNotice(`${body.action} ${it.workflow} ${itemLabel(it)} failed: ${err.message}`, true);
   } finally {
     state.busy.delete(it.id);
   }
@@ -2321,7 +2323,7 @@ function planItem(it) {
     h("div", { class: "plan-line" },
       h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? `runs at ${stamp(it.deadline)}` : undefined }, planWhen(it)),
       h("span", { class: "plan-wf" }, it.workflow),
-      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, it.label) : it.label),
+      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
       it.title ? h("span", { class: "plan-title" }, it.title) : null,
       it.mode === "observe" ? h("span", { class: "plan-mode", title: "This workflow only plans; nothing runs until it is switched to apply" }, "observe") : null),
     it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
@@ -2386,7 +2388,7 @@ function renderSearch() {
 // filtering for text no row contains. A URL typed by hand passes through
 // shorter URLs of other pull requests on its way, so only a paste jumps.
 function onSearch(value, pasted) {
-  const row = pasted && rowByKey(urlKey(value));
+  const row = pasted && rowByURL(value);
   if (row) {
     document.getElementById("search").value = "";
     lastFocus = `row:${keyOf(row)}`;
@@ -2492,7 +2494,9 @@ async function load() {
     checkBuild(state.health);
   }
   const failed = [cat, rows, health].filter((r) => r.status === "rejected");
-  if (failed.length) {
+  // A daemon that cannot open its store says why in its health's warnings.
+  const storeClosed = health.status === "fulfilled" && health.value.store && health.value.store.state !== "ok";
+  if (failed.length && !storeClosed) {
     state.error = `Could not reach the daemon: ${[...new Set(failed.map((r) => r.reason.message))].join("; ")}`;
   } else {
     state.error = "";

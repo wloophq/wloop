@@ -17,6 +17,7 @@ func desktopLike() *fake.Manager {
 }
 
 func TestAnUntrustedPullRequestFallsThroughToTheNextManager(t *testing.T) {
+	t.Parallel()
 	desk, orca := desktopLike(), &fake.Manager{ManagerName: "orca"}
 	te := newTestEnv(t, desk)
 	te.WS = workspace.NewSet(desk, orca)
@@ -41,6 +42,7 @@ func TestAnUntrustedPullRequestFallsThroughToTheNextManager(t *testing.T) {
 }
 
 func TestAnUnreachableManagerTakesNoNewSession(t *testing.T) {
+	t.Parallel()
 	desk, orca := desktopLike(), &fake.Manager{ManagerName: "orca"}
 	desk.Unreachable = workspace.ErrUnreachable
 	te := newTestEnv(t, desk)

@@ -74,6 +74,7 @@ func rpc(method string) metertest.Limit {
 }
 
 func TestFastCycleOrcaCalls(t *testing.T) {
+	t.Parallel()
 	rt := orcatest.Start(t, orcatest.Live())
 	m := rt.Manager()
 	ws := workspace.NewCached(m, m, 2*time.Minute)
@@ -120,6 +121,7 @@ func TestFastCycleOrcaCalls(t *testing.T) {
 }
 
 func TestStartupReconcileOrcaCalls(t *testing.T) {
+	t.Parallel()
 	rt := orcatest.Start(t, orcatest.Live())
 	m := rt.Manager()
 	a, err := orca.Ports(workspace.NewCached(m, m, 2*time.Minute), liveColumns, nil)

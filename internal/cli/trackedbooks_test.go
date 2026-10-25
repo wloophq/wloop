@@ -26,6 +26,7 @@ func (c *fakeCards) Prefetch(_ context.Context, units []unit.Unit) error {
 }
 
 func TestTheViewsListThePullRequestsACardCanMoveFor(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	te := newTestEnv(t, &fake.Manager{})
 	withTurn, carded, closed := github.Ref{Owner: "acme", Repo: "api", Number: 7}, github.Ref{Owner: "acme", Repo: "api", Number: 8}, github.Ref{Owner: "acme", Repo: "api", Number: 9}

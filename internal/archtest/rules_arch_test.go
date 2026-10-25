@@ -3,7 +3,6 @@ package archtest
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"path"
 	"path/filepath"
@@ -32,6 +31,7 @@ func ruleR7(self string, imports []string) []string {
 }
 
 func TestCoreImports(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -130,6 +130,7 @@ func ruleR9(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 func TestOnlyOrcaAdapterReachesOrca(t *testing.T) {
+	t.Parallel()
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		for _, b := range ruleR9(fset, file, f) {
 			t.Error(b)
@@ -165,6 +166,7 @@ func ruleR9Desktop(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 func TestOnlyClaudeDesktopManagerReachesDesktop(t *testing.T) {
+	t.Parallel()
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
 		for _, b := range ruleR9Desktop(fset, file, f) {
 			t.Error(b)
@@ -188,6 +190,7 @@ func ruleR11(self string, imports []string) []string {
 }
 
 func TestDomainImports(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -300,6 +303,7 @@ func concatenated(e ast.Expr, literals *int) string {
 }
 
 func TestOnlyTheStoreTouchesSQL(t *testing.T) {
+	t.Parallel()
 	used := map[int]bool{}
 	forEachFile(t, true, func(fset *token.FileSet, file string, f *ast.File) {
 		for _, b := range ruleR13(fset, file, f, sqlAllowlist, used) {
@@ -324,12 +328,8 @@ func forEachFile(t *testing.T, tests bool, fn func(fset *token.FileSet, file str
 		if tests {
 			names = slices.Concat(names, p.TestGoFiles, p.XTestGoFiles)
 		}
-		fset := token.NewFileSet()
 		for _, name := range names {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			fset, f := parseFile(t, filepath.Join(p.Dir, name))
 			fn(fset, self+"/"+name, f)
 		}
 	}

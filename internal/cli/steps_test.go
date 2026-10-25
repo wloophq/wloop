@@ -42,6 +42,7 @@ func wfStep(use string, args ...string) workflow.Step {
 }
 
 func TestEveryVocabularyStepHasAnAdapter(t *testing.T) {
+	t.Parallel()
 	reg := stepRegistry()
 	var vocabulary []string
 	for _, d := range builtin.Steps {
@@ -59,6 +60,7 @@ func TestEveryVocabularyStepHasAnAdapter(t *testing.T) {
 }
 
 func TestStepsContract(t *testing.T) {
+	t.Parallel()
 	automationtest.RunSteps(t, func(t *testing.T) automation.Steps {
 		te := newTestEnv(t, &fake.Manager{})
 		return newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
@@ -66,6 +68,7 @@ func TestStepsContract(t *testing.T) {
 }
 
 func TestASessionCloseRefusedAtRunIsAGuardRefusal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", StartedAt: testNow})
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
@@ -120,6 +123,7 @@ func (r *removalRig) check(t *testing.T, mode workflow.Mode) string {
 }
 
 func TestWorkspaceRemoveSkipsTheFetchDayInObserve(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	if got := r.check(t, workflow.ModeApply); got != workspaces.NotFetchedToday {
 		t.Fatalf("apply: %q", got)
@@ -133,6 +137,7 @@ func TestWorkspaceRemoveSkipsTheFetchDayInObserve(t *testing.T) {
 }
 
 func TestWorkspaceRemoveNoteFetchesTheItemsPullRequest(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	if err := r.s.Note(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, workspaces.NotFetchedToday); err != nil {
 		t.Fatal(err)
@@ -152,6 +157,7 @@ func TestWorkspaceRemoveNoteFetchesTheItemsPullRequest(t *testing.T) {
 }
 
 func TestWorkspaceRemoveAppendsTheBackupCommand(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{Unpushed: 2})
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
@@ -162,6 +168,7 @@ func TestWorkspaceRemoveAppendsTheBackupCommand(t *testing.T) {
 }
 
 func TestWorkspaceRemoveCheckReusesItsLookWhileTheFactsHold(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	now := testNow
 	r.te.Env.Now = func() time.Time { return now }
@@ -210,6 +217,7 @@ func (c countedSessions) closeCount(ctx context.Context, id, reason string) (int
 }
 
 func TestARefusedLastLookAfterClosingSessionsIsRecorded(t *testing.T) {
+	t.Parallel()
 	for closed, suffix := range map[int]bool{0: false, 2: true} {
 		r := newRemovalRig(t, wt.Checkout{})
 		r.s.d.Removal.Guard = countedSessions{Sessions: r.sessions, n: closed}
@@ -244,6 +252,7 @@ func noAgentSession(t *testing.T, listed bool) (*testEnv, turnsGuard) {
 }
 
 func TestARemovalRefusesAListedTerminalWithNoAgent(t *testing.T) {
+	t.Parallel()
 	_, g := noAgentSession(t, true)
 	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "session term-1: no agent" {
 		t.Fatalf("refusal %q %v", why, err)
@@ -251,6 +260,7 @@ func TestARemovalRefusesAListedTerminalWithNoAgent(t *testing.T) {
 }
 
 func TestARemovalIgnoresASessionWhoseTerminalIsGone(t *testing.T) {
+	t.Parallel()
 	_, g := noAgentSession(t, false)
 	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != "" {
 		t.Fatalf("refusal %q %v", why, err)
@@ -261,6 +271,7 @@ func TestARemovalIgnoresASessionWhoseTerminalIsGone(t *testing.T) {
 }
 
 func TestARemovalRefusesAnAgentTheLoopNeverRegistered(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.reg.withoutMCP("term-9")
 	terms := te.Turns.Sessions.(*turnstest.Sessions)
@@ -276,6 +287,7 @@ func TestARemovalRefusesAnAgentTheLoopNeverRegistered(t *testing.T) {
 }
 
 func TestARemovalReadsTheAgentTerminalsFromTheSnapshot(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.reg.withoutMCP("term-9")
 	snap := &wsdomain.Snapshot{TerminalScope: wsdomain.Scope{Complete: true}, Terminals: []wsdomain.Terminal{
@@ -294,6 +306,7 @@ func TestARemovalReadsTheAgentTerminalsFromTheSnapshot(t *testing.T) {
 }
 
 func TestARemovalRefusesWhileTheTerminalsAreNotAllListed(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	g := turnsGuard{e: te.Env, snap: staticSnapshot{&wsdomain.Snapshot{}}}
 	if why, err := g.Refusal(context.Background(), "ws1"); err != nil || why != notAllListed {
@@ -302,6 +315,7 @@ func TestARemovalRefusesWhileTheTerminalsAreNotAllListed(t *testing.T) {
 }
 
 func TestWorkspaceRemoveForgetsTheLookOfAWorkspaceThatLeft(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.s.looks["gone"] = removeLook{}
 	r.check(t, workflow.ModeObserve)
@@ -320,6 +334,7 @@ func (s staticSnapshot) Read(context.Context, wsdomain.Part) (*wsdomain.Snapshot
 }
 
 func TestWorkspaceRemoveSkipsTheFirstRoundInTheBoundState(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	st := r.s.bindForTest(t)
 	detail, err := r.s.Run(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{Workflow: "workspace-review-finished"}, automation.RunOpts{})
@@ -335,6 +350,7 @@ func TestWorkspaceRemoveSkipsTheFirstRoundInTheBoundState(t *testing.T) {
 }
 
 func TestWorkspaceUnregisterRefusesWhatItWouldRefuseToRun(t *testing.T) {
+	t.Parallel()
 	for want, edit := range map[string]func(w *wsdomain.Workspace){
 		"not a local workspace": func(w *wsdomain.Workspace) { w.HostID, w.Path = "ssh:box", "/nonexistent/ws1" },
 		"the main checkout":     func(w *wsdomain.Workspace) { w.IsMain, w.Path = true, "/nonexistent/ws1" },
@@ -351,6 +367,7 @@ func TestWorkspaceUnregisterRefusesWhatItWouldRefuseToRun(t *testing.T) {
 }
 
 func TestWorkspaceUnregisterRefusesAnExistingPath(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.world.Files.(*wt.Files).Put(r.world.Dir+"/README", "x")
 	refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
@@ -371,6 +388,7 @@ func (p *recordingPub) Publish(evs ...port.Event) {
 }
 
 func TestNotifySelfPublishesItsText(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	pub := &recordingPub{}
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds, Pub: pub})
@@ -447,6 +465,7 @@ func (r *classifyRig) run(t *testing.T) (string, error) {
 }
 
 func TestClassifyNeverBlocksTheSweep(t *testing.T) {
+	t.Parallel()
 	r := newClassifyRig(t, 5)
 	done := make(chan error, 1)
 	go func() {
@@ -479,6 +498,7 @@ func TestClassifyNeverBlocksTheSweep(t *testing.T) {
 }
 
 func TestClassifyCachesByFingerprint(t *testing.T) {
+	t.Parallel()
 	r := newClassifyRig(t, 5)
 	close(r.asker.release)
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
@@ -512,6 +532,7 @@ func TestClassifyCachesByFingerprint(t *testing.T) {
 }
 
 func TestClassifyStopsAtTheDailyCap(t *testing.T) {
+	t.Parallel()
 	r := newClassifyRig(t, 1)
 	close(r.asker.release)
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
@@ -557,6 +578,7 @@ func (a *failingAsker) Ask(context.Context, turns.Ask) (turns.Answer, error) {
 }
 
 func TestAFailedClassifyIsAnAttemptNotAnotherCharge(t *testing.T) {
+	t.Parallel()
 	r := newClassifyRig(t, 5)
 	asker := &failingAsker{}
 	r.s.d.Classify.Asker = asker

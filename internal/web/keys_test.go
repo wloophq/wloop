@@ -78,6 +78,7 @@ function harness(o = {}) {
     close: () => { log.closed++; },
     navigate: (v) => { log.nav.push(v); if (o.onNav) o.onNav(v); },
     views: () => o.views || [],
+    providers: () => o.providers || [],
     areas: async () => o.areas || [],
     setArea: (a) => { log.area.push(a); },
     filter: () => { log.filter++; },
@@ -362,6 +363,7 @@ func actPrelude(t *testing.T) string {
 	b.WriteString(keyJS(t))
 	b.WriteString(jsConst(t, src, "API_VERSION"))
 	b.WriteString(jsConst(t, src, "PLAN_ACTS"))
+	b.WriteString(jsConst(t, src, "itemLabel"))
 	b.WriteString(`
 const calls = [];
 const state = { specs: { byId: {} }, busy: new Set(), guidance: {} };
@@ -625,5 +627,29 @@ return { acted, posts: plain.log.posts.map((p) => [p.url, p.body]) };`, entryFix
 	}
 	if want := `[["/api/entries/e-a/answer",{"args":{"yes":"true"},"source":"cockpit"}]]`; mustJS(t, got.Posts) != want {
 		t.Errorf("fallback answer posts %s, want %s", mustJS(t, got.Posts), want)
+	}
+}
+
+func TestNavigatingToAProviderOpensItsFirstView(t *testing.T) {
+	var got []string
+	views := append(slices.Clone(viewsFixture), map[string]any{"id": "issues", "provider": "linear", "order": 2}, map[string]any{"id": "triage", "provider": "linear", "order": 1})
+	keysRun(t, "", `
+const o = { views: input.views, providers: ["github", "slack", "linear", "wiki"] };
+const k = harness(o);
+k.keys.setBindings([...BINDINGS, { key: "g l", action: "nav:linear", context: "global", owner: "linear" }, { key: "g x", action: "nav:wiki", context: "global", owner: "wiki" }]);
+for (const c of ["g", "g", "g", "l", "g", "x", "g", "o"]) await k.press(c);
+return k.log.nav;`, map[string]any{"views": views}, &got)
+	if want := []string{"needs-me", "triage", "outbox"}; !slices.Equal(got, want) {
+		t.Fatalf("navigated to %q, want %q", got, want)
+	}
+}
+
+func TestAPlanItemReadsAsItsServedLabel(t *testing.T) {
+	var got []string
+	nodeRun(t, keyJS(t)+jsConst(t, appJS(t), "itemLabel"), nil, `process.stdout.write(JSON.stringify([
+  itemLabel({ unit: { provider: "linear", key: "PAY-88" }, label: "PAY-88 Retry budget" }),
+  itemLabel({ unit: { provider: "github", key: "acme/api#7" } })]));`, nil, &got)
+	if want := []string{"PAY-88 Retry budget", "github:acme/api#7"}; !slices.Equal(got, want) {
+		t.Fatalf("labels %q, want %q", got, want)
 	}
 }

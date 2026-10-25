@@ -30,14 +30,17 @@ func newStore(t *testing.T) *Store {
 }
 
 func TestStoreContract(t *testing.T) {
+	t.Parallel()
 	turnstest.RunStore(t, func(t *testing.T) turnstest.Repository { return newStore(t) })
 }
 
 func TestRegistryContract(t *testing.T) {
+	t.Parallel()
 	turnstest.RunRegistry(t, func(t *testing.T) turns.Registry { return newStore(t) })
 }
 
 func TestStateContract(t *testing.T) {
+	t.Parallel()
 	viewstest.RunState(t, func(t *testing.T) views.State { return newStore(t) }, func(t *testing.T, s views.State) []port.Event { return storedEvents(t, s.(*Store)) })
 }
 
@@ -86,6 +89,7 @@ func eventRows(t *testing.T, s *Store) []string {
 }
 
 func TestSavesWriteTheirEvents(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -111,6 +115,7 @@ func TestSavesWriteTheirEvents(t *testing.T) {
 }
 
 func TestAFailedSaveWritesNoEvent(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -125,6 +130,7 @@ func TestAFailedSaveWritesNoEvent(t *testing.T) {
 }
 
 func TestATurnWithoutInputsStoresAnEmptyObjectAndReadsBackNil(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	b, err := s.Save(context.Background(), turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Sent, SentAt: time.Now()}}})

@@ -24,6 +24,7 @@ func colorEnv(cols string) func(string) string {
 }
 
 func TestProfileCheckReadsAsSectionsOnATerminal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, checkFixture)
 	te.Home = dir
@@ -35,6 +36,7 @@ func TestProfileCheckReadsAsSectionsOnATerminal(t *testing.T) {
 }
 
 func TestProfileCheckProblemsReadOnATerminal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, nil)
 	brokenIntent(t, dir)
@@ -51,6 +53,7 @@ func TestProfileCheckProblemsReadOnATerminal(t *testing.T) {
 }
 
 func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, checkFixture)
 	te.Getenv = func(k string) string { return map[string]string{"CLICOLOR_FORCE": "1"}[k] }
@@ -78,6 +81,7 @@ review   intent=review.md   every pull request
 }
 
 func TestProfileCheckPipedProblemsKeepTheirLines(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := userProfile(t, te, nil)
 	brokenIntent(t, dir)
@@ -129,6 +133,7 @@ func fits(t *testing.T, what, out string, width int) {
 }
 
 func TestProfileCheckFitsANarrowTerminal(t *testing.T) {
+	t.Parallel()
 	long := map[string]string{"organization=hooli-co/repo=billing-reconcilers/intent=review.md": "L"}
 	for k, v := range checkFixture {
 		long[k] = v
@@ -149,6 +154,7 @@ func TestProfileCheckFitsANarrowTerminal(t *testing.T) {
 }
 
 func TestProfileCheckNamesTheBundledFilesAProfileOverrides(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	nudge, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "nudge", "instructions.md.tmpl"))
 	if err != nil {

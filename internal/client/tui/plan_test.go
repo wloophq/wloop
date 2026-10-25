@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -96,41 +97,43 @@ type errFake string
 func (e errFake) Error() string { return string(e) }
 
 func TestThePlanViewAppliesAndDismisses(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), plan: planItems()}
-	term, done := start(t, d)
-	eventually(t, "the plan tab", func() bool { return strings.Contains(term.screen(), "Plan 3") })
-	term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyEnter})
-	eventually(t, "the apply", func() bool {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), plan: planItems()}
+		term, done := start(t, d)
+		eventually(t, "the plan tab", func() bool { return strings.Contains(term.screen(), "Plan 3") })
+		term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyEnter})
+		eventually(t, "the apply", func() bool {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return len(d.planActs) == 1
+		})
 		d.mu.Lock()
-		defer d.mu.Unlock()
-		return len(d.planActs) == 1
-	})
-	d.mu.Lock()
-	first := d.planActs[0]
-	d.mu.Unlock()
-	if first.Action != "apply" || !slices.Equal(first.IDs, []string{"review-follow-up/github/acme%2Fapi%237/aa"}) {
-		t.Fatalf("acted %+v", first)
-	}
-	eventually(t, "the status and the reload", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "plan_apply review-follow-up acme/api#7: run") && strings.Contains(s, "Plan 2")
-	})
-	term.press(Key{Rune: 'X'})
-	eventually(t, "the dismiss", func() bool {
+		first := d.planActs[0]
+		d.mu.Unlock()
+		if first.Action != "apply" || !slices.Equal(first.IDs, []string{"review-follow-up/github/acme%2Fapi%237/aa"}) {
+			t.Fatalf("acted %+v", first)
+		}
+		eventually(t, "the status and the reload", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "plan_apply review-follow-up acme/api#7: run") && strings.Contains(s, "Plan 2")
+		})
+		term.press(Key{Rune: 'X'})
+		eventually(t, "the dismiss", func() bool {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return len(d.planActs) == 2 && d.planActs[1].Action == "dismiss" && d.planActs[1].IDs[0] == "session-manual-quiet/session/term_3/bb"
+		})
+		eventually(t, "one item left", func() bool { return strings.Contains(term.screen(), "Plan 1") })
+		term.press(Key{Name: KeyEnter})
+		eventually(t, "the blocked reason", func() bool { return strings.Contains(term.screen(), "modified files") })
 		d.mu.Lock()
-		defer d.mu.Unlock()
-		return len(d.planActs) == 2 && d.planActs[1].Action == "dismiss" && d.planActs[1].IDs[0] == "session-manual-quiet/session/term_3/bb"
+		acts := len(d.planActs)
+		d.mu.Unlock()
+		if acts != 2 {
+			t.Fatalf("a blocked item was applied: %d actions", acts)
+		}
+		quit(t, term, done)
 	})
-	eventually(t, "one item left", func() bool { return strings.Contains(term.screen(), "Plan 1") })
-	term.press(Key{Name: KeyEnter})
-	eventually(t, "the blocked reason", func() bool { return strings.Contains(term.screen(), "modified files") })
-	d.mu.Lock()
-	acts := len(d.planActs)
-	d.mu.Unlock()
-	if acts != 2 {
-		t.Fatalf("a blocked item was applied: %d actions", acts)
-	}
-	quit(t, term, done)
 }
 
 func TestThePlanViewNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {

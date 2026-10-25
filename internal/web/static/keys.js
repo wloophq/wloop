@@ -198,10 +198,13 @@ function createKeys(env) {
     return true;
   }
 
-  function githubView() {
-    const vs = (env.views ? env.views() : []).filter((v) => v.provider === "github");
+  // navTarget is the view nav:<to> opens: the first view of the plugin to
+  // names, "" for a plugin with none served, else the view whose id is to.
+  function navTarget(to) {
+    const vs = (env.views ? env.views() : []).filter((v) => v.provider === to);
     vs.sort((a, b) => (a.order || 0) - (b.order || 0));
-    return vs.length ? vs[0].id : "";
+    if (vs.length) return vs[0].id;
+    return env.providers && env.providers().includes(to) ? "" : to;
   }
 
   async function areaList() {
@@ -277,7 +280,7 @@ function createKeys(env) {
     if (a === "detail:open") return env.open() !== false;
     if (a === "detail:close") return env.close() !== false;
     if (a.startsWith("nav:")) {
-      const view = a === "nav:github" ? githubView() : a.slice(4);
+      const view = navTarget(a.slice(4));
       if (!view) return false;
       env.navigate(view);
       return true;
@@ -465,6 +468,7 @@ function appEnv() {
     },
     navigate: (view) => setHashParam("view", view),
     views: () => catalog.views,
+    providers: () => [...providerNames.keys()],
     areas: async () => {
       if (!areas) areas = (await getJSON("/api/gtd")).areas || [];
       return areas;

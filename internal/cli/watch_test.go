@@ -126,6 +126,7 @@ func seedRound(t *testing.T, te *testEnv, key string) {
 }
 
 func TestReviewByHandKeepsAColdSession(t *testing.T) {
+	t.Parallel()
 	m, te := scenario(t)
 	m.LastOutput["ws-rev"] = testNow.Add(-2 * time.Hour)
 	te.gh.basics = openBasics
@@ -138,6 +139,7 @@ func TestReviewByHandKeepsAColdSession(t *testing.T) {
 }
 
 func TestFailingCommandStampsItsError(t *testing.T) {
+	t.Parallel()
 	_, te := scenario(t)
 	if code := te.run("address", "not-a-url"); code != 1 {
 		t.Fatalf("exit %d", code)
@@ -274,6 +276,7 @@ func exhaustCap(t *testing.T, sc sweepCase) {
 }
 
 func TestSweepRecordsDistinctTimesPerPRAndKind(t *testing.T) {
+	t.Parallel()
 	store := openInventory(t, t.TempDir())
 	s := &sweep{e: &Env{Rec: storeRecorder{store: store}}, now: testNow}
 	st := step{pr: github.Ref{Owner: "acme", Repo: "api", Number: 7}}
@@ -362,6 +365,7 @@ func lostWorkspaceScenario(t *testing.T) sweepCase {
 }
 
 func TestALeftoverBranchAtAStoredHeadIsResetOnlyWithTheFlag(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		name   string
 		flag   bool

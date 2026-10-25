@@ -36,6 +36,7 @@ func plan(t *testing.T, s *Store, q string, args ...any) string {
 }
 
 func TestBookOfPlans(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	for _, c := range []struct {
 		name, q string
@@ -61,6 +62,7 @@ func TestBookOfPlans(t *testing.T) {
 }
 
 func TestBookOfSameAsBefore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -92,6 +94,7 @@ func TestBookOfSameAsBefore(t *testing.T) {
 }
 
 func TestUnitsOfOneQuery(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	handles := make([]string, 159)
 	for i := range handles {

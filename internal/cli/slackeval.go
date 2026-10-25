@@ -116,7 +116,7 @@ func (e *Env) slackEvalExport(ctx context.Context, cfg config.Config, args []str
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("no store at %s: %w", path, err)
 	}
-	db, err := sqlite.Open(path, nil)
+	db, err := sqlite.OpenReadOnly(path)
 	if err != nil {
 		return err
 	}

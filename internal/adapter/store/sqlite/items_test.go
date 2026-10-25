@@ -67,6 +67,7 @@ func sampleItem(u unit.Unit, id string, at time.Time) items.Item {
 }
 
 func TestItemsStoreRoundTrips(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, path := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 500, time.UTC)
@@ -140,6 +141,7 @@ func TestItemsStoreRoundTrips(t *testing.T) {
 }
 
 func TestQueryByWaitingOn(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)

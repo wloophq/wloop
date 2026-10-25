@@ -22,7 +22,7 @@ func TestCardFromRow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Unit != r.Unit || c.Title != "Change 1" || c.State != "open" || c.Outcome != "" {
+	if c.Unit != r.Unit || c.Label != r.Label || c.Label == "" || c.Title != "Change 1" || c.State != "open" || c.Outcome != "" {
 		t.Errorf("card %+v", c)
 	}
 	if !slices.Contains(c.Signals, card.Signal{Key: "checks", Value: "failing: lint", Tone: card.Tone("bad")}) {

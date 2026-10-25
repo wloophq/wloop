@@ -15,6 +15,7 @@ import (
 )
 
 func TestRowFactsCarryChecksTurnsUsageAndWhatComesNext(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	ctx := context.Background()
 	created := fixtureNow.Add(-72 * time.Hour)

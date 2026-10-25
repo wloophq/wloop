@@ -95,6 +95,7 @@ func explorePost(t *testing.T, s *Server, query string) (int, api.ExploreResult,
 }
 
 func TestExploreSearchesGitHubAndAddsWhatTheInventoryKnows(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Total: 41, RateLimit: dgh.RateLimit{Cost: 1, Remaining: 4900, Limit: 5000},
 		Candidates: []dgh.Candidate{
 			{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN"},
@@ -121,6 +122,7 @@ func TestExploreSearchesGitHubAndAddsWhatTheInventoryKnows(t *testing.T) {
 }
 
 func TestExploreSanitizesWhatGitHubSends(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{
 		{Ref: r7, Title: "Batch\x1b[2J export\u202e", HeadBranch: "ana/\x07bell"},
 	}}}
@@ -133,6 +135,7 @@ func TestExploreSanitizesWhatGitHubSends(t *testing.T) {
 }
 
 func TestExploreRefusesWhatItCannotRun(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{err: fmt.Errorf("graphql: boom")}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	for query, want := range map[string]int{"": 400, strings.Repeat("x", 300): 400, "acme/api": 502} {
@@ -146,6 +149,7 @@ func TestExploreRefusesWhatItCannotRun(t *testing.T) {
 }
 
 func TestExploreWaitsWhenTheBudgetIsLow(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	seedRateLimit(t, s, 100, 5000, s.deps.Now().Add(time.Hour))
@@ -155,6 +159,7 @@ func TestExploreWaitsWhenTheBudgetIsLow(t *testing.T) {
 }
 
 func TestExploreRemembersTheLastSearches(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Explorer = &fakeExplorer{} })
 	for i := range recentMax + 1 {
 		explorePost(t, s, fmt.Sprintf("org:acme label:l%d", i))
@@ -174,6 +179,7 @@ func (goalBriefs) Views(_ context.Context, prs ...dinv.PR) (map[github.Ref]*brie
 }
 
 func TestExploreSanitizesTheBrief(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{{Ref: r7, Title: "Batch export"}}}}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe; withBriefs(d, goalBriefs{}) })
 	_, res, body := explorePost(t, s, "acme/api")
@@ -195,6 +201,7 @@ func (b *blockingExplorer) SearchCandidates(ctx context.Context, q, viewer strin
 }
 
 func TestExploreRunsOneSearchAtATime(t *testing.T) {
+	t.Parallel()
 	be := &blockingExplorer{started: make(chan struct{}), release: make(chan struct{})}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = be })
 	first := make(chan int)
@@ -214,6 +221,7 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestExploreKeepsTheBudgetItSpent(t *testing.T) {
+	t.Parallel()
 	var sent int
 	reset := time.Date(2026, 10, 8, 11, 0, 0, 0, time.UTC)
 	body := fmt.Sprintf(`{"data":{"search":{"issueCount":0,"nodes":[]},"rateLimit":{"cost":1,"remaining":100,"limit":5000,"resetAt":%q}}}`, reset.Format(time.RFC3339))
@@ -236,6 +244,7 @@ func TestExploreKeepsTheBudgetItSpent(t *testing.T) {
 }
 
 func TestExploreRemembersAPullRequestByItsURL(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Explorer = &fakeExplorer{} })
 	_, res, _ := explorePost(t, s, "  https://github.com/acme/api/pull/7/files?diff=split  ")
 	if len(res.Recent) != 1 || res.Recent[0] != "https://github.com/acme/api/pull/7" {
@@ -244,6 +253,7 @@ func TestExploreRemembersAPullRequestByItsURL(t *testing.T) {
 }
 
 func TestExploreReadsWhatTheUserMeant(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"zoe": true}, page: dgh.CandidatePage{Total: 1, Candidates: []dgh.Candidate{{Ref: r7}}}}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	const base = "is:pr is:open archived:false -author:@me "
@@ -271,6 +281,7 @@ func TestExploreReadsWhatTheUserMeant(t *testing.T) {
 }
 
 func TestExploreSaysWhoHasNothingOpen(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"zoe": true}}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	if _, res, body := explorePost(t, s, "zoe"); res.Empty != "zoe has no open pull requests you did not open in the 1 repository "+brand.Name+" knows" {
@@ -289,6 +300,7 @@ func TestExploreSaysWhoHasNothingOpen(t *testing.T) {
 }
 
 func TestExploreRetriesAGatewayErrorOnce(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{errs: []error{&github.StatusError{Status: 502}}, page: dgh.CandidatePage{Total: 3}}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	s.exploreRetryPause = time.Millisecond
@@ -321,6 +333,7 @@ func (e *slowExplorer) SearchCandidates(ctx context.Context, q, viewer string, f
 }
 
 func TestExploreRetriesATimeoutOnce(t *testing.T) {
+	t.Parallel()
 	se := &slowExplorer{slow: 1}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = se })
 	s.exploreRetryPause, s.exploreAttempt = time.Millisecond, 20*time.Millisecond
@@ -334,6 +347,7 @@ func TestExploreRetriesATimeoutOnce(t *testing.T) {
 }
 
 func TestExploreSendsTheViewerToTheirOwnView(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"me": true, "Me": true}}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe })
 	for _, in := range []string{"me", "@Me"} {
@@ -344,6 +358,7 @@ func TestExploreSendsTheViewerToTheirOwnView(t *testing.T) {
 }
 
 func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
+	t.Parallel()
 	at := func(h int) time.Time { return time.Date(2026, 10, 8, h, 0, 0, 0, time.UTC) }
 	fe := &fakeExplorer{users: map[string]bool{"ivanova": true}, pages: func(q string) dgh.CandidatePage {
 		page := dgh.CandidatePage{RateLimit: dgh.RateLimit{Cost: 1, Remaining: 4000, Limit: 5000}}
@@ -408,6 +423,7 @@ func TestExploreFindsAnAuthorSearchHidesInTheKnownRepositories(t *testing.T) {
 }
 
 func TestExploreKeepsTheSearchesThatDidNotFailAlone(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{users: map[string]bool{"ivanova": true}, pages: func(q string) dgh.CandidatePage {
 		page := dgh.CandidatePage{}
 		for n := range 20 {
@@ -462,6 +478,7 @@ func (b *refreshCounting) RefreshIfStale(context.Context, dinv.PR) error {
 }
 
 func TestExploreStartsNoBriefRefresh(t *testing.T) {
+	t.Parallel()
 	fe := &fakeExplorer{page: dgh.CandidatePage{Candidates: []dgh.Candidate{{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN"}}}}
 	b := &refreshCounting{}
 	s := newServerWith(t, func(d *Deps) { d.Explorer = fe; withBriefs(d, b) })
@@ -471,6 +488,7 @@ func TestExploreStartsNoBriefRefresh(t *testing.T) {
 }
 
 func TestExploreStoreBudget(t *testing.T) {
+	t.Parallel()
 	var cands []dgh.Candidate
 	s := newServerLogged(t, change.NewLog(change.DefaultWindow, nil), func(d *Deps) {
 		withBriefs(d, brief.New(brief.Deps{Store: d.PRs.(inventory.ByUnit).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
@@ -522,6 +540,9 @@ func TestExploreStoreBudget(t *testing.T) {
 		t.Fatalf("%d candidates", len(got))
 	}
 	for i, c := range cands {
+		if got[i].Unit != c.Ref.Unit() {
+			t.Fatalf("%s: unit %+v", c.Ref, got[i].Unit)
+		}
 		if (got[i].Brief != nil) != (c.Ref == briefed) {
 			t.Fatalf("%s: brief %+v", c.Ref, got[i].Brief)
 		}

@@ -1,12 +1,15 @@
 package claude
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 // Shell runs a claude call with env applied over this process's environment,
@@ -24,5 +27,8 @@ func Shell(ctx context.Context, dir string, env []string, stdin, name string, ar
 		}
 	}
 	cmd.Stdin = strings.NewReader(stdin)
-	return cmd.CombinedOutput()
+	var buf bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	err = procgroup.Run(cmd)
+	return buf.Bytes(), err
 }

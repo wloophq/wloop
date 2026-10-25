@@ -11,6 +11,7 @@ import (
 )
 
 func TestDoctorRepoListsBlocksAndConditions(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	user := t.TempDir()
@@ -49,6 +50,7 @@ func TestDoctorRepoListsBlocksAndConditions(t *testing.T) {
 }
 
 func TestDoctorRepoNamesARevertedOverride(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	user := t.TempDir()
@@ -61,6 +63,7 @@ func TestDoctorRepoNamesARevertedOverride(t *testing.T) {
 }
 
 func TestDoctorRepoShowsResolverErrors(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	bad := t.TempDir()
@@ -77,6 +80,7 @@ func TestDoctorRepoShowsResolverErrors(t *testing.T) {
 }
 
 func TestDoctorRepoShow(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	if code := te.run("profile", "show", "acme/api", "--kind", "nudge", "--show"); code != 0 {
@@ -89,6 +93,7 @@ func TestDoctorRepoShow(t *testing.T) {
 }
 
 func TestDoctorRepoNamesAChangedBundledGuide(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	user := t.TempDir()
@@ -102,6 +107,7 @@ func TestDoctorRepoNamesAChangedBundledGuide(t *testing.T) {
 }
 
 func TestDoctorProfileDirectories(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Profile = t.TempDir()
 	if got := te.profileChecks(te.cfg); len(got) != 1 || got[0].mark != markOK {

@@ -61,6 +61,7 @@ func staleEmbeds(allow []embedAllowed, used map[int]bool) []string {
 }
 
 func TestProseIsEmbeddedOnlyFromProfiles(t *testing.T) {
+	t.Parallel()
 	allow := slices.Concat(embedKept, embedMoving)
 	used := map[int]bool{}
 	for _, p := range packages(t) {

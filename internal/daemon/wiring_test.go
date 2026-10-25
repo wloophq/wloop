@@ -20,6 +20,7 @@ import (
 )
 
 func TestALaterTurnNeverWaits(t *testing.T) {
+	t.Parallel()
 	books := turnstest.NewStore()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
 	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, SentAt: at}}})
@@ -39,6 +40,7 @@ func TestALaterTurnNeverWaits(t *testing.T) {
 }
 
 func TestOpenIntakesForTheSweep(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	open, err := s.OpenIntakes(context.Background())
@@ -72,6 +74,7 @@ func (m *missingActions) seen() []string {
 }
 
 func TestAnIntakeWithoutItsBriefSaysWhy(t *testing.T) {
+	t.Parallel()
 	gaveUp := intake.Readiness{Go: true, Without: true, Cause: intake.CauseGaveUp, Attempt: 3, LastError: "unfit", Note: "the brief gave up after 3 attempts: unfit"}
 	fa := &missingActions{}
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(gaveUp), func(d *Deps) { d.Actions = fa })
@@ -83,6 +86,7 @@ func TestAnIntakeWithoutItsBriefSaysWhy(t *testing.T) {
 }
 
 func TestUnavailableBriefsAreReported(t *testing.T) {
+	t.Parallel()
 	fa := &missingActions{}
 	s, _ := newIntakeServer(t, nil, func(d *Deps) {
 		d.Actions = fa
@@ -103,6 +107,7 @@ func TestUnavailableBriefsAreReported(t *testing.T) {
 }
 
 func TestAnIntakeTheSweepAnsweredSendsNothingMore(t *testing.T) {
+	t.Parallel()
 	books := turnstest.NewStore()
 	mu := &sync.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) {
@@ -148,6 +153,7 @@ func raceRun(t *testing.T, body string, before []turn.Turn, during []turn.Turn) 
 }
 
 func TestAByHandTurnAfterTheAcceptStillRunsTheAction(t *testing.T) {
+	t.Parallel()
 	later := time.Now().Add(time.Second)
 	_, fa, got := raceRun(t, `{}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-hand", Trigger: turn.ByHand, State: turn.Started, SentAt: later}})
 	if got.State != intake.Started || len(fa.calls()) != 1 {
@@ -156,6 +162,7 @@ func TestAByHandTurnAfterTheAcceptStillRunsTheAction(t *testing.T) {
 }
 
 func TestAGuidedIntakeIsNotSwallowedByTheSweep(t *testing.T) {
+	t.Parallel()
 	later := time.Now().Add(time.Second)
 	_, fa, got := raceRun(t, `{"guidance":"check the migration"}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: later}})
 	if got.State != intake.Failed || !strings.Contains(got.Error, "your guidance was not sent, ask again once that turn ends") || len(fa.calls()) != 0 {
@@ -164,6 +171,7 @@ func TestAGuidedIntakeIsNotSwallowedByTheSweep(t *testing.T) {
 }
 
 func TestASweepTurnBeforeTheAcceptIsIgnored(t *testing.T) {
+	t.Parallel()
 	at := time.Now().Add(-time.Minute)
 	before := []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "earlier", Trigger: turn.Automated, State: turn.Done, SentAt: at}}
 	_, fa, got := raceRun(t, `{}`, before, nil)

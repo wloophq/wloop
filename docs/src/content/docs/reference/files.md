@@ -22,6 +22,8 @@ description: Where the configuration, the state, the logs and the installed piec
 | `mcp.key` | the secret of the MCP endpoint (mode 0600) |
 | `daemon.sock` | the socket the CLI talks to |
 | `daemon.lock` | keeps a second daemon from starting |
+| `store.lock` | held by whoever writes the store: the daemon, or `store migrate` and `store restore` while they run |
+| `backups/` | copies of the store taken before each migration (`store-v<version>-<time>.db`, the three newest kept) and before each restore (`*.pre-restore.db`, kept 30 days) |
 | `http.json` | the cockpit's port and token (mode 0600), kept across restarts so an open page reconnects |
 | `notified.json` | the held rounds the menu bar already announced today |
 | `dossiers/` | the dossiers and their archives (mode 0700) |

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -124,6 +125,7 @@ func ask(t *testing.T, s *Server, action, body string) api.Intake {
 }
 
 func TestReviewActionAnswersWithTheIntake(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, nil, nil)
 	in := ask(t, s, "review", `{"guidance":"look at the migration","source":"cli"}`)
 	if in.Seq == 0 || in.PR != r7.URL() || in.Intent != "review" || in.Joined {
@@ -147,6 +149,7 @@ func TestReviewActionAnswersWithTheIntake(t *testing.T) {
 }
 
 func TestRunTakesTheIntentOfWhoseThePullRequestIs(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, nil, nil)
 	holdByCap(t, s)
 	if in := ask(t, s, "run_now", `{"source":"cockpit"}`); in.Intent != "review" {
@@ -159,6 +162,7 @@ func TestRunTakesTheIntentOfWhoseThePullRequestIs(t *testing.T) {
 }
 
 func TestSecondReviewJoinsAndReplacesTheGuidance(t *testing.T) {
+	t.Parallel()
 	briefs := intaketest.NewBriefs(waitBriefing, intake.Readiness{Go: true})
 	s, fa := newIntakeServer(t, briefs, nil)
 	first := ask(t, s, "review", `{"source":"cockpit","guidance":"first"}`)
@@ -175,6 +179,7 @@ func TestSecondReviewJoinsAndReplacesTheGuidance(t *testing.T) {
 }
 
 func TestIntakeLongPollWakesOnALogLine(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
@@ -212,6 +217,7 @@ func TestIntakeLongPollWakesOnALogLine(t *testing.T) {
 }
 
 func TestWithoutAndCancelEndpoints(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	review := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, review.Seq).State == intake.Briefing })
@@ -246,6 +252,7 @@ func TestWithoutAndCancelEndpoints(t *testing.T) {
 }
 
 func TestRowsShowTheOpenIntake(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
@@ -263,6 +270,7 @@ func TestRowsShowTheOpenIntake(t *testing.T) {
 }
 
 func TestRecoveredIntakesAreDrivenAgain(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, nil, nil)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
@@ -296,44 +304,47 @@ func (b *byHandCalls) list() []string {
 }
 
 func TestTurnByHandWaitsUpToSessionWait(t *testing.T) {
-	briefs := intaketest.NewBriefs(waitBriefing, intake.Readiness{Go: true})
-	hand := &byHandCalls{}
-	s, _ := newIntakeServer(t, briefs, func(d *Deps) {
-		d.TurnByHand = hand.run
-		d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r7.Unit(), nil }
+	synctest.Test(t, func(t *testing.T) {
+		briefs := intaketest.NewBriefs(waitBriefing)
+		hand := &byHandCalls{}
+		s, _ := newIntakeServer(t, briefs, func(d *Deps) {
+			d.TurnByHand = hand.run
+			d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r7.Unit(), nil }
+		})
+		s.sessionWait = 100 * time.Millisecond
+		byHand := func() *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"review","cwd":"/w"}`))
+			req.Header.Set(api.SessionHeader, "term-1")
+			s.Handler().ServeHTTP(rec, req)
+			return rec
+		}
+		start := time.Now()
+		rec := byHand()
+		if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the brief of acme/api#7 is not ready yet (briefing, attempt 1); run this command again in a minute") {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		if took := time.Since(start); took != 100*time.Millisecond {
+			t.Fatalf("answered after %v", took)
+		}
+		if len(hand.list()) != 0 {
+			t.Fatalf("started without its brief: %v", hand.list())
+		}
+		briefs.Answer(intake.Readiness{Go: true})
+		s.sessionWait = brief.SessionWait
+		rec = byHand()
+		var res api.ByHandResult
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Text != "the instructions" {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		if !slices.Equal(hand.list(), []string{"review term-1"}) {
+			t.Fatalf("calls %v", hand.list())
+		}
+		open, _ := s.deps.Intakes.Open(context.Background())
+		if len(open) != 0 {
+			t.Fatalf("open intakes %+v", open)
+		}
 	})
-	s.sessionWait = 100 * time.Millisecond
-	byHand := func() *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"review","cwd":"/w"}`))
-		req.Header.Set(api.SessionHeader, "term-1")
-		s.Handler().ServeHTTP(rec, req)
-		return rec
-	}
-	start := time.Now()
-	rec := byHand()
-	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the brief of acme/api#7 is not ready yet (briefing, attempt 1); run this command again in a minute") {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if took := time.Since(start); took < 100*time.Millisecond || took > brief.SessionWait/3 {
-		t.Fatalf("answered after %v", took)
-	}
-	if len(hand.list()) != 0 {
-		t.Fatalf("started without its brief: %v", hand.list())
-	}
-	s.sessionWait = brief.SessionWait
-	rec = byHand()
-	var res api.ByHandResult
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Text != "the instructions" {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if !slices.Equal(hand.list(), []string{"review term-1"}) {
-		t.Fatalf("calls %v", hand.list())
-	}
-	open, _ := s.deps.Intakes.Open(context.Background())
-	if len(open) != 0 {
-		t.Fatalf("open intakes %+v", open)
-	}
 }
 
 type openBreaker struct{ stubBriefs }
@@ -344,6 +355,7 @@ func (openBreaker) Breaker() (bool, time.Time, string, time.Time) {
 }
 
 func TestBreakerBanner(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { withBriefs(d, openBreaker{}) })
 	var h api.Health
 	if code := get(t, s, "/api/health", &h); code != 200 {
@@ -378,6 +390,7 @@ func newByHandServer(t *testing.T, briefs intake.Briefs, wait time.Duration) (*S
 }
 
 func TestADaemonRequestDoesNotJoinATurnByHand(t *testing.T) {
+	t.Parallel()
 	s, fa, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), time.Hour)
 	asked := make(chan int)
 	go func() { asked <- byHandAs(t, s, "term-1", "review").Code }()
@@ -401,6 +414,7 @@ func TestADaemonRequestDoesNotJoinATurnByHand(t *testing.T) {
 }
 
 func TestATurnByHandDoesNotJoinADaemonRequest(t *testing.T) {
+	t.Parallel()
 	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
 	in := ask(t, s, "review", `{"guidance":"from the cli","source":"cli"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
@@ -415,6 +429,7 @@ func TestATurnByHandDoesNotJoinADaemonRequest(t *testing.T) {
 }
 
 func TestAnotherSessionDoesNotJoin(t *testing.T) {
+	t.Parallel()
 	s, _, hand := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 50*time.Millisecond)
 	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -429,6 +444,7 @@ func TestAnotherSessionDoesNotJoin(t *testing.T) {
 }
 
 func TestARunDoesNotJoinAReview(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	holdByCap(t, s)
@@ -440,6 +456,7 @@ func TestARunDoesNotJoinAReview(t *testing.T) {
 }
 
 func TestStaleSessionIntakeExpiresOnTick(t *testing.T) {
+	t.Parallel()
 	briefs := intaketest.NewBriefs(waitBriefing)
 	s, _, _ := newByHandServer(t, briefs, 30*time.Millisecond)
 	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
@@ -480,6 +497,7 @@ func TestStaleSessionIntakeExpiresOnTick(t *testing.T) {
 }
 
 func TestStaleSessionIntakesAreCanceledOnAccept(t *testing.T) {
+	t.Parallel()
 	s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), 30*time.Millisecond)
 	if rec := byHandAs(t, s, "term-1", "review"); rec.Code != 409 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -495,6 +513,7 @@ func TestStaleSessionIntakesAreCanceledOnAccept(t *testing.T) {
 }
 
 func TestStartUpCancelsSessionIntakes(t *testing.T) {
+	t.Parallel()
 	s, fa := newIntakeServer(t, nil, nil)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
@@ -517,6 +536,7 @@ func TestStartUpCancelsSessionIntakes(t *testing.T) {
 }
 
 func TestWithoutRefusesATurnByHand(t *testing.T) {
+	t.Parallel()
 	s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), time.Hour)
 	asked := make(chan int)
 	go func() { asked <- byHandAs(t, s, "term-1", "review").Code }()
@@ -546,6 +566,7 @@ func (a *sessionAsks) known(seq int64) bool {
 }
 
 func TestAJoinIsNeverExpired(t *testing.T) {
+	t.Parallel()
 	const wait = 20 * time.Millisecond
 	s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), wait)
 	stop := make(chan struct{})
@@ -573,6 +594,7 @@ func TestAJoinIsNeverExpired(t *testing.T) {
 }
 
 func TestAStopWhileWaitingForTheLoopLeavesTheIntakeStarting(t *testing.T) {
+	t.Parallel()
 	mu := &sync.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) { d.LoopMu = mu })
 	mu.Lock()
@@ -593,6 +615,7 @@ func TestAStopWhileWaitingForTheLoopLeavesTheIntakeStarting(t *testing.T) {
 }
 
 func TestTheStartHoldsTheLoopMutex(t *testing.T) {
+	t.Parallel()
 	mu := &sync.Mutex{}
 	held := make(chan bool, 1)
 	s, _ := newIntakeServer(t, nil, func(d *Deps) {
@@ -626,6 +649,7 @@ func (h *heldActions) Intent(context.Context, string, unit.Unit, Call) error {
 }
 
 func TestWireAttemptsComeFromTheBriefRecord(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), func(d *Deps) {
 		d.Now = func() time.Time { return time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC) }
 	})
@@ -661,6 +685,7 @@ func (attemptBriefs) Attempt(context.Context, github.Ref) (int, error) { return 
 func (attemptBriefs) AttemptOf(dinv.PR, dinv.BriefRecord) int { return 3 }
 
 func TestWireAttemptsCountTheQueuesGlobalTries(t *testing.T) {
+	t.Parallel()
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), func(d *Deps) { withBriefs(d, attemptBriefs{}) })
 	ctx := context.Background()
 	st := s.store()
@@ -681,6 +706,7 @@ func TestWireAttemptsCountTheQueuesGlobalTries(t *testing.T) {
 }
 
 func TestBreakerBannerSaysATrialRunsNow(t *testing.T) {
+	t.Parallel()
 	since := time.Date(2026, 10, 8, 13, 40, 0, 0, time.Local)
 	b := api.BriefsHealth{Open: true, Since: since, Error: "429", Next: since.Add(15 * time.Minute)}
 	if got := breakerWarning(b, since.Add(20*time.Minute)); got != "briefs unavailable since 13:40: 429; a trial runs now" {
@@ -692,6 +718,7 @@ func TestBreakerBannerSaysATrialRunsNow(t *testing.T) {
 }
 
 func TestRowIntakeRetryIsAsOfTheMinute(t *testing.T) {
+	t.Parallel()
 	retry := time.Date(2026, 10, 8, 10, 0, 30, 0, time.UTC)
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), func(d *Deps) {
 		d.Now = func() time.Time { return retry.Add(10 * time.Second) }

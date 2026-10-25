@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -110,33 +111,35 @@ func chord(m *Model, keys string) (Command, bool) {
 func screenOf(m *Model, w, h int) string { return strings.Join(m.Render(w, h, now), "\n") }
 
 func TestStartsOnFocus(t *testing.T) {
-	registerBoard(t)
-	m := gtdModel(t)
-	m.SetPlugins(boardPlugins(true))
-	if v, ok := m.gtdView(); !ok || v.ID != "focus" {
-		t.Fatalf("started on view %d", m.view)
-	}
-	tabs := m.Render(220, 20, now)[0]
-	order := []string{"[Focus 1]", "Inbox 2", "Outbox 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0", "Board"}
-	at := -1
-	for _, want := range order {
-		i := strings.Index(tabs, want)
-		if i <= at {
-			t.Fatalf("%q missing or out of order in %q", want, tabs)
+	synctest.Test(t, func(t *testing.T) {
+		registerBoard(t)
+		m := gtdModel(t)
+		m.SetPlugins(boardPlugins(true))
+		if v, ok := m.gtdView(); !ok || v.ID != "focus" {
+			t.Fatalf("started on view %d", m.view)
 		}
-		at = i
-	}
-	if narrow := m.Render(120, 20, now)[0]; strings.Contains(narrow, "Needs me") || !strings.Contains(narrow, "Logbook 12") {
-		t.Fatalf("a narrow tab line keeps the GTD views whole and drops the others: %q", narrow)
-	}
+		tabs := m.Render(220, 20, now)[0]
+		order := []string{"[Focus 1]", "Inbox 2", "Outbox 1", "Next 4", "Waiting 4", "Projects 0", "Someday 0", "Logbook 12", "Needs me 0", "Plan 0", "Board"}
+		at := -1
+		for _, want := range order {
+			i := strings.Index(tabs, want)
+			if i <= at {
+				t.Fatalf("%q missing or out of order in %q", want, tabs)
+			}
+			at = i
+		}
+		if narrow := m.Render(120, 20, now)[0]; strings.Contains(narrow, "Needs me") || !strings.Contains(narrow, "Logbook 12") {
+			t.Fatalf("a narrow tab line keeps the GTD views whole and drops the others: %q", narrow)
+		}
 
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
-	term, done := start(t, d)
-	eventually(t, "Focus", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "[Focus 1]") && strings.Contains(s, "Reply on the batch export review")
+		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "[Focus 1]") && strings.Contains(s, "Reply on the batch export review")
+		})
+		quit(t, term, done)
 	})
-	quit(t, term, done)
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -211,36 +214,40 @@ func TestGoGitHubSkipsOtherProviders(t *testing.T) {
 }
 
 func TestOutboxInTUI(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
-	term, done := start(t, d)
-	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
-	term.press(Key{Rune: 'g'}, Key{Rune: 'o'})
-	eventually(t, "the draft", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "[Outbox 1]") && strings.Contains(s, "#releases thread") && strings.Contains(s, "Ship it tonight.")
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters(), doLag: 300 * time.Millisecond}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
+		term.press(Key{Rune: 'g'}, Key{Rune: 'o'})
+		eventually(t, "the draft", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "[Outbox 1]") && strings.Contains(s, "#releases thread") && strings.Contains(s, "Ship it tonight.")
+		})
+		term.press(Key{Rune: 'a'})
+		eventually(t, "the refusal from the list", func() bool { return strings.Contains(term.screen(), "open the draft to approve it") })
+		term.press(Key{Name: KeyEnter})
+		eventually(t, "the whole text", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Ship it tonight.") && strings.Contains(s, "Rollback plan in the doc.")
+		})
+		term.press(Key{Rune: 'a'})
+		eventually(t, "the confirm", func() bool { return strings.Contains(term.screen(), "post to #releases thread? y confirms") })
+		if n := len(d.dos()); n != 0 {
+			t.Fatalf("%d verbs sent before the y", n)
+		}
+		term.press(Key{Rune: 'y'})
+		eventually(t, "the approval", func() bool { return len(d.dos()) == 1 && strings.Contains(term.screen(), "approve done") })
+		term.press(Key{Name: KeyBackspace})
+		eventually(t, "the discard confirm", func() bool { return strings.Contains(term.screen(), "y confirms") })
+		term.press(Key{Rune: 'y'})
+		eventually(t, "the discard", func() bool { return len(d.dos()) == 2 })
+		text := map[string]string{"text": "Ship it tonight.\nRollback plan in the doc.", "rev": "4"}
+		want := []entryDo{{"draft:11", "approve", "tui", text}, {"draft:11", "dismiss", "tui", nil}}
+		if got := d.dos(); !reflect.DeepEqual(got, want) {
+			t.Fatalf("sent %+v", got)
+		}
+		quit(t, term, done)
 	})
-	term.press(Key{Rune: 'a'})
-	eventually(t, "the refusal from the list", func() bool { return strings.Contains(term.screen(), "open the draft to approve it") })
-	term.press(Key{Name: KeyEnter})
-	eventually(t, "the whole text", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "Ship it tonight.") && strings.Contains(s, "Rollback plan in the doc.")
-	})
-	term.press(Key{Rune: 'a'})
-	eventually(t, "the confirm", func() bool { return strings.Contains(term.screen(), "post to #releases thread? y confirms") })
-	if n := len(d.dos()); n != 0 {
-		t.Fatalf("%d verbs sent before the y", n)
-	}
-	term.press(Key{Rune: 'y'})
-	eventually(t, "the approval", func() bool { return len(d.dos()) == 1 })
-	term.press(Key{Name: KeyBackspace}, Key{Rune: 'y'})
-	eventually(t, "the discard", func() bool { return len(d.dos()) == 2 })
-	text := map[string]string{"text": "Ship it tonight.\nRollback plan in the doc.", "rev": "4"}
-	want := []entryDo{{"draft:11", "approve", "tui", text}, {"draft:11", "dismiss", "tui", nil}}
-	if got := d.dos(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("sent %+v", got)
-	}
-	quit(t, term, done)
 }
 
 func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
@@ -644,30 +651,32 @@ func TestOpeningSendsSeen(t *testing.T) {
 }
 
 func TestEntriesFollowChanges(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
-	term, done := start(t, d)
-	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
-	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
-	before := len(d.asks())
-	moved := gtdEntries()["focus"][0]
-	moved.Title = "Reply on the batch export review, again"
-	c := gtdCounters()
-	c.Views["inbox"] = 5
-	d.changeEntries("focus", []api.EntryView{moved}, c)
-	eventually(t, "the delta and the counts", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "review, again") && strings.Contains(s, "Inbox 5")
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		before := len(d.asks())
+		moved := gtdEntries()["focus"][0]
+		moved.Title = "Reply on the batch export review, again"
+		c := gtdCounters()
+		c.Views["inbox"] = 5
+		d.changeEntries("focus", []api.EntryView{moved}, c)
+		eventually(t, "the delta and the counts", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "review, again") && strings.Contains(s, "Inbox 5")
+		})
+		asks := d.asks()[before:]
+		if len(asks) != 1 || asks[0].view != "focus" || asks[0].since != (api.Since{Epoch: "g1", Rev: 0}) {
+			t.Fatalf("asked %+v after the change", asks)
+		}
+		term.press(Key{Rune: 'g'}, Key{Rune: 'i'})
+		eventually(t, "the Inbox", func() bool { return strings.Contains(term.screen(), "Buy cables") })
+		if asks := d.asks(); asks[len(asks)-1].view != "inbox" || asks[len(asks)-1].since != (api.Since{}) {
+			t.Fatalf("the Inbox was asked %+v", asks[len(asks)-1])
+		}
+		quit(t, term, done)
 	})
-	asks := d.asks()[before:]
-	if len(asks) != 1 || asks[0].view != "focus" || asks[0].since != (api.Since{Epoch: "g1", Rev: 0}) {
-		t.Fatalf("asked %+v after the change", asks)
-	}
-	term.press(Key{Rune: 'g'}, Key{Rune: 'i'})
-	eventually(t, "the Inbox", func() bool { return strings.Contains(term.screen(), "Buy cables") })
-	if asks := d.asks(); asks[len(asks)-1].view != "inbox" || asks[len(asks)-1].since != (api.Since{}) {
-		t.Fatalf("the Inbox was asked %+v", asks[len(asks)-1])
-	}
-	quit(t, term, done)
 }
 
 func (f *fakeDaemon) asks() []entryAsk {
@@ -677,25 +686,27 @@ func (f *fakeDaemon) asks() []entryAsk {
 }
 
 func TestTheCatalogSurvivesAFailedPluginsRead(t *testing.T) {
-	registerBoard(t)
-	d := &fakeDaemon{rows: oneRow(), plugins: boardPlugins(true), pluginsErr: errFake("plugins down")}
-	term, done := start(t, d)
-	eventually(t, "the catalog's views", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "Needs me 1") && strings.Contains(s, "plugins down")
+	synctest.Test(t, func(t *testing.T) {
+		registerBoard(t)
+		d := &fakeDaemon{rows: oneRow(), plugins: boardPlugins(true), pluginsErr: errFake("plugins down")}
+		term, done := start(t, d)
+		eventually(t, "the catalog's views", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Needs me 1") && strings.Contains(s, "plugins down")
+		})
+		d.mu.Lock()
+		d.pluginsErr = nil
+		d.mu.Unlock()
+		d.announce()
+		eventually(t, "the plugins read again", func() bool { return strings.Contains(term.screen(), "Board") })
+		d.mu.Lock()
+		reads := d.catalogReads
+		d.mu.Unlock()
+		if reads != 1 {
+			t.Fatalf("the catalog was read %d times", reads)
+		}
+		quit(t, term, done)
 	})
-	d.mu.Lock()
-	d.pluginsErr = nil
-	d.mu.Unlock()
-	d.announce()
-	eventually(t, "the plugins read again", func() bool { return strings.Contains(term.screen(), "Board") })
-	d.mu.Lock()
-	reads := d.catalogReads
-	d.mu.Unlock()
-	if reads != 1 {
-		t.Fatalf("the catalog was read %d times", reads)
-	}
-	quit(t, term, done)
 }
 
 // squash collapses the runs of spaces that align columns.
@@ -753,20 +764,22 @@ func TestTheFilterNarrowsTheGTDTabCounts(t *testing.T) {
 }
 
 func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
-	term, done := start(t, d)
-	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
-	term.press(Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"})
-	eventually(t, "the filtered counts", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "Next 2") && strings.Contains(s, "Inbox 0") && strings.Contains(s, "Waiting 0")
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
+		term.press(Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"})
+		eventually(t, "the filtered counts", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Next 2") && strings.Contains(s, "Inbox 0") && strings.Contains(s, "Waiting 0")
+		})
+		d.mu.Lock()
+		asks := slices.Clone(d.counterAsks)
+		d.mu.Unlock()
+		if len(asks) == 0 || !slices.Equal(asks[len(asks)-1], []string{"computer"}) {
+			t.Errorf("counter asks %v", asks)
+		}
+		term.press(Key{Name: KeyEsc})
+		quit(t, term, done)
 	})
-	d.mu.Lock()
-	asks := slices.Clone(d.counterAsks)
-	d.mu.Unlock()
-	if len(asks) == 0 || !slices.Equal(asks[len(asks)-1], []string{"computer"}) {
-		t.Errorf("counter asks %v", asks)
-	}
-	term.press(Key{Name: KeyEsc})
-	quit(t, term, done)
 }

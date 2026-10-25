@@ -21,6 +21,7 @@ import (
 var viewer = me{login: "me", teams: []string{"acme/search"}}
 
 func TestTheReviewWaitStartsAtTheRequestMadeOfMe(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	opened := t0.Add(-2 * 24 * time.Hour)
 	ev := func(kind, actor, data string, at time.Time) dinv.Event {
@@ -46,6 +47,7 @@ func TestTheReviewWaitStartsAtTheRequestMadeOfMe(t *testing.T) {
 }
 
 func TestMigrationSeedsAreNotTimeInLoop(t *testing.T) {
+	t.Parallel()
 	recorded := t0.Add(-5 * 24 * time.Hour)
 	seeded := github.Ref{Owner: "acme", Repo: "api", Number: 1}
 	live := github.Ref{Owner: "acme", Repo: "api", Number: 2}
@@ -59,6 +61,7 @@ func TestMigrationSeedsAreNotTimeInLoop(t *testing.T) {
 }
 
 func TestTheAuthorOfMyPullRequestIsMe(t *testing.T) {
+	t.Parallel()
 	mine := github.Ref{Owner: "acme", Repo: "api", Number: 9}
 	theirs := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	since := t0.Add(-24 * time.Hour)
@@ -73,6 +76,7 @@ func TestTheAuthorOfMyPullRequestIsMe(t *testing.T) {
 }
 
 func TestRunsBeforeRecordingStayOutOfTheFigures(t *testing.T) {
+	t.Parallel()
 	recorded := t0.Add(-24 * time.Hour)
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cost := 0.52
@@ -89,6 +93,7 @@ func TestRunsBeforeRecordingStayOutOfTheFigures(t *testing.T) {
 }
 
 func TestChangeFailureWaitsForTheWindowAndIgnoresSharedFiles(t *testing.T) {
+	t.Parallel()
 	pr := func(n int, created time.Time) dinv.PR {
 		return dinv.PR{Ref: github.Ref{Owner: "acme", Repo: "api", Number: n}, CreatedAt: created}
 	}
@@ -114,6 +119,7 @@ func TestChangeFailureWaitsForTheWindowAndIgnoresSharedFiles(t *testing.T) {
 }
 
 func TestTheBriefWaitOfAnAutomatedFirstTurn(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	byHand := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	wanted := t0.Add(-time.Hour)
@@ -132,6 +138,7 @@ func TestTheBriefWaitOfAnAutomatedFirstTurn(t *testing.T) {
 }
 
 func TestTheTurnListSkipsProbesAndCarriesEachDuration(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	probe := github.Ref{Owner: ProbeOwner, Repo: ProbeRepo, Number: 1}
 	d := dinv.TimingsData{PRs: []dinv.PR{{Ref: ref}, {Ref: probe}},
@@ -162,6 +169,7 @@ func prsOf(rep api.TimingsReport) []string {
 }
 
 func TestARequestOnAPullRequestWithNoTurnTakesTheSweeps(t *testing.T) {
+	t.Parallel()
 	books := turnstest.NewStore()
 	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: t0}}})
 	s, _ := newIntakeServer(t, nil, func(d *Deps) { d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books} })

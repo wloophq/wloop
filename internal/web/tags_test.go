@@ -138,7 +138,7 @@ func TestMyPullRequestsStandOutAndTheStripExplainsItself(t *testing.T) {
 			t.Errorf("app.css lacks %s", want)
 		}
 	}
-	if strings.Index(css, "tbody tr.mine {") > strings.Index(css, "tbody tr.sel {") || strings.Index(css, ".card.mine {") > strings.Index(css, ".card.sel {") {
+	if strings.Index(css, "tbody tr.mine {") > strings.Index(css, "tbody tr.sel,") || strings.Index(css, ".card.mine {") > strings.Index(css, ".card.sel,") {
 		t.Error("the mine tint must come before the selection, so the open row still shows as open")
 	}
 	prelude := `function h(tag, attrs, ...c) { return { tag, attrs, children: c.flat().filter((x) => x !== null && x !== undefined && x !== false) }; }` + "\n" +

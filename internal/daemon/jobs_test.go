@@ -16,6 +16,7 @@ import (
 )
 
 func TestJobRunsOnIntervalAndRecordsErrors(t *testing.T) {
+	t.Parallel()
 	var runs atomic.Int32
 	j := newJob("t", 10*time.Millisecond, time.Second, func(ctx context.Context) (string, string, error) {
 		if runs.Add(1) == 2 {
@@ -36,6 +37,7 @@ func TestJobRunsOnIntervalAndRecordsErrors(t *testing.T) {
 }
 
 func TestJobBacksOffAfterFailure(t *testing.T) {
+	t.Parallel()
 	var runs atomic.Int32
 	j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
 		runs.Add(1)
@@ -50,6 +52,7 @@ func TestJobBacksOffAfterFailure(t *testing.T) {
 }
 
 func TestJobTriggerBeforeLoopIsNotLost(t *testing.T) {
+	t.Parallel()
 	var runs atomic.Int32
 	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
 	j.trigger()
@@ -62,6 +65,7 @@ func TestJobTriggerBeforeLoopIsNotLost(t *testing.T) {
 }
 
 func TestJobSkipIsAWarningNotAFailure(t *testing.T) {
+	t.Parallel()
 	var warned string
 	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { return "", "orca closed", nil })
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
@@ -73,6 +77,7 @@ func TestJobSkipIsAWarningNotAFailure(t *testing.T) {
 }
 
 func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
+	t.Parallel()
 	sweep := func(context.Context) (ghsource.Report, error) {
 		return ghsource.Report{Skipped: "rate limit at 100 of 5000, below 50%"}, nil
 	}
@@ -91,6 +96,7 @@ func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
 }
 
 func TestCollectorReportJoinsTruncationAndWarnings(t *testing.T) {
+	t.Parallel()
 	sweep := func(context.Context) (ghsource.Report, error) {
 		return ghsource.Report{Queries: 3, Fetched: 2, Truncated: []string{"q1"}, Warnings: []string{"team acme/x: 404"}}, nil
 	}
@@ -104,6 +110,7 @@ func TestCollectorReportJoinsTruncationAndWarnings(t *testing.T) {
 }
 
 func TestWarningsClearAndSort(t *testing.T) {
+	t.Parallel()
 	w := &warnings{}
 	w.set("slow", "b")
 	w.set("fast", "a")
@@ -115,6 +122,7 @@ func TestWarningsClearAndSort(t *testing.T) {
 }
 
 func TestJobPanicIsRecordedAndLoopContinues(t *testing.T) {
+	t.Parallel()
 	var runs atomic.Int32
 	j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
 		if runs.Add(1) == 1 {
@@ -136,6 +144,7 @@ func TestJobPanicIsRecordedAndLoopContinues(t *testing.T) {
 }
 
 func TestJobPanicSetsLastErr(t *testing.T) {
+	t.Parallel()
 	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { panic("bad shape") })
 	j.once(context.Background(), func(string, ...any) {}, func(string, string) {})
 	if st := j.status(); st.Running || !strings.Contains(st.LastErr, "bad shape") {
@@ -144,6 +153,7 @@ func TestJobPanicSetsLastErr(t *testing.T) {
 }
 
 func TestJobRunGetsTheJobTimeout(t *testing.T) {
+	t.Parallel()
 	var left time.Duration
 	j := newJob("t", time.Hour, 3*time.Second, func(ctx context.Context) (string, string, error) {
 		dl, ok := ctx.Deadline()
@@ -159,6 +169,7 @@ func TestJobRunGetsTheJobTimeout(t *testing.T) {
 }
 
 func TestJobSkipIsLogged(t *testing.T) {
+	t.Parallel()
 	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { return "", "orca closed", nil })
 	var logged string
 	j.once(context.Background(), func(format string, args ...any) { logged = fmt.Sprintf(format, args...) }, func(string, string) {})
@@ -168,6 +179,7 @@ func TestJobSkipIsLogged(t *testing.T) {
 }
 
 func TestJobStatusCarriesItsInterval(t *testing.T) {
+	t.Parallel()
 	j := newJob("fast", 7*time.Minute, time.Second, func(context.Context) (string, string, error) { return "", "", nil })
 	if got := j.status().Every; got != 7*time.Minute {
 		t.Fatalf("Every = %s", got)
@@ -191,6 +203,7 @@ func (u *usageStore) SaveUsage(_ context.Context, seq int64, _ []dusage.Model, s
 func (u *usageStore) Attempted(context.Context, int64) error { return nil }
 
 func TestTheUsageJobRunsOnTheSlowTick(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	store := &usageStore{pending: []coreusage.Turn{{Seq: 3, Kind: "echo", AgentSession: "a1"}}, saved: map[int64]string{}}
 	d.Usage = &coreusage.Service{Store: store, Clock: fixedClock(time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC))}
@@ -215,6 +228,7 @@ func TestTheUsageJobRunsOnTheSlowTick(t *testing.T) {
 }
 
 func TestTheRetainJobRunsHourly(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	calls := 0
 	d.Retain = func(context.Context) (string, error) {
@@ -238,6 +252,7 @@ func TestTheRetainJobRunsHourly(t *testing.T) {
 }
 
 func TestJobOnceStopsQuietlyOnShutdownButRecordsATimeout(t *testing.T) {
+	t.Parallel()
 	noop := func(string, ...any) {}
 	noWarn := func(string, string) {}
 

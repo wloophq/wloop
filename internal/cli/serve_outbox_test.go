@@ -98,6 +98,7 @@ func insertDraft(t *testing.T, db *sqlite.DB, d draft.Draft) draft.Draft {
 }
 
 func TestServeRecoversBeforeSending(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := shortDir(t)
 	log := change.NewLog(change.DefaultWindow, nil)
@@ -152,6 +153,7 @@ func TestServeRecoversBeforeSending(t *testing.T) {
 }
 
 func TestNoJobsServesNoSender(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noJobs = true
 	d := te.serveOutbox(daemon.Deps{}, te.db, te.cfg, nil, t.Logf)
@@ -161,6 +163,7 @@ func TestNoJobsServesNoSender(t *testing.T) {
 }
 
 func TestOutboxEffectsFollowThePlugins(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	cfg := te.cfg
 	off := false
@@ -185,6 +188,7 @@ func TestOutboxEffectsFollowThePlugins(t *testing.T) {
 }
 
 func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	other := unit.Unit{Provider: ingesttest.Provider, Key: "C1 0002"}
 	books := policyBooks{threadUnit: {Unit: threadUnit, Turns: []dturn.Turn{{Seq: 7, Intent: "review"}}}}

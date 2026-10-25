@@ -29,6 +29,7 @@ func flowBudget(sql, rows, readTx int64) metertest.Budget {
 }
 
 func TestBudgets(t *testing.T) {
+	t.Parallel()
 	probe := func(t *testing.T, s *Server, path string) *meter.Scope {
 		t.Helper()
 		ctx, sc := metertest.Start(t, context.Background())
@@ -61,6 +62,7 @@ func TestBudgets(t *testing.T) {
 	}
 	for _, fl := range flows {
 		t.Run(fl.name, func(t *testing.T) {
+			t.Parallel()
 			s, f := liveServer(t)
 			if fl.settle {
 				settledBrief(t, s, f, turned)

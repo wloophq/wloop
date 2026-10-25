@@ -76,6 +76,7 @@ func remainingEvents(t *testing.T, db *DB) []string {
 }
 
 func TestRetainSessionEvents(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	for _, k := range SessionEventKinds {
 		event_(t, db, "session", "term_1", k, "term_1:"+k, past)
@@ -97,6 +98,7 @@ func TestRetainSessionEvents(t *testing.T) {
 }
 
 func TestRetainViewEvents(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	for _, k := range []string{"view_applied", "view_override", "view_sink_failed"} {
 		event_(t, db, "github", "acme/api#7", k, "", past)
@@ -113,6 +115,7 @@ func TestRetainViewEvents(t *testing.T) {
 }
 
 func TestRetainClosedSessions(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	cut := retainNow.Add(-30 * day)
 	for handle, closed := range map[string]string{
@@ -160,6 +163,7 @@ func column(t *testing.T, db *DB, q string, args ...any) []string {
 }
 
 func TestRetainStops(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	for i, when := range []time.Time{past, recent} {
 		exec(t, db, `INSERT INTO turn_stops (session, prompt_id, at) VALUES ('term_1', ?, ?)`, fmt.Sprint("p", i), at(when))
@@ -179,6 +183,7 @@ func insertPR(t *testing.T, db *DB, ref pr.Ref, state string, merged, closed str
 }
 
 func TestRetainViewRows(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	merged, closed, open := pr.Ref{Owner: "acme", Repo: "api", Number: 1}, pr.Ref{Owner: "acme", Repo: "api", Number: 2}, pr.Ref{Owner: "acme", Repo: "api", Number: 3}
 	insertPR(t, db, merged, "MERGED", at(past), at(past))
@@ -199,6 +204,7 @@ func TestRetainViewRows(t *testing.T) {
 }
 
 func TestRetainBriefBodies(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	run := func(id int, started time.Time) {
 		exec(t, db, `INSERT INTO brief_runs (id, owner, repo, number, trigger, version, attempt_of, started_at, ended_at, outcome, input_tokens, brief, files, tags, dropped_tags)
@@ -285,6 +291,7 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 }
 
 func TestRetainEndedPR(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	gone, kept, open := pr.Ref{Owner: "acme", Repo: "api", Number: 1}, pr.Ref{Owner: "acme", Repo: "api", Number: 2}, pr.Ref{Owner: "acme", Repo: "web", Number: 1}
 	insertPR(t, db, gone, "MERGED", at(retainNow.Add(-401*day)), at(retainNow.Add(-401*day)))
@@ -350,6 +357,7 @@ func seedEveryKind(t *testing.T, db *DB) {
 }
 
 func TestRetainIdempotent(t *testing.T) {
+	t.Parallel()
 	e, log := openNoted(t)
 	seedEveryKind(t, e.db)
 	first := retain(t, e.db, DefaultRetention)
@@ -377,6 +385,7 @@ func TestRetainIdempotent(t *testing.T) {
 }
 
 func TestRetainChange(t *testing.T) {
+	t.Parallel()
 	e, log := openNoted(t)
 	event_(t, e.db, "session", "term_1", "session_idle", "term_1:a", past)
 	exec(t, e.db, `INSERT INTO turn_stops (session, prompt_id, at) VALUES ('term_1', 'p', ?)`, at(past))
@@ -393,6 +402,7 @@ func TestRetainChange(t *testing.T) {
 }
 
 func TestRetainFreesPages(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	data := strings.Repeat("x", 2048)
 	_, err := db.Write(context.Background(), func(tx *Tx) error {
@@ -424,6 +434,7 @@ func TestRetainFreesPages(t *testing.T) {
 }
 
 func TestRetainedString(t *testing.T) {
+	t.Parallel()
 	if got := (Retained{}).String(); got != "nothing" {
 		t.Errorf("empty: %q", got)
 	}

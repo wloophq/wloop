@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 type Cmd struct {
@@ -42,7 +43,7 @@ func (Exec) Run(ctx context.Context, c Cmd) ([]byte, error) {
 	cmd.Dir, cmd.Env = c.Dir, c.Env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := cmd.Run(); err != nil {
+	if err := procgroup.Run(cmd); err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()

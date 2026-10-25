@@ -33,6 +33,7 @@ func wantGitHubDisabled(t *testing.T, name string, rec *httptest.ResponseRecorde
 }
 
 func TestActionOnDisabledPluginIs409(t *testing.T) {
+	t.Parallel()
 	actions := &fakeActions{}
 	s := newServerWith(t, func(d *Deps) { d.Actions, d.PluginEnabled = actions, githubOff })
 	for _, action := range []string{"review", "mute", "remove", "open"} {
@@ -58,6 +59,7 @@ func (c *countingExplorer) SearchCandidatesEach(ctx context.Context, qs []string
 }
 
 func TestUnitScopedPostsOnDisabledPluginAre409(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	for _, c := range []struct {
 		name string
@@ -157,6 +159,7 @@ func TestUnitScopedPostsOnDisabledPluginAre409(t *testing.T) {
 		}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			rec, called := c.run(t)
 			wantGitHubDisabled(t, c.name, rec)
 			if called {
@@ -167,6 +170,7 @@ func TestUnitScopedPostsOnDisabledPluginAre409(t *testing.T) {
 }
 
 func TestIntakesUnavailableWithGitHubOnIs503(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Intakes = nil })
 	if rec := post(t, s, "/api/intakes/1/cancel", ""); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -174,6 +178,7 @@ func TestIntakesUnavailableWithGitHubOnIs503(t *testing.T) {
 }
 
 func TestRemoveDoneSkipsADisabledPluginsUnits(t *testing.T) {
+	t.Parallel()
 	for _, enabled := range []func(unit.ProviderID) bool{nil, githubOff} {
 		actions := &fakeActions{}
 		s := newServerWith(t, func(d *Deps) { d.Actions, d.PluginEnabled = actions, enabled })
@@ -210,6 +215,7 @@ func examplePath(path string) string {
 }
 
 func TestEveryProviderRouteIsGated(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Actions, d.PluginEnabled = &fakeActions{}, githubOff })
 	gated := 0
 	for _, op := range api.Operations {

@@ -176,6 +176,7 @@ func undeclared(pkg *types.Package, names []string) []string {
 }
 
 func TestContractSkeletonDeclared(t *testing.T) {
+	t.Parallel()
 	var pkgs []string
 	for p := range skeleton {
 		pkgs = append(pkgs, module+p)
@@ -194,6 +195,7 @@ func TestContractSkeletonDeclared(t *testing.T) {
 }
 
 func TestContractSkeletonFlagsAMissingName(t *testing.T) {
+	t.Parallel()
 	pkg, err := newChecker(t, []string{module + "internal/daemon"}).check(module + "internal/daemon")
 	if err != nil {
 		t.Fatal(err)

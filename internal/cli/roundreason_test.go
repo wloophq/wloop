@@ -13,6 +13,7 @@ import (
 )
 
 func TestAutomatedReasonJoinsThePlannersNamesWithTheRead(t *testing.T) {
+	t.Parallel()
 	f := workflow.Facts{"pr.address.reviewers": []string{"ana", "jussara-ai"}, "pr.address.checks": []any{"ci/test", "gone"}}
 	checks := []dpr.Check{{Name: "lint"}, {Name: "ci/test", Failed: true, Summary: "3 failed", URL: "https://ci/9"}}
 	want := &turn.RoundReason{
@@ -39,6 +40,7 @@ func handFacts(at func(h int) time.Time) dpr.Facts {
 }
 
 func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
+	t.Parallel()
 	base := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	at := func(h int) time.Time { return base.Add(time.Duration(h) * time.Hour) }
 	cfg := config.Config{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}
@@ -57,6 +59,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 }
 
 func TestHandReasonIsNilWithNothingToShow(t *testing.T) {
+	t.Parallel()
 	if got := handReason(dpr.Facts{State: dgh.StateOpen, HeadRefOid: "h"}, "me", time.Time{}, "", config.Config{}); got != nil {
 		t.Errorf("got %+v", got)
 	}

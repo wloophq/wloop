@@ -28,6 +28,7 @@ func cockpitSource(t *testing.T) string {
 }
 
 func TestEveryClientsAnswerIsAccepted(t *testing.T) {
+	t.Parallel()
 	for client, source := range map[string]string{"menubar": menubar.AnswerSource, "tui": tui.Source, "cockpit": cockpitSource(t)} {
 		r := newTurnRig(t)
 		r.asked(pr.Ref{Owner: "acme", Repo: "api", Number: 8}, turn.Intent(dintent.Review), turn.Asked, publishQuestion)

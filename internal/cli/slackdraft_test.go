@@ -118,6 +118,7 @@ func (w *sessionWiring) send(t *testing.T, target string) string {
 }
 
 func TestSessionSendUntrackedMatchesPhase0(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	var b strings.Builder
 	for _, target := range []string{
@@ -181,6 +182,7 @@ func (w *sessionWiring) drafts(t *testing.T) []draft.Draft {
 const draftHandle = "term_draft1"
 
 func TestSlackDraftProposes(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
@@ -226,6 +228,7 @@ func TestSlackDraftProposes(t *testing.T) {
 }
 
 func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessThreaded, Name: "random", Kind: dslack.KindChannel, IsMember: true}},
@@ -253,6 +256,7 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 }
 
 func TestSessionSendToASegmentIsRecorded(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}}
@@ -272,6 +276,7 @@ func TestSessionSendToASegmentIsRecorded(t *testing.T) {
 }
 
 func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
@@ -300,6 +305,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 }
 
 func TestSlackDraftIsTiedToTheEntryTheTurnWasAskedFrom(t *testing.T) {
+	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	u := dslack.ThreadUnit("T000", sessChannel, sessParent)

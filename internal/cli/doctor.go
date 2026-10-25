@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
@@ -146,7 +145,12 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 
 	daemon, daemonErr := e.daemonClient(ctx)
 	if errors.Is(daemonErr, errDaemonDown) {
-		return daemonErr
+		return e.downWithStore(daemonErr)
+	}
+	if daemonErr == nil {
+		if only, ok := e.waitingStore(ctx, daemon); ok {
+			return e.reportDoctor(color, only)
+		}
 	}
 	cfg, cfgErr := e.loadConfig()
 
@@ -255,10 +259,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 		checks = append(checks, e.gitAccessChecks(dr.health.GitAccess, live.record)...)
 	}
 	section("Login shell")
-	store := filepath.Join(e.StateDir, storeFile)
-	if err := sqlite.Check(store); err != nil {
-		add(markMissing, "store", err.Error(), "")
-	}
+	checks = append(checks, e.storeChecks()...)
 	if e.boardSink(cfg) != "" {
 		col := func(status string) string { return e.column(cfg, status) }
 		cols := uniq(col(config.ColumnWorking), col(config.ColumnNeedsMe), col(config.ColumnReviewed), col(config.ColumnWorkingFallback), col(config.ColumnReady),
@@ -269,6 +270,10 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 	section("Store and board")
 	section("Disk", e.diskChecks(ctx, cfg)...)
 
+	return e.reportDoctor(color, sections)
+}
+
+func (e *Env) reportDoctor(color termfmt.Mode, sections []checkSection) error {
 	sections = dedupe(sections)
 	t := e.term(color)
 	if t.TTY {

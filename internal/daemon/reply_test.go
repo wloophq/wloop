@@ -34,6 +34,7 @@ func (r *outboxRig) drafts(t *testing.T) []draft.Draft {
 }
 
 func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.put(t, unitEntry("e-1", gtd.KindAction, r7u))
 	var v api.EntryView
@@ -64,6 +65,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 }
 
 func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.put(t, unitEntry("e-1", gtd.KindWaiting, r7u))
 	rec := post(t, r.s, api.EntryPath("e-1", "reply"), `{"source":"notification","args":{"text":"Ping","send":"now"}}`)
@@ -81,6 +83,7 @@ func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 }
 
 func TestReplyRefusals(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.put(t, unitEntry("e-none", gtd.KindCapture), unitEntry("e-msg", gtd.KindMessage, r7u), unitEntry("e-1", gtd.KindAction, r7u),
 		unitEntry("e-s", gtd.KindAction, slackUnit))
@@ -112,6 +115,7 @@ func TestReplyRefusals(t *testing.T) {
 }
 
 func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t)
 	r.put(t, unitEntry("e-1", gtd.KindAction, r7u))
 	rec := post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"text":"LGTM","source":"cockpit"}`)
@@ -139,6 +143,7 @@ func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 }
 
 func TestDraftCreateRefusesADisabledPlugin(t *testing.T) {
+	t.Parallel()
 	r := newOutboxRig(t, unit.GitHub)
 	rec := post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"text":"x","source":"cockpit"}`)
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"github"`) {

@@ -21,6 +21,7 @@ import (
 var thread = unit.Unit{Provider: "thread", Key: "C1 thread 9"}
 
 func TestLoopTablesStoreANonGitHubUnit(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	e, log := openNoted(t)
 	s := New(e.db)
@@ -117,6 +118,7 @@ func TestLoopTablesStoreANonGitHubUnit(t *testing.T) {
 }
 
 func TestOpenAndWithTurnsListPullRequestsByNumber(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	review := turn.Intent(dintent.Review)
@@ -143,6 +145,7 @@ func TestOpenAndWithTurnsListPullRequestsByNumber(t *testing.T) {
 }
 
 func TestAnEventCitesAnotherUnit(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	cited := pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
@@ -161,6 +164,7 @@ func TestAnEventCitesAnotherUnit(t *testing.T) {
 }
 
 func TestAHandleKeyedEventOfNoUnitIsStoredUnderItsSession(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	evs := []port.Event{

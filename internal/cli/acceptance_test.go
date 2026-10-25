@@ -477,6 +477,7 @@ var fxCheckouts struct {
 
 func TestMain(m *testing.M) {
 	os.Unsetenv("ORCA_USER_DATA_PATH")
+	storeReportWait = 0
 	code := m.Run()
 	if len(fxCheckouts.paths.roots) > 0 {
 		os.RemoveAll(fxCheckouts.paths.roots[0])
@@ -914,6 +915,7 @@ func (f *fixtureEnv) rows(t *testing.T, eng *automation.Engine, clock string) []
 }
 
 func TestCleanupWorkflowsLoad(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	l := te.loadedIntents()
 	var names []string
@@ -1382,6 +1384,7 @@ func planOf(t *testing.T, eng *automation.Engine) []workflow.Item {
 }
 
 func TestReviewFinishedMatchesOnlyReviewWorkspacesPastGrace(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		facts workflow.Facts
 		match bool
@@ -1406,6 +1409,7 @@ func TestReviewFinishedMatchesOnlyReviewWorkspacesPastGrace(t *testing.T) {
 }
 
 func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ fact, refusal string }{
 		{"workspace.dirty", "1 modified tracked file in /w/ws1"},
 		{"workspace.untracked", "untracked or ignored files outside the disposable list: notes.txt"},
@@ -1428,6 +1432,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 }
 
 func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
+	t.Parallel()
 	eng, units, steps := cleanupRig(t, "workspace-idle-no-pr", "")
 	f := workspaceFactsOf("none", "", 0)
 	f["workspace.pr"], f["workspace.quiet_for"] = "", 15*24*time.Hour
@@ -1447,6 +1452,7 @@ func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 }
 
 func TestAuthorFinishedRemovesACleanWorkspaceWithNoPendency(t *testing.T) {
+	t.Parallel()
 	eng, units, steps := cleanupRig(t, "workspace-author-finished", workflow.ModeApply)
 	units.Put(finishedWorkspace, workspaceFactsOf("author", "merged", 25*time.Hour))
 	if items := planOf(t, eng); len(items) != 1 || items[0].Decision != workflow.DecisionRun {
@@ -1459,6 +1465,7 @@ func TestAuthorFinishedRemovesACleanWorkspaceWithNoPendency(t *testing.T) {
 }
 
 func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct{ pendency, refusal string }{
 		{factworkspace.PendingModified, "1 modified tracked file in /w/ws1"},
 		{factworkspace.PendingUntracked, "untracked or ignored files outside the disposable list: a.txt"},
@@ -1489,6 +1496,7 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 }
 
 func TestAuthorFinishedSkipsReviewWorkspacesAndOpenPRs(t *testing.T) {
+	t.Parallel()
 	for name, f := range map[string]workflow.Facts{
 		"a review workspace":  workspaceFactsOf("review", "merged", 25*time.Hour),
 		"an open PR":          workspaceFactsOf("author", "open", 0),

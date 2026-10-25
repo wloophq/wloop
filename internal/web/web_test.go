@@ -155,7 +155,7 @@ func TestCockpitHasTheStalledBoard(t *testing.T) {
 func TestCockpitHasTheFilter(t *testing.T) {
 	h := Handler("")
 	for path, wants := range map[string][]string{
-		"/static/app.js": {"function fold", "function terms", "function matches", "function marked", "function urlKey",
+		"/static/app.js": {"function fold", "function terms", "function matches", "function marked", "function rowByURL",
 			"function matchesActivity", `p.get("q")`, "history.replaceState", "function typing", "function emptyNote"},
 		"/static/keys.js": {`filter: () => {`, `getElementById("search")`},
 		"/":               {`id="search"`, `type="search"`, `aria-keyshortcuts="/"`},

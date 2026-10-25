@@ -43,6 +43,7 @@ func reviewedAuthorScenario(t *testing.T) (*fake.Manager, *testEnv) {
 }
 
 func TestAddressKeepsTheGuidanceWhenThePromptDoesNotLand(t *testing.T) {
+	t.Parallel()
 	m, te := reviewedAuthorScenario(t)
 	m.NotSubmitted = true
 	te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"}}}}}`
@@ -65,6 +66,7 @@ func addressBasics(t *testing.T, author obj) string {
 }
 
 func TestAddressCreatesTheAuthorWorkspaceForMyPR(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
@@ -92,6 +94,7 @@ func TestAddressCreatesTheAuthorWorkspaceForMyPR(t *testing.T) {
 }
 
 func TestTheNotOwnedHintSurvivesTheCatalog(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
@@ -108,6 +111,7 @@ func TestTheNotOwnedHintSurvivesTheCatalog(t *testing.T) {
 }
 
 func TestAddressUsesTheExistingAuthorWorkspace(t *testing.T) {
+	t.Parallel()
 	m, te := reviewedAuthorScenario(t)
 	linkAuthorWorkspace(t, te, 9, "ws-auth")
 	te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"},"author":{"__typename":"User","login":"jo"}}}}}`
@@ -123,6 +127,7 @@ func TestAddressUsesTheExistingAuthorWorkspace(t *testing.T) {
 }
 
 func TestAddressUsesAMainCheckoutOnTheBranch(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -150,6 +155,7 @@ func TestAddressUsesAMainCheckoutOnTheBranch(t *testing.T) {
 }
 
 func TestAddressDoesNotTakeAMainCheckoutForAForkPR(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -174,6 +180,7 @@ func TestAddressDoesNotTakeAMainCheckoutForAForkPR(t *testing.T) {
 }
 
 func TestAddressRefusesAReleasePRFromTheMainCheckoutsDefaultBranch(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api", DefaultBranch: "feat/mine"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -195,6 +202,7 @@ func TestAddressRefusesAReleasePRFromTheMainCheckoutsDefaultBranch(t *testing.T)
 }
 
 func TestAddressDoesNotTakeAMainCheckoutOnSomeoneElsesPR(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -216,6 +224,7 @@ func TestAddressDoesNotTakeAMainCheckoutOnSomeoneElsesPR(t *testing.T) {
 }
 
 func TestAddressAsksForTheViewerOnlyForAMainCheckout(t *testing.T) {
+	t.Parallel()
 	m, te := reviewedAuthorScenario(t)
 	linkAuthorWorkspace(t, te, 9, "ws-auth")
 	te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"},"author":{"__typename":"User","login":"jo"}}}}}`
@@ -229,6 +238,7 @@ func TestAddressAsksForTheViewerOnlyForAMainCheckout(t *testing.T) {
 }
 
 func TestAddressRecordsTheGuidanceItSends(t *testing.T) {
+	t.Parallel()
 	_, te := reviewedAuthorScenario(t)
 	te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"}}}}}`
 	rec := &memRecorder{}
@@ -242,6 +252,7 @@ func TestAddressRecordsTheGuidanceItSends(t *testing.T) {
 }
 
 func TestAddressTakeOverTakesOverFirst(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -271,6 +282,7 @@ func TestAddressTakeOverTakesOverFirst(t *testing.T) {
 }
 
 func TestAddressTakeOverOnAPullRequestAlreadyTakenOverAddresses(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -292,6 +304,7 @@ func TestAddressTakeOverOnAPullRequestAlreadyTakenOverAddresses(t *testing.T) {
 }
 
 func TestATakeOverOfAPullRequestOwnedAlreadyIsNoFailure(t *testing.T) {
+	t.Parallel()
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
 	for msg, want := range map[string]bool{
 		"daemon: " + catalog.ReasonYours:                           true,
@@ -306,6 +319,7 @@ func TestATakeOverOfAPullRequestOwnedAlreadyIsNoFailure(t *testing.T) {
 }
 
 func TestAddressTakeOverThroughTheDaemonTakesOverThenAddresses(t *testing.T) {
+	t.Parallel()
 	te, calls := daemonForActions(t)
 	if code := te.run("address", "https://github.com/acme/api/pull/20", "--take-over", "fix", "the", "nit"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -323,6 +337,7 @@ func TestAddressTakeOverThroughTheDaemonTakesOverThenAddresses(t *testing.T) {
 }
 
 func TestAddressTakeOverStopsWhenTheDaemonGoesAwayAfterTakingOver(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -370,6 +385,7 @@ func linkAuthorWorkspace(t *testing.T, te *testEnv, n int, id string) {
 }
 
 func TestAnAddressAskedForByHandSaysWhyNow(t *testing.T) {
+	t.Parallel()
 	for _, synced := range []bool{true, false} {
 		m, te := reviewedAuthorScenario(t)
 		te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"}}}}}`

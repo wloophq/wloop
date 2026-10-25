@@ -83,6 +83,7 @@ func socketClient(path string) *http.Client {
 }
 
 func TestRunServesSocketAndGuardsTCP(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -144,6 +145,7 @@ func TestRunServesSocketAndGuardsTCP(t *testing.T) {
 }
 
 func TestStaleSocketIsReplaced(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	stale, err := net.Listen("unix", d.Socket)
 	if err != nil {
@@ -167,6 +169,7 @@ func TestStaleSocketIsReplaced(t *testing.T) {
 }
 
 func TestASocketPathTooLongSaysSo(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	d.Socket = filepath.Join(d.StateDir, strings.Repeat("s", 120)+".sock")
 	err := New(d).Run(context.Background())
@@ -176,6 +179,7 @@ func TestASocketPathTooLongSaysSo(t *testing.T) {
 }
 
 func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })
@@ -203,6 +207,7 @@ func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
 }
 
 func TestSweepWaitsForTheServerMutex(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	var runs atomic.Int32
 	d.Sweep = SweepFunc(func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
@@ -226,6 +231,7 @@ func TestSweepWaitsForTheServerMutex(t *testing.T) {
 }
 
 func TestZeroIntervalsFallBackToDefaults(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	d.Cfg.Sweep.Fast, d.Cfg.Sweep.Slow = 0, 0
 	d.Collector = &ghsource.Collector{}
@@ -240,6 +246,7 @@ func TestZeroIntervalsFallBackToDefaults(t *testing.T) {
 }
 
 func TestWriteInfoReplacesAtomically(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "http.json")
 	if err := os.WriteFile(p, []byte("old"), 0o644); err != nil {
@@ -262,6 +269,7 @@ func TestWriteInfoReplacesAtomically(t *testing.T) {
 }
 
 func TestTokenQuerySetsCookieAndRedirects(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	h := s.AuthHandler()
 	srv := newTestServer(t, h)
@@ -294,6 +302,7 @@ func TestTokenQuerySetsCookieAndRedirects(t *testing.T) {
 }
 
 func TestTokenRedirectStaysOnThisHost(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -310,6 +319,7 @@ func TestTokenRedirectStaysOnThisHost(t *testing.T) {
 }
 
 func TestCrossSitePostIsForbidden(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())
 	for site, want := range map[string]int{"cross-site": http.StatusForbidden, "same-site": http.StatusForbidden, "same-origin": http.StatusNotFound, "none": http.StatusNotFound} {
@@ -329,6 +339,7 @@ func TestCrossSitePostIsForbidden(t *testing.T) {
 }
 
 func TestTheCockpitAnswersOnlyItsLoopbackHost(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())
 	port := strings.TrimPrefix(srv, "http://127.0.0.1:")
@@ -355,6 +366,7 @@ func TestTheCockpitAnswersOnlyItsLoopbackHost(t *testing.T) {
 }
 
 func TestAWriteWithoutTheAPIHeaderIsForbidden(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())
 	for name, c := range map[string]struct {
@@ -387,6 +399,7 @@ func TestAWriteWithoutTheAPIHeaderIsForbidden(t *testing.T) {
 }
 
 func TestCrossSiteWriteMethodsAreForbidden(t *testing.T) {
+	t.Parallel()
 	s := New(testDeps(t))
 	srv := newTestServer(t, s.AuthHandler())
 	for _, method := range []string{http.MethodPut, http.MethodPatch, http.MethodDelete} {
@@ -406,6 +419,7 @@ func TestCrossSiteWriteMethodsAreForbidden(t *testing.T) {
 }
 
 func TestRunJobUnknownName(t *testing.T) {
+	t.Parallel()
 	if New(testDeps(t)).RunJob("nope") {
 		t.Fatal("unknown job reported as triggered")
 	}
@@ -446,6 +460,7 @@ func runUntilServing(t *testing.T, d Deps) (token string, stop func()) {
 }
 
 func TestTokenSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	first, stop := runUntilServing(t, d)
 	stop()
@@ -460,6 +475,7 @@ func TestTokenSurvivesARestart(t *testing.T) {
 }
 
 func TestTokenIsNotReusedFromAnUnsafeInfoFile(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		body string
 		mode os.FileMode
@@ -469,6 +485,7 @@ func TestTokenIsNotReusedFromAnUnsafeInfoFile(t *testing.T) {
 		"not json":           {`garbage`, 0o600},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			d := testDeps(t)
 			if err := os.WriteFile(d.InfoPath, []byte(tc.body), 0o600); err != nil {
 				t.Fatal(err)
@@ -510,6 +527,7 @@ func TestPortSurvivesARestart(t *testing.T) {
 }
 
 func TestBusyPreviousPortFallsBackToAFreeOne(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	busy, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -556,6 +574,7 @@ func runUntilInfo(t *testing.T, d Deps) {
 }
 
 func TestTakenMCPPortRefusesTheStart(t *testing.T) {
+	t.Parallel()
 	taken, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -703,6 +722,7 @@ func TestUserAPIWaitsForTheReconcile(t *testing.T) {
 }
 
 func TestUserAPIServesWhenTheReconcileRunsLongButTheJobsWait(t *testing.T) {
+	t.Parallel()
 	release := make(chan struct{})
 	var sweeps atomic.Int32
 	d := testDeps(t)
@@ -749,6 +769,7 @@ func TestUserAPIServesWhenTheReconcileRunsLongButTheJobsWait(t *testing.T) {
 }
 
 func TestRowFeedStartsWhenTheUserAPIOpens(t *testing.T) {
+	t.Parallel()
 	release := make(chan struct{})
 	d := testDeps(t)
 	d.Changes = change.NewLog(change.DefaultWindow, nil)
@@ -771,12 +792,14 @@ func TestRowFeedStartsWhenTheUserAPIOpens(t *testing.T) {
 }
 
 func TestAUserAPIReadOutlastsTheReconcileWait(t *testing.T) {
+	t.Parallel()
 	if client.ReadTimeout <= ReconcileWait {
 		t.Fatalf("client.ReadTimeout %v does not outlast ReconcileWait %v", client.ReadTimeout, ReconcileWait)
 	}
 }
 
 func TestAdminAPIIsSocketOnly(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	s.token = "a-token-long-enough-for-the-check"
 	for _, op := range api.Operations {
@@ -794,6 +817,7 @@ func TestAdminAPIIsSocketOnly(t *testing.T) {
 }
 
 func TestDoctorRefusesAMalformedPullRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, apiRequest("GET", api.AdminDoctor+"?repo=acme/api&pr=nope", nil))

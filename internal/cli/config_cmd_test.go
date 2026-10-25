@@ -11,6 +11,7 @@ import (
 )
 
 func TestConfigGet(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Views["orca"].Columns["needs-me"] = "waiting-me"
 	for key, want := range map[string]string{
@@ -41,6 +42,7 @@ func TestConfigGet(t *testing.T) {
 }
 
 func TestConfigGetViewColumn(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	file := filepath.Join(t.TempDir(), "config.json")
 	writeFile(t, file, `{"views":{"orca":{"columns":{"needs-me":"x"}}}}`)

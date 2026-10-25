@@ -12,6 +12,7 @@ import (
 )
 
 func TestRoundPromptNamesTheExecutable(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.Executable = "/Apps/My App/" + brand.Name
@@ -26,6 +27,7 @@ func TestRoundPromptNamesTheExecutable(t *testing.T) {
 }
 
 func TestRoundStopsOnAMissingProfile(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.cfg.Profile = filepath.Join(t.TempDir(), "nope")

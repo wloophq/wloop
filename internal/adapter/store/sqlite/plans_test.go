@@ -143,9 +143,11 @@ func usedIndexes(plan string) []string {
 }
 
 func TestHotPlans(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	for _, p := range hotPlans {
 		t.Run(p.name, func(t *testing.T) {
+			t.Parallel()
 			checkPlan(t, queryPlan(t, db, p.query, anyArgs(p.args)...), p.want, p.tempSort)
 		})
 	}
@@ -160,6 +162,7 @@ var indexesUsedByInventory = []string{
 }
 
 func TestNoUnusedIndex(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	used := map[string]bool{}
 	for _, p := range hotPlans {

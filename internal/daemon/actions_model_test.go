@@ -34,6 +34,7 @@ func warm(t *testing.T, s *Server) {
 }
 
 func TestOfferedIssuesNoQueryWhenFresh(t *testing.T) {
+	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	warm(t, s)
 	ctx, sc := metertest.Start(t, context.Background())
@@ -45,6 +46,7 @@ func TestOfferedIssuesNoQueryWhenFresh(t *testing.T) {
 }
 
 func TestDetailAtMostTwoQueries(t *testing.T) {
+	t.Parallel()
 	s := newNotedServer(t, func(d *Deps) {
 		withBriefs(d, brief.New(brief.Deps{Store: d.PRs.(inventory.ByUnit).Store, Now: d.Now, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy }}))
 	})
@@ -58,6 +60,7 @@ func TestDetailAtMostTwoQueries(t *testing.T) {
 }
 
 func TestNudgeUnmutedRowNoQuery(t *testing.T) {
+	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	seedWaitingOnAna(t, s)
 	warm(t, s)
@@ -80,6 +83,7 @@ func (c *bookCalls) Books(ctx context.Context, units ...unit.Unit) (map[unit.Uni
 }
 
 func TestExploreBaseDeriverFromSnapshot(t *testing.T) {
+	t.Parallel()
 	books := &bookCalls{Store: turnstest.NewStore(turnstest.Strict(t))}
 	s := newNotedServer(t, func(d *Deps) {
 		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books, Registry: turnstest.NewRegistry(turnstest.Strict(t)),
@@ -117,6 +121,7 @@ func seedLapsed(t *testing.T, s *Server) github.Ref {
 }
 
 func TestDetailOfALapsedPR(t *testing.T) {
+	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	ref := seedLapsed(t, s)
 	var d api.Detail
@@ -126,6 +131,7 @@ func TestDetailOfALapsedPR(t *testing.T) {
 }
 
 func TestUnmutedRowOfALapsedPR(t *testing.T) {
+	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	ref := seedLapsed(t, s)
 	row, evs, d, err := s.unmutedRow(context.Background(), ref.Unit())

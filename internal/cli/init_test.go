@@ -142,6 +142,7 @@ func (te *initTestEnv) writeConfig(t *testing.T, raw string) {
 }
 
 func TestInitDefaults(t *testing.T) {
+	t.Parallel()
 	cur := config.Defaults()
 	cur.ProjectsDir, cur.Profile = "/p", "/prof"
 	cur.Scope.Repos = []string{"acme/api"}
@@ -215,6 +216,7 @@ func TestInitDefaults(t *testing.T) {
 }
 
 func TestInitFlagsExcludeEachOther(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"--profile", "/x", "--profile-default"}, {"--skip-slack", "--slack-client-id", "1.2"}, {"extra"}} {
 		if _, err := parseInitFlags(&Env{Err: &bytes.Buffer{}}, args); err == nil {
 			t.Errorf("%v: no error", args)
@@ -223,6 +225,7 @@ func TestInitFlagsExcludeEachOther(t *testing.T) {
 }
 
 func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
+	t.Parallel()
 	raw := `{
   "sweep": {"fast": "5m"},
   "agent": "claude",
@@ -265,6 +268,7 @@ func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
 }
 
 func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
+	t.Parallel()
 	raw := `{"projects_dir": "~/src", "profile": "mine"}`
 	got, err := mergeInitConfig([]byte(raw), initAnswers{ProjectsDir: config.ExpandHome("~/src"), Profile: config.ResolveProfile("mine"), Agent: "claude"})
 	if err != nil {
@@ -276,6 +280,7 @@ func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
 }
 
 func TestMergeInitConfigAddsNoEmptyKeys(t *testing.T) {
+	t.Parallel()
 	got, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Agent: "claude"})
 	if err != nil {
 		t.Fatal(err)
@@ -289,6 +294,7 @@ func TestMergeInitConfigAddsNoEmptyKeys(t *testing.T) {
 }
 
 func TestCommonParent(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		paths []string
 		want  string
@@ -523,6 +529,7 @@ func TestInitAtATerminal(t *testing.T) {
 }
 
 func TestSlackManifestIsTheDocs(t *testing.T) {
+	t.Parallel()
 	var docs []string
 	err := filepath.WalkDir(filepath.Join("..", "..", "docs"), func(p string, d fs.DirEntry, err error) error {
 		if d != nil && d.IsDir() && (d.Name() == "node_modules" || d.Name() == "dist") {

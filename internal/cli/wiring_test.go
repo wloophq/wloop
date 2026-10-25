@@ -49,6 +49,7 @@ func seedBriefOf(t *testing.T, st *inventory.Store, ref github.Ref, tags ...stri
 }
 
 func TestTurnKeepsItsBriefRun(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	te.cfg.Brief.Enabled = true
 	id := seedBriefOf(t, te.Store, r7)
@@ -73,6 +74,7 @@ func TestTurnKeepsItsBriefRun(t *testing.T) {
 }
 
 func TestTurnInstructionsCarryATagBlock(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tags", "change=refac", "intent=review.md")
@@ -98,6 +100,7 @@ func TestTurnInstructionsCarryATagBlock(t *testing.T) {
 }
 
 func TestATrimmedGuideIsRecorded(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	rec := &memRecorder{}
 	te.Rec = rec
@@ -109,6 +112,7 @@ func TestATrimmedGuideIsRecorded(t *testing.T) {
 }
 
 func TestTheReviewGuidesTrimmedBlocksArePrefixed(t *testing.T) {
+	t.Parallel()
 	l, err := turn.Bundled()
 	if err != nil {
 		t.Fatal(err)

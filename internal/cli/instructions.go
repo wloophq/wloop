@@ -100,9 +100,12 @@ func runInstructions(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return errors.New(err.Error())
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+	var cwd string
+	if e.Harness.Cwd != nil {
+		cwd = e.Harness.Cwd()
+	}
+	if cwd == "" {
+		return errors.New("instructions cannot read its working directory")
 	}
 	_, pane, agentSession, home := e.caller()
 	return e.askTurnByHand(ctx, api.ByHandRequest{Intent: string(d.Name), URL: url, Inputs: checked, Agent: *agentName, Guidance: guidance, Cwd: cwd,

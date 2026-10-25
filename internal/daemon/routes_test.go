@@ -7,6 +7,7 @@ import (
 )
 
 func TestOperationsAreRoutedOnce(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(*Deps) {})
 	routed := map[string]int{}
 	for _, rt := range s.routes() {

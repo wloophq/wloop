@@ -113,6 +113,27 @@ func TestPluginSectionsFollowTheCatalog(t *testing.T) {
 	waitFor(t, func() bool { return slices.Equal(r.openedURLs(), []string{"cockpit#view=x%26entry%3De-1"}) })
 }
 
+func TestAStoreTheDaemonCannotOpenShowsWhyAndTheCommand(t *testing.T) {
+	r := newRig(t)
+	var copied []string
+	r.c.cfg.Copy = func(s string) error { copied = append(copied, s); return nil }
+	r.d.rowsErr = errors.New("the store is not open")
+	r.d.health = api.Health{Store: &api.StoreStatus{State: api.StoreFailed, Message: "the store migration from version 1 failed", Fix: "fix-it migrate"}}
+	r.c.Refresh(context.Background())
+	if r.title() != "PR !" {
+		t.Fatalf("title %q", r.title())
+	}
+	got := titles(r.tray.menu)
+	want := []string{"Store needs attention: its migration failed", "the store migration from version 1 failed", "Copy command: fix-it migrate", "---", "Quit " + brand.Name}
+	if !slices.Equal(got, want) {
+		t.Fatalf("menu %q", got)
+	}
+	r.tray.menu[2].Action()
+	if !slices.Equal(copied, []string{"fix-it migrate"}) {
+		t.Fatalf("copied %q", copied)
+	}
+}
+
 func TestDaemonDownShowsAQuestionMark(t *testing.T) {
 	r := newRig(t)
 	r.d.err = errors.New("dial unix: connection refused")

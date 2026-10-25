@@ -3,7 +3,6 @@ package archtest
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"path/filepath"
 	"strconv"
@@ -58,6 +57,7 @@ func engineLiterals(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 func TestTheEngineImportsNoProvider(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -68,15 +68,11 @@ func TestTheEngineImportsNoProvider(t *testing.T) {
 		for _, b := range engineImports(self, p.Imports) {
 			t.Error(b)
 		}
-		fset := token.NewFileSet()
 		for _, name := range p.GoFiles {
 			if self != "internal/core/automation" {
 				continue
 			}
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			fset, f := parseFile(t, filepath.Join(p.Dir, name))
 			for _, b := range engineLiterals(fset, self+"/"+name, f) {
 				t.Error(b)
 			}
@@ -88,6 +84,7 @@ func TestTheEngineImportsNoProvider(t *testing.T) {
 }
 
 func TestTheEngineRuleFlagsAPlantedProvider(t *testing.T) {
+	t.Parallel()
 	ok := []string{"context", module + "internal/core/port", module + "internal/domain/unit", module + "internal/domain/workflow"}
 	flagged(t, "allowed", engineImports("internal/core/automation", ok), 0, "")
 	bad := append(ok, module+"internal/domain/pr", module+"internal/domain/turn", module+"internal/domain/view",

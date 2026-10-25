@@ -9,6 +9,7 @@ import (
 )
 
 func TestTUINeedsTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	if code := te.run("tui"); code != 1 || !strings.Contains(te.err.String(), brand.Command+" serve") {
@@ -20,6 +21,7 @@ func TestTUINeedsTheDaemon(t *testing.T) {
 }
 
 func TestTheTUIFollowsTheColorDecision(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		env  map[string]string
 		want bool

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/meter"
@@ -15,12 +14,23 @@ import (
 )
 
 func TestRetainBudget(t *testing.T) {
+	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	old := f.Now.Add(-40 * 24 * time.Hour).Format(event.TimeLayout)
-	for i := range 300 {
-		sqlitetest.Exec(t, f.DB, `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('session', ?, 'session_idle', ?, ?)`,
-			fmt.Sprint("term_old", i%30), fmt.Sprintf("term_old%d:%d", i%30, i), old)
-		sqlitetest.Exec(t, f.DB, `INSERT INTO turn_stops (session, prompt_id, at) VALUES (?, ?, ?)`, fmt.Sprint("term_old", i%30), fmt.Sprint("p", i), old)
+	if _, err := f.DB.Write(context.Background(), func(tx *sqlite.Tx) error {
+		for i := range 300 {
+			if _, err := tx.ExecContext(context.Background(), `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('session', ?, 'session_idle', ?, ?)`,
+				fmt.Sprint("term_old", i%30), fmt.Sprintf("term_old%d:%d", i%30, i), old); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(context.Background(), `INSERT INTO turn_stops (session, prompt_id, at) VALUES (?, ?, ?)`,
+				fmt.Sprint("term_old", i%30), fmt.Sprint("p", i), old); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	ctx, sc := metertest.Start(t, context.Background())
 	got, err := f.DB.Retain(ctx, f.Now, sqlite.DefaultRetention)

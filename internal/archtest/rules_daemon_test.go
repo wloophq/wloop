@@ -46,6 +46,7 @@ func portMethods(pkg *types.Package) map[string]int {
 }
 
 func TestDaemonImports(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -73,6 +74,7 @@ func TestDaemonImports(t *testing.T) {
 }
 
 func TestR8FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	ok := []string{"context", "net/http", module + "internal/api", module + "internal/core/port", module + "internal/domain/inventory",
 		module + "internal/domain/github", module + "internal/readmodel/prrow", module + "internal/workspace", module + "internal/brief"}
 	flagged(t, "allowed", ruleR8("internal/daemon", ok), 0, "")
@@ -141,6 +143,7 @@ func ruleR10Literals(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 func TestOnlyGitHubReachesGitHub(t *testing.T) {
+	t.Parallel()
 	seen := false
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
@@ -163,6 +166,7 @@ func TestOnlyGitHubReachesGitHub(t *testing.T) {
 }
 
 func TestR10FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	imports := []string{"net/http", module + "internal/github", module + "internal/ghcli"}
 	for _, self := range []string{"internal/github", "internal/github/githubtest", "internal/cli", "internal/ghcli"} {
 		flagged(t, self, ruleR10Imports(self, imports), 0, "")

@@ -50,6 +50,7 @@ func rowsPage(t *testing.T, s *Server, query string) (api.RowsPage, int) {
 func sinceOf(p api.RowsPage) string { return api.Since{Epoch: p.Epoch, Rev: p.Rev}.String() }
 
 func TestRowsSinceReturnsOnlyChanged(t *testing.T) {
+	t.Parallel()
 	s, f := liveServer(t)
 	full, fullBytes := rowsPage(t, s, "")
 	if !full.Full || len(full.Rows) < 100 {
@@ -76,6 +77,7 @@ func TestRowsSinceReturnsOnlyChanged(t *testing.T) {
 }
 
 func TestRowsSinceCarriesAChangedRow(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	before, _ := rowsPage(t, s, "")
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -89,6 +91,7 @@ func TestRowsSinceCarriesAChangedRow(t *testing.T) {
 }
 
 func TestRowsSinceZeroIsFull(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for _, q := range []string{"", "?since=", "?since=0"} {
 		p, _ := rowsPage(t, s, q)
@@ -108,6 +111,7 @@ func TestRowsSinceZeroIsFull(t *testing.T) {
 }
 
 func TestRowsSinceFromAnotherEpochIsFull(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	full, _ := rowsPage(t, s, "")
 	other := api.Since{Epoch: "another" + full.Epoch, Rev: full.Rev}
@@ -118,6 +122,7 @@ func TestRowsSinceFromAnotherEpochIsFull(t *testing.T) {
 }
 
 func TestRowsSinceAheadOfRevIsFull(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	full, _ := rowsPage(t, s, "")
 	ahead := api.Since{Epoch: full.Epoch, Rev: full.Rev + 5}
@@ -128,6 +133,7 @@ func TestRowsSinceAheadOfRevIsFull(t *testing.T) {
 }
 
 func TestZeroOverrideOmitted(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	raw := func() map[string]json.RawMessage {
@@ -167,6 +173,7 @@ func TestZeroOverrideOmitted(t *testing.T) {
 }
 
 func TestViewAllBytesAtLiveSize(t *testing.T) {
+	t.Parallel()
 	s, _ := liveServer(t)
 	p, n := rowsPage(t, s, "")
 	if len(p.Rows) < 100 {
@@ -219,6 +226,7 @@ func threadsFrom(from, to int) []unit.Unit {
 }
 
 func TestRowsSincePastTombstonesIsFull(t *testing.T) {
+	t.Parallel()
 	log := change.NewLog(change.DefaultWindow, nil)
 	p := &listedUnits{}
 	p.set(threadsFrom(0, 1100))

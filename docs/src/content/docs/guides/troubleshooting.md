@@ -43,7 +43,20 @@ launchctl kickstart gui/$(id -u)/io.github.{{org}}.{{name}}   # macOS, after app
 {{command}} serve                                               # or in a terminal
 ```
 
-The menu bar shows `PR ?` until the daemon answers. If the LaunchAgent is missing or runs another command, `{{command}} app install` rewrites it.
+The menu bar shows `PR ?` until the daemon answers. When the store is the reason, `doctor` says so under the daemon error. If the LaunchAgent is missing or runs another command, `{{command}} app install` rewrites it.
+
+## The store needs attention
+
+The menu bar shows `PR !` and the daemon serves only its health when it cannot open the store. `doctor`, the cockpit and the menu bar say why and name the command:
+
+| State | Why | Fix |
+|---|---|---|
+| migration failed | a migration failed; the store stays at the version it reached and a backup holds the one before | `{{command}} store migrate` retries with each step shown; a store that fails SQLite's integrity check names `{{command}} store restore` |
+| needs a migration | a build that is not a release found an older store | `{{command}} store migrate` |
+| written by a newer release | the store is at a schema version this release does not read | `brew upgrade {{name}}`, or `{{command}} store restore` |
+| a store command is running | `store migrate` or `store restore` holds the store | wait for it to finish |
+
+The daemon checks again every five seconds, so it starts once the store fits; no restart is needed. See [Upgrade](/guides/upgrade/) for the backups and the way back.
 
 ## A round is blocked on an untrusted folder
 

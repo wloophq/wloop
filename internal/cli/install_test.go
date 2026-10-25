@@ -24,6 +24,7 @@ import (
 )
 
 func TestInstalledIntervalReadsTheConfig(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Sweep.Fast = config.Days(5 * time.Minute)
 	if _, ok := te.installedInterval(); ok {

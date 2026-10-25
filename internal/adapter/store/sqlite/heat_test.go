@@ -55,6 +55,7 @@ func ledgerAt(t *testing.T, db *DB, clock *heatClock, at time.Time, ops ...items
 }
 
 func TestHeatFromTheLedger(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	clock := &heatClock{}
 	active, warm, cooled, none := heatUnit(1), heatUnit(2), heatUnit(3), heatUnit(4)
@@ -86,6 +87,7 @@ func TestHeatFromTheLedger(t *testing.T) {
 }
 
 func TestHeatFollowsItemChanges(t *testing.T) {
+	t.Parallel()
 	db, log := openLogged(t, filepath.Join(t.TempDir(), "heat.db"))
 	clock := &heatClock{}
 	cold := heatUnit(1)
@@ -106,6 +108,7 @@ func TestHeatFollowsItemChanges(t *testing.T) {
 }
 
 func TestHeatIsOneQuery(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	clock := &heatClock{}
 	units := make([]unit.Unit, 500)

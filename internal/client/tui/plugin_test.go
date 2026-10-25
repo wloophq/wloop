@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/client/rowset"
@@ -138,11 +139,13 @@ func TestAPluginViewTheDaemonDoesNotListIsAbsent(t *testing.T) {
 }
 
 func TestRunShowsAnEnabledPluginsView(t *testing.T) {
-	registerBoard(t)
-	d := &fakeDaemon{rows: oneRow(), plugins: boardPlugins(true)}
-	term, done := start(t, d)
-	eventually(t, "the plugin tab", func() bool { return strings.Contains(term.screen(), "Board") })
-	term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
-	eventually(t, "the plugin view", func() bool { return strings.Contains(term.screen(), "fake board: 1 rows") })
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		registerBoard(t)
+		d := &fakeDaemon{rows: oneRow(), plugins: boardPlugins(true)}
+		term, done := start(t, d)
+		eventually(t, "the plugin tab", func() bool { return strings.Contains(term.screen(), "Board") })
+		term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+		eventually(t, "the plugin view", func() bool { return strings.Contains(term.screen(), "fake board: 1 rows") })
+		quit(t, term, done)
+	})
 }

@@ -32,6 +32,7 @@ func linkWorkspaces(t *testing.T, st *inventory.Store, refs ...github.Ref) {
 }
 
 func TestDoneViewListsFinishedPullRequestsWithAWorkspace(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
 	f.open(30, "fer", at, merged)
@@ -49,6 +50,7 @@ func TestDoneViewListsFinishedPullRequestsWithAWorkspace(t *testing.T) {
 }
 
 func TestRemoveActionRecordsTheEventAndUnlinks(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	actions := &fakeActions{}
 	s.deps.Actions = actions
@@ -68,6 +70,7 @@ func TestRemoveActionRecordsTheEventAndUnlinks(t *testing.T) {
 }
 
 func TestARefusedRemoveIs409WithTheReason(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	s.deps.Actions = &fakeActions{refuse: map[github.Ref]string{r8: "2 uncommitted files"}}
@@ -82,6 +85,7 @@ func TestARefusedRemoveIs409WithTheReason(t *testing.T) {
 }
 
 func TestRemoveDoneRemovesTheCleanOnesAndSaysWhyItKeptTheRest(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
 	f.open(30, "fer", at, merged)
@@ -126,6 +130,7 @@ func removedEvents(t *testing.T, s *Server, ref github.Ref) int {
 }
 
 func TestARefusalCarriesTheToolsOwnMessage(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var logged strings.Builder
 	s.deps.Log = func(format string, args ...any) { fmt.Fprintf(&logged, format+"\n", args...) }
@@ -151,6 +156,7 @@ func TestARefusalCarriesTheToolsOwnMessage(t *testing.T) {
 }
 
 func TestForceReachesTheActionAndForceableTheCaller(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	actions := &fakeActions{broken: map[github.Ref]error{r8: Refusal{Reason: "its terminals could not be stopped", Detail: "PTY", Forceable: true}}}
@@ -178,6 +184,7 @@ func TestForceReachesTheActionAndForceableTheCaller(t *testing.T) {
 }
 
 func TestApprovedViewHoldsOpenPullRequestsThatWaitOnNothingOfMine(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	at := fixtureNow.Add(-time.Hour)
 	review := func(n int, by, state string) dinv.Event {
@@ -205,6 +212,7 @@ func TestApprovedViewHoldsOpenPullRequestsThatWaitOnNothingOfMine(t *testing.T) 
 }
 
 func TestForcedRemoveWithoutAStoredLinkLetsTheActionFindTheWorkspace(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(30, "fer", fixtureNow.Add(-time.Hour), merged)
 	actions := &fakeActions{}
@@ -221,6 +229,7 @@ func TestForcedRemoveWithoutAStoredLinkLetsTheActionFindTheWorkspace(t *testing.
 }
 
 func TestRemoveStillRefusesTheMainCheckout(t *testing.T) {
+	t.Parallel()
 	f := newFixture(t)
 	f.open(30, "fer", fixtureNow.Add(-time.Hour), merged)
 	if err := f.st.ReplaceWorkspaces(context.Background(), map[github.Ref]dinv.Workspace{ref(30): {ID: "main", DisplayName: "api", IsMain: true}}); err != nil {

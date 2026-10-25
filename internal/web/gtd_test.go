@@ -49,9 +49,9 @@ func gtdScripts(t *testing.T) string {
 	return staticJS(t, "routes.js") + staticJS(t, "gtd.js") + staticJS(t, "detail.js")
 }
 
-// gtdPrelude is routes.js, gtd.js and detail.js over a tree h.
+// gtdPrelude is plugins.js, routes.js, gtd.js and detail.js over a tree h.
 func gtdPrelude(t *testing.T) string {
-	return treeJS + gtdScripts(t)
+	return treeJS + pluginsJS(t) + gtdScripts(t)
 }
 
 func entry(id, state string, mod func(*api.EntryView)) api.EntryView {
@@ -340,5 +340,14 @@ const buttons = cards.map(buttonLabels);
 	}
 	if !slices.Equal(posts, want) {
 		t.Errorf("posts %v, want %v", posts, want)
+	}
+}
+
+func TestUnitLabelFallsBackToTheUnitForEveryProvider(t *testing.T) {
+	var got []string
+	nodeRun(t, gtdPrelude(t), nil, `process.stdout.write(JSON.stringify([
+  unitLabel({ provider: "github", key: "acme/api#7" }), unitLabel({ provider: "linear", key: "PAY-88" }), unitLabel(null)]));`, nil, &got)
+	if want := []string{"github:acme/api#7", "linear:PAY-88", ""}; !slices.Equal(got, want) {
+		t.Fatalf("labels %q, want %q", got, want)
 	}
 }

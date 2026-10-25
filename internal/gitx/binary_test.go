@@ -2,7 +2,6 @@ package gitx
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -25,11 +24,13 @@ func TestBinarySkipsTheXcrunShim(t *testing.T) {
 		t.Skip("the xcrun shim is macOS's")
 	}
 	t.Setenv("PATH", "/usr/bin:/bin")
-	got := Binary()
-	if got == "git" || got == xcrunShim {
-		t.Fatalf("Binary() = %q; want the git xcrun resolves", got)
-	}
-	if out, err := exec.Command(got, "--version").Output(); err != nil || len(out) == 0 {
-		t.Fatalf("%s --version: %v", got, err)
+	for resolved, want := range map[string]string{"/opt/dev/usr/bin/git": "/opt/dev/usr/bin/git", "": "git"} {
+		saved := developerGit
+		developerGit = func() string { return resolved }
+		got := Binary()
+		developerGit = saved
+		if got != want {
+			t.Errorf("xcrun resolving %q: Binary() = %q, want %q", resolved, got, want)
+		}
 	}
 }

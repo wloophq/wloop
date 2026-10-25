@@ -26,6 +26,7 @@ var _ = claude.Kind{}
 `
 
 func TestR1FlagsACliFileImportingClaude(t *testing.T) {
+	t.Parallel()
 	_, f := parse(t, importsClaude)
 	for _, file := range []string{"internal/cli/round.go", "internal/cli/cli.go", "internal/cli/serve.go"} {
 		if got := ruleR1(file, f); len(got) != 1 || !strings.Contains(got[0], "only the composition root picks providers") {
@@ -71,6 +72,7 @@ import "github.com/wloophq/wloop/internal/adapter/store/sqlite"
 }
 
 func TestR2FlagsCLAUDEInALiteral(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package cli
 const a = "CLAUDE_CONFIG_DIR"
 const b = "run Claude Code"
@@ -89,6 +91,7 @@ const g = "ORCA_TERMINAL_HANDLE"
 }
 
 func TestR2IgnoresImportPaths(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, importsClaude)
 	if got := ruleR2(fset, "internal/cli/cli.go", f, nil, map[int]bool{}); len(got) != 0 {
 		t.Fatalf("flagged an import path: %q", got)
@@ -96,6 +99,7 @@ func TestR2IgnoresImportPaths(t *testing.T) {
 }
 
 func TestR2StaleAllowlistFails(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package cli
 var kinds = map[string]int{"claude": 1}
 `)
@@ -113,6 +117,7 @@ var kinds = map[string]int{"claude": 1}
 }
 
 func TestR3FlagsParseOutsideAdapters(t *testing.T) {
+	t.Parallel()
 	_, f := parse(t, `package cli
 import dturn "github.com/wloophq/wloop/internal/domain/turn"
 var s = dturn.ParseAgentState("done")
@@ -128,6 +133,7 @@ var s = dturn.ParseAgentState("done")
 }
 
 func TestSpawnRuleFlagsAPlantedPackage(t *testing.T) {
+	t.Parallel()
 	_, f := parse(t, `package planted
 import "os/exec"
 func run() { _ = exec.CommandContext(nil, "x") }

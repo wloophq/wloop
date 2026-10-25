@@ -18,7 +18,7 @@ type PlanItem struct {
 	Error    string    `json:"error,omitempty"`
 	Unit     unit.Unit `json:"unit"`
 	// Label, Title and Link present the unit as its row does; with no row, Label is the unit's own.
-	Label    string        `json:"label,omitempty"`
+	Label    string        `json:"label"`
 	Title    string        `json:"title,omitempty"`
 	Link     string        `json:"link,omitempty"`
 	Steps    []string      `json:"steps"`
