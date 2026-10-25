@@ -2471,11 +2471,11 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 494682c5ae59
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 494682c5ae59 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 89ba33e9cef4
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 89ba33e9cef4 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 494682c5ae59 for address in acme/api.
+Instructions 89ba33e9cef4 for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
@@ -2596,15 +2596,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -2671,7 +2675,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -2744,7 +2748,7 @@ approval that already covers the current head stands.
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue), the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 
@@ -2806,11 +2810,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: 952e518ac440
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 952e518ac440 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 239fa3f464bd
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 239fa3f464bd https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 952e518ac440 for address in acme/api.
+Instructions 239fa3f464bd for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
@@ -2929,15 +2933,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -3004,7 +3012,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -3077,7 +3085,7 @@ approval that already covers the current head stands.
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue), the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 
@@ -3152,11 +3160,11 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: cf57dfa93232
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn cf57dfa93232 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 8b39f44bad29
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 8b39f44bad29 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions cf57dfa93232 for address in acme/api.
+Instructions 8b39f44bad29 for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
@@ -3271,15 +3279,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -3346,7 +3358,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -3419,7 +3431,7 @@ approval that already covers the current head stands.
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue), the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 
@@ -3969,11 +3981,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: 2519058d5d4f
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 2519058d5d4f https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4f7bfe9bf132
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 4f7bfe9bf132 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 2519058d5d4f for address in acme/api.
+Instructions 4f7bfe9bf132 for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
@@ -4103,15 +4115,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -4178,7 +4194,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -4251,7 +4267,7 @@ approval that already covers the current head stands.
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue), the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 
