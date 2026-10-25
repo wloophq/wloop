@@ -29,6 +29,7 @@ type Program struct {
 	prg   cel.Program
 	env   Env
 	reads []string
+	marks bool // the predicate calls handled()
 }
 
 type Error struct {

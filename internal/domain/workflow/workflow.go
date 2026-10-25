@@ -67,6 +67,13 @@ type Predicate interface {
 	Reads() []string
 }
 
+// ReadsMarks says whether p reads the unit's marks, so a caller loads them
+// only then; a predicate says so through a ReadsMarks() bool method.
+func ReadsMarks(p Predicate) bool {
+	r, ok := p.(interface{ ReadsMarks() bool })
+	return ok && r.ReadsMarks()
+}
+
 // All is a predicate that matches when every one of ps does; a nil one
 // matches.
 func All(ps ...Predicate) Predicate { return all(ps) }
@@ -84,6 +91,8 @@ func (a all) Match(v Vars) (bool, error) {
 	}
 	return true, nil
 }
+
+func (a all) ReadsMarks() bool { return slices.ContainsFunc(a, ReadsMarks) }
 
 func (a all) Reads() []string {
 	var out []string

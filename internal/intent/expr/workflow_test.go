@@ -204,3 +204,20 @@ func TestHandledComparesAFactWithTheUnitsMark(t *testing.T) {
 		t.Error("handled outside a workflow")
 	}
 }
+
+func TestAPredicateSaysWhetherItReadsMarks(t *testing.T) {
+	env := Env{"pr.head": String}
+	for src, want := range map[string]bool{`handled("w/head", pr.head)`: true, `pr.head == "x"`: false} {
+		p, err := CompileWorkflow(src, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := workflow.ReadsMarks(p); got != want {
+			t.Errorf("%s reads marks: %v", src, got)
+		}
+	}
+	both, _ := CompileWorkflow(`handled("w/head", pr.head)`, env)
+	if !workflow.ReadsMarks(workflow.All(nil, both)) {
+		t.Error("All hides that a part reads marks")
+	}
+}

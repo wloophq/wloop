@@ -124,6 +124,8 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 
 func (w predicate) Reads() []string { return w.p.reads }
 
+func (w predicate) ReadsMarks() bool { return w.p.marks }
+
 func (w predicate) Match(v workflow.Vars) (bool, error) {
 	return w.p.run(activation{env: w.p.env, marks: v.Marks, get: func(name string) any {
 		if name == nowVar {

@@ -36,6 +36,14 @@ func handledOptions() []cel.EnvOption {
 	}
 }
 
+func callsHandled(a *celast.AST) bool {
+	found := false
+	celast.PostOrderVisit(a.Expr(), celast.NewExprVisitor(func(e celast.Expr) {
+		found = found || (e.Kind() == celast.CallKind && e.AsCall().FunctionName() == handledFn)
+	}))
+	return found
+}
+
 func handled(args ...ref.Val) ref.Val {
 	m, ok := args[0].(traits.Mapper)
 	if !ok {

@@ -8,6 +8,11 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
+// readsMarks says whether w's predicates read the unit's marks.
+func readsMarks(w workflow.Workflow) bool {
+	return workflow.ReadsMarks(w.When) || workflow.ReadsMarks(w.Approval.WaitWhen)
+}
+
 // unitMarks are u's marks; none without a Marks port.
 func (e *Engine) unitMarks(ctx context.Context, u unit.Unit) (map[string]string, error) {
 	if e.Marks == nil {

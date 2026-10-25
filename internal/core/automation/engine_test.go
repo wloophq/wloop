@@ -1595,12 +1595,12 @@ func TestAnItemDeferredByHandBeforeTheLockIsNotStartedAgain(t *testing.T) {
 
 // unhandled matches while the unit's head is not the workflow's head mark.
 func unhandled(name string) workflow.Predicate {
-	return automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Marks[name+"/head"] != v.Facts["session.head"] }, "session.head")
+	return marksReading{automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Marks[name+"/head"] != v.Facts["session.head"] }, "session.head")}
 }
 
 func TestARunRecordsItsMarksAndTheNextEvaluationReadsThem(t *testing.T) {
 	w := sweepWF("once", unhandled("once"), "session.close")
-	w.Key, w.Marks = []string{"session.head"}, map[string]string{"head": "session.head"}
+	w.Marks = map[string]string{"head": "session.head"}
 	r := newRig(t, w)
 	r.e.Marks = r.ledger
 	r.put(s1, "a", "session.head", "h1")
@@ -1608,10 +1608,11 @@ func TestARunRecordsItsMarksAndTheNextEvaluationReadsThem(t *testing.T) {
 	if got := r.ledger.MarksOf(s1); got["once/head"] != "h1" {
 		t.Fatalf("marks after the run: %v", got)
 	}
+	r.put(s1, "b", "session.head", "h1")
 	if p := r.evaluate(); len(p.Items) != 0 {
-		t.Fatalf("a handled head planned %+v", p.Items)
+		t.Fatalf("a handled head planned under a new key: %+v", p.Items)
 	}
-	r.put(s1, "a", "session.head", "h2")
+	r.put(s1, "b", "session.head", "h2")
 	r.sweep()
 	if got := r.ran("session.close"); len(got) != 2 {
 		t.Fatalf("ran %v, want a run per head", got)
@@ -1634,5 +1635,24 @@ func TestADismissRecordsTheItemsMarks(t *testing.T) {
 	}
 	if got := r.ledger.MarksOf(s1); got["once/head"] != "h1" {
 		t.Fatalf("marks after the dismiss: %v", got)
+	}
+}
+
+type marksReading struct{ workflow.Predicate }
+
+func (marksReading) ReadsMarks() bool { return true }
+
+func TestOnlyAWorkflowThatReadsMarksLoadsThem(t *testing.T) {
+	r := newRig(t, sweepWF("close", idle, "session.close"))
+	r.e.Marks = r.ledger
+	r.put(s1, "a")
+	r.evaluate()
+	if slices.ContainsFunc(r.trace, func(c string) bool { return strings.HasSuffix(c, "ledger.marks") }) {
+		t.Fatalf("a workflow without handled() read marks: %v", r.trace)
+	}
+	r.wfs = []workflow.Workflow{sweepWF("close", marksReading{idle}, "session.close")}
+	r.evaluate()
+	if !slices.ContainsFunc(r.trace, func(c string) bool { return strings.HasSuffix(c, "ledger.marks") }) {
+		t.Fatalf("a workflow with handled() read no marks: %v", r.trace)
 	}
 }
