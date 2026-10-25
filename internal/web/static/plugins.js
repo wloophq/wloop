@@ -11,14 +11,18 @@ const THEME_TOKENS = ["bg", "panel", "ink", "muted", "rule", "hover", "sel", "me
 const pluginViews = new Map();
 // providerNames maps a provider to its service as a person reads it, "GitHub" or "Slack".
 const providerNames = new Map();
+// reactingProviders are the enabled plugins whose publisher posts reactions.
+const reactingProviders = new Set();
 const pluginSubscribers = new Set();
 const pluginKeys = new Map();
 const pluginMount = { view: "", el: null, mod: null, cancel: null, seq: 0, rows: null };
 
 function applyPlugins(list) {
   pluginViews.clear();
+  reactingProviders.clear();
   for (const p of list || []) {
     if (p.name) providerNames.set(p.id, p.name);
+    if (p.enabled && p.reacts) reactingProviders.add(p.id);
     const web = p.enabled && p.ui && p.ui.web;
     if (!web || !web.module) continue;
     for (const id of web.views || []) pluginViews.set(id, { plugin: p.id, module: web.module });
@@ -27,6 +31,10 @@ function applyPlugins(list) {
 
 function providerName(id) {
   return providerNames.get(id) || id;
+}
+
+function providerReacts(id) {
+  return reactingProviders.has(id);
 }
 
 function pluginModuleURL(plugin, module) {

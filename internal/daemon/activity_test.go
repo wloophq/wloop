@@ -70,6 +70,11 @@ func TestActivityListsEventsWithTheirPullRequest(t *testing.T) {
 	if first.Mine {
 		t.Fatal("ana's pull request marked mine")
 	}
+	for _, it := range items {
+		if it.Event.Unit != it.Event.PR.Unit() {
+			t.Fatalf("event of %s names unit %+v", it.Event.PR, it.Event.Unit)
+		}
+	}
 }
 
 func TestActivityLimitIsChecked(t *testing.T) {

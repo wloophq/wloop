@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -163,27 +164,29 @@ func TestReviewKeysTUI(t *testing.T) {
 }
 
 func TestReviewThroughTheDaemon(t *testing.T) {
-	rv := reviewFixture()
-	d := &fakeDaemon{rows: oneRow(), gtd: ptr(reviewCatalog()), entries: reviewEntries(), counters: gtdCounters(), review: &rv}
-	term, done := start(t, d)
-	eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
-	term.press(Key{Rune: 'g'}, Key{Rune: 'r'})
-	eventually(t, "the Inbox step", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "Inbox to zero (2)") && strings.Contains(s, "Buy cables")
+	synctest.Test(t, func(t *testing.T) {
+		rv := reviewFixture()
+		d := &fakeDaemon{rows: oneRow(), gtd: ptr(reviewCatalog()), entries: reviewEntries(), counters: gtdCounters(), review: &rv}
+		term, done := start(t, d)
+		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
+		term.press(Key{Rune: 'g'}, Key{Rune: 'r'})
+		eventually(t, "the Inbox step", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Inbox to zero (2)") && strings.Contains(s, "Buy cables")
+		})
+		term.press(Key{Name: KeyEnter})
+		eventually(t, "the step done and the Waiting step", func() bool {
+			s := term.screen()
+			return slices.Equal(d.doneSteps(), []string{"inbox"}) && strings.Contains(s, "Waiting: nudge? (4)") && strings.Contains(s, "Contract signature")
+		})
+		term.press(Key{Name: KeyEnter}, Key{Name: KeyEnter})
+		eventually(t, "the review done", func() bool {
+			steps := d.doneSteps()
+			slices.Sort(steps)
+			return slices.Equal(steps, []string{"inbox", "projects", "waiting"}) && strings.Contains(term.screen(), "Review done.")
+		})
+		quit(t, term, done)
 	})
-	term.press(Key{Name: KeyEnter})
-	eventually(t, "the step done and the Waiting step", func() bool {
-		s := term.screen()
-		return slices.Equal(d.doneSteps(), []string{"inbox"}) && strings.Contains(s, "Waiting: nudge? (4)") && strings.Contains(s, "Contract signature")
-	})
-	term.press(Key{Name: KeyEnter}, Key{Name: KeyEnter})
-	eventually(t, "the review done", func() bool {
-		steps := d.doneSteps()
-		slices.Sort(steps)
-		return slices.Equal(steps, []string{"inbox", "projects", "waiting"}) && strings.Contains(term.screen(), "Review done.")
-	})
-	quit(t, term, done)
 }
 
 func TestProjectsShowTheirReview(t *testing.T) {

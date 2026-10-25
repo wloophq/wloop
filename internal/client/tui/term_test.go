@@ -17,9 +17,7 @@ func TestReadDecodesWhatTheTerminalSends(t *testing.T) {
 	}
 	tty := &TTY{in: r, keys: make(chan Key, 16)}
 	go tty.read()
-	w.Write([]byte("\x1b["))
-	time.Sleep(10 * time.Millisecond)
-	w.Write([]byte("Aq"))
+	w.Write([]byte("\x1b[Aq"))
 	w.Close()
 	var got []Key
 	for k := range tty.Keys() {

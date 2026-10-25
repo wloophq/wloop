@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -303,45 +304,47 @@ func (b *byHandCalls) list() []string {
 }
 
 func TestTurnByHandWaitsUpToSessionWait(t *testing.T) {
-	briefs := intaketest.NewBriefs(waitBriefing)
-	hand := &byHandCalls{}
-	s, _ := newIntakeServer(t, briefs, func(d *Deps) {
-		d.TurnByHand = hand.run
-		d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r7.Unit(), nil }
+	synctest.Test(t, func(t *testing.T) {
+		briefs := intaketest.NewBriefs(waitBriefing)
+		hand := &byHandCalls{}
+		s, _ := newIntakeServer(t, briefs, func(d *Deps) {
+			d.TurnByHand = hand.run
+			d.ByHandRef = func(context.Context, api.ByHandRequest, string) (unit.Unit, error) { return r7.Unit(), nil }
+		})
+		s.sessionWait = 100 * time.Millisecond
+		byHand := func() *httptest.ResponseRecorder {
+			rec := httptest.NewRecorder()
+			req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"review","cwd":"/w"}`))
+			req.Header.Set(api.SessionHeader, "term-1")
+			s.Handler().ServeHTTP(rec, req)
+			return rec
+		}
+		start := time.Now()
+		rec := byHand()
+		if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the brief of acme/api#7 is not ready yet (briefing, attempt 1); run this command again in a minute") {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		if took := time.Since(start); took != 100*time.Millisecond {
+			t.Fatalf("answered after %v", took)
+		}
+		if len(hand.list()) != 0 {
+			t.Fatalf("started without its brief: %v", hand.list())
+		}
+		briefs.Answer(intake.Readiness{Go: true})
+		s.sessionWait = brief.SessionWait
+		rec = byHand()
+		var res api.ByHandResult
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Text != "the instructions" {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+		if !slices.Equal(hand.list(), []string{"review term-1"}) {
+			t.Fatalf("calls %v", hand.list())
+		}
+		open, _ := s.deps.Intakes.Open(context.Background())
+		if len(open) != 0 {
+			t.Fatalf("open intakes %+v", open)
+		}
 	})
-	s.sessionWait = 100 * time.Millisecond
-	byHand := func() *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		req := apiRequest("POST", api.AgentTurnsByHand, strings.NewReader(`{"intent":"review","cwd":"/w"}`))
-		req.Header.Set(api.SessionHeader, "term-1")
-		s.Handler().ServeHTTP(rec, req)
-		return rec
-	}
-	start := time.Now()
-	rec := byHand()
-	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "the brief of acme/api#7 is not ready yet (briefing, attempt 1); run this command again in a minute") {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if took := time.Since(start); took < 100*time.Millisecond || took > brief.SessionWait/3 {
-		t.Fatalf("answered after %v", took)
-	}
-	if len(hand.list()) != 0 {
-		t.Fatalf("started without its brief: %v", hand.list())
-	}
-	briefs.Answer(intake.Readiness{Go: true})
-	s.sessionWait = brief.SessionWait
-	rec = byHand()
-	var res api.ByHandResult
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Text != "the instructions" {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if !slices.Equal(hand.list(), []string{"review term-1"}) {
-		t.Fatalf("calls %v", hand.list())
-	}
-	open, _ := s.deps.Intakes.Open(context.Background())
-	if len(open) != 0 {
-		t.Fatalf("open intakes %+v", open)
-	}
 }
 
 type openBreaker struct{ stubBriefs }

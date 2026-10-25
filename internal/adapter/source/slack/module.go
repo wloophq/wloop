@@ -92,6 +92,7 @@ func (p *plugin) module() sourcereg.Module {
 		Untrack: p.untrack,
 
 		Publisher: p.publisher(),
+		Reacts:    true,
 	}
 	if p.cfg.Configured() {
 		m.Identity = p.identity

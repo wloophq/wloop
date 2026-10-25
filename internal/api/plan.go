@@ -16,6 +16,7 @@ type PlanItem struct {
 	Mode     string        `json:"mode"`
 	Error    string        `json:"error,omitempty"`
 	Unit     unit.Unit     `json:"unit"`
+	Label    string        `json:"label"` // Unit as a person reads it
 	Steps    []string      `json:"steps"`
 	Deadline time.Time     `json:"deadline,omitzero"`
 	Gain     Gain          `json:"gain"`
