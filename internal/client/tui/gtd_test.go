@@ -233,7 +233,9 @@ func TestOutboxInTUI(t *testing.T) {
 	}
 	term.press(Key{Rune: 'y'})
 	eventually(t, "the approval", func() bool { return len(d.dos()) == 1 })
-	term.press(Key{Name: KeyBackspace}, Key{Rune: 'y'})
+	term.press(Key{Name: KeyBackspace})
+	eventually(t, "the discard confirm", func() bool { return strings.Contains(term.screen(), "y confirms") })
+	term.press(Key{Rune: 'y'})
 	eventually(t, "the discard", func() bool { return len(d.dos()) == 2 })
 	text := map[string]string{"text": "Ship it tonight.\nRollback plan in the doc.", "rev": "4"}
 	want := []entryDo{{"draft:11", "approve", "tui", text}, {"draft:11", "dismiss", "tui", nil}}
