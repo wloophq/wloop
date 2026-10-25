@@ -35,6 +35,7 @@ func bookOfFive(t *testing.T, s *Store) turn.Book {
 }
 
 func TestSaveOneTurnChange(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	b := bookOfFive(t, s)
 	b.Turns[2].State = turn.Started
@@ -60,6 +61,7 @@ func TestSaveOneTurnChange(t *testing.T) {
 }
 
 func TestSaveReturnsAssignedIDs(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	b := bookOfFive(t, s)
 	newTurn := turn.Turn{ID: "r5", State: turn.Sent, SentAt: noteAt}
@@ -84,6 +86,7 @@ func TestSaveReturnsAssignedIDs(t *testing.T) {
 }
 
 func TestSaveNoChangeEmitsNoChange(t *testing.T) {
+	t.Parallel()
 	e, log := openNoted(t)
 	s := New(e.db)
 	b := bookOfFive(t, s)
@@ -104,6 +107,7 @@ func TestSaveNoChangeEmitsNoChange(t *testing.T) {
 }
 
 func TestSaveRekeyedRecordFreesItsOldKey(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	b := bookOfFive(t, s)
 	seq := b.Turns[0].Seq

@@ -101,6 +101,7 @@ func init() {
 }
 
 func TestSlackTimesSortAsText(t *testing.T) {
+	t.Parallel()
 	a := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 	b := a.Add(500 * time.Millisecond)
 	c := a.Add(time.Second)
@@ -110,6 +111,7 @@ func TestSlackTimesSortAsText(t *testing.T) {
 }
 
 func TestCompareSlackTS(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		a, b string
 		want int
@@ -126,6 +128,7 @@ func TestCompareSlackTS(t *testing.T) {
 }
 
 func TestPutConversationsKeepsAKnownName(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	s := db.Slack()

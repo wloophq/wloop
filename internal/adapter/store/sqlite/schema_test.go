@@ -9,6 +9,7 @@ import (
 )
 
 func TestFreshStoreIsVersion1(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	var v int
 	if err := db.R().QueryRowContext(context.Background(), `PRAGMA user_version`).Scan(&v); err != nil || v != 1 || SchemaVersion != 1 {
@@ -20,6 +21,7 @@ func TestFreshStoreIsVersion1(t *testing.T) {
 }
 
 func TestOtherVersionsAreRefused(t *testing.T) {
+	t.Parallel()
 	for _, v := range []int{0, 2, 8} {
 		db, path := openTemp(t)
 		if _, err := execW(db, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
@@ -42,6 +44,7 @@ func TestOtherVersionsAreRefused(t *testing.T) {
 }
 
 func TestANewerStoreThatDeclaresThisVersionCompatibleOpens(t *testing.T) {
+	t.Parallel()
 	db, path := openTemp(t)
 	if _, err := execW(db, `PRAGMA user_version = 5`); err != nil {
 		t.Fatal(err)
@@ -56,6 +59,7 @@ func TestANewerStoreThatDeclaresThisVersionCompatibleOpens(t *testing.T) {
 }
 
 func TestIntakesOpenIndexIsUnique(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	insert := func(state string) error {
 		_, err := execW(db, `INSERT INTO intakes (provider, unit_key, intent, source, request, state, accepted_at) VALUES ('github', 'acme/api#7', 'review', 'cli', '{}', ?, '2026-10-18T12:00:00.000000000Z')`, state)

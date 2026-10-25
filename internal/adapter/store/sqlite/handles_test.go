@@ -37,6 +37,7 @@ func openHandle(t *testing.T, s *Store, id string) turn.Session {
 }
 
 func TestBindHandleOpensAndReplaces(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	if err := s.SaveSession(ctx, turn.Session{ID: "s1", Manager: "orca"}); err != nil {
@@ -82,6 +83,7 @@ func TestBindHandleOpensAndReplaces(t *testing.T) {
 }
 
 func TestSessionOfPrefersTheOpenThenTheNewestHandle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	for _, id := range []string{"old", "new"} {
@@ -112,6 +114,7 @@ func TestSessionOfPrefersTheOpenThenTheNewestHandle(t *testing.T) {
 }
 
 func TestEndHandleMakesTheSessionDormant(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	if err := s.SaveSession(ctx, turn.Session{ID: "s1", Manager: "orca", Handle: "h1"}); err != nil {
@@ -144,6 +147,7 @@ func TestEndHandleMakesTheSessionDormant(t *testing.T) {
 }
 
 func TestSessionOfHandleIsAmbiguousAcrossManagers(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	s := newStore(t)
 	if _, _, ok, err := s.SessionOfHandle(ctx, "h"); ok || err != nil {
@@ -178,6 +182,7 @@ func TestSessionOfHandleIsAmbiguousAcrossManagers(t *testing.T) {
 }
 
 func TestOneOpenHandlePerSession(t *testing.T) {
+	t.Parallel()
 	s := newStore(t)
 	insert := func(handle, from string) error {
 		_, err := s.db.Write(context.Background(), func(tx *Tx) error {

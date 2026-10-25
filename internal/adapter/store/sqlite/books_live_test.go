@@ -14,6 +14,7 @@ import (
 )
 
 func TestBooksAtLiveSizes(t *testing.T) {
+	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	ctx, sc := metertest.Start(t, context.Background())
 	books, err := f.Turns.Books(ctx)
@@ -34,6 +35,7 @@ func TestBooksAtLiveSizes(t *testing.T) {
 }
 
 func TestBooksQueryBudget(t *testing.T) {
+	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	units := f.WithTurns[:20]
 	ctx, sc := metertest.Start(t, context.Background())
@@ -54,6 +56,7 @@ func TestBooksQueryBudget(t *testing.T) {
 }
 
 func TestBooksOfOneUnitEqualTheBookInBooks(t *testing.T) {
+	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	ctx := context.Background()
 	all, err := f.Turns.Books(ctx)

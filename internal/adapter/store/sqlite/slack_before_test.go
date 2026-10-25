@@ -15,6 +15,7 @@ func init() {
 }
 
 func TestMessagesBeforeNewestFirstReturnedAscending(t *testing.T) {
+	t.Parallel()
 	db, err := Open(filepath.Join(t.TempDir(), "s.db"), nil)
 	if err != nil {
 		t.Fatal(err)

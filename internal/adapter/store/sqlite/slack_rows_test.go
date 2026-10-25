@@ -11,6 +11,7 @@ func init() {
 }
 
 func TestRowObjectsAreWatchedOrRecent(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := openExtraction(t)
 	s := db.Slack()

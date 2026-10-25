@@ -351,8 +351,10 @@ func sortedUnits(us []unit.Unit) []unit.Unit {
 }
 
 func TestEveryWriteNotes(t *testing.T) {
+	t.Parallel()
 	for _, c := range writes {
 		t.Run(c.method+c.name, func(t *testing.T) {
+			t.Parallel()
 			e, log := openNoted(t)
 			if c.seed != nil {
 				c.seed(t, e)
@@ -375,6 +377,7 @@ func TestEveryWriteNotes(t *testing.T) {
 }
 
 func TestEveryExportedMethodIsReadOrNoted(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	types := []reflect.Type{reflect.TypeOf(db), reflect.TypeOf(New(db)), reflect.TypeOf(NewRounds(db))}
 	types = append(types, accessorTypes(db)...)
@@ -436,6 +439,7 @@ func accessorTypes(db *DB) []reflect.Type {
 }
 
 func TestUntouchedWriteNotesNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		seed func(t *testing.T, e *noteEnv)
@@ -480,6 +484,7 @@ func TestUntouchedWriteNotesNothing(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			e, log := openNoted(t)
 			if c.seed != nil {
 				c.seed(t, e)
@@ -496,6 +501,7 @@ func TestUntouchedWriteNotesNothing(t *testing.T) {
 }
 
 func TestRollbackNotesNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		seed func(t *testing.T, e *noteEnv)
@@ -532,6 +538,7 @@ func TestRollbackNotesNothing(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			e, log := openNoted(t)
 			if c.seed != nil {
 				c.seed(t, e)
@@ -551,6 +558,7 @@ func TestRollbackNotesNothing(t *testing.T) {
 // runs under the write lock; it panics instead of hanging every write, and
 // the log drops it.
 func TestSubscriberWriteDeadlockDetected(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var logged []string
 	log := change.NewLog(change.DefaultWindow, func(format string, args ...any) {
