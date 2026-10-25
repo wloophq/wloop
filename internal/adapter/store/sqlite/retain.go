@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -153,7 +154,7 @@ const (
 
 // A step that ran on a unit of work lives as long as that unit's events.
 var retainWorkflowEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(workflow.EngineKinds)), ", ") + `) AND at < ?
-	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', 'session', 'workspace'))`
+	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))`
 
 // unitlessTables are the endedTables UnitlessLoopRows deletes from.
 var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items"}

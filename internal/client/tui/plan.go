@@ -179,8 +179,15 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 		return append(lines, "  "+m.t.Red(termfmt.Cut(m.planErr, width-2)))
 	}
 	closed := m.closedLines(width, now)
+	room := body - 2
+	if len(m.plan) > 0 {
+		room = body / 2
+	}
+	if len(closed) > room {
+		closed = append(closed[:max(room-1, 1)], "  "+m.t.Dim(termfmt.Ellipsis))
+	}
 	if len(closed) > 0 {
-		body = max(body-len(closed)-1, min(body, 3))
+		body -= len(closed) + 1
 	}
 	if len(m.plan) == 0 {
 		text := "Nothing pending or blocked in the plan."

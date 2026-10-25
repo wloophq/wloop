@@ -84,12 +84,12 @@ func printPlan(ctx context.Context, e *Env, c *client.Client, q api.PlanQuery, w
 	}
 	if withClosed && q.Trigger != "" {
 		// The daemon serves the closed sessions with the stored plan only.
-		stored, err := c.Plan(ctx, api.PlanQuery{Closed: true})
-		if err != nil {
-			return err
+		if stored, err := c.Plan(ctx, api.PlanQuery{Closed: true}); err != nil {
+			res.Errors = append(res.Errors, "closed sessions: "+err.Error())
+		} else {
+			res.Closed = stored.Closed
+			res.Errors = append(res.Errors, stored.Errors...)
 		}
-		res.Closed = stored.Closed
-		res.Errors = append(res.Errors, stored.Errors...)
 	}
 	writePlan(e.Out, res.Items, e.Now())
 	writeClosed(e.Out, res.Closed, e.Now())
@@ -248,7 +248,7 @@ func writeClosed(w io.Writer, closed []api.ClosedSession, now time.Time) {
 	for _, c := range closed {
 		fmt.Fprintf(w, "  %s  %s ago: %s\n", c.Session, span(now.Sub(c.At)), oneLine(c.Reason))
 		if c.Resume != "" {
-			fmt.Fprintf(w, "  %s  resume: %s\n", strings.Repeat(" ", len(c.Session)), c.Resume)
+			fmt.Fprintf(w, "  %s  resume: %s\n", strings.Repeat(" ", len(c.Session)), oneLine(c.Resume))
 		}
 	}
 }

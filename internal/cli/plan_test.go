@@ -45,6 +45,8 @@ type planDaemon struct {
 	queries []string
 	acts    []api.PlanActRequest
 	closed  []api.ClosedSession
+	// closedDown fails a request for the closed sessions.
+	closedDown bool
 }
 
 func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *planDaemon {
@@ -55,6 +57,11 @@ func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *
 	mux.HandleFunc("GET "+api.Plan, func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		d.queries = append(d.queries, r.URL.RawQuery)
+		if d.closedDown && r.URL.Query().Get("closed") == "1" {
+			d.mu.Unlock()
+			http.Error(w, "store busy", http.StatusInternalServerError)
+			return
+		}
 		res := api.PlanResponse{Items: items, Errors: append([]string{}, errs...)}
 		if q := r.URL.Query(); q.Get("trigger") == "" && q.Get("closed") == "1" {
 			res.Closed = d.closed
@@ -117,7 +124,7 @@ func TestPlanListsTheSessionsClosedInTheLastDay(t *testing.T) {
 	d := servePlan(t, te, nil, nil)
 	d.closed = []api.ClosedSession{
 		{Session: "term_2", At: testNow.Add(-90 * time.Minute), Reason: "gone from the manager"},
-		{Session: "term_1", At: testNow.Add(-26 * time.Minute), Reason: "its pull request merged", Resume: "cd /wt/a && claude --resume b"},
+		{Session: "term_1", At: testNow.Add(-26 * time.Minute), Reason: "its pull request merged", Resume: "cd /wt/a &&\n  claude --resume b"},
 	}
 	for _, args := range [][]string{{"plan"}, {"plan", "--stored"}} {
 		te.out.Reset()
@@ -139,6 +146,16 @@ func TestPlanListsTheSessionsClosedInTheLastDay(t *testing.T) {
 	te.out.Reset()
 	if code := te.run("plan", "--workflow", "address"); code != 0 || strings.Contains(te.out.String(), "closed in the last day") {
 		t.Errorf("a filtered plan: exit %d, printed %s", code, te.out)
+	}
+}
+
+func TestPlanPrintsThePlanWhenTheClosedSessionsFail(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	d := servePlan(t, te, planFixture()[:1], nil)
+	d.closedDown = true
+	if code := te.run("plan"); code == 0 || !strings.Contains(te.out.String(), "review-first-round") || !strings.Contains(te.err.String(), "error: closed sessions: ") {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 }
 
