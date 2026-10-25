@@ -46,6 +46,12 @@ func (p PR) Followed() bool { return len(p.Reasons) > 0 || p.Workspace.ID != "" 
 
 // Lapsed tells an open pull request nothing follows anymore: no sweep
 // refreshes it, so no view shows it as live.
+// ConflictingSince is when the row was first seen CONFLICTING, and whether
+// it still is.
+func (p PR) ConflictingSince() (time.Time, bool) {
+	return p.MergeableAt, p.Mergeable == "CONFLICTING" && !p.MergeableAt.IsZero()
+}
+
 func (p PR) Lapsed() bool { return p.State == dgh.StateOpen && !p.Followed() }
 
 type FailingCheck struct {

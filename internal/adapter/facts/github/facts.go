@@ -450,8 +450,8 @@ func (pl *planner) first(ref pr.Ref, r *result) {
 func (pl *planner) address(ref pr.Ref, r *result) {
 	if ws, ok := pl.targets.author[ref]; ok {
 		r.address.target, r.address.ws = true, ws
-		if row := pl.v.byRef[ref]; row.Mergeable == "CONFLICTING" && !row.MergeableAt.IsZero() {
-			r.dueAt("conflict", row.MergeableAt.Add(pl.v.conflictWindow()))
+		if since, ok := pl.v.byRef[ref].ConflictingSince(); ok {
+			r.dueAt("conflict", since.Add(pl.v.conflictWindow()))
 		}
 		f, why := pl.prOf(ref, true, r)
 		if why != "" {
@@ -527,7 +527,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
-	if pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.ConflictHead(key) {
+	if pl.cfg.AddressConflicts && pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.ConflictHead(key) {
 		reasons = append(reasons, "conflicts with "+f.BaseRefName)
 		r.address.conflictHead = f.HeadRefOid
 	}
@@ -538,12 +538,12 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	r.address.due, r.address.reason, r.address.reviewers, r.address.checks, r.address.fingerprint = true, strings.Join(reasons, "; "), who, failed, fp
 }
 
-// conflicts says whether f's head has conflicted with its base for the
-// conflict window.
+// conflicts says whether f's head conflicts with its base and the pull
+// request has for the conflict window. The row keeps a conflict through
+// GitHub's UNKNOWN after a push, so the head's own read must confirm it.
 func (pl *planner) conflicts(f sweep.Facts) bool {
-	row := pl.v.byRef[f.Ref]
-	return row.Mergeable == "CONFLICTING" && !row.MergeableAt.IsZero() && row.HeadOid == f.HeadRefOid &&
-		pl.now.Sub(row.MergeableAt) >= pl.v.conflictWindow()
+	since, ok := pl.v.byRef[f.Ref].ConflictingSince()
+	return ok && f.Mergeable == "CONFLICTING" && pl.now.Sub(since) >= pl.v.conflictWindow()
 }
 
 // facts are ref's pr facts from r at now.

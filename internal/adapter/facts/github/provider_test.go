@@ -461,11 +461,28 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	}
 
 	row, d := w.rows[r], w.details[r]
-	row.HeadOid, d.HeadRefOid = "head2", "head2"
+	row.HeadOid, d.HeadRefOid, d.Mergeable = "head2", "head2", "UNKNOWN"
 	w.rows[r], w.details[r] = row, d
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false {
+		t.Fatalf("a new head GitHub has not judged yet, under the stored conflict: %v", f)
+	}
+	d.Mergeable = "CONFLICTING"
+	w.details[r] = d
 	f = facts(t, w.provider(), r.Unit())
 	if f["pr.address.due"] != true || f["pr.fingerprint"] == first {
 		t.Fatalf("a conflict on a new head: %v", f)
+	}
+}
+
+func TestAddressConflictsOffStartsNoRoundForAConflict(t *testing.T) {
+	w := newWorld()
+	w.cfg.AddressConflicts = false
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+		t.Fatalf("address_conflicts off: %v", f)
 	}
 }
 

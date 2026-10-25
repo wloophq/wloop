@@ -41,8 +41,8 @@ func (p *Provider) Author(ctx context.Context, u unit.Unit, needLocal bool) (*dv
 		ChangesRequestedOnHead: f.ReviewDecision == pr.ReviewChangesRequested && f.NewestChangesRequestOid == f.HeadRefOid,
 		Mergeable:              f.Mergeable, Base: f.BaseRefName, ConfirmConflictAfter: v.conflictWindow(),
 	}
-	if row.Mergeable == "CONFLICTING" && !row.MergeableAt.IsZero() {
-		af.ConflictingFor = now.Sub(row.MergeableAt)
+	if since, ok := row.ConflictingSince(); ok {
+		af.ConflictingFor = now.Sub(since)
 	}
 	targets := v.targetsOf(ctx)
 	_, af.ReviewWorkspace = targets.review[ref]
