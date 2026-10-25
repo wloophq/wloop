@@ -121,12 +121,43 @@ func TestDismissDetachesADisabledPluginsUnitsFromAMixedEntry(t *testing.T) {
 	}
 }
 
-func TestDismissTrashesAnEntryDetachingLeavesWithoutUnits(t *testing.T) {
+func TestDismissTrashesAnEntryWithNoUnitOfAnEnabledPluginWhole(t *testing.T) {
 	r := newRig()
 	r.facts.off[unit.GitHub] = true
-	r.put(t, gtd.Entry{ID: "e-gh", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU}, Origin: gtd.OriginUser})
+	r.put(t, gtd.Entry{ID: "e-gh", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "a"}}, Origin: gtd.OriginUser})
 	res, err := r.svc.Do(context.Background(), "e-gh", coregtd.Request{Verb: gtd.VerbDismiss})
-	if err != nil || res.Entry.State != gtd.Trash || r.entry(t, "e-gh").State != gtd.Trash {
-		t.Fatalf("%+v %v", res, err)
+	got := r.entry(t, "e-gh")
+	if err != nil || res.Entry.State != gtd.Trash || got.State != gtd.Trash || len(got.Units) != 1 || len(got.Items) != 1 {
+		t.Fatalf("trashed whole: %+v %+v %v", got, res, err)
+	}
+}
+
+func TestDismissTrashesADerivedMixedEntryWhole(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"] = true
+	slack := unit.Unit{Provider: "slack", Key: "C1/1.1"}
+	id := gtd.DerivedID(gtd.KindAction, slack, "i1")
+	r.put(t, gtd.Entry{ID: id, Kind: gtd.KindAction, State: gtd.Next, Units: []unit.Unit{slack, unitU},
+		Items: []gtd.ItemRef{{Unit: slack, Item: "i1"}, {Unit: unitU, Item: "a"}}, Origin: gtd.OriginDerived})
+	if _, err := r.svc.Do(context.Background(), id, coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, id); got.State != gtd.Trash || len(got.Units) != 2 || len(got.Items) != 2 {
+		t.Fatalf("a derived entry keeps the unit its id names: %+v", got)
+	}
+}
+
+func TestDetachDropsItemsOnAnyUnitOfTheDisabledPlugin(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"] = true
+	a, b := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "slack", Key: "C1/2.2"}
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU, a},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "x"}, {Unit: b, Item: "y"}}, Origin: gtd.OriginUser})
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, "e-mixed"); !slices.Equal(got.Items, []gtd.ItemRef{{Unit: unitU, Item: "x"}}) {
+		t.Fatalf("items %+v", got.Items)
 	}
 }
