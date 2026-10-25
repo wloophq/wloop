@@ -169,7 +169,7 @@ func (m *Model) tabs(width int) string {
 		flags = append(flags, "slow sync")
 	}
 	if right := strings.Join(flags, " · "); right != "" {
-		if gap := width - termfmt.Cells(left) - termfmt.Cells(right); gap >= 3 {
+		if gap := width - termfmt.Cells(termfmt.Plain(line)) - termfmt.Cells(right); gap >= 3 {
 			line += strings.Repeat(" ", gap) + t.Yellow(right)
 		}
 	}
