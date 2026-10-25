@@ -51,8 +51,17 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the headless turn's wrapper text in `internal/core/headless`;
 - the Slack extraction prompt (`internal/adapter/source/slack/extract/prompt.md`), and the brief's prompt and taxonomy (`internal/brief`);
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
+- what sending a draft does, which follows its kind and not its declared effects: a sent nudge stamps the entries it served (`internal/core/proposals`), and a nudge on a pull request records the event the next nudge's refusal reads (the GitHub plugin's publisher);
+- the Outbox's verdict, shown beside each draft, of whether it would send the draft on its own, which holds a question to an owner and a comment by their kind (`internal/core/outbox`);
+- the workflow subjects, pull requests, sessions and workspaces (`builtin.Slots`), and `turn.start`, which starts turns on pull requests only;
+- where a turn on a unit other than a pull request runs: placement decides, and the intent's `workspace` is read for pull requests only;
 - notification titles, the digest and the menu bar's copy.
 
 ## Direction
 
-Drafts already carry a purpose, a delivery and the effects of sending them, apart from their kind, but nothing reads those fields yet. Not yet true: the proposal rules become default workflows with their texts in the profile, a sent draft's effects are declared by the profile, workflows can start any intent on any unit, and the prose above moves to `profiles/default/partials/` and `profiles/default/prompts/`.
+Drafts already carry a purpose, a delivery and the effects of sending them, apart from their kind, but nothing reads those fields yet. Not yet true:
+
+- the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
+- a sent draft does what its declared effects say, and an agent's draft declares only the effects its intent's manifest allows;
+- workflows start any intent on any unit, each under its own daily limit and all under one daily budget, in the repository the intent names;
+- the prose above moves to `profiles/default/partials/` and `profiles/default/prompts/`.
