@@ -250,7 +250,7 @@ const catalog = { views: [
   { id: "needs-me", provider: "github", rows: true }, { id: "dash", provider: "github", rows: false },
   { id: "all", provider: "github", rows: true }, { id: "slack", provider: "slack", rows: true },
 ] };
-const providerName = (id) => ({ github: "GitHub", slack: "Slack" })[id] || id;
+applyPlugins([{ id: "github", name: "GitHub" }, { id: "slack", name: "Slack" }]);
 const links = (n, c) => byClass(n, c).map((a) => ({ Href: a.attrs.href, Text: text(a), Target: a.attrs.target || "" }));
 const out = {};
 for (const c of input) {
@@ -258,7 +258,7 @@ for (const c of input) {
   out[c.unit.provider] = { Ref: links(card, "ref"), Ext: links(card, "ext") };
 }
 process.stdout.write(JSON.stringify(out));`, []map[string]any{
-		{"unit": map[string]string{"provider": "github", "key": "acme/api#8"}, "link": "https://github.com/acme/api/pull/8"},
+		{"unit": map[string]string{"provider": "github", "key": "acme/api#8"}, "label": "acme/api#8", "link": "https://github.com/acme/api/pull/8"},
 		{"unit": map[string]string{"provider": "slack", "key": "T1/C1/1700.1"}, "label": "#eng thread", "link": "slack://channel?id=C1"},
 	}, &got)
 	want := map[string]struct{ Ref, Ext []link }{

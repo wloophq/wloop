@@ -10,7 +10,7 @@ import (
 )
 
 func wireEvent(e dinv.Event) api.Event {
-	return api.Event{PR: e.PR, Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: e.Data}
+	return api.Event{PR: e.PR, Unit: e.PR.Unit(), Kind: e.Kind, Key: e.Key, Actor: e.Actor, At: e.At, Data: e.Data}
 }
 
 func wireEvents(evs []dinv.Event) []api.Event {
@@ -46,7 +46,7 @@ func wireLimit(l dgh.Limit) api.RateLimit {
 }
 
 func wireCandidate(c dgh.Candidate, b *brief.View) api.Candidate {
-	return api.Candidate{Ref: c.Ref, URL: c.URL, Title: c.Title, Author: c.Author, State: c.State, IsDraft: c.IsDraft,
+	return api.Candidate{Ref: c.Ref, Unit: c.Ref.Unit(), URL: c.URL, Title: c.Title, Author: c.Author, State: c.State, IsDraft: c.IsDraft,
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Additions: c.Additions, Deletions: c.Deletions,
 		ChangedFiles: c.ChangedFiles, HeadBranch: c.HeadBranch, BaseBranch: c.BaseBranch, ReviewDecision: c.ReviewDecision,
 		ReviewRequests: c.ReviewRequests, ChecksState: c.ChecksState, Comments: c.Comments, MyReview: c.MyReview,

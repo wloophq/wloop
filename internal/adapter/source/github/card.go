@@ -28,6 +28,7 @@ func Card(_ context.Context, r api.Row) (card.Card, error) {
 	d := situationOf(r, p)
 	c := card.Card{
 		Unit:        r.Unit,
+		Label:       r.Label,
 		Title:       r.Title,
 		State:       "open",
 		Signals:     signals(d),
