@@ -98,6 +98,16 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 			t.Errorf("still refused: %+v", vs)
 		}
 	}
+	r.put(t, gtd.Entry{ID: "e-trashed", Kind: gtd.KindAction, State: gtd.Trash, Title: "gone", Units: []unit.Unit{r7u, slackUnit}})
+	var trashed api.EntryView
+	if code := get(t, r.s, api.EntryPath("e-trashed"), &trashed); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	for _, vs := range trashed.Verbs {
+		if vs.Verb == "dismiss" && (vs.Enabled || vs.Reason == "") {
+			t.Errorf("dismiss on a trashed entry: %+v", vs)
+		}
+	}
 }
 
 func TestTheDraftsRouteDiscardsADisabledPluginsDraft(t *testing.T) {

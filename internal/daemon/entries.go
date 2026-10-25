@@ -720,7 +720,6 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 			break
 		}
 	}
-	dismissable := ev.s.pluginOff(e)
 	var row *api.Row
 	if len(e.Units) > 0 {
 		if rd, ok, err := ev.s.readModel().Read(ctx, e.Units[0]); err == nil && ok {
@@ -736,8 +735,12 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 	for _, x := range gtdVerbs {
 		st := api.VerbState{Verb: string(x.verb)}
 		switch {
-		case dismissable && x.verb == gtd.VerbDismiss:
-			st.Enabled = coregtd.Accepts(e, x.verb) == nil
+		case off != "" && x.verb == gtd.VerbDismiss:
+			if err := coregtd.Accepts(e, x.verb); err != nil {
+				st.Reason = err.Error()
+			} else {
+				st.Enabled = true
+			}
 		case off != "":
 			st.Reason = off
 		case ev.g.Handles(e.Kind, x.verb):
