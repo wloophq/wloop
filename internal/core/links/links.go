@@ -126,10 +126,6 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 	if err != nil {
 		return 0, fmt.Errorf("events of %s: %w", target, err)
 	}
-	if len(evs) == 0 {
-		r.quiet(target, "has no settling events")
-		return 0, nil
-	}
 	slices.SortStableFunc(evs, func(a, b link.Event) int { return a.At.Compare(b.At) })
 	resolved := 0
 	var errs []error
@@ -189,9 +185,9 @@ func byAssignee(it ditems.Item, actor string) bool {
 	return slices.ContainsFunc(it.Assignees, func(p ditems.Person) bool { return p.Is(id) })
 }
 
-// quiet logs, once per target and reason per day, why a target resolved
-// nothing: no reader for its provider, or no review, merge or close since its
-// links' items were last touched.
+// quiet logs, once per target and reason per day, why a target cannot resolve
+// anything: no reader for its provider. A target with no review, merge or
+// close yet is waiting, which is not worth a line.
 func (r *Resolver) quiet(target unit.Unit, why string) {
 	if r.Log == nil {
 		return
