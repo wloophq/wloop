@@ -1,6 +1,10 @@
 package pr
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
 
 func TestParseURL(t *testing.T) {
 	cases := []struct {
@@ -34,5 +38,25 @@ func TestRefStringAndURL(t *testing.T) {
 func TestRemoteKey(t *testing.T) {
 	if got := (Ref{Owner: "acme", Repo: "api", Number: 7}).RemoteKey(); got != "github.com/acme/api" {
 		t.Fatalf("remote key %q", got)
+	}
+}
+
+func TestKeysRoundTripThroughTheCodec(t *testing.T) {
+	ref := Ref{Owner: "o", Repo: "r", Number: 12}
+	got, err := ParseKey("o/r#12")
+	if err != nil || got != ref {
+		t.Fatalf("ParseKey = %v %v", got, err)
+	}
+	if u := ref.Unit(); u.Provider != unit.GitHub || u.Key != "o/r#12" || u.String() != "github:o/r#12" {
+		t.Fatalf("Unit = %+v", u)
+	}
+	reg := unit.NewRegistry(Codec{})
+	if back, err := reg.Parse("github", "o/r#12"); err != nil || back != ref.Unit() {
+		t.Errorf("Parse = %v %v", back, err)
+	}
+	for _, key := range []string{"o/r#x", "o/r#012"} {
+		if _, err := reg.Parse("github", key); err == nil {
+			t.Errorf("%q parsed", key)
+		}
 	}
 }

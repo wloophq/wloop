@@ -17,9 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/core/views/viewstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/view"
 )
@@ -27,10 +25,10 @@ import (
 var _ views.Books = (*sqlite.Store)(nil)
 
 var (
-	r7      = pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit()
-	r8      = pr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit()
-	r9      = pr.Ref{Owner: "acme", Repo: "api", Number: 9}.Unit()
-	sandbox = pr.Ref{Owner: "acme", Repo: "sandbox", Number: 1}.Unit()
+	r7      = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	r8      = unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
+	r9      = unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
+	sandbox = unit.Unit{Provider: unit.GitHub, Key: "acme/sandbox#1"}
 	t0      = time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 )
 
@@ -395,12 +393,11 @@ func TestPausedRepositoriesGetNoWrites(t *testing.T) {
 	sink := testsink.New("test")
 	f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
 	var mu sync.Mutex
-	pause := round.Pause{Repos: []string{"acme/api"}}
+	paused := map[unit.Unit]bool{r7: true}
 	f.svc.Paused = func(_ context.Context, u unit.Unit) bool {
 		mu.Lock()
 		defer mu.Unlock()
-		ref, _ := pr.ParseKey(u.Key)
-		return pause.Holds(ref.Owner, ref.Repo)
+		return paused[u]
 	}
 	f.run(t)
 	f.books.Put(asked(r7, "keep both?"))
@@ -424,7 +421,7 @@ func TestPausedRepositoriesGetNoWrites(t *testing.T) {
 	}
 
 	mu.Lock()
-	pause = round.Pause{}
+	paused = nil
 	mu.Unlock()
 	if _, err := f.svc.Reconcile(ctx); err != nil {
 		t.Fatal(err)

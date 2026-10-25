@@ -54,11 +54,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/sweep` `internal/domain/inventory` | 🧾 | the Inputs port returns the stored pull request rows as inventory.PR |
 | `internal/core/sweep` `internal/domain/pr` | 🧾 | the sweep's Facts embed pr.Facts |
 | `internal/core/usage` `internal/domain/pr` | 🧾 | a Turn names its pull request as a pr.Ref |
-| `internal/core/views` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref, and a pause stub parses keys with pr.ParseKey |
-| `internal/core/views/viewstest` `internal/domain/pr` | 🔧 | the ViewSink and State contract suites build their units from pr.Ref |
-| `internal/domain/turn` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
-| `internal/domain/unit` `internal/domain/pr` | 🔧 | test only: the registry tests round-trip pr.Codec and pr.ParseKey, which unit.OpaqueCodec can stand in for |
-| `internal/domain/view` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
 | `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides |
 | `internal/readmodel` `internal/domain/pr` | 🔧 | test only: tests build pr.Ref units and parse row keys with pr.ParseKey |
 | `internal/readmodel` `internal/readmodel/prrow` | 🔧 | test only: tests build the GitHub row provider and read its payloads and renudge delay |
