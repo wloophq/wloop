@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 // tierModels are Claude Code's model aliases, which follow the latest model
@@ -208,8 +209,6 @@ func Exec(ctx context.Context, dir string, env []string, stdin, name string, arg
 	defer meterSpawn(ctx, "ask", time.Now(), &err)
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	// A wrapper that forks would otherwise keep stdout open past the timeout.
-	cmd.WaitDelay = 5 * time.Second
 	cmd.Env = withoutCallingSession(os.Environ())
 	for _, kv := range env {
 		key, _, set := strings.Cut(kv, "=")
@@ -221,7 +220,7 @@ func Exec(ctx context.Context, dir string, env []string, stdin, name string, arg
 	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err = cmd.Run()
+	err = procgroup.Run(cmd)
 	if err != nil && stderr.Len() > 0 {
 		err = fmt.Errorf("%s: %w", firstLine(stderr.String()), err)
 	}
