@@ -60,6 +60,8 @@ func staleEmbeds(allow []embedAllowed, used map[int]bool) []string {
 	return out
 }
 
+// TestProseIsEmbeddedOnlyFromProfiles checks that prose files are embedded only
+// from `profiles/`, except the allowlisted ones.
 func TestProseIsEmbeddedOnlyFromProfiles(t *testing.T) {
 	t.Parallel()
 	allow := slices.Concat(embedKept, embedMoving)

@@ -93,6 +93,11 @@ func under(path string, roots ...string) bool {
 	return slices.ContainsFunc(roots, func(r string) bool { return path == r || strings.HasPrefix(path, r+"/") })
 }
 
+// TestArchitecture checks that only the store imports the SQLite driver;
+// clients import only the API, the domain and `termfmt`; the domain imports
+// only the domain; the brief reaches agents and the store only through its
+// ports; the API imports only the domain; only `intent/expr` imports cel-go; a
+// core interface has at most five methods.
 func TestArchitecture(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {
@@ -145,6 +150,8 @@ func ruleR12(self string, imports []string) []string {
 	return out
 }
 
+// TestMeterIsALeaf checks that `internal/meter` imports only the standard
+// library.
 func TestMeterIsALeaf(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -163,6 +170,9 @@ func TestMeterIsALeaf(t *testing.T) {
 	}
 }
 
+// TestProvidersStayInAdaptersAndTheRoot checks that only a provider and the
+// composition root import a provider's packages, provider names appear only in
+// adapters and the root's allowlist, and only adapters parse an agent's state.
 func TestProvidersStayInAdaptersAndTheRoot(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
@@ -214,6 +224,8 @@ func ruleNoGate(self string, imports []string) []string {
 	return out
 }
 
+// TestNothingImportsTheGate checks that nothing imports `internal/gate`: the
+// workflow engine is the only planner of automatic rounds.
 func TestNothingImportsTheGate(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {
@@ -228,5 +240,9 @@ func TestNothingImportsTheGate(t *testing.T) {
 			t.Error(b)
 		}
 	}
+}
+
+func TestNoGateFlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	flagged(t, "a planted import", ruleNoGate("internal/cli", []string{"context", module + "internal/gate"}), 1, "the workflows are the only automation")
 }

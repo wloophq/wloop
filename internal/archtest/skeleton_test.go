@@ -175,6 +175,8 @@ func undeclared(pkg *types.Package, names []string) []string {
 	return out
 }
 
+// TestContractSkeletonDeclared checks that the shared names other packages
+// build on still exist.
 func TestContractSkeletonDeclared(t *testing.T) {
 	t.Parallel()
 	var pkgs []string
@@ -201,6 +203,7 @@ func TestContractSkeletonFlagsAMissingName(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := undeclared(pkg, []string{"Deps", "Deps.Plugins", "writePluginDisabled", "Server.refusePlugin", "Absent", "Deps.Absent", "Server.absent"})
+	flagged(t, "the missing names", got, 3, "bsent")
 	if strings.Join(got, ",") != "Absent,Deps.Absent,Server.absent" {
 		t.Errorf("%v", got)
 	}

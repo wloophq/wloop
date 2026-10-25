@@ -36,7 +36,7 @@ func engineImports(self string, imports []string) []string {
 
 // coreProviderAllowlist are the core files that may still name a provider.
 var coreProviderAllowlist = []allowed{
-	{"internal/core/port/port.go", "unit.GitHub", "PROf reads a pull request from a github event; a pluginDebt edge"},
+	{"internal/core/port/port.go", "unit.GitHub", "debt: PROf reads a pull request from a github event; a pluginDebt edge"},
 }
 
 // coreLiterals flags a provider id spelled in a non-test file of the
@@ -74,6 +74,7 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 	return out
 }
 
+// TestTheCoreNamesNoProvider checks that the core spells no provider id.
 func TestTheCoreNamesNoProvider(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
@@ -87,6 +88,8 @@ func TestTheCoreNamesNoProvider(t *testing.T) {
 	}
 }
 
+// TestTheEngineImportsNoProvider checks that the automation engine imports no
+// provider's domain.
 func TestTheEngineImportsNoProvider(t *testing.T) {
 	t.Parallel()
 	seen := false

@@ -30,6 +30,9 @@ func ruleR7(self string, imports []string) []string {
 	return out
 }
 
+// TestCoreImports checks that the core imports only the standard library, the
+// core, the domain and the meter, and nothing that reaches processes, the
+// network or the database.
 func TestCoreImports(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -129,6 +132,8 @@ func ruleR9(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestOnlyOrcaAdapterReachesOrca checks that only the Orca manager's package
+// reaches Orca's control surface.
 func TestOnlyOrcaAdapterReachesOrca(t *testing.T) {
 	t.Parallel()
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
@@ -165,6 +170,8 @@ func ruleR9Desktop(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestOnlyClaudeDesktopManagerReachesDesktop checks that only the Claude
+// Desktop manager's package reaches Claude Desktop's control surface.
 func TestOnlyClaudeDesktopManagerReachesDesktop(t *testing.T) {
 	t.Parallel()
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
@@ -189,6 +196,8 @@ func ruleR11(self string, imports []string) []string {
 	return out
 }
 
+// TestDomainImports checks that the domain imports no adapter, manager or
+// `internal/github`.
 func TestDomainImports(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -302,6 +311,8 @@ func concatenated(e ast.Expr, literals *int) string {
 	return " x "
 }
 
+// TestOnlyTheStoreTouchesSQL checks that only the sqlite package opens the
+// database, and SQL text appears only under `internal/adapter/store`.
 func TestOnlyTheStoreTouchesSQL(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
@@ -347,6 +358,9 @@ func ruleStoreWriter(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestOnlyServeWritesTheStore checks that only `storecmd.go` opens the store as
+// its writer, for the daemon and the store commands, and other processes use
+// `OpenReadOnly`.
 func TestOnlyServeWritesTheStore(t *testing.T) {
 	t.Parallel()
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {

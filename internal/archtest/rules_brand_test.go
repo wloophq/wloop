@@ -51,6 +51,8 @@ func slicesAny(res []*regexp.Regexp, f func(*regexp.Regexp) bool) bool {
 	return false
 }
 
+// TestBrandLiteralOnlyInBrand checks that the default product name appears only
+// in `internal/brand` and the exempt metadata.
 func TestBrandLiteralOnlyInBrand(t *testing.T) {
 	t.Parallel()
 	for _, b := range scanBrand(t, filepath.Join("..", ".."), fixedNames) {
@@ -110,12 +112,13 @@ func TestR14ReadsTheBrandConstant(t *testing.T) {
 	plant("internal/x/mixed.go", "package x\n\nconst a = \" "+mixed+"\"\n")
 	plant("internal/brand/brand.go", "package brand\n\nvar Name = \""+brandtest.DefaultName+"\"\n")
 	got := scanBrand(t, root, fixedNames)
+	flagged(t, "planted", got, 3, "internal/x/")
 	var files []string
 	for _, b := range got {
 		files = append(files, strings.SplitN(strings.TrimPrefix(b, "R14: "), ":", 2)[0])
 	}
 	if want := []string{"internal/x/env.go", "internal/x/mixed.go", "internal/x/name.go"}; strings.Join(files, " ") != strings.Join(want, " ") {
-		t.Fatalf("flagged %q, want %q:\n%s", files, want, strings.Join(got, "\n"))
+		t.Errorf("flagged %q, want %q", files, want)
 	}
 }
 
@@ -124,7 +127,8 @@ func TestR14FlagsAPlantedLiteral(t *testing.T) {
 	allowed := []*regexp.Regexp{regexp.MustCompile(`by_` + brandtest.DefaultName)}
 	src := "package x\n\nvar a = \"run " + brandtest.DefaultName + "\"\nvar b = \"by_" + brandtest.DefaultName + "\"\nvar c = \"" + module + "\"\n// " + strings.ToUpper(brandtest.DefaultName) + " in capitals\n"
 	got := ruleR14("internal/x/x.go", src, allowed)
-	if len(got) != 2 || !strings.Contains(got[0], "x.go:3") || !strings.Contains(got[1], "x.go:6") {
-		t.Fatalf("%q", got)
+	flagged(t, "planted", got, 2, "x.go:")
+	if len(got) == 2 && (!strings.Contains(got[0], "x.go:3") || !strings.Contains(got[1], "x.go:6")) {
+		t.Errorf("flagged lines %q, want 3 and 6", got)
 	}
 }

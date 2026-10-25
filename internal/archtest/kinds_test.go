@@ -43,6 +43,8 @@ func ruleNoAPIKinds(rel, src string) []string {
 	return out
 }
 
+// TestNoProviderKindsInAPI checks that a provider's kinds live in its own
+// package, never in the API.
 func TestNoProviderKindsInAPI(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join("..", "..")

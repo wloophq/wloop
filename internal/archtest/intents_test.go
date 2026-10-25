@@ -44,8 +44,8 @@ var intentAllowlist = map[string]string{
 	"internal/core/intake/intaketest/scenarios.go": "test fixtures of today's intents",
 	"internal/cli/try.go":                          "profile try is a review",
 	"internal/turn/scenarios.go":                   "eval fixtures",
-	"internal/situation/situation.go":              "the sweep's row kind",
-	"internal/adapter/facts/github/facts.go":       "the pull request facts of the review and address workflows",
+	"internal/situation/situation.go":              "a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic",
+	"internal/adapter/facts/github/facts.go":       "the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict",
 }
 
 // exempt are where the intent names are declared.
@@ -62,6 +62,8 @@ type exportPkg struct {
 	Module     *struct{ Main bool }
 }
 
+// TestNoIntentEnumerations checks that Go compares, switches on or lists no
+// intent name outside allowlisted files.
 func TestNoIntentEnumerations(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -375,8 +377,5 @@ func f(n Name) (bool, bool) { return n == reviewName, n == Review }
 	if _, err := (&types.Config{}).Check(module+"internal/domain/intent", fset, []*ast.File{f}, info); err != nil {
 		t.Fatal(err)
 	}
-	hits := enumerations(fset, info, f)
-	if len(hits) != 1 || !strings.HasPrefix(hits[0], "8: ") {
-		t.Fatalf("hits %q", hits)
-	}
+	flagged(t, "the named constant", enumerations(fset, info, f), 1, "8: ")
 }
