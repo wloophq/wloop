@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -60,5 +61,41 @@ func TestThePlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	gone := r.plan(t, "?unit="+url.QueryEscape("github:acme/api#99"))
 	if len(gone.Errors) != 1 || !strings.Contains(gone.Errors[0], "not tracked, or gone") || len(gone.Workflows) != 0 {
 		t.Fatalf("%+v", gone)
+	}
+}
+
+type failingMarks struct{}
+
+func (failingMarks) Marks(context.Context, unit.Unit) (map[string]string, error) {
+	return nil, errors.New("marks unreadable")
+}
+
+type readsHead struct{ workflow.Predicate }
+
+func (readsHead) MarkNames() []string { return []string{"w/head"} }
+
+func TestThePlanOfAUnitReadsMarksOnlyForAWorkflowThatCallsHandled(t *testing.T) {
+	t.Parallel()
+	r := newPlanRig(t)
+	r.units.Put(u7, workflow.Facts{"pr.repo": "acme/api", "pr.fingerprint": "h2", "pr.first.due": false})
+	r.eng.Marks = failingMarks{}
+	never := automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["pr.first.due"] == true }, "pr.first.due")
+	r.eng.Workflows = func() []workflow.Workflow {
+		wf := func(name string, when workflow.Predicate) workflow.Workflow {
+			return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.steps.Step("session.close")}, When: when}
+		}
+		return []workflow.Workflow{wf("plain", never), wf("marked", readsHead{never})}
+	}
+	res := r.plan(t, "?unit="+url.QueryEscape("github:acme/api#7"))
+	got := map[string]api.UnitWorkflow{}
+	for _, w := range res.Workflows {
+		got[w.Workflow] = w
+	}
+	if got["plain"].Outcome != "not matched" {
+		t.Errorf("a workflow without handled(): %+v", got["plain"])
+	}
+	if got["marked"].Outcome != "error" || !strings.Contains(got["marked"].Reason, "marks unreadable") {
+		t.Errorf("a workflow with handled(): %+v", got["marked"])
 	}
 }
