@@ -28,7 +28,8 @@ unsure goes to the user first.
   touched code, commit the merge and push. Say in the report that the base
   was merged in and which conflicts it resolved. Merge only on a clean
   checkout with no local commits you do not know; otherwise, and for a
-  conflict you cannot resolve with confidence, go to the user first.
+  conflict you cannot resolve with confidence, abort the merge
+  (`git merge --abort`) and go to the user first.
 - Otherwise leave the branch's relation to the base alone: do not merge or
   rebase the base in on your own.
 
