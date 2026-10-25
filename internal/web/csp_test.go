@@ -41,3 +41,17 @@ func TestThePageHasNoInlineScript(t *testing.T) {
 		t.Error("inline handler")
 	}
 }
+
+func TestThePageServesItsFavicon(t *testing.T) {
+	h := Handler("")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if !strings.Contains(rec.Body.String(), `<link rel="icon" href="/static/favicon.svg?v=`) {
+		t.Fatal("the page names no favicon")
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/favicon.svg", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/svg+xml" {
+		t.Fatalf("favicon: %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+}

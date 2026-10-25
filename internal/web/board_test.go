@@ -715,7 +715,7 @@ func TestTheOpenRowIsMarkedAndScrolledToOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"tbody tr.sel td:first-child { box-shadow: inset", ".card.sel { background: color-mix"} {
+	for _, want := range []string{"tbody tr.sel td:first-child, .card.sel", "box-shadow: inset 3px 0 0 var(--me)", "--sel-unit: color-mix(in srgb, var(--me) 14%"} {
 		if !strings.Contains(string(css), want) {
 			t.Errorf("app.css lacks %s", want)
 		}
