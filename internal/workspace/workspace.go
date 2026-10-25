@@ -1,5 +1,5 @@
-// Package workspace is the port between the review loop and whatever tool
-// manages worktrees and agent sessions. Orca is the only adapter today.
+// Package workspace is the port between the loop and the workspace managers,
+// the tools that host worktrees and agent sessions: Orca and Claude Desktop.
 package workspace
 
 import (
