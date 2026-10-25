@@ -37,8 +37,10 @@ Every user-visible name comes from `internal/brand`. `make test-brand` runs the 
 
 `internal/archtest` holds the rules of [Layers](/architecture/layers/), [Ports](/architecture/ports/), [Plugins](/architecture/plugins/) and [Profile first](/architecture/profile-first/). Each rule has a self-test that plants a violation and expects it caught. An allowlist entry names its file and its reason, and an entry that no longer matches fails the test, so allowlists only shrink.
 
-A rule test is a test that does not call the `flagged` helper, which every self-test calls. Its doc comment states its rule as `// TestX checks that <rule>.`, and `TestEveryRuleTestStatesItsRule` fails on a rule test without one. [Architecture rules](/reference/architecture-rules/) lists every rule with its sentence, and each allowlist with its entries and their reasons; `make docs-ref` generates it from the sources of `internal/archtest`, and `TestRulesDocIsCurrent` fails when it drifts.
+A rule test is a test that does not call the `flagged` helper, which every self-test calls. Its doc comment states its rule as `// TestX checks that <rule>.`, and `TestEveryRuleTestStatesItsRule` fails on a rule test without one. [Architecture rules](/reference/architecture-rules/) lists every rule with its sentence, and each allowlist with its entries, their reasons and their triage; `make docs-ref` generates it from the sources of `internal/archtest`, and `TestRulesDocIsCurrent` fails when it drifts.
 
 Outside `internal/archtest`, `TestEveryBuiltinNameHasAnImplementation` (`internal/cli`) checks that every name the vocabulary lists is wired, and `TestFactsDocIsCurrent` that the facts reference matches the binary (`make docs-ref` regenerates it).
+
+A reason that starts with `fix: ` marks an exception that does not hold and whose fix is mechanical, and `debt: ` one whose fix is a refactor; the page shows them as 🔧 and 🧾, the rest as ✅.
 
 A new rule comes with its self-test and its doc comment; `make docs-ref` adds it to the reference page.

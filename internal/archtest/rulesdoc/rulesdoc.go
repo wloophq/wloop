@@ -37,11 +37,38 @@ type Allowlist struct {
 	Entries []Entry
 }
 
-// Entry is one allowlist entry: its strings, and its reason when the list has
-// one.
+// Entry is one allowlist entry: its strings, and its reason and triage when
+// the list has reasons.
 type Entry struct {
 	Item   []string
+	Status Status
 	Reason string
+}
+
+// Status is the triage of an allowlist entry against the architecture rules,
+// read from its reason's prefix: "fix: " or "debt: ", none when it holds.
+type Status string
+
+const (
+	Holds Status = "holds"
+	// Fix is an exception that does not hold and whose fix is mechanical.
+	Fix Status = "fix"
+	// Debt is an exception that does not hold and whose fix is a refactor.
+	Debt Status = "debt"
+)
+
+var symbols = map[Status]string{Holds: "✅", Fix: "🔧", Debt: "🧾"}
+
+func triaged(item []string, reason string) Entry {
+	if reason == "" {
+		return Entry{Item: item}
+	}
+	for _, s := range []Status{Fix, Debt} {
+		if rest, ok := strings.CutPrefix(reason, string(s)+": "); ok {
+			return Entry{Item: item, Status: s, Reason: rest}
+		}
+	}
+	return Entry{Item: item, Status: Holds, Reason: reason}
 }
 
 // Read returns the rule tests of the test files in dir, sorted by name.
@@ -147,7 +174,7 @@ func entries(lit *ast.CompositeLit, structs map[string][]string) []Entry {
 		}
 		for _, e := range lit.Elts {
 			kv := e.(*ast.KeyValueExpr)
-			out = append(out, Entry{Item: []string{text(kv.Key)}, Reason: text(kv.Value)})
+			out = append(out, triaged([]string{text(kv.Key)}, text(kv.Value)))
 		}
 	case *ast.ArrayType:
 		id, ok := t.Elt.(*ast.Ident)
@@ -177,15 +204,13 @@ func entry(fields []string, lit *ast.CompositeLit) Entry {
 			values[fields[i]] = text(e)
 		}
 	}
-	var out Entry
+	var item []string
 	for _, f := range fields {
-		if f == "reason" {
-			out.Reason = values[f]
-		} else {
-			out.Item = append(out.Item, values[f])
+		if f != "reason" {
+			item = append(item, values[f])
 		}
 	}
-	return out
+	return triaged(item, values["reason"])
 }
 
 func isString(e ast.Expr) bool {
@@ -290,7 +315,7 @@ Each rule is a test in ` + "`internal/archtest`" + `, with a self-test that plan
 	for _, r := range rules {
 		fmt.Fprintf(&b, "| `%s` | %s |\n", r.Test, cell(r.Rule))
 	}
-	b.WriteString("\n## Allowlists\n\nThe entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink.\n")
+	b.WriteString("\n## Allowlists\n\nThe entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink. Status is the entry's triage against the architecture rules: ✅ the exception holds; 🔧 it does not, and the fix is mechanical; 🧾 it does not, and the fix is a refactor.\n")
 	for _, r := range rules {
 		if len(r.Allowlists) == 0 {
 			continue
@@ -299,7 +324,7 @@ Each rule is a test in ` + "`internal/archtest`" + `, with a self-test that plan
 		for _, l := range r.Allowlists {
 			reasons := slices.ContainsFunc(l.Entries, func(e Entry) bool { return e.Reason != "" })
 			if reasons {
-				fmt.Fprintf(&b, "\n| `%s` entry | Reason |\n|---|---|\n", l.Name)
+				fmt.Fprintf(&b, "\n| `%s` entry | Status | Reason |\n|---|---|---|\n", l.Name)
 			} else {
 				fmt.Fprintf(&b, "\n| `%s` entry |\n|---|\n", l.Name)
 			}
@@ -309,7 +334,7 @@ Each rule is a test in ` + "`internal/archtest`" + `, with a self-test that plan
 					items[i] = code(it)
 				}
 				if reasons {
-					fmt.Fprintf(&b, "| %s | %s |\n", strings.Join(items, " "), cell(e.Reason))
+					fmt.Fprintf(&b, "| %s | %s | %s |\n", strings.Join(items, " "), symbols[e.Status], cell(e.Reason))
 				} else {
 					fmt.Fprintf(&b, "| %s |\n", strings.Join(items, " "))
 				}

@@ -36,7 +36,7 @@ func engineImports(self string, imports []string) []string {
 
 // coreProviderAllowlist are the core files that may still name a provider.
 var coreProviderAllowlist = []allowed{
-	{"internal/core/port/port.go", "unit.GitHub", "PROf reads a pull request from a github event; a pluginDebt edge"},
+	{"internal/core/port/port.go", "unit.GitHub", "debt: PROf reads a pull request from a github event; a pluginDebt edge"},
 }
 
 // coreLiterals flags a provider id spelled in a non-test file of the

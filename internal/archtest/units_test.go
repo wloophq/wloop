@@ -12,12 +12,12 @@ var loopRoots = []string{"internal/core/turns", "internal/core/intake", "interna
 // prAllowed are the loop files that still import the pull request domain,
 // each with why.
 var prAllowed = map[string]string{
-	"internal/daemon/explore.go":        "explore lists GitHub search candidates, pull requests by nature",
-	"internal/daemon/timings.go":        "review timings read pr.Facts",
-	"internal/daemon/timings_derive.go": "review timings read pr.Facts",
+	"internal/daemon/explore.go":        "debt: explore lists GitHub search candidates, the GitHub plugin's job",
+	"internal/daemon/timings.go":        "debt: review timings read pr.Facts, which the plugin's Facts should provide",
+	"internal/daemon/timings_derive.go": "debt: review timings read pr.Facts, which the plugin's Facts should provide",
 	"internal/daemon/probe.go":          "the e2e probe names a pull request",
 	"internal/daemon/refs.go":           "the daemon's one edge to pull request references, for the GitHub-only roles keyed by one",
-	"internal/daemon/briefs.go":         "the brief queue is keyed by pull request",
+	"internal/daemon/briefs.go":         "debt: the brief queue is keyed by pull request, not by unit",
 }
 
 const prDomain = module + "internal/domain/pr"

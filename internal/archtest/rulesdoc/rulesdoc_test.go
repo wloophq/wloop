@@ -28,11 +28,11 @@ type allowed struct{ file, literal, reason string }
 type edge struct{ from, to string }
 
 var allowlist = []allowed{
-	{"internal/b.go", "x", "b | needs x"},
+	{"internal/b.go", "x", "debt: b | needs x"},
 	{"internal/a.go", "y", "a needs y"},
 }
 
-var exempt = map[string]string{"internal/z": "z spawns", "internal/m": "m spawns"}
+var exempt = map[string]string{"internal/z": "z spawns", "internal/m": "fix: m spawns"}
 
 var debt = []edge{{"internal/p", "internal/q"}}
 
@@ -81,12 +81,12 @@ func TestReadFindsRuleTestsAndTheirAllowlists(t *testing.T) {
 		{Test: "TestUndocumented", File: "rules_test.go"},
 		{Test: "TestZebra", File: "rules_test.go", Rule: "Zebras stay striped.", Allowlists: []Allowlist{
 			{Name: "allowlist", Entries: []Entry{
-				{Item: []string{"internal/a.go", "y"}, Reason: "a needs y"},
-				{Item: []string{"internal/b.go", "x"}, Reason: "b | needs x"},
+				{Item: []string{"internal/a.go", "y"}, Status: Holds, Reason: "a needs y"},
+				{Item: []string{"internal/b.go", "x"}, Status: Debt, Reason: "b | needs x"},
 			}},
 			{Name: "exempt", Entries: []Entry{
-				{Item: []string{"internal/m"}, Reason: "m spawns"},
-				{Item: []string{"internal/z"}, Reason: "z spawns"},
+				{Item: []string{"internal/m"}, Status: Fix, Reason: "m spawns"},
+				{Item: []string{"internal/z"}, Status: Holds, Reason: "z spawns"},
 			}},
 		}},
 	}
@@ -110,7 +110,10 @@ func TestPageIsStableAndEscapesCells(t *testing.T) {
 		"| `TestAardvark` | Aardvarks dig only where allowed. |\n",
 		"| `TestZebra` | Zebras stay striped. |\n",
 		"### `TestZebra`\n",
-		"| `internal/b.go` `x` | b \\| needs x |\n",
+		"| `allowlist` entry | Status | Reason |\n",
+		"| `internal/a.go` `y` | ✅ | a needs y |\n",
+		"| `internal/b.go` `x` | 🧾 | b \\| needs x |\n",
+		"| `internal/m` | 🔧 | m spawns |\n",
 		"| `debt` entry |\n|---|\n| `internal/p` `internal/q` |\n",
 	} {
 		if !strings.Contains(page, want) {

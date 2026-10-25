@@ -40,99 +40,99 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 
 ## Allowlists
 
-The entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink.
+The entries a rule lets pass, each with its reason. An entry that matches nothing fails its rule, so these lists only shrink. Status is the entry's triage against the architecture rules: ✅ the exception holds; 🔧 it does not, and the fix is mechanical; 🧾 it does not, and the fix is a refactor.
 
 ### `TestCoreImportsNoPlugin`
 
-| `pluginDebt` entry | Reason |
-|---|---|
-| `internal/api` `internal/domain/pr` | the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref |
-| `internal/api/client` `internal/domain/pr` | TurnBook and Facts take a pr.Ref |
-| `internal/client/tui` `internal/domain/pr` | the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey |
-| `internal/client/turncli` `internal/domain/pr` | unitArg parses a pull request URL argument with pr.ParseURL |
-| `internal/core/port` `internal/domain/pr` | PROf reads a pull request from a github event |
-| `internal/core/sweep` `internal/domain/inventory` | the Inputs port returns the stored pull request rows as inventory.PR |
-| `internal/core/sweep` `internal/domain/pr` | the sweep's Facts embed pr.Facts |
-| `internal/core/usage` `internal/domain/pr` | a Turn names its pull request as a pr.Ref |
-| `internal/core/views` `internal/domain/pr` | test only: fixtures build units from pr.Ref, and a pause stub parses keys with pr.ParseKey |
-| `internal/core/views/viewstest` `internal/domain/pr` | the ViewSink and State contract suites build their units from pr.Ref |
-| `internal/domain/turn` `internal/domain/pr` | test only: fixtures build units from pr.Ref |
-| `internal/domain/unit` `internal/domain/pr` | test only: the registry tests round-trip pr.Codec and pr.ParseKey |
-| `internal/domain/view` `internal/domain/pr` | test only: fixtures build units from pr.Ref |
-| `internal/readmodel` `internal/domain/inventory` | the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides |
-| `internal/readmodel` `internal/domain/pr` | test only: tests build pr.Ref units and parse row keys with pr.ParseKey |
-| `internal/readmodel` `internal/readmodel/prrow` | test only: tests build the GitHub row provider and read its payloads and renudge delay |
-| `internal/readmodel` `internal/situation` | test only: tests read the loop-waiting and muted row kinds and situation.WorkingDuration |
-| `internal/web` `internal/situation` | test only: the board and dashboard tests list situation kinds and use WorkingDuration |
+| `pluginDebt` entry | Status | Reason |
+|---|---|---|
+| `internal/api` `internal/domain/pr` | 🧾 | the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref where the API should carry a unit.Unit |
+| `internal/api/client` `internal/domain/pr` | 🧾 | TurnBook and Facts take a pr.Ref, following the API |
+| `internal/client/tui` `internal/domain/pr` | 🧾 | the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey; a client parses what the daemon should resolve |
+| `internal/client/turncli` `internal/domain/pr` | 🧾 | unitArg parses a pull request URL argument with pr.ParseURL; a client parses what the daemon should resolve |
+| `internal/core/port` `internal/domain/pr` | 🧾 | PROf reads a pull request from a github event |
+| `internal/core/sweep` `internal/domain/inventory` | 🧾 | the Inputs port returns the stored pull request rows as inventory.PR |
+| `internal/core/sweep` `internal/domain/pr` | 🧾 | the sweep's Facts embed pr.Facts |
+| `internal/core/usage` `internal/domain/pr` | 🧾 | a Turn names its pull request as a pr.Ref |
+| `internal/core/views` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref, and a pause stub parses keys with pr.ParseKey |
+| `internal/core/views/viewstest` `internal/domain/pr` | 🔧 | the ViewSink and State contract suites build their units from pr.Ref |
+| `internal/domain/turn` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
+| `internal/domain/unit` `internal/domain/pr` | 🔧 | test only: the registry tests round-trip pr.Codec and pr.ParseKey, which unit.OpaqueCodec can stand in for |
+| `internal/domain/view` `internal/domain/pr` | 🔧 | test only: fixtures build units from pr.Ref |
+| `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides |
+| `internal/readmodel` `internal/domain/pr` | 🔧 | test only: tests build pr.Ref units and parse row keys with pr.ParseKey |
+| `internal/readmodel` `internal/readmodel/prrow` | 🔧 | test only: tests build the GitHub row provider and read its payloads and renudge delay |
+| `internal/readmodel` `internal/situation` | 🔧 | test only: tests read the loop-waiting and muted row kinds and situation.WorkingDuration |
+| `internal/web` `internal/situation` | 🔧 | test only: the board and dashboard tests list situation kinds and use WorkingDuration |
 
 ### `TestLoopCodeImportsNoPR`
 
-| `prAllowed` entry | Reason |
-|---|---|
-| `internal/daemon/briefs.go` | the brief queue is keyed by pull request |
-| `internal/daemon/explore.go` | explore lists GitHub search candidates, pull requests by nature |
-| `internal/daemon/probe.go` | the e2e probe names a pull request |
-| `internal/daemon/refs.go` | the daemon's one edge to pull request references, for the GitHub-only roles keyed by one |
-| `internal/daemon/timings.go` | review timings read pr.Facts |
-| `internal/daemon/timings_derive.go` | review timings read pr.Facts |
+| `prAllowed` entry | Status | Reason |
+|---|---|---|
+| `internal/daemon/briefs.go` | 🧾 | the brief queue is keyed by pull request, not by unit |
+| `internal/daemon/explore.go` | 🧾 | explore lists GitHub search candidates, the GitHub plugin's job |
+| `internal/daemon/probe.go` | ✅ | the e2e probe names a pull request |
+| `internal/daemon/refs.go` | ✅ | the daemon's one edge to pull request references, for the GitHub-only roles keyed by one |
+| `internal/daemon/timings.go` | 🧾 | review timings read pr.Facts, which the plugin's Facts should provide |
+| `internal/daemon/timings_derive.go` | 🧾 | review timings read pr.Facts, which the plugin's Facts should provide |
 
 ### `TestNoIntentEnumerations`
 
-| `intentAllowlist` entry | Reason |
-|---|---|
-| `internal/adapter/facts/github/facts.go` | the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict |
-| `internal/cli/rounds.go` | the sweep sends review and address rounds |
-| `internal/cli/serve.go` | the sweep's review and address questions and follow-ups |
-| `internal/cli/stepstart.go` | turn.start sends the sweep's review and address rounds and guards a nudge as its prepare does |
-| `internal/cli/try.go` | profile try is a review |
-| `internal/core/intake/intaketest/scenarios.go` | test fixtures of today's intents |
-| `internal/core/turns/turnstest/intents.go` | the test registry of today's intents |
-| `internal/core/turns/turnstest/store.go` | test fixtures of today's intents |
-| `internal/daemon/probe.go` | the probe launches the probe intent |
-| `internal/situation/situation.go` | a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic |
-| `internal/turn/scenarios.go` | eval fixtures |
+| `intentAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/facts/github/facts.go` | ✅ | the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict |
+| `internal/cli/rounds.go` | ✅ | the sweep sends review and address rounds |
+| `internal/cli/serve.go` | ✅ | the sweep's review and address questions and follow-ups |
+| `internal/cli/stepstart.go` | ✅ | turn.start sends the sweep's review and address rounds and guards a nudge as its prepare does |
+| `internal/cli/try.go` | ✅ | profile try is a review |
+| `internal/core/intake/intaketest/scenarios.go` | ✅ | test fixtures of today's intents |
+| `internal/core/turns/turnstest/intents.go` | ✅ | the test registry of today's intents |
+| `internal/core/turns/turnstest/store.go` | ✅ | test fixtures of today's intents |
+| `internal/daemon/probe.go` | ✅ | the probe launches the probe intent |
+| `internal/situation/situation.go` | ✅ | a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic |
+| `internal/turn/scenarios.go` | ✅ | eval fixtures |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`
 
-| `embedKept` entry | Reason |
-|---|---|
-| `internal/adapter/source/slack/eval` | the extraction eval's own prompts, a dev tool |
-| `skills` | the skills install writes into agent homes |
+| `embedKept` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/source/slack/eval` | ✅ | the extraction eval's own prompts, a dev tool |
+| `skills` | ✅ | the skills install writes into agent homes |
 
-| `embedMoving` entry | Reason |
-|---|---|
-| `internal/adapter/source/slack/extract/prompt.md` | the Slack extraction prompt |
-| `internal/brief/prompt.md` | the brief prompt |
-| `internal/brief/taxonomy.md` | the brief taxonomy |
-| `internal/turn/templates` | turn partials |
+| `embedMoving` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/source/slack/extract/prompt.md` | ✅ | the Slack extraction prompt |
+| `internal/brief/prompt.md` | ✅ | the brief prompt |
+| `internal/brief/taxonomy.md` | ✅ | the brief taxonomy |
+| `internal/turn/templates` | ✅ | turn partials |
 
 ### `TestProvidersStayInAdaptersAndTheRoot`
 
-| `allowlist` entry | Reason |
-|---|---|
-| `internal/cli/root.go` `Claude Desktop` | the Claude Desktop manager entry's display name |
-| `internal/cli/root.go` `Orca` | the Orca manager entry's display name |
-| `internal/cli/root.go` `claude` | the registry key of the Claude agent entry |
-| `internal/cli/root.go` `orca` | the registry key and the sink name of the Orca manager entry |
-| `internal/config/config.go` `claude` | Defaults().Agent |
-| `internal/config/config.go` `claude-desktop` | Defaults().WorkspaceManagers |
-| `internal/config/config.go` `orca` | Defaults().WorkspaceManagers |
-| `internal/intent/builtin/facts.go` `The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop.` | session.closed_by_manager's doc names the manager that keeps such a record |
-| `internal/intent/builtin/facts.go` `The workspace manager that owns the session, such as orca or claude-desktop.` | session.manager's doc names the managers' keys |
+| `allowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/cli/root.go` `Claude Desktop` | ✅ | the Claude Desktop manager entry's display name |
+| `internal/cli/root.go` `Orca` | ✅ | the Orca manager entry's display name |
+| `internal/cli/root.go` `claude` | ✅ | the registry key of the Claude agent entry |
+| `internal/cli/root.go` `orca` | ✅ | the registry key and the sink name of the Orca manager entry |
+| `internal/config/config.go` `claude` | 🔧 | Defaults().Agent; a tool's name outside its adapter belongs in the composition root |
+| `internal/config/config.go` `claude-desktop` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
+| `internal/config/config.go` `orca` | 🔧 | Defaults().WorkspaceManagers; a tool's name outside its adapter belongs in the composition root |
+| `internal/intent/builtin/facts.go` `The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop.` | ✅ | session.closed_by_manager's doc names the manager that keeps such a record |
+| `internal/intent/builtin/facts.go` `The workspace manager that owns the session, such as orca or claude-desktop.` | ✅ | session.manager's doc names the managers' keys |
 
 ### `TestSpawningPackagesImportMeter`
 
-| `spawnExempt` entry | Reason |
-|---|---|
-| `internal/adapter/store/storetest` | test support that reads the inventory with sqlite3 for the e2e harness |
-| `internal/cli` | one-shot user commands: bundle, install, launchctl |
-| `internal/client/tui` | the user's editor, run in the foreground on a prompt's text |
-| `internal/e2e` | the end-to-end harness |
+| `spawnExempt` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/store/storetest` | ✅ | test support that reads the inventory with sqlite3 for the e2e harness |
+| `internal/cli` | ✅ | one-shot user commands: bundle, install, launchctl |
+| `internal/client/tui` | ✅ | the user's editor, run in the foreground on a prompt's text |
+| `internal/e2e` | ✅ | the end-to-end harness |
 
 ### `TestTheCoreNamesNoProvider`
 
-| `coreProviderAllowlist` entry | Reason |
-|---|---|
-| `internal/core/port/port.go` `unit.GitHub` | PROf reads a pull request from a github event; a pluginDebt edge |
+| `coreProviderAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/core/port/port.go` `unit.GitHub` | 🧾 | PROf reads a pull request from a github event; a pluginDebt edge |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.
