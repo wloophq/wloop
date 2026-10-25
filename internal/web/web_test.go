@@ -290,7 +290,7 @@ func TestDetailGridUsesWidthVariable(t *testing.T) {
 		t.Fatal(err)
 	}
 	css := string(raw)
-	if !strings.Contains(css, "body.has-detail #app { grid-template-columns: 188px minmax(0, 1fr) var(--detail-width, 380px); }") {
+	if !strings.Contains(css, "body.has-detail #app { grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--detail-width); }") {
 		t.Error("the detail grid column does not come from --detail-width")
 	}
 	if !strings.Contains(css, "#detail-resize, body.has-detail #detail-resize { display: none; }") {

@@ -1,11 +1,13 @@
+/* Generated from design/tokens.json by `go generate ./internal/web`. Do not edit. */
 :root {
   --bg: #eef0ec;
   --panel: #f8f9f6;
+  --hover: #e4e8e1;
+  --sel: #dfe7f5;
+  --mine-bg: #f4e8c8;
   --ink: #18201c;
   --muted: #5d6a63;
   --rule: #d3d8d1;
-  --hover: #e4e8e1;
-  --sel: #dfe7f5;
   --me: #1f5fd6;
   --author: #5a6860;
   --reviewer: #7a4fc2;
@@ -17,7 +19,6 @@
   --loop-text: #0b6b5f;
   --none-text: #5d6a63;
   --on-me: #ffffff;
-  --mine-bg: #f4e8c8;
   --mine-text: #7a5300;
   --late: #9a4507;
   --late-bg: #fbe8cf;
@@ -52,22 +53,23 @@
   --space-12: 12px;
   --space-16: 16px;
   --space-24: 24px;
+  --rail-width: 188px;
+  --detail-width: 380px;
   --strip-row: 4px;
   --strip-card: 3px;
-  --sel-unit: color-mix(in srgb, var(--me) 14%, var(--panel));
+  --state-glyph: 14px;
 }
-
-[hidden] { display: none !important; }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101412;
     --panel: #161b18;
+    --hover: #1d2420;
+    --sel: #1b2638;
+    --mine-bg: #2a2414;
     --ink: #e2e8e3;
     --muted: #8f9c94;
     --rule: #28302b;
-    --hover: #1d2420;
-    --sel: #1b2638;
     --me: #6b9cff;
     --author: #a3b0a8;
     --reviewer: #a88ae6;
@@ -79,7 +81,6 @@
     --loop-text: #3fbfa9;
     --none-text: #8f9c94;
     --on-me: #0b1220;
-    --mine-bg: #2a2414;
     --mine-text: #e3b65c;
     --late: #f0a54a;
     --late-bg: #3a2610;
@@ -89,6 +90,13 @@
     color-scheme: dark;
   }
 }
+/* End of generated tokens. */
+
+:root {
+  --sel-unit: color-mix(in srgb, var(--me) 14%, var(--panel));
+}
+
+[hidden] { display: none !important; }
 
 * { box-sizing: border-box; }
 
@@ -146,9 +154,9 @@ mark { color: var(--ink); background: var(--mark); border-radius: var(--radius-x
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
 }
-body.has-detail #app { grid-template-columns: 188px minmax(0, 1fr) var(--detail-width, 380px); }
+body.has-detail #app { grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--detail-width); }
 body.has-detail #detail-resize { display: block; }
 body.resizing { user-select: none; cursor: col-resize; }
 
@@ -318,7 +326,7 @@ tr.g-head .count { margin-left: var(--space-8); font: var(--text-meta) var(--mon
 #detail-resize {
   display: none;
   position: absolute; top: 0; bottom: 0;
-  right: calc(var(--detail-width, 380px) - 3px);
+  right: calc(var(--detail-width) - 3px);
   width: 6px;
   cursor: col-resize;
   z-index: 2;
