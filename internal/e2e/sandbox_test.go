@@ -314,7 +314,7 @@ func (s *sandbox) followUp(t *testing.T, r pr.Ref) {
 	if follow.Trigger != turn.Automated {
 		t.Fatalf("the follow-up's trigger is %s", follow.Trigger)
 	}
-	text := b.instructions(follow.Round)
+	text := b.instructions(follow.ID)
 	for _, want := range []string{"### Earlier turns", s1.Record.Summary, "endorsed:", "#### Follow-up approval rule"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the follow-up's instructions lack %q", want)
@@ -369,7 +369,7 @@ func (s *sandbox) deletedWorkspace(t *testing.T, r pr.Ref) {
 		if x.SentTo == follow.SentTo {
 			t.Errorf("the follow-up went to session %s of the earlier turn %d, not a new one", x.SentTo, x.Seq)
 		}
-		if rec, ok := lastRecord(b, x.Seq); ok && !strings.Contains(b.instructions(follow.Round), rec.Record.Summary) {
+		if rec, ok := lastRecord(b, x.Seq); ok && !strings.Contains(b.instructions(follow.ID), rec.Record.Summary) {
 			t.Errorf("the instructions lack the earlier round %q", rec.Record.Summary)
 		}
 	}
@@ -665,7 +665,7 @@ func (s *sandbox) selfReview(t *testing.T) {
 	if a := gate.Record.Artifact; a == nil || a.Kind != "triage" || !strings.Contains(a.Body, "(own)") {
 		t.Errorf("the gate's artifact does not mark its own findings: %+v", gate.Record.Artifact)
 	}
-	if !strings.Contains(bookOf(t, r.URL()).instructions(x.Round), "#### Your own review of the change") {
+	if !strings.Contains(bookOf(t, r.URL()).instructions(x.ID), "#### Your own review of the change") {
 		t.Error("the instructions lack the own review")
 	}
 
@@ -689,7 +689,7 @@ func (s *sandbox) selfReview(t *testing.T) {
 	if resumed.Inputs["self_review"] != true {
 		t.Errorf("the resumed turn's inputs are %v", resumed.Inputs)
 	}
-	if text := bookOf(t, r.URL()).instructions(resumed.Round); !strings.Contains(text, "review again only what changed since") {
+	if text := bookOf(t, r.URL()).instructions(resumed.ID); !strings.Contains(text, "review again only what changed since") {
 		t.Error("the resumed instructions review the whole change again")
 	}
 	if rec, _ := s.settle(t, r, x.Seq, turn.TUI); rec.Record.State != record.Done {

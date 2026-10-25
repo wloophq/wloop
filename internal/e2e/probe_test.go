@@ -36,19 +36,19 @@ func probeHome(t *testing.T, l *live, i int, home string) {
 	if err := json.Unmarshal(command(t, "probe", "--workspace", ws.ID, "--home", home, "--model", "haiku"), &res); err != nil {
 		t.Fatal(err)
 	}
-	l.own(res.Handle)
+	l.own(res.Session)
 	gh, err := github.ParseURL(res.PR)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ref := pr.Ref(gh)
-	t.Logf("probe %s round %s in %s", res.PR, res.Round, res.Handle)
+	t.Logf("probe %s turn %s in %s", res.PR, res.Turn, res.Session)
 
 	var first turn.Turn
 	waitFor(t, 3*time.Minute, "the Stop hook blocks the unrecorded turn", func() (bool, string) {
 		b := bookOf(t, res.PR)
 		for _, e := range b.events(turns.KindStopBlocked) {
-			if strings.HasPrefix(e.Key, res.Handle+":") {
+			if strings.HasPrefix(e.Key, res.Session+":") {
 				return true, ""
 			}
 		}
@@ -56,20 +56,20 @@ func probeHome(t *testing.T, l *live, i int, home string) {
 	})
 	waitFor(t, 3*time.Minute, "the first question is recorded through MCP by the session it was sent to", func() (bool, string) {
 		b := bookOf(t, res.PR)
-		t0, ok := b.ByRound(res.Round)
+		t0, ok := b.ByID(res.Turn)
 		if !ok {
-			return false, "no turn of round " + res.Round
+			return false, "no turn " + res.Turn
 		}
 		first = *t0
 		r, ok := b.record(first.Seq, "probe: first question")
 		if !ok {
 			return false, fmt.Sprintf("turn %+v, records %+v", first, b.Records)
 		}
-		if r.Handle != res.Handle {
-			t.Fatalf("the record came from %s, the turn was sent to %s", r.Handle, res.Handle)
+		if r.Session != res.Session {
+			t.Fatalf("the record came from %s, the turn was sent to %s", r.Session, res.Session)
 		}
 		for _, e := range b.events(turns.KindTurnEnded) {
-			if strings.HasPrefix(e.Key, res.Round+":") && strings.HasSuffix(e.Data, " (via mcp)") {
+			if strings.HasPrefix(e.Key, res.Turn+":") && strings.HasSuffix(e.Data, " (via mcp)") {
 				return true, ""
 			}
 		}
@@ -83,19 +83,19 @@ func probeHome(t *testing.T, l *live, i int, home string) {
 		if !ok || a.Route == turn.Pending || a.Route == turn.Queued {
 			return false, fmt.Sprintf("answers %+v", b.Answers)
 		}
-		if a.Route != turn.Typed || a.Session != res.Handle {
-			t.Fatalf("the answer went %s to %q, want typed to %s", a.Route, a.Session, res.Handle)
+		if a.Route != turn.Typed || a.Session != res.Session {
+			t.Fatalf("the answer went %s to %q, want typed to %s", a.Route, a.Session, res.Session)
 		}
 		r, ok := b.record(first.Seq, "probe: second question")
-		if ok && r.Handle != res.Handle {
-			t.Fatalf("the second question came from %s", r.Handle)
+		if ok && r.Session != res.Session {
+			t.Fatalf("the second question came from %s", r.Session)
 		}
 		return ok, fmt.Sprintf("records %+v", b.Records)
 	})
 
-	l.closeTerminal(t, res.Handle)
+	l.closeTerminal(t, res.Session)
 	waitFor(t, time.Minute, "Orca no longer lists the closed terminal", func() (bool, string) {
-		return !l.listed(t, ws.ID, res.Handle), res.Handle + " still listed"
+		return !l.listed(t, ws.ID, res.Session), res.Session + " still listed"
 	})
 
 	l.answer(t, ref, "finish", turn.Cockpit)
@@ -117,13 +117,13 @@ func probeHome(t *testing.T, l *live, i int, home string) {
 		if resumed.Seq == 0 || resumed.SentTo == "" {
 			return false, fmt.Sprintf("turns %+v", b.Turns)
 		}
-		if resumed.SentTo == res.Handle {
-			t.Fatalf("the resume went to the closed session %s", res.Handle)
+		if resumed.SentTo == res.Session {
+			t.Fatalf("the resume went to the closed session %s", res.Session)
 		}
 		l.own(resumed.SentTo)
 		r, ok := b.record(resumed.Seq, "probe: resumed after finish")
-		if ok && r.Handle != resumed.SentTo {
-			t.Fatalf("the resume's record came from %s, it was sent to %s", r.Handle, resumed.SentTo)
+		if ok && r.Session != resumed.SentTo {
+			t.Fatalf("the resume's record came from %s, it was sent to %s", r.Session, resumed.SentTo)
 		}
 		return ok && r.Record.State == "done", fmt.Sprintf("records %+v", b.Records)
 	})

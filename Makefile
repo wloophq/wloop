@@ -6,7 +6,7 @@ GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
-.PHONY: build build-targets vet-darwin dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand scan-real-data print-brand-ldflags docs-ref docs
+.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand scan-real-data print-brand-ldflags docs-ref docs
 
 build: ## Build the binary into ./bin
 	@mkdir -p bin
@@ -19,6 +19,10 @@ build-targets: ## Build every package for each release target
 
 vet-darwin: ## Vet the darwin build
 	GOOS=darwin CGO_ENABLED=0 go vet ./...
+
+vet-tags: ## Vet the contract and live tests, for linux and darwin, without running them
+	GOOS=linux go vet -tags contract,live ./...
+	GOOS=darwin CGO_ENABLED=0 go vet -tags contract,live ./...
 
 dev-install: build ## Run this checkout's build as the installed one: agent homes, app, LaunchAgents and ~/.local/bin
 	@mkdir -p $(HOME)/.local/bin
