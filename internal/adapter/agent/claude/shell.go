@@ -1,19 +1,21 @@
 package claude
 
 import (
+	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 // Shell runs a claude call with env applied over this process's environment,
 // and returns its standard output and standard error together.
 func Shell(ctx context.Context, dir string, env []string, stdin, name string, args ...string) (out []byte, err error) {
 	defer meterSpawn(ctx, "shell", time.Now(), &err)
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := procgroup.Command(ctx, killGrace, name, args...)
 	cmd.Dir = dir
 	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "CLAUDECODE=") })
 	for _, kv := range env {
@@ -24,5 +26,8 @@ func Shell(ctx context.Context, dir string, env []string, stdin, name string, ar
 		}
 	}
 	cmd.Stdin = strings.NewReader(stdin)
-	return cmd.CombinedOutput()
+	var buf bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	err = cmd.Run()
+	return buf.Bytes(), err
 }

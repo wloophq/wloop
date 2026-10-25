@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 // tierModels are Claude Code's model aliases, which follow the latest model
@@ -206,10 +207,8 @@ func firstLine(s string) string {
 // claude exits non-zero, since claude reports its own errors as JSON there.
 func Exec(ctx context.Context, dir string, env []string, stdin, name string, args ...string) (out []byte, err error) {
 	defer meterSpawn(ctx, "ask", time.Now(), &err)
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := procgroup.Command(ctx, killGrace, name, args...)
 	cmd.Dir = dir
-	// A wrapper that forks would otherwise keep stdout open past the timeout.
-	cmd.WaitDelay = 5 * time.Second
 	cmd.Env = withoutCallingSession(os.Environ())
 	for _, kv := range env {
 		key, _, set := strings.Cut(kv, "=")
@@ -227,6 +226,9 @@ func Exec(ctx context.Context, dir string, env []string, stdin, name string, arg
 	}
 	return stdout.Bytes(), err
 }
+
+// killGrace is how long a cancelled claude call has to exit after SIGTERM.
+const killGrace = 5 * time.Second
 
 // sessionEnv is what a Claude Code session that started the daemon would
 // hand down to claude -p: its session and its effort. Settings such as

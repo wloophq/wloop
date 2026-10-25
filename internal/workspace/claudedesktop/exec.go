@@ -5,12 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/procgroup"
 )
 
 type Cmd struct {
@@ -38,7 +38,7 @@ func (Exec) Run(ctx context.Context, c Cmd) ([]byte, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	cmd := procgroup.Command(ctx, 5*time.Second, c.Name, c.Args...)
 	cmd.Dir, cmd.Env = c.Dir, c.Env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
