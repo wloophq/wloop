@@ -1821,7 +1821,8 @@ function timelineEvents(d) {
 }
 
 function defaultDetailWidth() {
-  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--detail-width"));
+  const px = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--detail-width"));
+  return Number.isFinite(px) ? px : DETAIL_WIDTH_MIN;
 }
 
 function clampDetailWidth(px, viewport) {

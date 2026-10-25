@@ -336,6 +336,17 @@ process.stdout.write(JSON.stringify(seen));`, struct{}{}, &got)
 	}
 }
 
+func TestDetailWidthWithoutTheStylesheetValueIsTheMinimum(t *testing.T) {
+	src := appJS(t)
+	prelude := detailWidthCSS("") + jsConst(t, src, "DETAIL_WIDTH_MIN")
+	var got []float64
+	nodeRun(t, prelude, []string{"defaultDetailWidth", "clampDetailWidth"},
+		`process.stdout.write(JSON.stringify([defaultDetailWidth(), clampDetailWidth(NaN, 1600)]));`, struct{}{}, &got)
+	if got[0] != 300 || got[1] != 300 {
+		t.Errorf("got %v, want the 300 minimum", got)
+	}
+}
+
 func TestDetailWidthDoubleClickRestoresTheStylesheetDefault(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_MIN") + jsConst(t, src, "DETAIL_WIDTH_STEP") + `
