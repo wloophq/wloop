@@ -28,6 +28,7 @@ import (
 type effects struct {
 	round, fingerprint bool
 	checksHead         string
+	conflictHead       string
 	events             []string
 }
 
@@ -35,7 +36,7 @@ func effectsOf(t *testing.T, te *testEnv, ref github.Ref) effects {
 	t.Helper()
 	st := te.loadRounds(t)
 	key := ref.String()
-	got := effects{round: !st.RoundAt(key).IsZero(), fingerprint: st.Fingerprint(key) != "", checksHead: st.ChecksHead(key)}
+	got := effects{round: !st.RoundAt(key).IsZero(), fingerprint: st.Fingerprint(key) != "", checksHead: st.ChecksHead(key), conflictHead: st.ConflictHead(key)}
 	evs, err := te.Store.Events(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)
@@ -114,10 +115,10 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 		want effects
 	}{
 		{"session route, review", byHand(dintent.Review, reviewWS, nil), effects{round: true, events: []string{dinv.KindRoundSent}}},
-		{"session route, address", byHand(dintent.Address, ownWS, nil), effects{round: true, fingerprint: true, checksHead: "c2", events: []string{dinv.KindRoundSent}}},
+		{"session route, address", byHand(dintent.Address, ownWS, nil), effects{round: true, fingerprint: true, checksHead: "c2", conflictHead: "c2", events: []string{dinv.KindRoundSent}}},
 		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
 		{"resume, review", resume(dintent.Review, warm, review, nil), effects{round: true, fingerprint: true}},
-		{"resume, address", resume(dintent.Address, own, mine, nil), effects{round: true, fingerprint: true, checksHead: "c21"}},
+		{"resume, address", resume(dintent.Address, own, mine, nil), effects{round: true, fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
 		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{}},
 		{"held Run now, review", func(t *testing.T) (*testEnv, github.Ref) {
 			sc := followupScenario(t)
@@ -135,7 +136,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 				t.Fatalf("%v\n%s", err, te.err)
 			}
 			return te, ref
-		}, effects{round: true, fingerprint: true, checksHead: "c21"}},
+		}, effects{round: true, fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			te, ref := c.run(t)
@@ -211,7 +212,7 @@ func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
 	if err := (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r21).Unit(), Intent: dturn.Intent(dintent.Address), ResumeOf: seq, Answer: "go on"}); err != nil {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
-	if got := effectsOf(t, te, r21); !reflect.DeepEqual(got, effects{fingerprint: true, checksHead: "c21"}) {
+	if got := effectsOf(t, te, r21); !reflect.DeepEqual(got, effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}) {
 		t.Fatalf("effects %+v", got)
 	}
 }

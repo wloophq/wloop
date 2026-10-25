@@ -542,12 +542,7 @@ func skip(st *round.Store, key string, kind stepKind, cand roundCandidate, ok bo
 		if cand.Fingerprint != "" {
 			st.SetFingerprint(key, cand.Fingerprint)
 		}
-		if cand.ChecksHead != "" {
-			st.SetChecksHead(key, cand.ChecksHead)
-		}
-		if cand.ConflictHead != "" {
-			st.SetConflictHead(key, cand.ConflictHead)
-		}
+		st.SetHeads(key, cand.ChecksHead, cand.ConflictHead)
 	default:
 		st.SetFingerprint(key, cand.Fingerprint)
 	}

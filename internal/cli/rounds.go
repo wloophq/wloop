@@ -178,12 +178,7 @@ func (s *sweep) skip(st step) {
 		if st.fingerprint != "" {
 			s.st.SetFingerprint(key, st.fingerprint)
 		}
-		if st.checksHead != "" {
-			s.st.SetChecksHead(key, st.checksHead)
-		}
-		if st.conflictHead != "" {
-			s.st.SetConflictHead(key, st.conflictHead)
-		}
+		s.st.SetHeads(key, st.checksHead, st.conflictHead)
 	default:
 		s.st.SetFingerprint(key, st.fingerprint)
 	}
@@ -463,12 +458,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 	}
 	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
-	if st.checksHead != "" {
-		s.st.SetChecksHead(st.key(), st.checksHead)
-	}
-	if st.conflictHead != "" {
-		s.st.SetConflictHead(st.key(), st.conflictHead)
-	}
+	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
 }

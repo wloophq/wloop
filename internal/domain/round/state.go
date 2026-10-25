@@ -172,6 +172,17 @@ func (s *Store) SetConflictHead(key, head string) {
 	s.set(key, FieldConflictHead, func(p *PR) { p.ConflictHead = head })
 }
 
+// SetHeads marks the failing checks and the conflict of the heads an
+// address round covered; an empty head leaves its mark as it was.
+func (s *Store) SetHeads(key, checksHead, conflictHead string) {
+	if checksHead != "" {
+		s.SetChecksHead(key, checksHead)
+	}
+	if conflictHead != "" {
+		s.SetConflictHead(key, conflictHead)
+	}
+}
+
 // RecordFollowup keeps the previous fingerprint when the round was not
 // started by a review.
 func (s *Store) RecordFollowup(key, fingerprint string, now time.Time) {
