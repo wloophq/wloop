@@ -15,7 +15,7 @@ A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topi
 
 The daemon reads the switch when it starts. With a plugin off, nothing of it runs, its actions leave every surface, and its cards render from the last stored snapshot, marked stale.
 
-An entry with a unit of a plugin that is off refuses every verb but Dismiss, with the reason naming the plugin. Dismiss moves an entry whose units are all of plugins that are off to the Trash; on an entry that also has a unit of a plugin that is on, it detaches the units of the plugins that are off, and the entry stays where it is with the rest.
+An entry with a unit of a plugin that is off refuses every verb but Dismiss, with the reason naming the plugin. Dismiss moves an entry whose units are all of plugins that are off to the Trash; on an entry that also has a unit of a plugin that is on, it detaches the units of the plugins that are off, and the entry stays where it is with the rest. A link an item makes to a unit of a plugin that is off is stored, and is left out while the plugin is off.
 
 An **item** is one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is open or resolved, and says who asked, who must act next and where it came from.
 
