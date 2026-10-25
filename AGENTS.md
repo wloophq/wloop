@@ -34,7 +34,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - injection markers, JSON schemas and limits;
 - the guard that never sends a GitHub comment under the user's name without approval.
 
-Still owned by Go and being moved to the profile (see `internal/archtest`'s shrinking allowlists): the turn partials, the headless wrapper, the Slack extraction prompt, the brief prompt and taxonomy, and the Slack proposal rules in `internal/core/proposals`.
+Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them; `internal/archtest`'s shrinking allowlists hold the prose): the turn partials, the headless wrapper, the Slack extraction prompt, the brief prompt and taxonomy, the Slack proposal rules in `internal/core/proposals`, what a sent draft does and the Outbox's send verdict (both keyed on the draft's kind), the workflow subjects (pull requests, sessions and workspaces) and `turn.start` (pull requests only).
 
 ## Conventions
 

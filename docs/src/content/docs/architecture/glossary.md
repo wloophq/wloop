@@ -116,7 +116,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Inbox**: the entries not clarified yet, and the messages that need you to decide.
 - **Message**: an Inbox entry that needs a decision: an agent's question, a post an agent makes with `inbox_post`, or a proposal to change a confirmed item. See [Messages](/concepts/gtd/#messages).
 - **Outbox**: the drafts that wait for their approval policy before they go out. See [The Outbox](/concepts/approval/#the-outbox).
-- **Draft**: an outbound post an agent or a proposal rule proposes, such as a reply, a nudge or a Slack reaction. It moves from `proposed` to `approved`, `sending` and `sent`, or ends `discarded` or `failed`.
+- **Draft**: an outbound post an agent or a proposal rule proposes, such as a reply, a nudge or a Slack reaction. Besides its kind it carries a purpose (what it is for, such as `nudge` or `close`), a delivery (`message`, `reaction` or `comment`) and the effects sending it asks for (`entry.nudged`, `unit.closed`), which nothing applies yet. It moves from `proposed` to `approved`, `sending` and `sent`, or ends `discarded` or `failed`.
 - **Draft approval policy**: when a draft may go out: `always` (when you approve it), `window`, `none` or `observe`. Every bundled intent, workflow and rule uses `always`.
 - **Proposal rule**: a rule that adds drafts on its own, hourly and on changes: `stalled-nudge`, `closure`, `ask-owner` and `github-nudge`.
 - **Focus**: the star on an entry, and the view that lists starred entries. A stale waiting entry and an entry past its deadline get it on their own.
