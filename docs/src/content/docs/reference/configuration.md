@@ -169,7 +169,7 @@ The first rule whose `match`, a glob over `<provider>:<key>`, matches gives the 
 | `slack.extraction.max_failures` | `3` | failures in a row before a unit waits for its next change |
 | `slack.extraction.context_messages` | `10` | earlier DM messages shown as read-only context |
 | `slack.extraction.context_chars` | `4000` | the text budget of that context |
-| `slack.extraction.escalate_over_chars` | `0` | a conversation longer than this goes to the frontier tier; 0 is off |
+| `slack.extraction.escalate_over_chars` | `0` | a conversation longer than this goes to the frontier tier, and runs again on `tier`, within the daily caps, when that call hits `max_call_usd`; 0 is off |
 | `slack.turns.max_chars` | `30000` | the Slack text a turn's instructions carry |
 
 ## Example

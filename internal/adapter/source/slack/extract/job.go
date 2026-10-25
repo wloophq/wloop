@@ -108,7 +108,9 @@ type pend struct {
 	fails          int // answer-dependent failures, toward giving up
 	retries        int // every failure after a call, toward the backoff
 	retryAt        time.Time
-	oksAtFail      int64 // Job.oks at the last failure
+	// overCap is set once an escalated call ran over the per-call cap; later calls stay on the base tier.
+	overCap   bool
+	oksAtFail int64 // Job.oks at the last failure
 }
 
 // Warnings says the breaker is open, names the targets given up on in the last day and
@@ -433,28 +435,49 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 	in.Viewer = Viewer{ID: viewer, Name: userName(in, viewer)}
 	in.NewFrom = newFrom(st, p, in.Messages)
 
-	if t := TierFor(in, tier, ec.EscalateOver()); t != tier {
-		j.logf("slack extraction %s: over %d chars, escalated to %s", k, ec.EscalateOver(), t)
-		tier = t
-	}
-	cctx, cancel := context.WithTimeout(ctx, CallTimeout)
-	r, ans, callErr := Extract(cctx, j.Asker, turns.Ask{Tier: tier, MaxCostUSD: ec.MaxCallUSD()}, in)
-	cancel()
-	run := sqlite.ExtractionRun{Unit: k, At: now, Model: ans.Model, CostUSD: ans.CostUSD, Outcome: "ok"}
-	if callErr != nil {
-		run.Outcome, run.Error = "failed", callErr.Error()
-	}
-	if err := errors.Join(j.spend(ctx, ec, now, ans), j.Store.DB.Record(ctx, run)); err != nil {
-		return outcome{called: true, callErr: callErr, err: err}
-	}
-	if callErr != nil {
-		return outcome{called: true, callErr: callErr}
+	r, o := j.call(ctx, k, p, in, ec, tier, now)
+	if !o.called || o.callErr != nil || o.err != nil {
+		return o
 	}
 	n, err := j.apply(ctx, k, p, team, in, r, st, cfg, now)
 	if err != nil {
 		return outcome{called: true, err: err}
 	}
 	return outcome{called: true, done: true, ops: n}
+}
+
+// call asks for in's result and records the call. An escalated call that runs over the per-call
+// cap runs again on the base tier, within the daily caps, so the escalation never feeds the breaker
+// on its own.
+func (j *Job) call(ctx context.Context, k unit.Unit, p *pend, in Input, ec config.SlackExtraction, base turns.Tier,
+	now time.Time) (Result, outcome) {
+	tier := base
+	if !p.overCap {
+		tier = TierFor(in, base, ec.EscalateOver())
+	}
+	if tier != base {
+		j.logf("slack extraction %s: over %d chars, escalated to %s", k, ec.EscalateOver(), tier)
+	}
+	for {
+		cctx, cancel := context.WithTimeout(ctx, CallTimeout)
+		r, ans, callErr := Extract(cctx, j.Asker, turns.Ask{Tier: tier, MaxCostUSD: ec.MaxCallUSD()}, in)
+		cancel()
+		run := sqlite.ExtractionRun{Unit: k, At: now, Model: ans.Model, CostUSD: ans.CostUSD, Outcome: "ok"}
+		if callErr != nil {
+			run.Outcome, run.Error = "failed", callErr.Error()
+		}
+		if err := errors.Join(j.spend(ctx, ec, now, ans), j.Store.DB.Record(ctx, run)); err != nil {
+			return Result{}, outcome{called: true, callErr: callErr, err: err}
+		}
+		if tier == base || !errors.Is(callErr, turns.ErrOverBudget) {
+			return r, outcome{called: true, callErr: callErr}
+		}
+		j.logf("slack extraction %s: the %s call ran over $%.2f, next on %s", k, tier, ec.MaxCallUSD(), base)
+		p.overCap, tier = true, base
+		if why, err := j.capped(ctx, ec, now); err != nil || why != "" {
+			return Result{}, outcome{err: err}
+		}
+	}
 }
 
 // answerError is a failure the answer caused after a good call: ops, segments or their

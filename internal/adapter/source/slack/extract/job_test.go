@@ -801,3 +801,16 @@ func resolveByReview(t *testing.T, r *rig, target unit.Unit) {
 		t.Fatalf("resolver resolved %d: %v", n, err)
 	}
 }
+
+func TestDailyCapSaysWhenItFrees(t *testing.T) {
+	r := newRig(t)
+	r.cfg.Slack.Extraction.MaxCalls = 1
+	postUnits(r, 3)
+	at := jT0.Add(2 * time.Minute)
+	_, skipped := r.run(at)
+	l := at.Local()
+	midnight := time.Date(l.Year(), l.Month(), l.Day()+1, 0, 0, 0, 0, time.Local).Format("2006-01-02 15:04 MST")
+	if !strings.Contains(skipped, "frees at "+midnight) || !strings.Contains(skipped, "2 units wait") {
+		t.Fatalf("skipped %q; want when the cap frees (%s) and the queue", skipped, midnight)
+	}
+}
