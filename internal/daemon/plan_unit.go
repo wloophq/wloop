@@ -155,10 +155,9 @@ func (s *Server) handlePlanUnit(w http.ResponseWriter, r *http.Request, raw stri
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	res := api.PlanResponse{Items: []api.PlanItem{}, Errors: append([]string{}, got.Errors...), Unit: got.Unit.String(), Workflows: got.Workflows}
-	for _, it := range got.Items {
-		res.Items = append(res.Items, s.wirePlanItem(r.Context(), it))
-	}
+	p := s.presentations([]unit.Unit{got.Unit})[got.Unit]
+	res := api.PlanResponse{Items: s.wirePlanItems(r.Context(), got.Items), Errors: append([]string{}, got.Errors...), Unit: got.Unit.String(),
+		Label: p.Label, Title: p.Title, Workflows: got.Workflows}
 	writeJSON(w, res)
 }
 

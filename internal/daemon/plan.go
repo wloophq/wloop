@@ -107,9 +107,7 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	for _, it := range items {
-		res.Items = append(res.Items, s.wirePlanItem(ctx, it))
-	}
+	res.Items = append(res.Items, s.wirePlanItems(ctx, items)...)
 	if q.Trigger == "" && v.Get("closed") == "1" {
 		closed, err := s.closedSessions(ctx)
 		if err != nil {
@@ -175,15 +173,17 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}}
+	var acted []workflow.Item
 	for _, id := range req.IDs {
 		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance)
 		if err != nil {
 			res.Errors = append(res.Errors, id+": "+err.Error())
 		}
 		if kept {
-			res.Items = append(res.Items, s.wirePlanItem(ctx, it))
+			acted = append(acted, it)
 		}
 	}
+	res.Items = append(res.Items, s.wirePlanItems(ctx, acted)...)
 	writeJSON(w, res)
 }
 
@@ -228,12 +228,29 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	return done, true, err
 }
 
+// wirePlanItems are items as the API serves them, each unit presented as
+// its row presents it.
+func (s *Server) wirePlanItems(ctx context.Context, items []workflow.Item) []api.PlanItem {
+	units := make([]unit.Unit, len(items))
+	for i, it := range items {
+		units[i] = it.Unit
+	}
+	known := s.presentations(units)
+	out := make([]api.PlanItem, len(items))
+	for i, it := range items {
+		out[i] = s.wirePlanItem(ctx, it)
+		p := known[it.Unit]
+		out[i].Label, out[i].Title, out[i].Link = p.Label, p.Title, p.Link
+	}
+	return out
+}
+
 // wirePlanItem is it as the API serves it, with the actions it offers. A
 // turn.start item a start block holds offers its row's trust_run and
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
-		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Label: s.unitLabel(it.Unit), Steps: []string{}, Deadline: it.Deadline,
+		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
 	for _, st := range it.Steps {

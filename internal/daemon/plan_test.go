@@ -728,7 +728,7 @@ type labeledRows struct{ threadRows }
 func (labeledRows) Provider() unit.ProviderID { return unit.Session }
 
 func (labeledRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error) {
-	return api.Row{Title: in.(string), Label: "quiet terminal", Views: []string{}}, nil
+	return api.Row{Title: "idle since Monday", Label: "quiet terminal", Link: "https://term.example/" + in.(string), Views: []string{}}, nil
 }
 
 func TestPlanItemsCarryTheirRowsLabel(t *testing.T) {
@@ -744,11 +744,17 @@ func TestPlanItemsCarryTheirRowsLabel(t *testing.T) {
 	for _, q := range []string{"?trigger=sweep", "", "?unit=session:term_1"} {
 		res := r.plan(t, q)
 		i := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == r.sess })
-		if i < 0 || res.Items[i].Label != "quiet terminal" {
+		if i < 0 || res.Items[i].Label != "quiet terminal" || res.Items[i].Title != "idle since Monday" || res.Items[i].Link != "https://term.example/term_1" {
 			t.Fatalf("%q: %+v", q, res.Items)
 		}
 		if j := slices.IndexFunc(res.Items, func(it api.PlanItem) bool { return it.Unit == u7 }); j >= 0 && res.Items[j].Label != "acme/api#7" {
 			t.Fatalf("%q: the pull request is labeled %q", q, res.Items[j].Label)
 		}
+	}
+	if res := r.plan(t, "?unit=session:term_1"); res.Label != "quiet terminal" || res.Title != "idle since Monday" {
+		t.Fatalf("the explained unit is presented as %q %q", res.Label, res.Title)
+	}
+	if res := r.plan(t, "?unit=session:term_9"); res.Label != "session:term_9" || res.Title != "" {
+		t.Fatalf("a unit without a row is presented as %q %q", res.Label, res.Title)
 	}
 }

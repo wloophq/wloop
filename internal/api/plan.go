@@ -9,15 +9,18 @@ import (
 
 // PlanItem is one item of the workflows' plan.
 type PlanItem struct {
-	ID       string        `json:"id"`
-	Workflow string        `json:"workflow"`
-	Decision string        `json:"decision"`
-	Reason   string        `json:"reason,omitempty"`
-	Default  string        `json:"default,omitempty"`
-	Mode     string        `json:"mode"`
-	Error    string        `json:"error,omitempty"`
-	Unit     unit.Unit     `json:"unit"`
-	Label    string        `json:"label,omitempty"` // Unit as a person reads it
+	ID       string    `json:"id"`
+	Workflow string    `json:"workflow"`
+	Decision string    `json:"decision"`
+	Reason   string    `json:"reason,omitempty"`
+	Default  string    `json:"default,omitempty"`
+	Mode     string    `json:"mode"`
+	Error    string    `json:"error,omitempty"`
+	Unit     unit.Unit `json:"unit"`
+	// Label, Title and Link present the unit as its row does; with no row, Label is the unit's own.
+	Label    string        `json:"label,omitempty"`
+	Title    string        `json:"title,omitempty"`
+	Link     string        `json:"link,omitempty"`
 	Steps    []string      `json:"steps"`
 	Deadline time.Time     `json:"deadline,omitzero"`
 	Gain     Gain          `json:"gain"`
@@ -62,7 +65,10 @@ type PlanResponse struct {
 	Errors []string        `json:"errors"`
 	Closed []ClosedSession `json:"closed,omitempty"`
 	// Unit is the unit a Unit query explained, as its provider lists it.
-	Unit      string         `json:"unit,omitempty"`
+	Unit string `json:"unit,omitempty"`
+	// Label and Title present the explained unit as its row does.
+	Label     string         `json:"label,omitempty"`
+	Title     string         `json:"title,omitempty"`
 	Workflows []UnitWorkflow `json:"workflows,omitempty"`
 }
 

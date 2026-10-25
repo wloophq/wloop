@@ -27,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/readmodel"
 )
 
 const (
@@ -881,10 +882,23 @@ func (s *Server) unitLabels(units []unit.Unit) []string {
 	if len(units) == 0 {
 		return nil
 	}
-	known := s.readModel().Labels(units)
+	known := s.presentations(units)
 	out := make([]string, len(units))
 	for i, u := range units {
-		out[i] = cmp.Or(known[u], u.Label())
+		out[i] = known[u].Label
+	}
+	return out
+}
+
+// presentations are units as their rows present them, from one snapshot;
+// a unit without a row has its own label alone.
+func (s *Server) presentations(units []unit.Unit) map[unit.Unit]readmodel.Presentation {
+	known := s.readModel().Presentations(units)
+	out := make(map[unit.Unit]readmodel.Presentation, len(units))
+	for _, u := range units {
+		p := known[u]
+		p.Label = cmp.Or(p.Label, u.Label())
+		out[u] = p
 	}
 	return out
 }

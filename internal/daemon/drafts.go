@@ -305,8 +305,8 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 	}
 	v.Actions = catalog.DraftStates(f)
 	v.Where = s.draftWhere(ctx, d)
-	p := s.readModel().Presentations([]unit.Unit{d.Unit})[d.Unit]
-	v.Label, v.Title, v.Link = cmp.Or(p.Label, d.Unit.Label()), p.Title, p.Link
+	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
+	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link
 	return v
 }
 
