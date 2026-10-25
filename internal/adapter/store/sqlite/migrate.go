@@ -168,6 +168,9 @@ func (e *MigrationError) Unwrap() error { return e.Err }
 // freeSpace is freeBytes, which tests replace.
 var freeSpace = freeBytes
 
+// ErrDamaged is a store that fails SQLite's integrity checks.
+var ErrDamaged = errors.New("the store is damaged")
+
 // ErrNoSpace is too little free space for the backup a migration takes.
 var ErrNoSpace = errors.New("not enough free space for the store's backup")
 
@@ -239,8 +242,12 @@ func (set schemaSet) migrate(ctx context.Context, path string, o MigrateOptions)
 	if err := check(ctx, conn, "integrity_check"); err != nil {
 		return p, &MigrationError{From: p.From, Reached: reached, Step: "the final check", Backup: p.Backup, Err: err}
 	}
-	_, err = conn.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
-	warn(err)
+	var busy, frames, done int
+	if err := conn.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &frames, &done); err != nil {
+		warn(err)
+	} else if busy != 0 {
+		warn(errors.New("a reader kept the WAL from being checkpointed after the migration; the store's header shows the new version once it closes"))
+	}
 	return p, nil
 }
 
@@ -338,7 +345,7 @@ func check(ctx context.Context, q rowsQueryer, pragma string) error {
 	if len(found) > 3 {
 		found = append(found[:3], fmt.Sprintf("and %d more", len(found)-3))
 	}
-	return fmt.Errorf("the store fails its %s: %s", strings.ReplaceAll(pragma, "_", " "), strings.Join(found, "; "))
+	return fmt.Errorf("%w: it fails its %s: %s", ErrDamaged, strings.ReplaceAll(pragma, "_", " "), strings.Join(found, "; "))
 }
 
 // backupTo writes a consistent copy of the store on conn to dst, through a

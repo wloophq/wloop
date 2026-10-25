@@ -169,7 +169,7 @@ func (set schemaSet) inspect(path string) (Status, error) {
 		return Status{Empty: !ok}, err
 	}
 	s := Status{Version: v, Compatible: v}
-	if v == set.version {
+	if v == set.version && !walHolds(path) {
 		return s, nil
 	}
 	// The header lags a version change still in the WAL.
@@ -187,6 +187,15 @@ func (set schemaSet) inspect(path string) (Status, error) {
 	}
 	return s, err
 }
+
+func walHolds(path string) bool {
+	fi, err := os.Stat(path + "-wal")
+	return err == nil && fi.Size() > 0
+}
+
+// Refuse is the SchemaError of a store in s at path, nil when this release
+// opens it.
+func Refuse(path string, s Status) error { return current.refuse(path, s) }
 
 // headerVersion is the user_version in the header of the file at path; ok
 // is false for an absent file or one too short to hold a header.
