@@ -65,8 +65,9 @@ func (m *Manager) worktrees() ([]wsdomain.Workspace, error) {
 	return out, nil
 }
 
-// appWorktrees are the worktrees the app made for a session of its store, in
-// the store's order, while they are still on disk.
+// appWorktrees are the worktrees the app made for a session of its store not
+// archived, in the store's order, while they are still on disk: the app may
+// collect the worktree of an archived session.
 func (m *Manager) appWorktrees() ([]wsdomain.Workspace, error) {
 	files, err := m.storeFiles(hostPrefix + "*.json")
 	if err != nil {
@@ -75,10 +76,13 @@ func (m *Manager) appWorktrees() ([]wsdomain.Workspace, error) {
 	var out []wsdomain.Workspace
 	for _, f := range files {
 		s, err := readStored(f)
-		if err != nil || s.WorktreePath == "" {
+		if err != nil || s.WorktreePath == "" || s.IsArchived {
 			continue
 		}
-		path := filepath.Clean(s.WorktreePath)
+		path, err := canonical(s.WorktreePath)
+		if err != nil {
+			continue
+		}
 		if slices.ContainsFunc(out, func(o wsdomain.Workspace) bool { return o.Path == path }) {
 			continue
 		}

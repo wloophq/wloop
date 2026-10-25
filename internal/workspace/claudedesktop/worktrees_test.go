@@ -162,10 +162,19 @@ func TestListsTheWorktreesTheAppCreated(t *testing.T) {
 	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "elsewhere", found); err != nil {
 		t.Fatal(err)
 	}
+	archived := filepath.Join(f.repo, ".claude", "worktrees", "archived")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "archived", archived); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "api-link")
+	if err := os.Symlink(f.repo, link); err != nil {
+		t.Fatal(err)
+	}
 	gone := filepath.Join(f.repo, ".claude", "worktrees", "gone")
-	f.store(t, "acct-1", map[string]any{"sessionId": HandleOf(testUUID), "cwd": made, "worktreePath": made, "originCwd": f.repo})
+	f.store(t, "acct-1", map[string]any{"sessionId": HandleOf(testUUID), "worktreePath": filepath.Join(link, ".claude", "worktrees", "brave-lovelace-1a2b3c")})
 	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000003", "cwd": found})
-	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000004", "worktreePath": gone, "isArchived": true})
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000004", "worktreePath": gone})
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000005", "worktreePath": archived, "isArchived": true})
 	own := f.worktree(t, "pr-7")
 
 	list, err := f.m.List(ctx)
@@ -209,5 +218,30 @@ func TestRemovesAWorktreeTheAppCreated(t *testing.T) {
 	}
 	if _, err := os.Stat(made); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("the worktree is still there: %v", err)
+	}
+}
+
+func TestStartsASessionInAWorktreeTheAppCreated(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	made := filepath.Join(f.repo, ".claude", "worktrees", "brave-lovelace-1a2b3c")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "claude/brave-lovelace-1a2b3c", made); err != nil {
+		t.Fatal(err)
+	}
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000003", "worktreePath": made})
+	mint, err := os.ReadFile(filepath.Join("testdata", "mint_output.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.exec.claude = func(Cmd) ([]byte, error) { return mint, nil }
+	f.exec.open = func(Cmd) error {
+		f.register(t, "registry_desktop.json", map[string]any{"cwd": made})
+		return nil
+	}
+	if _, err := f.m.StartAgentSession(ctx, workspace.StartRequest{WorkspaceID: made, Session: testUUID, Agent: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if c := f.exec.ran("claude"); len(c) != 1 || c[0].Dir != made {
+		t.Fatalf("mint = %+v", c)
 	}
 }
