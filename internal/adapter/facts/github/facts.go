@@ -85,7 +85,10 @@ type addressResult struct {
 	reason                  string
 	reviewers, checks       []string
 	fingerprint, checksHead string
-	observed                bool
+	// conflictHead is the head whose lasting conflict with the base the
+	// round resolves.
+	conflictHead string
+	observed     bool
 }
 
 // runs says whether a round of r would run without the user: due and not
@@ -479,7 +482,7 @@ func (pl *planner) address(ref pr.Ref, r *result) {
 	}
 	pl.addressStep(wsdomain.Workspace{}, f, r)
 	if r.address.due && r.address.fingerprint == "" {
-		r.address.due, r.address.reason = false, "failing checks alone start no round without a workspace"
+		r.address.due, r.address.reason = false, "failing checks or a conflict alone start no round without a workspace"
 		return
 	}
 	r.address.observed = r.address.due && !pl.cfg.For(ref.Owner, ref.Repo).AddressWithoutWorkspace
@@ -496,7 +499,8 @@ func (pl *planner) developed(p dinv.PR) bool {
 }
 
 // addressStep decides a triage round when others reviewed a pull request I
-// develop since the last one, or its checks failed on a new head.
+// develop since the last one, its checks failed on a new head, or a new head
+// has conflicted with the base past the conflict window.
 func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	if f.State != dgh.StateOpen || (pl.completed != "" && w.Status == pl.completed) {
 		r.address.reason = "nothing to address"
@@ -523,11 +527,23 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
+	if pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.ConflictHead(key) {
+		reasons = append(reasons, "conflicts with "+f.BaseRefName)
+		r.address.conflictHead = f.HeadRefOid
+	}
 	if len(reasons) == 0 {
 		r.address.reason = "nothing to address"
 		return
 	}
 	r.address.due, r.address.reason, r.address.reviewers, r.address.checks, r.address.fingerprint = true, strings.Join(reasons, "; "), who, failed, fp
+}
+
+// conflicts says whether f's head has conflicted with its base for the
+// conflict window.
+func (pl *planner) conflicts(f sweep.Facts) bool {
+	row := pl.v.byRef[f.Ref]
+	return row.Mergeable == "CONFLICTING" && !row.MergeableAt.IsZero() && row.HeadOid == f.HeadRefOid &&
+		pl.now.Sub(row.MergeableAt) >= pl.v.conflictWindow()
 }
 
 // facts are ref's pr facts from r at now.
@@ -581,6 +597,7 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 	f["pr.first.due"], f["pr.first.reason"] = r.first.due, r.first.reason
 	f["pr.address.due"], f["pr.address.reason"], f["pr.address.observed"] = r.address.due, r.address.reason, r.address.observed
 	f["pr.address.reviewers"], f["pr.address.checks"] = nonNil(r.address.reviewers), nonNil(r.address.checks)
+	f["pr.address.conflict"] = r.address.due && r.address.conflictHead != ""
 	f["pr.fingerprint"] = fingerprint(r, row)
 	return f
 }
@@ -597,7 +614,11 @@ func fingerprint(r result, row dinv.PR) string {
 		parts = append(parts, "first:"+row.HeadOid)
 	}
 	if r.address.due {
-		parts = append(parts, "address:"+r.address.fingerprint+"@"+r.address.checksHead)
+		a := "address:" + r.address.fingerprint + "@" + r.address.checksHead
+		if r.address.conflictHead != "" {
+			a += "!conflict@" + r.address.conflictHead
+		}
+		parts = append(parts, a)
 	}
 	return strings.Join(parts, ";")
 }

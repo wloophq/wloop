@@ -641,13 +641,21 @@ func TestFirstRoundBlocks(t *testing.T) {
 	}
 }
 
+func TestAStartBlockAnOlderReleaseWroteReadsWithoutAConflictHead(t *testing.T) {
+	key := strings.Join([]string{"2026-10-09T10:00:00Z", "trust", "/src/api", "", "", "", "triage", "f1", "c2"}, "\n")
+	b, ok := StartBlockOf(port.Event{Kind: dinv.KindRoundBlocked, Key: key})
+	if want := (StartBlock{Question: "trust", Root: "/src/api", Round: "triage", Fingerprint: "f1", ChecksHead: "c2"}); !ok || !reflect.DeepEqual(b, want) {
+		t.Fatalf("%+v %v", b, ok)
+	}
+}
+
 func TestStoredStartBlocksReadByUnit(t *testing.T) {
 	s := open(t)
 	ctx := context.Background()
 	at := time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC)
 	pull := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	thread := unit.Unit{Provider: "thread", Key: "1700000000.1"}
-	want := StartBlock{Question: "project-mcp", Root: "/src/api", Home: "/h", Homes: []string{"/h"}, Round: "first round", Fingerprint: "f1"}
+	want := StartBlock{Question: "project-mcp", Root: "/src/api", Home: "/h", Homes: []string{"/h"}, Round: "first round", Fingerprint: "f1", ConflictHead: "c1"}
 	if err := s.RecordEvent(ctx, dinv.Event{PR: pull, Kind: dinv.KindRoundBlocked, Key: want.Key(at), At: at, Data: "asked"}); err != nil {
 		t.Fatal(err)
 	}

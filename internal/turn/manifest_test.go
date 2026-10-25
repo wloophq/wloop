@@ -299,6 +299,9 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.address.checks": func(_ *Builder, r *Request) {
 			r.Payload.(*PR).Address = &RoundReason{Checks: []FailingCheck{{Name: "ci/test"}}}
 		},
+		"pr.address.conflict": func(_ *Builder, r *Request) {
+			r.Payload.(*PR).Address = &RoundReason{Conflict: &RoundConflict{Base: "main"}}
+		},
 		"config.address_reviews":             func(b *Builder, _ *Request) { b.Config = config.Config{AddressReviews: true} },
 		"config.address_checks":              func(b *Builder, _ *Request) { b.Config = config.Config{AddressChecks: true} },
 		"config.followups_without_workspace": func(b *Builder, _ *Request) { b.Config = config.Config{FollowupsWithoutWorkspace: true} },

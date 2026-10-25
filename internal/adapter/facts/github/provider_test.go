@@ -438,14 +438,72 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 	}
 }
 
+func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	p := w.provider()
+	f := facts(t, p, r.Unit())
+	if f["pr.address.due"] != true || f["pr.address.reason"] != "conflicts with main" || f["pr.address.conflict"] != true {
+		t.Fatalf("a lasting conflict: %v", f)
+	}
+	c, ok, err := p.Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress)
+	if err != nil || !ok || c.ConflictHead != "head" || c.ChecksHead != "" || c.Fingerprint != "" {
+		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
+	}
+	first := f["pr.fingerprint"]
+
+	w.rounds.SetConflictHead(r.String(), "head")
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
+		t.Fatalf("a handled conflict is due: %v", f)
+	}
+
+	row, d := w.rows[r], w.details[r]
+	row.HeadOid, d.HeadRefOid = "head2", "head2"
+	w.rows[r], w.details[r] = row, d
+	f = facts(t, w.provider(), r.Unit())
+	if f["pr.address.due"] != true || f["pr.fingerprint"] == first {
+		t.Fatalf("a conflict on a new head: %v", f)
+	}
+}
+
+func TestAConflictWithinItsWindowIsNoReason(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Minute), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+		t.Fatalf("a fresh conflict: %v", f)
+	}
+}
+
+func TestAConflictJoinsTheReviewsItCameWith(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, _ *pr.Facts) {
+		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.reason"] != "reviewed by bob; failing checks: lint; conflicts with main" {
+		t.Fatalf("reason = %q", f["pr.address.reason"])
+	}
+}
+
 func TestAddressWithoutAWorkspaceNeedsReviews(t *testing.T) {
 	w := newWorld()
 	r := w.add(5, me, func(row *dinv.PR, f *pr.Facts) {
 		row.ChecksState = "FAILURE"
 		f.Checks = []pr.Check{{Name: "lint", Failed: true}}
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks alone start no round without a workspace" {
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
 		t.Fatalf("checks alone without a workspace: %v", f)
+	}
+	r = w.add(7, me, func(row *dinv.PR, _ *pr.Facts) {
+		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
+		t.Fatalf("a conflict alone without a workspace: %v", f)
 	}
 	r = w.mine(6, nil)
 	w.snap.Workspaces = w.snap.Workspaces[:1]

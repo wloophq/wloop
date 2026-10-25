@@ -14,9 +14,10 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-// automatedReason is the round the planner decided: its reviewers and
-// failing checks, each check with the summary and link of the read.
-func automatedReason(f workflow.Facts, checks []dpr.Check) *turn.RoundReason {
+// automatedReason is the round the planner decided: its reviewers, failing
+// checks and conflict, each check with the summary and link of the read.
+func automatedReason(f workflow.Facts, read dpr.Facts) *turn.RoundReason {
+	checks := read.Checks
 	var r turn.RoundReason
 	for _, who := range factList(f, "pr.address.reviewers") {
 		r.Reviewers = append(r.Reviewers, turn.RoundReviewer{Login: who})
@@ -28,14 +29,17 @@ func automatedReason(f workflow.Facts, checks []dpr.Check) *turn.RoundReason {
 		}
 		r.Checks = append(r.Checks, c)
 	}
+	if conflict, _ := f["pr.address.conflict"].(bool); conflict {
+		r.Conflict = &turn.RoundConflict{Base: read.BaseRefName}
+	}
 	return nonEmpty(r)
 }
 
 // handReason is what a round asked for by hand finds: the reviews a round
 // would answer with none before it, marked handled unless they came after
-// the last round, and the checks failing now, marked handled when the last
-// round covered this head.
-func handReason(f dpr.Facts, viewer string, handled time.Time, checksHead string, cfg config.Config) *turn.RoundReason {
+// the last round, and the checks failing and the conflict now, each marked
+// handled when the last round covered this head.
+func handReason(f dpr.Facts, viewer string, handled time.Time, checksHead, conflictHead string, cfg config.Config) *turn.RoundReason {
 	in := dchange.AddressInput{PR: f, Viewer: viewer, SkipReviewers: cfg.AddressSkipReviewers}
 	all, _ := dchange.ReviewsToAddress(in)
 	in.Handled = handled
@@ -55,11 +59,14 @@ func handReason(f dpr.Facts, viewer string, handled time.Time, checksHead string
 		}
 		r.Checks = append(r.Checks, turn.FailingCheck{Name: c.Name, Summary: c.Summary, URL: c.URL, Handled: f.HeadRefOid != "" && f.HeadRefOid == checksHead})
 	}
+	if f.Mergeable == "CONFLICTING" {
+		r.Conflict = &turn.RoundConflict{Base: f.BaseRefName, Handled: f.HeadRefOid != "" && f.HeadRefOid == conflictHead}
+	}
 	return nonEmpty(r)
 }
 
 func nonEmpty(r turn.RoundReason) *turn.RoundReason {
-	if len(r.Reviewers) == 0 && len(r.Checks) == 0 {
+	if len(r.Reviewers) == 0 && len(r.Checks) == 0 && r.Conflict == nil {
 		return nil
 	}
 	return &r
@@ -85,12 +92,12 @@ func (e *Env) withAddressReason(ctx context.Context, cfg config.Config, d dinten
 		return
 	}
 	var handled time.Time
-	var checksHead string
+	var checksHead, conflictHead string
 	if e.Rounds != nil {
 		if st, err := e.Rounds.Load(ctx); err == nil {
 			handled, _ = time.Parse(time.RFC3339, st.Fingerprint(ref.String()))
-			checksHead = st.ChecksHead(ref.String())
+			checksHead, conflictHead = st.ChecksHead(ref.String()), st.ConflictHead(ref.String())
 		}
 	}
-	p.Address = handReason(full.Facts, viewer, handled, checksHead, cfg.For(ref.Owner, ref.Repo))
+	p.Address = handReason(full.Facts, viewer, handled, checksHead, conflictHead, cfg.For(ref.Owner, ref.Repo))
 }

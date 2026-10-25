@@ -90,11 +90,19 @@ type PR struct {
 	Address *RoundReason
 }
 
-// RoundReason is what an address round answers: the reviewers and the
-// failing checks. Handled marks what an earlier round already covered.
+// RoundReason is what an address round answers: the reviewers, the
+// failing checks and a conflict with the base. Handled marks what an earlier
+// round already covered.
 type RoundReason struct {
 	Reviewers []RoundReviewer
 	Checks    []FailingCheck
+	Conflict  *RoundConflict
+}
+
+// RoundConflict is the head's conflict with Base, as GitHub reports it.
+type RoundConflict struct {
+	Base    string
+	Handled bool
 }
 
 type RoundReviewer struct {
