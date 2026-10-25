@@ -112,3 +112,19 @@ func TestARoundFallsThroughWhenTheCreatorCannotHostIt(t *testing.T) {
 		t.Fatalf("no reason logged: %s", te.err)
 	}
 }
+
+func TestARoundNoManagerCanHostFailsClosedInTheOwner(t *testing.T) {
+	t.Parallel()
+	desk, orca, te := madeByDesk(t)
+	desk.Refuses = errors.New("runs only the default home")
+	orca.OnlyAgents = []string{"another-agent"}
+	if code := te.run("address", "https://github.com/acme/api/pull/9"); code == 0 {
+		t.Fatalf("a round no manager can host went out: %s", te.out)
+	}
+	if !strings.Contains(te.err.String(), "desk owns brave-lovelace and cannot launch this session") {
+		t.Fatalf("err: %s", te.err)
+	}
+	if len(sessionsStarted(desk)) != 0 || len(sessionsStarted(orca)) != 0 {
+		t.Fatalf("desk started %v, orca %v", sessionsStarted(desk), sessionsStarted(orca))
+	}
+}
