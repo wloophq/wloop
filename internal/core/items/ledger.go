@@ -23,8 +23,8 @@ type Reconciler interface {
 	Reconcile(ctx context.Context, u unit.Unit, desired []items.Item, at unit.Anchor, absent items.Resolution) (Result, error)
 }
 
-// DisabledError is returned, with nothing applied, when an op or a proposal names a unit of a
-// disabled plugin; the daemon answers it with 409.
+// DisabledError is returned, with nothing applied, when an op or a proposal is on a unit of a
+// disabled plugin; the daemon answers it with 409. A link to such a unit is stored.
 type DisabledError struct{ Provider unit.ProviderID }
 
 func (e *DisabledError) Error() string { return string(e.Provider) + " is disabled" }
@@ -61,11 +61,6 @@ func (l *Ledger) Apply(ctx context.Context, prov items.Provenance, ops []items.O
 		}
 		if err := l.refuseDisabled(o.Unit); err != nil {
 			return Result{}, err
-		}
-		if o.To != nil && !o.To.IsZero() {
-			if err := l.refuseDisabled(*o.To); err != nil {
-				return Result{}, err
-			}
 		}
 		units = append(units, o.Unit)
 	}

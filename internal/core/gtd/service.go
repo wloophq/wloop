@@ -63,8 +63,8 @@ func (s *Service) handler(kind gtd.Kind, verb gtd.Verb) VerbHandler {
 }
 
 // Do runs req.Verb on entry id: a registered handler first, else the state change. An entry of a unit whose
-// plugin is disabled refuses every verb with ErrPluginDisabled, but dismiss moves an entry whose units are all of
-// disabled plugins to the Trash.
+// plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves a derived entry, or one
+// whose units are all of disabled plugins, to the Trash whole, and detaches a disabled plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error) {
 	if !known(req.Verb) {
 		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
@@ -86,14 +86,14 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
-	off := false
-	if err := s.writable(ctx, e, nil); err != nil {
-		if hidden := s.hider(); req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) || hidden == nil || !hidden(e) {
+	enabled := map[unit.Unit]bool{}
+	if err := s.writable(ctx, e, enabled); err != nil {
+		if req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
-		off = true
+		return s.dismissOff(ctx, id, enabled)
 	}
-	if h := s.handler(e.Kind, req.Verb); h != nil && !off {
+	if h := s.handler(e.Kind, req.Verb); h != nil {
 		return h(ctx, e, req)
 	}
 	s.mu.Lock()
@@ -158,6 +158,59 @@ func (s *Service) project(ctx context.Context, e gtd.Entry, args map[string]stri
 		e.Position = pos
 	}
 	return append(cs, gtd.Change{Op: gtd.OpUpdate, Entry: e, Why: "project"}), nil
+}
+
+// dismissOff dismisses entry id, which has a unit or an item of a disabled plugin, with no handler: it detaches
+// the disabled plugins' units and the items on them, and the entry keeps its state. A derived entry, whose id the
+// unit it came from names, or one with no unit of an enabled plugin moves to the Trash whole. enabled caches the
+// answers per unit.
+func (s *Service) dismissOff(ctx context.Context, id gtd.ID, enabled map[unit.Unit]bool) (Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.d.Store.Entry(ctx, id)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := accepts(e, gtd.VerbDismiss); err != nil {
+		return Result{}, err
+	}
+	units := slices.Clone(e.Units)
+	for _, r := range e.Items {
+		units = append(units, r.Unit)
+	}
+	var off []unit.ProviderID
+	for _, u := range units {
+		on, seen := enabled[u]
+		if !seen {
+			if _, on, err = s.d.Facts.UnitFacts(ctx, u); err != nil {
+				return Result{}, err
+			}
+			enabled[u] = on
+		}
+		if !on && !slices.Contains(off, u.Provider) {
+			off = append(off, u.Provider)
+		}
+	}
+	isOff := func(u unit.Unit) bool { return slices.Contains(off, u.Provider) }
+	now := s.now()
+	next, why := e, "detached"
+	if len(off) == 0 || e.Origin == gtd.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
+		if next, err = transition(e, Request{Verb: gtd.VerbDismiss}, now); err != nil {
+			return Result{}, err
+		}
+		why = string(gtd.VerbDismiss)
+	} else {
+		next.Units = slices.DeleteFunc(slices.Clone(e.Units), isOff)
+		next.Items = slices.DeleteFunc(slices.Clone(e.Items), func(r gtd.ItemRef) bool { return isOff(r.Unit) })
+		next.Updated = now
+		for _, p := range off {
+			why += " " + string(p)
+		}
+	}
+	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: next, Why: why}}); err != nil {
+		return Result{}, err
+	}
+	return Result{Entry: next}, nil
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

@@ -409,14 +409,27 @@ func TestDisabledProviderRefusesWholeCall(t *testing.T) {
 	if _, err := l.Decide(ctx, p.ID, true); !errors.As(err, &de) {
 		t.Errorf("decide: %v", err)
 	}
-	if _, err := l.Apply(ctx, items.User, []items.Op{{Op: items.OpLink, Unit: thread, Anchor: anchor("user:3"), To: &pull, LinkKind: link.Mention}}); !errors.As(err, &de) {
-		t.Errorf("link to a disabled unit: %v", err)
-	}
 	if _, err := l.Reconcile(ctx, pull, nil, anchor("row:1"), ""); !errors.As(err, &de) {
 		t.Errorf("reconcile: %v", err)
 	}
 	if s.commits != commits || len(s.log) != logged || len(s.items[thread]) != 0 {
 		t.Errorf("wrote: commits %d -> %d", commits, s.commits)
+	}
+}
+
+func TestALinkToADisabledProvidersUnitIsStored(t *testing.T) {
+	ctx := context.Background()
+	links := &fakeLinks{}
+	l, _ := newLedger(newMem())
+	l.Links = links
+	l.Enabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
+	res, err := l.Apply(ctx, items.User, []items.Op{{Op: items.OpLink, Unit: thread, Anchor: anchor("user:3"), To: &pull, LinkKind: link.Mention}})
+	if err != nil || len(res.Applied) != 1 || len(links.put) != 1 || links.put[0].To != pull {
+		t.Fatalf("%+v %v %+v", res, err, links.put)
+	}
+	var de *DisabledError
+	if _, err := l.Apply(ctx, items.User, []items.Op{{Op: items.OpLink, Unit: pull, Anchor: anchor("user:4"), To: &thread, LinkKind: link.Mention}}); !errors.As(err, &de) || de.Provider != unit.GitHub {
+		t.Errorf("a link from a disabled unit: %v", err)
 	}
 }
 

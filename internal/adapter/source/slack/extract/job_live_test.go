@@ -59,7 +59,7 @@ func TestLongCallOutlivesThePassBudget(t *testing.T) {
 	}
 }
 
-func TestLinkToDisabledProviderIsDropped(t *testing.T) {
+func TestLinkToDisabledProviderIsStored(t *testing.T) {
 	r := newRig(t)
 	r.ledger.Ledger.Enabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/widget#527"}
@@ -79,11 +79,8 @@ func TestLinkToDisabledProviderIsDropped(t *testing.T) {
 		t.Fatalf("items %+v", its)
 	}
 	ls, err := r.db.Links().From(context.Background(), thread(ts(1)))
-	if err != nil || len(ls) != 0 {
+	if err != nil || len(ls) != 1 || ls[0].To != pr {
 		t.Fatalf("links %+v %v", ls, err)
-	}
-	if !strings.Contains(strings.Join(r.logs, "\n"), "1 links to github dropped") {
-		t.Fatalf("logs %v", r.logs)
 	}
 }
 
