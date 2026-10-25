@@ -2471,17 +2471,17 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 494682c5ae59
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 494682c5ae59 https://github.com/acme/api/pull/7` and follow what it prints.
+id: a89525803f82
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn a89525803f82 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 494682c5ae59 for address in acme/api.
+Instructions a89525803f82 for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
 ## Your task this turn
 
-You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews and failing checks, change the code, reply and ask for the next look.
+You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews, failing checks and conflicts, change the code, reply and ask for the next look.
 
 ## Guidance
 
@@ -2535,7 +2535,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -2546,6 +2546,7 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
+- a conflict with the base (`CONFLICTING`);
 - each check that failed on the current head:
 
 ```bash
@@ -2635,6 +2636,8 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
+- a conflict with the base you cannot resolve confidently: abort the
+  merge, name its files and sides;
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 
@@ -2738,7 +2741,8 @@ changes and approval, and still ask for the next look.
 When the round only tidied up (threads already settled by earlier commits or
 replies, now resolved, with nothing pushed and nothing new for a reviewer),
 skip this section: no top-level comment, no re-request. The same holds when
-the round only fixed or reran failing checks: the push speaks for itself. An
+the round only fixed or reran failing checks, or only merged the base in:
+the push speaks for itself. An
 approval that already covers the current head stands.
 
 ### 8. Report
@@ -2806,17 +2810,17 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: 952e518ac440
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 952e518ac440 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4b3ddcf1e86a
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 4b3ddcf1e86a https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 952e518ac440 for address in acme/api.
+Instructions 4b3ddcf1e86a for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
 ## Your task this turn
 
-You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews and failing checks, change the code, reply and ask for the next look. The checkout holds work not on the pull request: 2 local commits.
+You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews, failing checks and conflicts, change the code, reply and ask for the next look. The checkout holds work not on the pull request: 2 local commits.
 
 ## Rules
 
@@ -2868,7 +2872,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -2879,6 +2883,7 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
+- a conflict with the base (`CONFLICTING`);
 - each check that failed on the current head:
 
 ```bash
@@ -2968,6 +2973,8 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
+- a conflict with the base you cannot resolve confidently: abort the
+  merge, name its files and sides;
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 
@@ -3071,7 +3078,8 @@ changes and approval, and still ask for the next look.
 When the round only tidied up (threads already settled by earlier commits or
 replies, now resolved, with nothing pushed and nothing new for a reviewer),
 skip this section: no top-level comment, no re-request. The same holds when
-the round only fixed or reran failing checks: the push speaks for itself. An
+the round only fixed or reran failing checks, or only merged the base in:
+the push speaks for itself. An
 approval that already covers the current head stands.
 
 ### 8. Report
@@ -3152,17 +3160,17 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: cf57dfa93232
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn cf57dfa93232 https://github.com/acme/api/pull/7` and follow what it prints.
+id: bbebd98610d6
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn bbebd98610d6 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions cf57dfa93232 for address in acme/api.
+Instructions bbebd98610d6 for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
 ## Your task this turn
 
-You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender", opened by @ana, which {{name}} took over for the user just before this turn: it is now theirs to develop. Triage its reviews and failing checks, change the code, reply and ask for the next look.
+You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender", opened by @ana, which {{name}} took over for the user just before this turn: it is now theirs to develop. Triage its reviews, failing checks and conflicts, change the code, reply and ask for the next look.
 
 ## Rules
 
@@ -3210,7 +3218,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -3221,6 +3229,7 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
+- a conflict with the base (`CONFLICTING`);
 - each check that failed on the current head:
 
 ```bash
@@ -3310,6 +3319,8 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
+- a conflict with the base you cannot resolve confidently: abort the
+  merge, name its files and sides;
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 
@@ -3413,7 +3424,8 @@ changes and approval, and still ask for the next look.
 When the round only tidied up (threads already settled by earlier commits or
 replies, now resolved, with nothing pushed and nothing new for a reviewer),
 skip this section: no top-level comment, no re-request. The same holds when
-the round only fixed or reran failing checks: the push speaks for itself. An
+the round only fixed or reran failing checks, or only merged the base in:
+the push speaks for itself. An
 approval that already covers the current head stands.
 
 ### 8. Report
@@ -3969,17 +3981,17 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: 2519058d5d4f
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 2519058d5d4f https://github.com/acme/api/pull/7` and follow what it prints.
+id: 12bc5482d31b
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 12bc5482d31b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 2519058d5d4f for address in acme/api.
+Instructions 12bc5482d31b for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
 ## Your task this turn
 
-You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews and failing checks, change the code, reply and ask for the next look.
+You develop https://github.com/acme/api/pull/7, "Add retries to the webhook sender". Triage its reviews, failing checks and conflicts, change the code, reply and ask for the next look.
 
 ## Where the last session stopped
 
@@ -4042,7 +4054,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -4053,6 +4065,7 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
+- a conflict with the base (`CONFLICTING`);
 - each check that failed on the current head:
 
 ```bash
@@ -4142,6 +4155,8 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
+- a conflict with the base you cannot resolve confidently: abort the
+  merge, name its files and sides;
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 
@@ -4245,7 +4260,8 @@ changes and approval, and still ask for the next look.
 When the round only tidied up (threads already settled by earlier commits or
 replies, now resolved, with nothing pushed and nothing new for a reviewer),
 skip this section: no top-level comment, no re-request. The same holds when
-the round only fixed or reran failing checks: the push speaks for itself. An
+the round only fixed or reran failing checks, or only merged the base in:
+the push speaks for itself. An
 approval that already covers the current head stands.
 
 ### 8. Report
@@ -4611,7 +4627,7 @@ For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 id: fcc9db862869
 prompt: {{name}} probe loop-e2e/probe#1760000000, started by {{name}}. Run `'/opt/loop/bin/loop' instructions probe --turn fcc9db862869 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
-sources:
+sources: 
 Instructions fcc9db862869 for probe in loop-e2e/probe.
 
 # {{name}} probe loop-e2e/probe#1760000000, started by {{name}}.
@@ -4663,7 +4679,7 @@ prompt; a long one tells you to run `'/opt/loop/bin/loop' turn answer https://gi
 id: 1856c191bee9
 prompt: Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered. Run `'/opt/loop/bin/loop' instructions probe --turn 1856c191bee9 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
-sources:
+sources: 
 Instructions 1856c191bee9 for probe in loop-e2e/probe.
 
 # Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered.

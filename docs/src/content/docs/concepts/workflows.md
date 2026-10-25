@@ -13,7 +13,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 |---|---|---|
 | `review-first-round` | starts a first review round on a pull request that requests your review by name | apply, 60 s window |
 | `review-follow-up` | starts a follow-up round when the author pushed, replied or re-requested you | apply, 60 s window |
-| `address` | starts an address round on your pull request when reviews arrive or checks fail | apply, 60 s window |
+| `address` | starts an address round on your pull request when reviews arrive, checks fail or it conflicts with its base | apply, 60 s window |
 | `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `nudge.silent_days` (30) of silence | apply, waits for you |
 | `session-pr-finished`, `session-duplicate`, `session-worktree-gone`, `session-finished-quiet`, `session-asked-quiet`, `session-close-when-done` | close agent sessions that are finished, duplicated or quiet, whose worktree or transcript is gone, or that their manager closed (a session you archived in Claude Desktop) | apply |
 | `session-manual-quiet` | offers to close a session you started that went quiet | apply, waits for you |
@@ -30,7 +30,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 
 **Follow-up.** After your last review: new non-merge commits, a comment or review by the author (ignored after an approval), or your review re-requested. There is one follow-up per published review and head, plus one per re-request. A round with nothing new to say publishes nothing and records `settled`; the author's next push starts another. A round that finds the author silent on every point of your last review asks you instead. An automatic first round never approves on its own; an automatic follow-up approves only after a verdict you stood behind, when every blocking finding is resolved and the new commits only answer the reviews.
 
-**Address.** On a pull request you develop: a review by someone else (bots included) with changes requested, comments, or an approval with inline comments; an unresolved thread whose last comment is someone else's; or failing checks, once every check on the head finished, one round per head. Turn them off with `address_reviews: false` and `address_checks: false`, or skip some with `address_skip_reviewers` and `ignore_checks`.
+**Address.** On a pull request you develop: a review by someone else (bots included) with changes requested, comments, or an approval with inline comments; an unresolved thread whose last comment is someone else's; failing checks, once every check on the head finished, one round per head; or a conflict with the base that lasted the conflict window (`sweep.fast`, at least five minutes), one round per head. Turn them off with `address_reviews: false` and `address_checks: false`, or skip some with `address_skip_reviewers` and `ignore_checks`.
 
 **Postponed.** A round waits while the agent of its workspace works or waits for input, or while you have the workspace focused in its manager. `rounds.per_pr_per_day` (5) bounds the automatic rounds per pull request per day; a held round marks the card unread, shows as "held (cap)", and `{{command}} review <url>` or `{{command}} address <url>` runs it by hand, outside the cap.
 

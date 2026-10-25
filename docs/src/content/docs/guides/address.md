@@ -1,6 +1,6 @@
 ---
 title: Address reviews on your pull request
-description: Let an agent triage the reviews and failing checks of a pull request you develop.
+description: Let an agent triage the reviews, failing checks and conflicts of a pull request you develop.
 ---
 
 An **address round** runs in the author workspace of a pull request you develop. The procedure verifies each review comment on its own, applies what holds, pushes, replies in every thread, resolves the settled ones and asks the reviewers for another look. It stops and asks you first when something is ambiguous or risky: a deep change of direction, an irreversible surface, a blocking request it would decline.
@@ -11,11 +11,14 @@ With a workspace for your pull request (linked to it, or on its head branch), th
 
 - someone else reviews it (bots included) with changes requested, comments, or an approval with inline comments;
 - an unresolved review thread ends with someone else's comment;
-- its checks fail, once every check on the head finished, one round per head.
+- its checks fail, once every check on the head finished, one round per head;
+- GitHub reports a conflict with its base for longer than the conflict window (`sweep.fast`, at least five minutes), one round per head.
 
 Each round waits in the [approval window](/concepts/approval/) first. A round waits while the agent is stopped on a permission prompt or a question. An agent mid-turn gets the prompt queued. Local work that is not on the pull request (uncommitted changes, unpushed commits) is named in the prompt, the round goes to the live session that knows it, and the procedure never commits or discards it.
 
 For failing checks, the procedure fixes what the pull request broke, reruns a flaky or infrastructure failure once, and verifies a quality gate's findings like review comments. It never gets a check green by disabling it, editing CI or dismissing a finding; a check that fails again after its rerun comes to you.
+
+For a conflict, the procedure merges the base into the branch (never a rebase or a force-push), resolves each conflict, runs the tests that cover what it touched, pushes and says so in the report. A conflict it cannot resolve with confidence comes to you, with the merge aborted. A round that only merged the base in posts no comment: the push speaks for itself.
 
 ## Text from other people
 
@@ -40,7 +43,7 @@ From a session in the workspace: `/{{name}}-address <url>`. The reviews so far c
 
 ## A pull request with no workspace
 
-Without a workspace, the daemon only records that it would start a round (`would_address`), and the cockpit lists the pull request in Needs me as "review to address, no workspace". To let it create the workspace and run the round:
+Failing checks or a conflict alone never start a round without a workspace. Without a workspace, the daemon only records that it would start a round (`would_address`), and the cockpit lists the pull request in Needs me as "review to address, no workspace". To let it create the workspace and run the round:
 
 ```json
 "address_without_workspace": true
@@ -56,12 +59,13 @@ It can also go on a `projects` entry, for some repositories only.
 | `"address_skip_reviewers": ["some-bot"]` | reviews by these logins never start one |
 | `"address_checks": false` | no round for failing checks |
 | `"ignore_checks": ["codecov/patch"]` | these checks never start one |
+| `"workflows": {"address": {"only_when": "!pr.address.conflict \|\| pr.address.reviewers != [] \|\| pr.address.checks != []"}}` | a conflict alone starts no round |
 | `"rounds": {"per_pr_per_day": 5}` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
 | `"workflows": {"address": {"only_when": "pr.visibility == \"private\""}}` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
 
 ## Rules for one reviewer
 
-The round's instructions open with why it runs now: the reviewers to answer and the failing checks, each with its summary and run link. A block under `reviewer=<login>/` applies when that reviewer is among them, such as a review bot whose findings you want verified one by one:
+The round's instructions open with why it runs now: the reviewers to answer, the failing checks, each with its summary and run link, and the conflict with the base. A block under `reviewer=<login>/` applies when that reviewer is among them, such as a review bot whose findings you want verified one by one:
 
 ```text
 reviewer=review-bot/intent=address.md
@@ -76,4 +80,4 @@ The match is membership: a round that answers a person and the bot gets the bot'
 
 ## How the guide reads
 
-The bundled `intent=address.md` sets the stance (a comment is a claim to verify), the risky surfaces, how to commit (the repository's conventions, one commit per item, tests for new behavior), how to reply (one or two sentences in the thread's language), and whom to ask again (never re-request a reviewer whose approval still stands). Change any of it in your [profile](/guides/review-profile/) with `intent=address.md` blocks.
+The bundled `intent=address.md` sets the stance (a comment is a claim to verify), the risky surfaces, how to commit (the repository's conventions, one commit per item, tests for new behavior), how to reply (one or two sentences in the thread's language), whom to ask again (never re-request a reviewer whose approval still stands), and that a conflict with the base is merged in and resolved. A block that says to leave the base alone makes the round only report conflicts. Change any of it in your [profile](/guides/review-profile/) with `intent=address.md` blocks.
