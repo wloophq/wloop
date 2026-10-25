@@ -690,3 +690,36 @@ func TestAnotherBinaryOfTheSameNameIsStillWrong(t *testing.T) {
 		}
 	}
 }
+
+func TestALinkOfAnotherNameRunsTheSameHooks(t *testing.T) {
+	direct, _, _ := linkedBinaries(t)
+	link := filepath.Join(t.TempDir(), "wl")
+	if err := os.Symlink(strings.Trim(direct, "'"), link); err != nil {
+		t.Fatal(err)
+	}
+	h, home := testHome(t, nil)
+	h.Command = shell.Quote(link)
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	h.Command = direct
+	for entry, p := range problems(t, h, home) {
+		if p != "" {
+			t.Errorf("%s: %s", entry, p)
+		}
+	}
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(home, "settings.json"))
+	if strings.Count(string(raw), "hook stop") != 1 || strings.Contains(string(raw), link) {
+		t.Fatalf("install over the link:\n%s", raw)
+	}
+	h.Command = shell.Quote(link)
+	if _, err := h.Remove(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(home, "settings.json")); strings.Contains(string(raw), "hook ") {
+		t.Fatalf("remove by the link left:\n%s", raw)
+	}
+}

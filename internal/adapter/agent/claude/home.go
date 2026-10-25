@@ -97,12 +97,16 @@ func sameCommand(got, want string) bool {
 	}
 	gotBin, gotRest, ok := shell.Cut(got)
 	wantBin, wantRest, wantOK := shell.Cut(want)
-	if !ok || !wantOK || gotRest != wantRest || !filepath.IsAbs(gotBin) || !filepath.IsAbs(wantBin) {
+	return ok && wantOK && gotRest == wantRest && sameBinary(gotBin, wantBin)
+}
+
+func sameBinary(a, b string) bool {
+	if !filepath.IsAbs(a) || !filepath.IsAbs(b) {
 		return false
 	}
-	a, errA := os.Stat(gotBin)
-	b, errB := os.Stat(wantBin)
-	return errA == nil && errB == nil && os.SameFile(a, b)
+	fa, errA := os.Stat(a)
+	fb, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(fa, fb)
 }
 
 func (h Home) registration() map[string]any {
@@ -206,8 +210,18 @@ func (h Home) registrationProblem(doc map[string]any, same func(got, want string
 	return ""
 }
 
-func ours(command, sub string) bool {
-	return strings.Contains(command, brand.Name) && strings.Contains(command, sub)
+// ours reports whether command is the loop's sub hook: it names the loop, or
+// runs this binary by any path.
+func (h Home) ours(command, sub string) bool {
+	if !strings.Contains(command, sub) {
+		return false
+	}
+	if strings.Contains(command, brand.Name) {
+		return true
+	}
+	bin, _, ok := shell.Cut(command)
+	self, _, selfOK := shell.Cut(h.Command)
+	return ok && selfOK && sameBinary(bin, self)
 }
 
 func hookCommands(settings map[string]any, event string) []map[string]any {
@@ -237,7 +251,7 @@ func (h Home) rightHook(hook map[string]any, sub string, same func(got, want str
 func (h Home) hookProblem(settings map[string]any, event, sub string) string {
 	var found []map[string]any
 	for _, hk := range hookCommands(settings, event) {
-		if ours(commandOf(hk), sub) {
+		if h.ours(commandOf(hk), sub) {
 			found = append(found, hk)
 		}
 	}
@@ -447,7 +461,7 @@ func (h Home) ensureHook(doc map[string]any, event, sub string) string {
 		for _, hk := range hs {
 			hm, _ := hk.(map[string]any)
 			switch {
-			case hm == nil || !ours(commandOf(hm), sub):
+			case hm == nil || !h.ours(commandOf(hm), sub):
 				keep = append(keep, hk)
 			case !found && h.rightHook(hm, sub, exactCommand):
 				found = true
@@ -475,7 +489,7 @@ func (h Home) ensureHook(doc map[string]any, event, sub string) string {
 	return ""
 }
 
-func removeSettings(doc map[string]any) []string {
+func (h Home) removeSettings(doc map[string]any) []string {
 	var out []string
 	hooks := object(doc, "hooks")
 	for _, hk := range loopHooks {
@@ -491,7 +505,7 @@ func removeSettings(doc map[string]any) []string {
 			}
 			keep := slices.DeleteFunc(slices.Clone(hs), func(x any) bool {
 				hm, _ := x.(map[string]any)
-				return hm != nil && ours(commandOf(hm), hk.sub)
+				return hm != nil && h.ours(commandOf(hm), hk.sub)
 			})
 			if len(keep) == len(hs) {
 				kept = append(kept, g)
@@ -720,7 +734,7 @@ func (h Home) Files(home string) []string { return []string{settingsFile(home), 
 
 // Remove takes out what Install adds and backs up every file it changes.
 func (h Home) Remove(ctx context.Context, home string, dryRun bool) ([]string, error) {
-	return h.apply(ctx, home, dryRun, true, removeSettings, func(r *run, mcp jsonFile) (string, func() error) {
+	return h.apply(ctx, home, dryRun, true, h.removeSettings, func(r *run, mcp jsonFile) (string, func() error) {
 		if _, ok := object(mcp.doc, "mcpServers")[brand.MCPServer()]; !ok {
 			return "", nil
 		}
