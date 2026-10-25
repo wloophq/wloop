@@ -267,12 +267,15 @@ func TestPlanNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {
 }
 
 // TestPlanOfAUnitTakesAnyProviderOrAnItemID names a Slack thread by
-// provider:key, then by the id plan printed for its item, which the daemon
-// holds or a sweep would plan.
+// provider:key, then by the ids of its item: the short one plan printed,
+// found in the daemon's plan with no sweep, the whole one, and one only a
+// sweep plans.
 func TestPlanOfAUnitTakesAnyProviderOrAnItemID(t *testing.T) {
 	th := unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}
 	thread := planItem("slack-follow-up", th, "ee00ff11ee00ff11", "pending", "asked you a question")
 	thread.Label, thread.Title = "#general", "Launch plan for the export"
+	later := planItem("slack-follow-up", th, "aa11bb22aa11bb22", "pending", "asked you a question")
+	later.Label, later.Title = thread.Label, thread.Title
 	var queries []string
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) { json.NewEncoder(w).Encode(api.Health{}) })
@@ -282,9 +285,9 @@ func TestPlanOfAUnitTakesAnyProviderOrAnItemID(t *testing.T) {
 		case r.URL.Query().Get("unit") != "":
 			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread}, Errors: []string{}, Unit: th.String(), Label: "#general", Title: "Launch plan for the export"})
 		case r.URL.Query().Get("trigger") == "sweep":
-			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread}, Errors: []string{}})
+			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread, later}, Errors: []string{}})
 		default:
-			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}})
+			json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{thread}, Errors: []string{}})
 		}
 	})
 	te := newTestEnv(t, &fake.Manager{})
@@ -293,20 +296,56 @@ func TestPlanOfAUnitTakesAnyProviderOrAnItemID(t *testing.T) {
 		"pending (1)\n" +
 		"  ee00ff11  slack-follow-up  #general: asked you a question\n" +
 		"            Launch plan for the export · waits for you\n"
-	for _, arg := range []string{"slack:T1/C1/171.1", "ee00ff11"} {
+	asked := "unit=slack%3AT1%2FC1%2F171.1"
+	for arg, sent := range map[string][]string{
+		"slack:T1/C1/171.1": {asked},
+		"ee00ff11":          {"", asked},
+		thread.ID:           {"", asked},
+		"aa11bb22":          {"", "trigger=sweep", asked},
+	} {
 		te.out.Reset()
+		queries = nil
 		if code := te.run("plan", "--unit", arg); code != 0 {
 			t.Fatalf("%s: exit %d: %s", arg, code, te.err)
 		}
-		if te.out.String() != want {
-			t.Fatalf("%s: printed\n%s\nwant\n%s", arg, te.out, want)
+		if te.out.String() != want || !slices.Equal(queries, sent) {
+			t.Fatalf("%s: queries %q, printed\n%s\nwant\n%s", arg, queries, te.out, want)
 		}
 	}
-	if !slices.Equal(queries, []string{"unit=slack%3AT1%2FC1%2F171.1", "", "trigger=sweep", "unit=slack%3AT1%2FC1%2F171.1"}) {
-		t.Fatalf("queries %q", queries)
+	for arg, says := range map[string]string{"ffffffff": "no item ffffffff", "term_3": "term_3 names no unit"} {
+		te.err.Reset()
+		queries = nil
+		if code := te.run("plan", "--unit", arg); code == 0 || !strings.Contains(te.err.String(), says) {
+			t.Fatalf("%s: exit %d: %s", arg, code, te.err)
+		}
+		if arg == "term_3" && len(queries) != 0 {
+			t.Fatalf("a word that is no id asked the daemon %q", queries)
+		}
 	}
-	te.err.Reset()
-	if code := te.run("plan", "--unit", "ffffffff"); code == 0 || !strings.Contains(te.err.String(), "no item ffffffff") {
-		t.Fatalf("an unknown id: exit %d: %s", code, te.err)
+}
+
+func TestThePlanHeaderComparesTheLabelWithTheExplainedUnit(t *testing.T) {
+	for _, c := range []struct {
+		res  api.PlanResponse
+		want string
+	}{
+		{api.PlanResponse{Unit: "github:acme/api#7", Label: "acme/api#7", Title: "Batch export"}, "acme/api#7  Batch export"},
+		{api.PlanResponse{Unit: "session:term_1", Label: "session:term_1"}, "session:term_1"},
+		{api.PlanResponse{Unit: "slack:T1/C1/171.1", Label: "#general\x1b[31m\n", Title: "Launch\nplan"}, "#general [31m  Launch plan  (slack:T1/C1/171.1)"},
+		{api.PlanResponse{Unit: "github:acme/api#7"}, "github:acme/api#7"},
+	} {
+		if got := unitHeader(c.res); got != c.want {
+			t.Errorf("unitHeader(%+v) = %q, want %q", c.res, got, c.want)
+		}
+	}
+}
+
+func TestPlanCleansARowsLabel(t *testing.T) {
+	var b strings.Builder
+	it := planItem("slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "ee00ff11ee00ff11", "run", "")
+	it.Label = "DM with ana\npending (9)"
+	writePlan(&b, []api.PlanItem{it}, testNow)
+	if want := "run (1)\n  ee00ff11  slack-follow-up  DM with ana pending (9)\n"; b.String() != want {
+		t.Fatalf("%q, want %q", b.String(), want)
 	}
 }

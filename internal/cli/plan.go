@@ -90,10 +90,6 @@ func printPlan(ctx context.Context, e *Env, c *client.Client, q api.PlanQuery) e
 	return nil
 }
 
-// providerID is the shape of a provider's id, the part of provider:key
-// before the colon.
-var providerID = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
-
 // planUnitArg is the unit arg names: a pull request's URL or owner/repo#n,
 // or provider:key, whose provider the daemon checks.
 func planUnitArg(arg string) (unit.Unit, error) {
@@ -101,7 +97,7 @@ func planUnitArg(arg string) (unit.Unit, error) {
 		ref, err := pr.ParseURL(arg)
 		return ref.Unit(), err
 	}
-	if p, key, ok := strings.Cut(arg, ":"); ok && providerID.MatchString(p) && key != "" {
+	if p, key, ok := strings.Cut(arg, ":"); ok && unit.ValidProvider(p) && key != "" {
 		return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
 	}
 	if ref, err := pr.ParseKey(arg); err == nil {
@@ -110,12 +106,17 @@ func planUnitArg(arg string) (unit.Unit, error) {
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a pull request URL, owner/repo#n, provider:key such as session:<session-id>, or an item's id as plan prints it", arg)
 }
 
+// itemID is the shape of an item's id as plan prints it, the start of its
+// key; a whole id has its workflow, provider, key and value apart by "/".
+var itemID = regexp.MustCompile(`^[0-9a-f]+$`)
+
 // planUnitOf is the unit plan --unit's arg names: the unit planUnitArg
-// reads, or the unit of the item whose id plan printed, held by the daemon
-// or planned by a sweep now.
+// reads, or the unit of the item an id names, in the daemon's plan or, when
+// it holds none, in the sweep's.
 func planUnitOf(ctx context.Context, c *client.Client, arg string) (unit.Unit, error) {
-	if strings.ContainsAny(arg, ":/#") {
-		return planUnitArg(arg)
+	u, err := planUnitArg(arg)
+	if err == nil || (!itemID.MatchString(arg) && strings.Count(arg, "/") < 3) {
+		return u, err
 	}
 	var items []api.PlanItem
 	for _, q := range []api.PlanQuery{{}, {Trigger: string(workflow.TriggerSweep)}} {
@@ -123,10 +124,8 @@ func planUnitOf(ctx context.Context, c *client.Client, arg string) (unit.Unit, e
 		if err != nil {
 			return unit.Unit{}, err
 		}
-		for _, it := range res.Items {
-			if !slices.ContainsFunc(items, func(o api.PlanItem) bool { return o.ID == it.ID }) {
-				items = append(items, it)
-			}
+		if items = res.Items; slices.ContainsFunc(items, func(it api.PlanItem) bool { return namesItem(it, arg) }) {
+			break
 		}
 	}
 	id, err := resolvePlanID(items, arg)
@@ -134,6 +133,11 @@ func planUnitOf(ctx context.Context, c *client.Client, arg string) (unit.Unit, e
 		return unit.Unit{}, err
 	}
 	return items[slices.IndexFunc(items, func(it api.PlanItem) bool { return it.ID == id })].Unit, nil
+}
+
+// namesItem says whether arg is it's id or the start of its key.
+func namesItem(it api.PlanItem, arg string) bool {
+	return it.ID == arg || strings.HasPrefix(it.ID[strings.LastIndex(it.ID, "/")+1:], arg)
 }
 
 // printUnitPlan prints u's items as plan does, then each workflow of u's
@@ -146,7 +150,7 @@ func printUnitPlan(ctx context.Context, e *Env, c *client.Client, u unit.Unit) e
 	if res.Unit == "" {
 		return errors.New("the daemon does not explain a unit; " + restartHint())
 	}
-	fmt.Fprintln(e.Out, unitHeader(res, u))
+	fmt.Fprintln(e.Out, unitHeader(res))
 	writePlan(e.Out, res.Items, e.Now())
 	if len(res.Workflows) > 0 {
 		fmt.Fprintf(e.Out, "no item (%d)\n", len(res.Workflows))
@@ -176,15 +180,17 @@ func printUnitPlan(ctx context.Context, e *Env, c *client.Client, u unit.Unit) e
 
 // unitHeader names the unit res explains as its row does, with its
 // provider:key when the label does not say it.
-func unitHeader(res api.PlanResponse, u unit.Unit) string {
-	if res.Label == "" {
+func unitHeader(res api.PlanResponse) string {
+	label := oneLine(res.Label)
+	if label == "" {
 		return res.Unit
 	}
-	head := res.Label
-	if res.Title != "" {
-		head += "  " + oneLine(res.Title)
+	head := label
+	if title := oneLine(res.Title); title != "" {
+		head += "  " + title
 	}
-	if res.Label != u.Label() {
+	p, key, _ := strings.Cut(res.Unit, ":")
+	if label != (unit.Unit{Provider: unit.ProviderID(p), Key: key}).Label() {
 		head += "  (" + res.Unit + ")"
 	}
 	return head
@@ -209,7 +215,7 @@ func writePlan(w io.Writer, items []api.PlanItem, now time.Time) {
 		}
 		fmt.Fprintf(w, "%s (%d)\n", d, len(group))
 		for _, it := range group {
-			head := fmt.Sprintf("  %s  %s  %s", planShortID(it.ID), it.Workflow, it.UnitLabel())
+			head := fmt.Sprintf("  %s  %s  %s", planShortID(it.ID), it.Workflow, oneLine(it.UnitLabel()))
 			if it.Reason != "" {
 				head += ": " + oneLine(it.Reason)
 			}
@@ -323,7 +329,7 @@ func runPlanAct(ctx context.Context, e *Env, action string, ids []string) error 
 		return err
 	}
 	for _, it := range res.Items {
-		fmt.Fprintf(e.Out, "%s  %s  %s: %s %s\n", planShortID(it.ID), it.Workflow, it.UnitLabel(), it.Decision, oneLine(it.Reason))
+		fmt.Fprintf(e.Out, "%s  %s  %s: %s %s\n", planShortID(it.ID), it.Workflow, oneLine(it.UnitLabel()), it.Decision, oneLine(it.Reason))
 	}
 	for _, msg := range res.Errors {
 		fmt.Fprintln(e.Err, "error: "+msg)
