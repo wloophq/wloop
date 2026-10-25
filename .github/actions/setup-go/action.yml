@@ -1,0 +1,38 @@
+name: Set up Go
+description: >-
+  Installs the go.mod toolchain and restores the build and module caches that
+  the Cache workflow saves from main under the given name.
+
+inputs:
+  cache:
+    description: Name of the cache, unique per job configuration
+    required: true
+
+outputs:
+  paths:
+    description: The cached directories, for actions/cache/save
+    value: ${{ steps.dirs.outputs.paths }}
+  key:
+    description: The key this commit's cache is saved under
+    value: go-${{ runner.os }}-${{ inputs.cache }}-${{ github.sha }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+    - id: dirs
+      shell: bash
+      run: |
+        {
+          echo "paths<<EOF"
+          go env GOCACHE GOMODCACHE
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.dirs.outputs.paths }}
+        key: go-${{ runner.os }}-${{ inputs.cache }}-${{ github.sha }}
+        restore-keys: go-${{ runner.os }}-${{ inputs.cache }}-
