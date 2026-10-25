@@ -101,6 +101,9 @@ var addressRules = []string{
 	"Stage by path",
 	"published under the user's name.",
 	"If any command",
+	"wins over the verdicts below, own findings included.",
+	"Scope is the pull request's stated goal, not the lines it touched.",
+	"file an issue and link it",
 }
 
 // Every scenario carries none of these; the turns that record also carry
@@ -305,7 +308,7 @@ func scenarios() []Scenario {
 				"against the plan, treat its own findings as items of the triage marked (own), and never publish them as a review or a comment.",
 			Must: append([]string{"#### Your own review of the change", "Plan: retry 5xx with backoff, cap at 5", "against the plan or goal in the guidance", "never reach the pull request",
 				"- /code-review high", "## Review judgment", "Open the body with one line to the author", "Blocking findings are applied or go to the gate", "(own)"}, addressRules...),
-			MustNot:  []string{"Measure the change against the goal its description states"},
+			MustNot:  []string{"Measure the change against the goal its description states", "or dropped", "the cost outweighs it"},
 			MaxWords: oldAddress + recordStep + untrustedStep + 350,
 		},
 		{

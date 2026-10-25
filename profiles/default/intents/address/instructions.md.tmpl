@@ -191,8 +191,7 @@ Each finding is an item like a reviewer's comment, through the same
 verification, verdicts and gate, marked `(own)` wherever items are listed:
 the triage artifact, the summary and the report.
 Blocking findings are applied or go to the gate. A non-blocking one is
-applied when it is cheap and inside the pull request's scope; otherwise it
-is a follow-up in the report, or dropped.
+applied when it is real and in scope; otherwise it is a follow-up.
 Your findings never reach the pull request as a review, an inline comment
 or a thread: their trace is the commits that fix them, the report and the
 record. Of the reviewer's guide, only its label syntax, its voice and its
@@ -208,15 +207,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -283,7 +286,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -356,7 +359,7 @@ approval that already covers the current head stands.
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict{{if .Inputs.self_review}}, your own findings marked (own) and listed apart from the reviewers' items{{end}}, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue){{if .Inputs.self_review}}, your own findings marked (own) and listed apart from the reviewers' items{{end}}, the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 {{template "record" .}}{{template "brief" .}}{{template "judgment" .}}{{if .Inputs.self_review}}{{template "review-judgment" .}}{{end}}

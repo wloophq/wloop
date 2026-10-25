@@ -40,7 +40,7 @@ finding was missed and blocks.
 ## What to leave out
 
 - Problems on lines the change did not touch, unless they make the change
-  wrong.
+  wrong or keep it from its goal.
 - What a linter, type checker or compiler reports on its own.
 - Matters of taste with no consequence.
 - Anything that restates what the change does or confirms that something
