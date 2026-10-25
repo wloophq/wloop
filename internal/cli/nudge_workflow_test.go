@@ -175,7 +175,7 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		}, func() { r.rec.overrides = nil }},
 		{"per-PR daily cap reached (1)", func() {
 			sc.te.cfg.Rounds.PerPRPerDay = 1
-			st.RecordFollowup(sc.ref.String(), "", testNow)
+			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 		}, func() { sc.te.cfg.Rounds = config.Defaults().Rounds }},
 	}
 	for _, g := range guards {

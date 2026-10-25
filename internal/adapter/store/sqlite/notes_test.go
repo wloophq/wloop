@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -159,7 +160,7 @@ var writes = []writeCase{
 	{
 		method: "Rounds.Save", name: "/fields and a count",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordFollowup(noteRef.String(), "fp", noteAt) })
+			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordFollowup(noteRef.String(), round.Reviewed, "fp", noteAt) })
 		},
 		topics: port.TopicRounds, units: []unit.Unit{u7},
 	},
@@ -233,6 +234,25 @@ var writes = []writeCase{
 		topics: port.TopicLoopEvents, units: []unit.Unit{u7},
 	},
 	{
+		method: "ledger.Record", name: "/a pull request's mark",
+		call: func(ctx context.Context, e *noteEnv) error {
+			it := noteItem(workflow.DecisionRun)
+			it.Unit, it.Key.Unit = u7, u7
+			it.Marks = map[string]mark.Value{"w/head": {Value: "h1"}}
+			return e.db.Ledger().Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDone, At: noteAt}, it, loopEvent(workflow.KindStepRan))
+		},
+		topics: port.TopicLoopEvents | port.TopicRounds, units: []unit.Unit{u7},
+	},
+	{
+		method: "ledger.Record", name: "/a session's mark",
+		call: func(ctx context.Context, e *noteEnv) error {
+			it := noteItem(workflow.DecisionRun)
+			it.Marks = map[string]mark.Value{"w/head": {Value: "h1"}}
+			return e.db.Ledger().Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDone, At: noteAt}, it, loopEvent(workflow.KindStepRan))
+		},
+		topics: port.TopicLoopEvents | port.TopicMarks, units: []unit.Unit{u7, term1},
+	},
+	{
 		method: "events.Advance",
 		call:   func(ctx context.Context, e *noteEnv) error { return e.db.Events().Advance(ctx, "w", 1, noteAt) },
 	},
@@ -282,7 +302,7 @@ var reads = []string{
 	"Rounds.AgentHome", "Rounds.Load", "Rounds.Pause",
 	"intakeStore.Intake", "intakeStore.Open",
 	"usageStore.Pending",
-	"DB.Ledger", "DB.Events", "DB.Classifications", "DB.Fetches",
+	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches",
 	"ledger.Items", "ledger.Run", "ledger.Count",
 	"events.Since", "events.Head", "events.Cursor",
 	"Classifications.Output", "Classifications.Spent",

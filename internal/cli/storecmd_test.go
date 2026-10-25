@@ -64,7 +64,7 @@ func setStore(t *testing.T, path string, stmts ...string) {
 	}
 }
 
-func markOf(t *testing.T, path string) string {
+func storeMarkOf(t *testing.T, path string) string {
 	t.Helper()
 	db, err := sqlite.OpenReadOnly(path)
 	if err != nil {
@@ -132,11 +132,11 @@ func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 	if code := te.runCLI("store", "restore", "--yes"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := markOf(t, te.storePath()); got != "before" {
+	if got := storeMarkOf(t, te.storePath()); got != "before" {
 		t.Fatalf("restored mark %q", got)
 	}
 	kept := filepath.Join(te.backupsPath(), "store-v"+schemaV+"-"+testNow.UTC().Format("20060102T150405Z")+".pre-restore.db")
-	if got := markOf(t, kept); got != "after" {
+	if got := storeMarkOf(t, kept); got != "after" {
 		t.Fatalf("kept mark %q", got)
 	}
 	out := te.out.String()
@@ -212,13 +212,14 @@ func TestTheDaemonOpensACurrentStoreAndReportsIt(t *testing.T) {
 func TestTheDaemonWaitsOnANewerStoreUntilItChanges(t *testing.T) {
 	t.Parallel()
 	te := storeEnv(t, "a")
-	setStore(t, te.storePath(), `UPDATE meta SET value = '3' WHERE key = 'compatible_version'`, `PRAGMA user_version = 3`)
+	newer := uint32(sqlite.SchemaVersion + 1)
+	setStore(t, te.storePath(), fmt.Sprintf(`UPDATE meta SET value = '%d' WHERE key = 'compatible_version'`, newer), fmt.Sprintf(`PRAGMA user_version = %d`, newer))
 	db, _, wait, err := te.tryStore(context.Background(), t.Logf)
 	if err != nil || db != nil {
 		t.Fatalf("%v", err)
 	}
 	st := wait.status
-	if st.State != api.StoreTooNew || st.Version != 3 || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads ("+schemaV+")") {
+	if st.State != api.StoreTooNew || st.Version != newer || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads ("+schemaV+")") {
 		t.Fatalf("%+v", st)
 	}
 	if wait.ready() {
@@ -264,9 +265,10 @@ func TestTheDaemonWaitsWhileAStoreCommandHoldsTheLock(t *testing.T) {
 func TestDoctorChecksAStoreThisReleaseCannotOpen(t *testing.T) {
 	t.Parallel()
 	te := storeEnv(t, "a")
-	setStore(t, te.storePath(), `UPDATE meta SET value = '4' WHERE key = 'compatible_version'`, `PRAGMA user_version = 4`)
+	newer := sqlite.SchemaVersion + 1
+	setStore(t, te.storePath(), fmt.Sprintf(`UPDATE meta SET value = '%d' WHERE key = 'compatible_version'`, newer), fmt.Sprintf(`PRAGMA user_version = %d`, newer))
 	got := te.storeChecks()
-	if got[0].mark != markMissing || got[0].fix != restoreCommand || !strings.Contains(got[0].info, "schema version 4, newer than this release reads ("+schemaV+")") {
+	if got[0].mark != markMissing || got[0].fix != restoreCommand || !strings.Contains(got[0].info, fmt.Sprintf("schema version %d, newer than this release reads (%s)", newer, schemaV)) {
 		t.Fatalf("%+v", got[0])
 	}
 	if got[1] != (check{markInfo, "store backup", "none yet; one is taken before each migration", ""}) {

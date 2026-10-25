@@ -166,7 +166,7 @@ func (e *Env) startBlockOf(ctx context.Context, u unit.Unit) (inventory.StartBlo
 // blockedStep is the round b holds, as the sweep marks it handled.
 func blockedStep(ref github.Ref, b inventory.StartBlock) (step, bool) {
 	for _, k := range []stepKind{stepFirstRound, stepAddress, stepFollowup} {
-		if st := (step{kind: k, pr: ref, fingerprint: b.Fingerprint, checksHead: b.ChecksHead}); st.roundKind() == b.Round {
+		if st := (step{kind: k, pr: ref, fingerprint: b.Fingerprint, checksHead: b.ChecksHead, conflictHead: b.ConflictHead}); st.roundKind() == b.Round {
 			return st, true
 		}
 	}

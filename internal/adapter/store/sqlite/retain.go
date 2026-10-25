@@ -136,6 +136,7 @@ const (
 	retainPlanItemsSQL       = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
 	retainWorkflowRunsSQL    = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL     = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSessionMarksSQL    = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
@@ -157,7 +158,7 @@ var retainWorkflowEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.Tri
 	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))`
 
 // unitlessTables are the endedTables UnitlessLoopRows deletes from.
-var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items"}
+var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items", "unit_marks", "round_state"}
 
 // Session-keyed bookkeeping is stored under its session unit, the rest
 // under no unit; a pull request's events never match.
@@ -190,6 +191,7 @@ var endedTables = []endedTable{
 	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"plan_items", port.TopicGate, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
+	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"pr_briefs", port.TopicBriefs, `DELETE FROM pr_briefs WHERE (owner, repo, number) IN ` + endedRefs, true},
@@ -229,6 +231,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("session_handles", 0, retainSessionHandlesSQL)
 			r.exec("agent_sessions", port.TopicSessions, retainAgentSessionsSQL, cutoff(now, p.ClosedSessions))
 			r.exec("workflow_runs", 0, retainSessionRunsSQL, cutoff(now, p.ClosedSessions))
+			r.exec("unit_marks", port.TopicMarks, retainSessionMarksSQL)
 		}
 		if p.Stops > 0 {
 			r.exec("turn_stops", port.TopicSessions, retainStopsSQL, cutoff(now, p.Stops))

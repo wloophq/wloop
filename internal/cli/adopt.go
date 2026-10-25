@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -69,18 +70,17 @@ func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref github.Ref, pro
 	return ws, e.clearFingerprint(ctx, ref)
 }
 
-// clearFingerprint forgets what the rounds on ref covered: review and
-// address share the mark, so a pull request taken over starts its triage
-// from no mark of the reviews.
+// clearFingerprint forgets the reviews the address rounds on ref covered, so
+// a pull request taken over starts its triage from none of them.
 func (e *Env) clearFingerprint(ctx context.Context, ref github.Ref) error {
 	if e.Rounds == nil {
 		return nil
 	}
 	st, err := e.Rounds.Load(ctx)
-	if err != nil || st.Fingerprint(ref.String()) == "" {
+	if err != nil || st.Mark(ref.String(), round.AddressedReviews) == "" {
 		return err
 	}
-	st.SetFingerprint(ref.String(), "")
+	st.SetMark(ref.String(), round.AddressedReviews, "")
 	return e.Rounds.Save(ctx, st)
 }
 

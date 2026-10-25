@@ -20,9 +20,18 @@ unsure goes to the user first.
 - New or changed behavior gets a test; docs that describe changed code are
   updated in the same round.
 - Run the tests and linters that cover what you changed before pushing.
-- Leave the branch's relation to the base alone: do not merge or rebase the
-  base in on your own. When GitHub reports conflicts, say so in the comment
-  asking for the next look and in the report.
+- When GitHub reports conflicts with the base, resolve them in the round:
+  fetch the base from the repository the pull request targets (`origin`,
+  or the remote that points at it when the branch lives in a fork) and
+  merge it into the branch, never rebase it or force-push. Resolve each
+  conflict keeping what both sides meant, run the tests that cover the
+  touched code, commit the merge and push. Say in the report that the base
+  was merged in and which conflicts it resolved. Merge only on a clean
+  checkout with no local commits you do not know; otherwise, and for a
+  conflict you cannot resolve with confidence, abort the merge
+  (`git merge --abort`) and go to the user first.
+- Otherwise leave the branch's relation to the base alone: do not merge or
+  rebase the base in on your own.
 
 ## Replies
 
@@ -30,6 +39,8 @@ One or two sentences in the thread's language: what changed and the commit,
 or why not, with the evidence. A question gets its answer and nothing else.
 
 ## The comment asking for the next look
+
+A round that only merged the base in posts none: the push speaks for itself.
 
 Short, addressed to the reviewers by `@login`, in the pull request's
 language: what was applied, what was declined or left open and why, and the

@@ -130,12 +130,15 @@ func TestRetainClosedSessions(t *testing.T) {
 	exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, sent_to) VALUES ('github', 'acme/api#7', 'review', 'r2', 'sent', ?, 'old-sent-to')`, at(past))
 	exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, session, agent_session, usage_source) VALUES ('github', 'acme/api#7', 'review', 'r3', 'done', ?, 'old', 'read', 'transcript')`, at(past))
 	exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, session, agent_session) VALUES ('github', 'acme/api#7', 'review', 'r4', 'done', ?, 'old', 'unread')`, at(past))
+	for _, u := range []string{"old", "open", "gone"} {
+		exec(t, db, `INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('session', ?, 'w/m', 'v')`, u)
+	}
 	for id, seen := range map[string]time.Time{"read": past, "unread": past, "no-turn": past, "seen-recently": recent} {
 		exec(t, db, `INSERT INTO agent_sessions (agent_session, first_seen_at, last_seen_at) VALUES (?, ?, ?)`, id, at(seen), at(seen))
 	}
 
 	got := retain(t, db, Retention{ClosedSessions: 30 * day})
-	if want := (Retained{"sessions": 1, "agent_sessions": 2}); !maps.Equal(got, want) {
+	if want := (Retained{"sessions": 1, "agent_sessions": 2, "unit_marks": 2}); !maps.Equal(got, want) {
 		t.Errorf("retained %v, want %v", got, want)
 	}
 	if left := column(t, db, `SELECT session_id FROM sessions ORDER BY session_id`); !slices.Equal(left, []string{"at-cutoff", "old-named", "old-sent-to", "open", "recent"}) {
@@ -143,6 +146,9 @@ func TestRetainClosedSessions(t *testing.T) {
 	}
 	if left := column(t, db, `SELECT agent_session FROM agent_sessions ORDER BY 1`); !slices.Equal(left, []string{"seen-recently", "unread"}) {
 		t.Errorf("agent sessions left %q", left)
+	}
+	if left := column(t, db, `SELECT unit_key FROM unit_marks`); !slices.Equal(left, []string{"open"}) {
+		t.Errorf("session marks left %q", left)
 	}
 }
 
@@ -246,6 +252,7 @@ var prTables = map[string]string{
 	"events":        `SELECT count(*) FROM events WHERE provider = 'github' AND unit_key = ?`,
 	"overrides":     `SELECT count(*) FROM overrides WHERE provider = 'github' AND unit_key = ?`,
 	"round_state":   `SELECT count(*) FROM round_state WHERE provider = 'github' AND unit_key = ?`,
+	"unit_marks":    `SELECT count(*) FROM unit_marks WHERE provider = 'github' AND unit_key = ?`,
 	"view_applied":  `SELECT count(*) FROM view_applied WHERE provider = 'github' AND unit_key = ?`,
 	"turns":         `SELECT count(*) FROM turns WHERE provider = 'github' AND unit_key = ?`,
 	"turn_records":  `SELECT count(*) FROM turn_records WHERE provider = 'github' AND unit_key = ?`,
@@ -281,7 +288,8 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	exec(t, db, `INSERT INTO pr_tags (owner, repo, number, key, value, run) VALUES (?, ?, ?, 'change', 'fix', 1)`, triple...)
 	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('github', ?, 'review', 'r1', ?)`, u, when)
 	exec(t, db, `INSERT INTO overrides (provider, unit_key, hold) VALUES ('github', ?, 1)`, u)
-	exec(t, db, `INSERT INTO round_state (provider, unit_key, fingerprint) VALUES ('github', ?, 'f')`, u)
+	exec(t, db, `INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('github', ?, 'f')`, u)
+	exec(t, db, `INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('github', ?, 'reviewed', 'f')`, u)
 	exec(t, db, `INSERT INTO view_applied (sink, provider, unit_key, role, at) VALUES ('orca', 'github', ?, 'review', ?)`, u, when)
 	exec(t, db, `INSERT INTO turns (seq, provider, unit_key, intent, turn_id, state, sent_at) VALUES (?, 'github', ?, 'review', 'r1', 'done', ?)`, seq, u, when)
 	exec(t, db, `INSERT INTO turn_records (turn_seq, provider, unit_key, hash, at, record) VALUES (?, 'github', ?, 'h', ?, '{}')`, seq, u, when)

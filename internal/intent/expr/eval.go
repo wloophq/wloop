@@ -32,11 +32,18 @@ func (p *Program) run(a activation) (bool, error) {
 }
 
 type activation struct {
-	env Env
-	get func(string) any
+	env   Env
+	marks map[string]string
+	get   func(string) any
 }
 
 func (a activation) ResolveName(name string) (any, bool) {
+	if name == marksVar {
+		if a.marks == nil {
+			return map[string]string{}, true
+		}
+		return a.marks, true
+	}
 	typ, ok := a.env[name]
 	if !ok {
 		return nil, false
@@ -101,7 +108,7 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 		full[k] = v
 	}
 	full[nowVar] = Time
-	p, err := Compile(src, full)
+	p, err := compileWith(src, full, true)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +124,10 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 
 func (w predicate) Reads() []string { return w.p.reads }
 
+func (w predicate) MarkNames() []string { return w.p.marks }
+
 func (w predicate) Match(v workflow.Vars) (bool, error) {
-	return w.p.run(activation{env: w.p.env, get: func(name string) any {
+	return w.p.run(activation{env: w.p.env, marks: v.Marks, get: func(name string) any {
 		if name == nowVar {
 			return v.Now
 		}

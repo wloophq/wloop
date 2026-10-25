@@ -18,11 +18,13 @@ import (
 )
 
 // Compile type-checks src against env; it returns an *Error on failure, and an empty or blank src is an error.
-func Compile(src string, env Env) (*Program, error) {
+func Compile(src string, env Env) (*Program, error) { return compileWith(src, env, false) }
+
+func compileWith(src string, env Env, marks bool) (*Program, error) {
 	if strings.TrimSpace(src) == "" {
 		return nil, &Error{Col: 1, Msg: "empty predicate"}
 	}
-	ce, err := celEnv(env)
+	ce, err := celEnv(env, marks)
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
@@ -42,12 +44,18 @@ func Compile(src string, env Env) (*Program, error) {
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	return &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env)}, nil
+	p := &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env)}
+	if marks {
+		if p.marks, err = handledNames(ast.NativeRep()); err != nil {
+			return nil, &Error{Col: 1, Msg: err.Error()}
+		}
+	}
+	return p, nil
 }
 
 var envs sync.Map
 
-func celEnv(env Env) (*cel.Env, error) {
+func celEnv(env Env, marks bool) (*cel.Env, error) {
 	names := make([]string, 0, len(env))
 	for k := range env {
 		names = append(names, k)
@@ -62,6 +70,10 @@ func celEnv(env Env) (*cel.Env, error) {
 			return nil, fmt.Errorf("field %s has an unsupported type", n)
 		}
 		opts = append(opts, cel.Variable(n, t))
+	}
+	if marks {
+		key.WriteString(marksVar)
+		opts = append(opts, handledOptions()...)
 	}
 	if ce, ok := envs.Load(key.String()); ok {
 		return ce.(*cel.Env), nil

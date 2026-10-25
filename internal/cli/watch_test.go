@@ -20,6 +20,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -119,7 +120,7 @@ func seedRound(t *testing.T, te *testEnv, key string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.RecordFollowup(key, "", testNow)
+	st.RecordFollowup(key, round.Reviewed, "", testNow)
 	if err := te.Rounds.Save(context.Background(), st); err != nil {
 		t.Fatal(err)
 	}

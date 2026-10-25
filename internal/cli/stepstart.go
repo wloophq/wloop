@@ -44,6 +44,7 @@ type roundCandidate struct {
 	Facts        coresweep.Facts
 	Fingerprint  string
 	ChecksHead   string
+	ConflictHead string
 	LastReviewAt time.Time
 	Observed     bool
 }
@@ -142,7 +143,7 @@ func (p startPlan) address() *turn.RoundReason {
 	if p.args.kind() != stepAddress {
 		return nil
 	}
-	return automatedReason(p.facts, p.cand.Facts.Checks)
+	return automatedReason(p.facts, p.cand.Facts.Facts)
 }
 
 func (s *stepSet) candidate(ctx context.Context, u unit.Unit, r string) (roundCandidate, bool, error) {
@@ -466,13 +467,13 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			return "", startError(err)
 		}
 		if p.args.capped() {
-			st.RecordFollowup(p.ref.String(), "", s.e.Now())
+			st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
 		}
 		return "started a " + p.args.intent + " turn", nil
 	}
 	reason := cmp.Or(factString(p.facts, p.args.reasonFact()), p.args.kindName())
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
-		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, LastReviewAt: p.cand.LastReviewAt,
+		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, ConflictHead: p.cand.ConflictHead, LastReviewAt: p.cand.LastReviewAt,
 		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why, Address: p.address()})
 	if !sent && guidance != "" {
 		s.e.keepGuidance(ctx, p.ref, guidance)
@@ -539,12 +540,10 @@ func skip(st *round.Store, key string, kind stepKind, cand roundCandidate, ok bo
 	case !ok:
 	case kind == stepAddress:
 		if cand.Fingerprint != "" {
-			st.SetFingerprint(key, cand.Fingerprint)
+			st.SetMark(key, round.AddressedReviews, cand.Fingerprint)
 		}
-		if cand.ChecksHead != "" {
-			st.SetChecksHead(key, cand.ChecksHead)
-		}
+		st.SetHeads(key, cand.ChecksHead, cand.ConflictHead)
 	default:
-		st.SetFingerprint(key, cand.Fingerprint)
+		st.SetMark(key, round.Reviewed, cand.Fingerprint)
 	}
 }

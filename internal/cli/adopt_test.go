@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -306,7 +307,7 @@ func TestTakeOverIsTheVerb(t *testing.T) {
 	}
 }
 
-func TestTakeOverClearsTheFingerprint(t *testing.T) {
+func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
@@ -314,12 +315,17 @@ func TestTakeOverClearsTheFingerprint(t *testing.T) {
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
 	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
-	st.SetFingerprint(ref.String(), "2026-10-18T10:00:00Z@c9")
+	st.SetMark(ref.String(), round.AddressedReviews, "2026-10-18T10:00:00Z")
+	st.SetMark(ref.String(), round.Reviewed, "2026-10-18T10:00:00Z@c9")
 	te.saveRounds(t, st)
 	if code := te.run("take-over", ref.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := te.loadRounds(t).Fingerprint(ref.String()); got != "" {
-		t.Fatalf("fingerprint %q survived the take-over", got)
+	st = te.loadRounds(t)
+	if got := st.Mark(ref.String(), round.AddressedReviews); got != "" {
+		t.Fatalf("the reviews addressed, %q, survived the take-over", got)
+	}
+	if got := st.Mark(ref.String(), round.Reviewed); got == "" {
+		t.Fatal("the take-over forgot my own review")
 	}
 }

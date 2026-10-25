@@ -26,6 +26,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.labels` | list | turn | The pull request's labels, from the Basics read. |
 | `pr.address.reviewers` | list | turn | The reviewers an address round answers; empty on any other turn. |
 | `pr.address.checks` | list | turn | The failing checks an address round fixes; empty on any other turn. |
+| `pr.address.conflict` | bool | turn | The head conflicts with the base and the address round resolves it; false on any other turn. |
 | `row.kind` | string | action | The row's situation kind. |
 | `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
 | `row.tracked` | bool | action | The pull request is in the inventory. |
@@ -68,6 +69,8 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
 | `pr.draft` | bool | The pull request is a draft. |
+| `pr.head` | string | The head commit's oid. |
+| `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.mine` | bool | The pull request's author is the viewer. |
 | `pr.checks` | string | The checks' rollup on the head. |
 | `pr.stalled` | bool | The checks stalled on the head. |
@@ -89,6 +92,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.address.reason` | string | Why an address round is due or not. |
 | `pr.address.reviewers` | list | The reviewers whose reviews the address round would answer. |
 | `pr.address.checks` | list | The failing checks the address round would fix. |
+| `pr.address.conflict` | bool | The head has conflicted with the base past the conflict window, and the address round would resolve it. |
 | `pr.address.observed` | bool | The address rules observe without acting. |
 | `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. |
 | `pr.silent_days` | int | Calendar days since last_interaction_at. |

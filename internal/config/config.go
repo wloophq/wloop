@@ -66,6 +66,9 @@ type Config struct {
 	// pull request I develop; IgnoreChecks names checks that never do.
 	AddressChecks bool     `json:"address_checks"`
 	IgnoreChecks  []string `json:"ignore_checks"`
+	// AddressConflicts starts a triage round when a pull request I develop
+	// conflicts with its base past the conflict window.
+	AddressConflicts bool `json:"address_conflicts"`
 	// Projects override settings for the pull requests of matching
 	// repositories; the first match wins.
 	Projects []Project `json:"projects"`
@@ -376,6 +379,7 @@ func Defaults() Config {
 		WorkspaceManagers:  []string{"claude-desktop", "orca"},
 		AddressReviews:     true,
 		AddressChecks:      true,
+		AddressConflicts:   true,
 		ReviewPrefix:       "REVIEW ",
 		Rounds:             Rounds{PerPRPerDay: DefaultPRDailyCap},
 		AutomatedReviewers: []string{},

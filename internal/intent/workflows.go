@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -29,18 +31,19 @@ var (
 
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.
 type wManifest struct {
-	Description   string           `toml:"description"`
-	Subject       *string          `toml:"subject"`
-	Trigger       *wTrigger        `toml:"trigger"`
-	When          *string          `toml:"when"`
-	Step          []map[string]any `toml:"step"`
-	Limits        *wLimits         `toml:"limits"`
-	Mode          *string          `toml:"mode"`
-	AllowVisible  bool             `toml:"allow_visible"`
-	Order         *int             `toml:"order"`
-	Key           []string         `toml:"key"`
-	Approval      *wApproval       `toml:"approval"`
-	DraftApproval *mDraftApproval  `toml:"draft_approval"`
+	Description   string            `toml:"description"`
+	Subject       *string           `toml:"subject"`
+	Trigger       *wTrigger         `toml:"trigger"`
+	When          *string           `toml:"when"`
+	Step          []map[string]any  `toml:"step"`
+	Limits        *wLimits          `toml:"limits"`
+	Mode          *string           `toml:"mode"`
+	AllowVisible  bool              `toml:"allow_visible"`
+	Order         *int              `toml:"order"`
+	Key           []string          `toml:"key"`
+	Marks         map[string]string `toml:"marks"`
+	Approval      *wApproval        `toml:"approval"`
+	DraftApproval *mDraftApproval   `toml:"draft_approval"`
 }
 
 type wTrigger struct {
@@ -70,6 +73,8 @@ type wUnit struct {
 	files    files
 	problems Problems
 	wf       workflow.Workflow
+	// whenAt is where the manifest's when is, for a problem found after it loaded.
+	whenAt dintent.Pos
 }
 
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
@@ -133,6 +138,19 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 			}
 			continue
 		}
+	}
+	readable := markNames(units)
+	for _, u := range units {
+		if len(u.problems) > 0 {
+			continue
+		}
+		if p := u.unknownMarks(readable); len(p) > 0 {
+			problems = append(problems, p...)
+			if !u.bundled {
+				broken[u.name] = p
+			}
+			continue
+		}
 		loaded = append(loaded, u.wf)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {
@@ -142,6 +160,34 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		return strings.Compare(a.Name, b.Name)
 	})
 	return loaded, broken, reverted, problems
+}
+
+// markNames are the marks a workflow may read: those the loaded workflows
+// record and the plugins' (builtin.Marks).
+func markNames(units []*wUnit) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range builtin.Marks {
+		out[m.Name] = true
+	}
+	for _, u := range units {
+		if len(u.problems) == 0 {
+			for name := range u.wf.Marks {
+				out[mark.Of(u.wf.Name, name)] = true
+			}
+		}
+	}
+	return out
+}
+
+func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
+	var out Problems
+	for _, name := range append(workflow.MarkNames(u.wf.When), workflow.MarkNames(u.wf.Approval.WaitWhen)...) {
+		if !readable[name] {
+			out = append(out, Problem{File: u.wf.Source, Line: u.whenAt.Line, Col: u.whenAt.Col, Field: "when",
+				Msg: fmt.Sprintf("handled(%q): no workflow records that mark and no plugin writes one a workflow can read", name)})
+		}
+	}
+	return out
 }
 
 func (u *wUnit) load(intentProblem func(string) string) {
@@ -172,6 +218,7 @@ func (u *wUnit) load(intentProblem func(string) string) {
 	}()
 	s.at = positions(src)
 	u.wf = s.defineWorkflow(u.name, m, intentProblem)
+	u.whenAt = s.pos("when")
 	u.wf.Source = file
 	u.wf.Bundled = u.bundled
 	u.wf.Overrides = overrides(u.files.overlay)
@@ -265,6 +312,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 		w.Order = *m.Order
 	}
 	s.defineKey(&w, m.Key, slot)
+	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
 	w.DraftApproval = s.draftApproval(m.DraftApproval)
 	return w
@@ -414,6 +462,28 @@ func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 		}
 	}
 	w.Key = key
+}
+
+// markTypes are the fact types a mark holds: a string is a version, a
+// time or an int a watermark (mark.Handled).
+var markTypes = []expr.Type{expr.String, expr.Time, expr.Int}
+
+func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot string) {
+	for _, name := range slices.Sorted(maps.Keys(marks)) {
+		p, fact := "marks."+name, marks[name]
+		if err := mark.ValidName(name); err != nil {
+			s.add(p, "%v", err)
+			continue
+		}
+		t, known := builtin.FactType(fact)
+		switch {
+		case !known || slot == "" || !strings.HasPrefix(fact, slot+"."):
+			s.add(p, "%s is not a fact of the %s slot", fact, slot)
+		case !slices.Contains(markTypes, t):
+			s.add(p, "%s is a %s; a mark holds a string, a time or an int", fact, t)
+		}
+	}
+	w.Marks = marks
 }
 
 func (s *sheet) defineApproval(w *workflow.Workflow, a *wApproval, slot string) {

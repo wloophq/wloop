@@ -6,14 +6,16 @@ import (
 	"io"
 	"time"
 
-	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/api/client"
-	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/intent"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent"
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -154,7 +156,7 @@ func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
 		t.Fatalf("%v\n%s", err, te.err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.GitHub}: 0})
-	if st := te.loadRounds(t); st.Fingerprint(r7.String()) == "" {
+	if st := te.loadRounds(t); st.Mark(r7.String(), round.Reviewed) == "" {
 		t.Fatal("the launched round marked no reviews covered")
 	}
 }

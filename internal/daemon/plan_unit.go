@@ -62,6 +62,9 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 		}
 	}
 	facts, factErr := eng.Units.Facts(ctx, u)
+	var marks map[string]string
+	var marksErr error
+	marksRead := false
 	var config workflow.Facts
 	if eng.Config != nil {
 		config = eng.Config()
@@ -73,12 +76,19 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 			continue
 		}
 		line := api.UnitWorkflow{Workflow: w.Name, Trigger: string(w.Trigger.Kind)}
-		vars := workflow.Vars{Facts: facts, Trigger: workflow.Facts{"trigger.kind": string(w.Trigger.Kind)}, Config: config, Now: eng.Clock.Now()}
+		readsMarks := workflow.ReadsMarks(w.When) || workflow.ReadsMarks(w.Approval.WaitWhen)
+		if readsMarks && !marksRead && eng.Marks != nil {
+			marks, marksErr = eng.Marks.Marks(ctx, u)
+			marksRead = true
+		}
+		vars := workflow.Vars{Facts: facts, Trigger: workflow.Facts{"trigger.kind": string(w.Trigger.Kind)}, Config: config, Marks: marks, Now: eng.Clock.Now()}
 		switch {
 		case w.Trigger.Kind == workflow.TriggerEvent:
 			line.Outcome, line.Reason = "waits", "decides when a "+strings.Join(w.Trigger.On, " or ")+" event arrives"
 		case factErr != nil:
 			line.Outcome, line.Reason = "error", factErr.Error()
+		case readsMarks && marksErr != nil:
+			line.Outcome, line.Reason = "error", "reading its marks: "+marksErr.Error()
 		default:
 			ok, err := true, error(nil)
 			if w.When != nil {
