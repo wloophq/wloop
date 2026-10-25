@@ -267,3 +267,15 @@ func TestDoctorChecksAStoreThisReleaseCannotOpen(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+func TestAFailedStorePointsAtTheCommandThatGetsPastIt(t *testing.T) {
+	te := storeEnv(t, "a")
+	opens := sqlite.Status{Version: sqlite.SchemaVersion, Compatible: sqlite.SchemaVersion}
+	if st := te.storeFailed(te.storePath(), opens, errors.New("the final check failed")).status; st.State != api.StoreFailed || st.Fix != restoreCommand {
+		t.Fatalf("a migrated store that failed its check: %+v", st)
+	}
+	stuck := sqlite.Status{Version: 0}
+	if st := te.storeFailed(te.storePath(), stuck, errors.New("unreadable")).status; st.Fix != migrateCommand || st.Message != "unreadable" {
+		t.Fatalf("%+v", st)
+	}
+}
