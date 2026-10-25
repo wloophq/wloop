@@ -145,6 +145,7 @@ var _ exec.Cmd
 		"package p\nimport \"syscall\"\nvar _ = syscall.Exec(\"x\", nil, nil)\n",
 		"package p\nimport \"syscall\"\nvar _, _ = syscall.ForkExec(\"x\", nil, nil)\n",
 		"package p\nimport . \"os/exec\"\nvar _ Cmd\n",
+		"package p\nimport \"" + module + "internal/procgroup\"\nvar _ = procgroup.Command(nil, 0, \"x\")\n",
 	} {
 		_, g := parse(t, src)
 		if got := ruleSpawn("internal/planted", nil, []*ast.File{g}); len(got) != 1 {

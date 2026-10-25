@@ -205,16 +205,17 @@ var spawnExempt = map[string]string{
 	"internal/e2e":                     "the end-to-end harness",
 	"internal/client/tui":              "the user's editor, run in the foreground on a prompt's text",
 	"internal/adapter/store/storetest": "test support that reads the inventory with sqlite3 for the e2e harness",
+	"internal/procgroup":               "the spawn mechanism; its callers meter",
 }
 
 // spawns reports whether f calls exec.Command or exec.CommandContext of
-// os/exec, os.StartProcess, syscall.Exec or syscall.ForkExec, or dot-imports
-// os/exec.
+// os/exec, os.StartProcess, syscall.Exec, syscall.ForkExec or
+// procgroup.Command, or dot-imports os/exec.
 func spawns(f *ast.File) bool {
 	names := map[string][]string{}
 	for _, imp := range f.Imports {
 		p, _ := strconv.Unquote(imp.Path.Value)
-		if p != "os/exec" && p != "os" && p != "syscall" {
+		if p != "os/exec" && p != "os" && p != "syscall" && p != module+"internal/procgroup" {
 			continue
 		}
 		name := path.Base(p)
@@ -230,9 +231,10 @@ func spawns(f *ast.File) bool {
 		names[name] = append(names[name], p)
 	}
 	calls := map[string][]string{
-		"os/exec": {"Command", "CommandContext"},
-		"os":      {"StartProcess"},
-		"syscall": {"Exec", "ForkExec"},
+		"os/exec":                     {"Command", "CommandContext"},
+		"os":                          {"StartProcess"},
+		"syscall":                     {"Exec", "ForkExec"},
+		module + "internal/procgroup": {"Command"},
 	}
 	found := false
 	ast.Inspect(f, func(n ast.Node) bool {
