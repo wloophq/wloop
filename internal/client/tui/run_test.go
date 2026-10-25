@@ -46,6 +46,7 @@ type fakeDaemon struct {
 	plan      []api.PlanItem
 	planErr   error
 	planReads int
+	closed    []api.ClosedSession
 	planActs  []api.PlanActRequest
 
 	plugins    []api.Plugin
@@ -202,11 +203,15 @@ func (f *fakeDaemon) changeEntries(view string, delta []api.EntryView, c api.Cou
 	s <- api.Change{Type: "changed", Epoch: "e1", Rev: rev, Counters: &c}
 }
 
-func (f *fakeDaemon) Plan(context.Context, api.PlanQuery) (api.PlanResponse, error) {
+func (f *fakeDaemon) Plan(_ context.Context, q api.PlanQuery) (api.PlanResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.planReads++
-	return api.PlanResponse{Items: slices.Clone(f.plan), Errors: []string{}}, f.planErr
+	res := api.PlanResponse{Items: slices.Clone(f.plan), Errors: []string{}}
+	if q.Closed && q.Trigger == "" {
+		res.Closed = slices.Clone(f.closed)
+	}
+	return res, f.planErr
 }
 
 func (f *fakeDaemon) ActOnPlan(_ context.Context, req api.PlanActRequest) (api.PlanResponse, error) {

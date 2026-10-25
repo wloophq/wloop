@@ -25,7 +25,7 @@ The daemon keeps every turn in its store. What GitHub does not keep (your answer
 
 A turn's instructions are stored text, rendered when the turn is created and read by hash, so editing your profile never changes a round already sent. They hold:
 
-- the **procedure**: the mechanics of the turn (reading the pull request, the ambiguity gate, publishing, the record that ends it), shipped in the binary;
+- the **procedure**: the mechanics of the turn (reading the pull request, the ambiguity gate, publishing, the record that ends it), from the intent's instructions and the shared partials;
 - the **judgment**: the blocks of your review profile that match this pull request (see [Profiles and intents](/concepts/profiles/));
 - the **brief**, when briefs are on (see [The brief](/concepts/brief/));
 - your **guidance** for this round, verbatim;

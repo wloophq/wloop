@@ -98,3 +98,17 @@ var j = "ORDER BY " + col + " DESC"
 	flagged(t, "allowlisted", ruleR13(fset, "internal/e2e/live.go", f, allow, used), 6, "(R13)")
 	flagged(t, "stale", stale(allow, used), 1, `"gone"`)
 }
+
+func TestTheStoreWriterRuleFlagsAPlantedOpen(t *testing.T) {
+	t.Parallel()
+	fset, f := parse(t, `package cli
+import store "github.com/wloophq/wloop/internal/adapter/store/sqlite"
+var db, _ = store.Open("store.db", nil)
+var ro, _ = store.OpenReadOnly("store.db")
+`)
+	flagged(t, "a command", ruleStoreWriter(fset, "internal/cli/slackeval.go", f), 1, "OpenReadOnly")
+	flagged(t, "the store commands", ruleStoreWriter(fset, "internal/cli/storecmd.go", f), 0, "")
+	flagged(t, "serve", ruleStoreWriter(fset, "internal/cli/serve.go", f), 1, "OpenReadOnly")
+	flagged(t, "store test support", ruleStoreWriter(fset, "internal/adapter/store/storetest/storetest.go", f), 0, "")
+	flagged(t, "a test file", ruleStoreWriter(fset, "internal/cli/slackeval_test.go", f), 0, "")
+}

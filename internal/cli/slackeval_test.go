@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/adapter/source/slack"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 )
 
 func TestOutputsRefuseARepository(t *testing.T) {
@@ -48,5 +52,31 @@ func TestSlackEvalUsage(t *testing.T) {
 	te := newSlackTestEnv(t)
 	if code := te.run("slack", "eval"); code == 0 || !strings.Contains(te.err.String(), "slack eval run") {
 		t.Fatalf("exit %d: %s", code, te.err)
+	}
+}
+
+func TestSlackEvalExportReadsTheStoreWithoutWritingIt(t *testing.T) {
+	te := newSlackTestEnv(t)
+	path := filepath.Join(te.StateDir, storeFile)
+	db, err := sqlitetest.Open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]string{slack.CursorViewerTeam: "T1", slack.CursorViewerUser: "U1"} {
+		if err := db.Slack().SetCursor(context.Background(), name, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("slack", "eval", "export", "--since", "2026-10-01", "--until", "2026-10-02", "--out", t.TempDir()); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if !strings.Contains(te.out.String(), "0 fixtures written") {
+		t.Fatalf("%s", te.out)
 	}
 }

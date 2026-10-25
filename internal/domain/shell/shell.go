@@ -13,3 +13,33 @@ func Word(s string) string {
 	}
 	return Quote(s)
 }
+
+// Cut reads the leading word of s as Word or Quote wrote it, and returns it
+// unquoted with the rest of s; ok is false for a word they would not write.
+func Cut(s string) (word, rest string, ok bool) {
+	if !strings.HasPrefix(s, "'") {
+		i := strings.IndexByte(s, ' ')
+		if i < 0 {
+			i = len(s)
+		}
+		return s[:i], s[i:], Word(s[:i]) == s[:i]
+	}
+	var b strings.Builder
+	s = s[1:]
+	for {
+		part, after, closed := strings.Cut(s, "'")
+		if !closed {
+			return "", "", false
+		}
+		b.WriteString(part)
+		if escaped, more := strings.CutPrefix(after, `\''`); more {
+			b.WriteByte('\'')
+			s = escaped
+			continue
+		}
+		if after != "" && after[0] != ' ' {
+			return "", "", false
+		}
+		return b.String(), after, true
+	}
+}

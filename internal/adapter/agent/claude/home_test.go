@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/setup"
+	"github.com/wloophq/wloop/internal/domain/shell"
 )
 
 var _ setup.AgentHome = Home{}
@@ -588,5 +589,137 @@ func TestAStaticSessionHeaderIsFlaggedAndRewritten(t *testing.T) {
 	raw, _ := os.ReadFile(filepath.Join(home, ".claude.json"))
 	if strings.Contains(string(raw), "X-Loop-Session") || !strings.Contains(string(raw), "hook mcp-headers") {
 		t.Fatalf("registration %s", raw)
+	}
+}
+
+// linkedBinaries is a binary, a symlink to it, and another binary of the
+// same name, as the shell words a Home runs them by.
+func linkedBinaries(t *testing.T) (direct, linked, other string) {
+	t.Helper()
+	root := t.TempDir()
+	target := filepath.Join(root, "checkout", "bin", brand.Command)
+	link := filepath.Join(root, "local bin", brand.Command)
+	elsewhere := filepath.Join(root, "elsewhere", brand.Command)
+	write(t, target, "#!/bin/sh\n")
+	write(t, elsewhere, "#!/bin/sh\n")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	return shell.Quote(target), shell.Quote(link), shell.Quote(elsewhere)
+}
+
+func TestABinaryThroughASymlinkJudgesTheHooksOfItsTargetRight(t *testing.T) {
+	direct, linked, _ := linkedBinaries(t)
+	for _, c := range []struct{ installed, checking string }{{direct, linked}, {linked, direct}} {
+		h, home := testHome(t, nil)
+		h.Command = c.installed
+		if _, err := h.Install(context.Background(), home, false); err != nil {
+			t.Fatal(err)
+		}
+		h.Command = c.checking
+		for entry, p := range problems(t, h, home) {
+			if p != "" {
+				t.Errorf("installed by %s, checked by %s: %s: %s", c.installed, c.checking, entry, p)
+			}
+		}
+	}
+}
+
+func TestInstallWritesThePathItRunsByOverTheSameBinarysOther(t *testing.T) {
+	direct, linked, _ := linkedBinaries(t)
+	h, home := testHome(t, nil)
+	h.Command = direct
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	h.Command = linked
+	lines, err := h.Install(context.Background(), home, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"changed MCP server", "changed hook Stop", "changed hook SessionStart", "changed hook UserPromptSubmit"} {
+		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, want) }) {
+			t.Errorf("no %q in %q", want, lines)
+		}
+	}
+	for _, f := range h.Files(home) {
+		raw, _ := os.ReadFile(f)
+		if strings.Contains(string(raw), strings.Trim(direct, "'")) {
+			t.Errorf("%s still runs %s:\n%s", f, direct, raw)
+		}
+	}
+}
+
+func TestTheSameBinaryRunningAnotherCommandIsWrong(t *testing.T) {
+	direct, linked, _ := linkedBinaries(t)
+	h, home := testHome(t, nil)
+	h.Command = direct
+	write(t, filepath.Join(home, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"`+linked+` hook stop --agent x || true","timeout":10}]}]}}`)
+	if p := problems(t, h, home)["hook Stop"]; !strings.Contains(p, "--agent x") {
+		t.Errorf("stop: %q", p)
+	}
+}
+
+func TestARelativePathToTheSameBinaryIsWrong(t *testing.T) {
+	direct, _, _ := linkedBinaries(t)
+	bin := strings.Trim(direct, "'")
+	t.Chdir(filepath.Dir(bin))
+	h, home := testHome(t, nil)
+	h.Command = direct
+	write(t, filepath.Join(home, "settings.json"), `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"./`+brand.Command+` hook stop || true","timeout":10}]}]}}`)
+	if p := problems(t, h, home)["hook Stop"]; !strings.Contains(p, "./"+brand.Command) {
+		t.Errorf("stop: %q", p)
+	}
+}
+
+func TestAnotherBinaryOfTheSameNameIsStillWrong(t *testing.T) {
+	direct, _, other := linkedBinaries(t)
+	h, home := testHome(t, nil)
+	h.Command = other
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	h.Command = direct
+	got := problems(t, h, home)
+	for _, entry := range []string{"MCP server " + brand.MCPServer(), "hook Stop", "hook SessionStart", "hook UserPromptSubmit"} {
+		if !strings.Contains(got[entry], other) {
+			t.Errorf("%s: %q", entry, got[entry])
+		}
+	}
+}
+
+func TestALinkOfAnotherNameRunsTheSameHooks(t *testing.T) {
+	direct, _, _ := linkedBinaries(t)
+	link := filepath.Join(t.TempDir(), "wl")
+	if err := os.Symlink(strings.Trim(direct, "'"), link); err != nil {
+		t.Fatal(err)
+	}
+	h, home := testHome(t, nil)
+	h.Command = shell.Quote(link)
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	h.Command = direct
+	for entry, p := range problems(t, h, home) {
+		if p != "" {
+			t.Errorf("%s: %s", entry, p)
+		}
+	}
+	if _, err := h.Install(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(home, "settings.json"))
+	if strings.Count(string(raw), "hook stop") != 1 || strings.Contains(string(raw), link) {
+		t.Fatalf("install over the link:\n%s", raw)
+	}
+	h.Command = shell.Quote(link)
+	if _, err := h.Remove(context.Background(), home, false); err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(home, "settings.json")); strings.Contains(string(raw), "hook ") {
+		t.Fatalf("remove by the link left:\n%s", raw)
 	}
 }

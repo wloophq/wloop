@@ -1,0 +1,54 @@
+---
+title: Plugins
+description: How a source of units plugs into the core, what it contributes, and the boundary that keeps the core free of it.
+---
+
+The core of {{name}} is a GTD system over opaque units: entries, the Inbox, the Outbox, projects, the Review, the turns, the workflows and the read model work on `unit.Unit{Provider, Key}` and never on a pull request or a Slack thread. Where units come from is a plugin's business. The plugins are compiled in, `github` and `slack`, with no plugin framework and no plugins loaded at run time.
+
+## A plugin
+
+A plugin is a `source.Plugin{ID, Name, Codec, Build}` listed in `internal/cli/sources.go`, the one file that names a source. Its codec mints and parses the keys of its units and stays registered when the plugin is disabled, so stored units still render. `Build` returns the plugin's `source.Module` from the configuration and the shared handles (`source.Deps`).
+
+A module must have its codec, an ingestion job with an interval and its rows; a module that derives items must have a card. A module that fails to build, or whose keys clash with the core's, is left out with its error reported, and the daemon runs without it. Everything else is optional, and the core does without what a plugin leaves out:
+
+| A plugin contributes | Through `Module` | What the core does with it |
+|---|---|---|
+| Units and their changes | `Ingest` (an `ingest.Job` over its `port.Source` and `port.SourceStore`), `Slow`, `Run` (a long-running stream, restarted after 30 s), `Jobs` | runs them as daemon jobs; a source never writes, ingest saves through the source's store |
+| Rows | `Rows`, a read model provider | serves them to every surface with the rest of the read model |
+| Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into GTD entries; renders the card on every surface; resolves linked items from unit events |
+| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units |
+| What a turn reads about a unit | `Payload`, a `turn.PayloadReader` | renders it into the turn's instructions |
+| Where its work runs | `PlacementDefaults`, `PlacementHints` | the placement service decides the repository and checkout |
+| Publishing | `Publisher`, a `port.Effects` | sends an approved draft once, with no automatic retry; `Verify` settles a draft a crash left in `sending` |
+| Following units | `Track`, `Untrack` | `{{command}} track` and untrack go through it |
+| UI | `UI` (facets, saved views, notification templates, keys, menu bar sections, terminal views), `WebAssets` served under `/plugins/<id>/`, `CLI` | renders the declarative parts on every surface; mounts the plugin's own web module and terminal views |
+| Health | `Health` | shows it with the daemon's health |
+
+The UI comes in three tiers: the card, which every surface renders the same way and which is kept as a stored snapshot; the declarative contributions the core renders; and the plugin's own views. Keys follow one map: the core owns every lowercase letter and digit, and a plugin or an intent gets one uppercase letter (`internal/keys`).
+
+## A disabled plugin
+
+`plugins.<id>.enabled = false` leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On an entry, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([GTD](/concepts/gtd/)). The core works with no plugin enabled.
+
+## The boundary
+
+The core never imports a plugin package, and no plugin imports another. The core here is `internal/core`, `internal/domain`, `internal/readmodel`, `internal/api`, `internal/web` and `internal/client`; each plugin owns its packages:
+
+| Plugin | Packages |
+|---|---|
+| `github` | `internal/adapter/source/github`, `internal/adapter/facts/github`, `internal/readmodel/prrow`, `internal/situation`, `internal/domain/github`, `internal/domain/pr`, `internal/domain/inventory`, `internal/domain/change`, `internal/github` |
+| `slack` | `internal/adapter/source/slack`, `internal/domain/slack`, `internal/slack` |
+
+Test imports count too, except a plugin's own test fake. The cockpit's scripts never quote a plugin's id either: they read the provider from the data the daemon serves. The edges that break the rule today are listed in `pluginDebt` in `internal/archtest/rules_plugins_test.go`, mostly core packages that still name `domain/pr`. The list only shrinks: an entry that no longer matches an import fails the test. Loop code outside the GitHub plugin is keyed by `unit.Unit`, and the few daemon files that name a pull request by nature are listed with their reason (`TestLoopCodeImportsNoPR`).
+
+`session` and `workspace` are providers the core keeps for its own units. They have no plugin: their facts come from the turn registry and the workspace managers, through `internal/adapter/facts/session` and `internal/adapter/facts/workspace`.
+
+## Adding a source
+
+1. A package under `internal/adapter/source/<id>` with its codec, its `port.Source`, its store and its rows; its domain values under `internal/domain/<id>`; a client for the service if it needs one.
+2. One entry in `plugins` in `internal/cli/sources.go`.
+3. Its packages under its id in `pluginRoots` in `internal/archtest/rules_plugins_test.go`.
+4. Its tables in `internal/adapter/store/sqlite/schema.sql`.
+5. A configuration section and its documentation.
+
+`internal/adapter/source/fakethread`, a provider of chat threads nothing registers, shows the minimum.

@@ -315,6 +315,47 @@ func TestOnlyTheStoreTouchesSQL(t *testing.T) {
 	}
 }
 
+// ruleStoreWriter flags, in a non-test file outside storecmd.go and the store's
+// packages, a call of the store's Open, which makes its caller the writer;
+// storecmd.go opens it for the daemon and for the store commands, which hold
+// the store's lock. Any other process reads through OpenReadOnly.
+func ruleStoreWriter(fset *token.FileSet, file string, f *ast.File) []string {
+	if testFile(file) || file == "internal/cli/storecmd.go" || under(path.Dir(file), "internal/adapter/store") {
+		return nil
+	}
+	name := ""
+	for _, imp := range f.Imports {
+		if p, _ := strconv.Unquote(imp.Path.Value); p == module+"internal/adapter/store/sqlite" {
+			name = "sqlite"
+			if imp.Name != nil {
+				name = imp.Name.Name
+			}
+		}
+	}
+	if name == "" {
+		return nil
+	}
+	var out []string
+	ast.Inspect(f, func(n ast.Node) bool {
+		if sel, ok := n.(*ast.SelectorExpr); ok && sel.Sel.Name == "Open" {
+			if x, ok := sel.X.(*ast.Ident); ok && x.Name == name {
+				out = append(out, fmt.Sprintf("%s: calls sqlite.Open; only the daemon and the store commands write the store, other processes use OpenReadOnly", fset.Position(sel.Pos())))
+			}
+		}
+		return true
+	})
+	return out
+}
+
+func TestOnlyServeWritesTheStore(t *testing.T) {
+	t.Parallel()
+	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
+		for _, b := range ruleStoreWriter(fset, file, f) {
+			t.Error(b)
+		}
+	})
+}
+
 // forEachFile parses every non-test Go file of the module, and its test files
 // when tests is set, and calls fn with its module-relative path.
 func forEachFile(t *testing.T, tests bool, fn func(fset *token.FileSet, file string, f *ast.File)) {

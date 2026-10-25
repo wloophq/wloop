@@ -88,8 +88,26 @@ jobs:
           path: ${{ steps.go.outputs.mod-path }}
           key: ${{ steps.go.outputs.mod-key }}
 
+  brand:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: brand
+      - run: go test -race -timeout 30m -run '^$' -ldflags "$(make -s print-brand-ldflags)" ./...
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+
   prune:
-    needs: [build, test-shard, test-macos]
+    needs: [build, test-shard, test-macos, brand]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:

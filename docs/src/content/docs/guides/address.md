@@ -5,6 +5,8 @@ description: Let an agent triage the reviews, failing checks and conflicts of a 
 
 An **address round** runs in the author workspace of a pull request you develop. The procedure verifies each review comment on its own, applies what holds, pushes, replies in every thread, resolves the settled ones and asks the reviewers for another look. It stops and asks you first when something is ambiguous or risky: a deep change of direction, an irreversible surface, a blocking request it would decline.
 
+A triage rule in the repository's `AGENTS.md` or `CLAUDE.md` wins over the round's own verdicts. Scope is the pull request's stated goal, not the lines it touched, and a real problem outside it becomes an issue the round files and links in its report.
+
 ## On its own
 
 With a workspace for your pull request (linked to it, or on its head branch), the daemon starts an address round when:

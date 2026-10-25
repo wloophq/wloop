@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/usage"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 type PR struct {
@@ -168,7 +169,7 @@ const (
 	KindBriefGaveUp = "brief_gave_up" // Key = the give-up time, Data = the reason
 )
 
-var bookkeepingKinds = []string{KindFollowed, KindUnfollowed, KindSituation, "turn_usage", KindBriefEnded, KindBriefWanted, KindBriefGaveUp, "reconcile_report"}
+var bookkeepingKinds = []string{KindFollowed, KindUnfollowed, KindSituation, "turn_usage", KindBriefEnded, KindBriefWanted, KindBriefGaveUp, "reconcile_report", workflow.KindPlanned}
 
 // Bookkeeping says whether kind is an event the loop keeps for timings and
 // reports, which no activity feed or timeline shows.

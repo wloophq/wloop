@@ -48,6 +48,13 @@ type Gainer interface {
 	Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error)
 }
 
+// Owner is an optional capability of Units: the units of work a subject
+// belongs to, whose timelines show the steps run on it. None keeps them on
+// the subject.
+type Owner interface {
+	Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
+}
+
 // Freshener is an optional capability of Units, asked before the loop lock:
 // the units whose source object moved since their facts were read.
 type Freshener interface {

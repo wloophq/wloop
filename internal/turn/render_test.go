@@ -251,6 +251,18 @@ func TestBundledGuidesAreAgentNeutral(t *testing.T) {
 	}
 }
 
+func TestTheBundledReviewGuideKeepsAnUntouchedLineThatBlocksTheGoal(t *testing.T) {
+	raw, err := fs.ReadFile(profiles.Default, "default/intent=review.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, out, _ := strings.Cut(string(raw), "## What to leave out")
+	out, _, _ = strings.Cut(out, "\n## ")
+	if !strings.Contains(strings.Join(strings.Fields(out), " "), "did not touch, unless they make the change wrong or keep it from its goal.") {
+		t.Errorf("what to leave out drops untouched lines the goal needs:\n%s", out)
+	}
+}
+
 func TestRecordStepNamesTheToolAndTheFallback(t *testing.T) {
 	for _, c := range []Context{
 		evalContext(Intent(dintent.Review), ByHand, nil, nil),

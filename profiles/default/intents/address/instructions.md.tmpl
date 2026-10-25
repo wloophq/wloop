@@ -1,6 +1,6 @@
 {{define "task"}}
 {{- if .NeedsTakeOver}}{{.PR.URL}} was opened by {{with .PR.Author}}@{{.}}{{else}}someone else{{end}}, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `{{.Command}} instructions address {{.PR.URL}} --take-over{{if .Inputs.self_review}} --self-review{{end}}`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
-{{- else}}You develop {{.PR.URL}}{{with .PR.Title}}, "{{.}}"{{end}}{{if .Inputs.take_over}}{{with .PR.Author}}, opened by @{{.}}{{end}}, which {{name}} took over for the user just before this turn: it is now theirs to develop{{end}}.{{if .Inputs.self_review}}{{if .Resume}} The last session already reviewed its change: review what changed since that review, then triage your findings and the ones it left with its reviews, failing checks and conflicts, change the code, reply and ask for the next look.{{else}} Review its change yourself, then triage your findings with its reviews, failing checks and conflicts, change the code, reply and ask for the next look.{{end}}{{else}} Triage its reviews, failing checks and conflicts, change the code, reply and ask for the next look.{{end}}
+{{- else}}You develop {{.PR.URL}}{{with .PR.Title}}, "{{.}}"{{end}}{{if .Inputs.take_over}}{{with .PR.Author}}, opened by @{{.}}{{end}}, which {{name}} took over for the user just before this turn: it is now theirs to develop{{end}}.{{if .Inputs.self_review}}{{if .Resume}} The last session already reviewed its change: review what changed since that review, then triage your findings and the ones it left with its reviews and failing checks, change the code, reply and ask for the next look.{{else}} Review its change yourself, then triage your findings with its reviews and failing checks, change the code, reply and ask for the next look.{{end}}{{else}} Triage its reviews and failing checks, change the code, reply and ask for the next look.{{end}}
 {{- with .Local}} The checkout holds work not on the pull request: {{.}}.{{end}}{{end}}
 {{end}}
 {{define "why-now"}}{{with .PR.Address}}
@@ -99,7 +99,6 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
-- a conflict with the base (`CONFLICTING`);
 - each check that failed on the current head:
 
 ```bash
@@ -194,8 +193,7 @@ Each finding is an item like a reviewer's comment, through the same
 verification, verdicts and gate, marked `(own)` wherever items are listed:
 the triage artifact, the summary and the report.
 Blocking findings are applied or go to the gate. A non-blocking one is
-applied when it is cheap and inside the pull request's scope; otherwise it
-is a follow-up in the report, or dropped.
+applied when it is real and in scope; otherwise it is a follow-up.
 Your findings never reach the pull request as a review, an inline comment
 or a thread: their trace is the commits that fix them, the report and the
 record. Of the reviewer's guide, only its label syntax, its voice and its
@@ -211,15 +209,19 @@ verify them in parallel subagents when you can (one item or a few related
 ones each); subagents read and run tests, they never edit, comment or push,
 and return the verdict with the evidence.
 
+A triage rule in the repository's agent instruction files (the nearest
+`AGENTS.md` or `CLAUDE.md`) wins over the verdicts below, own findings included.
+Scope is the pull request's stated goal, not the lines it touched.
+
 Each item ends in one of:
 
 | Verdict | Then |
 |---|---|
 | **apply** | the claim holds; change the code as suggested |
 | **apply differently** | the problem is real, a better fix exists; apply yours |
-| **decline** | the claim does not hold, or the cost outweighs it; give the technical reason |
+| **decline** | the claim is false, or the fix costs more than the user would accept; give the evidence |
 | **answer** | a question; answer it, changing code only if the answer reveals a problem |
-| **follow-up** | real, but out of this pull request's scope; say where it will be handled |
+| **follow-up** | real, but out of scope; file an issue and link it |
 
 For a failing check, find the cause before choosing:
 
@@ -250,8 +252,6 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
-- a conflict with the base you cannot resolve confidently: abort the
-  merge, name its files and sides;
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 
@@ -288,7 +288,7 @@ sets:
 - applied: what changed, with the commit;
 - declined: the technical reason, with the evidence;
 - answered: the answer, nothing else;
-- follow-up: where it will be handled.
+- follow-up: the issue that tracks it.
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<n>/comments/<databaseId>/replies -f body='...'
@@ -355,14 +355,13 @@ changes and approval, and still ask for the next look.
 When the round only tidied up (threads already settled by earlier commits or
 replies, now resolved, with nothing pushed and nothing new for a reviewer),
 skip this section: no top-level comment, no re-request. The same holds when
-the round only fixed or reran failing checks, or only merged the base in:
-the push speaks for itself. An
+the round only fixed or reran failing checks: the push speaks for itself. An
 approval that already covers the current head stands.
 
 ### 8. Report
 
 End the turn with a short report in the terminal: each item with its
-verdict{{if .Inputs.self_review}}, your own findings marked (own) and listed apart from the reviewers' items{{end}}, the commits pushed, the checks rerun, the threads resolved and
+verdict (a follow-up with its issue){{if .Inputs.self_review}}, your own findings marked (own) and listed apart from the reviewers' items{{end}}, the commits pushed, the checks rerun, the threads resolved and
 those left open, then record `done` with the summary of the round. When you
 stopped at the gate, the report is the question to the user.
 {{template "record" .}}{{template "brief" .}}{{template "judgment" .}}{{if .Inputs.self_review}}{{template "review-judgment" .}}{{end}}

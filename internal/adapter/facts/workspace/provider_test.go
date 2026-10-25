@@ -829,3 +829,17 @@ func TestASiblingSharesTheReadsAndKeepsItsOwnSeen(t *testing.T) {
 		t.Errorf("Seen = %d and %d, want 41 and 77", p.Seen(), s.Seen())
 	}
 }
+
+func TestTheOwnerIsTheWorkspacesPR(t *testing.T) {
+	w := newWorld()
+	w.add(workspace.Workspace{ID: "review", Path: "/w/review", DisplayName: "REVIEW feat", Branch: "review-local"})
+	w.rows = []dinv.PR{{Ref: ref(7), State: "CLOSED", HeadBranch: "feat", ClosedAt: now.Add(-time.Hour)}}
+	p := w.provider()
+	ctx := context.Background()
+	if got, err := p.Owners(ctx, w.unit("review")); err != nil || !slices.Equal(got, []unit.Unit{ref(7).Unit()}) {
+		t.Errorf("Owners(review) = %v, %v; want %s", got, err, ref(7).Unit())
+	}
+	if got, err := p.Owners(ctx, w.unit("main")); err != nil || len(got) != 0 {
+		t.Errorf("Owners of the main checkout = %v, %v; want none", got, err)
+	}
+}

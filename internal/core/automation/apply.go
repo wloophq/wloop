@@ -36,11 +36,17 @@ type result struct {
 // A transient failure records nothing. The error is the ledger's.
 func (e *Engine) runItem(ctx context.Context, it workflow.Item, o RunOpts) (result, error) {
 	now := e.now()
+	// Resolved before the first step: a step can end the ownership, as
+	// workspace.remove drops the workspace's units.
+	owners, err := e.owners(ctx, it.Unit)
+	if err != nil {
+		return e.stopped(ctx, it, Transient{Err: fmt.Errorf("reading the owners of %s: %w", it.Unit.Label(), err)}, nil, now)
+	}
 	var evs []port.Event
 	for i, st := range it.Steps {
 		detail, err := e.Steps.Run(ctx, st, it.Unit, it.Why, o)
 		if err == nil {
-			evs = append(evs, event(it, workflow.KindStepRan, fmt.Sprintf("%s:%d", it.ID, i), detail, now))
+			evs = append(evs, ran(it, owners, fmt.Sprintf("%s:%d", it.ID, i), detail, now)...)
 			continue
 		}
 		return e.stopped(ctx, it, err, evs, now)
@@ -109,6 +115,33 @@ func (e *Engine) save(ctx context.Context, p PlanWrite, evs []port.Event) error 
 
 func event(it workflow.Item, kind, key, data string, at time.Time) port.Event {
 	return port.Event{Unit: it.Unit, Kind: kind, Key: key, Data: data, At: at}
+}
+
+// owners are the units of work u belongs to; none for a unit gone or a
+// provider that knows no owners.
+func (e *Engine) owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	o, ok := e.Units.(Owner)
+	if !ok {
+		return nil, nil
+	}
+	owners, err := o.Owners(ctx, u)
+	if errors.Is(err, ErrUnitGone) {
+		return nil, nil
+	}
+	return owners, err
+}
+
+// ran are the workflow_step_ran events of a step: one on each owner, or one
+// on the subject when it has none, by the workflow.
+func ran(it workflow.Item, owners []unit.Unit, key, detail string, at time.Time) []port.Event {
+	if len(owners) == 0 {
+		owners = []unit.Unit{it.Unit}
+	}
+	evs := make([]port.Event, 0, len(owners))
+	for _, u := range owners {
+		evs = append(evs, port.Event{Unit: u, Kind: workflow.KindStepRan, Key: key, Actor: it.Workflow, Data: detail, At: at})
+	}
+	return evs
 }
 
 // Act carries the user's action on a plan item; the caller holds the loop

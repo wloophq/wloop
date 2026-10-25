@@ -571,7 +571,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 			itemUnit[op.Item] = k
 		}
 	}
-	if ops, err = j.applyOps(ctx, k, ops); err != nil {
+	if err := j.applyOps(ctx, k, ops); err != nil {
 		return 0, err
 	}
 	hints := hintsOf(r, ops, itemUnit, k)
@@ -586,29 +586,23 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	return len(ops), nil
 }
 
-// applyOps applies ops, leaving out the links to a disabled provider so the rest of the
-// answer lands. An op on a disabled unit fails as an answerError.
-func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) ([]items.Op, error) {
-	for len(ops) > 0 {
-		res, err := j.Ledger.Apply(ctx, items.Extracted, ops)
-		var off *coreitems.DisabledError
-		if !errors.As(err, &off) {
-			if err != nil {
-				return nil, err
-			}
-			if len(res.Refused) > 0 {
-				j.logf("slack extraction %s: %d ops refused, first: %s", k, len(res.Refused), res.Refused[0].Reason)
-			}
-			return ops, nil
-		}
-		kept := slices.DeleteFunc(slices.Clone(ops), func(op items.Op) bool { return op.To != nil && op.To.Provider == off.Provider })
-		if len(kept) == len(ops) {
-			return nil, &answerError{err}
-		}
-		j.logf("slack extraction %s: %d links to %s dropped: %v", k, len(ops)-len(kept), off.Provider, err)
-		ops = kept
+// applyOps applies ops; an op on a disabled unit fails as an answerError.
+func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) error {
+	if len(ops) == 0 {
+		return nil
 	}
-	return ops, nil
+	res, err := j.Ledger.Apply(ctx, items.Extracted, ops)
+	var off *coreitems.DisabledError
+	switch {
+	case errors.As(err, &off):
+		return &answerError{err}
+	case err != nil:
+		return err
+	}
+	if len(res.Refused) > 0 {
+		j.logf("slack extraction %s: %d ops refused, first: %s", k, len(res.Refused), res.Refused[0].Reason)
+	}
+	return nil
 }
 
 // segment writes the DM's segments the answer names before any op lands on them. Without

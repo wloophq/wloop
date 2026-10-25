@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -46,10 +47,38 @@ func TestActivityAndTimelineLeaveOutTheBookkeeping(t *testing.T) {
 	if len(items) != 2 || len(d.Events) != 2 {
 		t.Fatalf("activity %+v\ntimeline %+v", items, d.Events)
 	}
-	for _, kind := range []string{coreusage.KindTurnUsage, turns.KindReconcileReport, dinv.KindFollowed, dinv.KindBriefWanted, dinv.KindBriefGaveUp} {
+	for _, kind := range []string{coreusage.KindTurnUsage, turns.KindReconcileReport, dinv.KindFollowed, dinv.KindBriefWanted, dinv.KindBriefGaveUp, workflow.KindPlanned} {
 		if !dinv.Bookkeeping(kind) {
 			t.Errorf("%s is not bookkeeping", kind)
 		}
+	}
+}
+
+func TestTheTimelineShowsAStepByItsWorkflowWithoutItsPlanning(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	ctx := context.Background()
+	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	at := s.deps.Now().Add(time.Minute)
+	if _, err := s.store().AppendEvents(ctx, []dinv.Event{
+		{PR: r7, Kind: workflow.KindPlanned, Key: "finished/session/term_1/a:run", At: at},
+		{PR: r7, Kind: workflow.KindStepRan, Key: "finished/session/term_1/a:0", Actor: "finished", At: at, Data: "closed term_1"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var d api.Detail
+	get(t, s, "/api/units/github/acme%2Fapi%237", &d)
+	var steps []api.Event
+	for _, e := range d.Events {
+		switch e.Kind {
+		case workflow.KindPlanned:
+			t.Errorf("the timeline shows %s", e.Kind)
+		case workflow.KindStepRan:
+			steps = append(steps, e)
+		}
+	}
+	if len(steps) != 1 || steps[0].Actor != "finished" || steps[0].Data != "closed term_1" {
+		t.Errorf("steps in the timeline %+v", steps)
 	}
 }
 

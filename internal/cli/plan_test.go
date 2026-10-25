@@ -44,6 +44,9 @@ type planDaemon struct {
 	mu      sync.Mutex
 	queries []string
 	acts    []api.PlanActRequest
+	closed  []api.ClosedSession
+	// closedDown fails a request for the closed sessions.
+	closedDown bool
 }
 
 func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *planDaemon {
@@ -54,8 +57,17 @@ func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *
 	mux.HandleFunc("GET "+api.Plan, func(w http.ResponseWriter, r *http.Request) {
 		d.mu.Lock()
 		d.queries = append(d.queries, r.URL.RawQuery)
+		if d.closedDown && r.URL.Query().Get("closed") == "1" {
+			d.mu.Unlock()
+			http.Error(w, "store busy", http.StatusInternalServerError)
+			return
+		}
+		res := api.PlanResponse{Items: items, Errors: append([]string{}, errs...)}
+		if q := r.URL.Query(); q.Get("trigger") == "" && q.Get("closed") == "1" {
+			res.Closed = d.closed
+		}
 		d.mu.Unlock()
-		json.NewEncoder(w).Encode(api.PlanResponse{Items: items, Errors: append([]string{}, errs...)})
+		json.NewEncoder(w).Encode(res)
 	})
 	mux.HandleFunc("POST "+api.Plan, func(w http.ResponseWriter, r *http.Request) {
 		var req api.PlanActRequest
@@ -88,7 +100,7 @@ func TestPlanGroupsByDecision(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	golden(t, "plan.golden", te.out.String())
-	if !slices.Equal(d.queries, []string{"trigger=sweep"}) {
+	if !slices.Equal(d.queries, []string{"trigger=sweep", "closed=1"}) {
 		t.Fatalf("queries %q", d.queries)
 	}
 
@@ -103,6 +115,47 @@ func TestPlanFiltersAndReadsTheStoredPlan(t *testing.T) {
 	}
 	if te.out.String() != "nothing planned\n" || !slices.Equal(d.queries, []string{"provider=github&workflow=address"}) {
 		t.Fatalf("queries %q, printed %q", d.queries, te.out)
+	}
+}
+
+func TestPlanListsTheSessionsClosedInTheLastDay(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	d := servePlan(t, te, nil, nil)
+	d.closed = []api.ClosedSession{
+		{Session: "term_2", At: testNow.Add(-90 * time.Minute), Reason: "gone from the manager"},
+		{Session: "term_1", At: testNow.Add(-26 * time.Minute), Reason: "its pull request merged", Resume: "cd /wt/a &&\n  claude --resume b"},
+	}
+	for _, args := range [][]string{{"plan"}, {"plan", "--stored"}} {
+		te.out.Reset()
+		if code := te.run(args...); code != 0 {
+			t.Fatalf("%q: exit %d: %s", args, code, te.err)
+		}
+		want := "nothing planned\n" +
+			"closed in the last day (2)\n" +
+			"  term_2  1h 30m ago: gone from the manager\n" +
+			"  term_1  26m ago: its pull request merged\n" +
+			"          resume: cd /wt/a && claude --resume b\n"
+		if te.out.String() != want {
+			t.Errorf("%q printed\n%s\nwant\n%s", args, te.out, want)
+		}
+	}
+	if want := []string{"trigger=sweep", "closed=1", "closed=1"}; !slices.Equal(d.queries, want) {
+		t.Errorf("queries %q, want %q", d.queries, want)
+	}
+	te.out.Reset()
+	if code := te.run("plan", "--workflow", "address"); code != 0 || strings.Contains(te.out.String(), "closed in the last day") {
+		t.Errorf("a filtered plan: exit %d, printed %s", code, te.out)
+	}
+}
+
+func TestPlanPrintsThePlanWhenTheClosedSessionsFail(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	d := servePlan(t, te, planFixture()[:1], nil)
+	d.closedDown = true
+	if code := te.run("plan"); code == 0 || !strings.Contains(te.out.String(), "review-first-round") || !strings.Contains(te.err.String(), "error: closed sessions: ") {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 }
 

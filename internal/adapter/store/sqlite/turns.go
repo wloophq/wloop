@@ -59,8 +59,8 @@ func writeEvents(ctx context.Context, tx *Tx, evs []port.Event) error {
 	for _, ev := range evs {
 		u := storedUnit(ev)
 		if ev.Key != "" {
-			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, at, data) VALUES (?, ?, ?, ?, ?, ?)`,
-				string(u.Provider), u.Key, ev.Kind, ev.Key, ev.At.UTC().Format(event.TimeLayout), ev.Data)
+			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO events (provider, unit_key, kind, key, actor, at, data) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				string(u.Provider), u.Key, ev.Kind, ev.Key, ev.Actor, ev.At.UTC().Format(event.TimeLayout), ev.Data)
 			if err != nil {
 				return err
 			}
@@ -124,8 +124,8 @@ func compareUnits(a, b unit.Unit) int {
 
 func writeUnkeyed(ctx context.Context, tx *Tx, ev port.Event, u unit.Unit) error {
 	for at := ev.At.UTC(); ; at = at.Add(time.Nanosecond) {
-		res, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, at, data) VALUES (?, ?, ?, '', ?, ?) ON CONFLICT DO NOTHING`,
-			string(u.Provider), u.Key, ev.Kind, at.Format(event.TimeLayout), ev.Data)
+		res, err := tx.ExecContext(ctx, `INSERT INTO events (provider, unit_key, kind, key, actor, at, data) VALUES (?, ?, ?, '', ?, ?, ?) ON CONFLICT DO NOTHING`,
+			string(u.Provider), u.Key, ev.Kind, ev.Actor, at.Format(event.TimeLayout), ev.Data)
 		if err != nil {
 			return err
 		}

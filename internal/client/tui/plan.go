@@ -46,6 +46,9 @@ func waits(it api.PlanItem) int {
 	return 1
 }
 
+// SetClosed replaces the sessions closed in the last day.
+func (m *Model) SetClosed(closed []api.ClosedSession) { m.closed = closed }
+
 // SetPlanSpecs replaces the specs of the actions a plan item may offer.
 func (m *Model) SetPlanSpecs(specs []api.ActionSpec) { m.planSpecs = specs }
 
@@ -175,13 +178,50 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 	if m.planErr != "" {
 		return append(lines, "  "+m.t.Red(termfmt.Cut(m.planErr, width-2)))
 	}
+	closed := m.closedLines(width, now)
+	room := body - 2
+	if len(m.plan) > 0 {
+		room = body / 2
+	}
+	if len(closed) > room {
+		closed = append(closed[:max(room-1, 1)], "  "+m.t.Dim(termfmt.Ellipsis))
+	}
+	if len(closed) > 0 {
+		body -= len(closed) + 1
+	}
 	if len(m.plan) == 0 {
 		text := "Nothing pending or blocked in the plan."
 		if !m.planLoaded {
 			text = "loading…"
 		}
-		return append(lines, "  "+m.t.Dim(text))
+		lines = append(lines, "  "+m.t.Dim(text))
+	} else {
+		lines = m.renderItems(lines, width, body, now)
 	}
+	if len(closed) > 0 {
+		lines = append(append(lines, ""), closed...)
+	}
+	return lines
+}
+
+// closedLines are the sessions closed in the last day, each with its age,
+// reason and the line that resumes it.
+func (m *Model) closedLines(width int, now time.Time) []string {
+	if len(m.closed) == 0 {
+		return nil
+	}
+	t := m.t
+	out := []string{"  " + t.Bold(fmt.Sprintf("Sessions closed in the last day (%d)", len(m.closed)))}
+	for _, c := range m.closed {
+		out = append(out, "  "+termfmt.Cut(fmt.Sprintf("%s  %s  %s", span(now.Sub(c.At)), c.Session, oneLine(c.Reason)), width-2))
+		if c.Resume != "" {
+			out = append(out, "    "+t.Dim(termfmt.Cut("resume: "+oneLine(c.Resume), width-4)))
+		}
+	}
+	return out
+}
+
+func (m *Model) renderItems(lines []string, width, body int, now time.Time) []string {
 	cur := m.planCursor()
 	var detail []string
 	if width >= 40 && body >= 8 {
