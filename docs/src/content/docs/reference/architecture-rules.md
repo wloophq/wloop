@@ -44,26 +44,26 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 ### `TestCoreImportsNoPlugin`
 
-| `pluginDebt` entry |
-|---|
-| `internal/api` `internal/domain/pr` |
-| `internal/api/client` `internal/domain/pr` |
-| `internal/client/tui` `internal/domain/pr` |
-| `internal/client/turncli` `internal/domain/pr` |
-| `internal/core/port` `internal/domain/pr` |
-| `internal/core/sweep` `internal/domain/inventory` |
-| `internal/core/sweep` `internal/domain/pr` |
-| `internal/core/usage` `internal/domain/pr` |
-| `internal/core/views` `internal/domain/pr` |
-| `internal/core/views/viewstest` `internal/domain/pr` |
-| `internal/domain/turn` `internal/domain/pr` |
-| `internal/domain/unit` `internal/domain/pr` |
-| `internal/domain/view` `internal/domain/pr` |
-| `internal/readmodel` `internal/domain/inventory` |
-| `internal/readmodel` `internal/domain/pr` |
-| `internal/readmodel` `internal/readmodel/prrow` |
-| `internal/readmodel` `internal/situation` |
-| `internal/web` `internal/situation` |
+| `pluginDebt` entry | Reason |
+|---|---|
+| `internal/api` `internal/domain/pr` | the reconcile report, the turn book, events, explore candidates and remove-done results carry a pr.Ref |
+| `internal/api/client` `internal/domain/pr` | TurnBook and Facts take a pr.Ref |
+| `internal/client/tui` `internal/domain/pr` | the filter jumps to a pasted pull request URL with pr.ParseURL, and shortRef shortens an owner/repo#n label with pr.ParseKey |
+| `internal/client/turncli` `internal/domain/pr` | unitArg parses a pull request URL argument with pr.ParseURL |
+| `internal/core/port` `internal/domain/pr` | PROf reads a pull request from a github event |
+| `internal/core/sweep` `internal/domain/inventory` | the Inputs port returns the stored pull request rows as inventory.PR |
+| `internal/core/sweep` `internal/domain/pr` | the sweep's Facts embed pr.Facts |
+| `internal/core/usage` `internal/domain/pr` | a Turn names its pull request as a pr.Ref |
+| `internal/core/views` `internal/domain/pr` | test only: fixtures build units from pr.Ref, and a pause stub parses keys with pr.ParseKey |
+| `internal/core/views/viewstest` `internal/domain/pr` | the ViewSink and State contract suites build their units from pr.Ref |
+| `internal/domain/turn` `internal/domain/pr` | test only: fixtures build units from pr.Ref |
+| `internal/domain/unit` `internal/domain/pr` | test only: the registry tests round-trip pr.Codec and pr.ParseKey |
+| `internal/domain/view` `internal/domain/pr` | test only: fixtures build units from pr.Ref |
+| `internal/readmodel` `internal/domain/inventory` | the RowDeps.Intake hook takes an inventory.BriefRecord; tests seed rows, events and overrides |
+| `internal/readmodel` `internal/domain/pr` | test only: tests build pr.Ref units and parse row keys with pr.ParseKey |
+| `internal/readmodel` `internal/readmodel/prrow` | test only: tests build the GitHub row provider and read its payloads and renudge delay |
+| `internal/readmodel` `internal/situation` | test only: tests read the loop-waiting and muted row kinds and situation.WorkingDuration |
+| `internal/web` `internal/situation` | test only: the board and dashboard tests list situation kinds and use WorkingDuration |
 
 ### `TestLoopCodeImportsNoPR`
 
