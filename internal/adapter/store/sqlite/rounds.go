@@ -30,14 +30,14 @@ func NewRounds(db *DB) *Rounds { return &Rounds{db: db} }
 func (r *Rounds) Load(ctx context.Context) (*round.Store, error) {
 	st := round.New()
 	err := r.db.Read(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped FROM round_state WHERE provider = 'github'`)
+		rows, err := tx.QueryContext(ctx, `SELECT unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped, conflict_head FROM round_state WHERE provider = 'github'`)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var key, sent, roundAt string
 			var p round.PR
-			if err := rows.Scan(&key, &p.Fingerprint, &sent, &roundAt, &p.ChecksHead, &p.AgentHome, &p.FirstRoundSkipped); err != nil {
+			if err := rows.Scan(&key, &p.Fingerprint, &sent, &roundAt, &p.ChecksHead, &p.AgentHome, &p.FirstRoundSkipped, &p.ConflictHead); err != nil {
 				rows.Close()
 				return err
 			}
@@ -193,6 +193,7 @@ func saveFields(ctx context.Context, tx *Tx, ref pr.Ref, p round.PR, f round.Fie
 		{round.FieldChecksHead, "checks_head", p.ChecksHead},
 		{round.FieldAgentHome, "agent_home", p.AgentHome},
 		{round.FieldFirstRoundSkipped, "first_round_skipped", p.FirstRoundSkipped},
+		{round.FieldConflictHead, "conflict_head", p.ConflictHead},
 	} {
 		if f&c.field != 0 {
 			sets = append(sets, c.column+" = ?")

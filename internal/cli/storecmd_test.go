@@ -212,13 +212,14 @@ func TestTheDaemonOpensACurrentStoreAndReportsIt(t *testing.T) {
 func TestTheDaemonWaitsOnANewerStoreUntilItChanges(t *testing.T) {
 	t.Parallel()
 	te := storeEnv(t, "a")
-	setStore(t, te.storePath(), `UPDATE meta SET value = '3' WHERE key = 'compatible_version'`, `PRAGMA user_version = 3`)
+	newer := uint32(sqlite.SchemaVersion + 1)
+	setStore(t, te.storePath(), fmt.Sprintf(`UPDATE meta SET value = '%d' WHERE key = 'compatible_version'`, newer), fmt.Sprintf(`PRAGMA user_version = %d`, newer))
 	db, _, wait, err := te.tryStore(context.Background(), t.Logf)
 	if err != nil || db != nil {
 		t.Fatalf("%v", err)
 	}
 	st := wait.status
-	if st.State != api.StoreTooNew || st.Version != 3 || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads ("+schemaV+")") {
+	if st.State != api.StoreTooNew || st.Version != newer || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads ("+schemaV+")") {
 		t.Fatalf("%+v", st)
 	}
 	if wait.ready() {

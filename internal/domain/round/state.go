@@ -16,6 +16,9 @@ type PR struct {
 	RoundAt time.Time
 	// ChecksHead is the head whose failing checks a triage round covered.
 	ChecksHead string
+	// ConflictHead is the head whose conflict with the base a triage round
+	// covered.
+	ConflictHead string
 	// AgentHome is the agent home of the session that asked for the review,
 	// reused by the rounds the watch starts.
 	AgentHome string
@@ -43,6 +46,7 @@ const (
 	FieldChecksHead
 	FieldAgentHome
 	FieldFirstRoundSkipped
+	FieldConflictHead
 )
 
 // The kinds of a Note.
@@ -160,6 +164,12 @@ func (s *Store) ChecksHead(key string) string { return s.PRs[key].ChecksHead }
 
 func (s *Store) SetChecksHead(key, head string) {
 	s.set(key, FieldChecksHead, func(p *PR) { p.ChecksHead = head })
+}
+
+func (s *Store) ConflictHead(key string) string { return s.PRs[key].ConflictHead }
+
+func (s *Store) SetConflictHead(key, head string) {
+	s.set(key, FieldConflictHead, func(p *PR) { p.ConflictHead = head })
 }
 
 // RecordFollowup keeps the previous fingerprint when the round was not

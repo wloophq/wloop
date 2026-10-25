@@ -52,7 +52,7 @@ var golden = []string{
 	"round_day_notes: day, kind, note",
 	"round_day_prs: day, provider, unit_key, rounds",
 	"round_days: day, total",
-	"round_state: provider, unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped",
+	"round_state: provider, unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped, conflict_head",
 	"segment_map: provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at, closed",
 	"session_handles: session_id, manager, handle, runtime, from_at, to_at",
 	"sessions: session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed, started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key",
@@ -180,6 +180,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.SetChecksHead(key, "abc")
+	a.SetConflictHead(key, "def")
 	b.RecordFollowup(key, "fp", now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
@@ -193,7 +194,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.PRs[key]
-	if p.ChecksHead != "abc" || p.Fingerprint != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) || !p.RoundAt.Equal(now) {
+	if p.ChecksHead != "abc" || p.ConflictHead != "def" || p.Fingerprint != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) || !p.RoundAt.Equal(now) {
 		t.Fatalf("%+v", p)
 	}
 	if d := c.Days[round.DayKey(now)]; d.Total != 1 || d.PerPR[key] != 1 {

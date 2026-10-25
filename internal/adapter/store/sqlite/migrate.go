@@ -43,6 +43,9 @@ var migrations = []migration{
 			SELECT 1 FROM drafts d WHERE d.provider = extraction_cursors.provider AND d.unit_key = extraction_cursors.unit_key
 			AND d.kind = 'close' AND d.state = 'sent')`,
 	)},
+	{to: 3, name: "conflict_head", compatible: 2, up: execAll(
+		`ALTER TABLE round_state ADD COLUMN conflict_head TEXT NOT NULL DEFAULT ''`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run
