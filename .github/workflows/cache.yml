@@ -23,16 +23,19 @@ jobs:
         uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
           cache: build
+      - run: go mod download
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
-      - run: GOOS=darwin CGO_ENABLED=0 go vet ./...
-      - run: |
-          for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
-            CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} go build ./...
-          done
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - run: make vet-darwin
+      - run: make build-targets
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ steps.go.outputs.paths }}
-          key: ${{ steps.go.outputs.key }}
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.mod-path }}
+          key: ${{ steps.go.outputs.mod-key }}
 
   test-shard:
     strategy:
@@ -58,8 +61,8 @@ jobs:
           SHARD: ${{ matrix.shard }}
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ steps.go.outputs.paths }}
-          key: ${{ steps.go.outputs.key }}
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
 
   test-macos:
     runs-on: macos-latest
@@ -78,8 +81,12 @@ jobs:
       - run: CGO_ENABLED=0 go test -run '^$' ./internal/client/menubar/macos/
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ steps.go.outputs.paths }}
-          key: ${{ steps.go.outputs.key }}
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.mod-path }}
+          key: ${{ steps.go.outputs.mod-key }}
 
   prune:
     needs: [build, test-shard, test-macos]
