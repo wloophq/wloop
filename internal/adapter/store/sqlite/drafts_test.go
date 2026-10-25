@@ -371,3 +371,29 @@ func TestConcurrentSendAcrossHandlesPublishesOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestADraftStoresItsShapeAndEffects(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, _ := openTemp(t)
+	s := db.Drafts()
+	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	byKind := sampleDraft(slackThread, at)
+	byKind.Kind = draft.Nudge
+	d, err := s.Insert(ctx, byKind)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "nudge" || got.Delivery != draft.Message || got.Effects == nil || len(got.Effects) > 0 || !reflect.DeepEqual(got, d) {
+		t.Fatalf("shaped from its kind: %+v\ninsert returned %+v", got, d)
+	}
+	shaped := sampleDraft(slackThread, at)
+	shaped.Kind, shaped.Purpose, shaped.Delivery, shaped.Effects = draft.React, "close", draft.Reaction, []string{"unit.closed"}
+	d, err = s.Insert(ctx, shaped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Get(ctx, d.ID); got.Purpose != "close" || got.Delivery != draft.Reaction || !slices.Equal(got.Effects, []string{"unit.closed"}) {
+		t.Fatalf("%+v", got)
+	}
+}

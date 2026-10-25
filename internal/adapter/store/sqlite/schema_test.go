@@ -8,11 +8,11 @@ import (
 	"testing"
 )
 
-func TestFreshStoreIsVersion1(t *testing.T) {
+func TestFreshStoreIsAtSchemaVersion(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
 	var v int
-	if err := db.R().QueryRowContext(context.Background(), `PRAGMA user_version`).Scan(&v); err != nil || v != 1 || SchemaVersion != 1 {
+	if err := db.R().QueryRowContext(context.Background(), `PRAGMA user_version`).Scan(&v); err != nil || v != SchemaVersion {
 		t.Fatalf("user_version %d %v", v, err)
 	}
 	if err := db.R().QueryRowContext(context.Background(), `PRAGMA auto_vacuum`).Scan(&v); err != nil || v != 2 {
@@ -22,7 +22,7 @@ func TestFreshStoreIsVersion1(t *testing.T) {
 
 func TestOtherVersionsAreRefused(t *testing.T) {
 	t.Parallel()
-	for _, v := range []int{0, 2, 8} {
+	for _, v := range []int{0, SchemaVersion + 1, 8} {
 		db, path := openTemp(t)
 		if _, err := execW(db, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
 			t.Fatal(err)
@@ -31,9 +31,9 @@ func TestOtherVersionsAreRefused(t *testing.T) {
 			t.Fatal(err)
 		}
 		db.Close()
-		want := fmt.Sprintf("the store at %s is at schema version %d, newer than this release reads (1)", path, v)
+		want := fmt.Sprintf("the store at %s is at schema version %d, newer than this release reads (%d)", path, v, SchemaVersion)
 		if v == 0 {
-			want = fmt.Sprintf("the store at %s is at schema version 0; this release reads versions 1 to 1 only", path)
+			want = fmt.Sprintf("the store at %s is at schema version 0; this release reads versions 1 to %d only", path, SchemaVersion)
 		}
 		for name, err := range map[string]error{"Open": openErr(path), "Check": Check(path)} {
 			if !errors.Is(err, ErrSchema) || err.Error() != want {

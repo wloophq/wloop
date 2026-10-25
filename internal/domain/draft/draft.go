@@ -28,6 +28,41 @@ var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
+// Delivery is how a draft reaches the provider.
+type Delivery string // "message", "reaction", "comment"
+
+const (
+	Message         Delivery = "message"
+	Reaction        Delivery = "reaction"
+	CommentDelivery Delivery = "comment"
+)
+
+// ShapeOf is the purpose and delivery of a draft of kind k.
+func ShapeOf(k Kind) (purpose string, d Delivery) {
+	switch k {
+	case React:
+		return string(k), Reaction
+	case Comment:
+		return string(k), CommentDelivery
+	}
+	return string(k), Message
+}
+
+// KindOf is the kind readers of Kind see for a purpose and a delivery.
+func KindOf(purpose string, d Delivery) Kind {
+	switch d {
+	case Reaction:
+		return React
+	case CommentDelivery:
+		return Comment
+	}
+	switch k := Kind(purpose); k {
+	case Nudge, Close, AskOwner:
+		return k
+	}
+	return Reply
+}
+
 type State string // "proposed", "approved", "sending", "sent", "failed", "discarded"
 
 const (
@@ -97,11 +132,14 @@ type Draft struct {
 	Items    []string // item ids of Unit; may be empty
 	Entry    string   // the entry it serves, "" none; the Outbox entry itself is "draft:<ID>"
 	Kind     Kind
-	Target   string // plugin target grammar; "" means the unit itself (its thread, its PR)
-	Text     string // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
-	Reaction string // Kind "react" only: emoji name without colons
-	Original string // Text as proposed
-	Edited   bool   // Text != Original
+	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
+	Delivery Delivery // how it is posted
+	Effects  []string // applied when it is sent, such as "entry.nudged"
+	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
+	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
+	Reaction string   // Kind "react" only: emoji name without colons
+	Original string   // Text as proposed
+	Edited   bool     // Text != Original
 	Origin   Origin
 	Approval Approval  // fixed at proposal
 	Deadline time.Time // Approval.Mode "window": when Tick approves it; zero otherwise

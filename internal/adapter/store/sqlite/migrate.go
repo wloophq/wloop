@@ -31,7 +31,19 @@ func (m migration) label() string { return fmt.Sprintf("%04d_%s", m.to, m.name) 
 
 // migrations take a store from version 1 to SchemaVersion, one version each,
 // in order. A migration in a release is never edited: a fix is a new one.
-var migrations = []migration{}
+var migrations = []migration{
+	{to: 2, name: "draft_shape", compatible: 1, up: execAll(
+		`ALTER TABLE drafts ADD COLUMN purpose TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE drafts ADD COLUMN delivery TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE drafts ADD COLUMN effects TEXT NOT NULL DEFAULT '[]'`,
+		`UPDATE drafts SET purpose = kind, delivery = CASE kind WHEN 'react' THEN 'reaction' WHEN 'comment' THEN 'comment' ELSE 'message' END`,
+		`UPDATE drafts SET effects = '["entry.nudged"]' WHERE kind = 'nudge' AND state IN ('proposed', 'approved', 'sending', 'failed')`,
+		`UPDATE drafts SET effects = '["unit.closed"]' WHERE kind = 'close' AND state IN ('proposed', 'approved', 'sending', 'failed')`,
+		`UPDATE extraction_cursors SET closure_posted = 1 WHERE closure_posted = 0 AND EXISTS (
+			SELECT 1 FROM drafts d WHERE d.provider = extraction_cursors.provider AND d.unit_key = extraction_cursors.unit_key
+			AND d.kind = 'close' AND d.state = 'sent')`,
+	)},
+}
 
 // schemaSet is a schema and the migrations that reach it, so tests can run
 // the procedure on versions this release does not have.

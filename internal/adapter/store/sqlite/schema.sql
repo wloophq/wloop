@@ -414,7 +414,8 @@ CREATE TABLE drafts (
   error TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '',
   would_policy TEXT NOT NULL DEFAULT '', would_reason TEXT NOT NULL DEFAULT '', would_outcome TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sending_at TEXT NOT NULL DEFAULT '',
-  rev INTEGER NOT NULL DEFAULT 0
+  rev INTEGER NOT NULL DEFAULT 0,
+  purpose TEXT NOT NULL DEFAULT '', delivery TEXT NOT NULL DEFAULT '', effects TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);

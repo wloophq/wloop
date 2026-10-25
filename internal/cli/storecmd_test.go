@@ -86,7 +86,7 @@ func TestStoreMigrateWithNothingPending(t *testing.T) {
 	if code := te.runCLI("store", "migrate"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if got := te.out.String(); got != "store: at schema version 1; nothing to migrate\n" {
+	if got := te.out.String(); got != "store: at schema version "+schemaV+"; nothing to migrate\n" {
 		t.Fatalf("%q", got)
 	}
 }
@@ -98,16 +98,18 @@ func TestStoreMigrateRefusesANewerStore(t *testing.T) {
 	if code := te.runCLI("store", "migrate", "--dry-run"); code != 1 {
 		t.Fatalf("exit %d", code)
 	}
-	want := "is at schema version 5, newer than this release reads (1); upgrade " + brand.Name + " with `brew upgrade " + brand.Name + "`, or go back to the store from before that upgrade; `" + restoreCommand + "` restores it"
+	want := "is at schema version 5, newer than this release reads (" + schemaV + "); upgrade " + brand.Name + " with `brew upgrade " + brand.Name + "`, or go back to the store from before that upgrade; `" + restoreCommand + "` restores it"
 	if !strings.Contains(te.err.String(), want) {
 		t.Fatalf("%s", te.err)
 	}
 }
 
+var schemaV = fmt.Sprint(sqlite.SchemaVersion)
+
 func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 	t.Parallel()
 	te := storeEnv(t, "before")
-	backup := filepath.Join(te.backupsPath(), "store-v1-20261020T120000Z.db")
+	backup := filepath.Join(te.backupsPath(), "store-v"+schemaV+"-20261020T120000Z.db")
 	if err := os.MkdirAll(te.backupsPath(), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +125,7 @@ func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 	if code := te.runCLI("store", "restore", "--list"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if !strings.HasPrefix(te.out.String(), "store-v1-20261020T120000Z.db  version 1  ") {
+	if !strings.HasPrefix(te.out.String(), "store-v"+schemaV+"-20261020T120000Z.db  version "+schemaV+"  ") {
 		t.Fatalf("list %q", te.out)
 	}
 	te.out.Reset()
@@ -133,12 +135,12 @@ func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
 	if got := markOf(t, te.storePath()); got != "before" {
 		t.Fatalf("restored mark %q", got)
 	}
-	kept := filepath.Join(te.backupsPath(), "store-v1-"+testNow.UTC().Format("20060102T150405Z")+".pre-restore.db")
+	kept := filepath.Join(te.backupsPath(), "store-v"+schemaV+"-"+testNow.UTC().Format("20060102T150405Z")+".pre-restore.db")
 	if got := markOf(t, kept); got != "after" {
 		t.Fatalf("kept mark %q", got)
 	}
 	out := te.out.String()
-	for _, want := range []string{"restore " + backup + " (version 1, taken ", "what changed in " + brand.Name + " since then is lost", "kept the replaced store as " + kept, "store: restored at version 1"} {
+	for _, want := range []string{"restore " + backup + " (version " + schemaV + ", taken ", "what changed in " + brand.Name + " since then is lost", "kept the replaced store as " + kept, "store: restored at version " + schemaV} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -154,7 +156,7 @@ func TestStoreRestoreAsksFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, _ := os.ReadFile(te.storePath())
-	_ = os.WriteFile(filepath.Join(te.backupsPath(), "store-v1-20261020T120000Z.db"), raw, 0o600)
+	_ = os.WriteFile(filepath.Join(te.backupsPath(), "store-v"+schemaV+"-20261020T120000Z.db"), raw, 0o600)
 	if code := te.runCLI("store", "restore"); code != 1 || !strings.Contains(te.err.String(), "store restore asks first; pass --yes when standard input is not a terminal") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -172,7 +174,7 @@ func TestAStoreCommandWaitsForTheStoreLock(t *testing.T) {
 	te := storeEnv(t, "before")
 	_ = os.MkdirAll(te.backupsPath(), 0o700)
 	raw, _ := os.ReadFile(te.storePath())
-	_ = os.WriteFile(filepath.Join(te.backupsPath(), "store-v1-20261020T120000Z.db"), raw, 0o600)
+	_ = os.WriteFile(filepath.Join(te.backupsPath(), "store-v"+schemaV+"-20261020T120000Z.db"), raw, 0o600)
 	unlock, err := sqlite.LockStore(te.storePath())
 	if err != nil {
 		t.Fatal(err)
@@ -199,7 +201,7 @@ func TestTheDaemonOpensACurrentStoreAndReportsIt(t *testing.T) {
 	}
 	defer unlock()
 	defer db.Close()
-	if te.storeStatus == nil || te.storeStatus.State != api.StoreOK || te.storeStatus.Version != 1 {
+	if te.storeStatus == nil || te.storeStatus.State != api.StoreOK || te.storeStatus.Version != sqlite.SchemaVersion {
 		t.Fatalf("%+v", te.storeStatus)
 	}
 	if _, err := sqlite.LockStore(te.storePath()); err == nil {
@@ -216,7 +218,7 @@ func TestTheDaemonWaitsOnANewerStoreUntilItChanges(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	st := wait.status
-	if st.State != api.StoreTooNew || st.Version != 3 || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads (1)") {
+	if st.State != api.StoreTooNew || st.Version != 3 || st.Fix != restoreCommand || !strings.Contains(st.Message, "newer than this release reads ("+schemaV+")") {
 		t.Fatalf("%+v", st)
 	}
 	if wait.ready() {
@@ -264,7 +266,7 @@ func TestDoctorChecksAStoreThisReleaseCannotOpen(t *testing.T) {
 	te := storeEnv(t, "a")
 	setStore(t, te.storePath(), `UPDATE meta SET value = '4' WHERE key = 'compatible_version'`, `PRAGMA user_version = 4`)
 	got := te.storeChecks()
-	if got[0].mark != markMissing || got[0].fix != restoreCommand || !strings.Contains(got[0].info, "schema version 4, newer than this release reads (1)") {
+	if got[0].mark != markMissing || got[0].fix != restoreCommand || !strings.Contains(got[0].info, "schema version 4, newer than this release reads ("+schemaV+")") {
 		t.Fatalf("%+v", got[0])
 	}
 	if got[1] != (check{markInfo, "store backup", "none yet; one is taken before each migration", ""}) {

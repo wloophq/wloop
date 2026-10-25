@@ -26,11 +26,11 @@ const (
 	draftFields = `provider, unit_key, items, entry, kind, target, text, reaction, original, edited,
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome,
-	created_at, updated_at, sending_at`
+	created_at, updated_at, sending_at, purpose, delivery, effects`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -49,34 +49,52 @@ func parseDraftTime(s string) (time.Time, error) {
 }
 
 func draftArgs(d draft.Draft) []any {
+	d = shaped(d)
 	its := d.Items
 	if its == nil {
 		its = []string{}
 	}
 	list, _ := json.Marshal(its)
+	effects, _ := json.Marshal(d.Effects)
 	o, a, w, ev := d.Origin, d.Approval, d.Would, d.Evidence
 	return []any{string(d.Unit.Provider), d.Unit.Key, string(list), d.Entry, string(d.Kind), d.Target, d.Text, d.Reaction, d.Original, d.Edited,
 		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(a.Mode), int64(a.Window), draftTime(d.Deadline), string(d.State),
 		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason, string(w.Policy), w.Reason, string(w.Outcome),
-		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt)}
+		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects)}
+}
+
+// shaped is d with the purpose and delivery of its kind when it names
+// neither, as a draft an older release wrote does, and Effects never nil.
+func shaped(d draft.Draft) draft.Draft {
+	if d.Purpose == "" && d.Delivery == "" {
+		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
+	}
+	if d.Effects == nil {
+		d.Effects = []string{}
+	}
+	return d
 }
 
 func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
-	var provider, list, kind, originKind, mode, state, policy, outcome string
+	var provider, list, kind, originKind, mode, state, policy, outcome, delivery, effects string
 	var window int64
 	var deadline, evAt, created, updated, sending string
 	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Entry, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &mode, &window, &deadline, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason, &policy, &d.Would.Reason, &outcome,
-		&created, &updated, &sending); err != nil {
+		&created, &updated, &sending, &d.Purpose, &delivery, &effects); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)
 	d.Approval = draft.Approval{Mode: draft.ApprovalMode(mode), Window: time.Duration(window)}
 	d.Would.Policy, d.Would.Outcome = draft.WouldPolicy(policy), draft.Outcome(outcome)
+	d.Delivery = draft.Delivery(delivery)
 	if err := json.Unmarshal([]byte(list), &d.Items); err != nil {
 		return draft.Draft{}, fmt.Errorf("the items of draft %d: %w", d.ID, err)
+	}
+	if err := json.Unmarshal([]byte(effects), &d.Effects); err != nil {
+		return draft.Draft{}, fmt.Errorf("the effects of draft %d: %w", d.ID, err)
 	}
 	for _, f := range []struct {
 		dst *time.Time
@@ -88,11 +106,12 @@ func scanDraft(row scanner) (draft.Draft, error) {
 		}
 		*f.dst = t
 	}
-	return d, nil
+	return shaped(d), nil
 }
 
-// normal is d as a scan returns it: times in UTC, Items never nil.
+// normal is d as a scan returns it: shaped, times in UTC, Items never nil.
 func normal(d draft.Draft) draft.Draft {
+	d = shaped(d)
 	for _, t := range []*time.Time{&d.Deadline, &d.Evidence.At, &d.CreatedAt, &d.UpdatedAt, &d.SendingAt} {
 		if !t.IsZero() {
 			*t = t.UTC()
