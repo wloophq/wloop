@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -27,10 +28,6 @@ type fakeAgent struct {
 	// wait waits on the context and returns its error; boom panics.
 	wait, boom bool
 }
-
-// overrun is how far past Budget a hook may return before it counts as
-// ignoring its deadline: a loaded runner fires the timer late.
-const overrun = time.Second
 
 func (f *fakeAgent) act(ctx context.Context, handle string) error {
 	f.calls++
@@ -108,6 +105,12 @@ var ports = harness.Set{
 }
 
 // stdinOf is the hook's standard input; "" is one that never closes.
+// bubbled runs f on synctest's clock, which moves only when every goroutine
+// waits: a hook that waits out Budget returns at exactly Budget, at once.
+func bubbled(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) { synctest.Test(t, f) }
+}
+
 func stdinOf(t *testing.T, s string) io.Reader {
 	if s != "" {
 		return strings.NewReader(s)
@@ -139,11 +142,11 @@ func TestStopHookFailsOpen(t *testing.T) {
 		"client past budget": {inTerm, stopInput, &fakeAgent{wait: true, answer: api.StopAnswer{Block: true}}, 1},
 		"client panics":      {inTerm, stopInput, &fakeAgent{boom: true}, 1},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, bubbled(func(t *testing.T) {
 			var out, errw bytes.Buffer
 			start := time.Now()
 			code := Stop(context.Background(), c.env, stdinOf(t, c.in), &out, &errw, c.agent, ports, "")
-			if took := time.Since(start); took > Budget+overrun {
+			if took := time.Since(start); took > Budget {
 				t.Errorf("took %v", took)
 			}
 			if code != 0 || out.Len() != 0 || c.agent.calls != c.calls {
@@ -152,21 +155,23 @@ func TestStopHookFailsOpen(t *testing.T) {
 			if c.calls > 0 && !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
 				t.Fatalf("err %q", errw.String())
 			}
-		})
+		}))
 	}
 }
 
 func TestHookWithOpenStdinGivesUpWithinBudget(t *testing.T) {
-	var out, errw bytes.Buffer
-	a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
-	start := time.Now()
-	code := Stop(context.Background(), inTerm, stdinOf(t, ""), &out, &errw, a, ports, "")
-	if took := time.Since(start); took > Budget+overrun {
-		t.Fatalf("took %v", took)
-	}
-	if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
-		t.Fatalf("exit %d, out %q, calls %d, err %q", code, out.String(), a.calls, errw.String())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var out, errw bytes.Buffer
+		a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
+		start := time.Now()
+		code := Stop(context.Background(), inTerm, stdinOf(t, ""), &out, &errw, a, ports, "")
+		if took := time.Since(start); took != Budget {
+			t.Fatalf("took %v, want Budget", took)
+		}
+		if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
+			t.Fatalf("exit %d, out %q, calls %d, err %q", code, out.String(), a.calls, errw.String())
+		}
+	})
 }
 
 func TestHookWithMalformedInputAllows(t *testing.T) {
@@ -175,7 +180,7 @@ func TestHookWithMalformedInputAllows(t *testing.T) {
 		a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
 		start := time.Now()
 		code := Stop(context.Background(), inTerm, strings.NewReader(in), &out, &errw, a, ports, "")
-		if took := time.Since(start); took > Budget+overrun {
+		if took := time.Since(start); took > Budget {
 			t.Fatalf("%q took %v", in, took)
 		}
 		if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
@@ -287,17 +292,17 @@ func TestSessionStartPrintsNothing(t *testing.T) {
 		"client past budget": {inTerm, input, &fakeAgent{wait: true}},
 		"client panics":      {inTerm, input, &fakeAgent{boom: true}},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, bubbled(func(t *testing.T) {
 			var errw bytes.Buffer
 			code := -1
 			start := time.Now()
 			if out := stdout(t, func() { code = SessionStart(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, "") }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget+overrun {
+			if took := time.Since(start); code != 0 || took > Budget {
 				t.Fatalf("exit %d after %v", code, took)
 			}
-		})
+		}))
 	}
 	a := &fakeAgent{}
 	SessionStart(context.Background(), inTerm, strings.NewReader(input), io.Discard, a, ports, "")
@@ -325,14 +330,14 @@ func TestPromptHookNeverFails(t *testing.T) {
 		"client past budget": {inTerm, input, "prompts", &fakeAgent{wait: true}, 1},
 		"client panics":      {inTerm, input, "prompts", &fakeAgent{boom: true}, 1},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, bubbled(func(t *testing.T) {
 			var errw bytes.Buffer
 			code := -1
 			start := time.Now()
 			if out := stdout(t, func() { code = Prompt(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, c.kind) }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget+overrun {
+			if took := time.Since(start); code != 0 || took > Budget {
 				t.Fatalf("exit %d after %v", code, took)
 			}
 			if c.agent.calls != c.calls {
@@ -341,7 +346,7 @@ func TestPromptHookNeverFails(t *testing.T) {
 			if name != "sent" && name != "no handle" && !strings.Contains(errw.String(), brand.Command+" hook prompt: going on:") {
 				t.Fatalf("err %q", errw.String())
 			}
-		})
+		}))
 	}
 	a := &fakeAgent{}
 	Prompt(context.Background(), inTerm, strings.NewReader(input), io.Discard, a, ports, "prompts")

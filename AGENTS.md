@@ -40,6 +40,7 @@ Still owned by Go and being moved to the profile (see `internal/archtest`'s shri
 - Comments only where the code cannot say it: the non-obvious why, an external constraint, an invariant the type does not express.
 - Test first. `make lint` and `make test` pass before a pull request.
 - The repository is public: tests, fixtures and pull request bodies carry invented names and counts, never real user data. Run `make scan-real-data SCAN_BASE=origin/main` before pushing.
+- Tests never read the wall clock. Code with timers, deadlines or goroutines runs in `synctest.Test`, asserting after `synctest.Wait` and on exact durations (`took == Budget`, never `took < Budget+slack`); real processes, sockets and files stay out of the bubble, behind a condition poll whose deadline only guards a hang. Wait on the state you assert, not on a nearby signal (a fake that recorded a call is not a caller that handled the reply); fakes answer by state, not by call count; widen a race with a gate, never a sleep.
 - `internal/archtest` holds the architecture rules; each has a self-test that plants a violation. A new rule comes with its self-test.
 - Triage findings by what the product needs, not current convenience. "Latent", "nothing triggers it" or "existing code does the same" never justify a decline; only evidence that the claim is false does. Fix real in-scope problems in the same PR, test first; file the rest as issues. Remove code a fix leaves unused or duplicated.
 
