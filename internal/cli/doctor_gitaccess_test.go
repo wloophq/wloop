@@ -37,6 +37,7 @@ func (g noGit) Run(_ context.Context, dir string, _ []string, args ...string) ([
 }
 
 func TestDoctorRunsNoGitByDefault(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: checkoutOf(t, "git@github.com:acme/widget.git"), RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, m)
 	te.Git = gitx.Git{R: noGit{t}}
@@ -52,6 +53,7 @@ func TestDoctorRunsNoGitByDefault(t *testing.T) {
 }
 
 func TestDoctorGitChecksLiveAndRecordsIt(t *testing.T) {
+	t.Parallel()
 	dir := checkoutOf(t, "git@github.com:acme/widget.git")
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: dir, RemoteKey: "github.com/acme/widget"}}}
 	te := newTestEnv(t, m)
@@ -70,6 +72,7 @@ func TestDoctorGitChecksLiveAndRecordsIt(t *testing.T) {
 }
 
 func TestServeRecordsTheFetchOfARound(t *testing.T) {
+	t.Parallel()
 	dir := checkoutOf(t, "https://github.com/acme/api")
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: dir, RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
@@ -87,6 +90,7 @@ func TestServeRecordsTheFetchOfARound(t *testing.T) {
 }
 
 func TestCLIFetchRecordsNothing(t *testing.T) {
+	t.Parallel()
 	dir := checkoutOf(t, "https://github.com/acme/api")
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: dir, RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
@@ -101,6 +105,7 @@ func TestCLIFetchRecordsNothing(t *testing.T) {
 }
 
 func TestSlowStoreDoesNotBlockTheCaller(t *testing.T) {
+	t.Parallel()
 	release := make(chan struct{})
 	rec := newAccessRecorder(context.Background(), func(context.Context, api.GitAccessRecord) { <-release })
 	done := make(chan struct{})
@@ -120,6 +125,7 @@ func TestSlowStoreDoesNotBlockTheCaller(t *testing.T) {
 }
 
 func TestGitAccessChecks(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	at := func(ago time.Duration) time.Time { return testNow.Add(-ago) }
 	cmd := te.command()

@@ -46,6 +46,7 @@ func (unknownBudget) Allow(dgh.Priority) bool            { return true }
 func (unknownBudget) Budget() map[dgh.Resource]dgh.Limit { return nil }
 
 func TestTheClosedLineIsPinnedForClaude(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
 	reg, sess := turnstest.NewRegistry(turnstest.Strict(t)), turnstest.NewSessions()
 	reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws-1", Worktree: "/wt/a", Home: "/home/me/.claude-p",
@@ -95,6 +96,7 @@ func (c *countingBooks) Books(context.Context, ...unit.Unit) (map[unit.Unit]turn
 }
 
 func TestTheFastJobReconcilesTheTurnsAndTheViews(t *testing.T) {
+	t.Parallel()
 	store := &countingTurns{Store: turnstest.NewStore(turnstest.Strict(t))}
 	books := &countingBooks{}
 	d := testDeps(t)

@@ -77,6 +77,7 @@ func (r *silentRig) items(t *testing.T) []workflow.Item {
 }
 
 func TestNudgeSilentMatchesAnOpenSilentPRWaitingOnOthers(t *testing.T) {
+	t.Parallel()
 	r := newSilentRig(t)
 	items := r.items(t)
 	if len(items) != 1 || items[0].Decision != workflow.DecisionPending || items[0].Default != workflow.OutcomeWait {
@@ -91,6 +92,7 @@ func TestNudgeSilentMatchesAnOpenSilentPRWaitingOnOthers(t *testing.T) {
 }
 
 func TestNudgeSilentSkipsDraftsClosedRecentWaitingOnTheUserOrDevelopedByTheUser(t *testing.T) {
+	t.Parallel()
 	for name, set := range map[string][2]any{
 		"draft":               {"pr.draft", true},
 		"closed":              {"pr.state", "closed"},
@@ -109,6 +111,7 @@ func TestNudgeSilentSkipsDraftsClosedRecentWaitingOnTheUserOrDevelopedByTheUser(
 }
 
 func TestNudgeSilentDoesNotRepeatWithinASilencePeriod(t *testing.T) {
+	t.Parallel()
 	r := newSilentRig(t)
 	items := r.items(t)
 	if _, err := r.eng.Act(context.Background(), items[0].ID, workflow.ActionApply, ""); err != nil {
@@ -127,6 +130,7 @@ func TestNudgeSilentDoesNotRepeatWithinASilencePeriod(t *testing.T) {
 }
 
 func TestNudgeSilentRepeatsAfterANewInteractionThenSilence(t *testing.T) {
+	t.Parallel()
 	r := newSilentRig(t)
 	if _, err := r.eng.Act(context.Background(), r.items(t)[0].ID, workflow.ActionApply, ""); err != nil {
 		t.Fatal(err)
@@ -156,6 +160,7 @@ func nudgeStartRig(t *testing.T) *startRig {
 }
 
 func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
+	t.Parallel()
 	r := nudgeStartRig(t)
 	sc := r.sc
 	st := r.load(t)
@@ -188,6 +193,7 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 }
 
 func TestNudgeSilentHonorsTheNudgeRefusal(t *testing.T) {
+	t.Parallel()
 	r := nudgeStartRig(t)
 	r.units.Set(r.u, "pr.nudge_refusal", "it waits on you")
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
@@ -196,6 +202,7 @@ func TestNudgeSilentHonorsTheNudgeRefusal(t *testing.T) {
 }
 
 func TestBundledWorkflowsLoad(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	want := map[string]struct {
 		order         int

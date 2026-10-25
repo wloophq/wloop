@@ -66,6 +66,7 @@ func TestKindValid(t *testing.T) {
 }
 
 func TestShapeAndKindRoundTrip(t *testing.T) {
+	t.Parallel()
 	want := map[Kind]struct {
 		purpose  string
 		delivery Delivery

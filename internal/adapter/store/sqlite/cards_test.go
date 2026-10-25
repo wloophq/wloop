@@ -50,6 +50,7 @@ func sampleCard(u unit.Unit, title string) card.Card {
 }
 
 func TestCardsStoreRoundTrips(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, path := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 500, time.UTC)
@@ -85,6 +86,7 @@ func TestCardsStoreRoundTrips(t *testing.T) {
 }
 
 func TestCardsStoreRefusesNoUnit(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	if _, err := db.Cards().Save(context.Background(), card.Card{Title: "x"}, time.Now()); err == nil {
 		t.Error("saved a card without a unit")

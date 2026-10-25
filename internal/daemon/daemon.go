@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,6 +45,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
+	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
@@ -51,6 +53,10 @@ import (
 // ShutdownGrace is how long the daemon waits for open requests to finish when
 // it stops.
 const ShutdownGrace = 5 * time.Second
+
+// groupsFile, in the state directory, lists the process groups of the
+// children still running, for the next start to kill after a crash.
+const groupsFile = "groups"
 
 const (
 	tokenCookie  = "loop_token"
@@ -694,6 +700,9 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 	defer unlock()
+	if err := procgroup.Track(filepath.Join(d.StateDir, groupsFile)); err != nil {
+		s.logf("child process groups: %v", err)
+	}
 	if limit := len(syscall.RawSockaddrUnix{}.Path); len(d.Socket) >= limit {
 		return fmt.Errorf("socket path %s is %d bytes, too long for a unix socket (under %d); use a shorter state directory", d.Socket, len(d.Socket), limit)
 	}

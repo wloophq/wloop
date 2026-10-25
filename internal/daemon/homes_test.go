@@ -40,6 +40,7 @@ func waitCalls(t *testing.T, p *homeProbe, want int32) {
 }
 
 func TestFastCycleRunsNoHomeCheck(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
 	if err != nil {
@@ -60,6 +61,7 @@ func TestFastCycleRunsNoHomeCheck(t *testing.T) {
 }
 
 func TestSessionStartNewHomeRechecks(t *testing.T) {
+	t.Parallel()
 	s, _ := agentServer(t)
 	p := &homeProbe{}
 	s.deps.Homes = p.check
@@ -81,6 +83,7 @@ func TestSessionStartNewHomeRechecks(t *testing.T) {
 }
 
 func TestSessionStartBurstOfNewHomesSharesOneRecheck(t *testing.T) {
+	t.Parallel()
 	s, _ := agentServer(t)
 	p := &homeProbe{release: make(chan struct{})}
 	s.deps.Homes = p.check
@@ -98,6 +101,7 @@ func TestSessionStartBurstOfNewHomesSharesOneRecheck(t *testing.T) {
 }
 
 func TestStaleHomesRecheckOnRead(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	now := time.Now()
 	var mu sync.Mutex

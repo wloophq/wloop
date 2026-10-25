@@ -43,6 +43,7 @@ func turnStartWorkflow(name string) workflow.Workflow {
 }
 
 func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
+	t.Parallel()
 	off, window := false, config.Days(10*time.Minute)
 	cfg := config.Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{
@@ -72,6 +73,7 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 }
 
 func TestApplyConfigOnlyWhenNarrowsTheManifestsWhen(t *testing.T) {
+	t.Parallel()
 	when, err := expr.CompileWorkflow("pr.address.due", builtin.WorkflowEnv("pr"))
 	if err != nil {
 		t.Fatal(err)
@@ -127,6 +129,7 @@ func (c *countingRounds) Save(ctx context.Context, st *round.Store) error {
 }
 
 func TestOneStateLoadPerSweep(t *testing.T) {
+	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
@@ -157,6 +160,7 @@ func TestOneStateLoadPerSweep(t *testing.T) {
 }
 
 func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
+	t.Parallel()
 	units := automationtest.NewUnits()
 	u := unit.Unit{Provider: unit.Session, Key: "t1"}
 	units.Put(u, workflow.Facts{"session.fingerprint": "t1:a"})
@@ -206,6 +210,7 @@ func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
 }
 
 func TestPendingRoundsServeTheReadModel(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ledger := automationtest.NewLedger()
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
@@ -232,6 +237,7 @@ func TestPendingRoundsServeTheReadModel(t *testing.T) {
 }
 
 func TestUnitsRouteByProvider(t *testing.T) {
+	t.Parallel()
 	gh, sess := automationtest.NewUnits(), automationtest.NewUnits()
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	s := unit.Unit{Provider: unit.Session, Key: "t1"}
@@ -278,6 +284,7 @@ func TestUnitsRouteByProvider(t *testing.T) {
 }
 
 func TestNewEngineAssemblesOverTheStore(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "e.db"), nil)
 	if err != nil {
@@ -294,6 +301,7 @@ func TestNewEngineAssemblesOverTheStore(t *testing.T) {
 }
 
 func TestTheGithubModuleOffersTheRounds(t *testing.T) {
+	t.Parallel()
 	p := factsgithub.New(factsgithub.Deps{})
 	if _, ok := candidatesOf([]source.Module{{ID: unit.GitHub, Facts: p}}).(githubCandidates); !ok {
 		t.Fatal("the github facts provider does not offer its rounds")
@@ -330,6 +338,7 @@ func everyUnit(p unit.ProviderID, slot string) workflow.Workflow {
 }
 
 func TestASweepThroughNewEngineListsEveryProvider(t *testing.T) {
+	t.Parallel()
 	sc, d := threeProviders(t)
 	eng := sc.env.newEngine(d)
 	eng.Workflows = func() []workflow.Workflow {
@@ -352,6 +361,7 @@ func TestASweepThroughNewEngineListsEveryProvider(t *testing.T) {
 }
 
 func TestThePlanEngineKeepsItsOwnSeen(t *testing.T) {
+	t.Parallel()
 	sc, d := threeProviders(t)
 	sc.env.changes = change.NewLog(change.DefaultWindow, nil)
 	eng := sc.env.newEngine(d)
@@ -375,6 +385,7 @@ func TestThePlanEngineKeepsItsOwnSeen(t *testing.T) {
 }
 
 func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
+	t.Parallel()
 	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, config.Defaults())[0]; w.Approval.Window != time.Minute {
 		t.Fatalf("window %v", w.Approval.Window)
 	}
@@ -384,6 +395,7 @@ func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
 }
 
 func TestGuidanceAGuidedRunDidNotUseIsKeptUnlessNewerIsStored(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	rec := &memRecorder{}
 	g := recGuidance{&Env{Rec: rec}}
@@ -416,6 +428,7 @@ func TestGuidanceAGuidedRunDidNotUseIsKeptUnlessNewerIsStored(t *testing.T) {
 }
 
 func TestNoRemovalMatchesAWorkspaceWhosePathIsGone(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	cfg, err := te.loadConfig()
 	if err != nil {
@@ -482,6 +495,7 @@ func ranOnce(t *testing.T, db *sqlite.DB, eng *automation.Engine) {
 }
 
 func TestAnUnregisterThroughTheEngineRecordsItsRunAndItsEvent(t *testing.T) {
+	t.Parallel()
 	te, db, eng, u := appliedEngine(t, wfStep("workspace.unregister"), nil)
 	ranOnce(t, db, eng)
 	if list, _ := te.Env.WS.List(context.Background()); len(list) != 0 {
@@ -494,6 +508,7 @@ func TestAnUnregisterThroughTheEngineRecordsItsRunAndItsEvent(t *testing.T) {
 }
 
 func TestNotifySelfThroughTheEngineReachesTheNotices(t *testing.T) {
+	t.Parallel()
 	feed := &noticeFeed{}
 	var got []api.Notice
 	stop := feed.Follow(func(n api.Notice) { got = append(got, n) })
@@ -510,6 +525,7 @@ func TestNotifySelfThroughTheEngineReachesTheNotices(t *testing.T) {
 }
 
 func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
+	t.Parallel()
 	sc, _ := threeProviders(t)
 	f := sc.env.workspaceFacts()
 	s := siblingFacts(f)

@@ -17,6 +17,7 @@ import (
 )
 
 func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
+	t.Parallel()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)

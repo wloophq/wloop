@@ -16,6 +16,7 @@ import (
 )
 
 func TestUnitRoutesNameTheUnit(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	var d api.Detail
@@ -57,6 +58,7 @@ func (threadRows) Derive(_ readmodel.Base, in any, _ time.Time) (api.Row, error)
 }
 
 func TestAModuleCodecReachesTheRoute(t *testing.T) {
+	t.Parallel()
 	th := unit.Unit{Provider: "thread", Key: "C1/171.1"}
 	s := newServerWith(t, func(d *Deps) {
 		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})

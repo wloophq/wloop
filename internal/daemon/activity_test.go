@@ -16,6 +16,7 @@ import (
 )
 
 func TestActivityAndTimelineLeaveOutTheBookkeeping(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
@@ -53,6 +54,7 @@ func TestActivityAndTimelineLeaveOutTheBookkeeping(t *testing.T) {
 }
 
 func TestActivityListsEventsWithTheirPullRequest(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var items []api.ActivityItem
 	if code := get(t, s, "/api/activity?limit=10", &items); code != 200 {
@@ -71,6 +73,7 @@ func TestActivityListsEventsWithTheirPullRequest(t *testing.T) {
 }
 
 func TestActivityLimitIsChecked(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	for _, q := range []string{"limit=0", "limit=1001", "limit=x"} {
 		if code := get(t, s, "/api/activity?"+q, nil); code != 400 {
@@ -84,6 +87,7 @@ func TestActivityLimitIsChecked(t *testing.T) {
 }
 
 func TestActivitySkipsEventsOutsideTheInventoryAndMarksMine(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	mine := github.Ref{Owner: "acme", Repo: "api", Number: 9}
@@ -111,6 +115,7 @@ func TestActivitySkipsEventsOutsideTheInventoryAndMarksMine(t *testing.T) {
 }
 
 func TestActivityBudget(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	var evs []dinv.Event

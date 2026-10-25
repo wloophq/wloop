@@ -33,6 +33,7 @@ func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) error {
 }
 
 func TestProbeAPI(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	l := &probeLauncher{svc: svc}
 	svc.Launcher = l
@@ -63,6 +64,7 @@ func TestProbeAPI(t *testing.T) {
 }
 
 func TestProbeAPIRefusesWithoutAWorkspaceAndReportsALaunchFailure(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	l := &probeLauncher{svc: svc}
 	svc.Launcher = l

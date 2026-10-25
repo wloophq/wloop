@@ -131,6 +131,7 @@ func staleDebt(debts []debt, used map[int]bool) []string {
 }
 
 func TestCoreImportsNoPlugin(t *testing.T) {
+	t.Parallel()
 	used := map[int]bool{}
 	cores, plugins := 0, 0
 	for _, p := range packages(t) {
@@ -157,6 +158,7 @@ func TestCoreImportsNoPlugin(t *testing.T) {
 }
 
 func TestR16FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	slack, gh := module+"internal/domain/slack", module+"internal/adapter/source/github"
 	r16 := func(self string, imports, testImports []string) []string {
 		return ruleR16(self, imports, testImports, nil, map[int]bool{})
@@ -172,6 +174,7 @@ func TestR16FlagsAPlantedImport(t *testing.T) {
 }
 
 func TestR16ExemptsPluginTestFakes(t *testing.T) {
+	t.Parallel()
 	fake := module + "internal/adapter/source/github/ghsourcetest"
 	r16 := func(imports, testImports []string) []string {
 		return ruleR16("internal/core/views", imports, testImports, nil, map[int]bool{})
@@ -183,6 +186,7 @@ func TestR16ExemptsPluginTestFakes(t *testing.T) {
 }
 
 func TestR16FlagsStaleDebt(t *testing.T) {
+	t.Parallel()
 	slack := module + "internal/domain/slack"
 	debts := []debt{
 		{"internal/core/turns", "internal/domain/slack"},

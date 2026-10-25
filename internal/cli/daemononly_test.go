@@ -87,6 +87,7 @@ func startDaemonOf(t *testing.T, te *testEnv) {
 }
 
 func TestDoctorReadsStateThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	st := te.loadRounds(t)
 	st.FirstCapHit(r7.String(), testNow)
@@ -111,6 +112,7 @@ func TestDoctorReadsStateThroughTheDaemon(t *testing.T) {
 }
 
 func TestStartupReportsABrokenHome(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	home := filepath.Join(te.Home, ".claude")
 	if err := os.MkdirAll(home, 0o700); err != nil {
@@ -204,6 +206,7 @@ func TestDoctorListsAHomeOnlyASessionReported(t *testing.T) {
 }
 
 func TestHooksAllowWithoutTheDaemon(t *testing.T) {
+	t.Parallel()
 	for _, hook := range []string{"stop", "session-start"} {
 		te := newTestEnv(t, &fake.Manager{})
 		te.noDaemon(t)
@@ -221,6 +224,7 @@ func TestHooksAllowWithoutTheDaemon(t *testing.T) {
 }
 
 func TestARestartReconcilesAgainOnlyWhenItCancelledTheFirst(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	run := te.startupOnce(te.cfg, t.Logf)
 	cancelled, cancel := context.WithCancel(context.Background())

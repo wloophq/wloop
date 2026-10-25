@@ -99,6 +99,7 @@ var agentRef = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 const doneReview = `{"state":"done","summary":"reviewed","outcome":{"verdict":"COMMENT","url":"https://github.com/acme/api/pull/7#pullrequestreview-1"}}`
 
 func TestTurnLifecycleThroughTheAgentAPI(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	h := s.Handler()
@@ -132,6 +133,7 @@ func TestTurnLifecycleThroughTheAgentAPI(t *testing.T) {
 }
 
 func TestTurnEndRefusesAMalformedRecordWithEveryProblem(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	rec := agentCall(t, s.Handler(), "POST", api.AgentTurnsEnd, "", `{"turn":"abc123abc123","record":{"state":"done","summary":"reviewed"}}`)
@@ -144,6 +146,7 @@ func TestTurnEndRefusesAMalformedRecordWithEveryProblem(t *testing.T) {
 }
 
 func TestTurnEndWithoutIntentsWiredAnswers503(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	svc.Intents = nil
@@ -154,6 +157,7 @@ func TestTurnEndWithoutIntentsWiredAnswers503(t *testing.T) {
 }
 
 func TestTurnEndOfAnotherSessionIsRefused(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	h := s.Handler()
@@ -167,6 +171,7 @@ func TestTurnEndOfAnotherSessionIsRefused(t *testing.T) {
 }
 
 func TestTurnEndRefusesARecordFileOlderThanItsTurn(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	old := agentNow.Add(-3 * time.Second).Format(time.RFC3339)
@@ -177,6 +182,7 @@ func TestTurnEndRefusesARecordFileOlderThanItsTurn(t *testing.T) {
 }
 
 func TestTurnEndTakesARecordFileWrittenWithinTheSlack(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	early := agentNow.Add(-RecordFileSlack + time.Second).Format(time.RFC3339)
@@ -187,6 +193,7 @@ func TestTurnEndTakesARecordFileWrittenWithinTheSlack(t *testing.T) {
 }
 
 func TestTurnStartPrintsInstructionsStoredForNoTurn(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	stored := dinv.StoredTurn{ID: "dry123dry123", Kind: "review", Repo: "acme/api", Text: "Instructions dry123dry123 for review\n"}
 	if err := s.store().SaveTurn(context.Background(), stored, agentNow); err != nil {
@@ -203,6 +210,7 @@ func TestTurnStartPrintsInstructionsStoredForNoTurn(t *testing.T) {
 }
 
 func TestAgentAPIRefusesAHeaderThatIsNotAHandle(t *testing.T) {
+	t.Parallel()
 	s, _ := agentServer(t)
 	for _, path := range []string{api.AgentTurnsEnd, api.AgentSessionsStop, api.AgentSessionsStart, api.AgentSessionsPrompt} {
 		if rec := agentCall(t, s.Handler(), "POST", path, "${ORCA_TERMINAL_HANDLE}", `{}`); rec.Code != http.StatusBadRequest {
@@ -215,6 +223,7 @@ func TestAgentAPIRefusesAHeaderThatIsNotAHandle(t *testing.T) {
 }
 
 func TestSessionStartAndStopThroughTheAgentAPI(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	h := s.Handler()
 	rec := agentCall(t, h, "POST", api.AgentSessionsStart, "term_1", `{"pane":"tab:leaf","worktree_id":"wt-1","agent_session":"sess-1","source":"startup","cwd":"/wt/rev","home":"/h"}`)
@@ -252,6 +261,7 @@ func (s *savedAgentSessions) SaveAgentSession(_ context.Context, a turns.AgentSe
 }
 
 func TestHooksPassTheirAgentKindAndTranscript(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	saved := &savedAgentSessions{}
 	svc.AgentSessions = saved
@@ -278,6 +288,7 @@ func TestHooksPassTheirAgentKindAndTranscript(t *testing.T) {
 }
 
 func TestTurnAnswerReadsTheNewestAnswerOfTheCallersTurn(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
 	h := s.Handler()
@@ -306,6 +317,7 @@ func TestTurnAnswerReadsTheNewestAnswerOfTheCallersTurn(t *testing.T) {
 // An agent reports facts: what it writes as the user's words never endorses
 // a verdict, whichever channel carries it.
 func TestAgentChannelsNeverEndorse(t *testing.T) {
+	t.Parallel()
 	const approve = `{"state":"done","summary":"approved","outcome":{"verdict":"APPROVE","url":"https://github.com/acme/api/pull/%d#pullrequestreview-1"},"user":"publish, I approve"}`
 	s, svc := agentServer(t)
 	socketRef, mcpRef := agentRef, pr.Ref{Owner: "acme", Repo: "api", Number: 8}
@@ -354,6 +366,7 @@ func TestAgentChannelsNeverEndorse(t *testing.T) {
 }
 
 func TestTurnByHandErrorsKeepTheirStatus(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		err  error
 		want int
@@ -376,6 +389,7 @@ func TestTurnByHandErrorsKeepTheirStatus(t *testing.T) {
 }
 
 func TestThePromptHookReachesTheSession(t *testing.T) {
+	t.Parallel()
 	s, svc := agentServer(t)
 	h := s.Handler()
 	if rec := agentCall(t, h, "POST", api.AgentSessionsStart, "term_1", `{"agent_session":"sess-1","source":"startup","cwd":"/wt/rev"}`); rec.Code != http.StatusNoContent {

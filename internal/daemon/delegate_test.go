@@ -47,6 +47,7 @@ func verbState(v api.EntryView, verb string) api.VerbState {
 }
 
 func TestDelegateOnAThreadEntryRunsActWithGuidanceAndMode(t *testing.T) {
+	t.Parallel()
 	r, h, fa := newDelegateRig(t)
 	r.put(t, unitEntry("e-a", gtd.KindAction, actThread), unitEntry("e-w", gtd.KindWaiting, actThread),
 		unitEntry("e-c", gtd.KindClose, actThread), unitEntry("e-n", gtd.KindCapture))
@@ -81,6 +82,7 @@ func TestDelegateOnAThreadEntryRunsActWithGuidanceAndMode(t *testing.T) {
 }
 
 func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
+	t.Parallel()
 	r, _, _ := newDelegateRig(t)
 	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(entriesNow)}
 	r.put(t, unitEntry("e-a", gtd.KindAction, actThread), unitEntry("e-n", gtd.KindCapture))
@@ -108,6 +110,7 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 }
 
 func TestDelegateRefusesAModeTheActionDoesNotRun(t *testing.T) {
+	t.Parallel()
 	c, _ := bridgeRig(t)
 	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit","args":{"mode":"headless"}}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "review does not run in headless mode; hand it to an agent instead") {
@@ -123,6 +126,7 @@ type placerFunc func(unit.Unit) (string, error)
 func (f placerFunc) SessionPlace(_ context.Context, u unit.Unit) (string, error) { return f(u) }
 
 func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
+	t.Parallel()
 	r, _, fa := newDelegateRig(t)
 	r.put(t, unitEntry("e-a", gtd.KindAction, actThread))
 	modes := func() []api.ModeState {

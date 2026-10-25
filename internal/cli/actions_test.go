@@ -78,6 +78,7 @@ func (f *recordingActions) Remove(_ context.Context, u unit.Unit, c daemon.Call)
 }
 
 func TestPauseRequiresDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	if code := te.run("pause", r7.URL()); code != 1 {
@@ -89,6 +90,7 @@ func TestPauseRequiresDaemon(t *testing.T) {
 }
 
 func TestMuteParsesUntil(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
@@ -115,6 +117,7 @@ func TestMuteParsesUntil(t *testing.T) {
 }
 
 func TestReviewRoutesToDaemonWhenUp(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	d := startDaemon(t, fa)
 	m := &fake.Manager{}
@@ -143,6 +146,7 @@ func TestReviewRoutesToDaemonWhenUp(t *testing.T) {
 }
 
 func TestOpenWithoutURLOpensTheCockpit(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
@@ -179,6 +183,7 @@ func cockpitEnv(t *testing.T) (*testEnv, *[]string) {
 }
 
 func TestOpenPrintShowsTheCockpitURL(t *testing.T) {
+	t.Parallel()
 	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cases := []struct {
 		name string
@@ -211,6 +216,7 @@ func TestOpenPrintShowsTheCockpitURL(t *testing.T) {
 }
 
 func TestCockpitURLTakesARoute(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if _, err := cockpitURL(dir, ""); err == nil || !strings.Contains(err.Error(), "cockpit address") {
 		t.Fatalf("no address file: %v", err)
@@ -236,6 +242,7 @@ func TestCockpitURLTakesARoute(t *testing.T) {
 }
 
 func TestOpenViewOpensTheCockpitOnThatView(t *testing.T) {
+	t.Parallel()
 	te, opened := cockpitEnv(t)
 	if code := te.run("open", "--view", "mine"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -246,6 +253,7 @@ func TestOpenViewOpensTheCockpitOnThatView(t *testing.T) {
 }
 
 func TestOpenRejectsAnUnknownView(t *testing.T) {
+	t.Parallel()
 	te, opened := cockpitEnv(t)
 	if code := te.run("open", "--print", "--view", "later"); code == 0 {
 		t.Fatalf("accepted an unknown view: %s", te.out)
@@ -259,6 +267,7 @@ func TestOpenRejectsAnUnknownView(t *testing.T) {
 }
 
 func TestOpenPrintNeedsTheDaemon(t *testing.T) {
+	t.Parallel()
 	te, _ := cockpitEnv(t)
 	te.Socket = filepath.Join(t.TempDir(), "none.sock")
 	if code := te.run("open", "--print"); code == 0 {
@@ -287,6 +296,7 @@ func openStore(t *testing.T) *inventory.Store {
 }
 
 func TestOpenFallsBackToTheBrowser(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		ws      string
 		focusOK bool
@@ -331,6 +341,7 @@ func TestOpenFallsBackToTheBrowser(t *testing.T) {
 }
 
 func TestOpenFocusesAMainCheckout(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{WorkspaceList: []wsdomain.Workspace{{ID: "main-api", Path: "/src/api", IsMain: true, HostID: "local", Branch: "feat/x"}}}
 	te := newTestEnv(t, m)
 	te.Sh = func(_ context.Context, name string, args ...string) ([]byte, error) {
@@ -354,6 +365,7 @@ func TestOpenFocusesAMainCheckout(t *testing.T) {
 }
 
 func TestRoundsAskedByHandDoNotCountAgainstTheCap(t *testing.T) {
+	t.Parallel()
 	sc := addressScenario(t)
 	sc.te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"}}}}}`
 	if err := (envActions{sc.env, nil}).Intent(context.Background(), "address", sc.ref.Unit(), daemon.Call{Guidance: "skip the nit", Out: io.Discard}); err != nil {
@@ -369,6 +381,7 @@ func TestRoundsAskedByHandDoNotCountAgainstTheCap(t *testing.T) {
 }
 
 func TestRunSendsTheHeldFollowupNow(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	exhaustCap(t, sc)
 	sc.te.gh.basics = openBasics
@@ -391,6 +404,7 @@ func TestRunSendsTheHeldFollowupNow(t *testing.T) {
 }
 
 func TestDaemonRoutedCommandsForwardTheCallersProfile(t *testing.T) {
+	t.Parallel()
 	fa := &recordingActions{}
 	d := startDaemon(t, fa)
 	te := newTestEnv(t, &fake.Manager{})
@@ -414,6 +428,7 @@ func TestDaemonRoutedCommandsForwardTheCallersProfile(t *testing.T) {
 const personal = "/home/me/.claude-personal"
 
 func TestDelegatedAdoptUsesTheCallersProfileElseTheRemembered(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		profile, remembered string
 	}{
@@ -457,6 +472,7 @@ func shortDir(t *testing.T) string {
 }
 
 func TestReviewFailsWhenTheDaemonIsDown(t *testing.T) {
+	t.Parallel()
 	for name, socket := range map[string]func(t *testing.T) string{
 		"no socket": func(t *testing.T) string { return filepath.Join(shortDir(t), "daemon.sock") },
 		"stale socket": func(t *testing.T) string {
@@ -490,6 +506,7 @@ func TestReviewFailsWhenTheDaemonIsDown(t *testing.T) {
 }
 
 func TestReviewFailsWhenALiveDaemonDoesNotAnswer(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(shortDir(t), "daemon.sock")
 	l, err := net.Listen("unix", path)
 	if err != nil {
@@ -549,6 +566,7 @@ func daemonForActions(t *testing.T) (*testEnv, func() []string) {
 }
 
 func TestPauseAndResumeRouteToTheDaemon(t *testing.T) {
+	t.Parallel()
 	te, calls := daemonForActions(t)
 	if code := te.run("pause"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -574,6 +592,7 @@ func TestPauseAndResumeRouteToTheDaemon(t *testing.T) {
 }
 
 func TestNudgeRoutesToTheDaemon(t *testing.T) {
+	t.Parallel()
 	te, calls := daemonForActions(t)
 	if code := te.run("nudge", r7.URL(), "be", "brief"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -586,6 +605,7 @@ func TestNudgeRoutesToTheDaemon(t *testing.T) {
 }
 
 func TestNudgeNeedsTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
 	if code := te.run("nudge", r7.URL()); code != 1 || !strings.Contains(te.err.String(), brand.Command+" serve") {
@@ -597,6 +617,7 @@ func TestNudgeNeedsTheDaemon(t *testing.T) {
 }
 
 func TestTrackAndUntrackGoThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
@@ -611,6 +632,7 @@ func TestTrackAndUntrackGoThroughTheDaemon(t *testing.T) {
 }
 
 func TestBriefRefreshGoesThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket

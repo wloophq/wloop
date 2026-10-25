@@ -32,6 +32,7 @@ func (viewRows) Facets() []api.FacetSpec { return nil }
 func (viewRows) Situations() []api.SituationSpec { return nil }
 
 func TestRowsServeAPluginView(t *testing.T) {
+	t.Parallel()
 	th := unit.Unit{Provider: "thread", Key: "C1/171.1"}
 	s := newServerWith(t, func(d *Deps) {
 		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})

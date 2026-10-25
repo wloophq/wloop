@@ -22,6 +22,7 @@ import (
 )
 
 func TestWriterPragmas(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	want := map[string]string{
 		"journal_mode":       "wal",
@@ -54,6 +55,7 @@ func TestWriterPragmas(t *testing.T) {
 }
 
 func TestReaderIsQueryOnly(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	err := db.Read(ctx, func(tx *sql.Tx) error {
@@ -71,6 +73,7 @@ func TestReaderIsQueryOnly(t *testing.T) {
 }
 
 func TestReadDoesNotBlockWrite(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	held, release := make(chan struct{}), make(chan struct{})
@@ -96,6 +99,7 @@ func TestReadDoesNotBlockWrite(t *testing.T) {
 }
 
 func TestWriteDoesNotBlockRead(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	held, release, done := make(chan struct{}), make(chan struct{}), make(chan error)
@@ -132,6 +136,7 @@ func TestWriteDoesNotBlockRead(t *testing.T) {
 }
 
 func TestReadSeesOneSnapshot(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	var first, second int
@@ -150,6 +155,7 @@ func TestReadSeesOneSnapshot(t *testing.T) {
 }
 
 func TestSnapshotPinsOneTransaction(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	count := func(ctx context.Context) int {
@@ -188,6 +194,7 @@ func TestSnapshotPinsOneTransaction(t *testing.T) {
 }
 
 func TestSnapshotPinsOnlyItsOwnStore(t *testing.T) {
+	t.Parallel()
 	a, _ := openTemp(t)
 	b, _ := openTemp(t)
 	ctx := context.Background()
@@ -212,6 +219,7 @@ func TestSnapshotPinsOnlyItsOwnStore(t *testing.T) {
 }
 
 func TestCloseNamesLeakedConnections(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("waits closeWait")
 	}
@@ -230,6 +238,7 @@ func TestCloseNamesLeakedConnections(t *testing.T) {
 }
 
 func TestWriteNotesWhatItTouched(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "notes.db")
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := Open(path, log)
@@ -269,6 +278,7 @@ func TestWriteNotesWhatItTouched(t *testing.T) {
 }
 
 func TestWriteInsideWritePanics(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	defer func() {
@@ -289,6 +299,7 @@ func TestWriteInsideWritePanics(t *testing.T) {
 // or begins on a handle, and no function holding a transaction reads the
 // pool, directly or through a store method.
 func TestNoWriterOutsideWrite(t *testing.T) {
+	t.Parallel()
 	for _, dir := range []string{".", "../inventory"} {
 		for _, problem := range writerProblems(t, dir) {
 			t.Error(problem)
@@ -297,6 +308,7 @@ func TestNoWriterOutsideWrite(t *testing.T) {
 }
 
 func TestNoWriterOutsideWriteFindsViolations(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	src := `package bad
 

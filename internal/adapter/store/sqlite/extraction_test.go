@@ -50,6 +50,7 @@ func openExtraction(t *testing.T) *DB {
 }
 
 func TestExtractionStoreRoundTrips(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := openExtraction(t)
 	s := db.Extraction()
@@ -102,6 +103,7 @@ func TestExtractionStoreRoundTrips(t *testing.T) {
 }
 
 func TestOpenSegmentsOfAConversation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db := openExtraction(t)
 	seg := db.Segments()

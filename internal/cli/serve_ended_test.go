@@ -17,6 +17,7 @@ import (
 )
 
 func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "store.db")
 	seededStore(t, path, []seedTurn{askedTurn(1), askedTurn(2), askedTurn(3), askedTurn(4)})
 	log := change.NewLog(change.DefaultWindow, t.Logf)

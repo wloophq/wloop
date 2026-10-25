@@ -182,6 +182,7 @@ func (te *slackTestEnv) fakeOAuth() {
 }
 
 func TestSlackLoginSavesTheToken(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.fakeOAuth()
 	te.slack.Open = func(u string) error { browse(t, u); return nil }
@@ -220,6 +221,7 @@ type writerFunc func(p []byte)
 func (w writerFunc) Write(p []byte) (int, error) { w(p); return len(p), nil }
 
 func TestSlackLoginNeedsAClientID(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.ClientID = ""
 	if code := te.run("slack", "login"); code != 1 || !strings.Contains(te.err.String(), "slack.client_id") {
@@ -231,6 +233,7 @@ func TestSlackLoginNeedsAClientID(t *testing.T) {
 }
 
 func TestAppTokenFromStdin(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.In = strings.NewReader("xapp-1-fakeapp\n")
 	if code := te.run("slack", "login", "--app-token"); code != 0 {
@@ -267,6 +270,7 @@ func TestAppTokenFromStdin(t *testing.T) {
 }
 
 func TestSlackStatus(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	if code := te.run("slack", "status"); code != 0 || !strings.Contains(te.out.String(), "not logged in") || !strings.Contains(te.out.String(), "slack login") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
@@ -295,6 +299,7 @@ func TestSlackStatus(t *testing.T) {
 }
 
 func TestSlackStatusNeverDeletesOnLoggedOut(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	tok := fakeToken()
 	tok.Expires = testNow.Add(-time.Hour)
@@ -308,6 +313,7 @@ func TestSlackStatusNeverDeletesOnLoggedOut(t *testing.T) {
 }
 
 func TestSlackLogout(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
 	te.kc.items["loop-test-slack/app"] = []byte("xapp-1-fakeapp")
@@ -359,6 +365,7 @@ func (te *slackTestEnv) fakeChannel() {
 }
 
 func TestSlackSendConfirms(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name        string
 		interactive bool
@@ -399,6 +406,7 @@ func TestSlackSendConfirms(t *testing.T) {
 }
 
 func TestSlackSendRefusesWhileDisabled(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
 	te.fakeChannel()
@@ -413,6 +421,7 @@ func TestSlackSendRefusesWhileDisabled(t *testing.T) {
 }
 
 func TestSlackAuthCommandsWorkWhileDisabled(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	off := false
 	te.cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
@@ -430,6 +439,7 @@ func TestSlackAuthCommandsWorkWhileDisabled(t *testing.T) {
 }
 
 func TestKeychainServiceFromConfig(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.KeychainService = "x"
 	te.run("slack", "status")
@@ -447,6 +457,7 @@ func TestKeychainServiceFromConfig(t *testing.T) {
 }
 
 func TestPostAllowlistFromConfig(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.PostAllowlist = []string{"U000"}
 	te.saveToken(t, fakeToken())
@@ -467,6 +478,7 @@ func TestPostAllowlistFromConfig(t *testing.T) {
 }
 
 func TestRequestLogFromConfig(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
 	te.fakeChannel()
@@ -506,6 +518,7 @@ func TestRequestLogFromConfig(t *testing.T) {
 }
 
 func TestDoctorSlackChecks(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.cfg.Slack.ClientID = ""
 	if got := te.slackChecks(te.cfg); len(got) != 0 {
@@ -531,6 +544,7 @@ func TestDoctorSlackChecks(t *testing.T) {
 }
 
 func TestSlackLogoutPastACorruptItem(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.kc.items["loop-test-slack/current"] = []byte("not a token")
 	te.kc.items["loop-test-slack/app"] = []byte("xapp-1-fakeapp")
@@ -546,6 +560,7 @@ func TestSlackLogoutPastACorruptItem(t *testing.T) {
 }
 
 func TestAppTokenAtATerminalIsNotEchoed(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.In = strings.NewReader("xapp-1-fromthepipe\n")
 	te.slack.Interactive = func() bool { return true }
@@ -563,6 +578,7 @@ func TestAppTokenAtATerminalIsNotEchoed(t *testing.T) {
 }
 
 func TestSlackFlagErrorsDoNotEchoTheirValue(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{
 		{"slack", "login", "--no-browser=xoxp-1-fakeflag"},
 		{"slack", "login", "--xapp-1-fakeflag"},
@@ -580,6 +596,7 @@ func TestSlackFlagErrorsDoNotEchoTheirValue(t *testing.T) {
 }
 
 func TestSlackHelpFlagPrintsTheUsage(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"slack", "login", "-h"}, {"slack", "send", "--help"}} {
 		te := newSlackTestEnv(t)
 		if code := te.run(args...); code != 0 {

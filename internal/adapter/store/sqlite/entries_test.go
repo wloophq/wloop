@@ -47,10 +47,12 @@ func capture(id gtd.ID, s gtd.State, min int) gtd.Entry {
 }
 
 func TestEntryStoreContract(t *testing.T) {
+	t.Parallel()
 	gtdtest.Contract(t, func(t *testing.T) coregtd.Store { s, _ := openEntries(t); return s })
 }
 
 func TestEntriesRoundTrip(t *testing.T) {
+	t.Parallel()
 	s, _ := openEntries(t)
 	want := gtdtest.Full("e-00000000000000aa")
 	applyEntries(t, s, want)
@@ -67,6 +69,7 @@ func TestEntriesRoundTrip(t *testing.T) {
 }
 
 func TestApplyNotesEntries(t *testing.T) {
+	t.Parallel()
 	s, log := openEntries(t)
 	ctx := context.Background()
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
@@ -92,6 +95,7 @@ func TestApplyNotesEntries(t *testing.T) {
 }
 
 func TestEmptyApplyNotesNothing(t *testing.T) {
+	t.Parallel()
 	s, log := openEntries(t)
 	ctx := context.Background()
 	e := capture("e-1", gtd.Inbox, 0)
@@ -114,6 +118,7 @@ func TestEmptyApplyNotesNothing(t *testing.T) {
 }
 
 func TestEntriesSinceStore(t *testing.T) {
+	t.Parallel()
 	s, _ := openEntries(t)
 	ctx := context.Background()
 	a, b, c := capture("e-a", gtd.Next, 0), capture("e-b", gtd.Next, 1), capture("e-c", gtd.Inbox, 2)

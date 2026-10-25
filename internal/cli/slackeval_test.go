@@ -8,6 +8,7 @@ import (
 )
 
 func TestOutputsRefuseARepository(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o700); err != nil {
 		t.Fatal(err)
@@ -43,6 +44,7 @@ func TestOutputsRefuseARepository(t *testing.T) {
 }
 
 func TestSlackEvalUsage(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	if code := te.run("slack", "eval"); code == 0 || !strings.Contains(te.err.String(), "slack eval run") {
 		t.Fatalf("exit %d: %s", code, te.err)

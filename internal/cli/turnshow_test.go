@@ -54,12 +54,14 @@ func bookFixture() api.TurnBook {
 }
 
 func TestTurnShowReadsAsABookOnATerminal(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	writeBook(&out, termfmt.Term{TTY: true, Color: true, Width: 100}, bookFixture(), time.UTC)
 	golden(t, "turn_show_tty.golden", bracketed(out.String()))
 }
 
 func TestTurnShowStaysJSONWhenPiped(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	ctx := context.Background()
@@ -106,6 +108,7 @@ func TestTurnShowStaysJSONWhenPiped(t *testing.T) {
 }
 
 func TestTurnShowFitsANarrowTerminal(t *testing.T) {
+	t.Parallel()
 	b := bookFixture()
 	b.Turns[0].Records[1].Record.Question.Options = append(b.Turns[0].Records[1].Record.Question.Options,
 		record.Option{ID: "a-very-long-option-identifier-past-the-cap", Label: "Something else", Consequence: "Takes the long road."})

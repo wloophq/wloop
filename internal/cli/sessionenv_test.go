@@ -25,6 +25,7 @@ func nudgeCommand(t *testing.T, env map[string]string) string {
 }
 
 func TestAgentSessionCarriesTheDaemonsXDGDirs(t *testing.T) {
+	t.Parallel()
 	plain := nudgeCommand(t, nil)
 	got := nudgeCommand(t, map[string]string{"XDG_CONFIG_HOME": "/iso/config", "XDG_STATE_HOME": "/iso/my state"})
 	if want := "XDG_CONFIG_HOME='/iso/config' XDG_STATE_HOME='/iso/my state' " + plain; got != want {
@@ -33,6 +34,7 @@ func TestAgentSessionCarriesTheDaemonsXDGDirs(t *testing.T) {
 }
 
 func TestAgentSessionSkipsUnusableXDGDirs(t *testing.T) {
+	t.Parallel()
 	plain := nudgeCommand(t, nil)
 	if launches([]string{plain})[0] != "CLAUDE_CONFIG_DIR='/home/me/.claude-work' claude" {
 		t.Fatalf("command %q", plain)
@@ -44,6 +46,7 @@ func TestAgentSessionSkipsUnusableXDGDirs(t *testing.T) {
 }
 
 func TestAgentSessionWithoutAPromptCarriesTheDaemonsXDGDirs(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics

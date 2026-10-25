@@ -55,7 +55,7 @@ Dependencies point inward. Adapters import ports and the domain; the core import
 - **The store is the truth.** Turn state, questions, answers and history live only in the store. Orca's board is a view sink: it receives the same projection as every other view, fails alone and is reconciled on start. Any workspace or session can be recreated from stored context, in any manager that hosts its agent.
 - **Every change leaves a trail.** Each command writes its domain events in the same transaction as its state change, so a turn's timeline can be read from events alone.
 - **Authority comes from you.** Agents report facts; only your surfaces endorse a verdict, choose an option that publishes, take over or remove a workspace.
-- **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients.
+- **Down means down.** With the daemon stopped, every client fails within a second and names the fix; only the hooks allow and go on. On start the daemon reconciles turns, sessions and cards before it serves clients. Each `claude -p` the daemon runs leads its own process group. A cancelled call sends the group SIGTERM, then SIGKILL after five seconds; once the call ends, whatever it left in the group is stopped the same way, and a stopping daemon kills every group still running. The daemon lists the live groups in its state directory, so after a crash the next start kills what the crashed one left.
 
 ## Plugins
 

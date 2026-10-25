@@ -18,6 +18,7 @@ import (
 )
 
 func TestReleaseBuild(t *testing.T) {
+	t.Parallel()
 	for v, want := range map[string]bool{
 		"v0.1.0":                  true,
 		"v0.2.0-rc.1":             true,
@@ -80,6 +81,7 @@ func markOf(t *testing.T, path string) string {
 func (te *testEnv) runCLI(args ...string) int { return Run(context.Background(), te.Env, args) }
 
 func TestStoreMigrateWithNothingPending(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	if code := te.runCLI("store", "migrate"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -90,6 +92,7 @@ func TestStoreMigrateWithNothingPending(t *testing.T) {
 }
 
 func TestStoreMigrateRefusesANewerStore(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	setStore(t, te.storePath(), `UPDATE meta SET value = '5' WHERE key = 'compatible_version'`, `PRAGMA user_version = 5`)
 	if code := te.runCLI("store", "migrate", "--dry-run"); code != 1 {
@@ -104,6 +107,7 @@ func TestStoreMigrateRefusesANewerStore(t *testing.T) {
 var schemaV = fmt.Sprint(sqlite.SchemaVersion)
 
 func TestStoreRestorePutsTheNewestBackupBack(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "before")
 	backup := filepath.Join(te.backupsPath(), "store-v"+schemaV+"-20261020T120000Z.db")
 	if err := os.MkdirAll(te.backupsPath(), 0o700); err != nil {
@@ -159,6 +163,7 @@ func TestStoreRestoreAsksFirst(t *testing.T) {
 }
 
 func TestStoreRestoreWithoutABackup(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	if code := te.runCLI("store", "restore", "--yes"); code != 1 || !strings.Contains(te.err.String(), "no backup in "+te.backupsPath()+" that this release reads") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -188,6 +193,7 @@ func TestAStoreCommandWaitsForTheStoreLock(t *testing.T) {
 }
 
 func TestTheDaemonOpensACurrentStoreAndReportsIt(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	db, unlock, wait, err := te.tryStore(context.Background(), t.Logf)
 	if err != nil || db == nil {
@@ -204,6 +210,7 @@ func TestTheDaemonOpensACurrentStoreAndReportsIt(t *testing.T) {
 }
 
 func TestTheDaemonWaitsOnANewerStoreUntilItChanges(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	setStore(t, te.storePath(), `UPDATE meta SET value = '3' WHERE key = 'compatible_version'`, `PRAGMA user_version = 3`)
 	db, _, wait, err := te.tryStore(context.Background(), t.Logf)
@@ -255,6 +262,7 @@ func TestTheDaemonWaitsWhileAStoreCommandHoldsTheLock(t *testing.T) {
 }
 
 func TestDoctorChecksAStoreThisReleaseCannotOpen(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	setStore(t, te.storePath(), `UPDATE meta SET value = '4' WHERE key = 'compatible_version'`, `PRAGMA user_version = 4`)
 	got := te.storeChecks()
@@ -272,6 +280,7 @@ func TestDoctorChecksAStoreThisReleaseCannotOpen(t *testing.T) {
 }
 
 func TestAFailedStorePointsAtTheCommandThatGetsPastIt(t *testing.T) {
+	t.Parallel()
 	te := storeEnv(t, "a")
 	opens := sqlite.Status{Version: sqlite.SchemaVersion, Compatible: sqlite.SchemaVersion}
 	if st := te.storeFailed(te.storePath(), opens, errors.New("the final check failed")).status; st.State != api.StoreFailed || st.Fix != restoreCommand {
@@ -290,6 +299,7 @@ func TestAFailedStorePointsAtTheCommandThatGetsPastIt(t *testing.T) {
 }
 
 func TestAnUnknownStoreNamesTheVersionsThisReleaseReads(t *testing.T) {
+	t.Parallel()
 	st := tooNewStatus("/s.db", sqlite.Status{Version: 0})
 	if st.Message != fmt.Sprintf("the store at /s.db is at schema version 0; this release reads versions 1 to %d only", sqlite.SchemaVersion) {
 		t.Fatalf("%q", st.Message)

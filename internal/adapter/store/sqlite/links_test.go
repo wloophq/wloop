@@ -67,6 +67,7 @@ func sameLinks(t *testing.T, got, want []link.Link) {
 }
 
 func TestLinksPutUpserts(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	first := sampleLink(linkThread, linkPull, link.Extraction, noteAt)
@@ -88,6 +89,7 @@ func TestLinksPutUpserts(t *testing.T) {
 }
 
 func TestLinksPutRefusesFactsOrigin(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	if err := db.Links().Put(context.Background(), sampleLink(linkThread, linkPull, link.Facts, noteAt)); err == nil {
 		t.Fatal("Put of a facts link succeeded")
@@ -95,6 +97,7 @@ func TestLinksPutRefusesFactsOrigin(t *testing.T) {
 }
 
 func TestLinksPutKeepsUserOrigin(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	if err := db.Links().Put(ctx, sampleLink(linkThread, linkPull, link.User, noteAt)); err != nil {
@@ -110,6 +113,7 @@ func TestLinksPutKeepsUserOrigin(t *testing.T) {
 }
 
 func TestLinksTo(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	a := sampleLink(linkThread2, linkPull, link.Extraction, noteAt)
@@ -133,6 +137,7 @@ func TestLinksTo(t *testing.T) {
 }
 
 func TestReplaceFactsKeepsOtherOriginsAndAt(t *testing.T) {
+	t.Parallel()
 	log := change.NewLog(change.DefaultWindow, nil)
 	db, err := Open(filepath.Join(t.TempDir(), "store.db"), log)
 	if err != nil {
@@ -168,6 +173,7 @@ func TestReplaceFactsKeepsOtherOriginsAndAt(t *testing.T) {
 }
 
 func TestReplaceFactsRefusesForeignFrom(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	err := db.Links().ReplaceFacts(context.Background(), []unit.Unit{linkThread}, []link.Link{sampleLink(linkThread2, linkPull, link.Facts, noteAt)}, noteAt)
 	if err == nil {
@@ -179,6 +185,7 @@ func TestReplaceFactsRefusesForeignFrom(t *testing.T) {
 }
 
 func TestLinkTargetsAreResolvableTargets(t *testing.T) {
+	t.Parallel()
 	db, _ := openTemp(t)
 	ctx := context.Background()
 	mention := sampleLink(linkThread, unit.Unit{Provider: unit.GitHub, Key: "acme/api#1"}, link.Extraction, noteAt)

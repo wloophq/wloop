@@ -85,6 +85,7 @@ func doctorFixture() []checkSection {
 }
 
 func TestDoctorReadsAsSectionsOnATerminal(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	e := &Env{Out: &out, Home: "/home/u"}
 	e.writeDoctor(termfmt.Term{TTY: true, Color: true, Width: 100}, doctorFixture())
@@ -92,6 +93,7 @@ func TestDoctorReadsAsSectionsOnATerminal(t *testing.T) {
 }
 
 func TestDoctorPipedKeepsItsLines(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	writeDoctorPlain(&out, doctorFixture())
 	want := `  [ok     ] gh authenticated
@@ -126,6 +128,7 @@ func TestDoctorPipedKeepsItsLines(t *testing.T) {
 }
 
 func TestDoctorStylesOnlyWhenForced(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.run("doctor")
 	if strings.Contains(te.out.String(), "\x1b") || !strings.Contains(te.out.String(), "  [ok     ] config: ") {

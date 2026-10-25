@@ -3,6 +3,7 @@ package archtest
 import "testing"
 
 func TestR1KnowsEveryWorkspaceManager(t *testing.T) {
+	t.Parallel()
 	_, f := parse(t, `package cli
 import "github.com/wloophq/wloop/internal/workspace/zed"
 `)
@@ -29,6 +30,7 @@ import "github.com/wloophq/wloop/internal/workspace"
 }
 
 func TestR2FlagsTheManagersName(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package cli
 const a = "orca"
 const b = "open the Orca app"
@@ -46,6 +48,7 @@ const d = "orcas and torcal are fine"
 }
 
 func TestR2ExemptsTheFakesByPathNotByName(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package latest
 const a = "claude"
 `)
@@ -58,6 +61,7 @@ const a = "claude"
 }
 
 func TestR3FlagsADotImportAndUnmarshalText(t *testing.T) {
+	t.Parallel()
 	_, dot := parse(t, `package cli
 import . "github.com/wloophq/wloop/internal/domain/turn"
 var s = ParseAgentState("done")

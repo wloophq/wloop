@@ -22,6 +22,7 @@ import (
 )
 
 func TestPriorReviewIsYourLatestHeadAndVerdict(t *testing.T) {
+	t.Parallel()
 	at := func(h int) time.Time { return time.Date(2026, 10, 8, h, 0, 0, 0, time.UTC) }
 	got := priorReview([]pr.Review{
 		{State: pr.ReviewChangesRequested, ByViewer: true, SubmittedAt: at(10), CommitOid: "c2"},
@@ -49,6 +50,7 @@ func TestPriorReviewIsYourLatestHeadAndVerdict(t *testing.T) {
 }
 
 func TestTurnPRKeepsTheFactsATurnReads(t *testing.T) {
+	t.Parallel()
 	p := turnPR(&github.PullRequest{Facts: pr.Facts{Title: "Add x", Author: "ana", AuthorAssociation: "MEMBER", HeadRefOid: "c2", BaseRefName: "main", ViewerRequested: true}})
 	if p.Title != "Add x" || p.Author != "ana" || p.Association != "MEMBER" || p.Head != "c2" || p.Base != "main" || p.Prior != nil || !p.ReviewRequested {
 		t.Fatalf("%+v", p)
@@ -80,6 +82,7 @@ func turnText(t *testing.T, te *testEnv, prompt string) string {
 }
 
 func TestASentTurnIsReadByItsRound(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	sent, err := te.sendTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: r7.Unit(), Payload: &turn.PR{Title: "Add x"}, Guidance: "look at the migration first"})
 	if err != nil {
@@ -98,6 +101,7 @@ func TestASentTurnIsReadByItsRound(t *testing.T) {
 }
 
 func TestAStoredTurnSurvivesItsProfileDirectoryGoingAway(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "intent=review.md"), []byte("USER LAYER\n"), 0o600); err != nil {
@@ -118,6 +122,7 @@ func TestAStoredTurnSurvivesItsProfileDirectoryGoingAway(t *testing.T) {
 }
 
 func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	drifted := &turn.PR{Title: "Add x", Head: "c9", Prior: &turn.PriorReview{Verdict: pr.ReviewApproved, Head: "m8"}}
 	te := newTestEnv(t, &fake.Manager{})

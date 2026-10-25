@@ -19,6 +19,7 @@ import (
 var inBundle = "/Users/me/Applications/" + brand.App + ".app/Contents/MacOS/" + brand.Name
 
 func TestAppQuitExitsZero(t *testing.T) {
+	t.Parallel()
 	d := startDaemon(t, nil)
 	te := newTestEnv(t, nil)
 	te.Socket = d.socket
@@ -58,6 +59,7 @@ func TestAppQuitExitsZero(t *testing.T) {
 }
 
 func TestAppShowsTheDaemonMissingWhileItWaits(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	te.Socket = shortDir(t) + "/none.sock"
 	te.Executable = inBundle
@@ -77,6 +79,7 @@ func TestAppShowsTheDaemonMissingWhileItWaits(t *testing.T) {
 }
 
 func TestAppOutsideTheBundleIsAnError(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	te.Executable = "/opt/homebrew/bin/" + brand.Name
 	te.NativeAvailable = func() bool { return true }
@@ -87,6 +90,7 @@ func TestAppOutsideTheBundleIsAnError(t *testing.T) {
 }
 
 func TestAppOffMacOSIsAnError(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, nil)
 	te.Executable = inBundle
 	if err := runApp(context.Background(), te.Env, nil); !errors.Is(err, errNotMacOS) {
@@ -145,6 +149,7 @@ func (silentNotifier) WithdrawAll()                      {}
 func (silentNotifier) OnResponse(func(menubar.Response)) {}
 
 func TestRunInTheBundleWithoutArgumentsStartsTheApp(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{nil, {"-psn_0_12345"}} {
 		te := newTestEnv(t, nil)
 		te.Executable = inBundle

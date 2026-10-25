@@ -28,6 +28,7 @@ func listDir(dir string) ([]string, error) {
 const openBasics = `{"data":{"pr":{"pullRequest":{"number":7,"title":"Add x","state":"OPEN","headRefName":"feat/x","headRefOid":"c2","repository":{"nameWithOwner":"acme/api"}}}}}`
 
 func TestReviewCreatesTheWorkspace(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{
 		{ID: "dup", Path: "/elsewhere/legacy", RemoteKey: "github.com/acme/api"},
 		{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"},
@@ -62,6 +63,7 @@ func TestReviewCreatesTheWorkspace(t *testing.T) {
 }
 
 func TestReviewContinuesAnExistingWorkspace(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -84,6 +86,7 @@ func TestReviewContinuesAnExistingWorkspace(t *testing.T) {
 }
 
 func TestReviewRefusesBusyOrDirtyWorkspaces(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		name  string
 		busy  bool
@@ -118,6 +121,7 @@ func TestReviewRefusesBusyOrDirtyWorkspaces(t *testing.T) {
 }
 
 func TestReviewNeedsProjectsDirToClone(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -133,6 +137,7 @@ func TestReviewNeedsProjectsDirToClone(t *testing.T) {
 }
 
 func TestReviewRejectsClosedPRs(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = strings.Replace(openBasics, `"OPEN"`, `"MERGED"`, 1)
 	if code := te.run("review", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "no review on acme/api#7") {
@@ -141,6 +146,7 @@ func TestReviewRejectsClosedPRs(t *testing.T) {
 }
 
 func TestReviewStartsTheAgentInTheProjectProfile(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.cfg.Projects = []config.Project{
@@ -164,6 +170,7 @@ func TestReviewStartsTheAgentInTheProjectProfile(t *testing.T) {
 }
 
 func TestReviewStartsTheProjectsAgent(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.withEcho()
@@ -179,6 +186,7 @@ func TestReviewStartsTheProjectsAgent(t *testing.T) {
 }
 
 func TestReviewRemembersTheCallerProfile(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.withCallerHome("/home/me/.claude-personal")
@@ -200,6 +208,7 @@ func TestReviewRemembersTheCallerProfile(t *testing.T) {
 }
 
 func TestReviewIgnoresTheDefaultProfile(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		basics string
 		want   []string
@@ -224,6 +233,7 @@ func TestReviewIgnoresTheDefaultProfile(t *testing.T) {
 }
 
 func TestReviewKeepsTheBranchWhenTheNameIsTakenOrTheHeadIsAFork(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		basics string
 		taken  bool
@@ -254,12 +264,14 @@ func TestReviewKeepsTheBranchWhenTheNameIsTakenOrTheHeadIsAFork(t *testing.T) {
 }
 
 func TestReviewRefusesABranchCheckedOutElsewhere(t *testing.T) {
+	t.Parallel()
 	for name, w := range map[string]wsdomain.Workspace{
 		"main checkout":    {ID: "main-api", RepoID: "r1", Path: "/src/api", DisplayName: "api", Branch: "feat/x", HostID: "local", IsMain: true},
 		"author worktree":  {ID: "ws-x", RepoID: "r1", Path: "/wt/x", DisplayName: "x", Branch: "feat/x", HostID: "local"},
 		"other review one": {ID: "ws-r", RepoID: "r1", Path: "/wt/r", DisplayName: "REVIEW old", Branch: "feat/x", HostID: "local"},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, WorkspaceList: []wsdomain.Workspace{w}}
 			te := newTestEnv(t, m)
 			te.gh.basics = openBasics
@@ -277,6 +289,7 @@ func TestReviewRefusesABranchCheckedOutElsewhere(t *testing.T) {
 }
 
 func TestReviewRemovesTheWorkspaceWhenTheAgentDoesNotGetThePrompt(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		set   func(*fake.Manager)
 		wants string
@@ -300,6 +313,7 @@ func TestReviewRemovesTheWorkspaceWhenTheAgentDoesNotGetThePrompt(t *testing.T) 
 }
 
 func TestReviewReportsAnUnobservedSubmissionOnCreate(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, NotSubmitted: true}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -312,6 +326,7 @@ func TestReviewReportsAnUnobservedSubmissionOnCreate(t *testing.T) {
 }
 
 func TestReviewKeepsTheGuidanceOfARoundWhosePromptDidNotLand(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, NotSubmitted: true}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -344,6 +359,7 @@ func TestReviewKeepsTheGuidanceOfARoundWhosePromptDidNotLand(t *testing.T) {
 }
 
 func TestReviewGuidanceReplacesTheKeptOne(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -374,6 +390,7 @@ func guidanceEvents(rec *memRecorder) []string {
 }
 
 func TestEveryGuidanceSentIsRecordedWhetherOrNotItsPromptLands(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}, NotSubmitted: true}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -396,6 +413,7 @@ func TestEveryGuidanceSentIsRecordedWhetherOrNotItsPromptLands(t *testing.T) {
 }
 
 func TestReviewDiscardsAWorkspaceOrcaPutOnARenamedBranch(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{ManagerName: "orca", BranchSuffix: "-2", RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = strings.Replace(openBasics, `"headRefName":"feat/x"`, `"headRefName":"feat"`, 1)

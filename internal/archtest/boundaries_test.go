@@ -3,7 +3,6 @@ package archtest
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"path"
@@ -232,6 +231,7 @@ func builtinLiterals(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 func TestBoundaryImports(t *testing.T) {
+	t.Parallel()
 	termfmt := false
 	for _, p := range packages(t) {
 		termfmt = termfmt || p.ImportPath == module+"internal/termfmt"
@@ -245,6 +245,7 @@ func TestBoundaryImports(t *testing.T) {
 }
 
 func TestOnlyTheCatalogBuildsActions(t *testing.T) {
+	t.Parallel()
 	fset, files := typedFiles(t)
 	for _, tf := range files {
 		for _, b := range actionLiterals(fset, tf.rel, tf.info, tf.file) {
@@ -254,6 +255,7 @@ func TestOnlyTheCatalogBuildsActions(t *testing.T) {
 }
 
 func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
+	t.Parallel()
 	fset, files := typedFiles(t)
 	for _, tf := range files {
 		for _, b := range programReads(fset, tf.rel, tf.info, tf.file) {
@@ -263,17 +265,14 @@ func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 }
 
 func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
+	t.Parallel()
 	for _, p := range packages(t) {
 		self, ok := local(p.ImportPath)
 		if !ok {
 			continue
 		}
-		fset := token.NewFileSet()
 		for _, name := range p.GoFiles {
-			f, err := parser.ParseFile(fset, filepath.Join(p.Dir, name), nil, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
+			fset, f := parseFile(t, filepath.Join(p.Dir, name))
 			for _, b := range builtinLiterals(fset, self+"/"+name, f) {
 				t.Error(b)
 			}
@@ -284,6 +283,7 @@ func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
 // TestTheBoundaryAnchorsExist fails when a package, type or field the rules
 // name moves, which would leave R4 and R5 matching nothing.
 func TestTheBoundaryAnchorsExist(t *testing.T) {
+	t.Parallel()
 	_, files := typedFiles(t)
 	pkgs := map[string]*types.Package{}
 	for _, tf := range files {

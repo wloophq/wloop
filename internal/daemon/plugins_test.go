@@ -19,6 +19,7 @@ import (
 )
 
 func TestWritePluginDisabled(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	writePluginDisabled(rec, "slack")
 	if rec.Code != http.StatusConflict || rec.Header().Get("Content-Type") != "application/json" {
@@ -34,6 +35,7 @@ func TestWritePluginDisabled(t *testing.T) {
 }
 
 func TestRefusePlugin(t *testing.T) {
+	t.Parallel()
 	gh := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	sl := unit.Unit{Provider: "slack", Key: "T1/C1/1.2"}
 	all := &Server{}
@@ -66,6 +68,7 @@ func (c streamClock) After(d time.Duration) <-chan time.Time {
 }
 
 func TestPluginRunRestarts(t *testing.T) {
+	t.Parallel()
 	runs := make(chan struct{}, 4)
 	var logged atomic.Value
 	s := New(Deps{Log: func(f string, args ...any) { logged.Store(fmt.Sprintf(f, args...)) }})
@@ -104,6 +107,7 @@ func TestPluginRunRestarts(t *testing.T) {
 }
 
 func TestPluginJobsRegistered(t *testing.T) {
+	t.Parallel()
 	var n atomic.Int32
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{{Name: "extract:thread", Every: 20 * time.Millisecond, Run: func(context.Context) (string, string, error) {
@@ -126,6 +130,7 @@ func TestPluginJobsRegistered(t *testing.T) {
 }
 
 func TestAPluginHealthWarningReachesTheWarnings(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{
 			{ID: "slack", Health: func(context.Context) (api.SourceHealth, error) {
@@ -147,6 +152,7 @@ func TestAPluginHealthWarningReachesTheWarnings(t *testing.T) {
 }
 
 func TestPluginsServed(t *testing.T) {
+	t.Parallel()
 	plugins := []api.Plugin{{ID: unit.GitHub, Enabled: false}, {ID: "thread", Enabled: true, UI: &api.PluginUI{TUIViews: []string{"t"}}}}
 	s := newServerWith(t, func(d *Deps) { d.Plugins = plugins })
 	var got []api.Plugin
@@ -162,6 +168,7 @@ func TestPluginsServed(t *testing.T) {
 }
 
 func TestPluginJobTimeout(t *testing.T) {
+	t.Parallel()
 	run := func(context.Context) (string, string, error) { return "", "", nil }
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{
@@ -178,6 +185,7 @@ func TestPluginJobTimeout(t *testing.T) {
 }
 
 func TestNegativePluginJobTimeoutIsTheDefault(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
 		d.Runtimes = []PluginRuntime{{ID: "thread", Jobs: []PluginJob{{Name: "neg", Every: time.Minute, Timeout: -time.Second,
 			Run: func(context.Context) (string, string, error) { return "", "", nil }}}}}

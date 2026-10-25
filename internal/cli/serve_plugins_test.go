@@ -92,6 +92,7 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 }
 
 func TestPluginsRoute(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -127,6 +128,7 @@ func TestPluginsRoute(t *testing.T) {
 }
 
 func TestPluginsDefaultEnabled(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{"brief": {"enabled": false}}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -160,6 +162,7 @@ func TestPluginsDefaultEnabled(t *testing.T) {
 }
 
 func TestStatusNamesDisabledPlugins(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{"GET /api/health": api.Health{}, "GET /api/rows": api.RowsPage{Full: true, Rows: []api.Row{}},
 		"GET " + api.Plugins: []api.Plugin{{ID: unit.GitHub}, {ID: "thread", Enabled: true}}})
@@ -226,6 +229,7 @@ func TestDaemonRunsWithNoPluginEnabled(t *testing.T) {
 }
 
 func TestRuntimeCarriesJobTimeout(t *testing.T) {
+	t.Parallel()
 	rt := runtimeOf(source.Module{ID: unit.GitHub, Jobs: []source.Job{{Name: "j", Every: time.Minute, Timeout: 25 * time.Minute}}})
 	if len(rt.Jobs) != 1 || rt.Jobs[0].Timeout != 25*time.Minute {
 		t.Fatalf("jobs %+v", rt.Jobs)

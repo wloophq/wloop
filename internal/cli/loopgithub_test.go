@@ -53,6 +53,7 @@ func wantNothingUnderLock(t *testing.T, te *testEnv) {
 }
 
 func TestAReviewActionAsksGitHubNothingUnderTheLoop(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -67,6 +68,7 @@ func TestAReviewActionAsksGitHubNothingUnderTheLoop(t *testing.T) {
 }
 
 func TestATakeOverAsksGitHubNothingUnderTheLoop(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList:      []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-rev", RepoID: "r1", Path: "/wt/rev", DisplayName: "REVIEW feat/theirs", Status: "needs-me", HostID: "local", LinkedPR: 20}},
@@ -97,6 +99,7 @@ func actAhead(t *testing.T, te *testEnv, ref github.Ref, full bool, act func(ctx
 }
 
 func TestARunNowReadAheadAsksGitHubNothing(t *testing.T) {
+	t.Parallel()
 	sc := followupScenario(t)
 	exhaustCap(t, sc)
 	sc.te.gh.basics = openBasics
@@ -109,6 +112,7 @@ func TestARunNowReadAheadAsksGitHubNothing(t *testing.T) {
 }
 
 func TestARemoveReadAheadAsksGitHubNothing(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	actAhead(t, te, r12, false, func(ctx context.Context) error {
 		return envActions{e: te.Env}.Remove(ctx, r12.Unit(), daemon.Call{Out: io.Discard, WorkspaceID: doneWS})
@@ -119,6 +123,7 @@ func TestARemoveReadAheadAsksGitHubNothing(t *testing.T) {
 }
 
 func TestATurnByHandAsksGitHubNothingUnderTheLoop(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	watchLoop(t, te)
 	if code := te.run("instructions", "review"); code != 0 {
@@ -131,6 +136,7 @@ func TestATurnByHandAsksGitHubNothingUnderTheLoop(t *testing.T) {
 }
 
 func TestALaunchedTurnOfAStoredPullRequestAsksGitHubNothing(t *testing.T) {
+	t.Parallel()
 	_, te := scenario(t)
 	te.gh.basics = openBasics
 	ctx := context.Background()
@@ -189,6 +195,7 @@ func answerByAction(te *testEnv) error {
 }
 
 func TestAnAnswerAfterAPushResumesWithTheHeadMoved(t *testing.T) {
+	t.Parallel()
 	m, te := askedAuthorTurn(t)
 	te.gh.mu.Lock()
 	te.gh.basics = strings.Replace(openBasics, `"headRefOid":"c2"`, `"headRefOid":"c9"`, 1)
@@ -207,6 +214,7 @@ func TestAnAnswerAfterAPushResumesWithTheHeadMoved(t *testing.T) {
 }
 
 func TestAnAnswerAfterAMergeIsRefused(t *testing.T) {
+	t.Parallel()
 	m, te := askedAuthorTurn(t)
 	te.gh.mu.Lock()
 	te.gh.basics = strings.Replace(openBasics, `"state":"OPEN"`, `"state":"MERGED"`, 1)
@@ -220,6 +228,7 @@ func TestAnAnswerAfterAMergeIsRefused(t *testing.T) {
 }
 
 func TestARunNowWithoutAReviewWorkspaceReadsOnlyTheBasicsAhead(t *testing.T) {
+	t.Parallel()
 	_, te := scenario(t)
 	te.gh.basics = strings.NewReplacer(`"number":7`, `"number":11`, `"headRefName":"feat/x"`, `"headRefName":"feat/unreviewed"`).Replace(openBasics)
 	if err := te.Store.SetViewer(context.Background(), unit.GitHub, "me"); err != nil {
@@ -231,6 +240,7 @@ func TestARunNowWithoutAReviewWorkspaceReadsOnlyTheBasicsAhead(t *testing.T) {
 }
 
 func TestAnActionRefusesAPullRequestTheInventorySawCloseWhileItWaited(t *testing.T) {
+	t.Parallel()
 	_, te := scenario(t)
 	te.gh.basics = openBasics
 	ctx := te.ReadAhead(context.Background(), r7, false)

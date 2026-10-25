@@ -24,6 +24,7 @@ func helpOut(t *testing.T, te *testEnv, args ...string) string {
 }
 
 func TestUsageNamesTheWorkspaceManager(t *testing.T) {
+	t.Parallel()
 	for name, want := range map[string]string{"orca": "Open the workspace of a pull request in Orca", "zed": "Open the workspace of a pull request in zed"} {
 		te := newTestEnv(t, &fake.Manager{})
 		te.cfg.WorkspaceManagers = []string{name}
@@ -39,6 +40,7 @@ func TestUsageNamesTheWorkspaceManager(t *testing.T) {
 }
 
 func TestEveryCommandHasItsHelp(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	topics := allTopics(te.helpGroups())
 	for name := range commands() {
@@ -60,6 +62,7 @@ func TestEveryCommandHasItsHelp(t *testing.T) {
 }
 
 func TestTheHelpLinksPagesThatExist(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, nil)
 	for _, tp := range allTopics(te.helpGroups()) {
@@ -73,6 +76,7 @@ func TestTheHelpLinksPagesThatExist(t *testing.T) {
 }
 
 func TestUsageListsEveryCommandByTask(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	got := helpOut(t, te, "--help")
 	for _, want := range []string{"\nGET STARTED\n  init ", "\nPULL REQUESTS\n  review ", "\nWHAT WAITS ON YOU\n", "\nAUTOMATION\n", "\nPROFILE\n", "\nSLACK\n", "\nSETUP\n", "\nTROUBLESHOOTING\n",
@@ -93,6 +97,7 @@ func TestUsageListsEveryCommandByTask(t *testing.T) {
 }
 
 func TestUsageSeparatesWhatAgentsAndScriptsRun(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	got := helpOut(t, te, "help")
 	agents := strings.Index(got, "\nFOR AGENTS AND SCRIPTS\n")
@@ -110,6 +115,7 @@ func TestUsageSeparatesWhatAgentsAndScriptsRun(t *testing.T) {
 }
 
 func TestUsageLeavesTheRemovedAndTheDeveloperCommandsOut(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	all := helpOut(t, te, "help")
 	for _, tp := range allTopics(te.helpGroups()) {
@@ -124,6 +130,7 @@ func TestUsageLeavesTheRemovedAndTheDeveloperCommandsOut(t *testing.T) {
 }
 
 func TestACommandsHelpComesFromEitherSpelling(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	for _, c := range []struct {
 		args []string
@@ -148,6 +155,7 @@ func TestACommandsHelpComesFromEitherSpelling(t *testing.T) {
 }
 
 func TestGuidanceAndTextAreNotAskingForHelp(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	for _, args := range [][]string{
 		{"review", "https://github.com/acme/api/pull/7", "explain", "-h"},
@@ -161,6 +169,7 @@ func TestGuidanceAndTextAreNotAskingForHelp(t *testing.T) {
 }
 
 func TestAnUnknownCommandSuggestsTheClosest(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	for name, want := range map[string]string{"stauts": "did you mean 'status'?", "outbx": "did you mean 'outbox'?", "prof": "did you mean 'profile'?", "zzzzzz": ""} {
 		te.out.Reset()
@@ -186,6 +195,7 @@ func TestAnUnknownCommandSuggestsTheClosest(t *testing.T) {
 }
 
 func TestHelpWrapsToTheTerminal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	topics := allTopics(te.helpGroups())
 	for _, width := range []int{40, 60, 80, 200} {
@@ -208,6 +218,7 @@ func TestHelpWrapsToTheTerminal(t *testing.T) {
 }
 
 func TestHelpStylesOnlyWhenAsked(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if got := helpOut(t, te, "help"); strings.Contains(got, "\x1b") {
 		t.Errorf("piped help has escapes: %q", got)
@@ -230,6 +241,7 @@ func TestHelpStylesOnlyWhenAsked(t *testing.T) {
 }
 
 func TestHelpGolden(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	golden(t, "help_main.golden", helpOut(t, te, "help"))
 	golden(t, "help_main_color.golden", bracketed(helpOut(t, te, "help", "--color=always")))
@@ -239,6 +251,7 @@ func TestHelpGolden(t *testing.T) {
 }
 
 func TestHelpDevListsTheDeveloperTools(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("help", "dev"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -254,6 +267,7 @@ func TestHelpDevListsTheDeveloperTools(t *testing.T) {
 }
 
 func TestBundledIntentsKeepTheirPlace(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	var prs []string
 	for _, g := range te.helpGroups() {

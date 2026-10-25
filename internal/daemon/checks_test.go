@@ -3,6 +3,7 @@ package daemon
 import "testing"
 
 func TestFailedStepsCacheBounded(t *testing.T) {
+	t.Parallel()
 	var c stepCache
 	for job := int64(1); job <= 600; job++ {
 		c.Store(job, stepsOf{steps: []string{"step"}})

@@ -139,6 +139,7 @@ func (r *wakeRig) at(t *testing.T, d time.Duration) int {
 var u7 = r7.Unit()
 
 func TestSweepAtMostOncePerChange(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	r.start(t)
 	noting := map[int]bool{2: true, 4: true, 10: true, 12: true, 22: true, 30: true, 44: true, 58: true}
@@ -171,6 +172,7 @@ func TestSweepAtMostOncePerChange(t *testing.T) {
 }
 
 func TestIdleHourOneSweep(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	r.start(t)
 	r.sw.runs.Store(0)
@@ -186,6 +188,7 @@ func TestIdleHourOneSweep(t *testing.T) {
 }
 
 func TestWatchdogRunsHourly(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	r.start(t)
 	for h := 1; h <= 3; h++ {
@@ -199,6 +202,7 @@ func TestWatchdogRunsHourly(t *testing.T) {
 }
 
 func TestKickDuringRunCoalesces(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	first := true
 	r.sw.during = func() {
@@ -216,6 +220,7 @@ func TestKickDuringRunCoalesces(t *testing.T) {
 }
 
 func TestOwnWritesDoNotWake(t *testing.T) {
+	t.Parallel()
 	t.Run("events and rounds", func(t *testing.T) {
 		r := newWakeRig(t, nil)
 		r.sw.during = func() {
@@ -257,6 +262,7 @@ func TestOwnWritesDoNotWake(t *testing.T) {
 }
 
 func TestFailedIngestWakesNoSweep(t *testing.T) {
+	t.Parallel()
 	var r *wakeRig
 	r = newWakeRig(t, func(d *Deps) {
 		closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
@@ -280,6 +286,7 @@ func TestFailedIngestWakesNoSweep(t *testing.T) {
 }
 
 func TestFirstRunAfterStartPlans(t *testing.T) {
+	t.Parallel()
 	for _, notes := range []int{0, 3} {
 		r := newWakeRig(t, nil)
 		for range notes {
@@ -322,18 +329,22 @@ func deadlineRig(t *testing.T, due time.Duration) {
 }
 
 func TestConflictWindowWakesSweep(t *testing.T) {
+	t.Parallel()
 	deadlineRig(t, 5*time.Minute)
 }
 
 func TestCapRolloverWakesSweep(t *testing.T) {
+	t.Parallel()
 	deadlineRig(t, 15*time.Hour)
 }
 
 func TestBlindBlockWakesAfterADay(t *testing.T) {
+	t.Parallel()
 	deadlineRig(t, 24*time.Hour)
 }
 
 func TestALaterDeadlineReplacesAnEarlierOne(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	r.start(t)
 	r.job.at(wakeStart.Add(10 * time.Minute))
@@ -352,6 +363,7 @@ func TestALaterDeadlineReplacesAnEarlierOne(t *testing.T) {
 }
 
 func TestAChangeRightAfterARunSettlesFirst(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	r.start(t)
 	r.log.Note(port.TopicPRs, u7)
@@ -372,6 +384,7 @@ func TestAChangeRightAfterARunSettlesFirst(t *testing.T) {
 }
 
 func TestFailedSweepRetriesWithBackoff(t *testing.T) {
+	t.Parallel()
 	t.Run("failed", func(t *testing.T) {
 		r := newWakeRig(t, nil)
 		r.sw.result = func(n int32) (string, error) {
@@ -479,6 +492,7 @@ func (c *sleepClock) run(d time.Duration) {
 }
 
 func TestADeadlineSurvivesAMachineSleep(t *testing.T) {
+	t.Parallel()
 	r := newWakeRig(t, nil)
 	clk := &sleepClock{wall: wakeStart}
 	r.job.clock = clk

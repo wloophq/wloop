@@ -5,6 +5,7 @@ import (
 )
 
 func TestR7FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	ok := []string{"context", "fmt", module + "internal/domain/pr", module + "internal/core/port", module + "internal/meter"}
 	flagged(t, "allowed", ruleR7("internal/core/turns", ok), 0, "")
 	bad := append(ok, module+"internal/adapter/store/sqlite", module+"internal/github", module+"internal/profile", "github.com/x/y", "os/exec", "database/sql")
@@ -14,6 +15,7 @@ func TestR7FlagsAPlantedImport(t *testing.T) {
 }
 
 func TestR9FlagsAPlantedSpawn(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package cli
 import "os/exec"
 var a = exec.Command("orca", "status")
@@ -33,6 +35,7 @@ var k = exec.Command(agent.Binary())
 }
 
 func TestR9FlagsAPlantedDesktopReach(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package claude
 var a = "claude://resume?session=x"
 var b = []string{"open", "-g", "claude://code/continue?session=local_x"}
@@ -51,6 +54,7 @@ var i = "a peer review"
 }
 
 func TestR11FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	ok := []string{"time", module + "internal/domain/pr", module + "internal/meter"}
 	flagged(t, "allowed", ruleR11("internal/domain/turn", ok), 0, "")
 	bad := append(ok, module+"internal/adapter/store/sqlite", module+"internal/workspace/orca", module+"internal/github", module+"internal/github/graphql")
@@ -59,6 +63,7 @@ func TestR11FlagsAPlantedImport(t *testing.T) {
 }
 
 func TestR12FlagsAPlantedImport(t *testing.T) {
+	t.Parallel()
 	ok := []string{"sync", "time", module + "internal/meter/metertest"}
 	flagged(t, "allowed", ruleR12("internal/meter", ok), 0, "")
 	bad := append(ok, module+"internal/domain/pr", module+"internal/config", "github.com/x/y")
@@ -67,6 +72,7 @@ func TestR12FlagsAPlantedImport(t *testing.T) {
 }
 
 func TestR13FlagsAPlantedQuery(t *testing.T) {
+	t.Parallel()
 	fset, f := parse(t, `package e2e
 import "database/sql"
 var db, _ = sql.Open("sqlite", "x.db")

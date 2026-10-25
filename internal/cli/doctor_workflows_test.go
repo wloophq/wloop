@@ -110,6 +110,7 @@ func checkNamed(checks []api.DoctorCheck, name string) (api.DoctorCheck, bool) {
 }
 
 func TestDoctorReportsWorkflows(t *testing.T) {
+	t.Parallel()
 	te, db := workflowDoctorEnv(t)
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
 	if err != nil {
@@ -157,6 +158,7 @@ func TestDoctorReportsWorkflows(t *testing.T) {
 }
 
 func TestDoctorNamesARevertedWorkflowOverride(t *testing.T) {
+	t.Parallel()
 	te, db := workflowDoctorEnv(t)
 	writeUserWorkflow(t, te.cfg.Profile, "session-duplicate", "bogus = 1\n")
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
@@ -170,6 +172,7 @@ func TestDoctorNamesARevertedWorkflowOverride(t *testing.T) {
 }
 
 func TestDoctorWarnsOnAnUnknownWorkflowConfig(t *testing.T) {
+	t.Parallel()
 	te, db := workflowDoctorEnv(t)
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
 	if err != nil {
@@ -194,6 +197,7 @@ func (failingReads) WorkflowActivity(context.Context, time.Time) (map[string]sql
 }
 
 func TestDoctorKeepsTheStateChecksWhenAWorkflowReadFails(t *testing.T) {
+	t.Parallel()
 	te, db := workflowDoctorEnv(t)
 	te.Rounds = sqlite.NewRounds(db)
 	rep, err := te.doctorWith(failingReads{db})(context.Background(), api.DoctorQuery{})
@@ -207,6 +211,7 @@ func TestDoctorKeepsTheStateChecksWhenAWorkflowReadFails(t *testing.T) {
 }
 
 func TestDoctorReportsAConfigItCannotRead(t *testing.T) {
+	t.Parallel()
 	te, db := workflowDoctorEnv(t)
 	te.LoadConfig = func() (config.Config, error) { return config.Config{}, errors.New("invalid character '}'") }
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})

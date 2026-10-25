@@ -70,6 +70,7 @@ func dossierPathOf(t *testing.T, te *testEnv, u unit.Unit) string {
 }
 
 func TestDossierOpenedBeforeLaunch(t *testing.T) {
+	t.Parallel()
 	te, _ := servedDossiers(t)
 	ctx := context.Background()
 	path := dossierPathOf(t, te, headlessThread)
@@ -108,6 +109,7 @@ func TestDossierOpenedBeforeLaunch(t *testing.T) {
 }
 
 func TestHeadlessBuilderLeavesTheDossierToThePrompt(t *testing.T) {
+	t.Parallel()
 	te, _ := servedDossiers(t)
 	got, err := headlessBuilder{e: te.Env, cfg: te.cfg}.Instructions(context.Background(), headlessThread, dturn.Intent(dintent.Act), nil)
 	if err != nil {
@@ -132,6 +134,7 @@ func (a *dossierAsker) Ask(_ context.Context, q turns.Ask) (turns.Answer, error)
 }
 
 func TestHeadlessReadsTheDossier(t *testing.T) {
+	t.Parallel()
 	te, db := servedDossiers(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -158,6 +161,7 @@ func TestHeadlessReadsTheDossier(t *testing.T) {
 }
 
 func TestHeadlessTurnsCountTheDossierCalls(t *testing.T) {
+	t.Parallel()
 	te, db := servedDossiers(t)
 	ctx := context.Background()
 	te.dossierCalls.Caps = dossiers.Caps{PerCallUSD: 0.5, PerDayUSD: 0.5}
@@ -193,11 +197,13 @@ func serveDepsAgain(t *testing.T, te *testEnv, db *sqlite.DB) *headless.Service 
 }
 
 func TestATurnEndCommitsTheDossier(t *testing.T) {
+	t.Parallel()
 	te, _ := servedDossiers(t)
 	assertTurnEndCommits(t, te)
 }
 
 func TestATurnEndCommitsAfterTheConfigLoads(t *testing.T) {
+	t.Parallel()
 	te, _ := servedDossiersAfter(t, true)
 	assertTurnEndCommits(t, te)
 }
@@ -249,6 +255,7 @@ func gitLog(dir string) (string, error) {
 }
 
 func TestDossierSpendSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	te, db := servedDossiers(t)
 	ctx := context.Background()
 	n := 0
@@ -281,6 +288,7 @@ func TestDossierSpendSurvivesARestart(t *testing.T) {
 }
 
 func TestOnlyALaunchWithTheGrantIsGranted(t *testing.T) {
+	t.Parallel()
 	te, _ := servedDossiers(t)
 	ctx := context.Background()
 	render := func() string {

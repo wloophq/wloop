@@ -157,6 +157,7 @@ func apiRequest(method, path string, body io.Reader) *http.Request {
 }
 
 func TestAPISkew(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Restart = "launchctl kickstart -k gui/501/" + brand.Name })
 	h := s.Handler()
 	for _, c := range []struct {
@@ -212,6 +213,7 @@ func TestAPISkew(t *testing.T) {
 }
 
 func TestCockpitSpeaksTheAPIVersion(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	newServer(t).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `const API_VERSION = "`+api.Version+`"`) ||
@@ -255,6 +257,7 @@ func viewOf(t *testing.T, path string, rows []api.Row) []api.Row {
 }
 
 func TestPRsViewNeedsMe(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var rows []api.Row
 	if code := get(t, s, "/api/rows?view=needs-me", &rows); code != 200 {
@@ -269,6 +272,7 @@ func TestPRsViewNeedsMe(t *testing.T) {
 }
 
 func TestAReviewToAddressWithoutAWorkspaceShowsInNeedsMeUntilARoundRuns(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	ctx := context.Background()
 	now := s.deps.Now()
@@ -301,6 +305,7 @@ func TestAReviewToAddressWithoutAWorkspaceShowsInNeedsMeUntilARoundRuns(t *testi
 }
 
 func TestPRsViewAllIncludesDone(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var rows []api.Row
 	get(t, s, "/api/rows?view=all", &rows)
@@ -314,6 +319,7 @@ func TestPRsViewAllIncludesDone(t *testing.T) {
 }
 
 func TestDetailIncludesEvents(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var d api.Detail
 	if code := get(t, s, "/api/units/github/acme%2Fapi%237", &d); code != 200 || len(d.Events) != 2 || d.Events[1].Kind != dinv.KindReviewRequest || rowNumber(d.Row) != 7 {
@@ -325,6 +331,7 @@ func TestDetailIncludesEvents(t *testing.T) {
 }
 
 func TestHealthListsVersionAndWarnings(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedRateLimit(t, s, 100, 5000, s.deps.Now().Add(time.Hour))
 	s.warnings.set("fast", "rate limit low")
@@ -338,6 +345,7 @@ func TestHealthListsVersionAndWarnings(t *testing.T) {
 }
 
 func TestAuthHandlerRequiresToken(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	s.token = "secret"
 	rec := httptest.NewRecorder()
@@ -363,6 +371,7 @@ func TestAuthHandlerRequiresToken(t *testing.T) {
 }
 
 func TestSSEReceivesChange(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	srv := httptest.NewServer(s.Handler())
 	defer srv.Close()
@@ -390,6 +399,7 @@ func TestSSEReceivesChange(t *testing.T) {
 }
 
 func TestHealthSaysWhenNoNotifier(t *testing.T) {
+	t.Parallel()
 	var start = "launchctl kickstart gui/501/" + brand.LaunchAgent() + ".app"
 	s := newServerWith(t, func(d *Deps) { d.NotifierStart = start })
 	srv := httptest.NewServer(s.Handler())
@@ -427,6 +437,7 @@ func TestHealthSaysWhenNoNotifier(t *testing.T) {
 }
 
 func TestHealthWarnsOfNoNotifierOnlyWhenOneIsExpected(t *testing.T) {
+	t.Parallel()
 	var h api.Health
 	if code := get(t, newServer(t), "/api/health", &h); code != 200 || h.Notifier || slices.ContainsFunc(h.Warnings, func(w string) bool { return strings.HasPrefix(w, "menu bar") }) {
 		t.Fatalf("%d %+v", code, h)
@@ -444,6 +455,7 @@ func seedRateLimit(t *testing.T, s *Server, remaining, limit int, resetAt time.T
 }
 
 func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	now := s.deps.Now()
 	s.warnings.set("fast", "truncated: review-requested:@me")
@@ -471,6 +483,7 @@ func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
 }
 
 func TestHealthSaysWhenAReviewStalls(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { d.Cfg.Stalled.Review = config.Days(72 * time.Hour) })
 	var h api.Health
 	get(t, s, "/api/health", &h)
@@ -480,6 +493,7 @@ func TestHealthSaysWhenAReviewStalls(t *testing.T) {
 }
 
 func TestHealthJSONIsSnakeCase(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	seedRateLimit(t, s, 100, 5000, s.deps.Now().Add(time.Hour))
 	rec := httptest.NewRecorder()
@@ -495,6 +509,7 @@ func TestHealthJSONIsSnakeCase(t *testing.T) {
 }
 
 func TestSSEUnsubscribesOnDisconnect(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	srv := httptest.NewServer(s.Handler())
 	defer srv.Close()
@@ -524,6 +539,7 @@ func TestSSEUnsubscribesOnDisconnect(t *testing.T) {
 }
 
 func TestCockpitPageIsBehindTheToken(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	s.token = "secret"
 	rec := httptest.NewRecorder()
@@ -541,6 +557,7 @@ func TestCockpitPageIsBehindTheToken(t *testing.T) {
 }
 
 func TestUnknownAPIPathIsAJSONError(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, apiRequest("GET", "/api/nope", nil))
@@ -556,6 +573,7 @@ func TestUnknownAPIPathIsAJSONError(t *testing.T) {
 }
 
 func TestHealthReportsTheViewer(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	get(t, s, "/api/rows", nil)
 	var h api.Health
@@ -601,6 +619,7 @@ func (b *summaryBriefs) Briefed(context.Context) (map[github.Ref]brief.Summary, 
 }
 
 func TestRowsCarryTheBriefSummaryReadOncePerListing(t *testing.T) {
+	t.Parallel()
 	sb := &summaryBriefs{}
 	s := newServerWith(t, func(d *Deps) { withBriefs(d, sb) })
 	var rows []api.Row
@@ -625,6 +644,7 @@ func TestRowsCarryTheBriefSummaryReadOncePerListing(t *testing.T) {
 }
 
 func TestBriefInHealthAndDetail(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	var h api.Health
 	get(t, s, "/api/health", &h)
@@ -655,6 +675,7 @@ func (brokenBriefs) Views(context.Context, ...dinv.PR) (map[github.Ref]*brief.Vi
 }
 
 func TestDetailWithoutTheBriefWhenItCannotBeRead(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) { withBriefs(d, brokenBriefs{}) })
 	var d struct {
 		Row   api.Row     `json:"row"`
@@ -666,6 +687,7 @@ func TestDetailWithoutTheBriefWhenItCannotBeRead(t *testing.T) {
 }
 
 func TestChecksDetailNamesTheFailedStepsOnce(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	s := newServerWith(t, func(d *Deps) {
 		d.FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
@@ -701,6 +723,7 @@ func TestChecksDetailNamesTheFailedStepsOnce(t *testing.T) {
 }
 
 func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var asked []string
 	clock := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
@@ -760,6 +783,7 @@ func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.
 }
 
 func TestDetailNamesTheProfileChain(t *testing.T) {
+	t.Parallel()
 	s := newServerWith(t, func(d *Deps) {
 		d.Cfg.Profile = "/u"
 	})
@@ -781,6 +805,7 @@ func (f *fakeBriefs) Forget(_ context.Context, ref github.Ref) error {
 }
 
 func TestBriefRefreshActionTriggersTheJob(t *testing.T) {
+	t.Parallel()
 	off := newServer(t)
 	if rec := post(t, off, "/api/units/github/acme%2Fapi%237/brief_refresh", `{}`); rec.Code != http.StatusConflict {
 		t.Fatalf("brief off: %d %s", rec.Code, rec.Body)
@@ -796,6 +821,7 @@ func TestBriefRefreshActionTriggersTheJob(t *testing.T) {
 }
 
 func TestPauseOfARepositoryHoldsOnlyItAndResumingLessThanEverythingIsRefused(t *testing.T) {
+	t.Parallel()
 	plan := newPendingPlan(time.Time{})
 	s := newServerWith(t, func(d *Deps) { d.Plan, d.Pending = plan, plan })
 	plan.propose(r7.Unit())
@@ -840,8 +866,10 @@ func (c *countingWriter) Write(b []byte) (int, error) { return len(b), nil }
 func (c *countingWriter) WriteHeader(code int)        { c.codes = append(c.codes, code) }
 
 func TestWriteJSONSetsOneStatus(t *testing.T) {
+	t.Parallel()
 	for name, v := range map[string]any{"encodable": map[string]int{"a": 1}, "unencodable": make(chan int)} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			w := &countingWriter{header: http.Header{}}
 			writeJSON(w, v)
 			if len(w.codes) > 1 {
@@ -855,6 +883,7 @@ func TestWriteJSONSetsOneStatus(t *testing.T) {
 }
 
 func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	stale := false
 	s.deps.ConfigWarning = func() string {
@@ -890,6 +919,7 @@ func viewsOf(v *brief.View, prs []dinv.PR) map[github.Ref]*brief.View {
 }
 
 func TestANoticeStreamsAsANotifyMessage(t *testing.T) {
+	t.Parallel()
 	s := newServer(t)
 	srv := httptest.NewServer(s.Handler())
 	defer srv.Close()
@@ -921,6 +951,7 @@ func TestANoticeStreamsAsANotifyMessage(t *testing.T) {
 }
 
 func TestVersion1RefusesAPreReleaseClient(t *testing.T) {
+	t.Parallel()
 	h := newServerWith(t, func(*Deps) {}).Handler()
 	for _, path := range []string{api.Rows, api.Catalog, "/api/health"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -942,6 +973,7 @@ func TestVersion1RefusesAPreReleaseClient(t *testing.T) {
 }
 
 func TestCatalogRouteServesTheProviders(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	newServerWith(t, func(*Deps) {}).Handler().ServeHTTP(rec, apiRequest(http.MethodGet, api.Catalog, nil))
 	var c api.CatalogResponse

@@ -9,6 +9,7 @@ import (
 )
 
 func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v1.sql"))
 	if err != nil {
@@ -61,6 +62,7 @@ func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
 }
 
 func TestADraftAnOlderReleaseWroteReadsWithTheShapeOfItsKind(t *testing.T) {
+	t.Parallel()
 	db, path := openTemp(t)
 	db.Close()
 	rawExec(t, path, `INSERT INTO drafts (provider, unit_key, kind, origin_kind, state, created_at, updated_at) VALUES ('slack', 'C1/1', 'react', 'auto', 'proposed', '', '')`)

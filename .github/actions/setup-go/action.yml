@@ -1,0 +1,57 @@
+name: Set up Go
+description: >-
+  Installs the go.mod toolchain and restores the build cache saved under the
+  given name and the module cache, both saved by the Cache workflow on main.
+
+inputs:
+  cache:
+    description: Name of the build cache, unique per job configuration
+    required: true
+
+outputs:
+  build-path:
+    description: The build cache directory, for actions/cache/save
+    value: ${{ steps.dirs.outputs.build }}
+  build-key:
+    description: The key this commit's build cache is saved under
+    value: ${{ steps.keys.outputs.build }}
+  mod-path:
+    description: The module cache directory, for actions/cache/save
+    value: ${{ steps.dirs.outputs.mod }}
+  mod-key:
+    description: The key this commit's module cache is saved under
+    value: ${{ steps.keys.outputs.mod }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+    - id: dirs
+      shell: bash
+      run: |
+        echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+        echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+    - id: keys
+      shell: bash
+      env:
+        BUILD: go-${{ runner.os }}-${{ inputs.cache }}@${{ steps.dirs.outputs.version }}-
+        MOD: go-${{ runner.os }}-mod@
+        SHA: ${{ github.sha }}
+      run: |
+        echo "build-prefix=$BUILD" >> "$GITHUB_OUTPUT"
+        echo "build=$BUILD$SHA" >> "$GITHUB_OUTPUT"
+        echo "mod=$MOD$SHA" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.dirs.outputs.build }}
+        key: ${{ steps.keys.outputs.build }}
+        restore-keys: ${{ steps.keys.outputs.build-prefix }}
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.dirs.outputs.mod }}
+        key: ${{ steps.keys.outputs.mod }}
+        restore-keys: go-${{ runner.os }}-mod@

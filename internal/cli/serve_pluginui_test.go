@@ -68,6 +68,7 @@ func pluginOf(ps []api.Plugin, id unit.ProviderID) api.Plugin {
 }
 
 func TestGitHubViewsServedAsPluginViews(t *testing.T) {
+	t.Parallel()
 	ps, cat := servedUI(t, nil)
 	gh := pluginOf(ps, unit.GitHub)
 	if gh.UI == nil {
@@ -118,6 +119,7 @@ func TestGitHubViewsServedAsPluginViews(t *testing.T) {
 }
 
 func TestDisabledPluginHasNoViews(t *testing.T) {
+	t.Parallel()
 	ps, cat := servedUI(t, githubDisabled)
 	if gh := pluginOf(ps, unit.GitHub); gh.Enabled || gh.UI != nil {
 		t.Fatalf("disabled github: %+v", gh)
@@ -135,6 +137,7 @@ func TestDisabledPluginHasNoViews(t *testing.T) {
 }
 
 func TestPluginWithCoreKeyIsNotLoaded(t *testing.T) {
+	t.Parallel()
 	keyed := source.Plugin{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(config.Config, source.Deps) (source.Module, error) {
 		return source.Module{ID: unit.GitHub, Codec: pr.Codec{},
 			Ingest: ingest.Job{Every: time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) { return ingest.Plan{}, "", nil }},

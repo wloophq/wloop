@@ -63,6 +63,7 @@ func waitsFor(j *job, d time.Duration) bool {
 }
 
 func TestNoBriefInputNoteRunsNoBriefJob(t *testing.T) {
+	t.Parallel()
 	s, log, b := briefWakeServer(t)
 	j := s.jobs["brief"]
 	j.once(context.Background(), t.Logf, func(string, string) {})
@@ -79,6 +80,7 @@ func TestNoBriefInputNoteRunsNoBriefJob(t *testing.T) {
 }
 
 func TestFastWithADirtyRefWakesTheQueueOnce(t *testing.T) {
+	t.Parallel()
 	s, log, b := briefWakeServer(t)
 	j := s.jobs["brief"]
 	j.once(context.Background(), t.Logf, func(string, string) {})
@@ -99,6 +101,7 @@ func TestFastWithADirtyRefWakesTheQueueOnce(t *testing.T) {
 }
 
 func TestHealthAtMostThreeQueries(t *testing.T) {
+	t.Parallel()
 	f := storetest.Seeded(t, storetest.Live)
 	q := brief.New(brief.Deps{Store: f.Inventory, Taxonomy: func(github.Ref) string { return brief.DefaultTaxonomy },
 		Retry: time.Hour, Changes: f.Log, Now: func() time.Time { return f.Now }, Log: t.Logf})

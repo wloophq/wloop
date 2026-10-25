@@ -9,6 +9,7 @@ import (
 )
 
 func TestRunTightensStateDir(t *testing.T) {
+	t.Parallel()
 	d := testDeps(t)
 	older := map[string]os.FileMode{
 		"store.db-wal": 0o644,

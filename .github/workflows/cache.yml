@@ -1,0 +1,105 @@
+name: Cache
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: build
+      - run: go mod download
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - run: make vet-darwin
+      - run: make build-targets
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.mod-path }}
+          key: ${{ steps.go.outputs.mod-key }}
+
+  test-shard:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [daemon, store, cli, sources, rest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: test-${{ matrix.shard }}
+      - run: |
+          pkgs=$(scripts/test-shard.sh "$SHARD")
+          # shellcheck disable=SC2086
+          go test -race -run '^$' $pkgs
+        env:
+          SHARD: ${{ matrix.shard }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+
+  test-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: go
+        uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: macos
+      - run: go test -run '^$' ./...
+      - run: go test -race -run '^$' ./cmd/... ./internal/client/menubar/macos/
+      - run: CGO_ENABLED=0 go test -run '^$' ./internal/client/menubar/macos/
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.build-path }}
+          key: ${{ steps.go.outputs.build-key }}
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go.outputs.mod-path }}
+          key: ${{ steps.go.outputs.mod-key }}
+
+  prune:
+    needs: [build, test-shard, test-macos]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Keep only the newest Go cache of each name on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh cache list --ref refs/heads/main --key go- --limit 1000 --json id,key,createdAt \
+            --jq 'group_by(.key | split("@")[0]) | .[] | sort_by(.createdAt) | .[:-1][] | .id' |
+            while read -r id; do gh cache delete "$id"; done

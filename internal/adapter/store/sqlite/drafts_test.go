@@ -72,6 +72,7 @@ func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
 }
 
 func TestDraftsStoreRoundTrips(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	s := db.Drafts()
@@ -156,6 +157,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 }
 
 func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	clock := fixedNow{noteAt}
@@ -258,6 +260,7 @@ func draftService(db *DB, fx port.Effects) *outbox.Service {
 }
 
 func TestEditDuringApproveConflicts(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
@@ -293,6 +296,7 @@ func TestEditDuringApproveConflicts(t *testing.T) {
 }
 
 func TestStaleSendClaimConflicts(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	fx := &gatedFx{published: map[draft.ID][]string{}}
@@ -318,6 +322,7 @@ func TestStaleSendClaimConflicts(t *testing.T) {
 }
 
 func TestConcurrentSendAcrossHandlesPublishesOnce(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "state", "store.db")
 	fx := &gatedFx{published: map[draft.ID][]string{}}
@@ -368,6 +373,7 @@ func TestConcurrentSendAcrossHandlesPublishesOnce(t *testing.T) {
 }
 
 func TestADraftStoresItsShapeAndEffects(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	s := db.Drafts()

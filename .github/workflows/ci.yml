@@ -7,7 +7,7 @@ on:
 permissions: {}
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,18 +15,51 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          go-version-file: go.mod
+          cache: build
       - run: make fmt-check
+      - run: scripts/test-shard.sh check
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
-      - run: go test -race ./...
-      - run: GOOS=darwin CGO_ENABLED=0 go vet ./...
-      - name: Build every release target
+      - run: make vet-darwin
+      - run: make build-targets
+
+  test-shard:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [daemon, store, cli, sources, rest]
+    name: test (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: test-${{ matrix.shard }}
+      - run: |
+          pkgs=$(scripts/test-shard.sh "$SHARD")
+          # shellcheck disable=SC2086
+          go test -race -timeout 30m $pkgs
+        env:
+          SHARD: ${{ matrix.shard }}
+
+  test:
+    needs: [build, test-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require the build and every shard
+        env:
+          BUILD: ${{ needs.build.result }}
+          SHARDS: ${{ needs.test-shard.result }}
         run: |
-          for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
-            CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} go build ./...
-          done
+          echo "build: $BUILD, shards: $SHARDS"
+          test "$BUILD" = success && test "$SHARDS" = success
 
   test-macos:
     runs-on: macos-latest
@@ -36,10 +69,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          go-version-file: go.mod
-      - run: go test -race ./...
+          cache: macos
+      - run: go test -timeout 30m ./...
+      - run: go test -race ./cmd/... ./internal/client/menubar/macos/
       - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
 
   lint:
@@ -50,9 +84,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          go-version-file: go.mod
+          cache: build
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
@@ -67,9 +101,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          go-version-file: go.mod
+          cache: build
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
@@ -86,9 +120,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          go-version-file: go.mod
+          cache: build
       - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
         with:
