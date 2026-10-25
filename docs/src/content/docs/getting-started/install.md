@@ -30,6 +30,8 @@ brew install {{org}}/tap/{{command}}
 - the permissions in `settings.json`: `mcp__{{name}}__turn_end` allowed, and `mcp__{{name}}__slack_send_message` under `ask`, so Claude Code asks before every Slack post;
 - the bundled skills (`{{name}}`, `{{name}}-review`, `{{name}}-address`, `{{name}}-nudge` and `{{name}}-profile`), also into `~/.agents/skills` for Codex.
 
+The hooks and the `headersHelper` call the binary by its absolute path: on macOS the one you ran `install` by, a symlink such as Homebrew's `bin/{{command}}` included; on Linux the file the symlink points to. `{{command}} doctor` and the daemon accept a hook that runs the same binary by its link or its target, and `install` rewrites it to its own path.
+
 It finds the homes on its own: `~/.claude`, `CLAUDE_CONFIG_DIR` when set, every `agent_home` of the configuration and of each `projects` entry, and every Orca Claude profile home. `--home <dir>` (repeatable) names them instead. It backs up `settings.json` and the MCP registration before their first change, replaces a skill only while it is unedited, prints every entry it adds, changes or removes, and is safe to run again. `--dry-run` prints and changes nothing. It needs no daemon.
 
 Run it again after changing `mcp.port` and after every upgrade.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar/macos"
+	"github.com/wloophq/wloop/internal/fsx"
 )
 
 var (
@@ -203,12 +204,6 @@ func (e *Env) bundleCheck(ctx context.Context) check {
 	return check{markOK, brand.App + ".app", version, ""}
 }
 
-func sameFile(a, b string) bool {
-	fa, errA := os.Stat(a)
-	fb, errB := os.Stat(b)
-	return errA == nil && errB == nil && os.SameFile(fa, fb)
-}
-
 func runApp(ctx context.Context, e *Env, args []string) error {
 	switch {
 	case len(args) == 0:
@@ -248,7 +243,7 @@ func runAppInstall(ctx context.Context, e *Env, args []string) error {
 	// Homebrew's /opt/homebrew/bin link survives upgrades, the versioned
 	// Cellar path it points to does not.
 	source := e.Executable
-	if sameFile(source, bundleExe(e.Home)) || macos.InBundle(source) {
+	if fsx.SameFile(source, bundleExe(e.Home)) || macos.InBundle(source) {
 		return errors.New("run '" + brand.Command + " app install' from the installed binary, not from the bundle")
 	}
 	if err := e.buildBundle(ctx, source); err != nil {

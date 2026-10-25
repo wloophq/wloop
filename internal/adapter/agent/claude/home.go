@@ -18,6 +18,8 @@ import (
 	"github.com/wloophq/wloop/internal/backup"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/setup"
+	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/fsx"
 )
 
 // TurnEndTool is the turn_end tool of the loop's MCP server as Claude Code
@@ -87,6 +89,22 @@ func (h Home) fix(home string) string { return setup.InstallCommand(h.Command, h
 // registration's ${VAR} headers unexpanded.
 func (h Home) headersHelper() string { return h.Command + " hook mcp-headers" }
 
+// sameCommand reports whether got is want, or want run by another absolute
+// path to the same binary, such as a symlink and its target. Check accepts
+// either; install writes the path it runs by.
+func sameCommand(got, want string) bool {
+	if got == want {
+		return true
+	}
+	gotBin, gotRest, ok := shell.Cut(got)
+	wantBin, wantRest, wantOK := shell.Cut(want)
+	return ok && wantOK && gotRest == wantRest && sameBinary(gotBin, wantBin)
+}
+
+func sameBinary(a, b string) bool {
+	return filepath.IsAbs(a) && filepath.IsAbs(b) && fsx.SameFile(a, b)
+}
+
 func (h Home) registration() map[string]any {
 	return map[string]any{"type": "http", "url": h.MCPURL, "headersHelper": h.headersHelper(), "headers": map[string]any{api.MCPKeyHeader: h.MCPKey}}
 }
@@ -148,8 +166,10 @@ func object(parent map[string]any, key string) map[string]any {
 	return m
 }
 
+func exactCommand(got, want string) bool { return got == want }
+
 // registrationProblem is "" when the entry is the loop's, right.
-func (h Home) registrationProblem(doc map[string]any) string {
+func (h Home) registrationProblem(doc map[string]any, same func(got, want string) bool) string {
 	entry, ok := object(doc, "mcpServers")[brand.MCPServer()]
 	if !ok {
 		return "missing"
@@ -169,7 +189,7 @@ func (h Home) registrationProblem(doc map[string]any) string {
 		return fmt.Sprintf("type is %q, want http", got.Type)
 	case got.URL != h.MCPURL:
 		return fmt.Sprintf("url is %s, want %s", got.URL, h.MCPURL)
-	case got.HeadersHelper != h.headersHelper():
+	case !same(got.HeadersHelper, h.headersHelper()):
 		return fmt.Sprintf("headersHelper is %q, want %q", got.HeadersHelper, h.headersHelper())
 	case h.MCPKey == "":
 		return "no MCP key in " + brand.Name + "'s state"
@@ -186,8 +206,18 @@ func (h Home) registrationProblem(doc map[string]any) string {
 	return ""
 }
 
-func ours(command, sub string) bool {
-	return strings.Contains(command, brand.Name) && strings.Contains(command, sub)
+// ours reports whether command is the loop's sub hook: it names the loop, or
+// runs this binary by any path.
+func (h Home) ours(command, sub string) bool {
+	if !strings.Contains(command, sub) {
+		return false
+	}
+	if strings.Contains(command, brand.Name) {
+		return true
+	}
+	bin, _, ok := shell.Cut(command)
+	self, _, selfOK := shell.Cut(h.Command)
+	return ok && selfOK && sameBinary(bin, self)
 }
 
 func hookCommands(settings map[string]any, event string) []map[string]any {
@@ -210,14 +240,14 @@ func commandOf(hook map[string]any) string {
 	return s
 }
 
-func (h Home) rightHook(hook map[string]any, sub string) bool {
-	return hook["type"] == "command" && commandOf(hook) == h.hookCommand(sub) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
+func (h Home) rightHook(hook map[string]any, sub string, same func(got, want string) bool) bool {
+	return hook["type"] == "command" && same(commandOf(hook), h.hookCommand(sub)) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
 }
 
 func (h Home) hookProblem(settings map[string]any, event, sub string) string {
 	var found []map[string]any
 	for _, hk := range hookCommands(settings, event) {
-		if ours(commandOf(hk), sub) {
+		if h.ours(commandOf(hk), sub) {
 			found = append(found, hk)
 		}
 	}
@@ -228,7 +258,7 @@ func (h Home) hookProblem(settings map[string]any, event, sub string) string {
 		return fmt.Sprintf("%d "+brand.Name+" entries, want one", len(found))
 	case !strings.HasSuffix(strings.TrimSpace(commandOf(found[0])), "|| true"):
 		return fmt.Sprintf("%q has no `|| true`, so a failing "+brand.Name+" blocks the agent", commandOf(found[0]))
-	case !h.rightHook(found[0], sub):
+	case !h.rightHook(found[0], sub, sameCommand):
 		return fmt.Sprintf("runs %q with timeout %v, want %q with timeout %d", commandOf(found[0]), found[0]["timeout"], h.hookCommand(sub), hookTimeout)
 	}
 	return ""
@@ -302,7 +332,7 @@ func (h Home) Check(_ context.Context, home string) ([]setup.Finding, error) {
 		}
 		return f
 	}
-	out := []setup.Finding{finding("MCP server "+brand.MCPServer(), h.registrationProblem(mcp.doc))}
+	out := []setup.Finding{finding("MCP server "+brand.MCPServer(), h.registrationProblem(mcp.doc, sameCommand))}
 	for _, hk := range loopHooks {
 		out = append(out, finding("hook "+hk.event, h.hookProblem(settings.doc, hk.event, hk.sub)))
 	}
@@ -427,9 +457,9 @@ func (h Home) ensureHook(doc map[string]any, event, sub string) string {
 		for _, hk := range hs {
 			hm, _ := hk.(map[string]any)
 			switch {
-			case hm == nil || !ours(commandOf(hm), sub):
+			case hm == nil || !h.ours(commandOf(hm), sub):
 				keep = append(keep, hk)
-			case !found && h.rightHook(hm, sub):
+			case !found && h.rightHook(hm, sub, exactCommand):
 				found = true
 				keep = append(keep, hk)
 			case !found:
@@ -455,7 +485,7 @@ func (h Home) ensureHook(doc map[string]any, event, sub string) string {
 	return ""
 }
 
-func removeSettings(doc map[string]any) []string {
+func (h Home) removeSettings(doc map[string]any) []string {
 	var out []string
 	hooks := object(doc, "hooks")
 	for _, hk := range loopHooks {
@@ -471,7 +501,7 @@ func removeSettings(doc map[string]any) []string {
 			}
 			keep := slices.DeleteFunc(slices.Clone(hs), func(x any) bool {
 				hm, _ := x.(map[string]any)
-				return hm != nil && ours(commandOf(hm), hk.sub)
+				return hm != nil && h.ours(commandOf(hm), hk.sub)
 			})
 			if len(keep) == len(hs) {
 				kept = append(kept, g)
@@ -684,7 +714,7 @@ func (h Home) Install(ctx context.Context, home string, dryRun bool) ([]string, 
 		return nil, errors.New("no MCP key to register")
 	}
 	return h.apply(ctx, home, dryRun, false, h.installSettings, func(r *run, mcp jsonFile) (string, func() error) {
-		switch problem := h.registrationProblem(mcp.doc); problem {
+		switch problem := h.registrationProblem(mcp.doc, exactCommand); problem {
 		case "":
 			return "", nil
 		case "missing":
@@ -700,7 +730,7 @@ func (h Home) Files(home string) []string { return []string{settingsFile(home), 
 
 // Remove takes out what Install adds and backs up every file it changes.
 func (h Home) Remove(ctx context.Context, home string, dryRun bool) ([]string, error) {
-	return h.apply(ctx, home, dryRun, true, removeSettings, func(r *run, mcp jsonFile) (string, func() error) {
+	return h.apply(ctx, home, dryRun, true, h.removeSettings, func(r *run, mcp jsonFile) (string, func() error) {
 		if _, ok := object(mcp.doc, "mcpServers")[brand.MCPServer()]; !ok {
 			return "", nil
 		}
@@ -713,7 +743,7 @@ func (h Home) Remove(ctx context.Context, home string, dryRun bool) ([]string, e
 func (r *run) addServer(ctx context.Context, mcp jsonFile) error {
 	entry := r.h.registration()
 	return rewriteMode(ctx, mcp.path, mcp.raw, 0o600, func(doc map[string]any) []string {
-		if r.h.registrationProblem(doc) == "" {
+		if r.h.registrationProblem(doc, exactCommand) == "" {
 			return nil
 		}
 		servers := object(doc, "mcpServers")
