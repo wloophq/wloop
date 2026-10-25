@@ -21,7 +21,7 @@ func TestStoreWaitAnswersItsHealthAndRefusesTheRestUntilReady(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	var ready atomic.Bool
-	st := api.StoreStatus{Version: 3, Reads: 1, State: api.StoreTooNew, Message: "the store is newer", Fix: "wloop store restore"}
+	st := api.StoreStatus{Version: 3, Reads: 1, State: api.StoreTooNew, Message: "the store is newer", Fix: "fix-it restore"}
 	w := StoreWait{
 		Version: "v0.2.0", StateDir: dir, Socket: filepath.Join(dir, "d.sock"),
 		LockPath: filepath.Join(dir, "daemon.lock"), InfoPath: filepath.Join(dir, "http.json"),
@@ -46,7 +46,7 @@ func TestStoreWaitAnswersItsHealthAndRefusesTheRestUntilReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
-	if h.Version != "v0.2.0" || h.Store == nil || h.Store.State != api.StoreTooNew || len(h.Warnings) != 1 || h.Warnings[0] != "store: the store is newer; run `wloop store restore`" {
+	if h.Version != "v0.2.0" || h.Store == nil || h.Store.State != api.StoreTooNew || len(h.Warnings) != 1 || h.Warnings[0] != "store: the store is newer; run `fix-it restore`" {
 		t.Fatalf("health %+v", h)
 	}
 	req, _ := http.NewRequest(http.MethodGet, "http://daemon/api/rows", nil)
@@ -58,7 +58,7 @@ func TestStoreWaitAnswersItsHealthAndRefusesTheRestUntilReady(t *testing.T) {
 	var refusal map[string]string
 	_ = json.NewDecoder(resp.Body).Decode(&refusal)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusServiceUnavailable || refusal["error"] != "the store is not open: the store is newer" || refusal["fix"] != "wloop store restore" {
+	if resp.StatusCode != http.StatusServiceUnavailable || refusal["error"] != "the store is not open: the store is newer" || refusal["fix"] != "fix-it restore" {
 		t.Fatalf("%d %v", resp.StatusCode, refusal)
 	}
 	if info, err := ReadInfo(w.InfoPath); err != nil || info.Port == 0 || len(info.Token) < minTokenLen {

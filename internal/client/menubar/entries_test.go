@@ -118,18 +118,18 @@ func TestAStoreTheDaemonCannotOpenShowsWhyAndTheCommand(t *testing.T) {
 	var copied []string
 	r.c.cfg.Copy = func(s string) error { copied = append(copied, s); return nil }
 	r.d.rowsErr = errors.New("the store is not open")
-	r.d.health = api.Health{Store: &api.StoreStatus{State: api.StoreFailed, Message: "the store migration from version 1 failed", Fix: "wloop store migrate"}}
+	r.d.health = api.Health{Store: &api.StoreStatus{State: api.StoreFailed, Message: "the store migration from version 1 failed", Fix: "fix-it migrate"}}
 	r.c.Refresh(context.Background())
 	if r.title() != "PR !" {
 		t.Fatalf("title %q", r.title())
 	}
 	got := titles(r.tray.menu)
-	want := []string{"Store needs attention: its migration failed", "the store migration from version 1 failed", "Copy command: wloop store migrate", "---", "Quit " + brand.Name}
+	want := []string{"Store needs attention: its migration failed", "the store migration from version 1 failed", "Copy command: fix-it migrate", "---", "Quit " + brand.Name}
 	if !slices.Equal(got, want) {
 		t.Fatalf("menu %q", got)
 	}
 	r.tray.menu[2].Action()
-	if !slices.Equal(copied, []string{"wloop store migrate"}) {
+	if !slices.Equal(copied, []string{"fix-it migrate"}) {
 		t.Fatalf("copied %q", copied)
 	}
 }
