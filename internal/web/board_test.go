@@ -1675,6 +1675,7 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
   await actOnPlan(it, "guide");
   await actOnPlan(it, "unblock");
   await actOnPlan({ ...it, unit: { provider: "session", key: "term_1" } }, "trust_run");
+  await actOnPlan({ ...it, unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general · launch plan" }, "trust_run");
   process.stdout.write(JSON.stringify({ posts, acts }));
 })();`, nil, &got)
 	want := []string{
@@ -1690,7 +1691,7 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
 			t.Errorf("post %d: %s, want %s", i, p, want[i])
 		}
 	}
-	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1"}) {
+	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1", "trust_run #general · launch plan"}) {
 		t.Errorf("acts %q", got.Acts)
 	}
 }

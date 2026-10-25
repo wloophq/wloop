@@ -2261,7 +2261,7 @@ function planCount() {
   return state.plan.loaded ? planGroups(state.plan.items).reduce((n, g) => n + g.items.length, 0) : "";
 }
 
-const itemLabel = (it) => (it.unit.provider === "github" ? it.unit.key : unitKey(it.unit));
+const itemLabel = (it) => it.label || (it.unit.provider === "github" ? it.unit.key : unitKey(it.unit));
 
 async function loadPlan() {
   const view = readHash().view;
