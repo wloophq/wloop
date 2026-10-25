@@ -72,6 +72,24 @@ func TestParseRefusesAStyleSizeThatIsNotPixels(t *testing.T) {
 	}
 }
 
+func TestParseRefusesASizeThatIsNotAPositiveNumber(t *testing.T) {
+	for _, size := range []string{"NaNpx", "Infpx", "-12px", "0px", "0x1p4px"} {
+		bad := strings.Replace(sample, `"fontSize": "20px"`, `"fontSize": "`+size+`"`, 1)
+		if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "kpi") {
+			t.Errorf("%s: err = %v, want one naming the kpi style", size, err)
+		}
+	}
+}
+
+func TestParseRefusesAColorWithoutALightValueOrWithAnUnknownTheme(t *testing.T) {
+	for _, value := range []string{`{"dark": "#000000"}`, `{"light": "#ffffff", "Dark": "#000000"}`} {
+		bad := strings.Replace(sample, `{"light": "#ffffff", "dark": "#000000"}`, value, 1)
+		if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "bg") {
+			t.Errorf("%s: err = %v, want one naming the bg color", value, err)
+		}
+	}
+}
+
 func TestParseRefusesThemesOtherThanLightThenDark(t *testing.T) {
 	bad := strings.Replace(sample, `{"id": "light", "name": "Light"}, {"id": "dark", "name": "Dark"}`, `{"id": "dark", "name": "Dark"}, {"id": "light", "name": "Light"}`, 1)
 	if _, err := Parse([]byte(bad)); err == nil {

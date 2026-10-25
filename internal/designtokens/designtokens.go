@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,6 +90,8 @@ func (v themeValue) in(theme string, first bool) (string, bool) {
 	return s, ok && first
 }
 
+var pixels = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?px$`)
+
 // Parse reads tokens.json. The cockpit has a light theme and a dark one, in
 // that order, and every type style's size is in pixels.
 func Parse(raw []byte) (Tokens, error) {
@@ -99,12 +102,25 @@ func Parse(raw []byte) (Tokens, error) {
 	if len(t.Color.Themes) != 2 || t.Color.Themes[0].ID != "light" || t.Color.Themes[1].ID != "dark" {
 		return t, errors.New("color.themes must be light, then dark")
 	}
+	for _, c := range t.Color.Tokens {
+		if _, plain := c.Value[""]; plain {
+			continue
+		}
+		if _, ok := c.Value["light"]; !ok {
+			return t, fmt.Errorf("color %s has no light value", c.Name)
+		}
+		for theme := range c.Value {
+			if theme != "light" && theme != "dark" {
+				return t, fmt.Errorf("color %s: unknown theme %q", c.Name, theme)
+			}
+		}
+	}
 	seen := map[float64]bool{}
 	for _, g := range t.Type.Groups {
 		for _, s := range g.Styles {
-			px, err := strconv.ParseFloat(strings.TrimSuffix(s.FontSize, "px"), 64)
-			if err != nil || !strings.HasSuffix(s.FontSize, "px") {
-				return t, fmt.Errorf("type style %s: fontSize %q is not in px", s.Name, s.FontSize)
+			px, _ := strconv.ParseFloat(strings.TrimSuffix(s.FontSize, "px"), 64)
+			if !pixels.MatchString(s.FontSize) || px == 0 {
+				return t, fmt.Errorf("type style %s: fontSize %q is not a positive size in px", s.Name, s.FontSize)
 			}
 			if !seen[px] {
 				seen[px] = true
