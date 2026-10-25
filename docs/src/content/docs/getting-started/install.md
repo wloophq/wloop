@@ -30,7 +30,7 @@ brew install {{org}}/tap/{{command}}
 - the permissions in `settings.json`: `mcp__{{name}}__turn_end` allowed, and `mcp__{{name}}__slack_send_message` under `ask`, so Claude Code asks before every Slack post;
 - the bundled skills (`{{name}}`, `{{name}}-review`, `{{name}}-address`, `{{name}}-nudge` and `{{name}}-profile`), also into `~/.agents/skills` for Codex.
 
-It finds the homes on its own: `~/.claude`, `CLAUDE_CONFIG_DIR` when set, every `agent_home` of the configuration and of each `projects` entry, and every Orca Claude profile home. `--home <dir>` (repeatable) names them instead. It backs up `settings.json` and the MCP registration before their first change, replaces a skill only while it is unedited, prints every entry it adds, changes or removes, and is safe to run again. `--dry-run` prints and changes nothing. It needs no daemon.
+It finds the homes on its own: `~/.claude`, `CLAUDE_CONFIG_DIR` when set, every `agent_home` of the configuration and of each `projects` entry, and every Orca Claude profile home. `--home <dir>` (repeatable) names them instead. It backs up `settings.json` and the MCP registration before their first change, replaces a skill only while it is unedited, prints every entry it adds, changes or removes, and is safe to run again. `--dry-run` prints and changes nothing. It needs no daemon. The hooks and the `headersHelper` call the binary by the absolute path you ran `install` with, a symlink such as Homebrew's `bin/{{command}}` included; a hook that calls the same binary by another path, its link or its target, is right as it is, so `{{command}} doctor` and the daemon, which may run the binary by different paths, agree on it.
 
 Run it again after changing `mcp.port` and after every upgrade.
 

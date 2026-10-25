@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/backup"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/setup"
+	"github.com/wloophq/wloop/internal/domain/shell"
 )
 
 // TurnEndTool is the turn_end tool of the loop's MCP server as Claude Code
@@ -86,6 +87,22 @@ func (h Home) fix(home string) string { return setup.InstallCommand(h.Command, h
 // headersHelper names the session to the MCP server: Claude Desktop sends a
 // registration's ${VAR} headers unexpanded.
 func (h Home) headersHelper() string { return h.Command + " hook mcp-headers" }
+
+// sameCommand reports whether got is want, or want run by another absolute
+// path to the same binary, such as a symlink and its target.
+func sameCommand(got, want string) bool {
+	if got == want {
+		return true
+	}
+	gotBin, gotRest, ok := shell.Cut(got)
+	wantBin, wantRest, wantOK := shell.Cut(want)
+	if !ok || !wantOK || gotRest != wantRest || !filepath.IsAbs(gotBin) || !filepath.IsAbs(wantBin) {
+		return false
+	}
+	a, errA := os.Stat(gotBin)
+	b, errB := os.Stat(wantBin)
+	return errA == nil && errB == nil && os.SameFile(a, b)
+}
 
 func (h Home) registration() map[string]any {
 	return map[string]any{"type": "http", "url": h.MCPURL, "headersHelper": h.headersHelper(), "headers": map[string]any{api.MCPKeyHeader: h.MCPKey}}
@@ -169,7 +186,7 @@ func (h Home) registrationProblem(doc map[string]any) string {
 		return fmt.Sprintf("type is %q, want http", got.Type)
 	case got.URL != h.MCPURL:
 		return fmt.Sprintf("url is %s, want %s", got.URL, h.MCPURL)
-	case got.HeadersHelper != h.headersHelper():
+	case !sameCommand(got.HeadersHelper, h.headersHelper()):
 		return fmt.Sprintf("headersHelper is %q, want %q", got.HeadersHelper, h.headersHelper())
 	case h.MCPKey == "":
 		return "no MCP key in " + brand.Name + "'s state"
@@ -211,7 +228,7 @@ func commandOf(hook map[string]any) string {
 }
 
 func (h Home) rightHook(hook map[string]any, sub string) bool {
-	return hook["type"] == "command" && commandOf(hook) == h.hookCommand(sub) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
+	return hook["type"] == "command" && sameCommand(commandOf(hook), h.hookCommand(sub)) && fmt.Sprint(hook["timeout"]) == fmt.Sprint(hookTimeout)
 }
 
 func (h Home) hookProblem(settings map[string]any, event, sub string) string {
