@@ -3,7 +3,7 @@ title: Tune workflows
 description: Switch workflows on and off, change their windows, let cleanup remove workspaces and let nudges go out.
 ---
 
-The `workflows` key of `config.json` overrides a bundled workflow, or one of yours, without editing its manifest:
+The `workflows` key of `config.json` tunes a bundled workflow, or one of yours, without editing its manifest:
 
 ```json
 "workflows": {
@@ -131,3 +131,7 @@ text = "This pull request has waited on you for two days"
 ```
 
 The [workflow manifest](/reference/workflow-manifest/) lists every field and the [facts](/reference/facts/) every condition can read. `{{command}} profile check` loads it; a broken workflow disables only itself.
+
+## Rewrite a bundled one
+
+A directory of your profile named as a bundled workflow overrides it: `<profile>/workflows/review-first-round/workflow.toml` replaces the bundled manifest whole, so you can change its predicate, steps or trigger. Other files you put there replace the bundled files of the same name. The `workflows` key of `config.json` still applies on top. Files whose name starts with `.` are ignored. `profile check` lists the workflow as `bundled, overridden: workflow.toml`; when your manifest does not load or cannot be read, the bundled workflow stays, the problem names your file, and `{{command}} doctor` lists the workflow as running as bundled.

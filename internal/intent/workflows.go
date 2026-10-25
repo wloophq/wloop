@@ -67,18 +67,19 @@ type wUnit struct {
 	name     string
 	dir      string // as shown in problems
 	bundled  bool
-	read     func(file string) ([]byte, error)
+	files    files
 	problems Problems
 	wf       workflow.Workflow
 }
 
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
-// A user workflow that fails is listed in broken and left out of loaded; the
-// bundled layer never has problems. intentProblem, when set, is why a
-// turn.start may not name an intent, "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken map[string]Problems, problems Problems) {
+// A user workflow that fails is listed in broken and left out of loaded; a
+// bundled one whose override fails is listed in reverted and loads without
+// it. intentProblem, when set, is why a turn.start may not name an intent,
+// "" when it may.
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
 	var units []*wUnit
-	bundledNames := map[string]bool{}
+	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
 		entries, _ := fs.ReadDir(bundled, "workflows")
 		for _, e := range entries {
@@ -86,11 +87,9 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 				continue
 			}
 			dir := path.Join("workflows", e.Name())
-			bundledNames[e.Name()] = true
-			units = append(units, &wUnit{
-				name: e.Name(), dir: dir, bundled: true,
-				read: func(f string) ([]byte, error) { return fs.ReadFile(bundled, path.Join(dir, f)) },
-			})
+			u := &wUnit{name: e.Name(), dir: dir, bundled: true, files: files{bundled: bundled, dir: dir}}
+			bundledUnits[u.name] = u
+			units = append(units, u)
 		}
 	}
 	seen := map[string]string{}
@@ -104,24 +103,29 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 				continue
 			}
 			dir := filepath.Join(l.Dir, "workflows", e.Name())
-			switch {
-			case bundledNames[e.Name()]:
-				problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is bundled; change its mode, approval or enabled flag with workflows.%s in the config", e.Name(), e.Name())})
+			if b := bundledUnits[e.Name()]; b != nil {
+				if len(overrides([]string{dir})) > 0 {
+					b.files.overlay = append(b.files.overlay, dir)
+				}
 				continue
-			case seen[e.Name()] != "":
+			}
+			if seen[e.Name()] != "" {
 				problems = append(problems, Problem{File: dir, Msg: fmt.Sprintf("%s is defined already in %s", e.Name(), seen[e.Name()])})
 				continue
 			}
 			seen[e.Name()] = dir
-			units = append(units, &wUnit{
-				name: e.Name(), dir: dir,
-				read: func(f string) ([]byte, error) { return os.ReadFile(filepath.Join(dir, f)) },
-			})
+			units = append(units, &wUnit{name: e.Name(), dir: dir, files: files{dir: dir}})
 		}
 	}
-	broken = map[string]Problems{}
+	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
 		u.load(intentProblem)
+		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
+			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
+			problems = append(problems, reverted[u.name]...)
+			u.files.overlay = nil
+			u.load(intentProblem)
+		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
 			if !u.bundled {
@@ -137,26 +141,19 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return loaded, broken, problems
-}
-
-func (u *wUnit) join(f string) string {
-	if u.bundled {
-		return path.Join(u.dir, f)
-	}
-	return filepath.Join(u.dir, f)
+	return loaded, broken, reverted, problems
 }
 
 func (u *wUnit) load(intentProblem func(string) string) {
-	file := u.join("workflow.toml")
+	file := u.files.path("workflow.toml")
 	s := &sheet{file: file}
 	defer func() { u.problems = s.problems }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
 	}
-	src, err := u.read("workflow.toml")
+	src, err := u.files.read("workflow.toml")
 	if err != nil {
-		s.problems = append(s.problems, Problem{File: file, Msg: "missing: every workflow directory holds workflow.toml"})
+		s.problems = append(s.problems, readProblem(file, err, "missing: every workflow directory holds workflow.toml"))
 		return
 	}
 	m, problems, skip, complete := decode[wManifest](file, src)
@@ -176,6 +173,8 @@ func (u *wUnit) load(intentProblem func(string) string) {
 	s.at = positions(src)
 	u.wf = s.defineWorkflow(u.name, m, intentProblem)
 	u.wf.Source = file
+	u.wf.Bundled = u.bundled
+	u.wf.Overrides = overrides(u.files.overlay)
 }
 
 func (s *sheet) has(path string) bool {

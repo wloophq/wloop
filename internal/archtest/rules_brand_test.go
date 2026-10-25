@@ -14,7 +14,7 @@ import (
 
 // brandExempt are the files and directories R14 does not read: the module and
 // release metadata that keep the repository name, and the documentation.
-var brandExempt = []string{".git", ".claude", "bin", "docs", "internal/brand", "README.md", "SECURITY.md", "go.mod", "go.sum", "Makefile", ".goreleaser.yaml", ".gitignore", "LICENSE"}
+var brandExempt = []string{".git", ".claude", "bin", "docs", "internal/brand", "README.md", "SECURITY.md", "AGENTS.md", "go.mod", "go.sum", "Makefile", ".goreleaser.yaml", ".gitignore", "LICENSE"}
 
 // fixedNames are the lines that spell the default brand in names fixed
 // outside the program: the live run's Keychain item.

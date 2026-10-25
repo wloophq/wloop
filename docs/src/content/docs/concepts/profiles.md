@@ -5,7 +5,7 @@ description: How your judgment reaches every round, and how a profile adds kinds
 
 A turn's instructions have two parts:
 
-- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It ships in the binary, rendered for each turn with only the steps that turn runs. No profile changes it.
+- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It comes from the intent's instructions, rendered for each turn with only the steps that turn runs. The bundled intents are defaults: your profile overrides any of their files, as [Change a bundled intent](/guides/custom-intent/#change-a-bundled-intent) shows. The shared partials, such as the record protocol, are still fixed.
 - The **judgment** is yours: what a review looks for, the labels and what blocks, the risky surfaces, the shape of the body, the voice; how you answer reviews of your pull requests, commit and test the fixes, and whom you ask for another look; what a nudge says and its tone.
 
 ## The review profile
@@ -38,7 +38,7 @@ An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, the `probe
 - a way to run it by hand from any agent session: `{{command}} instructions <intent>`, or the bundled skills such as `/{{name}}-review <url>`;
 - an action on the rows of the cockpit, the terminal client and the menu bar, with its own key.
 
-A turn of any intent records, asks, takes answers and resumes the same way. A user intent runs only when you ask; what starts a turn on its own is a [workflow](/concepts/workflows/) whose `turn.start` step names the intent.
+A turn of any intent records, asks, takes answers and resumes the same way. A user intent runs only when you ask; what starts a turn on its own is a [workflow](/concepts/workflows/) whose `turn.start` step names the intent. A directory of your profile named as a bundled intent or workflow overrides it file by file.
 
 | Bundled intent | Key | Runs in | Does |
 |---|---|---|---|

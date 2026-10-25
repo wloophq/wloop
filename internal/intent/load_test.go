@@ -230,20 +230,82 @@ func TestGoodManifestLoads(t *testing.T) {
 	}
 }
 
-func TestUserCannotRedefineABundledIntent(t *testing.T) {
-	bundled := fstest.MapFS{
+func greetBundle() fstest.MapFS {
+	return fstest.MapFS{
 		"intents/greet/intent.toml":          {Data: []byte(minimal)},
 		"intents/greet/instructions.md.tmpl": {Data: []byte("{{.Headline}}")},
 	}
-	root := t.TempDir()
-	writeIntent(t, root, "greet", minimal, "mine")
-	l, problems := Load(userLayer(root), bundled, testBase(), nil)
-	want := filepath.Join(root, "intents", "greet") + ": greet is bundled; change its judgment with intent=greet.md blocks"
-	if problems.Error() != want {
-		t.Fatalf("got %q want %q", problems.Error(), want)
+}
+
+func writeFile(t testing.TB, file, data string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if d, ok := l.Registry.Get("greet"); !ok || !d.Bundled {
-		t.Fatalf("the bundled intent did not survive: %+v", d)
+	if err := os.WriteFile(file, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUserOverridesABundledTemplateAndInheritsTheManifest(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "intents", "greet", "instructions.md.tmpl"), "mine")
+	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, ok := l.Registry.Get("greet")
+	if !ok || !d.Bundled || d.Summary != "Ask the author one question" {
+		t.Fatalf("%+v", d)
+	}
+	if want := (dintent.Source{Layer: "user", Dir: filepath.Join(root, "intents", "greet"), Overrides: []string{"instructions.md.tmpl"}}); !reflect.DeepEqual(d.Source, want) {
+		t.Errorf("source %+v, want %+v", d.Source, want)
+	}
+	var b strings.Builder
+	if err := l.Templates["greet"].Execute(&b, nil); err != nil || b.String() != "mine" {
+		t.Fatalf("%q %v", b.String(), err)
+	}
+}
+
+func TestUserOverridesABundledManifestWhole(t *testing.T) {
+	root := t.TempDir()
+	manifest := "context = \"pr\"\n" + strings.Replace(minimal, "one question", "two questions", 1)
+	writeFile(t, filepath.Join(root, "intents", "greet", "intent.toml"), manifest)
+	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, _ := l.Registry.Get("greet")
+	if d.Summary != "Ask the author two questions" || !slices.Equal(d.Source.Overrides, []string{"intent.toml"}) {
+		t.Fatalf("%+v", d)
+	}
+}
+
+func TestABrokenOverrideNamesTheUserFileAndKeepsTheBundledIntent(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "intents", "greet", "intent.toml")
+	writeFile(t, file, minimal+"bogus = 1\n")
+	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
+	if len(problems) == 0 || problems[0].File != file {
+		t.Fatalf("problems %q", problems.Error())
+	}
+	d, ok := l.Registry.Get("greet")
+	if !ok || !d.Bundled || len(d.Source.Overrides) > 0 {
+		t.Fatalf("the bundled intent did not stay: %+v", d)
+	}
+	if _, broken := l.Broken["greet"]; broken {
+		t.Error("a bundled intent is never broken")
+	}
+}
+
+func TestAnEmptyOverrideDirectoryChangesNothing(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "intents", "greet"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
+	if d, _ := l.Registry.Get("greet"); len(problems) > 0 || d.Source.Layer != "bundled" || len(d.Source.Overrides) > 0 {
+		t.Fatalf("%q %+v", problems.Error(), d)
 	}
 }
 

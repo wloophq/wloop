@@ -46,7 +46,7 @@ func (r registryActions) broken() []dintent.Name {
 }
 
 func manifestPath(d dintent.Def) string {
-	if d.Source.Dir == "" {
+	if d.Source.Dir == "" || d.Bundled && !slices.Contains(d.Source.Overrides, "intent.toml") {
 		return path.Join("intents", string(d.Name), "intent.toml")
 	}
 	return filepath.Join(d.Source.Dir, "intent.toml")

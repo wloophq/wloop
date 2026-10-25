@@ -147,3 +147,31 @@ func TestProfileCheckFitsANarrowTerminal(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileCheckNamesTheBundledFilesAProfileOverrides(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	nudge, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "nudge", "instructions.md.tmpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wf, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "review-first-round", "workflow.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userProfile(t, te, map[string]string{
+		"intents/nudge/instructions.md.tmpl":         string(nudge) + "\nWrite in Portuguese.\n",
+		"workflows/review-first-round/workflow.toml": string(wf),
+	})
+	if code := te.run("profile", "check"); code != 0 {
+		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
+	}
+	out := te.out.String()
+	for _, want := range []string{
+		"  nudge            bundled, overridden: instructions.md.tmpl   Ask whoever",
+		"Workflows\n  review-first-round   bundled, overridden: workflow.toml\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("no %q in\n%s", want, out)
+		}
+	}
+}

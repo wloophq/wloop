@@ -25,6 +25,7 @@ type pkg struct {
 	TestImports  []string
 	XTestImports []string
 	Standard     bool
+	EmbedFiles   []string
 }
 
 var forbidden = []string{"os/exec", "net/http", "database/sql"}

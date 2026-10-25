@@ -45,7 +45,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, broken, problems := loadWorkflows(nil, sub, nil)
+	loaded, broken, _, problems := loadWorkflows(nil, sub, nil)
 	if len(problems) > 0 || len(broken) > 0 {
 		t.Fatalf("%v", problems.Error())
 	}
@@ -200,16 +200,34 @@ func mapKeys[V any](m map[string]V) func(func(string) bool) {
 	}
 }
 
-func TestAUserWorkflowCannotRedefineABundledOne(t *testing.T) {
+func TestAUserWorkflowOverridesABundledManifest(t *testing.T) {
 	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
-	writeWorkflow(t, root, "close-quiet", quietSession)
+	writeWorkflow(t, root, "close-quiet", strings.Replace(quietSession, "config.cleanup.idle", "duration(\"2h\")", 1))
 	l, problems := Load(userLayer(root), bundled, testBase(), nil)
-	if len(l.Workflows) != 1 || l.Workflows[0].Source != "workflows/close-quiet/workflow.toml" {
-		t.Errorf("%+v", l.Workflows)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
 	}
-	if want := "close-quiet is bundled; change its mode, approval or enabled flag with workflows.close-quiet in the config"; !strings.Contains(problems.Error(), want) {
-		t.Error(problems.Error())
+	file := filepath.Join(root, "workflows", "close-quiet", "workflow.toml")
+	if len(l.Workflows) != 1 || l.Workflows[0].Source != file || !slices.Equal(l.Workflows[0].Overrides, []string{"workflow.toml"}) {
+		t.Fatalf("%+v", l.Workflows)
+	}
+}
+
+func TestABrokenWorkflowOverrideKeepsTheBundledOne(t *testing.T) {
+	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	root := t.TempDir()
+	writeWorkflow(t, root, "close-quiet", quietSession+"bogus = 1\n")
+	l, problems := Load(userLayer(root), bundled, testBase(), nil)
+	file := filepath.Join(root, "workflows", "close-quiet", "workflow.toml")
+	if len(problems) == 0 || problems[0].File != file {
+		t.Fatalf("problems %q", problems.Error())
+	}
+	if len(l.Workflows) != 1 || l.Workflows[0].Source != "workflows/close-quiet/workflow.toml" || len(l.Workflows[0].Overrides) > 0 {
+		t.Fatalf("%+v", l.Workflows)
+	}
+	if _, ok := l.BrokenWorkflows["close-quiet"]; ok {
+		t.Error("a bundled workflow is never broken")
 	}
 }
 

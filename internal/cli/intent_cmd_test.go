@@ -417,6 +417,15 @@ func TestDoctorLoadsTheIntents(t *testing.T) {
 	}
 }
 
+func TestDoctorNamesARevertedOverride(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	dir := userProfile(t, te, map[string]string{"intents/nudge/instructions.md.tmpl": "{{\n"})
+	got := te.intentChecks()
+	if len(got) != 1 || got[0].mark != markMissing || got[0].name != "intent nudge" || !strings.Contains(got[0].info, filepath.Join(dir, "intents", "nudge", "instructions.md.tmpl")) {
+		t.Fatalf("checks %+v", got)
+	}
+}
+
 func TestASessionRunsUnderItsManifestsPolicy(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Executable = "/Apps/" + brand.Name

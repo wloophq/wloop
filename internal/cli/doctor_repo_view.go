@@ -142,6 +142,13 @@ func (v *repoView) broken(name string, err error) {
 	}
 }
 
+func (v *repoView) reverted(name string, err error) {
+	v.section(name, []tally{{"runs as bundled, the override does not load", v.t.Yellow}})
+	for _, l := range strings.Split(err.Error(), "\n") {
+		fmt.Fprintln(v.w, "  "+termfmt.Clean(l))
+	}
+}
+
 // show writes the sources dimmed and the instructions as the agent reads
 // them, unstyled.
 func (v *repoView) show(sources []string, text string) {

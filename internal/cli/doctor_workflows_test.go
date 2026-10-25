@@ -156,6 +156,19 @@ func TestDoctorReportsWorkflows(t *testing.T) {
 	}
 }
 
+func TestDoctorNamesARevertedWorkflowOverride(t *testing.T) {
+	te, db := workflowDoctorEnv(t)
+	writeUserWorkflow(t, te.cfg.Profile, "session-duplicate", "bogus = 1\n")
+	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := checkNamed(rep.Workflows, "workflow session-duplicate override")
+	if !ok || got.Mark != api.DoctorMissing || !strings.Contains(got.Info, "runs as bundled") || !strings.Contains(got.Info, filepath.Join(te.cfg.Profile, "workflows", "session-duplicate", "workflow.toml")) {
+		t.Fatalf("%+v in %+v", got, rep.Workflows)
+	}
+}
+
 func TestDoctorWarnsOnAnUnknownWorkflowConfig(t *testing.T) {
 	te, db := workflowDoctorEnv(t)
 	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
