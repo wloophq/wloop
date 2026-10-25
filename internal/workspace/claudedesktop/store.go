@@ -14,6 +14,7 @@ type stored struct {
 	SessionID      string `json:"sessionId"`
 	CliSessionID   string `json:"cliSessionId"`
 	Cwd            string `json:"cwd"`
+	WorktreePath   string `json:"worktreePath"`
 	IsArchived     bool   `json:"isArchived"`
 	LastActivityAt int64  `json:"lastActivityAt"`
 }

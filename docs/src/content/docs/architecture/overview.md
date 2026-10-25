@@ -13,14 +13,14 @@ description: The daemon, its clients, the ports to the outside tools, and the ru
 | GitHub | pull requests, reviews, checks and the rate budget, read over its API with the token of `gh` | the comments of drafts you approved, posted by the GitHub plugin |
 | Agents (Claude Code) | turn records and hook events | instructions; they publish reviews, push and reply on GitHub under your name |
 | Orca | the workspace list, terminals, agent activity, card placement | workspaces created, linked, renamed and removed; sessions started, woken and typed into; board writes |
-| Claude Desktop | the sessions it runs and their processes | sessions imported, woken and typed into; worktrees under a root {{name}} owns |
+| Claude Desktop | the sessions it runs and their processes, the worktrees it made for them | sessions imported, woken and typed into; worktrees under a root {{name}} owns |
 | macOS | | the LaunchAgents, the app bundle, notifications |
 
 Each manager is both an actuator (workspaces, sessions, and Orca's board) and a source of live signals (processes, activity, focus), never of record.
 
 ## Managers and custody
 
-Both managers run at the same time. `workspace_managers` lists the enabled ones in order (by default Claude Desktop, then Orca). A new worktree goes to the first manager that is enabled, available, hosts the project's agent and honors the session's launch policy; that manager becomes its owner. The store records the custody of every worktree and the units it stands for, so a worktree two managers list still has one owner: the manager that created it, else the one with a live agent there, else the first by order.
+Both managers run at the same time. `workspace_managers` lists the enabled ones in order (by default Claude Desktop, then Orca). A new worktree goes to the first manager that is enabled, available, hosts the project's agent and honors the session's launch policy; that manager becomes its owner. The store records the custody of every worktree and the units it stands for, so a worktree two managers list still has one owner: the manager that created it, as custody or the manager itself says, else the one custody names, else the one with a live agent there, else the first by order. A round's new session starts in the owner; when the owner cannot launch it, it starts in the next manager by order that lists the worktree and can, and the daemon logs why the owner could not.
 
 Sessions are routed by the id {{name}} mints, not by a handle. A turn names its session; the router finds the session's manager and the handle of its live process. A session missing from its manager's process census turns dormant, never closed, and a manager that closes or restarts never marks another manager's sessions. The next turn wakes a dormant session in its own manager when it is still warm, and starts a new session otherwise.
 

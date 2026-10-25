@@ -752,30 +752,76 @@ func (e *Env) chooseManager(ctx context.Context, cfg config.Config, opts roundOp
 			why = append(why, name+": not enabled")
 			continue
 		}
-		if k, ok := e.managers()[name]; ok && k.Available != nil {
-			if err := k.Available(ctx); err != nil {
-				why = append(why, name+": "+err.Error())
-				continue
-			}
-		}
-		if err := m.Reachable(ctx); err != nil {
-			why = append(why, name+": not running")
+		if no := e.cannotHost(ctx, cfg, m, n); no != "" {
+			why = append(why, name+": "+no)
 			continue
 		}
-		if !m.Hosts(cfg.Agent) {
-			why = append(why, name+": does not run "+cfg.Agent)
-			continue
-		}
-		if err := workspace.Honors(m, n); err != nil {
-			why = append(why, name+": "+err.Error())
-			continue
-		}
-		if len(why) > 0 {
-			fmt.Fprintf(e.Err, "%s %s launches this session (%s)\n", e.stamp(), e.displayOf([]string{name}), strings.Join(why, "; "))
-		}
+		e.fellThrough(name, why)
 		return m, nil
 	}
 	return nil, fmt.Errorf("no workspace manager can launch this session (%s)", strings.Join(why, "; "))
+}
+
+// cannotHost says why m cannot launch a session of cfg's agent with needs n,
+// "" when it can.
+func (e *Env) cannotHost(ctx context.Context, cfg config.Config, m workspace.Manager, n workspace.LaunchNeeds) string {
+	if k, ok := e.managers()[m.Name()]; ok && k.Available != nil {
+		if err := k.Available(ctx); err != nil {
+			return err.Error()
+		}
+	}
+	if err := m.Reachable(ctx); err != nil {
+		return "not running"
+	}
+	if !m.Hosts(cfg.Agent) {
+		return "does not run " + cfg.Agent
+	}
+	if err := workspace.Honors(m, n); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// fellThrough logs that name launches the session because the managers before
+// it could not, for why.
+func (e *Env) fellThrough(name string, why []string) {
+	if len(why) > 0 {
+		fmt.Fprintf(e.Err, "%s %s launches this session (%s)\n", e.stamp(), e.displayOf([]string{name}), strings.Join(why, "; "))
+	}
+}
+
+// hostOf is the row of the worktree ws whose manager launches a round's new
+// session: its owner's when the owner can, else, by priority, that of another
+// manager listing the worktree that can. With none, it is ws, whose owner
+// then fails the round closed.
+func (e *Env) hostOf(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, opts roundOptions) (wsdomain.Workspace, error) {
+	owner, err := e.WS.For(ctx, ws)
+	if err != nil {
+		return ws, err
+	}
+	a, err := e.agent(cfg.Agent)
+	if err != nil {
+		return ws, err
+	}
+	n := needs(a, cfg, e.launchPolicy(ctx, cfg, opts))
+	no := e.cannotHost(ctx, cfg, owner, n)
+	if no == "" || ws.Path == "" {
+		return ws, nil
+	}
+	why := []string{owner.Name() + ": " + no}
+	for _, w := range e.WS.Listings(ctx, ws.Path) {
+		m, ok := e.WS.Named(w.Manager)
+		if !ok || m.Name() == owner.Name() {
+			continue
+		}
+		if no := e.cannotHost(ctx, cfg, m, n); no != "" {
+			why = append(why, m.Name()+": "+no)
+			continue
+		}
+		e.fellThrough(m.Name(), why)
+		return w, nil
+	}
+	return ws, nil
 }
 
 // preflight runs the agent's preflight and names the command that fixes an

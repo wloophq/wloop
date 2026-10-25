@@ -99,6 +99,31 @@ func TestSetListSettlesAPathTwoManagersList(t *testing.T) {
 	}
 }
 
+func TestSetListGivesAWorktreeToTheManagerThatCreatedIt(t *testing.T) {
+	orca, desktop := twoManagers()
+	desktop.WorkspaceList[0].Created = true
+	s := workspace.NewSet(orca, desktop)
+	if got := ids(list(t, s)); !slices.Equal(got, []string{"orca:o2", "desktop:d1", "desktop:d2"}) {
+		t.Fatalf("over priority: %v", got)
+	}
+	s.UseCustody(newCustody(wsdomain.Custody{Path: "/wt/a", Manager: "orca"}))
+	if got := ids(list(t, s)); !slices.Equal(got, []string{"orca:o2", "desktop:d1", "desktop:d2"}) {
+		t.Fatalf("over a custody the loop found: %v", got)
+	}
+	s.UseCustody(newCustody(wsdomain.Custody{Path: "/wt/a", Manager: "orca", CreatedBy: "orca"}))
+	if got := ids(list(t, s)); !slices.Equal(got, []string{"orca:o1", "orca:o2", "desktop:d2"}) {
+		t.Fatalf("custody of a worktree the loop created: %v", got)
+	}
+}
+
+func TestSetListingsAreEveryManagersRowOfAPath(t *testing.T) {
+	orca, desktop := twoManagers()
+	s := workspace.NewSet(desktop, orca)
+	if got := ids(s.Listings(context.Background(), "/wt/a")); !slices.Equal(got, []string{"desktop:d1", "orca:o1"}) {
+		t.Fatalf("Listings = %v", got)
+	}
+}
+
 func TestSetListLinksThePullRequestOfCustody(t *testing.T) {
 	orca, desktop := twoManagers()
 	s := workspace.NewSet(orca, desktop)
