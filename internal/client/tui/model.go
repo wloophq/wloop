@@ -125,6 +125,8 @@ type Model struct {
 	planAt     int
 	planLoaded bool
 	planErr    string
+	// closed are the sessions closed in the last day, newest first.
+	closed []api.ClosedSession
 
 	// plugins are the enabled plugins' views, after the plan; set is the
 	// rows as they read them, nil until one asks.

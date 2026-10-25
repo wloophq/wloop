@@ -61,6 +61,7 @@ var (
 	_ automation.Units     = (*Provider)(nil)
 	_ automation.Refresher = (*Provider)(nil)
 	_ automation.Dueer     = (*Provider)(nil)
+	_ automation.Owner     = (*Provider)(nil)
 )
 
 func New(d Deps) *Provider {
@@ -133,6 +134,22 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	p.due[u.Key] = p.deadline(s)
 	p.mu.Unlock()
 	return s.facts(p.d.Clock.Now(), pf, p.d.Turns.ProcessGone(u.Key)), nil
+}
+
+// Owners is the unit the session's facts are about: that of the newest turn
+// it ran or was sent; none when it has no turn.
+func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	if u.Provider != unit.Session {
+		return nil, nil
+	}
+	units, err := p.d.Turns.Store.UnitsOf(ctx, []string{u.Key})
+	if err != nil {
+		return nil, err
+	}
+	if owner, ok := units[u.Key]; ok {
+		return []unit.Unit{owner}, nil
+	}
+	return nil, nil
 }
 
 // missing is why a session the world does not list has no facts: it is

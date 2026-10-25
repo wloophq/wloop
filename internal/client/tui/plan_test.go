@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -134,6 +135,54 @@ func TestThePlanViewAppliesAndDismisses(t *testing.T) {
 		}
 		quit(t, term, done)
 	})
+}
+
+func TestThePlanViewListsTheSessionsClosedInTheLastDay(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), closed: []api.ClosedSession{
+			{Session: "term_1", At: now.Add(-2 * time.Hour), Reason: "its pull request merged", Resume: "cd /wt/a && claude --resume b"},
+		}}
+		term, done := start(t, d)
+		eventually(t, "the first load", func() bool { return d.planCount() == 1 })
+		term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+		eventually(t, "the closed sessions", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Sessions closed in the last day (1)") && strings.Contains(s, "2h  term_1  its pull request merged") &&
+				strings.Contains(s, "resume: cd /wt/a && claude --resume b")
+		})
+		quit(t, term, done)
+	})
+}
+
+func TestManyClosedSessionsLeaveThePlanItemsOnScreen(t *testing.T) {
+	m := newModel(t)
+	m.SetPlan(planItems(), nil)
+	var closed []api.ClosedSession
+	for i := range 20 {
+		closed = append(closed, api.ClosedSession{Session: fmt.Sprintf("term_%d", i), At: now.Add(-time.Hour), Reason: "idle", Resume: "claude --resume x"})
+	}
+	m.SetClosed(closed)
+	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+	screen := strings.Join(m.Render(100, 24, now), "\n")
+	for _, want := range []string{"review-follow-up", "session-manual-quiet", "workspace-temporary", "Sessions closed in the last day (20)", "term_0", termfmt.Ellipsis} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("missing %q in:\n%s", want, screen)
+		}
+	}
+}
+
+func TestClosedSessionsFitAShortTerminal(t *testing.T) {
+	m := newModel(t)
+	m.SetClosed([]api.ClosedSession{{Session: "term_1", At: now.Add(-time.Hour), Reason: "idle", Resume: "claude --resume x"}})
+	for _, plan := range [][]api.PlanItem{nil, planItems()} {
+		m.SetPlan(plan, nil)
+		m.view = m.planView()
+		for h := 5; h <= 9; h++ {
+			if got := m.Render(60, h, now); len(got) != h {
+				t.Errorf("%d items, height %d: %d lines", len(plan), h, len(got))
+			}
+		}
+	}
 }
 
 func TestThePlanViewNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {

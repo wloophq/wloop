@@ -12,6 +12,8 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/event"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
 )
@@ -440,5 +442,20 @@ func TestRetainedString(t *testing.T) {
 	}
 	if got := (Retained{"sessions": 1, "events": 3}).String(); got != "events 3, sessions 1" {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestAnEventKeepsItsActor(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	if err := New(db).RecordEvents(context.Background(),
+		port.Event{Unit: u, Kind: workflow.KindStepRan, Key: "close/session/term_1/a:0", Actor: "close", Data: "closed term_1", At: at},
+		port.Event{Unit: u, Kind: "comment", Actor: "rita", At: at}); err != nil {
+		t.Fatal(err)
+	}
+	if got := rowsOf(t, db, `SELECT kind || '|' || actor FROM events ORDER BY kind`); !slices.Equal(got, []string{"comment|rita", workflow.KindStepRan + "|close"}) {
+		t.Errorf("events %q", got)
 	}
 }

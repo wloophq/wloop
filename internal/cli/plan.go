@@ -70,17 +70,29 @@ func runPlan(ctx context.Context, e *Env, args []string) error {
 	if !*stored {
 		q.Trigger = string(workflow.TriggerSweep)
 	}
-	return printPlan(ctx, e, c, q)
+	return printPlan(ctx, e, c, q, *wf == "" && *provider == "")
 }
 
-// printPlan prints the plan q asks for, grouped by decision, and its
-// evaluation errors on stderr.
-func printPlan(ctx context.Context, e *Env, c *client.Client, q api.PlanQuery) error {
+// printPlan prints the plan q asks for, grouped by decision, then the
+// sessions closed in the last day when withClosed, and its errors on
+// stderr.
+func printPlan(ctx context.Context, e *Env, c *client.Client, q api.PlanQuery, withClosed bool) error {
+	q.Closed = withClosed && q.Trigger == ""
 	res, err := c.Plan(ctx, q)
 	if err != nil {
 		return err
 	}
+	if withClosed && q.Trigger != "" {
+		// The daemon serves the closed sessions with the stored plan only.
+		if stored, err := c.Plan(ctx, api.PlanQuery{Closed: true}); err != nil {
+			res.Errors = append(res.Errors, "closed sessions: "+err.Error())
+		} else {
+			res.Closed = stored.Closed
+			res.Errors = append(res.Errors, stored.Errors...)
+		}
+	}
 	writePlan(e.Out, res.Items, e.Now())
+	writeClosed(e.Out, res.Closed, e.Now())
 	for _, msg := range res.Errors {
 		fmt.Fprintln(e.Err, "error: "+msg)
 	}
@@ -223,6 +235,20 @@ func writePlan(w io.Writer, items []api.PlanItem, now time.Time) {
 			if more := planDetails(it, now); more != "" {
 				fmt.Fprintf(w, "  %s  %s\n", strings.Repeat(" ", shortID), more)
 			}
+		}
+	}
+}
+
+// writeClosed lists the closed sessions with the line that resumes each.
+func writeClosed(w io.Writer, closed []api.ClosedSession, now time.Time) {
+	if len(closed) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "closed in the last day (%d)\n", len(closed))
+	for _, c := range closed {
+		fmt.Fprintf(w, "  %s  %s ago: %s\n", c.Session, span(now.Sub(c.At)), oneLine(c.Reason))
+		if c.Resume != "" {
+			fmt.Fprintf(w, "  %s  resume: %s\n", strings.Repeat(" ", len(c.Session)), oneLine(c.Resume))
 		}
 	}
 }

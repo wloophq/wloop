@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/situation"
@@ -910,14 +911,14 @@ func TestAnswerSaidJoinsTheChoiceAndTheNote(t *testing.T) {
 	}
 }
 
-func TestEveryTurnEventHasALabelAndIsALoopEvent(t *testing.T) {
+func TestEveryLoopActionHasALabelAndIsALoopEvent(t *testing.T) {
 	src := appJS(t)
 	labels := src[strings.Index(src, "const EVENT_LABEL = {"):]
 	labels = labels[:strings.Index(labels, "};")]
 	loop := src[strings.Index(src, "const LOOP_EVENTS = "):]
 	loop = loop[:strings.Index(loop, "\n")]
 	for _, kind := range []string{"turn_sent", "turn_delivered", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn",
-		"answered", "answer_routed", "question_dismissed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance"} {
+		"answered", "answer_routed", "question_dismissed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"} {
 		if !strings.Contains(labels, kind+": ") {
 			t.Errorf("%s has no label", kind)
 		}
@@ -1719,5 +1720,18 @@ const link = all(unit, (x) => x.tag === "a")[0];
 process.stdout.write(JSON.stringify({ unit: text(unit), title: text(byClass(li, "plan-title")[0]), href: link ? link.attrs.href : "" }));`, nil, &got)
 	if got.Unit != "#general" || got.Title != "Launch plan for the export" || got.Href != "https://chat.example/T1/C1/171.1" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestAClosedSessionNamesItsSession(t *testing.T) {
+	prelude := `function h(tag, attrs, ...c) { return [tag, c.flat(Infinity).filter((x) => x !== null && x !== undefined)]; }
+function stamp(t) { return t; }
+function age() { return "2h 0m"; }
+`
+	c := api.ClosedSession{Session: "term_1", At: time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC), Reason: "its pull request merged", Resume: "claude --resume b"}
+	var got string
+	nodeRun(t, prelude, []string{"closedItem"}, `process.stdout.write(JSON.stringify(JSON.stringify(closedItem(input))));`, c, &got)
+	if !strings.Contains(got, `"term_1"`) || !strings.Contains(got, "claude --resume b") {
+		t.Errorf("closed item %s", got)
 	}
 }

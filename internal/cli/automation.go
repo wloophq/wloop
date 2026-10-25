@@ -343,6 +343,7 @@ var (
 	_ automation.Refresher = (*unitSet)(nil)
 	_ automation.Settler   = (*unitSet)(nil)
 	_ automation.Gainer    = (*unitSet)(nil)
+	_ automation.Owner     = (*unitSet)(nil)
 	_ automation.Freshener = (*unitSet)(nil)
 	_ automation.Seener    = (*unitSet)(nil)
 	_ automation.Dueer     = (*unitSet)(nil)
@@ -416,6 +417,13 @@ func (s *unitSet) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) 
 		return g.Gain(ctx, u)
 	}
 	return workflow.Gain{}, nil
+}
+
+func (s *unitSet) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	if o, ok := s.providers[u.Provider].(automation.Owner); ok {
+		return o.Owners(ctx, u)
+	}
+	return nil, nil
 }
 
 func (s *unitSet) Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {

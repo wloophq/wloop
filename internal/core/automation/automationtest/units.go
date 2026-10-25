@@ -16,7 +16,7 @@ import (
 )
 
 // Units is an in-memory facts provider for every provider, with all the
-// optional capabilities: Refresher, Settler, Gainer, Freshener, Seener, Dueer.
+// optional capabilities: Refresher, Settler, Gainer, Owner, Freshener, Seener, Dueer.
 type Units struct {
 	o options
 
@@ -25,6 +25,8 @@ type Units struct {
 	errs      map[unit.Unit]error
 	listErr   map[unit.ProviderID]error
 	gains     map[unit.Unit]workflow.Gain
+	owners    map[unit.Unit][]unit.Unit
+	ownerErrs map[unit.Unit]error
 	moved     map[unit.Unit]bool
 	due       time.Time
 	seen      port.Generation
@@ -35,7 +37,8 @@ type Units struct {
 
 func NewUnits(opts ...Option) *Units {
 	return &Units{o: build(opts), facts: map[unit.Unit]workflow.Facts{}, errs: map[unit.Unit]error{},
-		listErr: map[unit.ProviderID]error{}, gains: map[unit.Unit]workflow.Gain{}, moved: map[unit.Unit]bool{}}
+		listErr: map[unit.ProviderID]error{}, gains: map[unit.Unit]workflow.Gain{},
+		owners: map[unit.Unit][]unit.Unit{}, ownerErrs: map[unit.Unit]error{}, moved: map[unit.Unit]bool{}}
 }
 
 // Put sets u's facts, listing u under its provider.
@@ -92,6 +95,20 @@ func (f *Units) SetGain(u unit.Unit, g workflow.Gain) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.gains[u] = g
+}
+
+// SetOwners makes Owners of u answer owners; none clears them.
+func (f *Units) SetOwners(u unit.Unit, owners ...unit.Unit) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.owners[u] = slices.Clone(owners)
+}
+
+// FailOwners makes Owners of u fail with err; nil clears it.
+func (f *Units) FailOwners(u unit.Unit, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ownerErrs[u] = err
 }
 
 // SetMoved makes Moved report us, until the next SetMoved.
@@ -188,6 +205,16 @@ func (f *Units) Gain(ctx context.Context, u unit.Unit) (workflow.Gain, error) {
 	defer f.mu.Unlock()
 	f.gainAsked = append(f.gainAsked, u)
 	return f.gains[u], nil
+}
+
+func (f *Units) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	f.o.read("units.owners")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.ownerErrs[u]; err != nil {
+		return nil, err
+	}
+	return slices.Clone(f.owners[u]), nil
 }
 
 // Moved is a read, but the engine asks it only in Sweep; a strict fake counts it.
