@@ -121,7 +121,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 	if !slices.Equal(d.queries, []string{""}) || len(d.acts) != 1 || d.acts[0].Action != "apply" || !slices.Equal(d.acts[0].IDs, []string{items[2].ID, items[4].ID}) {
 		t.Fatalf("queries %q, acts %+v", d.queries, d.acts)
 	}
-	if want := "1f2e3d4c  review-follow-up  github:acme/api#12: run applied by you\naa00bb11  session-manual-quiet  session:term_3: run applied by you\n"; te.out.String() != want {
+	if want := "1f2e3d4c  review-follow-up  acme/api#12: run applied by you\naa00bb11  session-manual-quiet  session:term_3: run applied by you\n"; te.out.String() != want {
 		t.Fatalf("printed %q", te.out)
 	}
 
@@ -222,7 +222,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	}
 	want := "github:acme/api#7\n" +
 		"pending (1)\n" +
-		"  1f2e3d4c  review-follow-up  github:acme/api#7: new commits since your review\n" +
+		"  1f2e3d4c  review-follow-up  acme/api#7: new commits since your review\n" +
 		"            runs in 4m0s · steps turn.start\n" +
 		"no item (2)\n" +
 		"  after-merge  event, waits: decides when a merged or closed event arrives\n" +
@@ -242,6 +242,16 @@ func TestPlanPrintsNoColonForAnItemWithoutReason(t *testing.T) {
 	var b strings.Builder
 	writePlan(&b, []api.PlanItem{planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_1"}, "0011223344556677", "run", "")}, testNow)
 	if want := "run (1)\n  00112233  session-pr-finished  session:term_1\n"; b.String() != want {
+		t.Fatalf("%q, want %q", b.String(), want)
+	}
+}
+
+func TestPlanNamesAnItemByItsRowsLabel(t *testing.T) {
+	var b strings.Builder
+	thread := planItem("slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "ee00ff11ee00ff11", "run", "")
+	thread.Label = "#general · launch plan"
+	writePlan(&b, []api.PlanItem{thread}, testNow)
+	if want := "run (1)\n  ee00ff11  slack-follow-up  #general · launch plan\n"; b.String() != want {
 		t.Fatalf("%q, want %q", b.String(), want)
 	}
 }

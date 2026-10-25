@@ -162,7 +162,7 @@ func writePlan(w io.Writer, items []api.PlanItem, now time.Time) {
 		}
 		fmt.Fprintf(w, "%s (%d)\n", d, len(group))
 		for _, it := range group {
-			head := fmt.Sprintf("  %s  %s  %s", planShortID(it.ID), it.Workflow, it.Unit)
+			head := fmt.Sprintf("  %s  %s  %s", planShortID(it.ID), it.Workflow, it.UnitLabel())
 			if it.Reason != "" {
 				head += ": " + oneLine(it.Reason)
 			}
@@ -273,7 +273,7 @@ func runPlanAct(ctx context.Context, e *Env, action string, ids []string) error 
 		return err
 	}
 	for _, it := range res.Items {
-		fmt.Fprintf(e.Out, "%s  %s  %s: %s %s\n", planShortID(it.ID), it.Workflow, it.Unit, it.Decision, oneLine(it.Reason))
+		fmt.Fprintf(e.Out, "%s  %s  %s: %s %s\n", planShortID(it.ID), it.Workflow, it.UnitLabel(), it.Decision, oneLine(it.Reason))
 	}
 	for _, msg := range res.Errors {
 		fmt.Fprintln(e.Err, "error: "+msg)

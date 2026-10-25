@@ -27,13 +27,13 @@ Handing a review to an agent is one command. Everything after it is manual: noti
 ```text
 $ {{command}} plan
 pending (1)
-  3f9a1c2e  review-follow-up  github:acme/api#4610: runs when its window ends
+  3f9a1c2e  review-follow-up  acme/api#4610: runs when its window ends
             runs in 41s · steps turn.start
 run (1)
   b07d44a9  session-pr-finished  session:7f2c
             steps session.close · frees 410.0 MiB of memory
 skipped (1)
-  91c0e5d2  address  github:acme/api#4582: paused
+  91c0e5d2  address  acme/api#4582: paused
 ```
 
 ## Next steps
