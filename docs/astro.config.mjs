@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import mermaid from 'astro-mermaid';
 import remarkProduct from './src/plugins/remark-product.mjs';
 import { product } from './site.config.mjs';
 
@@ -14,6 +15,7 @@ export default defineConfig({
     remarkPlugins: [[remarkProduct, { product, base, snippetsDir: new URL('./src/snippets/', import.meta.url) }]],
   },
   integrations: [
+    mermaid({ autoTheme: true }),
     starlight({
       title: product.name,
       customCss: ['./src/styles/theme.css'],
