@@ -1890,6 +1890,7 @@ function setupDetailResize() {
     saveDetailWidth(preferred);
   });
   handle.addEventListener("dblclick", () => {
+    root.style.removeProperty("--detail-width");
     choose(defaultDetailWidth());
     saveDetailWidth(null);
   });

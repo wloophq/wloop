@@ -335,3 +335,31 @@ process.stdout.write(JSON.stringify(seen));`, struct{}{}, &got)
 		}
 	}
 }
+
+func TestDetailWidthDoubleClickRestoresTheStylesheetDefault(t *testing.T) {
+	src := appJS(t)
+	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_MIN") + jsConst(t, src, "DETAIL_WIDTH_STEP") + `
+const listeners = {};
+const style = {};
+const handle = {
+  addEventListener: (n, f) => { listeners[n] = f; },
+  setAttribute: () => {},
+};
+globalThis.document = { getElementById: () => handle, documentElement: { style: {
+  setProperty: (k, v) => { style[k] = v; },
+  removeProperty: (k) => { delete style[k]; },
+} } };
+globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => name === "--detail-width" ? (style[name] ?? "380px") : "" });
+globalThis.window = { innerWidth: 1600, addEventListener: () => {} };
+let stored = "900";
+globalThis.localStorage = { getItem: () => stored, setItem: (k, v) => { stored = v; }, removeItem: () => { stored = null; } };
+`
+	var got []any
+	nodeRun(t, prelude, []string{"defaultDetailWidth", "clampDetailWidth", "storedDetailWidth", "saveDetailWidth", "setupDetailResize"}, `
+setupDetailResize();
+listeners.dblclick();
+process.stdout.write(JSON.stringify([style["--detail-width"], stored]));`, struct{}{}, &got)
+	if got[0] != "380px" || got[1] != nil {
+		t.Errorf("after a double click the width is %v and the stored one %v, want 380px and none", got[0], got[1])
+	}
+}
