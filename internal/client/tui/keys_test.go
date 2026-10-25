@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -61,25 +62,27 @@ func TestDecoderBoundsAPaste(t *testing.T) {
 	}
 }
 
-// feed runs pump over chunks sent gap apart and returns the keys, each with
-// its read.
+// feed runs pump over chunks sent gap apart on synctest's clock and returns
+// the keys, each with its read.
 func feed(t *testing.T, gap time.Duration, chunks ...string) []Key {
 	t.Helper()
-	in := make(chan []byte)
-	keys := make(chan Key, 64)
-	go pump(in, keys, 20*time.Millisecond, 150*time.Millisecond)
-	for i, c := range chunks {
-		if i > 0 {
-			time.Sleep(gap)
-		}
-		in <- []byte(c)
-	}
-	time.Sleep(gap)
-	close(in)
 	var got []Key
-	for k := range keys {
-		got = append(got, k)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		in := make(chan []byte)
+		keys := make(chan Key, 64)
+		go pump(in, keys, 20*time.Millisecond, 150*time.Millisecond)
+		for i, c := range chunks {
+			if i > 0 {
+				time.Sleep(gap)
+			}
+			in <- []byte(c)
+		}
+		time.Sleep(gap)
+		close(in)
+		for k := range keys {
+			got = append(got, k)
+		}
+	})
 	return got
 }
 
