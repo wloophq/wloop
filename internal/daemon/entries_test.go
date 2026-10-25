@@ -212,7 +212,31 @@ func (r *entriesRig) subscribe(t *testing.T) *subscriber {
 	t.Cleanup(func() { cancel(); wg.Wait() })
 	sub := r.s.hub.subscribe("test")
 	t.Cleanup(func() { r.s.hub.unsubscribe(sub) })
+	waitFeedListening(t, r.log, sub)
 	return sub
+}
+
+// waitFeedListening notes changes until the feed publishes one, so a change
+// the test makes next cannot land before the feed subscribed to the log.
+func waitFeedListening(t *testing.T, log *change.Log, sub *subscriber) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		log.NoteAll(entryInputs)
+		retry := time.After(4 * syncQuiet)
+		for waiting := true; waiting; {
+			select {
+			case <-sub.signal:
+				if c, ok := sub.take(); ok && c.Counters != nil {
+					return
+				}
+			case <-retry:
+				waiting = false
+			case <-deadline:
+				t.Fatal("the entries feed never published")
+			}
+		}
+	}
 }
 
 // nextChange is the first change of sub that carries counters.
