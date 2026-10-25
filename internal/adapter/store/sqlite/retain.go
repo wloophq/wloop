@@ -136,6 +136,7 @@ const (
 	retainPlanItemsSQL       = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
 	retainWorkflowRunsSQL    = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL     = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSessionMarksSQL    = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
@@ -230,6 +231,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("session_handles", 0, retainSessionHandlesSQL)
 			r.exec("agent_sessions", port.TopicSessions, retainAgentSessionsSQL, cutoff(now, p.ClosedSessions))
 			r.exec("workflow_runs", 0, retainSessionRunsSQL, cutoff(now, p.ClosedSessions))
+			r.exec("unit_marks", port.TopicRounds, retainSessionMarksSQL)
 		}
 		if p.Stops > 0 {
 			r.exec("turn_stops", port.TopicSessions, retainStopsSQL, cutoff(now, p.Stops))
