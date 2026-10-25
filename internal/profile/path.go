@@ -23,13 +23,14 @@ const (
 	DimLabel        Dim = "label"
 	DimBase         Dim = "base"
 	DimRound        Dim = dintent.DimRound
+	DimReviewer     Dim = dintent.DimReviewer
 	DimKind         Dim = "kind"
 	DimSize         Dim = "size"
 	DimRisk         Dim = "risk"
 )
 
 // Dims lists the dimensions in their canonical order.
-var Dims = []Dim{DimOrganization, DimRepo, DimUser, DimTeam, DimAssociation, DimLabel, DimBase, DimRound, DimKind, DimSize, DimRisk}
+var Dims = []Dim{DimOrganization, DimRepo, DimUser, DimTeam, DimAssociation, DimLabel, DimBase, DimRound, DimReviewer, DimKind, DimSize, DimRisk}
 
 var dimValues = map[Dim][]string{
 	DimAssociation: {"owner", "member", "collaborator", "contributor", "first-timer", "first-time-contributor", "mannequin", "none"},
@@ -292,8 +293,11 @@ func checkOrder(p BlockPath, intents *dintent.Registry) error {
 	if has(DimRepo) && !has(DimOrganization) {
 		return PathError{Problem: "repo is only valid right after organization", Fix: "put it under organization=<owner>/"}
 	}
-	if has(DimRound) && !slices.Contains(DimsOf(intents, p.Intent), string(DimRound)) {
-		return PathError{Problem: "round does not apply to " + string(p.Intent) + ": its manifest's dims do not list it", Fix: "drop the round condition, or move the block to an intent whose dims list round"}
+	for _, d := range []Dim{DimRound, DimReviewer} {
+		if has(d) && !slices.Contains(DimsOf(intents, p.Intent), string(d)) {
+			return PathError{Problem: string(d) + " does not apply to " + string(p.Intent) + ": its manifest's dims do not list it",
+				Fix: "drop the " + string(d) + " condition, or move the block to an intent whose dims list " + string(d)}
+		}
 	}
 	if !slices.Equal(s.Conds, p.Conds) || !slices.Equal(s.Tags, p.Tags) {
 		return PathError{Problem: "conditions are out of order", Fix: "rename it to " + write(s)}

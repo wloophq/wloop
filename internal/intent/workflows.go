@@ -73,10 +73,11 @@ type wUnit struct {
 }
 
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
-// A user workflow that fails is listed in broken and left out of loaded; the
-// bundled layer never has problems. intentProblem, when set, is why a
-// turn.start may not name an intent, "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken map[string]Problems, problems Problems) {
+// A user workflow that fails is listed in broken and left out of loaded; a
+// bundled one whose override fails is listed in reverted and loads without
+// it. intentProblem, when set, is why a turn.start may not name an intent,
+// "" when it may.
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -116,11 +117,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 			units = append(units, &wUnit{name: e.Name(), dir: dir, files: files{dir: dir}})
 		}
 	}
-	broken = map[string]Problems{}
+	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
 		u.load(intentProblem)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
-			problems = append(problems, u.problems...)
+			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
+			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
 			u.load(intentProblem)
 		}
@@ -139,7 +141,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return loaded, broken, problems
+	return loaded, broken, reverted, problems
 }
 
 func (u *wUnit) load(intentProblem func(string) string) {
@@ -151,7 +153,7 @@ func (u *wUnit) load(intentProblem func(string) string) {
 	}
 	src, err := u.files.read("workflow.toml")
 	if err != nil {
-		s.problems = append(s.problems, Problem{File: file, Msg: "missing: every workflow directory holds workflow.toml"})
+		s.problems = append(s.problems, readProblem(file, err, "missing: every workflow directory holds workflow.toml"))
 		return
 	}
 	m, problems, skip, complete := decode[wManifest](file, src)

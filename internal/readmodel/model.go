@@ -76,6 +76,9 @@ type snapshot struct {
 	// floor is the newest Rev of a dropped tombstone; a client behind it
 	// may miss a removal.
 	floor uint64
+	// origin is the Rev of the model's first snapshot, the oldest a client
+	// can hold.
+	origin uint64
 }
 
 type entry struct {
@@ -234,10 +237,11 @@ func (m *Model) rebuild(ctx context.Context) (*snapshot, error) {
 		return nil, err
 	}
 	prev := m.cur.Load()
-	if prev == nil {
+	first := prev == nil
+	if first {
 		prev = &snapshot{}
 	}
-	next := &snapshot{rev: prev.rev, applied: gen, at: at, base: base, list: entries, byUnit: make(map[unit.Unit]*entry, len(entries)), gone: map[unit.Unit]uint64{}, floor: prev.floor}
+	next := &snapshot{rev: prev.rev, applied: gen, at: at, base: base, list: entries, byUnit: make(map[unit.Unit]*entry, len(entries)), gone: map[unit.Unit]uint64{}, floor: prev.floor, origin: prev.origin}
 	var moved []*entry
 	for _, e := range entries {
 		if old, ok := prev.byUnit[e.Unit]; ok && bytes.Equal(old.JSON, e.JSON) {
@@ -267,6 +271,9 @@ func (m *Model) rebuild(ctx context.Context) (*snapshot, error) {
 			next.gone[u] = next.rev
 		}
 		next.trim()
+	}
+	if first {
+		next.origin = next.rev
 	}
 	m.cur.Store(next)
 	return next, nil
@@ -441,7 +448,8 @@ func (m *Model) Base(ctx context.Context) (Base, time.Time, error) {
 
 // Run keeps the snapshot current until ctx ends: it rebuilds on a row
 // input's note, debounced, and on the minute, and publishes a Change each
-// time the revision moved.
+// time the revision moved, starting from the model's first snapshot, since
+// a client may have read it before Run started.
 func (m *Model) Run(ctx context.Context, publish func(api.Change)) {
 	var poke <-chan struct{}
 	if m.changes != nil {
@@ -450,10 +458,17 @@ func (m *Model) Run(ctx context.Context, publish func(api.Change)) {
 		poke = p
 	}
 	var published uint64
+	moved := func(s *snapshot) {
+		if s.rev != published {
+			publish(s.changeSince(m.epoch, published))
+			published = s.rev
+		}
+	}
 	if s, err := m.refresh(ctx); err != nil {
 		m.logf("readmodel: %v", err)
 	} else {
-		published = s.rev
+		published = s.origin
+		moved(s)
 	}
 	tick := nextMinute()
 	var quiet, late <-chan time.Time
@@ -478,10 +493,7 @@ func (m *Model) Run(ctx context.Context, publish func(api.Change)) {
 			m.logf("readmodel: %v", err)
 			continue
 		}
-		if s.rev != published {
-			publish(s.changeSince(m.epoch, published))
-			published = s.rev
-		}
+		moved(s)
 	}
 }
 

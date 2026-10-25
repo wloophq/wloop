@@ -19,7 +19,9 @@ type Facts struct {
 	// Teams are the teams a review was requested through, as <org>-<slug>.
 	Teams, Labels []string
 	// Round is first or follow-up.
-	Round            string
+	Round string
+	// Reviewers are the reviewers an address round answers.
+	Reviewers        []string
 	Kind, Size, Risk string
 	Tags, Files      []string
 	HasBrief         bool
@@ -69,6 +71,9 @@ func holds(list []string, v string) bool {
 	return slices.ContainsFunc(list, func(s string) bool { return fold(s) == v })
 }
 
+// bareLogin drops the "[bot]" GitHub's REST API gives a bot's login.
+func bareLogin(login string) string { return strings.TrimSuffix(login, "[bot]") }
+
 func (f Facts) value(d Dim) (string, bool) {
 	switch d {
 	case DimOrganization:
@@ -101,6 +106,8 @@ func (f Facts) match(b Block) (ok, needsBrief bool) {
 			hit = holds(f.Teams, c.Value)
 		case DimLabel:
 			hit = holds(f.Labels, c.Value)
+		case DimReviewer:
+			hit = slices.ContainsFunc(f.Reviewers, func(r string) bool { return bareLogin(fold(r)) == bareLogin(c.Value) })
 		default:
 			var v string
 			v, brief = f.value(c.Dim)
@@ -189,6 +196,8 @@ func segLabel(s seg) string {
 			return "First rounds"
 		}
 		return "Follow-up rounds"
+	case DimReviewer:
+		return "Reviewer " + s.value
 	case DimKind:
 		return "Kind " + s.value
 	case DimSize:

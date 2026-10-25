@@ -46,6 +46,8 @@ var Facts = []Fact{
 	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
 	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
 	prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read."),
+	prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn."),
+	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
 	fact("row.kind", expr.String, act, "The row's situation kind."),
 	fact("row.open", expr.Bool, act, "The pull request is open: kind is not done, or, untracked, its GitHub state is open."),
 	fact("row.tracked", expr.Bool, act, "The pull request is in the inventory."),

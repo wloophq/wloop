@@ -24,7 +24,7 @@ const ReadConns = 4
 
 const pragmas = "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)" +
 	"&_pragma=temp_store(MEMORY)&_pragma=cache_size(-8000)&_pragma=mmap_size(67108864)" +
-	"&_pragma=journal_size_limit(8388608)"
+	"&_pragma=journal_size_limit(8388608)&_pragma=foreign_keys(1)"
 
 const (
 	writerDSN = "?" + pragmas + "&_txlock=immediate"
@@ -47,16 +47,18 @@ type DB struct {
 	log    Noter
 }
 
-// Open opens the store at path, creating it when it holds no table and
-// migrating it to SchemaVersion, and refuses a store it cannot migrate with
-// ErrSchema. Both handles open through connector. A nil log gets a private
+// Open opens the store at path, creating it at SchemaVersion when it holds
+// no table, and refuses with a SchemaError a store it cannot open as it is:
+// an older one, which Migrate takes first, or a newer one that is not
+// compatible. Both handles open through connector. A nil log gets a private
 // change log.
-func Open(path string, log Noter) (*DB, error) {
+func Open(path string, log Noter) (*DB, error) { return current.open(path, log) }
+
+func (set schemaSet) open(path string, log Noter) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	created, err := createIfEmpty(path)
-	if err != nil {
+	if err := set.createIfEmpty(path); err != nil {
 		return nil, err
 	}
 	if err := tighten(path); err != nil {
@@ -71,11 +73,14 @@ func Open(path string, log Noter) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	if err := versionError(path, v); err != nil {
-		w.Close()
-		return nil, err
+	status := Status{Version: v, Compatible: v}
+	if v > set.version {
+		if status.Compatible, err = readCompatible(context.Background(), w, v); err != nil {
+			w.Close()
+			return nil, err
+		}
 	}
-	if err := migrate(w, path, v, !created); err != nil {
+	if err := set.refuse(path, status); err != nil {
 		w.Close()
 		return nil, err
 	}

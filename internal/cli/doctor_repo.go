@@ -170,13 +170,20 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 		}
 	}
 	if *kind == "" {
-		for _, name := range l.BrokenNames() {
+		for _, name := range slices.Sorted(maps.Keys(l.Broken)) {
 			if v != nil {
 				v.broken(string(name), l.Broken[name])
 			} else {
 				fmt.Fprintf(e.Out, "%-8s does not load:\n  %s\n", name, strings.ReplaceAll(l.Broken[name].Error(), "\n", "\n  "))
 			}
 			failed++
+		}
+		for _, name := range slices.Sorted(maps.Keys(l.Reverted)) {
+			if v != nil {
+				v.reverted(string(name), l.Reverted[name])
+			} else {
+				fmt.Fprintf(e.Out, "%-8s runs as bundled, the override does not load:\n  %s\n", name, strings.ReplaceAll(l.Reverted[name].Error(), "\n", "\n  "))
+			}
 		}
 	}
 	if failed > 0 {
@@ -419,6 +426,10 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 		known[name] = true
 		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflow " + name,
 			Info: "disabled, every other workflow runs: " + oneLine(l.BrokenWorkflows[name].Error()), Fix: brand.Command + " profile check"})
+	}
+	for _, name := range slices.Sorted(maps.Keys(l.RevertedWorkflows)) {
+		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflow " + name + " override",
+			Info: "runs as bundled, the override does not load: " + oneLine(l.RevertedWorkflows[name].Error()), Fix: brand.Command + " profile check"})
 	}
 	for _, name := range slices.Sorted(maps.Keys(cfg.Workflows)) {
 		if !known[name] {

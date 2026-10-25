@@ -51,7 +51,7 @@ func (p uninstallPlan) empty() bool { return len(p.remove) == 0 && len(p.purge) 
 func runUninstall(ctx context.Context, e *Env, args []string) error {
 	fset := flag.NewFlagSet("uninstall", flag.ContinueOnError)
 	fset.SetOutput(e.Err)
-	purge := fset.Bool("purge", false, "also delete the state and config directories: the store, MCP key, dossiers, logs, config and review profiles")
+	purge := fset.Bool("purge", false, "also delete the state and config directories: the store and its backups, MCP key, dossiers, logs, config and review profiles")
 	dryRun := fset.Bool("dry-run", false, "print what would be removed and change nothing")
 	yes := fset.Bool("yes", false, "remove without asking")
 	if err := fset.Parse(args); err != nil {
@@ -329,7 +329,7 @@ func (e *Env) slackSteps(cfg config.Config) []uninstallStep {
 func (e *Env) purgeSteps(cfg config.Config) (steps []uninstallStep, kept []string) {
 	configDir := filepath.Dir(e.ConfigPath)
 	for _, d := range []struct{ dir, holds string }{
-		{e.StateDir, "the store, MCP key, dossiers and logs"},
+		{e.StateDir, "the store and its backups, MCP key, dossiers and logs"},
 		{configDir, "config.json and the review profiles in it"},
 	} {
 		dir := filepath.Clean(d.dir)

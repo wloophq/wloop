@@ -1,19 +1,19 @@
 module github.com/wloophq/wloop
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.10
 
 require (
 	cel.dev/cel-go v0.32.0
-	github.com/clipperhouse/uax29/v2 v2.2.0
-	github.com/coder/websocket v1.8.14
-	github.com/ebitengine/purego v0.11.1
-	github.com/mattn/go-runewidth v0.0.30
+	github.com/clipperhouse/uax29/v2 v2.7.0
+	github.com/coder/websocket v1.8.15
+	github.com/ebitengine/purego v0.11.2
+	github.com/mattn/go-runewidth v0.0.31
 	github.com/pelletier/go-toml/v2 v2.4.3
-	golang.org/x/sys v0.47.0
-	golang.org/x/term v0.45.0
-	modernc.org/sqlite v1.59.0
+	golang.org/x/sys v0.49.0
+	golang.org/x/term v0.47.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -29,7 +29,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	modernc.org/libc v1.75.7 // indirect
+	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )

@@ -64,7 +64,7 @@ func draftArgs(d draft.Draft) []any {
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
-// neither, and Effects never nil.
+// neither, as a draft an older release wrote does, and Effects never nil.
 func shaped(d draft.Draft) draft.Draft {
 	if d.Purpose == "" && d.Delivery == "" {
 		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
@@ -106,7 +106,7 @@ func scanDraft(row scanner) (draft.Draft, error) {
 		}
 		*f.dst = t
 	}
-	return d, nil
+	return shaped(d), nil
 }
 
 // normal is d as a scan returns it: shaped, times in UTC, Items never nil.

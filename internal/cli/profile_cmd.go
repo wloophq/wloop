@@ -128,6 +128,9 @@ func (c *conditions) facts() profile.Facts {
 	if l := v(profile.DimLabel); l != "" {
 		f.Labels = []string{l}
 	}
+	if r := v(profile.DimReviewer); r != "" {
+		f.Reviewers = []string{r}
+	}
 	for _, kv := range c.tags {
 		if t, err := profile.NormalizeTag(kv); err == nil {
 			f.Tags = append(f.Tags, t)

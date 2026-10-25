@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
@@ -146,7 +145,12 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 
 	daemon, daemonErr := e.daemonClient(ctx)
 	if errors.Is(daemonErr, errDaemonDown) {
-		return daemonErr
+		return e.downWithStore(daemonErr)
+	}
+	if daemonErr == nil {
+		if only, ok := e.waitingStore(ctx, daemon); ok {
+			return e.reportDoctor(color, only)
+		}
 	}
 	cfg, cfgErr := e.loadConfig()
 
@@ -255,10 +259,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 		checks = append(checks, e.gitAccessChecks(dr.health.GitAccess, live.record)...)
 	}
 	section("Login shell")
-	store := filepath.Join(e.StateDir, storeFile)
-	if err := sqlite.Check(store); err != nil {
-		add(markMissing, "store", err.Error(), "")
-	}
+	checks = append(checks, e.storeChecks()...)
 	if e.boardSink(cfg) != "" {
 		col := func(status string) string { return e.column(cfg, status) }
 		cols := uniq(col(config.ColumnWorking), col(config.ColumnNeedsMe), col(config.ColumnReviewed), col(config.ColumnWorkingFallback), col(config.ColumnReady),
@@ -269,6 +270,10 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 	section("Store and board")
 	section("Disk", e.diskChecks(ctx, cfg)...)
 
+	return e.reportDoctor(color, sections)
+}
+
+func (e *Env) reportDoctor(color termfmt.Mode, sections []checkSection) error {
 	sections = dedupe(sections)
 	t := e.term(color)
 	if t.TTY {
@@ -837,13 +842,19 @@ func roundDuration(d time.Duration) string {
 }
 
 // intentChecks load the profile's intents: a line per user intent that
-// does not load, with all its problems, else the intents the loop runs.
+// does not load and per override read as bundled, with all its problems,
+// else the intents the loop runs.
 func (e *Env) intentChecks() []check {
 	l := e.loadedIntents()
 	var out []check
+	fix := "fix the manifest; '" + e.command() + " profile check' lists every problem"
 	for _, name := range slices.Sorted(maps.Keys(l.Broken)) {
 		problems := strings.ReplaceAll(l.Broken[name].Error(), "\n", "\n            ")
-		out = append(out, check{markMissing, "intent " + string(name), "does not load:\n            " + problems, "fix the manifest; '" + e.command() + " profile check' lists every problem"})
+		out = append(out, check{markMissing, "intent " + string(name), "does not load:\n            " + problems, fix})
+	}
+	for _, name := range slices.Sorted(maps.Keys(l.Reverted)) {
+		problems := strings.ReplaceAll(l.Reverted[name].Error(), "\n", "\n            ")
+		out = append(out, check{markMissing, "intent " + string(name), "runs as bundled, the override does not load:\n            " + problems, fix})
 	}
 	if len(out) > 0 {
 		return out

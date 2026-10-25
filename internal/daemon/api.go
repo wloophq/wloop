@@ -171,6 +171,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Viewer:             s.viewer.cachedLogin(),
 		StalledReviewHours: time.Duration(s.deps.Cfg.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
+		Store:              s.deps.Store,
 	}
 	if s.deps.PRs != nil {
 		h.RateLimit = wireLimit(s.graphQLBudget())

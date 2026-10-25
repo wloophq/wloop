@@ -118,6 +118,8 @@ mkdir -p <profile>/intents/address
 {{command}} profile check
 ```
 
-Each file you write replaces the bundled file of the same name; the files you leave out are the bundled ones. An `intent.toml` of yours replaces the bundled manifest whole, with no merge of keys, so start from a copy of the bundled one. `profile check` lists the intent as `bundled, overridden: instructions.md.tmpl`. When your files do not load, or break another bundled intent, the bundled intent stays in force and `profile check` reports the problem against your file.
+Each file you write replaces the bundled file of the same name; the files you leave out are the bundled ones. An `intent.toml` of yours replaces the bundled manifest whole, with no merge of keys, so start from a copy of the bundled one. Files whose name starts with `.` are ignored. `profile check` lists the intent as `bundled, overridden: instructions.md.tmpl`. When your files do not load, cannot be read, or break another bundled intent, the bundled intent stays in force, `profile check` reports the problem against your file, and `{{command}} doctor` lists the intent as running as bundled. A problem your manifest causes in a bundled file you did not override, such as a bundled template reading an input your manifest dropped, is reported against your manifest. The judgment blocks that only your override made valid, such as `intent=<name>.md` for a `profile` it added or a `round=` condition for `dims` it added, are skipped until it loads again.
+
+Your override yields to your own intents: when it claims a key, a flag or a row-driving workspace one of your intents already holds, the override is the one that does not load.
 
 Judgment blocks (`intent=address.md`) remain the way to add to what a turn looks for; override the instructions when you want to change what the turn is.

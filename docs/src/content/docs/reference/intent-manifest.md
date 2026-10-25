@@ -15,7 +15,7 @@ description: Every field of intent.toml, the predicate language, the templates a
 
 - The name is the directory's: a lower-case letter, then 1 to 23 lower-case letters, digits or `-`. `intent.toml` has no name key.
 - A name may not be a CLI command, a built-in action id, a profile dimension, or one of `try`, `eval`, `settings`, `intents` and `tags`.
-- A directory named as a bundled intent overrides it file by file: each file it holds replaces the bundled file of the same name, and the bundled intent's other files are kept. An `intent.toml` there replaces the bundled manifest whole. When the result does not load, the bundled intent stays and `profile check` reports the problem against your file.
+- A directory named as a bundled intent overrides it file by file: each file it holds replaces the bundled file of the same name, and the bundled intent's other files are kept. An `intent.toml` there replaces the bundled manifest whole; files whose name starts with `.` are ignored. When the result does not load, the bundled intent stays and `profile check` reports the problem against your file, against your manifest for a problem it causes in a bundled file. In a clash of key, flag or `drives_row` with one of your own intents, the override yields.
 - Judgment blocks `intent=<name>.md` apply to any intent whose manifest names a `profile`.
 
 The bundled intents are written the same way; `{{command}} profile show <owner/repo> --show` renders any of them. A worked example is in [Add your own intent](/guides/custom-intent/).

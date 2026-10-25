@@ -87,6 +87,10 @@ func (p *PR) Fact(name string) (any, bool) {
 			return []string{}, true
 		}
 		return p.Labels, true
+	case "pr.address.reviewers":
+		return p.Address.ReviewerLogins(), true
+	case "pr.address.checks":
+		return p.Address.CheckNames(), true
 	}
 	return nil, false
 }

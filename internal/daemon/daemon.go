@@ -225,6 +225,8 @@ type Deps struct {
 	// Restart is the command that restarts the daemon, which a refused
 	// client of another API major is told to run.
 	Restart string
+	// Store is the open store's version and last backup, for the health.
+	Store *api.StoreStatus
 	// ConfigWarning is the health warning about config.json drifting from the
 	// running config, "" for none; nil never warns.
 	ConfigWarning func() string
@@ -611,8 +613,11 @@ func (s *Server) jobStatuses() []api.JobStatus {
 
 // AuthHandler is Handler behind the token check, for the TCP port, which
 // serves no AgentAPI and no AdminAPI.
-func (s *Server) AuthHandler() http.Handler {
-	h := s.Handler()
+func (s *Server) AuthHandler() http.Handler { return authHandler(s.token, s.Handler()) }
+
+// authHandler serves h on the cockpit's TCP listener to a page holding
+// token.
+func authHandler(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, api.AgentPrefix) || strings.HasPrefix(r.URL.Path, api.AdminPrefix) {
 			writeError(w, http.StatusNotFound, "no such endpoint "+r.URL.Path)
@@ -635,14 +640,14 @@ func (s *Server) AuthHandler() http.Handler {
 			}
 		}
 		q := r.URL.Query()
-		if t := q.Get("token"); t != "" && s.validToken(t) {
+		if t := q.Get("token"); t != "" && validToken(token, t) {
 			http.SetCookie(w, &http.Cookie{Name: tokenCookie, Value: t, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode}) //nolint:gosec // G124: served over plain HTTP on loopback, where Secure would drop the cookie
 			q.Del("token")
 			u := url.URL{Path: "/" + strings.TrimLeft(r.URL.Path, `/\`), RawQuery: q.Encode()}
 			http.Redirect(w, r, u.RequestURI(), http.StatusSeeOther)
 			return
 		}
-		if !s.authorized(r) {
+		if !authorized(token, r) {
 			http.Error(w, "missing or invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -670,13 +675,13 @@ func safeMethod(m string) bool {
 	return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
 }
 
-func (s *Server) validToken(t string) bool {
-	return t != "" && subtle.ConstantTimeCompare([]byte(t), []byte(s.token)) == 1
+func validToken(token, t string) bool {
+	return t != "" && subtle.ConstantTimeCompare([]byte(t), []byte(token)) == 1
 }
 
-func (s *Server) authorized(r *http.Request) bool {
+func authorized(token string, r *http.Request) bool {
 	c, err := r.Cookie(tokenCookie)
-	return err == nil && s.validToken(c.Value)
+	return err == nil && validToken(token, c.Value)
 }
 
 func (s *Server) Run(ctx context.Context) error {

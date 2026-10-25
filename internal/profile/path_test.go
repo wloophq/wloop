@@ -51,6 +51,7 @@ func TestParsePath(t *testing.T) {
 		{"tags/lang=go/lang=go/intent=review.md", "appears twice", "drop the repeated tag"},
 		{"tags/lang=go/change=fix/intent=review.md", "out of order", "rename it to tags/change=fix/lang=go/intent=review.md"},
 		{"round=first/intent=address.md", "round does not apply to address", "dims list round"},
+		{"reviewer=jussara-ai/intent=review.md", "reviewer does not apply to review", "dims list reviewer"},
 		{"organization=x/notes.md", "not a block", "intent=<intent>.md"},
 		{"tags/lang=golang/intent=review.md", "spelled lang=go", "rename it to tags/lang=go/intent=review.md"},
 		{"tags/change=rewrite/intent=review.md", "not a valid value", "change is one of feature, fix"},
@@ -149,5 +150,12 @@ func TestIntentBlocksForAUserIntentLoad(t *testing.T) {
 	}
 	if _, ok, err := ParsePath("intent=borrow.md", intents); ok || err == nil {
 		t.Fatal("borrow reads review's blocks; it has none of its own")
+	}
+}
+
+func TestAReviewerBlockParsesUnderAddress(t *testing.T) {
+	p, ok, err := ParsePath("reviewer=jussara-ai/intent=address.md", testIntents)
+	if !ok || err != nil || !slices.Equal(p.Conds, []Cond{{Dim: DimReviewer, Value: "jussara-ai"}}) {
+		t.Fatalf("%+v %v %v", p, ok, err)
 	}
 }

@@ -368,3 +368,25 @@ func linkAuthorWorkspace(t *testing.T, te *testEnv, n int, id string) {
 		t.Fatal(err)
 	}
 }
+
+func TestAnAddressAskedForByHandSaysWhyNow(t *testing.T) {
+	for _, synced := range []bool{true, false} {
+		m, te := reviewedAuthorScenario(t)
+		te.gh.basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"}}}}}`
+		if synced {
+			if err := te.syncInventory(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if code := te.run("address", "https://github.com/acme/api/pull/9"); code != 0 {
+			t.Fatalf("exit %d: %s", code, te.err)
+		}
+		if len(m.Prompts) != 1 {
+			t.Fatalf("prompts %+v", m.Prompts)
+		}
+		text := turnText(t, te, m.Prompts[0].Text)
+		if got := strings.Contains(text, "## Why now") && strings.Contains(text, "- @bob\n"); got != synced {
+			t.Fatalf("synced %v, why now %v:\n%s", synced, got, text)
+		}
+	}
+}
