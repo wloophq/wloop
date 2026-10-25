@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -29,18 +30,19 @@ var (
 
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.
 type wManifest struct {
-	Description   string           `toml:"description"`
-	Subject       *string          `toml:"subject"`
-	Trigger       *wTrigger        `toml:"trigger"`
-	When          *string          `toml:"when"`
-	Step          []map[string]any `toml:"step"`
-	Limits        *wLimits         `toml:"limits"`
-	Mode          *string          `toml:"mode"`
-	AllowVisible  bool             `toml:"allow_visible"`
-	Order         *int             `toml:"order"`
-	Key           []string         `toml:"key"`
-	Approval      *wApproval       `toml:"approval"`
-	DraftApproval *mDraftApproval  `toml:"draft_approval"`
+	Description   string            `toml:"description"`
+	Subject       *string           `toml:"subject"`
+	Trigger       *wTrigger         `toml:"trigger"`
+	When          *string           `toml:"when"`
+	Step          []map[string]any  `toml:"step"`
+	Limits        *wLimits          `toml:"limits"`
+	Mode          *string           `toml:"mode"`
+	AllowVisible  bool              `toml:"allow_visible"`
+	Order         *int              `toml:"order"`
+	Key           []string          `toml:"key"`
+	Marks         map[string]string `toml:"marks"`
+	Approval      *wApproval        `toml:"approval"`
+	DraftApproval *mDraftApproval   `toml:"draft_approval"`
 }
 
 type wTrigger struct {
@@ -265,6 +267,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 		w.Order = *m.Order
 	}
 	s.defineKey(&w, m.Key, slot)
+	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
 	w.DraftApproval = s.draftApproval(m.DraftApproval)
 	return w
@@ -414,6 +417,28 @@ func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 		}
 	}
 	w.Key = key
+}
+
+// markTypes are the fact types a mark holds: a string is a version, a
+// time or an int a watermark (mark.Handled).
+var markTypes = []expr.Type{expr.String, expr.Time, expr.Int}
+
+func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot string) {
+	for _, name := range slices.Sorted(maps.Keys(marks)) {
+		p, fact := "marks."+name, marks[name]
+		if err := mark.ValidName(name); err != nil {
+			s.add(p, "%v", err)
+			continue
+		}
+		t, known := builtin.FactType(fact)
+		switch {
+		case !known || slot == "" || !strings.HasPrefix(fact, slot+"."):
+			s.add(p, "%s is not a fact of the %s slot", fact, slot)
+		case !slices.Contains(markTypes, t):
+			s.add(p, "%s is a %s; a mark holds a string, a time or an int", fact, t)
+		}
+	}
+	w.Marks = marks
 }
 
 func (s *sheet) defineApproval(w *workflow.Workflow, a *wApproval, slot string) {

@@ -26,7 +26,12 @@ var (
 
 type ledgerBackend struct {
 	automation.Ledger
-	log *change.Log
+	marks *DB
+	log   *change.Log
+}
+
+func (b ledgerBackend) Marks(ctx context.Context, u unit.Unit) (map[string]string, error) {
+	return b.marks.Marks(ctx, u)
 }
 
 func (b ledgerBackend) Changes() port.Changes { return b.log }
@@ -72,7 +77,7 @@ func TestLedgerContract(t *testing.T) {
 	t.Parallel()
 	automationtest.RunLedger(t, func(t *testing.T) automationtest.LedgerBackend {
 		db, log := openLogged(t, filepath.Join(t.TempDir(), "ledger.db"))
-		return ledgerBackend{db.Ledger(), log}
+		return ledgerBackend{db.Ledger(), db, log}
 	})
 }
 

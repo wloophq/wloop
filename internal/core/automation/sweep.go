@@ -254,7 +254,11 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if err != nil {
 			return "its facts cannot be read: " + err.Error()
 		}
-		vars := workflow.Vars{Facts: facts, Trigger: triggerFacts(pl.item.Why), Config: config, Now: now}
+		marks, err := e.unitMarks(ctx, pl.item.Unit)
+		if err != nil {
+			return "its marks cannot be read: " + err.Error()
+		}
+		vars := workflow.Vars{Facts: facts, Trigger: triggerFacts(pl.item.Why), Config: config, Marks: marks, Now: now}
 		if ok, err := match(pl.w.When, vars); err != nil || !ok {
 			return "it no longer matches since it was planned"
 		}

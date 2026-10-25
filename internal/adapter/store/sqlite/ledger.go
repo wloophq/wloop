@@ -84,6 +84,11 @@ func (l ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, ev
 			return err
 		}
 		if terminal {
+			for name, value := range it.Marks {
+				if err := saveMark(ctx, tx, it.Unit, name, value); err != nil {
+					return err
+				}
+			}
 			_, err := tx.ExecContext(ctx, `DELETE FROM plan_items WHERE id = ?`, it.ID)
 			return err
 		}
@@ -253,6 +258,9 @@ type storedWhy struct {
 	Event    *storedEvent  `json:"event,omitempty"`
 	FiredAt  string        `json:"fired_at,omitempty"`
 	Matched  []storedValue `json:"matched,omitempty"`
+	// Marks are the item's, kept with its why since both come from the
+	// facts it was planned with.
+	Marks map[string]string `json:"marks,omitempty"`
 }
 
 // storedValue keeps a fact's Go type, which JSON alone loses.
@@ -275,7 +283,7 @@ func itemArgs(it workflow.Item) ([]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the steps of %s: %w", it.ID, err)
 	}
-	why := storedWhy{Workflow: it.Why.Workflow, Trigger: string(it.Why.Trigger), FiredAt: eventTime(it.Why.FiredAt)}
+	why := storedWhy{Workflow: it.Why.Workflow, Trigger: string(it.Why.Trigger), FiredAt: eventTime(it.Why.FiredAt), Marks: it.Marks}
 	if ev := it.Why.Event; ev != nil {
 		why.Event = &storedEvent{ev.ID, string(ev.Unit.Provider), ev.Unit.Key, ev.Kind, ev.Key, ev.Data, eventTime(ev.At)}
 	}
@@ -423,6 +431,7 @@ func scanItem(row scanner) (workflow.Item, error) {
 		return fail("why", err)
 	}
 	it.Why = workflow.Why{Workflow: w.Workflow, Trigger: workflow.TriggerKind(w.Trigger)}
+	it.Marks = w.Marks
 	if it.Why.FiredAt, err = parseStoredTime(w.FiredAt); err != nil {
 		return fail("firing time", err)
 	}

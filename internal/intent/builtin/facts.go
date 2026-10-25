@@ -84,6 +84,8 @@ var Facts = []Fact{
 	wf("pr", "closed_at", expr.Time, "When the pull request closed; zero when open."),
 	wf("pr", "finished_for", expr.Duration, "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."),
 	wf("pr", "draft", expr.Bool, "The pull request is a draft."),
+	wf("pr", "head", expr.String, "The head commit's oid."),
+	wf("pr", "conflicting_for", expr.Duration, "How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not."),
 	wf("pr", "mine", expr.Bool, "The pull request's author is the viewer."),
 	wf("pr", "checks", expr.String, "The checks' rollup on the head."),
 	wf("pr", "stalled", expr.Bool, "The checks stalled on the head."),

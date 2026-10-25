@@ -3,6 +3,8 @@ package round
 import (
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/mark"
 )
 
 func TestCapAndFingerprint(t *testing.T) {
@@ -81,5 +83,13 @@ func TestAnEmptyMarkIsNoMark(t *testing.T) {
 	}
 	if !s.Changes().Marks["a/b#1"][AddressedReviews] {
 		t.Fatal("removing a mark is a change to save")
+	}
+}
+
+func TestTheRoundsMarksArePluginMarkNames(t *testing.T) {
+	for _, name := range []string{Reviewed, AddressedReviews, AddressedChecks, AddressedConflict} {
+		if err := mark.ValidName(name); err != nil {
+			t.Error(err)
+		}
 	}
 }

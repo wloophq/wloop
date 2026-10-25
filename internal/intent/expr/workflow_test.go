@@ -3,6 +3,7 @@ package expr
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -167,4 +168,39 @@ func compileEnv(t *testing.T, src string, env Env) *Program {
 		t.Fatalf("Compile(%q): %v", src, err)
 	}
 	return p
+}
+
+func TestHandledComparesAFactWithTheUnitsMark(t *testing.T) {
+	env := Env{"pr.head": String, "pr.reviewed_at": Time, "pr.seq": Int}
+	at := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	marks := map[string]string{"w/head": "h1", "w/at": "2026-10-08T10:00:00.000000000Z", "w/seq": "7"}
+	for _, c := range []struct {
+		src   string
+		facts workflow.Facts
+		want  bool
+	}{
+		{`handled("w/head", pr.head)`, workflow.Facts{"pr.head": "h1"}, true},
+		{`handled("w/head", pr.head)`, workflow.Facts{"pr.head": "h2"}, false},
+		{`!handled("w/none", pr.head)`, workflow.Facts{"pr.head": "h1"}, true},
+		{`handled("w/at", pr.reviewed_at)`, workflow.Facts{"pr.reviewed_at": at}, true},
+		{`handled("w/at", pr.reviewed_at)`, workflow.Facts{"pr.reviewed_at": at.Add(time.Second)}, false},
+		{`handled("w/seq", pr.seq)`, workflow.Facts{"pr.seq": 8}, false},
+	} {
+		p, err := CompileWorkflow(c.src, env)
+		if err != nil {
+			t.Fatalf("%s: %v", c.src, err)
+		}
+		if got, err := p.Match(workflow.Vars{Facts: c.facts, Marks: marks}); err != nil || got != c.want {
+			t.Errorf("%s over %v = %v, %v", c.src, c.facts, got, err)
+		}
+		if !slices.Equal(p.Reads(), []string{slices.Sorted(maps.Keys(c.facts))[0]}) {
+			t.Errorf("%s reads %v", c.src, p.Reads())
+		}
+	}
+	if _, err := CompileWorkflow(`handled("w/head", pr.draft)`, Env{"pr.draft": Bool}); err == nil {
+		t.Error("a bool is no mark")
+	}
+	if _, err := Compile(`handled("w/head", pr.head)`, env); err == nil {
+		t.Error("handled outside a workflow")
+	}
 }

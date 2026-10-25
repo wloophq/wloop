@@ -102,9 +102,10 @@ func (r Refused) Match(Vars) (bool, error) { return false, r.Err }
 func (Refused) Reads() []string            { return nil }
 
 type Vars struct {
-	Facts   Facts // the unit's slot ("pr.state", "session.idle_for")
-	Trigger Facts // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
-	Config  Facts // "config.cleanup.idle", ...
+	Facts   Facts             // the unit's slot ("pr.state", "session.idle_for")
+	Trigger Facts             // "trigger.kind", "trigger.event.kind", "trigger.event.key", "trigger.event.data", "trigger.fired_at"
+	Config  Facts             // "config.cleanup.idle", ...
+	Marks   map[string]string // the unit's handled marks by name, which handled() reads
 	Now     time.Time
 }
 
@@ -142,9 +143,12 @@ type Workflow struct {
 	AllowVisible      bool
 	Order             int
 	Key               []string // fact names; empty means the slot's fingerprint fact
-	Approval          Approval
-	Source            string // manifest path
-	Bundled           bool
+	// Marks are the facts whose values a done or dismissed item records as
+	// the unit's marks, by the mark's name under the workflow (mark.Of).
+	Marks    map[string]string
+	Approval Approval
+	Source   string // manifest path
+	Bundled  bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
@@ -232,6 +236,9 @@ type Item struct {
 	Default  Outcome
 	Deadline time.Time
 	Guidance string // set by Act(guide) only
+	// Marks are the marks a done or dismissed run records, by full name, from
+	// the facts the item was planned with.
+	Marks    map[string]string
 	Attempts int
 	Error    string
 	Mode     Mode

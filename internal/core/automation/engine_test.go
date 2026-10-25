@@ -1592,3 +1592,47 @@ func TestAnItemDeferredByHandBeforeTheLockIsNotStartedAgain(t *testing.T) {
 		t.Errorf("the run deferred by hand was started again: %s", sum)
 	}
 }
+
+// unhandled matches while the unit's head is not the workflow's head mark.
+func unhandled(name string) workflow.Predicate {
+	return automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Marks[name+"/head"] != v.Facts["session.head"] }, "session.head")
+}
+
+func TestARunRecordsItsMarksAndTheNextEvaluationReadsThem(t *testing.T) {
+	w := sweepWF("once", unhandled("once"), "session.close")
+	w.Key, w.Marks = []string{"session.head"}, map[string]string{"head": "session.head"}
+	r := newRig(t, w)
+	r.e.Marks = r.ledger
+	r.put(s1, "a", "session.head", "h1")
+	r.sweep()
+	if got := r.ledger.MarksOf(s1); got["once/head"] != "h1" {
+		t.Fatalf("marks after the run: %v", got)
+	}
+	if p := r.evaluate(); len(p.Items) != 0 {
+		t.Fatalf("a handled head planned %+v", p.Items)
+	}
+	r.put(s1, "a", "session.head", "h2")
+	r.sweep()
+	if got := r.ran("session.close"); len(got) != 2 {
+		t.Fatalf("ran %v, want a run per head", got)
+	}
+}
+
+func TestADismissRecordsTheItemsMarks(t *testing.T) {
+	w := windowed(sweepWF("once", unhandled("once"), "session.close"), 5*time.Minute)
+	w.Key, w.Marks = []string{"session.head"}, map[string]string{"head": "session.head"}
+	r := newRig(t, w)
+	r.e.Marks = r.ledger
+	r.put(s1, "a", "session.head", "h1")
+	r.sweep()
+	it := r.mustItem("once", s1)
+	if it.Marks["once/head"] != "h1" {
+		t.Fatalf("the item's marks %v", it.Marks)
+	}
+	if _, err := r.e.Act(context.Background(), it.ID, workflow.ActionDismiss, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ledger.MarksOf(s1); got["once/head"] != "h1" {
+		t.Fatalf("marks after the dismiss: %v", got)
+	}
+}

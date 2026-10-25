@@ -449,6 +449,9 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	if f["pr.address.due"] != true || f["pr.address.reason"] != "conflicts with main" || f["pr.address.conflict"] != true {
 		t.Fatalf("a lasting conflict: %v", f)
 	}
+	if f["pr.head"] != "head" || f["pr.conflicting_for"] != time.Hour {
+		t.Fatalf("signals: head %v, conflicting for %v", f["pr.head"], f["pr.conflicting_for"])
+	}
 	c, ok, err := p.Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress)
 	if err != nil || !ok || c.ConflictHead != "head" || c.ChecksHead != "" || c.Fingerprint != "" {
 		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)

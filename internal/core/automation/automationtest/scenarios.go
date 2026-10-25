@@ -3,6 +3,7 @@ package automationtest
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -161,6 +162,7 @@ func RunSteps(t *testing.T, mk func(*testing.T) automation.Steps) {
 // log its writes note on.
 type LedgerBackend interface {
 	automation.Ledger
+	automation.Marks
 	Changes() port.Changes
 }
 
@@ -180,7 +182,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 			Gain:  workflow.Gain{MemoryBytes: 1, DiskBytes: 2},
 			Why: workflow.Why{Workflow: wf, Trigger: workflow.TriggerEvent, Event: &ev,
 				Matched: []workflow.Fact{{Name: "session.state", Value: "done"}}},
-			Mode: workflow.ModeApply, Attempts: 1, Error: "e", At: at0}
+			Mode: workflow.ModeApply, Marks: map[string]string{wf + "/head": "h1"}, Attempts: 1, Error: "e", At: at0}
 		if d == workflow.DecisionPending {
 			it.Default, it.Deadline = workflow.OutcomeRun, at0.Add(5*time.Minute)
 		}
@@ -211,8 +213,26 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 			g.Error != "e" || g.Mode != want.Mode || !g.At.Equal(want.At) || g.Gain != want.Gain || len(g.Steps) != 1 ||
 			g.Steps[0].Use != "some.step" || g.Steps[0].Args["reason"] != "done" || g.Why.Event == nil ||
 			g.Why.Event.ID != 3 || g.Why.Event.Kind != "merged" || g.Why.Trigger != workflow.TriggerEvent ||
-			len(g.Why.Matched) != 1 || g.Why.Matched[0].Value != "done" {
+			len(g.Why.Matched) != 1 || g.Why.Matched[0].Value != "done" || g.Marks[want.Workflow+"/head"] != "h1" {
 			t.Errorf("Items = %+v\nwant %+v", g, want)
+		}
+	})
+	t.Run("ADoneOrDismissedRunSetsTheItemsMarks", func(t *testing.T) {
+		l := mk(t)
+		failed, done, dismissed := item("x", a, workflow.DecisionRun), item("y", a, workflow.DecisionRun), item("z", b, workflow.DecisionRun)
+		for _, c := range []struct {
+			it     workflow.Item
+			status workflow.RunStatus
+		}{{failed, workflow.RunFailed}, {done, workflow.RunDone}, {dismissed, workflow.RunDismissed}} {
+			if err := l.Record(ctx, workflow.Run{Key: c.it.Key, Status: c.status, At: at0}, c.it); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got, err := l.Marks(ctx, a); err != nil || !maps.Equal(got, map[string]string{"y/head": "h1"}) {
+			t.Errorf("marks of %s = %v, %v; want only the done run's", a, got, err)
+		}
+		if got, err := l.Marks(ctx, b); err != nil || got["z/head"] != "h1" {
+			t.Errorf("marks of %s = %v, %v", b, got, err)
 		}
 	})
 	t.Run("SaveReplacesOnlyTheNamedWorkflows", func(t *testing.T) {

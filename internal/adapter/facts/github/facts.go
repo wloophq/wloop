@@ -566,6 +566,11 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 		}
 		f["pr.finished_for"] = finishedFor(row, now)
 		f["pr.draft"] = row.IsDraft
+		f["pr.head"] = row.HeadOid
+		f["pr.conflicting_for"] = time.Duration(0)
+		if since, ok := row.ConflictingSince(); ok {
+			f["pr.conflicting_for"] = now.Sub(since)
+		}
 		f["pr.author"] = row.Author
 		f["pr.mine"] = v.viewer != "" && strings.EqualFold(row.Author, v.viewer)
 		f["pr.checks"] = strings.ToLower(row.ChecksState)

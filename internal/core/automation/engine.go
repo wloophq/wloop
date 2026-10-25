@@ -24,6 +24,7 @@ type Engine struct {
 	Pause     func(ctx context.Context) (Pause, error)
 	Config    func() workflow.Facts
 	State     StateLoader
+	Marks     Marks // nil reads every unit as having no marks
 	Reachable func(ctx context.Context) error
 	RetryBase time.Duration
 	Pub       port.Publisher

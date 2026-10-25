@@ -1,0 +1,14 @@
+description = "Address a lasting conflict once per head"
+subject = "github"
+when = 'pr.mine && pr.conflicting_for > duration("10m") && !handled("conflict-once/head", pr.head)'
+key = ["pr.head"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "address"
+
+[marks]
+head = "pr.head"

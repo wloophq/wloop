@@ -81,6 +81,11 @@
       "description": "Stable facts of the subject's slot that make the idempotency key. Default is the slot's fingerprint.",
       "items": {"type": "string"}
     },
+    "marks": {
+      "type": "object",
+      "description": "Marks a done or dismissed run records on its unit: each name, stored as <workflow>/<name>, takes the value of a string, time or int fact of the subject's slot as planned. handled(\"<workflow>/<name>\", <fact>) reads it back.",
+      "additionalProperties": {"type": "string"}
+    },
     "approval": {
       "type": "object",
       "additionalProperties": false,

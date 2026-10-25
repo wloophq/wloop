@@ -69,6 +69,8 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
 | `pr.draft` | bool | The pull request is a draft. |
+| `pr.head` | string | The head commit's oid. |
+| `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.mine` | bool | The pull request's author is the viewer. |
 | `pr.checks` | string | The checks' rollup on the head. |
 | `pr.stalled` | bool | The checks stalled on the head. |

@@ -62,6 +62,10 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 		}
 	}
 	facts, factErr := eng.Units.Facts(ctx, u)
+	var marks map[string]string
+	if eng.Marks != nil && factErr == nil {
+		marks, factErr = eng.Marks.Marks(ctx, u)
+	}
 	var config workflow.Facts
 	if eng.Config != nil {
 		config = eng.Config()
@@ -73,7 +77,7 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 			continue
 		}
 		line := api.UnitWorkflow{Workflow: w.Name, Trigger: string(w.Trigger.Kind)}
-		vars := workflow.Vars{Facts: facts, Trigger: workflow.Facts{"trigger.kind": string(w.Trigger.Kind)}, Config: config, Now: eng.Clock.Now()}
+		vars := workflow.Vars{Facts: facts, Trigger: workflow.Facts{"trigger.kind": string(w.Trigger.Kind)}, Config: config, Marks: marks, Now: eng.Clock.Now()}
 		switch {
 		case w.Trigger.Kind == workflow.TriggerEvent:
 			line.Outcome, line.Reason = "waits", "decides when a "+strings.Join(w.Trigger.On, " or ")+" event arrives"
