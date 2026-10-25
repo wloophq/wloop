@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/mattn/go-runewidth"
@@ -411,10 +412,16 @@ func (t *fakeTerm) stats() (draws, widest, suspended int) {
 	return t.draws, t.widest, t.suspended
 }
 
+// eventually waits for cond on the synctest clock: it checks once every
+// goroutine of the test waits, and the deadline passes in fake time only.
 func eventually(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for !cond() {
+	deadline := time.Now().Add(time.Minute)
+	for {
+		synctest.Wait()
+		if cond() {
+			return
+		}
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
 		}
@@ -458,291 +465,324 @@ func oneRow() []api.Row {
 }
 
 func TestRunActsRefreshesAndQuits(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	term.press(Key{Rune: 'V'}, Key{Rune: 'x'}, Key{Name: KeyEnter})
-	eventually(t, "the review", func() bool { return slices.Equal(d.calls(), []string{"review acme/api#7 x"}) })
-	eventually(t, "the status", func() bool { return strings.Contains(term.screen(), "review acme/api#7: accepted as intake 42") })
-	d.mu.Lock()
-	sources := slices.Clone(d.sources)
-	d.mu.Unlock()
-	if !slices.Equal(sources, []string{"tui"}) {
-		t.Fatalf("sources %q", sources)
-	}
-	eventually(t, "a refresh after the action", func() bool {
-		rows := d.times(&d.rowsAt)
-		return rows[len(rows)-1].After(d.times(&d.actionsAt)[0])
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		synctest.Wait()
+		pulled := len(d.times(&d.rowsAt))
+		term.press(Key{Rune: 'V'}, Key{Rune: 'x'}, Key{Name: KeyEnter})
+		eventually(t, "the review", func() bool { return slices.Equal(d.calls(), []string{"review acme/api#7 x"}) })
+		eventually(t, "the status", func() bool { return strings.Contains(term.screen(), "review acme/api#7: accepted as intake 42") })
+		d.mu.Lock()
+		sources := slices.Clone(d.sources)
+		d.mu.Unlock()
+		if !slices.Equal(sources, []string{"tui"}) {
+			t.Fatalf("sources %q", sources)
+		}
+		eventually(t, "a refresh after the action", func() bool { return len(d.times(&d.rowsAt)) > pulled })
+		if _, widest, _ := term.stats(); widest > 119 {
+			t.Fatalf("a line reached the last column: %d cells", widest)
+		}
+		quit(t, term, done)
 	})
-	if _, widest, _ := term.stats(); widest > 119 {
-		t.Fatalf("a line reached the last column: %d cells", widest)
-	}
-	quit(t, term, done)
 }
 
 func TestRunSurvivesTheDaemonGoingAway(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	d.set(true)
-	d.announce()
-	eventually(t, "the error", func() bool { return strings.Contains(term.screen(), "daemon not answering: connection refused") })
-	if !strings.Contains(term.screen(), "Batch export") {
-		t.Fatal("the last rows left the screen")
-	}
-	d.set(false)
-	d.announce()
-	eventually(t, "the recovery", func() bool { return !strings.Contains(term.screen(), "not answering") })
-	term.press(Key{Name: KeyCtrlC})
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		d.set(true)
+		d.announce()
+		eventually(t, "the error", func() bool { return strings.Contains(term.screen(), "daemon not answering: connection refused") })
+		if !strings.Contains(term.screen(), "Batch export") {
+			t.Fatal("the last rows left the screen")
+		}
+		d.set(false)
+		d.announce()
+		eventually(t, "the recovery", func() bool { return !strings.Contains(term.screen(), "not answering") })
+		term.press(Key{Name: KeyCtrlC})
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestRunReconnectsAfterTheStreamEndsButNotAtOnce(t *testing.T) {
-	const wait = 60 * time.Millisecond
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d, func(c *Config) { c.Reconnect = wait })
-	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
-	ended := time.Now()
-	d.endStream()
-	eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
-	if gap := d.times(&d.eventsAt)[1].Sub(ended); gap < wait {
-		t.Fatalf("reconnected after %v, before %v", gap, wait)
-	}
-	time.Sleep(4 * wait)
-	if n := len(d.times(&d.eventsAt)); n != 2 {
-		t.Fatalf("%d streams while one stayed open", n)
-	}
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		const wait = 60 * time.Millisecond
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d, func(c *Config) { c.Reconnect = wait })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		ended := time.Now()
+		d.endStream()
+		eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
+		if gap := d.times(&d.eventsAt)[1].Sub(ended); gap < wait {
+			t.Fatalf("reconnected after %v, before %v", gap, wait)
+		}
+		time.Sleep(4 * wait)
+		if n := len(d.times(&d.eventsAt)); n != 2 {
+			t.Fatalf("%d streams while one stayed open", n)
+		}
+		quit(t, term, done)
+	})
 }
 
 func TestTUINoTickWhileConnected(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d, func(c *Config) { c.Refresh = 10 * time.Millisecond })
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	time.Sleep(300 * time.Millisecond)
-	if n, h := len(d.times(&d.rowsAt)), len(d.times(&d.healthAt)); n != 1 || h != 1 {
-		t.Fatalf("%d rows and %d health requests with the stream up and nothing announced", n, h)
-	}
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d, func(c *Config) { c.Refresh = 10 * time.Millisecond })
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		time.Sleep(300 * time.Millisecond)
+		if n, h := len(d.times(&d.rowsAt)), len(d.times(&d.healthAt)); n != 1 || h != 1 {
+			t.Fatalf("%d rows and %d health requests with the stream up and nothing announced", n, h)
+		}
+		quit(t, term, done)
+	})
 }
 
 func TestTUIOneRequestPerChange(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
-	changed := row(7, "Batch export v2", "review", "needs-me")
-	changed.SpecsVersion = d.specs.Version
-	changed = offering(changed, "review")
-	d.change([]api.Row{changed})
-	d.announce()
-	eventually(t, "the delta", func() bool { return strings.Contains(term.screen(), "Batch export v2") })
-	d.mu.Lock()
-	got, health := slices.Clone(d.rowsSince), len(d.healthAt)
-	d.mu.Unlock()
-	if want := []api.Since{{}, {Epoch: "e1", Rev: 0}}; !slices.Equal(got, want) || health != 1 {
-		t.Fatalf("rows asked since %v, %d health requests", got, health)
-	}
-	d.change(nil, changed.Unit)
-	d.announce()
-	eventually(t, "the removal", func() bool { return !strings.Contains(term.screen(), "Batch export") })
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		changed := row(7, "Batch export v2", "review", "needs-me")
+		changed.SpecsVersion = d.specs.Version
+		changed = offering(changed, "review")
+		d.change([]api.Row{changed})
+		d.announce()
+		eventually(t, "the delta", func() bool { return strings.Contains(term.screen(), "Batch export v2") })
+		d.mu.Lock()
+		got, health := slices.Clone(d.rowsSince), len(d.healthAt)
+		d.mu.Unlock()
+		if want := []api.Since{{}, {Epoch: "e1", Rev: 0}}; !slices.Equal(got, want) || health != 1 {
+			t.Fatalf("rows asked since %v, %d health requests", got, health)
+		}
+		d.change(nil, changed.Unit)
+		d.announce()
+		eventually(t, "the removal", func() bool { return !strings.Contains(term.screen(), "Batch export") })
+		quit(t, term, done)
+	})
 }
 
 func TestTUIHealthOnlyChangeReadsNoRows(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
-	d.announceHealth()
-	eventually(t, "the health", func() bool { return len(d.times(&d.healthAt)) == 2 })
-	if n := len(d.times(&d.rowsAt)); n != 1 {
-		t.Fatalf("%d rows requests for a health-only change", n)
-	}
-	d.change(nil)
-	d.announceHealth()
-	eventually(t, "the rows past the held revision", func() bool { return len(d.times(&d.rowsAt)) == 2 })
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		d.announceHealth()
+		eventually(t, "the health", func() bool { return len(d.times(&d.healthAt)) == 2 })
+		if n := len(d.times(&d.rowsAt)); n != 1 {
+			t.Fatalf("%d rows requests for a health-only change", n)
+		}
+		d.change(nil)
+		d.announceHealth()
+		eventually(t, "the rows past the held revision", func() bool { return len(d.times(&d.rowsAt)) == 2 })
+		quit(t, term, done)
+	})
 }
 
 func TestTUIResumesFromRev(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d, func(c *Config) { c.Reconnect = 10 * time.Millisecond })
-	eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
-	// The first load pulls after the stream opens; a change before it would
-	// fold into that pull and leave nothing to resume from.
-	eventually(t, "the first load", func() bool { return d.planCount() == 1 })
-	d.change(nil)
-	d.announce()
-	// The load asks for the plan after it holds the pulled revision.
-	eventually(t, "the second load", func() bool { return len(d.times(&d.rowsAt)) == 2 && d.planCount() == 2 })
-	d.endStream()
-	eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
-	d.mu.Lock()
-	from := slices.Clone(d.eventsFrom)
-	d.mu.Unlock()
-	if want := []api.Since{{}, {Epoch: "e1", Rev: 1}}; !slices.Equal(from, want) {
-		t.Fatalf("streams opened from %v, want %v", from, want)
-	}
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d, func(c *Config) { c.Reconnect = 10 * time.Millisecond })
+		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
+		// The first load pulls after the stream opens; a change before it would
+		// fold into that pull and leave nothing to resume from.
+		eventually(t, "the first load", func() bool { return d.planCount() == 1 })
+		d.change(nil)
+		d.announce()
+		// The load asks for the plan after it holds the pulled revision.
+		eventually(t, "the second load", func() bool { return len(d.times(&d.rowsAt)) == 2 && d.planCount() == 2 })
+		d.endStream()
+		eventually(t, "the reconnection", func() bool { return len(d.times(&d.eventsAt)) == 2 })
+		d.mu.Lock()
+		from := slices.Clone(d.eventsFrom)
+		d.mu.Unlock()
+		if want := []api.Since{{}, {Epoch: "e1", Rev: 1}}; !slices.Equal(from, want) {
+			t.Fatalf("streams opened from %v, want %v", from, want)
+		}
+		quit(t, term, done)
+	})
 }
 
 func TestRunPollsADaemonWithoutAnEventStream(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), noEvents: true}
-	term, done := start(t, d, func(c *Config) {
-		c.Reconnect = 10 * time.Millisecond
-		c.Refresh = 100 * time.Millisecond
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), noEvents: true}
+		term, done := start(t, d, func(c *Config) {
+			c.Reconnect = 10 * time.Millisecond
+			c.Refresh = 100 * time.Millisecond
+		})
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		time.Sleep(400 * time.Millisecond)
+		if n := len(d.times(&d.eventsAt)); n > 7 {
+			t.Fatalf("asked for the stream %d times in 400ms: it reconnects instead of polling", n)
+		}
+		if n := len(d.times(&d.rowsAt)); n < 4 {
+			t.Fatalf("read the rows %d times", n)
+		}
+		quit(t, term, done)
 	})
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	time.Sleep(400 * time.Millisecond)
-	if n := len(d.times(&d.eventsAt)); n > 7 {
-		t.Fatalf("asked for the stream %d times in 400ms: it reconnects instead of polling", n)
-	}
-	if n := len(d.times(&d.rowsAt)); n < 4 {
-		t.Fatalf("read the rows %d times", n)
-	}
-	quit(t, term, done)
 }
 
 func TestRunWaitsForARunningActionBeforeLeaving(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), hold: make(chan struct{})}
-	term, done := start(t, d)
-	eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
-	eventually(t, "the wait", func() bool { return strings.Contains(term.screen(), "waiting for 1 running action") })
-	select {
-	case <-done:
-		t.Fatal("left with an action running")
-	case <-time.After(50 * time.Millisecond):
-	}
-	close(d.hold)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if len(d.actionErr) != 1 || d.actionErr[0] != nil {
-		t.Fatalf("the action's context: %v", d.actionErr)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), hold: make(chan struct{})}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
+		eventually(t, "the wait", func() bool { return strings.Contains(term.screen(), "waiting for 1 running action") })
+		select {
+		case <-done:
+			t.Fatal("left with an action running")
+		case <-time.After(50 * time.Millisecond):
+		}
+		close(d.hold)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if len(d.actionErr) != 1 || d.actionErr[0] != nil {
+			t.Fatalf("the action's context: %v", d.actionErr)
+		}
+	})
 }
 
 func TestRunASecondQLeavesWithoutTheAction(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow(), hold: make(chan struct{})}
-	term, done := start(t, d)
-	eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'}, Key{Rune: 'q'})
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	close(d.hold)
-	eventually(t, "the action", func() bool { return len(d.calls()) == 1 })
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.actionErr[0] != nil {
-		t.Fatalf("leaving cancelled the action on its way to the daemon: %v", d.actionErr[0])
-	}
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), hold: make(chan struct{})}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'}, Key{Rune: 'q'})
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		close(d.hold)
+		eventually(t, "the action", func() bool { return len(d.calls()) == 1 })
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if d.actionErr[0] != nil {
+			t.Fatalf("leaving cancelled the action on its way to the daemon: %v", d.actionErr[0])
+		}
+	})
 }
 
 func TestRunSuspendsOnCtrlZ(t *testing.T) {
-	term, done := start(t, &fakeDaemon{})
-	term.press(Key{Name: KeyCtrlZ})
-	eventually(t, "the suspend", func() bool { _, _, s := term.stats(); return s == 1 })
-	quit(t, term, done)
+	synctest.Test(t, func(t *testing.T) {
+		term, done := start(t, &fakeDaemon{})
+		term.press(Key{Name: KeyCtrlZ})
+		eventually(t, "the suspend", func() bool { _, _, s := term.stats(); return s == 1 })
+		quit(t, term, done)
+	})
 }
 
 func TestRunReturnsAPanicAsAnError(t *testing.T) {
-	_, done := start(t, &fakeDaemon{panics: true})
-	if err := <-done; err == nil || !strings.Contains(err.Error(), "rows exploded") {
-		t.Fatalf("%v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		_, done := start(t, &fakeDaemon{panics: true})
+		if err := <-done; err == nil || !strings.Contains(err.Error(), "rows exploded") {
+			t.Fatalf("%v", err)
+		}
+	})
 }
 
 func TestRunEndsWhenTheKeysClose(t *testing.T) {
-	term, done := start(t, &fakeDaemon{})
-	eventually(t, "a draw", func() bool { n, _, _ := term.stats(); return n > 0 })
-	close(term.keys)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		term, done := start(t, &fakeDaemon{})
+		eventually(t, "a draw", func() bool { n, _, _ := term.stats(); return n > 0 })
+		close(term.keys)
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestRunKeepsCountingTheActionsItWaitsFor(t *testing.T) {
-	d := &fakeDaemon{rows: append(oneRow(), row(8, "Cache warmup", "review", "needs-me")), hold: make(chan struct{})}
-	term, done := start(t, d)
-	eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Cache warmup") })
-	term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Name: KeyDown}, Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
-	eventually(t, "two", func() bool { return strings.Contains(term.screen(), "waiting for 2 running action(s) to finish") })
-	d.hold <- struct{}{}
-	eventually(t, "one", func() bool {
-		return strings.Contains(term.screen(), "waiting for 1 running action(s) to finish; q again")
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: append(oneRow(), row(8, "Cache warmup", "review", "needs-me")), hold: make(chan struct{})}
+		term, done := start(t, d)
+		eventually(t, "the rows", func() bool { return strings.Contains(term.screen(), "Cache warmup") })
+		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Name: KeyDown}, Key{Rune: 'V'}, Key{Name: KeyEnter}, Key{Rune: 'q'})
+		eventually(t, "two", func() bool { return strings.Contains(term.screen(), "waiting for 2 running action(s) to finish") })
+		d.hold <- struct{}{}
+		eventually(t, "one", func() bool {
+			return strings.Contains(term.screen(), "waiting for 1 running action(s) to finish; q again")
+		})
+		d.hold <- struct{}{}
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
 	})
-	d.hold <- struct{}{}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestRunEndsWhenTheTerminalCannotBeTakenBack(t *testing.T) {
-	term, done := start(t, &fakeDaemon{})
-	term.mu.Lock()
-	term.suspendErr = errors.New("tcsetattr: bad file descriptor")
-	term.mu.Unlock()
-	term.press(Key{Name: KeyCtrlZ})
-	if err := <-done; err == nil || !strings.Contains(err.Error(), "suspend: tcsetattr") {
-		t.Fatalf("%v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		term, done := start(t, &fakeDaemon{})
+		term.mu.Lock()
+		term.suspendErr = errors.New("tcsetattr: bad file descriptor")
+		term.mu.Unlock()
+		term.press(Key{Name: KeyCtrlZ})
+		if err := <-done; err == nil || !strings.Contains(err.Error(), "suspend: tcsetattr") {
+			t.Fatalf("%v", err)
+		}
+	})
 }
 
 func TestSpecsAreFetchedOnceAndAgainWhenTheirVersionChanges(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	d.announce()
-	eventually(t, "a refresh", func() bool { return len(d.times(&d.rowsAt)) >= 2 })
-	d.announce()
-	eventually(t, "another refresh", func() bool { return len(d.times(&d.rowsAt)) >= 3 })
-	d.mu.Lock()
-	fetched := d.specsFetched
-	d.mu.Unlock()
-	if fetched != 1 {
-		t.Fatalf("specs fetched %d times at one version", fetched)
-	}
-	d.mu.Lock()
-	d.specs.Version = "next"
-	d.rows[0].SpecsVersion = "next"
-	d.mu.Unlock()
-	d.change(slices.Clone(d.rows))
-	d.announce()
-	eventually(t, "the new version", func() bool {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		d.announce()
+		eventually(t, "a refresh", func() bool { return len(d.times(&d.rowsAt)) >= 2 })
+		d.announce()
+		eventually(t, "another refresh", func() bool { return len(d.times(&d.rowsAt)) >= 3 })
 		d.mu.Lock()
-		defer d.mu.Unlock()
-		return d.specsFetched == 2
+		fetched := d.specsFetched
+		d.mu.Unlock()
+		if fetched != 1 {
+			t.Fatalf("specs fetched %d times at one version", fetched)
+		}
+		d.mu.Lock()
+		d.specs.Version = "next"
+		d.rows[0].SpecsVersion = "next"
+		d.mu.Unlock()
+		d.change(slices.Clone(d.rows))
+		d.announce()
+		eventually(t, "the new version", func() bool {
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			return d.specsFetched == 2
+		})
+		quit(t, term, done)
 	})
-	quit(t, term, done)
 }
 
 func TestAFailingSpecsReadKeepsTheFreshRows(t *testing.T) {
-	d := &fakeDaemon{rows: oneRow()}
-	term, done := start(t, d)
-	eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
-	d.mu.Lock()
-	d.specsErr = errors.New("actions down")
-	d.specs.Version = "next"
-	d.rows[0].SpecsVersion = "next"
-	d.rows[0].Title = "Fresh title"
-	d.mu.Unlock()
-	d.change(slices.Clone(d.rows))
-	d.announce()
-	eventually(t, "the fresh row and the status", func() bool {
-		s := term.screen()
-		return strings.Contains(s, "Fresh title") && strings.Contains(s, "actions not refreshed: actions down")
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow()}
+		term, done := start(t, d)
+		eventually(t, "the row", func() bool { return strings.Contains(term.screen(), "Batch export") })
+		d.mu.Lock()
+		d.specsErr = errors.New("actions down")
+		d.specs.Version = "next"
+		d.rows[0].SpecsVersion = "next"
+		d.rows[0].Title = "Fresh title"
+		d.mu.Unlock()
+		d.change(slices.Clone(d.rows))
+		d.announce()
+		eventually(t, "the fresh row and the status", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Fresh title") && strings.Contains(s, "actions not refreshed: actions down")
+		})
+		if strings.Contains(term.screen(), "not answering") {
+			t.Fatal("a specs failure was shown as a daemon failure")
+		}
+		term.press(Key{Rune: 'V'}, Key{Name: KeyEnter})
+		eventually(t, "the review still works with the previous specs", func() bool { return len(d.calls()) == 1 })
+		quit(t, term, done)
 	})
-	if strings.Contains(term.screen(), "not answering") {
-		t.Fatal("a specs failure was shown as a daemon failure")
-	}
-	term.press(Key{Rune: 'V'}, Key{Name: KeyEnter})
-	eventually(t, "the review still works with the previous specs", func() bool { return len(d.calls()) == 1 })
-	quit(t, term, done)
 }
