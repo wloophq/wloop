@@ -71,14 +71,18 @@ var (
 // parseFile parses the Go file at path once per test binary, into fileSet.
 func parseFile(t *testing.T, path string) (*token.FileSet, *ast.File) {
 	t.Helper()
-	parse, _ := parsed.LoadOrStore(path, sync.OnceValues(func() (*ast.File, error) {
-		return parser.ParseFile(fileSet, path, nil, 0)
-	}))
-	f, err := parse.(func() (*ast.File, error))()
+	f, err := parseOnce(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return fileSet, f
+}
+
+func parseOnce(path string) (*ast.File, error) {
+	parse, _ := parsed.LoadOrStore(path, sync.OnceValues(func() (*ast.File, error) {
+		return parser.ParseFile(fileSet, path, nil, 0)
+	}))
+	return parse.(func() (*ast.File, error))()
 }
 
 func local(path string) (string, bool) { return strings.CutPrefix(path, module) }
