@@ -16,9 +16,11 @@ const sample = `{
  },
  "type": {
   "families": {"sans": "system-ui, sans-serif", "mono": "ui-monospace, monospace"},
-  "groups": [{"name": "Text", "family": "sans", "styles": [{"name": "body", "fontSize": "13px"}]}]
+  "groups": [
+   {"name": "Text", "family": "sans", "styles": [{"name": "body", "fontSize": "13px"}, {"name": "row-title", "fontSize": "13px"}, {"name": "meta", "fontSize": "12px"}]},
+   {"name": "Mono", "family": "mono", "styles": [{"name": "kpi", "fontSize": "20px"}, {"name": "code", "fontSize": "12px"}]}
+  ]
  },
- "text": {"tokens": [{"name": "text-body", "value": "13px"}]},
  "spacing": {"tokens": [{"name": "space-4", "value": "4px"}]},
  "radius": {"tokens": [{"name": "radius-md", "value": "4px"}]},
  "layout": {"tokens": [
@@ -43,7 +45,9 @@ func TestCSSRendersThemesAndScales(t *testing.T) {
 }
 
 :root {
+  --text-kpi: 20px;
   --text-body: 13px;
+  --text-meta: 12px;
   --radius-md: 4px;
   --space-4: 4px;
   --rail-width: 188px;
@@ -61,10 +65,10 @@ func TestCSSRendersThemesAndScales(t *testing.T) {
 	}
 }
 
-func TestParseRefusesAStyleOffTheTextScale(t *testing.T) {
-	bad := strings.Replace(sample, `"fontSize": "13px"`, `"fontSize": "17px"`, 1)
-	if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "body") {
-		t.Errorf("err = %v, want one naming the body style", err)
+func TestParseRefusesAStyleSizeThatIsNotPixels(t *testing.T) {
+	bad := strings.Replace(sample, `"fontSize": "20px"`, `"fontSize": "1.5rem"`, 1)
+	if _, err := Parse([]byte(bad)); err == nil || !strings.Contains(err.Error(), "kpi") {
+		t.Errorf("err = %v, want one naming the kpi style", err)
 	}
 }
 
@@ -106,7 +110,9 @@ func TestBundleKeepsTheScaleAndTheRulesButNotTheColors(t *testing.T) {
 	}
 	want := BundleHeader + `
 :root {
+  --text-kpi: 20px;
   --text-body: 13px;
+  --text-meta: 12px;
   --radius-md: 4px;
   --space-4: 4px;
   --rail-width: 188px;

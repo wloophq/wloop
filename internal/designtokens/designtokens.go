@@ -5,11 +5,13 @@ package designtokens
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -41,10 +43,18 @@ type Tokens struct {
 			} `json:"styles"`
 		} `json:"groups"`
 	} `json:"type"`
-	Text    family `json:"text"`
 	Spacing family `json:"spacing"`
 	Radius  family `json:"radius"`
 	Layout  family `json:"layout"`
+
+	text []sizeStep
+}
+
+// sizeStep is one step of the text scale: a distinct style size, named after
+// the first style that uses it.
+type sizeStep struct {
+	name string
+	px   float64
 }
 
 type family struct {
@@ -80,7 +90,7 @@ func (v themeValue) in(theme string, first bool) (string, bool) {
 }
 
 // Parse reads tokens.json. The cockpit has a light theme and a dark one, in
-// that order, and every type style's size is a step of the text scale.
+// that order, and every type style's size is in pixels.
 func Parse(raw []byte) (Tokens, error) {
 	var t Tokens
 	if err := json.Unmarshal(raw, &t); err != nil {
@@ -89,17 +99,20 @@ func Parse(raw []byte) (Tokens, error) {
 	if len(t.Color.Themes) != 2 || t.Color.Themes[0].ID != "light" || t.Color.Themes[1].ID != "dark" {
 		return t, errors.New("color.themes must be light, then dark")
 	}
-	sizes := map[string]bool{}
-	for _, s := range t.Text.Tokens {
-		sizes[s.Value] = true
-	}
+	seen := map[float64]bool{}
 	for _, g := range t.Type.Groups {
 		for _, s := range g.Styles {
-			if !sizes[s.FontSize] {
-				return t, fmt.Errorf("type style %s: fontSize %s is not on the text scale", s.Name, s.FontSize)
+			px, err := strconv.ParseFloat(strings.TrimSuffix(s.FontSize, "px"), 64)
+			if err != nil || !strings.HasSuffix(s.FontSize, "px") {
+				return t, fmt.Errorf("type style %s: fontSize %q is not in px", s.Name, s.FontSize)
+			}
+			if !seen[px] {
+				seen[px] = true
+				t.text = append(t.text, sizeStep{"text-" + s.Name, px})
 			}
 		}
 	}
+	slices.SortFunc(t.text, func(a, b sizeStep) int { return cmp.Compare(b.px, a.px) })
 	return t, nil
 }
 
@@ -130,7 +143,10 @@ func (t Tokens) CSS() string {
 func (t Tokens) scale() string {
 	var b strings.Builder
 	b.WriteString(":root {\n")
-	for _, f := range []family{t.Text, t.Radius, t.Spacing, t.Layout} {
+	for _, s := range t.text {
+		fmt.Fprintf(&b, "  --%s: %spx;\n", s.name, strconv.FormatFloat(s.px, 'f', -1, 64))
+	}
+	for _, f := range []family{t.Radius, t.Spacing, t.Layout} {
 		for _, s := range f.Tokens {
 			// A custom property cannot be read by a media query.
 			if strings.HasPrefix(s.Name, "breakpoint-") {

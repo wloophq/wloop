@@ -237,6 +237,13 @@ func TestTheScriptsParse(t *testing.T) {
 	}
 }
 
+// detailWidthCSS stands in for a stylesheet whose --detail-width is width.
+func detailWidthCSS(width string) string {
+	return `globalThis.document = { documentElement: {} };
+globalThis.getComputedStyle = () => ({ getPropertyValue: (name) => name === "--detail-width" ? " ` + width + `" : "" });
+`
+}
+
 func TestDetailWidthClamp(t *testing.T) {
 	type in struct {
 		Px       float64 `json:"px"`
@@ -245,9 +252,9 @@ func TestDetailWidthClamp(t *testing.T) {
 	cases := []in{{380, 1600}, {100, 1600}, {5000, 1600}, {960, 1600}, {961, 1600}, {500, 400}, {299.6, 1600}}
 	want := []float64{380, 300, 960, 960, 960, 300, 300}
 	src := appJS(t)
-	prelude := jsConst(t, src, "DETAIL_WIDTH_DEFAULT") + jsConst(t, src, "DETAIL_WIDTH_MIN")
+	prelude := detailWidthCSS("380px") + jsConst(t, src, "DETAIL_WIDTH_MIN")
 	var got []float64
-	nodeRun(t, prelude, []string{"clampDetailWidth"},
+	nodeRun(t, prelude, []string{"defaultDetailWidth", "clampDetailWidth"},
 		`process.stdout.write(JSON.stringify(input.map((c) => clampDetailWidth(c.px, c.viewport))));`, cases, &got)
 	for i := range cases {
 		if got[i] != want[i] {
@@ -262,11 +269,11 @@ func TestDetailWidthRestore(t *testing.T) {
 		Throws bool   `json:"throws"`
 	}
 	cases := []in{{Stored: ""}, {Stored: "520"}, {Stored: "50"}, {Stored: "99999"}, {Stored: "junk"}, {Stored: "520", Throws: true}}
-	want := []float64{380, 520, 300, 960, 380, 380}
+	want := []float64{412, 520, 300, 960, 412, 412}
 	src := appJS(t)
-	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_DEFAULT") + jsConst(t, src, "DETAIL_WIDTH_MIN")
+	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + detailWidthCSS("412px") + jsConst(t, src, "DETAIL_WIDTH_MIN")
 	var got []float64
-	nodeRun(t, prelude, []string{"clampDetailWidth", "storedDetailWidth", "saveDetailWidth"}, `
+	nodeRun(t, prelude, []string{"defaultDetailWidth", "clampDetailWidth", "storedDetailWidth", "saveDetailWidth"}, `
 process.stdout.write(JSON.stringify(input.map((c) => {
   globalThis.localStorage = {
     getItem: () => { if (c.throws) throw new Error("denied"); return c.stored === "" ? null : c.stored; },
@@ -300,7 +307,7 @@ func TestDetailGridUsesWidthVariable(t *testing.T) {
 
 func TestDetailWidthSurvivesShrinkThenGrow(t *testing.T) {
 	src := appJS(t)
-	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + jsConst(t, src, "DETAIL_WIDTH_DEFAULT") +
+	prelude := jsConst(t, src, "DETAIL_WIDTH_KEY") + detailWidthCSS("380px") +
 		jsConst(t, src, "DETAIL_WIDTH_MIN") + jsConst(t, src, "DETAIL_WIDTH_STEP") + `
 const listeners = {};
 const attrs = {};
@@ -315,7 +322,7 @@ globalThis.window = { innerWidth: 1600, addEventListener: (n, f) => { winListene
 globalThis.localStorage = { getItem: () => "900", setItem: () => {}, removeItem: () => {} };
 `
 	var got []string
-	nodeRun(t, prelude, []string{"clampDetailWidth", "storedDetailWidth", "saveDetailWidth", "setupDetailResize"}, `
+	nodeRun(t, prelude, []string{"defaultDetailWidth", "clampDetailWidth", "storedDetailWidth", "saveDetailWidth", "setupDetailResize"}, `
 setupDetailResize();
 const seen = [style["--detail-width"]];
 window.innerWidth = 700; winListeners.resize(); seen.push(style["--detail-width"]);
