@@ -64,7 +64,7 @@ func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *tes
 	}
 }
 
-func TestAMixedEntryIsNeitherHiddenNorDismissedWithoutItsPlugin(t *testing.T) {
+func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 	r := newOutboxRig(t, "slack")
 	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
 	if got := entryIDs(r.page(t, "view=inbox").Entries); len(got) != 1 || got[0] != "e-mixed" {
@@ -75,12 +75,28 @@ func TestAMixedEntryIsNeitherHiddenNorDismissedWithoutItsPlugin(t *testing.T) {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range v.Verbs {
-		if vs.Enabled {
+		if vs.Enabled != (vs.Verb == "dismiss") || !vs.Enabled && vs.Reason != "slack is disabled" {
 			t.Errorf("%+v", vs)
 		}
 	}
-	if rec := post(t, r.s, api.EntryPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+	if rec := post(t, r.s, api.EntryPath("e-mixed", "next"), `{"source":"cockpit"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+		t.Fatalf("next: %d %s", rec.Code, rec.Body)
+	}
+	rec := post(t, r.s, api.EntryPath("e-mixed", "dismiss"), `{"source":"cockpit"}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"inbox"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
+	}
+	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || len(got.Units) != 1 || got.Units[0] != r7u || got.State != gtd.Inbox {
+		t.Fatalf("detached %+v %v", got, err)
+	}
+	var after api.EntryView
+	if code := get(t, r.s, api.EntryPath("e-mixed"), &after); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	for _, vs := range after.Verbs {
+		if vs.Reason == "slack is disabled" {
+			t.Errorf("still refused: %+v", vs)
+		}
 	}
 }
 

@@ -63,8 +63,8 @@ func (s *Service) handler(kind gtd.Kind, verb gtd.Verb) VerbHandler {
 }
 
 // Do runs req.Verb on entry id: a registered handler first, else the state change. An entry of a unit whose
-// plugin is disabled refuses every verb with ErrPluginDisabled, but dismiss moves an entry whose units are all of
-// disabled plugins to the Trash.
+// plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves an entry whose units are
+// all of disabled plugins to the Trash and detaches a disabled plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error) {
 	if !known(req.Verb) {
 		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
@@ -88,8 +88,11 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 	}
 	off := false
 	if err := s.writable(ctx, e, nil); err != nil {
-		if hidden := s.hider(); req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) || hidden == nil || !hidden(e) {
+		if req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
+		}
+		if hidden := s.hider(); hidden == nil || !hidden(e) {
+			return s.detach(ctx, id)
 		}
 		off = true
 	}
@@ -158,6 +161,48 @@ func (s *Service) project(ctx context.Context, e gtd.Entry, args map[string]stri
 		e.Position = pos
 	}
 	return append(cs, gtd.Change{Op: gtd.OpUpdate, Entry: e, Why: "project"}), nil
+}
+
+// detach removes from entry id the units of a disabled plugin and its items on them; the entry keeps its state.
+func (s *Service) detach(ctx context.Context, id gtd.ID) (Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.d.Store.Entry(ctx, id)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := accepts(e, gtd.VerbDismiss); err != nil {
+		return Result{}, err
+	}
+	var off []unit.Unit
+	var providers []string
+	for _, u := range e.Units {
+		if _, enabled, err := s.d.Facts.UnitFacts(ctx, u); err != nil {
+			return Result{}, err
+		} else if !enabled {
+			off = append(off, u)
+			if p := string(u.Provider); !slices.Contains(providers, p) {
+				providers = append(providers, p)
+			}
+		}
+	}
+	if len(off) == 0 {
+		return Result{Entry: e}, nil
+	}
+	e.Units = slices.DeleteFunc(slices.Clone(e.Units), func(u unit.Unit) bool { return slices.Contains(off, u) })
+	e.Items = slices.DeleteFunc(slices.Clone(e.Items), func(r gtd.ItemRef) bool { return slices.Contains(off, r.Unit) })
+	e.Updated = s.now()
+	why := "detached " + strings.Join(providers, ", ")
+	if len(e.Units) == 0 {
+		if e, err = transition(e, Request{Verb: gtd.VerbDismiss}, e.Updated); err != nil {
+			return Result{}, err
+		}
+		why += "; dismiss"
+	}
+	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: e, Why: why}}); err != nil {
+		return Result{}, err
+	}
+	return Result{Entry: e}, nil
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

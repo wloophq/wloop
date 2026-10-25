@@ -262,7 +262,7 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	v := gtd.Verb(verb)
-	if v == gtd.VerbDismiss && s.pluginsOff(e) {
+	if v == gtd.VerbDismiss && s.pluginOff(e) {
 		res, err := g.Do(ctx, e.ID, coregtd.Request{Verb: v, Args: req.Args, Source: req.Source})
 		s.writeEntryResult(ctx, w, g, res, err)
 		return
@@ -720,7 +720,7 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 			break
 		}
 	}
-	dismissable := ev.s.pluginsOff(e)
+	dismissable := ev.s.pluginOff(e)
 	var row *api.Row
 	if len(e.Units) > 0 {
 		if rd, ok, err := ev.s.readModel().Read(ctx, e.Units[0]); err == nil && ok {
