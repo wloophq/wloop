@@ -49,18 +49,17 @@ jobs:
           SHARD: ${{ matrix.shard }}
 
   test:
-    needs: [build, test-shard]
+    needs: [build, test-shard, brand, lint, generated, workflows]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Require the build and every shard
+      - name: Require every job
         env:
-          BUILD: ${{ needs.build.result }}
-          SHARDS: ${{ needs.test-shard.result }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
-          echo "build: $BUILD, shards: $SHARDS"
-          test "$BUILD" = success && test "$SHARDS" = success
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null
 
   test-macos:
     runs-on: macos-latest
