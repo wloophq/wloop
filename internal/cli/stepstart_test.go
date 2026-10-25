@@ -196,7 +196,7 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 	ref := sc.ref
 	st := r.load(t)
 	sc.te.cfg.Rounds.PerPRPerDay = 1
-	st.RecordFollowup(ref.String(), "", testNow)
+	st.RecordFollowup(ref.String(), round.Reviewed, "", testNow)
 	guards := []struct {
 		want     string
 		set, off func()
@@ -315,7 +315,7 @@ func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.te.cfg.Rounds.PerPRPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), "", testNow)
+	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 	r.save(t)
 	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
 	if refusal != "per-PR daily cap reached (1)" {
@@ -349,13 +349,13 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		kind          string
 	}{
 		"follow-up": {followupScenario, string(dintent.Review), roundFollowup, func(t *testing.T, st *round.Store, c roundCandidate, key string) {
-			if st.Fingerprint(key) != c.Fingerprint {
-				t.Errorf("fingerprint %q, want %q", st.Fingerprint(key), c.Fingerprint)
+			if st.Mark(key, round.Reviewed) != c.Fingerprint {
+				t.Errorf("fingerprint %q, want %q", st.Mark(key, round.Reviewed), c.Fingerprint)
 			}
 		}, "follow-up"},
 		"triage": {addressScenario, string(dintent.Address), "", func(t *testing.T, st *round.Store, c roundCandidate, key string) {
-			if st.Fingerprint(key) != c.Fingerprint || st.ChecksHead(key) != c.ChecksHead {
-				t.Errorf("fingerprint %q, checks head %q; want %+v", st.Fingerprint(key), st.ChecksHead(key), c)
+			if st.Mark(key, round.AddressedReviews) != c.Fingerprint || st.Mark(key, round.AddressedChecks) != c.ChecksHead {
+				t.Errorf("fingerprint %q, checks head %q; want %+v", st.Mark(key, round.AddressedReviews), st.Mark(key, round.AddressedChecks), c)
 			}
 		}, "triage"},
 	} {
@@ -541,7 +541,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	cands[key] = c
 	sc.te.cfg.Rounds.PerPRPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), "", testNow)
+	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 	r.save(t)
 	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
 	if refusal != "per-PR daily cap reached (1)" {
@@ -565,7 +565,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	fc[fkey] = f
 	fsc.te.cfg.Rounds.PerPRPerDay = 1
 	fst := fr.load(t)
-	fst.RecordFollowup(fsc.ref.String(), "", testNow)
+	fst.RecordFollowup(fsc.ref.String(), round.Reviewed, "", testNow)
 	fr.save(t)
 	if got := fr.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "" {
 		t.Fatalf("observed follow-up: %q", got)

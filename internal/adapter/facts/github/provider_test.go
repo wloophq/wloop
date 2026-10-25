@@ -302,10 +302,10 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 		{name: "no review by me", edit: func(_ *dinv.PR, f *pr.Facts) { f.Reviews = nil }},
 		{name: "new commits", action: "follow-up"},
 		{name: "this head got its follow-up", setup: func(w *world) {
-			w.rounds.SetFingerprint(ref(7).String(), t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
+			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
 		}},
 		{name: "this review got its follow-up", setup: func(w *world) {
-			w.rounds.SetFingerprint(ref(7).String(), t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
+			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
 		}},
 		{name: "draft", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsDraft = true }},
 		{name: "fork", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsFork = true }},
@@ -321,7 +321,7 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 				c.setup(w)
 			}
 			want := dchange.Reviewer(dchange.ReviewerInput{PR: w.details[r].Facts, Viewer: me, WorkspaceStatus: w.snap.Workspaces[1].Status,
-				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Fingerprint(r.String())})
+				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), round.Reviewed)})
 			f := facts(t, w.provider(), r.Unit())
 			if f["pr.review.action"] != c.action || f["pr.review.reason"] != want.Reason {
 				t.Fatalf("review = %q, %q; want %q, %q", f["pr.review.action"], f["pr.review.reason"], c.action, want.Reason)
@@ -428,8 +428,8 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
 	}
 
-	w.rounds.SetFingerprint(r.String(), fp)
-	w.rounds.SetChecksHead(r.String(), "head")
+	w.rounds.SetMark(r.String(), round.AddressedReviews, fp)
+	w.rounds.SetHeads(r.String(), "head", "")
 	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" {
 		t.Fatalf("a handled pull request is due: %v", f)
 	}
@@ -455,7 +455,7 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	}
 	first := f["pr.fingerprint"]
 
-	w.rounds.SetConflictHead(r.String(), "head")
+	w.rounds.SetHeads(r.String(), "", "head")
 	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
 		t.Fatalf("a handled conflict is due: %v", f)
 	}
@@ -619,7 +619,7 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w := newWorld()
 	reviewed := w.review(7, nil)
 	reviewedAt := t0.Add(-2 * time.Hour).UTC().Format(time.RFC3339)
-	w.rounds.SetFingerprint(reviewed.String(), reviewedAt)
+	w.rounds.SetMark(reviewed.String(), round.Reviewed, reviewedAt)
 	skipped := w.requested(3, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "skipped" })
 	w.rounds.SkipFirstRound(skipped.String())
 	w.workspace(wsdomain.Workspace{ID: "rev3", DisplayName: "REVIEW skipped", Branch: "skipped"})
@@ -637,7 +637,7 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
 		t.Fatal(err)
 	}
-	if fp := w.rounds.Fingerprint(reviewed.String()); fp != reviewedAt+"@c2" {
+	if fp := w.rounds.Mark(reviewed.String(), round.Reviewed); fp != reviewedAt+"@c2" {
 		t.Fatalf("fingerprint = %q, want the head added", fp)
 	}
 	if w.rounds.FirstRoundSkipped(skipped.String()) {
@@ -813,7 +813,7 @@ func TestDueMatchesTheBasesNextDue(t *testing.T) {
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
 			for range w.cfg.Rounds.PerPRPerDay {
-				w.rounds.RecordFollowup(r.String(), "", t0)
+				w.rounds.RecordFollowup(r.String(), round.Reviewed, "", t0)
 			}
 		}, nextDay(t0)},
 		{"conflict window", func(w *world) {

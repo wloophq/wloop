@@ -348,6 +348,6 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 // recordAddressed marks the reviews so far and the checks and the conflict
 // of head as covered by a round asked for by hand.
 func (e *Env) recordAddressed(st *round.Store, ref github.Ref, head string) {
-	st.SetFingerprint(ref.String(), e.Now().UTC().Format(time.RFC3339))
+	st.SetMark(ref.String(), round.AddressedReviews, e.Now().UTC().Format(time.RFC3339))
 	st.SetHeads(ref.String(), head, head)
 }

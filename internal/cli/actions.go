@@ -24,6 +24,7 @@ import (
 	dchange "github.com/wloophq/wloop/internal/domain/change"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
@@ -436,7 +437,7 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 	if !submitted {
 		verb += " (submission not observed; check the session)"
 	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.TrustedAuthors}); d.Fingerprint != "" {
-		st.SetFingerprint(ref.String(), d.Fingerprint)
+		st.SetMark(ref.String(), round.Reviewed, d.Fingerprint)
 	}
 	st.RecordRound(ref.String(), e.Now())
 	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)

@@ -467,7 +467,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			return "", startError(err)
 		}
 		if p.args.capped() {
-			st.RecordFollowup(p.ref.String(), "", s.e.Now())
+			st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
 		}
 		return "started a " + p.args.intent + " turn", nil
 	}
@@ -540,10 +540,10 @@ func skip(st *round.Store, key string, kind stepKind, cand roundCandidate, ok bo
 	case !ok:
 	case kind == stepAddress:
 		if cand.Fingerprint != "" {
-			st.SetFingerprint(key, cand.Fingerprint)
+			st.SetMark(key, round.AddressedReviews, cand.Fingerprint)
 		}
 		st.SetHeads(key, cand.ChecksHead, cand.ConflictHead)
 	default:
-		st.SetFingerprint(key, cand.Fingerprint)
+		st.SetMark(key, round.Reviewed, cand.Fingerprint)
 	}
 }

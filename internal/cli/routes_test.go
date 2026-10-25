@@ -18,6 +18,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
@@ -36,7 +37,7 @@ func effectsOf(t *testing.T, te *testEnv, ref github.Ref) effects {
 	t.Helper()
 	st := te.loadRounds(t)
 	key := ref.String()
-	got := effects{round: !st.RoundAt(key).IsZero(), fingerprint: st.Fingerprint(key) != "", checksHead: st.ChecksHead(key), conflictHead: st.ConflictHead(key)}
+	got := effects{round: !st.RoundAt(key).IsZero(), fingerprint: st.Mark(key, round.Reviewed)+st.Mark(key, round.AddressedReviews) != "", checksHead: st.Mark(key, round.AddressedChecks), conflictHead: st.Mark(key, round.AddressedConflict)}
 	evs, err := te.Store.Events(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)

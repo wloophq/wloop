@@ -11,7 +11,7 @@ func TestCapAndFingerprint(t *testing.T) {
 	if s.CapReason("a#1", now, 1) != "" {
 		t.Fatal("capped on a fresh state")
 	}
-	s.RecordFollowup("a#1", "fp1", now)
+	s.RecordFollowup("a#1", Reviewed, "fp1", now)
 	if s.CapReason("a#1", now, 1) == "" {
 		t.Fatal("per-PR cap not applied")
 	}
@@ -21,8 +21,8 @@ func TestCapAndFingerprint(t *testing.T) {
 	if !s.FirstCapHit("a#3", now) || s.FirstCapHit("a#3", now) {
 		t.Fatal("cap hit should be reported once per day")
 	}
-	if s.Fingerprint("a#1") != "fp1" {
-		t.Fatalf("fingerprint lost: %q", s.Fingerprint("a#1"))
+	if s.Mark("a#1", Reviewed) != "fp1" || s.Mark("a#1", AddressedReviews) != "" {
+		t.Fatalf("marks: reviewed %q, addressed %q", s.Mark("a#1", Reviewed), s.Mark("a#1", AddressedReviews))
 	}
 	if s.CapReason("a#1", now.Add(24*time.Hour), 1) != "" {
 		t.Fatal("cap did not reset the next day")
@@ -32,14 +32,17 @@ func TestCapAndFingerprint(t *testing.T) {
 func TestSettersRecordWhatTheyChanged(t *testing.T) {
 	now := time.Date(2026, 10, 9, 10, 0, 0, 0, time.Local)
 	s := New()
-	s.SetChecksHead("a/b#1", "abc")
-	s.RecordFollowup("a/b#1", "", now)
+	s.SetHeads("a/b#1", "abc", "")
+	s.RecordFollowup("a/b#1", AddressedReviews, "", now)
 	s.ClearFirstRoundSkipped("a/b#2")
 	s.FirstNote("hello", now)
 	s.FirstNote("hello", now)
 	ch := s.Changes()
-	if got, want := ch.PRs["a/b#1"], FieldChecksHead|FieldSentAt|FieldRoundAt; got != want {
+	if got, want := ch.PRs["a/b#1"], FieldSentAt|FieldRoundAt; got != want {
 		t.Fatalf("fields %b, want %b", got, want)
+	}
+	if got := ch.Marks["a/b#1"]; len(got) != 1 || !got[AddressedChecks] {
+		t.Fatalf("marks %v, want only %s", got, AddressedChecks)
 	}
 	if _, ok := ch.PRs["a/b#2"]; ok {
 		t.Fatal("a clear that changed nothing was recorded")
@@ -51,7 +54,7 @@ func TestSettersRecordWhatTheyChanged(t *testing.T) {
 		t.Fatalf("notes %+v", ch.Notes)
 	}
 	s.Saved()
-	if ch := s.Changes(); len(ch.PRs)+len(ch.Counts)+len(ch.Notes) != 0 {
+	if ch := s.Changes(); len(ch.PRs)+len(ch.Marks)+len(ch.Counts)+len(ch.Notes) != 0 {
 		t.Fatalf("changes kept after Saved: %+v", ch)
 	}
 }
@@ -66,5 +69,17 @@ func TestPauseHoldsEverythingOrItsRepositories(t *testing.T) {
 	}
 	if (Pause{}).Holds("acme", "api") {
 		t.Fatal("an off pause holds")
+	}
+}
+
+func TestAnEmptyMarkIsNoMark(t *testing.T) {
+	s := New()
+	s.SetMark("a/b#1", AddressedReviews, "2026-10-09T10:00:00Z")
+	s.SetMark("a/b#1", AddressedReviews, "")
+	if _, ok := s.PRs["a/b#1"].Marks[AddressedReviews]; ok {
+		t.Fatal("an emptied mark is kept")
+	}
+	if !s.Changes().Marks["a/b#1"][AddressedReviews] {
+		t.Fatal("removing a mark is a change to save")
 	}
 }

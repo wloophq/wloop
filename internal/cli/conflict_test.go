@@ -15,13 +15,13 @@ func TestAHandledAddressRoundMarksItsConflictHead(t *testing.T) {
 
 	dismissed := round.New()
 	skip(dismissed, key, stepAddress, roundCandidate{ConflictHead: "h1"}, true)
-	if got := dismissed.ConflictHead(key); got != "h1" {
+	if got := dismissed.Mark(key, round.AddressedConflict); got != "h1" {
 		t.Errorf("a dismissed candidate: conflict head %q", got)
 	}
 
 	skipped := &sweep{st: round.New()}
 	skipped.skip(step{kind: stepAddress, pr: ref, conflictHead: "h2"})
-	if got := skipped.st.ConflictHead(key); got != "h2" {
+	if got := skipped.st.Mark(key, round.AddressedConflict); got != "h2" {
 		t.Errorf("a skipped step: conflict head %q", got)
 	}
 

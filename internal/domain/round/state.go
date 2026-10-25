@@ -7,18 +7,25 @@ import (
 	"time"
 )
 
+// The marks the rounds of a pull request write, by what they covered.
+const (
+	// Reviewed is my last review and the head on a PR I review.
+	Reviewed = "reviewed"
+	// AddressedReviews is the newest review triaged on a PR I develop.
+	AddressedReviews = "addressed.reviews"
+	// AddressedChecks is the head whose failing checks a triage round covered.
+	AddressedChecks = "addressed.checks"
+	// AddressedConflict is the head whose conflict with the base a triage
+	// round covered.
+	AddressedConflict = "addressed.conflict"
+)
+
 type PR struct {
-	// Fingerprint is what the last round covered: on a PR I review, my last
-	// review and the head; on a PR I develop, the newest review triaged.
-	Fingerprint string
-	SentAt      time.Time
+	// Marks are what the rounds covered, by mark name; see mark.Handled.
+	Marks  map[string]string
+	SentAt time.Time
 	// RoundAt is when the last round of any kind was sent.
 	RoundAt time.Time
-	// ChecksHead is the head whose failing checks a triage round covered.
-	ChecksHead string
-	// ConflictHead is the head whose conflict with the base a triage round
-	// covered.
-	ConflictHead string
 	// AgentHome is the agent home of the session that asked for the review,
 	// reused by the rounds the watch starts.
 	AgentHome string
@@ -40,13 +47,10 @@ type Day struct {
 type Fields uint8
 
 const (
-	FieldFingerprint Fields = 1 << iota
-	FieldSentAt
+	FieldSentAt Fields = 1 << iota
 	FieldRoundAt
-	FieldChecksHead
 	FieldAgentHome
 	FieldFirstRoundSkipped
-	FieldConflictHead
 )
 
 // The kinds of a Note.
@@ -64,7 +68,9 @@ type Note struct{ Day, Kind, Text string }
 // saved: a repository writes only these, so two snapshots that change
 // different fields of one PR both keep their change.
 type Changes struct {
-	PRs    map[string]Fields
+	PRs map[string]Fields
+	// Marks are the marks set or removed, by PR.
+	Marks  map[string]map[string]bool
 	Counts []Count
 	Notes  []Note
 }
@@ -79,13 +85,15 @@ type Store struct {
 }
 
 func New() *Store {
-	return &Store{PRs: map[string]PR{}, Days: map[string]Day{}, changes: Changes{PRs: map[string]Fields{}}}
+	return &Store{PRs: map[string]PR{}, Days: map[string]Day{}, changes: Changes{PRs: map[string]Fields{}, Marks: map[string]map[string]bool{}}}
 }
 
 func (s *Store) Changes() Changes { return s.changes }
 
 // Saved forgets the changes once a repository wrote them.
-func (s *Store) Saved() { s.changes = Changes{PRs: map[string]Fields{}} }
+func (s *Store) Saved() {
+	s.changes = Changes{PRs: map[string]Fields{}, Marks: map[string]map[string]bool{}}
+}
 
 func (s *Store) set(key string, f Fields, edit func(*PR)) {
 	p := s.PRs[key]
@@ -101,7 +109,29 @@ func (s *Store) set(key string, f Fields, edit func(*PR)) {
 // reset mid-evening in America/Sao_Paulo.
 func DayKey(t time.Time) string { return t.Local().Format("2006-01-02") }
 
-func (s *Store) Fingerprint(key string) string { return s.PRs[key].Fingerprint }
+// Mark is key's mark name; empty when none.
+func (s *Store) Mark(key, name string) string { return s.PRs[key].Marks[name] }
+
+// SetMark sets key's mark name; an empty value removes it.
+func (s *Store) SetMark(key, name, value string) {
+	p := s.PRs[key]
+	if value == "" {
+		delete(p.Marks, name)
+	} else {
+		if p.Marks == nil {
+			p.Marks = map[string]string{}
+		}
+		p.Marks[name] = value
+	}
+	s.PRs[key] = p
+	if s.changes.Marks == nil {
+		s.changes.Marks = map[string]map[string]bool{}
+	}
+	if s.changes.Marks[key] == nil {
+		s.changes.Marks[key] = map[string]bool{}
+	}
+	s.changes.Marks[key][name] = true
+}
 
 // CapReason returns why an automated round for key may not run today, or "".
 func (s *Store) CapReason(key string, now time.Time, perPR int) string {
@@ -156,46 +186,24 @@ func (s *Store) RecordRound(key string, now time.Time) {
 	s.set(key, FieldRoundAt, func(p *PR) { p.RoundAt = now.UTC() })
 }
 
-func (s *Store) SetFingerprint(key, fingerprint string) {
-	s.set(key, FieldFingerprint, func(p *PR) { p.Fingerprint = fingerprint })
-}
-
-func (s *Store) ChecksHead(key string) string { return s.PRs[key].ChecksHead }
-
-func (s *Store) SetChecksHead(key, head string) {
-	s.set(key, FieldChecksHead, func(p *PR) { p.ChecksHead = head })
-}
-
-func (s *Store) ConflictHead(key string) string { return s.PRs[key].ConflictHead }
-
-func (s *Store) SetConflictHead(key, head string) {
-	s.set(key, FieldConflictHead, func(p *PR) { p.ConflictHead = head })
-}
-
 // SetHeads marks the failing checks and the conflict of the heads an
 // address round covered; an empty head leaves its mark as it was.
 func (s *Store) SetHeads(key, checksHead, conflictHead string) {
 	if checksHead != "" {
-		s.SetChecksHead(key, checksHead)
+		s.SetMark(key, AddressedChecks, checksHead)
 	}
 	if conflictHead != "" {
-		s.SetConflictHead(key, conflictHead)
+		s.SetMark(key, AddressedConflict, conflictHead)
 	}
 }
 
-// RecordFollowup keeps the previous fingerprint when the round was not
-// started by a review.
-func (s *Store) RecordFollowup(key, fingerprint string, now time.Time) {
-	f := FieldSentAt | FieldRoundAt
+// RecordFollowup counts a round sent and sets its mark to fingerprint; an
+// empty fingerprint keeps the mark as it was, for a round no review started.
+func (s *Store) RecordFollowup(key, mark, fingerprint string, now time.Time) {
 	if fingerprint != "" {
-		f |= FieldFingerprint
+		s.SetMark(key, mark, fingerprint)
 	}
-	s.set(key, f, func(p *PR) {
-		if fingerprint != "" {
-			p.Fingerprint = fingerprint
-		}
-		p.SentAt, p.RoundAt = now.UTC(), now.UTC()
-	})
+	s.set(key, FieldSentAt|FieldRoundAt, func(p *PR) { p.SentAt, p.RoundAt = now.UTC(), now.UTC() })
 	day := DayKey(now)
 	d := s.Days[day]
 	if d.PerPR == nil {

@@ -159,7 +159,7 @@ var writes = []writeCase{
 	{
 		method: "Rounds.Save", name: "/fields and a count",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordFollowup(noteRef.String(), "fp", noteAt) })
+			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordFollowup(noteRef.String(), round.Reviewed, "fp", noteAt) })
 		},
 		topics: port.TopicRounds, units: []unit.Unit{u7},
 	},
@@ -282,7 +282,7 @@ var reads = []string{
 	"Rounds.AgentHome", "Rounds.Load", "Rounds.Pause",
 	"intakeStore.Intake", "intakeStore.Open",
 	"usageStore.Pending",
-	"DB.Ledger", "DB.Events", "DB.Classifications", "DB.Fetches",
+	"DB.Ledger", "DB.Marks", "DB.Events", "DB.Classifications", "DB.Fetches",
 	"ledger.Items", "ledger.Run", "ledger.Count",
 	"events.Since", "events.Head", "events.Cursor",
 	"Classifications.Output", "Classifications.Spent",

@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -86,7 +87,7 @@ func TestAFollowUpWhoseSubmissionWasNotObservedStoresNothing(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	st, _ := sc.te.Rounds.Load(context.Background())
-	if st.Fingerprint(sc.ref.String()) != "" {
+	if st.Mark(sc.ref.String(), round.Reviewed) != "" {
 		t.Fatal("fingerprint stored without an observed submission")
 	}
 	if st.CapReason(sc.ref.String(), testNow, 1) != "" {
@@ -106,7 +107,7 @@ func TestAnAddressRoundQueuesInABusySession(t *testing.T) {
 		t.Fatalf("writes:\n%s", w)
 	}
 	st, _ := sc.te.Rounds.Load(context.Background())
-	if st.Fingerprint(sc.ref.String()) == "" {
+	if st.Mark(sc.ref.String(), round.AddressedReviews) == "" {
 		t.Fatal("a queued prompt was not recorded; the next sweep would send it again")
 	}
 }

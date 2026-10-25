@@ -30,14 +30,14 @@ func NewRounds(db *DB) *Rounds { return &Rounds{db: db} }
 func (r *Rounds) Load(ctx context.Context) (*round.Store, error) {
 	st := round.New()
 	err := r.db.Read(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT unit_key, fingerprint, sent_at, round_at, checks_head, agent_home, first_round_skipped, conflict_head FROM round_state WHERE provider = 'github'`)
+		rows, err := tx.QueryContext(ctx, `SELECT unit_key, sent_at, round_at, agent_home, first_round_skipped FROM round_state WHERE provider = 'github'`)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
 			var key, sent, roundAt string
 			var p round.PR
-			if err := rows.Scan(&key, &p.Fingerprint, &sent, &roundAt, &p.ChecksHead, &p.AgentHome, &p.FirstRoundSkipped, &p.ConflictHead); err != nil {
+			if err := rows.Scan(&key, &sent, &roundAt, &p.AgentHome, &p.FirstRoundSkipped); err != nil {
 				rows.Close()
 				return err
 			}
@@ -46,6 +46,21 @@ func (r *Rounds) Load(ctx context.Context) (*round.Store, error) {
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
+			return err
+		}
+		if err := each(ctx, tx, `SELECT unit_key, mark, value FROM unit_marks WHERE provider = 'github'`, func(rows *sql.Rows) error {
+			var key, name, value string
+			if err := rows.Scan(&key, &name, &value); err != nil {
+				return err
+			}
+			p := st.PRs[key]
+			if p.Marks == nil {
+				p.Marks = map[string]string{}
+			}
+			p.Marks[name] = value
+			st.PRs[key] = p
+			return nil
+		}); err != nil {
 			return err
 		}
 		return loadDays(ctx, tx, st)
@@ -132,6 +147,17 @@ func (r *Rounds) Save(ctx context.Context, st *round.Store) error {
 			}
 			tx.Touch(port.TopicRounds, ref.Unit())
 		}
+		for key, names := range ch.Marks {
+			ref, err := ParseKey(key)
+			if err != nil {
+				return err
+			}
+			for name := range names {
+				if err := saveMark(ctx, tx, ref.Unit(), name, st.PRs[key].Marks[name]); err != nil {
+					return err
+				}
+			}
+		}
 		newest := ""
 		for _, c := range ch.Counts {
 			ref, err := ParseKey(c.Key)
@@ -187,13 +213,10 @@ func saveFields(ctx context.Context, tx *Tx, ref pr.Ref, p round.PR, f round.Fie
 		column string
 		value  any
 	}{
-		{round.FieldFingerprint, "fingerprint", p.Fingerprint},
 		{round.FieldSentAt, "sent_at", formatTime(p.SentAt)},
 		{round.FieldRoundAt, "round_at", formatTime(p.RoundAt)},
-		{round.FieldChecksHead, "checks_head", p.ChecksHead},
 		{round.FieldAgentHome, "agent_home", p.AgentHome},
 		{round.FieldFirstRoundSkipped, "first_round_skipped", p.FirstRoundSkipped},
-		{round.FieldConflictHead, "conflict_head", p.ConflictHead},
 	} {
 		if f&c.field != 0 {
 			sets = append(sets, c.column+" = ?")

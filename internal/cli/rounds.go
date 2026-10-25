@@ -76,6 +76,16 @@ func (s step) payload() turn.Payload {
 	return p
 }
 
+// mark is the round mark the step's reviews fingerprint sets.
+func (s step) mark() string { return markOf(s.kind) }
+
+func markOf(k stepKind) string {
+	if k == stepAddress {
+		return round.AddressedReviews
+	}
+	return round.Reviewed
+}
+
 func (s step) roundKind() string {
 	switch s.kind {
 	case stepFirstRound:
@@ -176,11 +186,11 @@ func (s *sweep) skip(st step) {
 		s.st.SkipFirstRound(key)
 	case stepAddress:
 		if st.fingerprint != "" {
-			s.st.SetFingerprint(key, st.fingerprint)
+			s.st.SetMark(key, round.AddressedReviews, st.fingerprint)
 		}
 		s.st.SetHeads(key, st.checksHead, st.conflictHead)
 	default:
-		s.st.SetFingerprint(key, st.fingerprint)
+		s.st.SetMark(key, round.Reviewed, st.fingerprint)
 	}
 }
 
@@ -347,7 +357,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -397,7 +407,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -456,7 +466,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
 	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)

@@ -14,6 +14,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 )
 
 // blindBlock is how long a start block holds when the session runs with its
@@ -119,7 +120,7 @@ func (p *Provider) Settle(ctx context.Context, st automation.State) error {
 		}
 		key := ref.String()
 		if r.review.upgrade != "" && r.review.settle && !everywhere && !v.pause.Holds(ref.Owner, ref.Repo) {
-			v.rounds.SetFingerprint(key, r.review.upgrade)
+			v.rounds.SetMark(key, round.Reviewed, r.review.upgrade)
 		}
 		if v.requested(ref) {
 			requested[ref] = true

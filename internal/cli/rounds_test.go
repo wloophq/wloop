@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -103,7 +104,7 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 		t.Fatalf("out %q, want %q", out.String(), want)
 	}
 	fp := r.steps.d.Candidates.(fakeCandidates)[sc.ref.String()+" "+roundAddress].Fingerprint
-	if got := sc.te.loadRounds(t).Fingerprint(sc.ref.String()); fp == "" || got != fp {
+	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.AddressedReviews); fp == "" || got != fp {
 		t.Fatalf("fingerprint %q, want the blocked round's %q", got, fp)
 	}
 }

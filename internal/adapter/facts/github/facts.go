@@ -17,6 +17,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -255,7 +256,7 @@ func (pl *planner) review(ref pr.Ref, r *result) error {
 		CompletedStatus: pl.completed,
 		TrustedOwners:   pl.owners,
 		TrustedAuthors:  pl.cfg.For(ref.Owner, ref.Repo).TrustedAuthors,
-		LastFingerprint: pl.v.rounds.Fingerprint(ref.String()),
+		LastFingerprint: pl.v.rounds.Mark(ref.String(), round.Reviewed),
 		Recorded:        pl.recorded(ref),
 	})
 	r.review.reason, r.review.settle = d.Reason, !r.stale
@@ -511,13 +512,13 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	var fp string
 	if pl.cfg.AddressReviews {
 		var handled time.Time
-		if prev := pl.v.rounds.Fingerprint(key); prev != "" {
+		if prev := pl.v.rounds.Mark(key, round.AddressedReviews); prev != "" {
 			handled, _ = time.Parse(time.RFC3339, prev)
 		}
 		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.AddressSkipReviewers})
 	}
 	if pl.cfg.AddressChecks {
-		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.ChecksHead(key), pl.cfg.IgnoreChecks)
+		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.Mark(key, round.AddressedChecks), pl.cfg.IgnoreChecks)
 	}
 	var reasons []string
 	if len(who) > 0 {
@@ -527,7 +528,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
-	if pl.cfg.AddressConflicts && pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.ConflictHead(key) {
+	if pl.cfg.AddressConflicts && pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.Mark(key, round.AddressedConflict) {
 		reasons = append(reasons, "conflicts with "+f.BaseRefName)
 		r.address.conflictHead = f.HeadRefOid
 	}

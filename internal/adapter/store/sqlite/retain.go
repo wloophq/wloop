@@ -190,6 +190,7 @@ var endedTables = []endedTable{
 	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"plan_items", port.TopicGate, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
+	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"pr_briefs", port.TopicBriefs, `DELETE FROM pr_briefs WHERE (owner, repo, number) IN ` + endedRefs, true},
