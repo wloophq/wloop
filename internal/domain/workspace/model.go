@@ -61,6 +61,10 @@ type Workspace struct {
 	BranchRenamed bool
 	// Unread is the card's unread mark.
 	Unread bool
+	// Created is set when the manager made the worktree, rather than found
+	// one another tool made: it owns the worktree over a manager that only
+	// lists it.
+	Created bool
 }
 
 // Local tells whether w is on this machine at an absolute path.

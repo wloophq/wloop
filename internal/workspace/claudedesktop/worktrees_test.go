@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestCreateListsOnlyWorktreesUnderRoot(t *testing.T) {
 		t.Fatalf("review workspace = %+v", review)
 	}
 	want := wsdomain.Workspace{ID: filepath.Join(root, "api", "pr-7"), RepoID: f.repo, Path: filepath.Join(root, "api", "pr-7"),
-		DisplayName: "pr-7", Branch: "feat/x", HostID: wsdomain.LocalHost}
+		DisplayName: "pr-7", Branch: "feat/x", HostID: wsdomain.LocalHost, Created: true}
 	if pr != want {
 		t.Fatalf("Create = %+v, want %+v", pr, want)
 	}
@@ -148,4 +149,99 @@ func slicesContainName(ws []wsdomain.Workspace, name string) bool {
 		}
 	}
 	return false
+}
+
+func TestListsTheWorktreesTheAppCreated(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	made := filepath.Join(f.repo, ".claude", "worktrees", "brave-lovelace-1a2b3c")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "claude/brave-lovelace-1a2b3c", made); err != nil {
+		t.Fatal(err)
+	}
+	found := filepath.Join(filepath.Dir(f.repo), "elsewhere")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "elsewhere", found); err != nil {
+		t.Fatal(err)
+	}
+	archived := filepath.Join(f.repo, ".claude", "worktrees", "archived")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "archived", archived); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "api-link")
+	if err := os.Symlink(f.repo, link); err != nil {
+		t.Fatal(err)
+	}
+	gone := filepath.Join(f.repo, ".claude", "worktrees", "gone")
+	f.store(t, "acct-1", map[string]any{"sessionId": HandleOf(testUUID), "worktreePath": filepath.Join(link, ".claude", "worktrees", "brave-lovelace-1a2b3c")})
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000003", "cwd": found})
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000004", "worktreePath": gone})
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000005", "worktreePath": archived, "isArchived": true})
+	own := f.worktree(t, "pr-7")
+
+	list, err := f.m.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []wsdomain.Workspace{
+		{ID: own.Path, RepoID: f.repo, Path: own.Path, DisplayName: "pr-7", Branch: "pr-7", HostID: wsdomain.LocalHost, Created: true},
+		{ID: made, RepoID: f.repo, Path: made, DisplayName: "brave-lovelace-1a2b3c", Branch: "claude/brave-lovelace-1a2b3c", HostID: wsdomain.LocalHost, Created: true},
+	}
+	if !slices.Equal(list, want) {
+		t.Fatalf("List = %+v, want %+v", list, want)
+	}
+
+	if err := os.Remove(f.m.reposPath()); err != nil {
+		t.Fatal(err)
+	}
+	repos, err := f.m.Repos(ctx)
+	if err != nil || len(repos) != 1 || repos[0].Path != f.repo || repos[0].RemoteKey != "github.com/acme/api" {
+		t.Fatalf("Repos = %+v, %v; want the repository of the app's worktree", repos, err)
+	}
+}
+
+func TestRemovesAWorktreeTheAppCreated(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	made := filepath.Join(f.repo, ".claude", "worktrees", "brave-lovelace-1a2b3c")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "claude/brave-lovelace-1a2b3c", made); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(f.repo, ".claude", "worktrees", "not-the-apps")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "not-the-apps", other); err != nil {
+		t.Fatal(err)
+	}
+	f.store(t, "acct-1", map[string]any{"sessionId": HandleOf(testUUID), "cwd": made, "worktreePath": made})
+	if err := f.m.Remove(ctx, other, true); err == nil {
+		t.Fatal("removed a worktree the app did not create")
+	}
+	if err := f.m.Remove(ctx, made, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(made); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the worktree is still there: %v", err)
+	}
+}
+
+func TestStartsASessionInAWorktreeTheAppCreated(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	made := filepath.Join(f.repo, ".claude", "worktrees", "brave-lovelace-1a2b3c")
+	if _, err := f.m.git(ctx, f.repo, "worktree", "add", "-q", "-b", "claude/brave-lovelace-1a2b3c", made); err != nil {
+		t.Fatal(err)
+	}
+	f.store(t, "acct-1", map[string]any{"sessionId": "local_c1b2c3d4-0000-4000-8000-000000000003", "worktreePath": made})
+	mint, err := os.ReadFile(filepath.Join("testdata", "mint_output.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.exec.claude = func(Cmd) ([]byte, error) { return mint, nil }
+	f.exec.open = func(Cmd) error {
+		f.register(t, "registry_desktop.json", map[string]any{"cwd": made})
+		return nil
+	}
+	if _, err := f.m.StartAgentSession(ctx, workspace.StartRequest{WorkspaceID: made, Session: testUUID, Agent: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if c := f.exec.ran("claude"); len(c) != 1 || c[0].Dir != made {
+		t.Fatalf("mint = %+v", c)
+	}
 }

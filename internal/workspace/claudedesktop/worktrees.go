@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -44,9 +45,55 @@ func (m *Manager) Workspaces(ctx context.Context) ([]wsdomain.Workspace, wsdomai
 	return out, scope, nil
 }
 
-// worktrees are the git worktrees at <Root>/<repo name>/<name>, read from
-// their files so a sweep spawns no git process.
+// worktrees are the git worktrees at <Root>/<repo name>/<name>, then those
+// the app created for its sessions, read from their files so a sweep spawns no
+// git process.
 func (m *Manager) worktrees() ([]wsdomain.Workspace, error) {
+	out, err := m.rootWorktrees()
+	if err != nil {
+		return nil, err
+	}
+	made, err := m.appWorktrees()
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range made {
+		if !slices.ContainsFunc(out, func(o wsdomain.Workspace) bool { return o.Path == w.Path }) {
+			out = append(out, w)
+		}
+	}
+	return out, nil
+}
+
+// appWorktrees are the worktrees the app made for a session of its store not
+// archived, in the store's order, while they are still on disk: the app may
+// collect the worktree of an archived session.
+func (m *Manager) appWorktrees() ([]wsdomain.Workspace, error) {
+	files, err := m.storeFiles(hostPrefix + "*.json")
+	if err != nil {
+		return nil, err
+	}
+	var out []wsdomain.Workspace
+	for _, f := range files {
+		s, err := readStored(f)
+		if err != nil || s.WorktreePath == "" || s.IsArchived {
+			continue
+		}
+		path, err := canonical(s.WorktreePath)
+		if err != nil {
+			continue
+		}
+		if slices.ContainsFunc(out, func(o wsdomain.Workspace) bool { return o.Path == path }) {
+			continue
+		}
+		if ws, ok := worktreeAt(path); ok {
+			out = append(out, ws)
+		}
+	}
+	return out, nil
+}
+
+func (m *Manager) rootWorktrees() ([]wsdomain.Workspace, error) {
 	root := m.root()
 	repos, err := os.ReadDir(root)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -90,7 +137,7 @@ func worktreeAt(path string) (wsdomain.Workspace, bool) {
 		name = strings.TrimSpace(string(b))
 	}
 	return wsdomain.Workspace{ID: path, RepoID: repo, Path: path, DisplayName: name,
-		Branch: headBranch(gitDir), HostID: wsdomain.LocalHost}, true
+		Branch: headBranch(gitDir), HostID: wsdomain.LocalHost, Created: true}, true
 }
 
 // displayNameFile keeps, in a worktree's git directory, the name the loop gave
@@ -263,12 +310,20 @@ func (m *Manager) Unregister(ctx context.Context, id string) error {
 	return nil
 }
 
-// owned is the workspace id as a path, checked to be a worktree place under Root.
+// owned is the workspace id as a path, checked to be a worktree place under
+// Root or a worktree the app made.
 func (m *Manager) owned(id string) (string, error) {
 	path := filepath.Clean(id)
 	rel, err := filepath.Rel(m.root(), path)
-	if err != nil || len(strings.Split(rel, string(filepath.Separator))) != 2 || strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("%s is not a workspace under %s", id, m.root())
+	if err == nil && len(strings.Split(rel, string(filepath.Separator))) == 2 && !strings.HasPrefix(rel, "..") {
+		return path, nil
+	}
+	made, err := m.appWorktrees()
+	if err != nil {
+		return "", err
+	}
+	if !slices.ContainsFunc(made, func(w wsdomain.Workspace) bool { return w.Path == path }) {
+		return "", fmt.Errorf("%s is not a workspace under %s nor one the app made", id, m.root())
 	}
 	return path, nil
 }

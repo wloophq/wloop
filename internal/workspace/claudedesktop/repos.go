@@ -42,6 +42,15 @@ func (m *Manager) Repos(ctx context.Context) ([]wsdomain.Repo, error) {
 	if err != nil {
 		return nil, err
 	}
+	made, err := m.appWorktrees()
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range made {
+		if !slices.Contains(paths, w.RepoID) {
+			paths = append(paths, w.RepoID)
+		}
+	}
 	out := make([]wsdomain.Repo, 0, len(paths))
 	for _, p := range paths {
 		out = append(out, repoAt(p))
