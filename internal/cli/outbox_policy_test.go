@@ -54,6 +54,7 @@ func (b policyBooks) Books(ctx context.Context, units ...unit.Unit) (map[unit.Un
 }
 
 func TestBundledManifestsDefaultToAlways(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	l := te.loadedIntents()
 	if len(l.Problems) > 0 {
@@ -94,6 +95,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 }
 
 func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{
 		"workflows/follow-up-run/workflow.toml":   followUp,

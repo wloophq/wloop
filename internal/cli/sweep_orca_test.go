@@ -40,6 +40,7 @@ func orcaFollowup(t *testing.T) (*orcatest.Runtime, *testEnv) {
 }
 
 func TestStartAddressRereadsAWaitingAgent(t *testing.T) {
+	t.Parallel()
 	rt, te := orcaFollowup(t)
 	rt.Update(func(w *orcatest.World) { w.Worktrees[0].Agents[0].State = "waiting" })
 	ws, ok, err := te.findFresh(context.Background(), "ws-rev")
@@ -61,6 +62,7 @@ func TestStartAddressRereadsAWaitingAgent(t *testing.T) {
 }
 
 func TestRemoveRereadsAnAgentThatStartedSinceTheSnapshot(t *testing.T) {
+	t.Parallel()
 	_, te := finishedScenario(t, "MERGED")
 	rt := orcatest.Start(t, orcatest.World{
 		Repos: []orcatest.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},

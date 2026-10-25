@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"io"
-	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -65,11 +64,12 @@ func storedTurn(t *testing.T, te *testEnv, ref github.Ref, intent dintent.Name, 
 var nudgeInputs = map[string]any{"situation": "Waiting on: bob.", "waits_on_maintainers": true, "who": []string{"bob"}}
 
 func TestEachRouteRunsTodaysEffects(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	byHand := func(intent dintent.Name, ws wsdomain.Workspace, inputs map[string]any) func(t *testing.T) (*testEnv, github.Ref) {
 		return func(t *testing.T) (*testEnv, github.Ref) {
 			_, te := handScenario(t, ws)
-			cwd, err := os.Getwd()
+			cwd, err := te.Getwd()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -150,6 +150,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 }
 
 func TestAResumeRestoresPersistedInputs(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -171,6 +172,7 @@ func TestAResumeRestoresPersistedInputs(t *testing.T) {
 }
 
 func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	te := newTestEnv(t, myPRManager())
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
@@ -199,6 +201,7 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 }
 
 func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, myPRManager())
 	withBundled(t, te, func(fsys fstest.MapFS) {
 		f := fsys["intents/address/intent.toml"]

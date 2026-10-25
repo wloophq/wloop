@@ -53,6 +53,7 @@ func (te *testEnv) sessionOf(t *testing.T, manager, handle string) string {
 }
 
 func TestInstructionsByRoundIgnoresLaterEdits(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	user := t.TempDir()
@@ -72,6 +73,7 @@ func TestInstructionsByRoundIgnoresLaterEdits(t *testing.T) {
 }
 
 func TestInstructionsUnknownRound(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	if code := te.run("instructions", "review", r7.URL(), "--turn", "deadbeef0000"); code == 0 || !strings.Contains(te.err.String(), "deadbeef0000") {
@@ -80,6 +82,7 @@ func TestInstructionsUnknownRound(t *testing.T) {
 }
 
 func TestInstructionsCurrentNamesTheExecutable(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	te.Executable = "/Apps/My App/" + brand.Name
@@ -100,6 +103,7 @@ func TestInstructionsCurrentNamesTheExecutable(t *testing.T) {
 }
 
 func TestInstructionsStopsOnAMissingProfile(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Profile = "/nope"
 	te.gh.basics = openBasics
@@ -114,6 +118,7 @@ func TestInstructionsStopsOnAMissingProfile(t *testing.T) {
 }
 
 func TestInstructionsRejectsAnUnknownKind(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("instructions", "merge", r7.URL()); code == 0 {
 		t.Fatal("accepted kind merge")
@@ -127,11 +132,12 @@ func handScenario(t *testing.T, ws wsdomain.Workspace) (*fake.Manager, *testEnv)
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
 	agentDaemon(t, te)
-	t.Chdir(ws.Path)
+	te.Getwd = func() (string, error) { return ws.Path, nil }
 	return m, te
 }
 
 func TestInstructionsByHandFindsThePullRequestOfTheWorktree(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	if code := te.run("instructions", "review", "--", "look", "at", "the", "migration"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -158,10 +164,12 @@ func TestInstructionsByHandFindsThePullRequestOfTheWorktree(t *testing.T) {
 }
 
 func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{}
 	te := newTestEnv(t, m)
 	agentDaemon(t, te)
-	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	te.Getwd = func() (string, error) { return dir, nil }
 	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no pull request here; pass its URL") || te.out.Len() != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -171,6 +179,7 @@ func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
 }
 
 func TestInstructionsByHandLinksAnUnlinkedReviewWorktree(t *testing.T) {
+	t.Parallel()
 	m, te := handScenario(t, wsdomain.Workspace{ID: "ws-2", DisplayName: "REVIEW feat/x"})
 	if code := te.run("instructions", "review", r7.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -181,6 +190,7 @@ func TestInstructionsByHandLinksAnUnlinkedReviewWorktree(t *testing.T) {
 }
 
 func TestInstructionsByHandNeverRelinksAWorktree(t *testing.T) {
+	t.Parallel()
 	m, te := handScenario(t, wsdomain.Workspace{ID: "ws-3", DisplayName: "REVIEW other", LinkedPR: 8})
 	if code := te.run("instructions", "review", r7.URL()); code == 0 || len(m.Writes) != 0 || te.out.Len() != 0 {
 		t.Fatalf("exit %d writes %v out %s", code, m.Writes, te.out)
@@ -188,6 +198,7 @@ func TestInstructionsByHandNeverRelinksAWorktree(t *testing.T) {
 }
 
 func TestInstructionsByHandLeavesAWorktreeOfAnotherRoleUnlinked(t *testing.T) {
+	t.Parallel()
 	m, te := handScenario(t, wsdomain.Workspace{ID: "ws-4", DisplayName: "feat-x"})
 	if code := te.run("instructions", "review", r7.URL()); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -198,6 +209,7 @@ func TestInstructionsByHandLeavesAWorktreeOfAnotherRoleUnlinked(t *testing.T) {
 }
 
 func TestAddressByHandOnSomeoneElsesPullRequestAsksAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	m, te := handScenario(t, wsdomain.Workspace{ID: "ws-5", DisplayName: "feat-x"})
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
 	url := "https://github.com/acme/api/pull/21"
@@ -214,6 +226,7 @@ func TestAddressByHandOnSomeoneElsesPullRequestAsksAndChangesNothing(t *testing.
 }
 
 func TestAddressByHandTakeOverTakesOverThenRendersTheRound(t *testing.T) {
+	t.Parallel()
 	m, te := handScenario(t, wsdomain.Workspace{ID: "ws-rev", DisplayName: "REVIEW feat/theirs", LinkedPR: 20})
 	te.gh.basics = adoptBasics
 	url := "https://github.com/acme/api/pull/20"
@@ -229,6 +242,7 @@ func TestAddressByHandTakeOverTakesOverThenRendersTheRound(t *testing.T) {
 }
 
 func TestTakeOverByHandWritesTheDaemonsStore(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-rev", DisplayName: "REVIEW feat/theirs", LinkedPR: 20})
 	te.gh.basics = adoptBasics
 	blocked := filepath.Join(t.TempDir(), "file")
@@ -246,18 +260,21 @@ func TestTakeOverByHandWritesTheDaemonsStore(t *testing.T) {
 }
 
 func TestAddressByHandTakeOverElsewhereNamesTheWorktree(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
 	agentDaemon(t, te)
-	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	te.Getwd = func() (string, error) { return dir, nil }
 	if code := te.run("instructions", "address", "--take-over", "https://github.com/acme/api/pull/20"); code == 0 || !strings.Contains(te.err.String(), "run this command there") || !strings.Contains(te.err.String(), "/worktrees/feat/theirs") || te.out.Len() != 0 {
 		t.Fatalf("exit %d out %s err %s", code, te.out, te.err)
 	}
 }
 
 func TestTakeOverAppliesOnlyToAddress(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("instructions", "review", r7.URL(), "--take-over"); code == 0 || !strings.Contains(te.err.String(), "--take-over applies to address") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -265,6 +282,7 @@ func TestTakeOverAppliesOnlyToAddress(t *testing.T) {
 }
 
 func TestGuidanceAfterTheSeparatorKeepsItsLeadingDash(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	if code := te.run("instructions", "review", r7.URL(), "--", "-x", "first"); code != 0 || !strings.Contains(te.out.String(), "\n-x first\n") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
@@ -272,6 +290,7 @@ func TestGuidanceAfterTheSeparatorKeepsItsLeadingDash(t *testing.T) {
 }
 
 func TestARoundTakesNoGuidance(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	if code := te.run("instructions", "review", r7.URL(), "--turn", "abc123abc123", "--", "more"); code == 0 || !strings.Contains(te.err.String(), "takes no input flags and no guidance") {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -279,6 +298,7 @@ func TestARoundTakesNoGuidance(t *testing.T) {
 }
 
 func TestAnAllowedRoundFormNeverRunsATurnByHand(t *testing.T) {
+	t.Parallel()
 	for name, args := range map[string][]string{
 		"empty turn":          {"--turn", "", r7.URL()},
 		"old flag":            {"--sha=", r7.URL()},
@@ -297,6 +317,7 @@ func TestAnAllowedRoundFormNeverRunsATurnByHand(t *testing.T) {
 }
 
 func TestGuidanceNamingAStoredTurnFlagIsGuidance(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	if code := te.run("instructions", "review", r7.URL(), "--", "check", "--sha", "handling"); code != 0 || !strings.Contains(te.out.String(), "\ncheck --sha handling\n") {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
@@ -304,6 +325,7 @@ func TestGuidanceNamingAStoredTurnFlagIsGuidance(t *testing.T) {
 }
 
 func TestTurnByHandStartsOnTheCaller(t *testing.T) {
+	t.Parallel()
 	_, te := handScenario(t, wsdomain.Workspace{ID: "ws-1", DisplayName: "REVIEW feat/x", LinkedPR: 7})
 	inSession(te, "term_1")
 	if code := te.run("instructions", "review", r7.URL()); code != 0 {
@@ -323,6 +345,7 @@ func TestTurnByHandStartsOnTheCaller(t *testing.T) {
 }
 
 func TestNudgeByHandStartsItsTurn(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
 	ctx := context.Background()

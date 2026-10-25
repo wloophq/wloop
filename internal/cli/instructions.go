@@ -100,7 +100,11 @@ func runInstructions(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return errors.New(err.Error())
 	}
-	cwd, err := os.Getwd()
+	getwd := e.Getwd
+	if getwd == nil {
+		getwd = os.Getwd
+	}
+	cwd, err := getwd()
 	if err != nil {
 		return err
 	}

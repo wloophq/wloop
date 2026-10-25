@@ -63,6 +63,7 @@ func (te *testEnv) liveTerminals(ws string, ts ...turns.Terminal) {
 }
 
 func TestSharedWorkspaceTypesIntoTheUnitsSession(t *testing.T) {
+	t.Parallel()
 	te, m := sharedEnv(t, "s2")
 	te.registerSession(t, dturn.Session{ID: "s1", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), StartedAt: testNow.Add(-time.Hour)})
 	te.registerSession(t, dturn.Session{ID: "s2", WorkspaceID: sharedWS.ID, Unit: r8.Unit(), StartedAt: testNow.Add(-time.Minute)})
@@ -85,6 +86,7 @@ func TestSharedWorkspaceTypesIntoTheUnitsSession(t *testing.T) {
 }
 
 func TestClosedRegistrySessionIsSkipped(t *testing.T) {
+	t.Parallel()
 	te, m := sharedEnv(t, "s2")
 	te.registerSession(t, dturn.Session{ID: "s1", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), StartedAt: testNow.Add(-time.Hour)})
 	te.registerSession(t, dturn.Session{ID: "s2", WorkspaceID: sharedWS.ID, Unit: r8.Unit(), StartedAt: testNow.Add(-time.Minute)})
@@ -99,6 +101,7 @@ func TestClosedRegistrySessionIsSkipped(t *testing.T) {
 }
 
 func TestNewSessionCarriesItsUnit(t *testing.T) {
+	t.Parallel()
 	te, _ := sharedEnv(t, "s2")
 	te.registerSession(t, dturn.Session{ID: "s2", WorkspaceID: sharedWS.ID, Unit: r8.Unit(), StartedAt: testNow.Add(-time.Minute)})
 	te.liveTerminals(sharedWS.ID, turns.Terminal{Session: "s2", LastOutput: testNow})
@@ -118,6 +121,7 @@ func TestNewSessionCarriesItsUnit(t *testing.T) {
 }
 
 func TestUserStartedSessionStillPickedInPRWorkspace(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	m.LastOutput["ws-rev"] = testNow.Add(-48 * time.Hour)
 	te := newTestEnv(t, m)
@@ -130,6 +134,7 @@ func TestUserStartedSessionStillPickedInPRWorkspace(t *testing.T) {
 }
 
 func TestPRSessionPick(t *testing.T) {
+	t.Parallel()
 	existing := pick{handle: "term-rev", verb: verbExisting}
 	fresh := pick{handle: "term-ws-rev", verb: verbNew, writes: "session ws-rev"}
 	cases := []struct {
@@ -179,6 +184,7 @@ type pick struct {
 }
 
 func TestGitHubDefaultPlacement(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	if err := te.Store.SetViewer(ctx, unit.GitHub, "me"); err != nil {
@@ -199,6 +205,7 @@ func TestGitHubDefaultPlacement(t *testing.T) {
 }
 
 func TestAWakeThatFailsLateBindsTheProcessAndStartsANewSession(t *testing.T) {
+	t.Parallel()
 	te, m := sharedEnv(t, "")
 	m.Sessions = nil
 	m.WakeLate = errors.New("no process within 10s")

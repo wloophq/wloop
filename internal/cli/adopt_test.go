@@ -16,6 +16,7 @@ import (
 const adoptBasics = `{"data":{"pr":{"pullRequest":{"number":20,"title":"Theirs","state":"OPEN","headRefName":"feat/theirs","baseRefName":"main","headRefOid":"c9","repository":{"nameWithOwner":"acme/api"}}}}}`
 
 func TestAdoptTurnsTheReviewWorkspaceIntoAnAuthorOne(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -37,6 +38,7 @@ func TestAdoptTurnsTheReviewWorkspaceIntoAnAuthorOne(t *testing.T) {
 }
 
 func TestAdoptCreatesAWorkspaceWithoutAPrompt(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -53,6 +55,7 @@ func TestAdoptCreatesAWorkspaceWithoutAPrompt(t *testing.T) {
 }
 
 func TestTakeOverMarksTheInventory(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -73,6 +76,7 @@ func TestTakeOverMarksTheInventory(t *testing.T) {
 }
 
 func TestTakeOverRefusesMyOwnPullRequest(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -91,6 +95,7 @@ func TestTakeOverRefusesMyOwnPullRequest(t *testing.T) {
 }
 
 func TestAdoptRefusesABranchCheckedOutElsewhere(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -111,6 +116,7 @@ func TestAdoptRefusesABranchCheckedOutElsewhere(t *testing.T) {
 }
 
 func TestCreateRemovesAWorkspaceOrcaPutOnAnotherBranch(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		args          []string
 		basics, wants string
@@ -146,6 +152,7 @@ func TestCreateRemovesAWorkspaceOrcaPutOnAnotherBranch(t *testing.T) {
 }
 
 func TestAdoptRefusesAReleasePRFromTheMainCheckoutsDefaultBranch(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api", DefaultBranch: "feat/theirs"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -166,6 +173,7 @@ func TestAdoptRefusesAReleasePRFromTheMainCheckoutsDefaultBranch(t *testing.T) {
 }
 
 func TestAdoptRefusesALocalBranchWithCommitsNotOnThePR(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -182,6 +190,7 @@ func TestAdoptRefusesALocalBranchWithCommitsNotOnThePR(t *testing.T) {
 }
 
 func TestAdoptFastForwardsALocalBranchBehindThePR(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -201,6 +210,7 @@ func TestAdoptFastForwardsALocalBranchBehindThePR(t *testing.T) {
 }
 
 func TestAdoptRefusesABranchCheckedOutInAWorktreeOrcaDoesNotList(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -218,6 +228,7 @@ func TestAdoptRefusesABranchCheckedOutInAWorktreeOrcaDoesNotList(t *testing.T) {
 }
 
 func TestAdoptRefusesAMainCheckoutOnSomeoneElsesBranch(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{
 		RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}},
 		WorkspaceList: []wsdomain.Workspace{
@@ -238,6 +249,7 @@ func TestAdoptRefusesAMainCheckoutOnSomeoneElsesBranch(t *testing.T) {
 }
 
 func TestAdoptReusesALocalBranchAtThePRHead(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -251,6 +263,7 @@ func TestAdoptReusesALocalBranchAtThePRHead(t *testing.T) {
 }
 
 func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
+	t.Parallel()
 	yes := func() (bool, error) { return true, nil }
 	no := func() (bool, error) { return false, nil }
 	repos := []wsdomain.Repo{{ID: "r1", RemoteKey: "github.com/acme/api"}}
@@ -280,6 +293,7 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 }
 
 func TestTakeOverIsTheVerb(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
@@ -293,6 +307,7 @@ func TestTakeOverIsTheVerb(t *testing.T) {
 }
 
 func TestTakeOverClearsTheFingerprint(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics

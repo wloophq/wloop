@@ -85,6 +85,7 @@ func serveUntil(t *testing.T, te *testEnv, what string, cond func(*sqlite.DB) bo
 }
 
 func TestServeRunsTheUsageJob(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	reader := &fakeUsage{}
 	te.Usage = map[string]coreusage.Reader{"claude": reader}
@@ -107,6 +108,7 @@ func TestServeRunsTheUsageJob(t *testing.T) {
 }
 
 func TestServeInterruptsRunningBriefRuns(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	var id int64
 	seedStore(t, te.StateDir, func(ctx context.Context, db *sqlite.DB) {
@@ -126,6 +128,7 @@ func TestServeInterruptsRunningBriefRuns(t *testing.T) {
 }
 
 func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	te.cfg.Brief.Enabled = true
@@ -170,6 +173,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 }
 
 func TestEchoTurnsAreUnavailable(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	te.Usage = map[string]coreusage.Reader{"claude": &fakeUsage{}}
@@ -192,6 +196,7 @@ func TestEchoTurnsAreUnavailable(t *testing.T) {
 }
 
 func TestServeKeepsTheAgentSessionsTheHooksReport(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)

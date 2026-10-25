@@ -42,6 +42,7 @@ func withIdentity(p source.Plugin, who items.Person) source.Plugin {
 }
 
 func TestMeFromEveryEnabledModule(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -152,6 +153,7 @@ func viewerItem(r api.Row) bool {
 }
 
 func TestEveryNeedsMeRowHasAnInboxOrNextEntry(t *testing.T) {
+	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
 	needs, muted, questions := 0, 0, 0
@@ -185,6 +187,7 @@ func TestEveryNeedsMeRowHasAnInboxOrNextEntry(t *testing.T) {
 }
 
 func TestCardOnlyRowsHaveNoEntry(t *testing.T) {
+	t.Parallel()
 	cases := ghsourcetest.Cases()
 	r := newDerivedRig(t, cases)
 	seen := map[string]int{}
@@ -218,6 +221,7 @@ func seedTodo(t *testing.T, db *sqlite.DB, u unit.Unit) {
 }
 
 func TestSyncRunsUnderNoJobs(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
@@ -283,6 +287,7 @@ func socketDo(t *testing.T, sock, method, path, body string) (int, string) {
 }
 
 func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	no := false
 	te.cfg.Plugins = map[string]config.Plugin{string(unit.GitHub): {Enabled: &no}}

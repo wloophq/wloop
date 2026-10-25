@@ -67,6 +67,7 @@ func wantRefusal(t *testing.T, err error, want string) {
 }
 
 func TestRemoveDeletesTheLinkedCleanWorkspace(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	if err := removeVia(te, doneWS); err != nil {
 		t.Fatal(err)
@@ -77,6 +78,7 @@ func TestRemoveDeletesTheLinkedCleanWorkspace(t *testing.T) {
 }
 
 func TestRemovingAnOpenPullRequestsWorkspaceOptsOutOfItsFirstRound(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "OPEN")
 	if err := removeVia(te, doneWS); err != nil {
 		t.Fatal(err)
@@ -97,6 +99,7 @@ func TestRemovingAnOpenPullRequestsWorkspaceOptsOutOfItsFirstRound(t *testing.T)
 }
 
 func TestRemoveRefusesWhatWouldLoseWork(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		state string
 		edit  func(m *fake.Manager, te *testEnv)
@@ -132,6 +135,7 @@ func TestRemoveRefusesWhatWouldLoseWork(t *testing.T) {
 }
 
 func TestRemoveActsOnExactlyTheLinkedWorkspace(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	m.WorkspaceList = append(m.WorkspaceList, wsdomain.Workspace{ID: "ws-other", RepoID: "r1", Path: "/wt/other", DisplayName: "feat-done", Branch: "feat/done", HostID: "local", LinkedPR: 12})
 	if err := removeVia(te, "ws-other"); err != nil {
@@ -143,6 +147,7 @@ func TestRemoveActsOnExactlyTheLinkedWorkspace(t *testing.T) {
 }
 
 func TestRemoveRefusesALinkThatIsGoneOrNotThisPullRequests(t *testing.T) {
+	t.Parallel()
 	for id, want := range map[string]string{"ws-gone": "is gone", "main": "main checkout", "remote": "not local"} {
 		m, te := finishedScenario(t, "MERGED")
 		wantRefusal(t, removeVia(te, id), want)
@@ -156,6 +161,7 @@ func TestRemoveRefusesALinkThatIsGoneOrNotThisPullRequests(t *testing.T) {
 }
 
 func TestRemoveWithoutALinkFallsBackCarefully(t *testing.T) {
+	t.Parallel()
 	unlinked := func(m *fake.Manager) {
 		m.WorkspaceList[2].LinkedPR = 0
 	}
@@ -196,6 +202,7 @@ func (r removeFails) Remove(context.Context, string, bool) error { return r.err 
 const stuckPTY = "runtime_error: Failed to physically stop every PTY for worktree: ws-done \u2014 the terminal sweep failed: connect ENOENT /Users/x/Library/Application Support/orca/daemon/daemon-v37.sock. Retry with force delete (--force) to remove it anyway."
 
 func TestRemoveMapsOrcasFailureToARefusalWithItsMessage(t *testing.T) {
+	t.Parallel()
 	for msg, want := range map[string]struct {
 		reason    string
 		forceable bool
@@ -214,6 +221,7 @@ func TestRemoveMapsOrcasFailureToARefusalWithItsMessage(t *testing.T) {
 }
 
 func TestUncommittedFilesAreLeftToOrca(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	te.git.dirty["/wt/done"] = true
 	te.git.untracked["/wt/done"] = 2
@@ -226,6 +234,7 @@ func TestUncommittedFilesAreLeftToOrca(t *testing.T) {
 }
 
 func TestForceRemovesWhatTheChecksWouldRefuse(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	m.Activity = map[string]wsdomain.Activity{doneWS: {Busy: true}}
 	te.git.unpushed["/wt/done"] = 3
@@ -248,6 +257,7 @@ func TestForceRemovesWhatTheChecksWouldRefuse(t *testing.T) {
 }
 
 func TestIgnoredRefusalListsWhatMatters(t *testing.T) {
+	t.Parallel()
 	_, te := finishedScenario(t, "MERGED")
 	for i := range 12 {
 		te.git.ignored["/wt/done"] = append(te.git.ignored["/wt/done"], fmt.Sprintf("secret-%02d.json", i))
@@ -262,6 +272,7 @@ func TestIgnoredRefusalListsWhatMatters(t *testing.T) {
 }
 
 func TestACleanNestedCloneIsLossless(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	dir := t.TempDir()
 	m.WorkspaceList[2].Path = dir
@@ -280,6 +291,7 @@ func TestACleanNestedCloneIsLossless(t *testing.T) {
 }
 
 func TestRemoveAcceptsCommitsThePullRequestHolds(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	te.git.unpushed["/wt/done"] = 2
 	te.git.head["/wt/done"] = "c12"
@@ -302,6 +314,7 @@ func TestRemoveAcceptsCommitsThePullRequestHolds(t *testing.T) {
 }
 
 func TestRemoveRoutesToTheDaemon(t *testing.T) {
+	t.Parallel()
 	te, calls := daemonForActions(t)
 	if code := te.run("remove", "https://github.com/acme/api/pull/12"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
@@ -317,6 +330,7 @@ func TestRemoveRoutesToTheDaemon(t *testing.T) {
 }
 
 func TestRemoveDoesNotCountIgnoredSymlinks(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	dir := t.TempDir()
 	m.WorkspaceList[2].Path = dir
@@ -351,6 +365,7 @@ func (c *commitDuringChecks) Run(ctx context.Context, dir string, env []string, 
 }
 
 func TestRemoveRefusesWhenSomethingChangedDuringTheChecks(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "MERGED")
 	te.Env.Git = gitx.Git{R: &commitDuringChecks{fakeGit: te.git}}
 	wantRefusal(t, removeVia(te, doneWS), "changed while it was checked")
@@ -360,6 +375,7 @@ func TestRemoveRefusesWhenSomethingChangedDuringTheChecks(t *testing.T) {
 }
 
 func TestRemoveFetchesWithoutPruning(t *testing.T) {
+	t.Parallel()
 	_, te := finishedScenario(t, "MERGED")
 	te.git.upstream["/wt/done"] = "feat/done"
 	te.git.onRemote["feat/done"] = true
@@ -373,6 +389,7 @@ func TestRemoveFetchesWithoutPruning(t *testing.T) {
 }
 
 func TestRemoveWithItsBranchGoneTrustsOnlyThePullRequest(t *testing.T) {
+	t.Parallel()
 	m, te := finishedScenario(t, "CLOSED")
 	te.git.upstream["/wt/done"] = "feat/done"
 	te.git.head["/wt/done"] = "pushed-after-close"
@@ -389,6 +406,7 @@ func TestRemoveWithItsBranchGoneTrustsOnlyThePullRequest(t *testing.T) {
 }
 
 func TestRemovePrintsTheToolsMessageOnASecondLine(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = filepath.Join(shortDir(t), "daemon.sock")
 	ln, err := net.Listen("unix", te.Socket)

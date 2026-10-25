@@ -44,6 +44,7 @@ func (n *recNotifier) seen() ([]menubar.Notification, []string) {
 }
 
 func TestTheMenubarFollowsARealDaemonsInbox(t *testing.T) {
+	t.Parallel()
 	te := newServeEnv(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)

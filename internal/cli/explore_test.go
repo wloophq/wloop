@@ -11,6 +11,7 @@ import (
 )
 
 func TestExplorePrintsCandidatesThroughTheDaemon(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{
 		"GET /api/health": api.Health{Version: "test"},
@@ -43,6 +44,7 @@ func TestExplorePrintsCandidatesThroughTheDaemon(t *testing.T) {
 }
 
 func TestExploreSaysAnAuthorHasNothingOpen(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{
 		"GET /api/health": api.Health{Version: "test"},

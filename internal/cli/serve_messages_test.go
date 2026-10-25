@@ -98,6 +98,7 @@ func waitOpen(t *testing.T, d daemon.Deps, want func([]message.Message) bool) []
 }
 
 func TestOpenQuestionsBecomeMessages(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "store.db")
 	done := seedTurn{unit: ghUnit(3), round: "r3", state: turn.Done, record: record.Record{State: record.Done, Summary: "published",
 		Outcome: &record.Outcome{Verdict: "APPROVE", URL: "https://example.com/r"}}}
@@ -131,6 +132,7 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 }
 
 func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
+	t.Parallel()
 	log := change.NewLog(change.DefaultWindow, t.Logf)
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), log)
 	if err != nil {
@@ -191,6 +193,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 }
 
 func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
+	t.Parallel()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -223,6 +226,7 @@ func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
 }
 
 func TestMessagesCostOnARealStore(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("measures")
 	}

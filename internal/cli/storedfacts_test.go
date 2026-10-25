@@ -13,6 +13,7 @@ import (
 )
 
 func TestStoredFactsReadTheBriefTagsFilesAndTeams(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", HeadOid: "h1", ReviewRequests: []string{"bob", "team:acme/platform"}, Reasons: []string{"author"}})
@@ -45,6 +46,7 @@ func TestStoredFactsReadTheBriefTagsFilesAndTeams(t *testing.T) {
 }
 
 func TestABriefOfAnOlderFormatIsNotAMovedHead(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}})
@@ -60,6 +62,7 @@ func TestABriefOfAnOlderFormatIsNotAMovedHead(t *testing.T) {
 }
 
 func TestATurnWithBriefsOffSaysSo(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg.Brief.Enabled = false
 	c, _, err := te.renderTurn(context.Background(), te.cfg, turn.Request{Intent: turn.Intent(dintent.Review), Unit: r7.Unit(), Payload: &turn.PR{}})
@@ -69,6 +72,7 @@ func TestATurnWithBriefsOffSaysSo(t *testing.T) {
 }
 
 func TestAnUnreadableBriefIsAnError(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", HeadOid: "h1", Reasons: []string{"author"}})

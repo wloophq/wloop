@@ -73,6 +73,7 @@ func intentProfile(t *testing.T) string {
 }
 
 func TestServeIntentLayersReadNoConfigFile(t *testing.T) {
+	t.Parallel()
 	h := newHolderEnv(t, map[string]any{})
 	for range 50 {
 		h.now = h.now.Add(config.StatEvery)
@@ -84,6 +85,7 @@ func TestServeIntentLayersReadNoConfigFile(t *testing.T) {
 }
 
 func TestAProfileEditReloadsLive(t *testing.T) {
+	t.Parallel()
 	h := newHolderEnv(t, map[string]any{})
 	if _, ok := h.e.loadedIntents().Registry.Get(dintent.Name("ask-author")); ok {
 		t.Fatal("the intent exists before the profile names it")
@@ -102,6 +104,7 @@ func TestAProfileEditReloadsLive(t *testing.T) {
 }
 
 func TestAJobIntervalEditWarns(t *testing.T) {
+	t.Parallel()
 	h := newHolderEnv(t, map[string]any{})
 	h.write(map[string]any{"sweep": map[string]any{"fast": "7m"}})
 	h.now = h.now.Add(config.StatEvery)
@@ -111,6 +114,7 @@ func TestAJobIntervalEditWarns(t *testing.T) {
 }
 
 func TestServeReadersReadNoConfigFile(t *testing.T) {
+	t.Parallel()
 	h := newHolderEnv(t, map[string]any{})
 	for range 20 {
 		h.now = h.now.Add(config.StatEvery)

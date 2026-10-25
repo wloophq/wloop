@@ -26,6 +26,7 @@ func writeSized(t *testing.T, path string, size int) {
 }
 
 func TestDoctorDiskGolden(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
@@ -84,6 +85,7 @@ func TestDoctorDiskGolden(t *testing.T) {
 }
 
 func TestDoctorDiskNamesACheckout(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	repo := filepath.Join(home, "src", "repo")
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {

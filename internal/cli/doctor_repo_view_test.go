@@ -34,6 +34,7 @@ func repoProfile(t *testing.T, te *testEnv) string {
 }
 
 func TestDoctorRepoReadsAsSectionsOnATerminal(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	dir := repoProfile(t, te)
@@ -45,6 +46,7 @@ func TestDoctorRepoReadsAsSectionsOnATerminal(t *testing.T) {
 }
 
 func TestDoctorRepoPipedKeepsItsLines(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	dir := repoProfile(t, te)
@@ -70,6 +72,7 @@ review   bundled  embedded intent=review.md   every pull request   replaced by a
 }
 
 func TestDoctorRepoShowPrintsTheInstructionsUnstyled(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
 	if code := te.run("profile", "show", "acme/api", "--kind", "nudge", "--show", "--color", "always"); code != 0 {
@@ -86,6 +89,7 @@ func TestDoctorRepoShowPrintsTheInstructionsUnstyled(t *testing.T) {
 }
 
 func TestDoctorRepoFitsANarrowTerminal(t *testing.T) {
+	t.Parallel()
 	for _, width := range []int{40, 60, 80} {
 		te := newTestEnv(t, &fake.Manager{})
 		agentDaemon(t, te)

@@ -141,6 +141,7 @@ func TestASessionThatCannotTakeTheRoundIsAbandoned(t *testing.T) {
 }
 
 func TestTrusts(t *testing.T) {
+	t.Parallel()
 	cfg := config.Config{TrustedAuthors: []string{"bot[bot]"}}
 	for _, c := range []struct {
 		name string
@@ -162,6 +163,7 @@ func TestTrusts(t *testing.T) {
 }
 
 func TestRoundStartWritesTheBoardThroughTheViews(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
@@ -192,6 +194,7 @@ func TestRoundStartWritesTheBoardThroughTheViews(t *testing.T) {
 }
 
 func TestDeliverKeepsATurnTheAgentStartedFirst(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{}
 	te := newTestEnv(t, m)
 	ctx := context.Background()
@@ -225,6 +228,7 @@ func (w *startingWS) SendPrompt(ctx context.Context, handle, prompt string, queu
 }
 
 func TestAPromptThatCannotBeTypedLeavesNoQuestion(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	m.SendFails = errors.New("orca: terminal closed")
 	te := newTestEnv(t, m)
@@ -243,6 +247,7 @@ func TestAPromptThatCannotBeTypedLeavesNoQuestion(t *testing.T) {
 }
 
 func TestAFailedResumeLeavesTheQuestionOpen(t *testing.T) {
+	t.Parallel()
 	m := warmReviewWorkspace()
 	m.SendFails = errors.New("orca: terminal closed")
 	te := newTestEnv(t, m)
@@ -282,6 +287,7 @@ func (f failingDelivery) Save(ctx context.Context, b dturn.Book, evs ...port.Eve
 }
 
 func TestATypedRoundSurvivesAFailureToNameItsSession(t *testing.T) {
+	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics

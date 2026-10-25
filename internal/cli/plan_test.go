@@ -80,6 +80,7 @@ func servePlan(t *testing.T, te *testEnv, items []api.PlanItem, errs []string) *
 }
 
 func TestPlanGroupsByDecision(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, planFixture(), nil)
 	if code := te.run("plan"); code != 0 {
@@ -93,6 +94,7 @@ func TestPlanGroupsByDecision(t *testing.T) {
 }
 
 func TestPlanFiltersAndReadsTheStoredPlan(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, nil, nil)
 	if code := te.run("plan", "--workflow", "address", "--provider", "github", "--stored"); code != 0 {
@@ -104,6 +106,7 @@ func TestPlanFiltersAndReadsTheStoredPlan(t *testing.T) {
 }
 
 func TestPlanPrintsItsErrorsAndFails(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	servePlan(t, te, planFixture()[:1], []string{"address: github:acme/api#5: boom"})
 	if code := te.run("plan"); code == 0 || !strings.Contains(te.err.String(), "error: address: github:acme/api#5: boom") || !strings.Contains(te.out.String(), "review-first-round") {
@@ -112,6 +115,7 @@ func TestPlanPrintsItsErrorsAndFails(t *testing.T) {
 }
 
 func TestPlanApplyAndDismiss(t *testing.T) {
+	t.Parallel()
 	items := planFixture()
 	te := newTestEnv(t, &fake.Manager{})
 	d := servePlan(t, te, items, nil)
@@ -147,6 +151,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 }
 
 func TestPlanApplyRefusesAShortAmbiguousOrUnknownID(t *testing.T) {
+	t.Parallel()
 	a := planItem("session-duplicate", unit.Unit{Provider: unit.Session, Key: "term_1"}, "abcd1234000000000", "pending", "")
 	b := planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_1"}, "abcd1234111111111", "pending", "")
 	c := planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_2"}, "abcd9999000000000", "pending", "")
@@ -169,6 +174,7 @@ func TestPlanApplyRefusesAShortAmbiguousOrUnknownID(t *testing.T) {
 }
 
 func TestPlanApplyAndDismissTakeAPullRequestsPendingItem(t *testing.T) {
+	t.Parallel()
 	items := planFixture()
 	second := planItem("nudge-silent", unit.Unit{Provider: unit.GitHub, Key: "acme/api#12"}, "2e2e2e2e2e2e2e2e", "pending", "silent for 30 days")
 	te := newTestEnv(t, &fake.Manager{})
@@ -195,6 +201,7 @@ func TestPlanApplyAndDismissTakeAPullRequestsPendingItem(t *testing.T) {
 }
 
 func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
+	t.Parallel()
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	followup := planItem("review-follow-up", u, "1f2e3d4c5b6a7980", "pending", "new commits since your review")
 	followup.Default, followup.Deadline, followup.Steps = "run", testNow.Add(4*time.Minute), []string{"turn.start"}
@@ -239,6 +246,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 }
 
 func TestPlanPrintsNoColonForAnItemWithoutReason(t *testing.T) {
+	t.Parallel()
 	var b strings.Builder
 	writePlan(&b, []api.PlanItem{planItem("session-pr-finished", unit.Unit{Provider: unit.Session, Key: "term_1"}, "0011223344556677", "run", "")}, testNow)
 	if want := "run (1)\n  00112233  session-pr-finished  session:term_1\n"; b.String() != want {

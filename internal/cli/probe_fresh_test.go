@@ -12,6 +12,7 @@ import (
 )
 
 func TestFindFreshListsAgainBeforeGone(t *testing.T) {
+	t.Parallel()
 	rt := orcatest.Start(t, orcatest.Live())
 	m := rt.Manager()
 	e := &Env{WS: workspace.NewSet(workspace.NewCached(m, m, 2*time.Minute))}

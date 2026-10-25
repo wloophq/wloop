@@ -13,10 +13,12 @@ import (
 )
 
 func TestTheConfigsPinsReachTheAgentsHeadlessCalls(t *testing.T) {
+	t.Parallel()
 	for name, raw := range map[string]string{
 		"agent_models": `{"brief": {"enabled": true}, "agent_models": {"claude": {"fast": "x"}}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			path := filepath.Join(t.TempDir(), "config.json")
 			if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 				t.Fatal(err)
@@ -46,6 +48,7 @@ func TestTheConfigsPinsReachTheAgentsHeadlessCalls(t *testing.T) {
 }
 
 func TestAKindWithoutAHeadlessShellIsRefusedAtStartup(t *testing.T) {
+	t.Parallel()
 	e := &Env{Agents: map[string]turns.Agent{"claude": claude.Agent{}}}
 	if _, err := e.asker(config.Defaults(), t.TempDir()); err == nil {
 		t.Fatal("an asker without a shell")
@@ -53,6 +56,7 @@ func TestAKindWithoutAHeadlessShellIsRefusedAtStartup(t *testing.T) {
 }
 
 func TestUnknownAgentNamesTheSupportedOnes(t *testing.T) {
+	t.Parallel()
 	e := &Env{Agents: map[string]turns.Agent{"claude": claude.Agent{}, "aider": claude.Agent{}}}
 	_, err := e.agent("codex")
 	if err == nil || err.Error() != `agent "codex" is not supported; supported: aider, claude` {
@@ -64,6 +68,7 @@ func TestUnknownAgentNamesTheSupportedOnes(t *testing.T) {
 }
 
 func TestAnAgentWithoutHeadlessIsRefused(t *testing.T) {
+	t.Parallel()
 	e := &Env{Agents: map[string]turns.Agent{"plain": plainKind{}}}
 	if _, err := e.headlessAgent("plain"); err == nil || err.Error() != `agent "plain" cannot run headless` {
 		t.Fatalf("err = %v", err)

@@ -58,6 +58,7 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
 }
 
 func TestFollowSendsTrackForTheThread(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	slack := startSlackDaemon(t, te)
 	te.saveToken(t, fakeToken())
@@ -101,6 +102,7 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 }
 
 func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {
+	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
 	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message permalink") {

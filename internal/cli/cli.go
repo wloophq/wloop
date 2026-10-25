@@ -148,6 +148,8 @@ type Env struct {
 	// Getenv reads the environment of the agent session that runs hook, turn
 	// and instructions.
 	Getenv func(string) string
+	// Getwd is the directory instructions runs in; nil reads the process's.
+	Getwd func() (string, error)
 	// Harness reads the hook payloads and the session identity of that session.
 	Harness harness.Set
 	// Executable is the binary the LaunchAgent runs.

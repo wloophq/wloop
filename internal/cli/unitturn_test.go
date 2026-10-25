@@ -413,6 +413,7 @@ func TestADisabledThreadPluginRunsNoTurn(t *testing.T) {
 }
 
 func TestTheSessionPlacerNamesWhereASessionRuns(t *testing.T) {
+	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	ctx := context.Background()
 	if got, err := (sessionPlacer{e: te.Env, cfg: te.cfg}).SessionPlace(ctx, thread1); err != nil || got != "a neutral directory with no checkout" {
