@@ -1,6 +1,6 @@
 pending (3)
   1f2e3d4c  review-follow-up  acme/api#12: new commits since your review
-            runs in 4m10s · steps turn.start
+            Retry webhooks with backoff · runs in 4m10s · steps turn.start
   aa00bb11  session-manual-quiet  session:term_3: !session.managed, session.agent_state = done, session.idle_for = 30h0m0s
             waits for you · steps session.close · frees 300.0 MiB of memory
   00998877  workspace-temporary  workspace:wt-9: workspace.temporary = true

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-var planUsage = "usage: " + brand.Command + " plan [--workflow <name>] [--provider <id>] [--stored] | plan --unit <pr-url|owner/repo#n|session:<session-id>|workspace:<worktree-path>> | plan apply <id|pr-url>... | plan dismiss <id|pr-url>..."
+var planUsage = "usage: " + brand.Command + " plan [--workflow <name>] [--provider <id>] [--stored] | plan --unit <pr-url|owner/repo#n|provider:key|id> | plan apply <id|pr-url>... | plan dismiss <id|pr-url>..."
 
 // planOrder is the order plan prints its decisions in, those that need the
 // user first.
@@ -59,7 +60,7 @@ func runPlan(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	if *of != "" {
-		u, err := planUnitArg(*of)
+		u, err := planUnitOf(ctx, c, *of)
 		if err != nil {
 			return err
 		}
@@ -89,20 +90,50 @@ func printPlan(ctx context.Context, e *Env, c *client.Client, q api.PlanQuery) e
 	return nil
 }
 
+// providerID is the shape of a provider's id, the part of provider:key
+// before the colon.
+var providerID = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+
 // planUnitArg is the unit arg names: a pull request's URL or owner/repo#n,
-// or provider:key.
+// or provider:key, whose provider the daemon checks.
 func planUnitArg(arg string) (unit.Unit, error) {
 	if strings.Contains(arg, "://") {
 		ref, err := pr.ParseURL(arg)
 		return ref.Unit(), err
 	}
-	if p, key, ok := strings.Cut(arg, ":"); ok && slices.Contains([]unit.ProviderID{unit.GitHub, unit.Session, unit.Workspace}, unit.ProviderID(p)) && key != "" {
+	if p, key, ok := strings.Cut(arg, ":"); ok && providerID.MatchString(p) && key != "" {
 		return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
 	}
 	if ref, err := pr.ParseKey(arg); err == nil {
 		return ref.Unit(), nil
 	}
-	return unit.Unit{}, fmt.Errorf("%s names no unit: give a pull request URL, owner/repo#n, session:<session-id> or workspace:<worktree-path>", arg)
+	return unit.Unit{}, fmt.Errorf("%s names no unit: give a pull request URL, owner/repo#n, provider:key such as session:<session-id>, or an item's id as plan prints it", arg)
+}
+
+// planUnitOf is the unit plan --unit's arg names: the unit planUnitArg
+// reads, or the unit of the item whose id plan printed, held by the daemon
+// or planned by a sweep now.
+func planUnitOf(ctx context.Context, c *client.Client, arg string) (unit.Unit, error) {
+	if strings.ContainsAny(arg, ":/#") {
+		return planUnitArg(arg)
+	}
+	var items []api.PlanItem
+	for _, q := range []api.PlanQuery{{}, {Trigger: string(workflow.TriggerSweep)}} {
+		res, err := c.Plan(ctx, q)
+		if err != nil {
+			return unit.Unit{}, err
+		}
+		for _, it := range res.Items {
+			if !slices.ContainsFunc(items, func(o api.PlanItem) bool { return o.ID == it.ID }) {
+				items = append(items, it)
+			}
+		}
+	}
+	id, err := resolvePlanID(items, arg)
+	if err != nil {
+		return unit.Unit{}, err
+	}
+	return items[slices.IndexFunc(items, func(it api.PlanItem) bool { return it.ID == id })].Unit, nil
 }
 
 // printUnitPlan prints u's items as plan does, then each workflow of u's
@@ -115,7 +146,7 @@ func printUnitPlan(ctx context.Context, e *Env, c *client.Client, u unit.Unit) e
 	if res.Unit == "" {
 		return errors.New("the daemon does not explain a unit; " + restartHint())
 	}
-	fmt.Fprintln(e.Out, res.Unit)
+	fmt.Fprintln(e.Out, unitHeader(res, u))
 	writePlan(e.Out, res.Items, e.Now())
 	if len(res.Workflows) > 0 {
 		fmt.Fprintf(e.Out, "no item (%d)\n", len(res.Workflows))
@@ -141,6 +172,22 @@ func printUnitPlan(ctx context.Context, e *Env, c *client.Client, u unit.Unit) e
 		return fmt.Errorf("the plan of %s has %d error(s)", res.Unit, n)
 	}
 	return nil
+}
+
+// unitHeader names the unit res explains as its row does, with its
+// provider:key when the label does not say it.
+func unitHeader(res api.PlanResponse, u unit.Unit) string {
+	if res.Label == "" {
+		return res.Unit
+	}
+	head := res.Label
+	if res.Title != "" {
+		head += "  " + oneLine(res.Title)
+	}
+	if res.Label != u.Label() {
+		head += "  (" + res.Unit + ")"
+	}
+	return head
 }
 
 // writePlan prints items under a header per decision: a line per item
@@ -174,10 +221,13 @@ func writePlan(w io.Writer, items []api.PlanItem, now time.Time) {
 	}
 }
 
-// planDetails is the item's window, mode, steps, gain and last error; it
-// never starts with a decision, so it never reads as a header line.
+// planDetails is the title of the item's unit, its window, mode, steps,
+// gain and last error; it is indented, so it never reads as a header line.
 func planDetails(it api.PlanItem, now time.Time) string {
 	var parts []string
+	if it.Title != "" {
+		parts = append(parts, oneLine(it.Title))
+	}
 	if when := planWhen(it, now); when != "" {
 		parts = append(parts, when)
 	}
