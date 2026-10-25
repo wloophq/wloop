@@ -92,14 +92,17 @@ func draftsGolden(t *testing.T, color bool) *Model {
 	return m
 }
 
-// planGolden is the Plan view over planItems and a Slack thread named by
-// its row's label, the first item selected.
+// planGolden is the Plan view over planItems, the pull request with its
+// title, and a Slack thread named by its row's label and title, the first
+// item selected.
 func planGolden(t *testing.T, color bool) *Model {
 	m := goldenModel(t, color)
 	m.SetPlanSpecs(servedSpecs(t).Plan)
 	thread := planOf("slack-follow-up/slack/T1%2FC1%2F171.1/ee", "slack-follow-up", unit.Unit{Provider: "slack", Key: "T1/C1/171.1"}, "pending", "asked you a question")
-	thread.Label, thread.Default = "#general · launch plan", "wait"
-	m.SetPlan(append(planItems(), thread), nil)
+	thread.Label, thread.Title, thread.Default = "#general", "Launch plan for the export", "wait"
+	items := planItems()
+	items[3].Title, items[3].Link = "Batch export", "https://github.com/acme/api/pull/7"
+	m.SetPlan(append(items, thread), nil)
 	press(m, Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
 	return m
 }

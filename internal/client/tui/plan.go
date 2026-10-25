@@ -200,11 +200,16 @@ func (m *Model) renderPlan(lines []string, width, body int, now time.Time) []str
 
 func (m *Model) planList(cur, width, height int, now time.Time) []string {
 	t := m.t
-	cols := []termfmt.Column{{Right: true}, {Max: 28}, {Max: min(max((width-2)/3, 14), 40)}, {Flex: true}}
+	cols := []termfmt.Column{{Right: true}, {Max: 28}, {Max: min(max((width-2)*2/5, 14), 60)}, {Flex: true}}
 	cells := make([][]termfmt.Cell, len(m.plan))
 	for i, it := range m.plan {
 		left, style := m.timeLeft(it, now)
-		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: shortRef(it.UnitLabel(), 40)}, {Text: oneLine(it.Reason)}}
+		name := shortRef(it.UnitLabel(), 40)
+		if it.Title != "" {
+			name += "  " + oneLine(it.Title)
+		}
+		link := func(s string) string { return t.Link(it.Link, s) }
+		cells[i] = []termfmt.Cell{{Text: left, Style: style}, {Text: it.Workflow, Style: t.Dim}, {Text: name, Style: link}, {Text: oneLine(it.Reason)}}
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
 	start := max(0, cur-height+1)
@@ -226,14 +231,15 @@ func (m *Model) planList(cur, width, height int, now time.Time) []string {
 	return out
 }
 
-// planDetail is the selected item: its decision and time left, the reason,
-// the steps, the facts that matched, what it frees and the keys it offers.
+// planDetail is the selected item: its unit, its workflow, its decision and
+// time left, the reason, the steps, the facts that matched, what it frees
+// and the keys it offers.
 func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	t := m.t
 	label := termfmt.Cut(it.UnitLabel(), width)
 	head := t.Bold(label)
-	if room := width - termfmt.Cells(label) - 2; room > 0 {
-		head += "  " + termfmt.Cut(it.Workflow, room)
+	if room := width - termfmt.Cells(label) - 2; room > 0 && it.Title != "" {
+		head += "  " + termfmt.Cut(oneLine(it.Title), room)
 	}
 	lines := []string{head}
 	col := 2 + factLabel + 2
@@ -258,6 +264,7 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	if it.Mode == "observe" {
 		decision += " · observe"
 	}
+	fact("workflow", it.Workflow, plain)
 	fact("decision", decision, plain)
 	if it.Reason != "" {
 		fact("why", it.Reason, plain)
