@@ -130,6 +130,8 @@ func staleDebt(debts []debt, used map[int]bool) []string {
 	return out
 }
 
+// TestCoreImportsNoPlugin checks that the core imports no plugin, no plugin
+// imports another, and `pluginDebt` only shrinks.
 func TestCoreImportsNoPlugin(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}

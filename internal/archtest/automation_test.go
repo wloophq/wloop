@@ -74,6 +74,7 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 	return out
 }
 
+// TestTheCoreNamesNoProvider checks that the core spells no provider id.
 func TestTheCoreNamesNoProvider(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}
@@ -87,6 +88,8 @@ func TestTheCoreNamesNoProvider(t *testing.T) {
 	}
 }
 
+// TestTheEngineImportsNoProvider checks that the automation engine imports no
+// provider's domain.
 func TestTheEngineImportsNoProvider(t *testing.T) {
 	t.Parallel()
 	seen := false

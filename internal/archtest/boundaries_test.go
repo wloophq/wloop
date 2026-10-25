@@ -230,6 +230,8 @@ func builtinLiterals(fset *token.FileSet, file string, f *ast.File) []string {
 	return out
 }
 
+// TestBoundaryImports checks that the catalog, the intent vocabulary's leaves,
+// the loader and `termfmt` import only their allowed sets.
 func TestBoundaryImports(t *testing.T) {
 	t.Parallel()
 	termfmt := false
@@ -244,6 +246,8 @@ func TestBoundaryImports(t *testing.T) {
 	}
 }
 
+// TestOnlyTheCatalogBuildsActions checks that only the catalog builds action
+// specs.
 func TestOnlyTheCatalogBuildsActions(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -254,6 +258,8 @@ func TestOnlyTheCatalogBuildsActions(t *testing.T) {
 	}
 }
 
+// TestOnlyTheCatalogEvaluatesIntentPredicates checks that only the loader and
+// the catalog read an intent's predicates.
 func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -264,6 +270,8 @@ func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 	}
 }
 
+// TestBuiltinNamesLiveInTheirTables checks that builtin names appear only in
+// their table files.
 func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

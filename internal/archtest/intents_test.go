@@ -62,6 +62,8 @@ type exportPkg struct {
 	Module     *struct{ Main bool }
 }
 
+// TestNoIntentEnumerations checks that Go compares, switches on or lists no
+// intent name outside allowlisted files.
 func TestNoIntentEnumerations(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)

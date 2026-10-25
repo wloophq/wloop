@@ -34,6 +34,8 @@ func loopPRImports(file string, imports []string, allowed map[string]string) []s
 	return []string{file + " imports internal/domain/pr; loop code is keyed by unit.Unit"}
 }
 
+// TestLoopCodeImportsNoPR checks that loop code is keyed by `unit.Unit` and
+// imports the pull request domain only in allowlisted files.
 func TestLoopCodeImportsNoPR(t *testing.T) {
 	t.Parallel()
 	used := map[string]bool{}

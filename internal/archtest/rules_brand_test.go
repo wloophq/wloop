@@ -50,6 +50,8 @@ func slicesAny(res []*regexp.Regexp, f func(*regexp.Regexp) bool) bool {
 	return false
 }
 
+// TestBrandLiteralOnlyInBrand checks that the default product name appears only
+// in `internal/brand` and the exempt metadata.
 func TestBrandLiteralOnlyInBrand(t *testing.T) {
 	t.Parallel()
 	for _, b := range scanBrand(t, filepath.Join("..", ".."), fixedNames) {

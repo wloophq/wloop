@@ -175,6 +175,8 @@ func undeclared(pkg *types.Package, names []string) []string {
 	return out
 }
 
+// TestContractSkeletonDeclared checks that the shared names other packages
+// build on still exist.
 func TestContractSkeletonDeclared(t *testing.T) {
 	t.Parallel()
 	var pkgs []string

@@ -263,6 +263,8 @@ func ruleSpawn(self string, imports []string, files []*ast.File) []string {
 	return nil
 }
 
+// TestSpawningPackagesImportMeter checks that a package that spawns a process
+// imports the meter.
 func TestSpawningPackagesImportMeter(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {
