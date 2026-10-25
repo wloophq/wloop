@@ -356,9 +356,9 @@ func TestAFailingSinkIsIsolated(t *testing.T) {
 	if b := working.Batches(); len(b) != 1 || len(b[0]) != len(refs) {
 		t.Fatalf("working batches = %v", b)
 	}
-	eventually(t, "a stored sink failure", func() bool { return f.stored(views.KindViewSinkFailed, r7) })
-	if !slices.Contains(f.pub.kinds(r7), views.KindViewSinkFailed) {
-		t.Fatalf("the failure was not published: %v", f.pub.kinds(r7))
+	eventually(t, "a published sink failure", func() bool { return slices.Contains(f.pub.kinds(r7), views.KindViewSinkFailed) })
+	if !f.stored(views.KindViewSinkFailed, r7) {
+		t.Fatal("the published failure was not stored")
 	}
 	broken.Fail(nil)
 	eventually(t, "the retried items", func() bool {
