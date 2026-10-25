@@ -571,7 +571,7 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 			itemUnit[op.Item] = k
 		}
 	}
-	if ops, err = j.applyOps(ctx, k, ops); err != nil {
+	if err := j.applyOps(ctx, k, ops); err != nil {
 		return 0, err
 	}
 	hints := hintsOf(r, ops, itemUnit, k)
@@ -587,22 +587,22 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 }
 
 // applyOps applies ops; an op on a disabled unit fails as an answerError.
-func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) ([]items.Op, error) {
+func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) error {
 	if len(ops) == 0 {
-		return ops, nil
+		return nil
 	}
 	res, err := j.Ledger.Apply(ctx, items.Extracted, ops)
 	var off *coreitems.DisabledError
 	switch {
 	case errors.As(err, &off):
-		return nil, &answerError{err}
+		return &answerError{err}
 	case err != nil:
-		return nil, err
+		return err
 	}
 	if len(res.Refused) > 0 {
 		j.logf("slack extraction %s: %d ops refused, first: %s", k, len(res.Refused), res.Refused[0].Reason)
 	}
-	return ops, nil
+	return nil
 }
 
 // segment writes the DM's segments the answer names before any op lands on them. Without
