@@ -2261,7 +2261,6 @@ function planCount() {
   return state.plan.loaded ? planGroups(state.plan.items).reduce((n, g) => n + g.items.length, 0) : "";
 }
 
-const itemLabel = (it) => it.label || (it.unit.provider === "github" ? it.unit.key : unitKey(it.unit));
 
 async function loadPlan() {
   const view = readHash().view;
@@ -2274,10 +2273,10 @@ async function loadPlan() {
 }
 
 async function actOnPlan(it, id) {
-  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: itemLabel(it) }, id);
+  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: it.label }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(`Guidance for ${it.workflow} on ${itemLabel(it)}`, "");
+    const guidance = prompt(`Guidance for ${it.workflow} on ${it.label}`, "");
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2292,9 +2291,9 @@ async function actOnPlan(it, id) {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
     if ((out.errors || []).length) throw new Error(out.errors.join("; "));
-    setNotice(`${body.action}: ${it.workflow} ${itemLabel(it)}`);
+    setNotice(`${body.action}: ${it.workflow} ${it.label}`);
   } catch (err) {
-    setNotice(`${body.action} ${it.workflow} ${itemLabel(it)} failed: ${err.message}`, true);
+    setNotice(`${body.action} ${it.workflow} ${it.label} failed: ${err.message}`, true);
   } finally {
     state.busy.delete(it.id);
   }
@@ -2322,7 +2321,8 @@ function planItem(it) {
     h("div", { class: "plan-line" },
       h("span", { class: "plan-when" + (ticking ? " plan-left" : ""), "data-deadline": ticking ? it.deadline : undefined, title: ticking ? `runs at ${stamp(it.deadline)}` : undefined }, planWhen(it)),
       h("span", { class: "plan-wf" }, it.workflow),
-      h("span", { class: "plan-unit" }, itemLabel(it)),
+      h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, it.label) : it.label),
+      it.title ? h("span", { class: "plan-title" }, it.title) : null,
       it.mode === "observe" ? h("span", { class: "plan-mode", title: "This workflow only plans; nothing runs until it is switched to apply" }, "observe") : null),
     it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
     it.error ? h("p", { class: "plan-error" }, `attempt ${it.attempts}: ${it.error}`) : null,

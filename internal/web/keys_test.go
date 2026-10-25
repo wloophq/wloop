@@ -362,7 +362,6 @@ func actPrelude(t *testing.T) string {
 	b.WriteString(keyJS(t))
 	b.WriteString(jsConst(t, src, "API_VERSION"))
 	b.WriteString(jsConst(t, src, "PLAN_ACTS"))
-	b.WriteString(jsConst(t, src, "itemLabel"))
 	b.WriteString(`
 const calls = [];
 const state = { specs: { byId: {} }, busy: new Set(), guidance: {} };

@@ -539,6 +539,7 @@ button.kpi:hover { border-color: var(--muted); }
 .plan-item.blocked .plan-when { color: var(--err); }
 .plan-wf { font-weight: 600; }
 .plan-unit { color: var(--muted); overflow-wrap: anywhere; }
+.plan-title { overflow-wrap: anywhere; }
 .plan-mode { color: var(--late); font-size: 12px; }
 .plan-reason { margin: 4px 0; overflow-wrap: anywhere; }
 .plan-error { margin: 4px 0; color: var(--err); overflow-wrap: anywhere; }
