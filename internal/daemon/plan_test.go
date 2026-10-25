@@ -314,6 +314,20 @@ func TestThePlanFiltersByWorkflowAndProvider(t *testing.T) {
 	}
 }
 
+func TestPlanItemsCarryTheirUnitsLabel(t *testing.T) {
+	r := newPlanRig(t)
+	r.sweep(t)
+	res := r.plan(t, "?")
+	if len(res.Items) == 0 {
+		t.Fatal("no plan items")
+	}
+	for _, it := range res.Items {
+		if want := r.s.unitLabel(it.Unit); it.Label == "" || it.Label != want {
+			t.Fatalf("%s: label %q, want %q", it.Unit, it.Label, want)
+		}
+	}
+}
+
 func TestSkipOnAPendingRoundIsTerminal(t *testing.T) {
 	t.Parallel()
 	r := newPlanRig(t)

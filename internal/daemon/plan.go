@@ -233,7 +233,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
-		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Steps: []string{}, Deadline: it.Deadline,
+		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Label: s.unitLabel(it.Unit), Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
 	for _, st := range it.Steps {

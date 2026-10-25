@@ -122,6 +122,8 @@ func TestWireShape(t *testing.T) {
 func TestWireTypesCoverTheirSources(t *testing.T) {
 	t.Parallel()
 	unwired := map[reflect.Type]int{reflect.TypeFor[turn.Turn](): 1, reflect.TypeFor[dinv.Override](): 1}
+	// derived are wire fields the daemon computes from the source's: an event's and a candidate's unit.
+	derived := map[reflect.Type]int{reflect.TypeFor[api.Event](): 1}
 	for _, c := range []struct{ from, to any }{
 		{dinv.Workspace{}, api.Workspace{}},
 		{dinv.Override{}, api.Override{}},
@@ -137,13 +139,13 @@ func TestWireTypesCoverTheirSources(t *testing.T) {
 		{turn.Answer{}, api.TurnAnswer{}},
 	} {
 		from, to := reflect.TypeOf(c.from), reflect.TypeOf(c.to)
-		if from.NumField() != to.NumField()+unwired[from] {
+		if from.NumField()+derived[to] != to.NumField()+unwired[from] {
 			t.Errorf("%s has %d fields, %s %d", from, from.NumField(), to, to.NumField())
 		}
 	}
 	cand := reflect.TypeOf(dgh.Candidate{})
-	if got := reflect.TypeOf(api.Candidate{}).NumField(); got != cand.NumField()+2 {
-		t.Errorf("api.Candidate has %d fields, github.Candidate %d plus the brief and the actions", got, cand.NumField())
+	if got := reflect.TypeOf(api.Candidate{}).NumField(); got != cand.NumField()+3 {
+		t.Errorf("api.Candidate has %d fields, github.Candidate %d plus the unit, the brief and the actions", got, cand.NumField())
 	}
 }
 

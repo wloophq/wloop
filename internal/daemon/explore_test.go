@@ -540,6 +540,9 @@ func TestExploreStoreBudget(t *testing.T) {
 		t.Fatalf("%d candidates", len(got))
 	}
 	for i, c := range cands {
+		if got[i].Unit != c.Ref.Unit() {
+			t.Fatalf("%s: unit %+v", c.Ref, got[i].Unit)
+		}
 		if (got[i].Brief != nil) != (c.Ref == briefed) {
 			t.Fatalf("%s: brief %+v", c.Ref, got[i].Brief)
 		}

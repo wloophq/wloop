@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -233,5 +234,20 @@ func TestRuntimeCarriesJobTimeout(t *testing.T) {
 	rt := runtimeOf(source.Module{ID: unit.GitHub, Jobs: []source.Job{{Name: "j", Every: time.Minute, Timeout: 25 * time.Minute}}})
 	if len(rt.Jobs) != 1 || rt.Jobs[0].Timeout != 25*time.Minute {
 		t.Fatalf("jobs %+v", rt.Jobs)
+	}
+}
+
+func TestPluginsServeWhetherTheyReact(t *testing.T) {
+	const linear, wiki unit.ProviderID = "linear", "wiki"
+	ps := []source.Plugin{{ID: linear, Name: "Linear"}, {ID: wiki, Name: "Wiki"}, {ID: unit.GitHub, Name: "GitHub"}}
+	mods := []source.Module{{ID: linear, Reacts: true}, {ID: unit.GitHub}}
+	off := false
+	cfg := config.Config{Plugins: map[string]config.Plugin{string(wiki): {Enabled: &off}}}
+	got := map[unit.ProviderID]bool{}
+	for _, p := range pluginList(ps, mods, cfg) {
+		got[p.ID] = p.Reacts
+	}
+	if want := map[unit.ProviderID]bool{linear: true, wiki: false, unit.GitHub: false}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("reacts %v, want %v", got, want)
 	}
 }

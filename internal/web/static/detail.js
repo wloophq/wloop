@@ -381,14 +381,14 @@ function entryComposer(e) {
   if (!(e.verbs || []).some((v) => v.verb === "reply")) return null;
   const st = verbState(e, "reply");
   const u = (e.units || [])[0];
-  return composer("entry:" + e.id, { scope: "detail:reply", reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && u.provider !== "github",
+  return composer("entry:" + e.id, { scope: "detail:reply", reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
     post: (args) => entryAct(e, "reply", args) });
 }
 
 // unitComposer replies on a unit through POST /api/drafts.
 function unitComposer(u) {
   if (!u || !u.provider) return null;
-  return composer("unit:" + u.provider + ":" + u.key, { scope: "unit:reply", reacts: u.provider !== "github", post: async (args) => {
+  return composer("unit:" + u.provider + ":" + u.key, { scope: "unit:reply", reacts: providerReacts(u.provider), post: async (args) => {
     try {
       const d = await detailEnv.postJSON("/api/drafts", { unit: u, kind: args.kind, text: args.text, reaction: args.reaction, send: args.send === "now", source: "cockpit" });
       detailEnv.notice(d.state === "approved" ? `Draft ${d.id} approved; it goes out in a moment` : `Draft ${d.id} saved to the Outbox for your approval`);

@@ -282,6 +282,7 @@ type Override struct {
 
 type Event struct {
 	PR    pr.Ref    `json:"pr"`
+	Unit  unit.Unit `json:"unit"`
 	Kind  string    `json:"kind"`
 	Key   string    `json:"key"`
 	Actor string    `json:"actor"`
@@ -530,6 +531,7 @@ type ExploreRequest struct {
 // help on it needs.
 type Candidate struct {
 	Ref            pr.Ref    `json:"ref"`
+	Unit           unit.Unit `json:"unit"`
 	URL            string    `json:"url"`
 	Title          string    `json:"title"`
 	Author         string    `json:"author"`

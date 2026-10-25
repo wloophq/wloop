@@ -27,6 +27,10 @@
         "number": 7,
         "owner": "acme",
         "repo": "api"
+      },
+      "unit": {
+        "key": "acme/api#7",
+        "provider": "github"
       }
     },
     {
@@ -39,6 +43,10 @@
         "number": 7,
         "owner": "acme",
         "repo": "api"
+      },
+      "unit": {
+        "key": "acme/api#7",
+        "provider": "github"
       }
     }
   ],

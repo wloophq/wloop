@@ -23,6 +23,7 @@ const composeHarness = `
 detailEnv.postJSON = async (path, body) => { posts.push({ path, body }); return { id: 9, state: body.send ? "approved" : "proposed" }; };
 const typeInto = (pane, focus, value) => byFocus(pane, focus).attrs.oninput({ target: { value } });
 const click = async (pane, focus) => { await byFocus(pane, focus).attrs.onclick(); };
+applyPlugins([{ id: "slack", name: "Slack", enabled: true, reacts: true }, { id: "github", name: "GitHub", enabled: true }]);
 `
 
 func TestDelegateBoxSendsGuidanceAndMode(t *testing.T) {
@@ -182,8 +183,9 @@ func TestEntryDetailListsItsDrafts(t *testing.T) {
 
 func TestUnitComposerPostsADraft(t *testing.T) {
 	var got struct {
-		Posts []map[string]any
-		Text  string
+		Posts  []map[string]any
+		Text   string
+		Reacts []bool
 	}
 	nodeRun(t, gtdPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
@@ -191,8 +193,11 @@ func TestUnitComposerPostsADraft(t *testing.T) {
   let box = unitExtras(d);
   typeInto(box, "unit:reply:text", "Thanks, merged");
   await click(box, "unit:reply:send");
+  const reacts = (u) => !!byFocus(unitExtras({ row: { unit: u }, items: [] }), "unit:reply:reaction");
   box = unitExtras({ row: { unit: { provider: "github", key: "acme/api#8" } }, items: [] });
-  process.stdout.write(JSON.stringify({ Posts: posts, Text: text(box) + (byFocus(box, "unit:reply:reaction") ? " reacts" : "") }));
+  applyPlugins([{ id: "slack", name: "Slack", enabled: true, reacts: true }, { id: "github", name: "GitHub", enabled: true }, { id: "linear", name: "Linear", enabled: true, reacts: true }]);
+  process.stdout.write(JSON.stringify({ Posts: posts, Text: text(box) + (byFocus(box, "unit:reply:reaction") ? " reacts" : ""),
+    Reacts: [reacts(input.unit), reacts({ provider: "linear", key: "PAY-88" }), reacts({ provider: "wiki", key: "Home" })] }));
 })();`, map[string]any{"unit": slackThread}, &got)
 	if len(got.Posts) != 1 || got.Posts[0]["path"] != "/api/drafts" {
 		t.Fatalf("posts %+v", got.Posts)
@@ -203,6 +208,9 @@ func TestUnitComposerPostsADraft(t *testing.T) {
 	}
 	if strings.Contains(got.Text, "reacts") {
 		t.Errorf("a pull request's composer offers a reaction: %s", got.Text)
+	}
+	if !slices.Equal(got.Reacts, []bool{true, true, false}) {
+		t.Errorf("reactions offered for slack, a reacting plugin, a plugin that does not react: %v", got.Reacts)
 	}
 }
 

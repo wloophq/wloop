@@ -10,7 +10,9 @@ type Plugin struct {
 	ID      unit.ProviderID `json:"id"`
 	Name    string          `json:"name"` // the service as a person reads it, such as "GitHub"
 	Enabled bool            `json:"enabled"`
-	UI      *PluginUI       `json:"ui,omitempty"` // only when enabled
+	// Reacts: the plugin's publisher posts reactions (drafts of kind react); only when enabled.
+	Reacts bool      `json:"reacts,omitempty"`
+	UI     *PluginUI `json:"ui,omitempty"` // only when enabled
 }
 
 // Plugins is the route of every compiled-in plugin: GET -> []Plugin.

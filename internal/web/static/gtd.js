@@ -219,7 +219,7 @@ function gtdGroups(view, entries) {
 }
 
 function unitLabel(u) {
-  return !u ? "" : u.provider === "github" ? u.key : `${u.provider}:${u.key}`;
+  return !u ? "" : `${u.provider}:${u.key}`;
 }
 
 function shortDate(t) {
