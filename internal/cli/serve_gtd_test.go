@@ -221,7 +221,6 @@ func seedTodo(t *testing.T, db *sqlite.DB, u unit.Unit) {
 }
 
 func TestSyncRunsUnderNoJobs(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
@@ -287,7 +286,6 @@ func socketDo(t *testing.T, sock, method, path, body string) (int, string) {
 }
 
 func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	no := false
 	te.cfg.Plugins = map[string]config.Plugin{string(unit.GitHub): {Enabled: &no}}

@@ -132,7 +132,7 @@ func handScenario(t *testing.T, ws wsdomain.Workspace) (*fake.Manager, *testEnv)
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
 	agentDaemon(t, te)
-	te.Getwd = func() (string, error) { return ws.Path, nil }
+	te.Harness.Cwd = func() string { return ws.Path }
 	return m, te
 }
 
@@ -169,7 +169,7 @@ func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
 	te := newTestEnv(t, m)
 	agentDaemon(t, te)
 	dir := t.TempDir()
-	te.Getwd = func() (string, error) { return dir, nil }
+	te.Harness.Cwd = func() string { return dir }
 	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no pull request here; pass its URL") || te.out.Len() != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -267,7 +267,7 @@ func TestAddressByHandTakeOverElsewhereNamesTheWorktree(t *testing.T) {
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
 	agentDaemon(t, te)
 	dir := t.TempDir()
-	te.Getwd = func() (string, error) { return dir, nil }
+	te.Harness.Cwd = func() string { return dir }
 	if code := te.run("instructions", "address", "--take-over", "https://github.com/acme/api/pull/20"); code == 0 || !strings.Contains(te.err.String(), "run this command there") || !strings.Contains(te.err.String(), "/worktrees/feat/theirs") || te.out.Len() != 0 {
 		t.Fatalf("exit %d out %s err %s", code, te.out, te.err)
 	}

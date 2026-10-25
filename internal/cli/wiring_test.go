@@ -126,7 +126,6 @@ func TestTheReviewGuidesTrimmedBlocksArePrefixed(t *testing.T) {
 }
 
 func TestRestartDrivesOpenIntakes(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	var waiting, starting intake.Intake
 	seedStore(t, te.StateDir, func(ctx context.Context, db *sqlite.DB) {
@@ -148,7 +147,6 @@ func TestRestartDrivesOpenIntakes(t *testing.T) {
 }
 
 func TestServeStartsTheWantedBriefs(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	seedR7(t, te)
 	te.cfg.Brief.Enabled = true
@@ -184,7 +182,6 @@ func TestServeStartsTheWantedBriefs(t *testing.T) {
 }
 
 func TestServeReportsBriefsItCannotMake(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	te.cfg.Brief.Enabled = true
 	te.Agents = map[string]turns.Agent{"claude": plainKind{}}

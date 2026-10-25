@@ -69,11 +69,8 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 	byHand := func(intent dintent.Name, ws wsdomain.Workspace, inputs map[string]any) func(t *testing.T) (*testEnv, github.Ref) {
 		return func(t *testing.T) (*testEnv, github.Ref) {
 			_, te := handScenario(t, ws)
-			cwd, err := te.Getwd()
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = te.byHand(&sync.Mutex{})(ctx, api.ByHandRequest{Intent: string(intent), URL: r7.URL(), Cwd: cwd, Inputs: inputs}, "term_1")
+			cwd := te.Harness.Cwd()
+			_, err := te.byHand(&sync.Mutex{})(ctx, api.ByHandRequest{Intent: string(intent), URL: r7.URL(), Cwd: cwd, Inputs: inputs}, "term_1")
 			if err != nil {
 				t.Fatalf("%v\n%s", err, te.err)
 			}

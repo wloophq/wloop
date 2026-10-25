@@ -85,7 +85,6 @@ func serveUntil(t *testing.T, te *testEnv, what string, cond func(*sqlite.DB) bo
 }
 
 func TestServeRunsTheUsageJob(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	reader := &fakeUsage{}
 	te.Usage = map[string]coreusage.Reader{"claude": reader}
@@ -108,7 +107,6 @@ func TestServeRunsTheUsageJob(t *testing.T) {
 }
 
 func TestServeInterruptsRunningBriefRuns(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	var id int64
 	seedStore(t, te.StateDir, func(ctx context.Context, db *sqlite.DB) {

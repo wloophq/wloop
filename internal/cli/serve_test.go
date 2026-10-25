@@ -285,7 +285,6 @@ func seedSession(t *testing.T, te *testEnv, id string) {
 }
 
 func TestServeNoJobsAnswersMCP(t *testing.T) {
-	t.Parallel()
 	te := newServeEnv(t)
 	seedSession(t, te, "term_probe")
 	port := freePort(t)
