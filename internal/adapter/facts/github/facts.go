@@ -16,6 +16,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -513,7 +514,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	if pl.cfg.AddressReviews {
 		var handled time.Time
 		if prev := pl.v.rounds.Mark(key, round.AddressedReviews); prev != "" {
-			handled, _ = time.Parse(time.RFC3339, prev)
+			handled, _ = time.Parse(time.RFC3339Nano, prev)
 		}
 		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.AddressSkipReviewers})
 	}
@@ -528,7 +529,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
-	if pl.cfg.AddressConflicts && pl.conflicts(f) && f.HeadRefOid != pl.v.rounds.Mark(key, round.AddressedConflict) {
+	if pl.cfg.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.v.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
 		reasons = append(reasons, "conflicts with "+f.BaseRefName)
 		r.address.conflictHead = f.HeadRefOid
 	}

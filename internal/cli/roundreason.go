@@ -96,7 +96,7 @@ func (e *Env) withAddressReason(ctx context.Context, cfg config.Config, d dinten
 	var checksHead, conflictHead string
 	if e.Rounds != nil {
 		if st, err := e.Rounds.Load(ctx); err == nil {
-			handled, _ = time.Parse(time.RFC3339, st.Mark(ref.String(), round.AddressedReviews))
+			handled, _ = time.Parse(time.RFC3339Nano, st.Mark(ref.String(), round.AddressedReviews))
 			checksHead, conflictHead = st.Mark(ref.String(), round.AddressedChecks), st.Mark(ref.String(), round.AddressedConflict)
 		}
 	}
