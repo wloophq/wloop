@@ -1662,7 +1662,7 @@ func TestCockpitPlanActionsPostToThePlanOrActOnTheUnit(t *testing.T) {
 		Acts  []string          `json:"acts"`
 	}
 	src := appJS(t)
-	prelude := jsConst(t, src, "PLAN_ACTS") + jsConst(t, src, "itemLabel") + jsConst(t, src, "unitKey") + `
+	prelude := jsConst(t, src, "PLAN_ACTS") + jsConst(t, src, "itemLabel") + jsConst(t, src, "planName") + jsConst(t, src, "unitKey") + `
 const API_VERSION = "1";
 const state = { busy: new Set() };
 const posts = [], acts = [];
@@ -1679,7 +1679,7 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
   await actOnPlan(it, "guide");
   await actOnPlan(it, "unblock");
   await actOnPlan({ ...it, unit: { provider: "session", key: "term_1" }, label: "session:term_1" }, "trust_run");
-  await actOnPlan({ ...it, unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general" }, "trust_run");
+  await actOnPlan({ ...it, unit: { provider: "slack", key: "T1/C1/171.1" }, label: "#general", title: "Launch plan" }, "trust_run");
   process.stdout.write(JSON.stringify({ posts, acts }));
 })();`, nil, &got)
 	want := []string{
@@ -1695,7 +1695,7 @@ const fetch = async (url, opts) => { posts.push(JSON.parse(opts.body)); return {
 			t.Errorf("post %d: %s, want %s", i, p, want[i])
 		}
 	}
-	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1", "trust_run #general"}) {
+	if !slices.Equal(got.Acts, []string{"unblock acme/api#7", "trust_run session:term_1", "trust_run #general · Launch plan"}) {
 		t.Errorf("acts %q", got.Acts)
 	}
 }

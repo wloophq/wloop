@@ -2263,6 +2263,7 @@ function planCount() {
 }
 
 const itemLabel = (it) => it.label || unitKey(it.unit);
+const planName = (it) => (it.title ? `${itemLabel(it)} · ${it.title}` : itemLabel(it));
 
 async function loadPlan() {
   const view = readHash().view;
@@ -2275,10 +2276,10 @@ async function loadPlan() {
 }
 
 async function actOnPlan(it, id) {
-  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: itemLabel(it) }, id);
+  if (!PLAN_ACTS[id]) return act({ unit: it.unit, actions: it.actions, label: planName(it) }, id);
   const body = { ids: [it.id], action: PLAN_ACTS[id] };
   if (id === "guide") {
-    const guidance = prompt(`Guidance for ${it.workflow} on ${itemLabel(it)}`, "");
+    const guidance = prompt(`Guidance for ${it.workflow} on ${planName(it)}`, "");
     if (guidance === null || !guidance.trim()) return;
     body.guidance = guidance.trim();
   }
@@ -2293,9 +2294,9 @@ async function actOnPlan(it, id) {
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(apiError(out, `HTTP ${res.status}`, res.status));
     if ((out.errors || []).length) throw new Error(out.errors.join("; "));
-    setNotice(`${body.action}: ${it.workflow} ${itemLabel(it)}`);
+    setNotice(`${body.action}: ${it.workflow} ${planName(it)}`);
   } catch (err) {
-    setNotice(`${body.action} ${it.workflow} ${itemLabel(it)} failed: ${err.message}`, true);
+    setNotice(`${body.action} ${it.workflow} ${planName(it)} failed: ${err.message}`, true);
   } finally {
     state.busy.delete(it.id);
   }
