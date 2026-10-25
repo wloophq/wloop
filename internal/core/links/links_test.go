@@ -263,12 +263,16 @@ func TestResolverSkipsWhatCannotResolve(t *testing.T) {
 			t.Fatalf("a day later, logs = %q", f.logs)
 		}
 	})
-	t.Run("no settling event", func(t *testing.T) {
+	t.Run("no settling event is the waiting state and logs nothing", func(t *testing.T) {
 		f := newFixture(t, openItem(octocat), reviewLink(link.Review))
 		if n := f.run(t); n != 0 || len(f.ledger.applied) != 0 {
 			t.Fatalf("resolved = %d", n)
 		}
-		if len(f.logs) != 1 || !strings.Contains(f.logs[0], "link target "+pull.String()+" has no settling events") {
+		f.events.evs = []link.Event{review("someone-else", t0.Add(time.Hour))}
+		if n := f.run(t); n != 0 || len(f.ledger.applied) != 0 {
+			t.Fatalf("resolved = %d", n)
+		}
+		if len(f.logs) != 0 {
 			t.Fatalf("logs = %q", f.logs)
 		}
 	})
