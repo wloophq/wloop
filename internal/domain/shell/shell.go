@@ -22,7 +22,7 @@ func Cut(s string) (word, rest string, ok bool) {
 		if i < 0 {
 			i = len(s)
 		}
-		return s[:i], s[i:], i > 0 && Word(s[:i]) == s[:i]
+		return s[:i], s[i:], Word(s[:i]) == s[:i]
 	}
 	var b strings.Builder
 	s = s[1:]

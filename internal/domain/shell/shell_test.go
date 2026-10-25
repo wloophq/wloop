@@ -20,7 +20,7 @@ func TestQuoteAndWord(t *testing.T) {
 }
 
 func TestCutReadsTheWordWordWrote(t *testing.T) {
-	for _, in := range []string{"/a/b", "", "it's", "/Application Support/x", "~/x", "a'b'c"} {
+	for _, in := range []string{"/a/b", "", "it's", "/Application Support/x", "~/x", "a'b'c", "'x", "x'", "'"} {
 		for _, w := range []string{Word(in), Quote(in)} {
 			got, rest, ok := Cut(w + " hook stop || true")
 			if !ok || got != in || rest != " hook stop || true" {
