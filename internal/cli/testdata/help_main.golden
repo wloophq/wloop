@@ -49,6 +49,8 @@ SETUP
   app install            macOS: the app, menu bar and the daemon at login
   trust                  Trust a repository in an agent home
   uninstall              Take out what install and app install set up
+  store migrate          Migrate the store to this release's schema
+  store restore          Put a backup of the store back
   config get             Print a configuration value
   version                Print the version
 

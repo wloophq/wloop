@@ -146,10 +146,11 @@ func serve(ctx context.Context, e *Env, args []string) error {
 		fmt.Fprintf(e.Err, "%s %s\n", e.stamp(), fmt.Sprintf(format, args...))
 	}
 	e.changes = change.NewLog(change.DefaultWindow, logf)
-	db, err := sqlite.Open(filepath.Join(e.StateDir, storeFile), e.changes)
-	if err != nil {
+	db, unlockStore, err := e.openStore(ctx, logf)
+	if err != nil || db == nil {
 		return err
 	}
+	defer unlockStore()
 	defer db.Close()
 	e.WS.UseCustody(db.Worktrees())
 	store := inventory.New(db)
@@ -374,6 +375,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		LockPath: filepath.Join(e.StateDir, daemonLock),
 		InfoPath: filepath.Join(e.StateDir, httpInfoFile),
 		Restart:  restartHint(),
+		Store:    e.storeStatus,
 
 		WorkspaceManager:  e.healthManager(),
 		WorkspaceManagers: e.managerDisplays(),

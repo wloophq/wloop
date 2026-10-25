@@ -477,6 +477,7 @@ var fxCheckouts struct {
 
 func TestMain(m *testing.M) {
 	os.Unsetenv("ORCA_USER_DATA_PATH")
+	storeReportWait = 0
 	code := m.Run()
 	if len(fxCheckouts.paths.roots) > 0 {
 		os.RemoveAll(fxCheckouts.paths.roots[0])

@@ -49,6 +49,8 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]app install[/]            macOS: the app, menu bar and the daemon at login
   [cyan]trust[/]                  Trust a repository in an agent home
   [cyan]uninstall[/]              Take out what install and app install set up
+  [cyan]store migrate[/]          Migrate the store to this release's schema
+  [cyan]store restore[/]          Put a backup of the store back
   [cyan]config get[/]             Print a configuration value
   [cyan]version[/]                Print the version
 

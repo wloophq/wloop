@@ -48,13 +48,17 @@ type DB struct {
 }
 
 // Open opens the store at path, creating it at SchemaVersion when it holds
-// no table, and refuses a store at any other version with ErrSchema. Both
-// handles open through connector. A nil log gets a private change log.
-func Open(path string, log Noter) (*DB, error) {
+// no table, and refuses with a SchemaError a store it cannot open as it is:
+// an older one, which Migrate takes first, or a newer one that is not
+// compatible. Both handles open through connector. A nil log gets a private
+// change log.
+func Open(path string, log Noter) (*DB, error) { return current.open(path, log) }
+
+func (set schemaSet) open(path string, log Noter) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
-	if err := createIfEmpty(path); err != nil {
+	if err := set.createIfEmpty(path); err != nil {
 		return nil, err
 	}
 	if err := tighten(path); err != nil {
@@ -69,7 +73,14 @@ func Open(path string, log Noter) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	if err := versionError(path, v); err != nil {
+	status := Status{Version: v, Compatible: v}
+	if v > set.version {
+		if status.Compatible, err = readCompatible(context.Background(), w, v); err != nil {
+			w.Close()
+			return nil, err
+		}
+	}
+	if err := set.refuse(path, status); err != nil {
 		w.Close()
 		return nil, err
 	}

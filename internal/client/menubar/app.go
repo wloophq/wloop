@@ -60,7 +60,9 @@ type Config struct {
 	// "entry=<id>" or "view=inbox".
 	CockpitURL func(route string) (string, error)
 	Quit       func()
-	Now        func() time.Time
+	// Copy puts text on the clipboard; nil offers no copy.
+	Copy func(text string) error
+	Now  func() time.Time
 	// After is time.After unless a test supplies its own clock.
 	After func(time.Duration) <-chan time.Time
 	Log   func(format string, args ...any)
@@ -268,6 +270,11 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 		err = c.loadSpecs(ctx, shown)
 	}
 	if err != nil {
+		if h, herr := c.cfg.Daemon.Health(ctx); herr == nil && h.Store != nil && h.Store.State != api.StoreOK {
+			c.cfg.Tray.SetTitle("PR !")
+			c.cfg.Tray.SetMenu(c.storeMenu(*h.Store))
+			return
+		}
 		c.cfg.Tray.SetTitle("PR ?")
 		c.cfg.Tray.SetMenu([]MenuItem{
 			{Title: "Daemon not answering: " + err.Error()},
@@ -279,6 +286,27 @@ func (c *Controller) refresh(ctx context.Context, health, rows bool) {
 	c.cfg.Tray.SetTitle(c.title())
 	c.cfg.Tray.SetMenu(c.menu(c.health))
 	c.notify()
+}
+
+// storeMenu is the menu of a daemon that cannot open its store: why, and
+// the command that gets past it.
+func (c *Controller) storeMenu(st api.StoreStatus) []MenuItem {
+	why := map[string]string{
+		api.StoreBusy:           "a store command is running",
+		api.StoreNeedsMigration: "it needs a migration",
+		api.StoreTooNew:         "a newer release wrote it",
+		api.StoreFailed:         "its migration failed",
+	}[st.State]
+	items := []MenuItem{{Title: "Store needs attention: " + cmp.Or(why, st.State)}, {Title: st.Message}}
+	if st.Fix != "" && c.cfg.Copy != nil {
+		fix := st.Fix
+		items = append(items, MenuItem{Title: "Copy command: " + fix, Enabled: true, Action: func() {
+			if err := c.cfg.Copy(fix); err != nil {
+				c.cfg.Log("copying %q: %v", fix, err)
+			}
+		}})
+	}
+	return append(items, MenuItem{Separator: true}, MenuItem{Title: "Quit " + brand.Name, Enabled: true, Action: c.cfg.Quit})
 }
 
 // loadSections reads the menu bar sections of the enabled plugins, in the

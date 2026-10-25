@@ -25,13 +25,33 @@ func TestOtherVersionsAreRefused(t *testing.T) {
 		if _, err := execW(db, fmt.Sprintf(`PRAGMA user_version = %d`, v)); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := execW(db, `UPDATE meta SET value = ? WHERE key = ?`, fmt.Sprint(v), compatibleKey); err != nil {
+			t.Fatal(err)
+		}
 		db.Close()
+		want := fmt.Sprintf("the store at %s is at schema version %d, newer than this release reads (1)", path, v)
+		if v == 0 {
+			want = fmt.Sprintf("the store at %s is at schema version 0; this release reads versions 1 to 1 only", path)
+		}
 		for name, err := range map[string]error{"Open": openErr(path), "Check": Check(path)} {
-			want := fmt.Sprintf("the store at %s is at schema version %d; this release reads version 1 only", path, v)
 			if !errors.Is(err, ErrSchema) || err.Error() != want {
 				t.Errorf("version %d, %s: %v", v, name, err)
 			}
 		}
+	}
+}
+
+func TestANewerStoreThatDeclaresThisVersionCompatibleOpens(t *testing.T) {
+	db, path := openTemp(t)
+	if _, err := execW(db, `PRAGMA user_version = 5`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := Check(path); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if err := openErr(path); err != nil {
+		t.Fatalf("Open: %v", err)
 	}
 }
 

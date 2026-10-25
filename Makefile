@@ -17,6 +17,7 @@ dev-install: build ## Run this checkout's build as the installed one: agent home
 	ln -sf $(CURDIR)/bin/$(BINARY) $(HOME)/.local/bin/$(BINARY)
 	bin/$(BINARY) install
 	bin/$(BINARY) app install
+	bin/$(BINARY) store migrate
 
 test: ## Run the tests
 	go test -race -timeout 30m ./...
