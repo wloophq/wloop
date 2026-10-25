@@ -22,6 +22,7 @@ jobs:
       - run: scripts/test-shard.sh check
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - run: make vet-darwin
+      - run: make vet-tags
       - run: make build-targets
 
   test-shard:

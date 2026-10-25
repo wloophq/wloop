@@ -194,14 +194,14 @@ func TestRealSessionsContract(t *testing.T) {
 	})
 	a := orca.New(m, boardColumns(), func(context.Context) (map[pr.Ref]orca.Link, error) { return nil, nil })
 
-	t.Run("terminals of a workspace", func(t *testing.T) {
-		ts, err := a.Terminals(ctx, ws.ID)
+	t.Run("processes of a workspace", func(t *testing.T) {
+		ts, err := a.Processes(ctx, ws.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		i := slices.IndexFunc(ts, func(x turns.Terminal) bool { return x.Handle == handle })
+		i := slices.IndexFunc(ts, func(x turns.Process) bool { return x.Handle == handle })
 		if i < 0 || ts[i].Title != title || ts[i].Key == "" {
-			t.Fatalf("terminals = %+v, want %s titled %s", ts, handle, title)
+			t.Fatalf("processes = %+v, want %s titled %s", ts, handle, title)
 		}
 	})
 
@@ -242,11 +242,11 @@ func TestRealSessionsContract(t *testing.T) {
 		if err := a.Close(ctx, c.Result.Terminal.Handle); err != nil {
 			t.Fatal(err)
 		}
-		ts, err := a.Terminals(ctx, ws.ID)
+		ts, err := a.Processes(ctx, ws.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if slices.ContainsFunc(ts, func(x turns.Terminal) bool { return x.Handle == c.Result.Terminal.Handle }) {
+		if slices.ContainsFunc(ts, func(x turns.Process) bool { return x.Handle == c.Result.Terminal.Handle }) {
 			t.Fatalf("terminal %s is still listed after Close", c.Result.Terminal.Handle)
 		}
 	})

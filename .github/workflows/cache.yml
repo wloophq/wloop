@@ -27,6 +27,7 @@ jobs:
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
       - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - run: make vet-darwin
+      - run: make vet-tags
       - run: make build-targets
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

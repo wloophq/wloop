@@ -320,9 +320,9 @@ type liveBook struct {
 	Events []storetest.Event
 }
 
-func (b liveBook) instructions(round string) string {
+func (b liveBook) instructions(id string) string {
 	for _, s := range b.shown.Turns {
-		if s.Turn.Round == round {
+		if s.Turn.ID == id {
 			return s.Instructions
 		}
 	}
