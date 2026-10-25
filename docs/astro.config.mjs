@@ -16,6 +16,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: product.name,
+      customCss: ['./src/styles/theme.css'],
       description: 'A work loop for GitHub pull requests and Slack, with AI coding agents doing the rounds in local worktrees.',
       social: [{ icon: 'github', label: 'GitHub', href: `https://github.com/${product.repo}` }],
       editLink: { baseUrl: `https://github.com/${product.repo}/edit/main/docs/` },
