@@ -80,7 +80,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `intentAllowlist` entry | Reason |
 |---|---|
-| `internal/adapter/facts/github/facts.go` | the pull request facts of the review and address workflows |
+| `internal/adapter/facts/github/facts.go` | the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict |
 | `internal/cli/rounds.go` | the sweep sends review and address rounds |
 | `internal/cli/serve.go` | the sweep's review and address questions and follow-ups |
 | `internal/cli/stepstart.go` | turn.start sends the sweep's review and address rounds and guards a nudge as its prepare does |
@@ -89,7 +89,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/turns/turnstest/intents.go` | the test registry of today's intents |
 | `internal/core/turns/turnstest/store.go` | test fixtures of today's intents |
 | `internal/daemon/probe.go` | the probe launches the probe intent |
-| `internal/situation/situation.go` | the sweep's row kind |
+| `internal/situation/situation.go` | a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic |
 | `internal/turn/scenarios.go` | eval fixtures |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`

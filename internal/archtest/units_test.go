@@ -9,8 +9,8 @@ import (
 
 var loopRoots = []string{"internal/core/turns", "internal/core/intake", "internal/daemon"}
 
-// prAllowed are the loop files that may import the pull request domain, each
-// with the reason it names a pull request by nature.
+// prAllowed are the loop files that still import the pull request domain,
+// each with why.
 var prAllowed = map[string]string{
 	"internal/daemon/explore.go":        "explore lists GitHub search candidates, pull requests by nature",
 	"internal/daemon/timings.go":        "review timings read pr.Facts",
