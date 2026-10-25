@@ -613,3 +613,49 @@ func TestRestoreCarriesWhatTheBackupHoldsInItsWAL(t *testing.T) {
 		t.Fatalf("%q %v", v, err)
 	}
 }
+
+func TestRestoreOverAnUnreadableStoreKeepsItsBytes(t *testing.T) {
+	path := storeAt(t, synthetic(t, 1))
+	backup := storeAt(t, synthetic(t, 1))
+	garbage := []byte("not a database, and long enough to have a header of sorts: " + strings.Repeat("x", 100))
+	if err := os.WriteFile(path, garbage, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := synthetic(t, 1).restore(context.Background(), path, backup, filepath.Join(t.TempDir(), "backups"), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kept, err := os.ReadFile(got.Kept); err != nil || string(kept) != string(garbage) {
+		t.Fatalf("kept %q %v", kept, err)
+	}
+	if v := versionOf(t, path); v != 1 {
+		t.Fatalf("version %d", v)
+	}
+}
+
+func TestBackupsOfTheSameSecondListNewestFirst(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"store-v1-20261102T120000Z.db", "store-v1-20261102T120000Z-2.db", "store-v1-20261102T120000Z-10.db"} {
+		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, _ := Backups(dir)
+	var names []string
+	for _, b := range all {
+		names = append(names, filepath.Base(b.Path))
+	}
+	if strings.Join(names, ",") != "store-v1-20261102T120000Z-10.db,store-v1-20261102T120000Z-2.db,store-v1-20261102T120000Z.db" {
+		t.Fatalf("%s", strings.Join(names, ","))
+	}
+}
+
+func TestRefuseNamesTheVersionsThisReleaseReads(t *testing.T) {
+	err := Refuse("/s.db", Status{Version: 0})
+	if err == nil || err.Error() != fmt.Sprintf("the store at /s.db is at schema version 0; this release reads versions 1 to %d only", SchemaVersion) {
+		t.Fatalf("%v", err)
+	}
+	if Refuse("/s.db", Status{Version: SchemaVersion, Compatible: SchemaVersion}) != nil {
+		t.Fatal("a current store refused")
+	}
+}

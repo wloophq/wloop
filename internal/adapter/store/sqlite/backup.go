@@ -1,15 +1,16 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -27,6 +28,8 @@ type Backup struct {
 	// PreRestore is the store as it was before a restore replaced it.
 	PreRestore bool
 	Size       int64
+	// nth orders backups taken in the same second: 1, then -2, -3...
+	nth int
 }
 
 const stampLayout = "20060102T150405Z"
@@ -81,7 +84,10 @@ func Backups(dir string) ([]Backup, error) {
 		if err != nil {
 			continue
 		}
-		b := Backup{Path: filepath.Join(dir, e.Name()), Version: uint32(v), Taken: taken, PreRestore: m[4] != ""}
+		b := Backup{Path: filepath.Join(dir, e.Name()), Version: uint32(v), Taken: taken, PreRestore: m[4] != "", nth: 1}
+		if m[3] != "" {
+			b.nth, _ = strconv.Atoi(m[3])
+		}
 		if fi, err := e.Info(); err == nil {
 			b.Size = fi.Size()
 		}
@@ -91,7 +97,7 @@ func Backups(dir string) ([]Backup, error) {
 		if c := b.Taken.Compare(a.Taken); c != 0 {
 			return c
 		}
-		return strings.Compare(b.Path, a.Path)
+		return cmp.Compare(b.nth, a.nth)
 	})
 	return out, nil
 }
@@ -181,9 +187,17 @@ func (set schemaSet) restore(ctx context.Context, path, from, backups string, no
 		return Restored{}, fmt.Errorf("%s: %w", from, err)
 	}
 	out := Restored{From: s}
-	if cur, err := set.inspect(path); err != nil {
-		return out, err
-	} else if !cur.Empty {
+	var need int64
+	for _, f := range []string{from, from + "-wal", path, path + "-wal"} {
+		if fi, err := os.Stat(f); err == nil {
+			need += fi.Size()
+		}
+	}
+	if free := freeSpace(backups); free >= 0 && free < need {
+		return out, fmt.Errorf("%w: it needs about %s free in %s, and %s is free", ErrNoSpace, Megabytes(need), backups, Megabytes(free))
+	}
+	// An unreadable store is still kept aside: it is the store a restore is for.
+	if cur, err := set.inspect(path); err != nil || !cur.Empty {
 		if out.Kept, err = backupName(backups, cur.Version, now, true); err != nil {
 			return out, err
 		}
@@ -212,7 +226,8 @@ func (set schemaSet) restore(ctx context.Context, path, from, backups string, no
 }
 
 // keepAside copies the store at path to dst; a store too damaged to copy
-// through SQLite is moved there with its WAL instead.
+// through SQLite is copied file by file with its WAL. The store stays in
+// place either way, so a restore that fails after it loses nothing.
 func keepAside(ctx context.Context, path, dst string) error {
 	db, err := handle(path+"?_pragma=busy_timeout(5000)", 1)
 	if err != nil {
@@ -230,11 +245,34 @@ func keepAside(ctx context.Context, path, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err
 	}
-	if err := os.Rename(path, dst); err != nil {
+	if err := copyFile(path, dst); err != nil {
 		return err
 	}
-	if err := os.Rename(path+"-wal", dst+"-wal"); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := copyFile(path+"-wal", dst+"-wal"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, storeMode)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		_ = os.Remove(dst)
+		return err
+	}
+	if err := out.Sync(); err != nil {
+		out.Close()
+		_ = os.Remove(dst)
+		return err
+	}
+	return out.Close()
 }
