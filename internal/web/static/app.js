@@ -145,8 +145,9 @@ const EVENT_LABEL = {
   turn_withdrawn: "turn withdrawn", question_dismissed: "question dismissed",
   turn_delivered: "turn delivered", answer_routed: "answer routed", late_record: "late record",
   stop_blocked: "stop blocked", turn_stopped: "turn stopped", guide_trimmed: "guide trimmed", dossier_restored: "dossier file restored", dossier_granted: "dossier granted to the session", dossier_call: "dossier compaction, US$", brief_waiting: "waiting for the brief", intake_accepted: "request accepted", intake_briefing: "request waits for the brief", intake_starting: "request starting", intake_started: "request started", intake_failed: "request failed", intake_canceled: "request canceled", intake_guidance: "request guidance replaced",
+  workflow_step_ran: "step ran",
 };
-const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance"]);
+const LOOP_EVENTS = new Set(["round_pending", "round_sent", "round_skipped", "round_held", "round_blocked", "round_unblocked", "held", "released", "muted", "unmuted", "adopted", "status", "removed", "nudged", "tracked", "untracked", "answered", "guidance", "turn_sent", "turn_started", "turn_ended", "turn_resumed", "turn_withdrawn", "question_dismissed", "turn_delivered", "answer_routed", "late_record", "stop_blocked", "turn_stopped", "guide_trimmed", "dossier_restored", "dossier_granted", "dossier_call", "brief_waiting", "intake_accepted", "intake_briefing", "intake_starting", "intake_started", "intake_failed", "intake_canceled", "intake_guidance", "workflow_step_ran"]);
 const LOOP_ONLY_KEY = "loop.activity.loopOnly";
 const DETAIL_WIDTH_KEY = "loop.detailWidth";
 const DETAIL_WIDTH_DEFAULT = 380;
@@ -2336,12 +2337,12 @@ function closedItem(c) {
   return h("li", { class: "plan-item closed" },
     h("div", { class: "plan-line" },
       h("time", { datetime: c.at, title: stamp(c.at) }, age(c.at)),
-      h("span", { class: "plan-unit" }, c.handle),
+      h("span", { class: "plan-unit" }, c.session),
       h("span", { class: "plan-reason" }, c.reason)),
     c.resume ? h("div", { class: "plan-resume" },
       h("code", {}, c.resume),
-      h("button", { type: "button", class: "act", "data-focus": `plan:closed:${c.handle}`, title: "Copy the command that resumes this session",
-        onclick: () => navigator.clipboard.writeText(c.resume).then(() => setNotice(`copied the resume line of ${c.handle}`), (err) => setNotice(`could not copy the resume line of ${c.handle}: ${err.message}`, true)) }, "Copy")) : null);
+      h("button", { type: "button", class: "act", "data-focus": `plan:closed:${c.session}`, title: "Copy the command that resumes this session",
+        onclick: () => navigator.clipboard.writeText(c.resume).then(() => setNotice(`copied the resume line of ${c.session}`), (err) => setNotice(`could not copy the resume line of ${c.session}: ${err.message}`, true)) }, "Copy")) : null);
 }
 
 function renderPlan(view) {

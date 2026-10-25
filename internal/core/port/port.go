@@ -15,6 +15,7 @@ import (
 type Event struct {
 	Unit      unit.Unit
 	Kind, Key string
+	Actor     string
 	Data      string
 	At        time.Time
 }

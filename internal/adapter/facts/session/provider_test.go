@@ -582,3 +582,18 @@ func TestDueIsTheEarliestThresholdNotPassed(t *testing.T) {
 }
 
 func ptr(t time.Time) *time.Time { return &t }
+
+func TestTheOwnerIsTheUnitOfTheNewestTurn(t *testing.T) {
+	w := newWorld(t)
+	w.session("term_1", nil)
+	w.session("term_2", nil)
+	w.book(prUnit(7), turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-4 * time.Hour), StartedAt: t0.Add(-4 * time.Hour), EndedAt: t0.Add(-3 * time.Hour)})
+	w.book(prUnit(8), turn.Turn{Intent: turn.Intent(dintent.Nudge), ID: "n1", State: turn.Done, Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-time.Hour), StartedAt: t0.Add(-time.Hour), EndedAt: t0})
+	ctx := context.Background()
+	if got, err := w.p.Owners(ctx, sessionUnit("term_1")); err != nil || !slices.Equal(got, []unit.Unit{prUnit(8)}) {
+		t.Errorf("Owners(term_1) = %v, %v; want %s", got, err, prUnit(8))
+	}
+	if got, err := w.p.Owners(ctx, sessionUnit("term_2")); err != nil || len(got) != 0 {
+		t.Errorf("Owners of a session with no turn = %v, %v; want none", got, err)
+	}
+}

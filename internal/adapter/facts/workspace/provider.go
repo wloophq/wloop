@@ -33,6 +33,7 @@ const Scope = "facts:workspace"
 var (
 	_ automation.Units  = (*Provider)(nil)
 	_ automation.Gainer = (*Provider)(nil)
+	_ automation.Owner  = (*Provider)(nil)
 	_ automation.Seener = (*Provider)(nil)
 	_ automation.Dueer  = (*Provider)(nil)
 )
@@ -269,6 +270,25 @@ func (p *Provider) workspace(ctx context.Context, u unit.Unit) (*workspace.Snaps
 		return nil, workspace.Workspace{}, fmt.Errorf("workspace %s: %w", u.Key, automation.ErrUnitGone)
 	}
 	return nil, workspace.Workspace{}, fmt.Errorf("workspace %s is not in an incomplete listing", u.Key)
+}
+
+// Owners is the pull request the workspace's facts name as workspace.pr;
+// none when it has none.
+func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
+	ctx, sc := meter.Start(ctx, Scope)
+	defer sc.End()
+	snap, w, err := p.workspace(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	ix, err := p.index(ctx, snap, p.d.Cfg())
+	if err != nil {
+		return nil, err
+	}
+	if linked, ok := ix.prOf(w); ok {
+		return []unit.Unit{linked.Ref.Unit()}, nil
+	}
+	return nil, nil
 }
 
 // Gain is the disk the workspace's checkout holds, walked for at most

@@ -40,6 +40,7 @@ type Steps struct {
 	checkErrs map[stepUnit]error
 	fails     map[stepUnit]error
 	defers    map[stepUnit]string
+	onRun     map[string]func(unit.Unit)
 	ran       []Call
 	noted     []Call
 	dismissed []Call
@@ -50,7 +51,7 @@ type Steps struct {
 func NewSteps(reach map[string]workflow.Reach, opts ...Option) *Steps {
 	return &Steps{o: build(opts), reach: maps.Clone(reach), refusals: map[stepUnit]string{},
 		guards: map[string]func(unit.Unit, automation.CheckOpts) string{}, checkErrs: map[stepUnit]error{},
-		fails: map[stepUnit]error{}, defers: map[stepUnit]string{}}
+		fails: map[stepUnit]error{}, defers: map[stepUnit]string{}, onRun: map[string]func(unit.Unit){}}
 }
 
 // Step is the step use with its vocabulary reach and args as key, value pairs.
@@ -98,6 +99,13 @@ func (f *Steps) Defer(use string, u unit.Unit, reason string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.defers[stepUnit{use, u}] = reason
+}
+
+// OnRun makes each run of use call fn with its unit, after it ran.
+func (f *Steps) OnRun(use string, fn func(unit.Unit)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.onRun[use] = fn
 }
 
 func (f *Steps) Ran() []Call       { return f.calls(&f.ran) }
@@ -166,18 +174,25 @@ func (f *Steps) Run(ctx context.Context, st workflow.Step, u unit.Unit, why work
 		return "", automation.Transient{Err: err}
 	}
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	k := stepUnit{st.Use, u}
 	if r := f.refusal(st.Use, u, automation.CheckOpts{ByHand: o.ByHand}); r != "" {
+		f.mu.Unlock()
 		return "", automation.Refused{Reason: r}
 	}
 	if err := f.fails[k]; err != nil {
+		f.mu.Unlock()
 		return "", err
 	}
 	if r := f.defers[k]; r != "" {
+		f.mu.Unlock()
 		return "", automation.Deferred{Reason: r}
 	}
 	f.ran = append(f.ran, Call{Step: st, Unit: u, Why: why, Run: o})
+	fn := f.onRun[st.Use]
+	f.mu.Unlock()
+	if fn != nil {
+		fn(u)
+	}
 	return st.Use + " ran", nil
 }
 

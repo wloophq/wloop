@@ -136,6 +136,23 @@ func TestThePlanViewAppliesAndDismisses(t *testing.T) {
 	})
 }
 
+func TestThePlanViewListsTheSessionsClosedInTheLastDay(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		d := &fakeDaemon{rows: oneRow(), closed: []api.ClosedSession{
+			{Session: "term_1", At: now.Add(-2 * time.Hour), Reason: "its pull request merged", Resume: "cd /wt/a && claude --resume b"},
+		}}
+		term, done := start(t, d)
+		eventually(t, "the first load", func() bool { return d.planCount() == 1 })
+		term.press(Key{Name: KeyTab}, Key{Name: KeyTab}, Key{Name: KeyTab})
+		eventually(t, "the closed sessions", func() bool {
+			s := term.screen()
+			return strings.Contains(s, "Sessions closed in the last day (1)") && strings.Contains(s, "2h  term_1  its pull request merged") &&
+				strings.Contains(s, "resume: cd /wt/a && claude --resume b")
+		})
+		quit(t, term, done)
+	})
+}
+
 func TestThePlanViewNamesAnItemByItsRowsLabelAndTitle(t *testing.T) {
 	m := newModel(t)
 	m.SetSpecs(servedSpecs(t).Specs)

@@ -89,6 +89,7 @@ type loaded struct {
 	// plan is the stored plan when this load read it; planErr is why it
 	// could not, which leaves the rows fresh.
 	plan    *[]api.PlanItem
+	closed  []api.ClosedSession
 	planErr error
 	// gtd and keys are the served views and bindings when this load read
 	// them; entries is the page of the GTD view on screen when it pulled
@@ -295,6 +296,9 @@ func (m *Model) apply(r loaded) {
 	}
 	if r.plan != nil || r.planErr != nil {
 		m.SetPlan(deref(r.plan), r.planErr)
+		if r.plan != nil {
+			m.SetClosed(r.closed)
+		}
 	}
 	if r.specs != nil {
 		m.SetSpecs(r.specs.Specs)
@@ -515,19 +519,20 @@ func load(ctx context.Context, d Daemon, refresh <-chan struct{}, out chan<- loa
 		}
 		needHealth = err != nil
 		var planRead *[]api.PlanItem
+		var closed []api.ClosedSession
 		var planErr error
 		needPlan = due.plan.Swap(false) || needPlan
 		if err == nil && needPlan {
 			var res api.PlanResponse
-			if res, planErr = d.Plan(ctx, api.PlanQuery{}); planErr == nil {
-				plan = res.Items
+			if res, planErr = d.Plan(ctx, api.PlanQuery{Closed: true}); planErr == nil {
+				plan, closed = res.Items, res.Closed
 				read := slices.Clone(plan)
 				planRead = &read
 			}
 			needPlan = planErr != nil
 		}
 		rows := set.View(api.ViewAll)
-		r := loaded{rows: rows, health: h, err: err, plan: planRead, planErr: planErr}
+		r := loaded{rows: rows, health: h, err: err, plan: planRead, closed: closed, planErr: planErr}
 		if err == nil {
 			r.specsErr = have.read(ctx, d, rows, len(plan) > 0, &r)
 			if shown.reviewing() {

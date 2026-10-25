@@ -473,11 +473,14 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 	recordRun(t, l, "r", wfUnit, "new-done", workflow.RunDone, recent)
 	event_(t, db, "session", "term_1", workflow.KindStepRan, "a:0", past)
 	event_(t, db, "session", "term_1", workflow.KindPlanned, "a:run", recent)
+	event_(t, db, "workspace", "/w/feat", workflow.KindStepRan, "b:0", past)
+	event_(t, db, "github", "acme/api#7", workflow.KindStepRan, "c:0", past)
+	event_(t, db, "github", "acme/api#7", workflow.KindPlanned, "c:run", past)
 	event_(t, db, "github", "acme/api#7", "merged", "m", past)
 	insertPR(t, db, pr.Ref{Owner: "acme", Repo: "api", Number: 7}, "OPEN", "", "")
 
 	got := retain(t, db, DefaultRetention)
-	if want := (Retained{"plan_items": 2, "workflow_runs": 1, WorkflowEventsKey: 1}); !maps.Equal(got, want) {
+	if want := (Retained{"plan_items": 2, "workflow_runs": 1, WorkflowEventsKey: 3}); !maps.Equal(got, want) {
 		t.Errorf("retained %v, want %v", got, want)
 	}
 	left, err := db.Ledger().Items(ctx, automation.Filter{})
@@ -494,7 +497,7 @@ func TestRetentionPrunesWorkflowRows(t *testing.T) {
 	if got := rowsOf(t, db, `SELECT key_value FROM workflow_runs ORDER BY key_value`); !slices.Equal(got, []string{"new-done", "old-dismissed", "old-failed"}) {
 		t.Errorf("runs left %v", got)
 	}
-	if want := []string{"github|acme/api#7|merged|m", "session|term_1|" + workflow.KindPlanned + "|a:run"}; !slices.Equal(remainingEvents(t, db), want) {
+	if want := []string{"github|acme/api#7|merged|m", "github|acme/api#7|" + workflow.KindStepRan + "|c:0", "session|term_1|" + workflow.KindPlanned + "|a:run"}; !slices.Equal(remainingEvents(t, db), want) {
 		t.Errorf("events left %q, want %q", remainingEvents(t, db), want)
 	}
 }
