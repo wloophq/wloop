@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -231,6 +232,25 @@ var writes = []writeCase{
 			return e.db.Ledger().Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDone, At: noteAt}, it, loopEvent(workflow.KindStepRan))
 		},
 		topics: port.TopicLoopEvents, units: []unit.Unit{u7},
+	},
+	{
+		method: "ledger.Record", name: "/a pull request's mark",
+		call: func(ctx context.Context, e *noteEnv) error {
+			it := noteItem(workflow.DecisionRun)
+			it.Unit, it.Key.Unit = u7, u7
+			it.Marks = map[string]mark.Value{"w/head": {Value: "h1"}}
+			return e.db.Ledger().Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDone, At: noteAt}, it, loopEvent(workflow.KindStepRan))
+		},
+		topics: port.TopicLoopEvents | port.TopicRounds, units: []unit.Unit{u7},
+	},
+	{
+		method: "ledger.Record", name: "/a session's mark",
+		call: func(ctx context.Context, e *noteEnv) error {
+			it := noteItem(workflow.DecisionRun)
+			it.Marks = map[string]mark.Value{"w/head": {Value: "h1"}}
+			return e.db.Ledger().Record(ctx, workflow.Run{Key: it.Key, Status: workflow.RunDone, At: noteAt}, it, loopEvent(workflow.KindStepRan))
+		},
+		topics: port.TopicLoopEvents | port.TopicMarks, units: []unit.Unit{u7, term1},
 	},
 	{
 		method: "events.Advance",

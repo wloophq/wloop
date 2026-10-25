@@ -20,9 +20,18 @@ func saveMark(ctx context.Context, tx *Tx, u unit.Unit, name, value string) erro
 			ON CONFLICT (provider, unit_key, mark) DO UPDATE SET value = excluded.value`, string(u.Provider), u.Key, name, value)
 	}
 	if err == nil {
-		tx.Touch(port.TopicRounds, u)
+		tx.Touch(marksTopic(u), u)
 	}
 	return err
+}
+
+// marksTopic is TopicRounds for a pull request, whose marks the round state
+// holds, and TopicMarks for any other unit, whose no reader caches.
+func marksTopic(u unit.Unit) port.Topic {
+	if u.Provider == unit.GitHub {
+		return port.TopicRounds
+	}
+	return port.TopicMarks
 }
 
 // recordMark sets u's mark name to v, keeping a stored watermark v does

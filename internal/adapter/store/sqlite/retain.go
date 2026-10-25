@@ -231,7 +231,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("session_handles", 0, retainSessionHandlesSQL)
 			r.exec("agent_sessions", port.TopicSessions, retainAgentSessionsSQL, cutoff(now, p.ClosedSessions))
 			r.exec("workflow_runs", 0, retainSessionRunsSQL, cutoff(now, p.ClosedSessions))
-			r.exec("unit_marks", port.TopicRounds, retainSessionMarksSQL)
+			r.exec("unit_marks", port.TopicMarks, retainSessionMarksSQL)
 		}
 		if p.Stops > 0 {
 			r.exec("turn_stops", port.TopicSessions, retainStopsSQL, cutoff(now, p.Stops))
