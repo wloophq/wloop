@@ -1,6 +1,6 @@
 {{define "task"}}
 {{- if .NeedsTakeOver}}{{.PR.URL}} was opened by {{with .PR.Author}}@{{.}}{{else}}someone else{{end}}, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `{{.Command}} instructions address {{.PR.URL}} --take-over{{if .Inputs.self_review}} --self-review{{end}}`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
-{{- else}}You develop {{.PR.URL}}{{with .PR.Title}}, "{{.}}"{{end}}{{if .Inputs.take_over}}{{with .PR.Author}}, opened by @{{.}}{{end}}, which {{name}} took over for the user just before this turn: it is now theirs to develop{{end}}.{{if .Inputs.self_review}}{{if .Resume}} The last session already reviewed its change: review what changed since that review, then triage your findings and the ones it left with its reviews and failing checks, change the code, reply and ask for the next look.{{else}} Review its change yourself, then triage your findings with its reviews and failing checks, change the code, reply and ask for the next look.{{end}}{{else}} Triage its reviews and failing checks, change the code, reply and ask for the next look.{{end}}
+{{- else}}You develop {{.PR.URL}}{{with .PR.Title}}, "{{.}}"{{end}}{{if .Inputs.take_over}}{{with .PR.Author}}, opened by @{{.}}{{end}}, which {{name}} took over for the user just before this turn: it is now theirs to develop{{end}}.{{if .Inputs.self_review}}{{if .Resume}} The last session already reviewed its change: review what changed since that review, then triage your findings and the ones it left with its reviews and failing checks{{template "and-conflict" .}}, change the code, reply and ask for the next look.{{else}} Review its change yourself, then triage your findings with its reviews and failing checks{{template "and-conflict" .}}, change the code, reply and ask for the next look.{{end}}{{else}} Triage its reviews and failing checks{{template "and-conflict" .}}, change the code, reply and ask for the next look.{{end}}
 {{- with .Local}} The checkout holds work not on the pull request: {{.}}.{{end}}{{end}}
 {{end}}
 {{define "why-now"}}{{with .PR.Address}}
@@ -20,7 +20,10 @@ Checks failing on the head:
 {{quote . 200 6}}
 {{- end}}
 {{- end}}
+{{end}}{{with .Conflict}}
+GitHub reports conflicts between the head and the base `{{line .Base}}`{{if .Handled}} (an earlier round already covered this head){{end}}.
 {{end}}{{end}}{{end}}
+{{- define "and-conflict"}}{{with .PR.Address}}{{with .Conflict}}, resolve its conflict with the base `{{line .Base}}`{{end}}{{end}}{{end}}
 {{- define "guidance"}}The user's guidance for this round. It comes from the user: it overrides your own judgment on the points it covers.{{end}}
 # {{.Headline}}
 
@@ -86,7 +89,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -97,6 +100,8 @@ Items to address, from every reviewer, humans and bots alike:
 - each unresolved review thread whose last comment is not yours;
 - each point in the body of a review submitted after your last reply or push;
 - each top-level comment from a reviewer asking for something;
+{{with .PR.Address}}{{with .Conflict}}- the conflict with the base `{{line .Base}}` that GitHub reports;
+{{end}}{{end -}}
 - each check that failed on the current head:
 
 ```bash
@@ -250,6 +255,10 @@ verdict per item (claim, your verdict, the evidence, what you propose) when:
   link) and what it asked for, and nothing changed, pushed or replied;
 - you would decline a change a human reviewer requested as blocking;
 - a check keeps failing after its rerun, or you cannot tell why it fails;
+{{- with .PR.Address}}{{with .Conflict}}
+- a conflict with the base you cannot resolve with confidence: abort the
+  merge (`git merge --abort`) and name its files and both sides;
+{{- end}}{{end}}
 - an item touches a file with work in progress you do not know, or the
   fast-forward is refused because of it.
 

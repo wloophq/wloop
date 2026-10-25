@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -34,6 +35,7 @@ type Ledger struct {
 	mu      sync.Mutex
 	items   map[string]workflow.Item
 	runs    map[string]workflow.Run
+	marks   map[unit.Unit]map[string]string
 	events  []port.Event
 	saveErr error
 }
@@ -43,7 +45,7 @@ func NewLedger(opts ...Option) *Ledger {
 	if o.notes == nil {
 		o.notes = change.NewLog(256, nil)
 	}
-	return &Ledger{o: o, items: map[string]workflow.Item{}, runs: map[string]workflow.Run{}}
+	return &Ledger{o: o, items: map[string]workflow.Item{}, runs: map[string]workflow.Run{}, marks: map[unit.Unit]map[string]string{}}
 }
 
 // Changes is the log the ledger notes on.
@@ -142,6 +144,12 @@ func (l *Ledger) Record(ctx context.Context, r workflow.Run, it workflow.Item, e
 		l.runs[r.Key.ID()] = r
 		if r.Status == workflow.RunDone || r.Status == workflow.RunDismissed {
 			delete(l.items, it.ID)
+			for name, v := range it.Marks {
+				if l.marks[it.Unit] == nil {
+					l.marks[it.Unit] = map[string]string{}
+				}
+				l.marks[it.Unit][name] = mark.Merge(l.marks[it.Unit][name], v)
+			}
 			return
 		}
 		l.items[it.ID] = cloneItem(it)
@@ -195,6 +203,7 @@ func (l *Ledger) Count(ctx context.Context, wf string, since time.Time, u *unit.
 func cloneItem(it workflow.Item) workflow.Item {
 	it.Steps = slices.Clone(it.Steps)
 	it.Why.Matched = slices.Clone(it.Why.Matched)
+	it.Marks = maps.Clone(it.Marks)
 	if it.Why.Event != nil {
 		ev := *it.Why.Event
 		it.Why.Event = &ev
@@ -204,3 +213,19 @@ func cloneItem(it workflow.Item) workflow.Item {
 
 // Strict makes the fake fail t on any later write.
 func (l *Ledger) Strict(t testing.TB) { l.o.seal(t) }
+
+// Marks are the marks done and dismissed runs recorded on u.
+func (l *Ledger) Marks(ctx context.Context, u unit.Unit) (map[string]string, error) {
+	l.o.read("ledger.marks")
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return l.MarksOf(u), nil
+}
+
+// MarksOf is Marks for a test to assert on.
+func (l *Ledger) MarksOf(u unit.Unit) map[string]string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return maps.Clone(l.marks[u])
+}

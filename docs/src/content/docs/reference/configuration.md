@@ -61,6 +61,7 @@ An empty list is an error. The old `workspace_manager` key is refused; list the 
 | `address_reviews` | `true` | address rounds for reviews on your pull requests |
 | `address_skip_reviewers` | `[]` | logins whose reviews never start one |
 | `address_checks` | `true` | address rounds for failing checks |
+| `address_conflicts` | `true` | address rounds for a conflict with the base |
 | `ignore_checks` | `[]` | check names that never start one |
 | `followups_without_workspace` | `false` | a follow-up may recreate a review workspace you deleted |
 | `address_without_workspace` | `false` | an address round may create the author workspace of your pull request |

@@ -70,6 +70,7 @@ The commands call the daemon through `internal/api/client`. Those that work with
 |---|---|---|
 | A behavior: when something happens, on which units, with which text | the profile: a workflow under `profiles/default/workflows/<name>/` or an intent under `profiles/default/intents/<name>/` | see [Profile first](/architecture/profile-first/) |
 | A fact a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go`, computed by the provider's facts adapter (`internal/adapter/facts/<provider>`) | `make docs-ref` |
+| A trigger that fires once per signal | a workflow with `[marks]` and `handled()` in its `when`; the signal as a fact of its provider if it is not one yet | see [Marks](/reference/workflow-manifest/#marks) |
 | A workflow step or an intent builtin | its name in `internal/intent/builtin/builtin.go`, its implementation in `internal/cli/steps.go` or `internal/cli/builtins.go` (`internal/daemon/builtins.go` for the daemon's routes) | `make docs-ref` |
 | A use case | a package under `internal/core`, with the ports it needs declared there and a fake in `<name>test` | |
 | A value or a pure rule | `internal/domain/<name>` | |

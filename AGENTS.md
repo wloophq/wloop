@@ -19,6 +19,7 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Workflow steps | `builtin.Steps` in `internal/intent/builtin/builtin.go`, adapted in `internal/cli/steps.go` |
 | Workflow subjects | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
 | Intent built-ins (`on_sent`, `prepare`, `workspace`, ...) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
+| What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |
 | Visual tokens, brand book, components | `design/`, which the clients follow; `go generate ./internal/web` writes `app.css`'s token region from `design/tokens.json` |
 
 Adding a fact, a step or an effect: add it to its table with its doc, wire it, test it, then `make docs-ref` to regenerate the reference pages.

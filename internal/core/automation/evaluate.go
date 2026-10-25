@@ -70,6 +70,7 @@ type planner struct {
 	config  workflow.Facts
 	facts   map[unit.Unit]workflow.Facts
 	factErr map[unit.Unit]error
+	marks   map[unit.Unit]map[string]string
 	lists   map[unit.ProviderID][]unit.Unit
 	seen    map[string]bool
 	perRun  map[string]int
@@ -104,7 +105,7 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
 	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[unit.Unit]workflow.Facts{},
-		factErr: map[unit.Unit]error{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
+		factErr: map[unit.Unit]error{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
 	if e.Config != nil {
 		p.config = e.Config()
@@ -251,8 +252,26 @@ func (p *planner) unitFacts(u unit.Unit) (workflow.Facts, error) {
 	return f, nil
 }
 
-func (p *planner) vars(facts workflow.Facts, why workflow.Why) workflow.Vars {
-	return workflow.Vars{Facts: facts, Trigger: triggerFacts(why), Config: p.config, Now: p.now}
+func (p *planner) unitMarks(u unit.Unit) (map[string]string, error) {
+	if m, ok := p.marks[u]; ok {
+		return m, nil
+	}
+	m, err := p.e.unitMarks(p.ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	p.marks[u] = m
+	return m, nil
+}
+
+func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, why workflow.Why) (workflow.Vars, error) {
+	v := workflow.Vars{Facts: facts, Trigger: triggerFacts(why), Config: p.config, Now: p.now}
+	if !readsMarks(w) {
+		return v, nil
+	}
+	var err error
+	v.Marks, err = p.unitMarks(u)
+	return v, err
 }
 
 // decide applies the decision rules to one candidate; a unit that does not
@@ -265,7 +284,11 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 		p.errorf("%s: %s: %v", w.Name, c.u, err)
 		return err
 	}
-	vars := p.vars(facts, c.why)
+	vars, err := p.vars(w, c.u, facts, c.why)
+	if err != nil {
+		p.errorf("%s: %s: reading its marks: %v", w.Name, c.u, err)
+		return err
+	}
 	if ok, err := match(w.When, vars); err != nil {
 		p.errorf("%s: %s: %v", w.Name, c.u, err)
 		return err
@@ -289,7 +312,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 		return nil
 	}
 	pl := &planned{w: w, facts: facts, refusedStep: -1, item: workflow.Item{ID: id, Key: key, Workflow: w.Name,
-		Unit: c.u, Steps: slices.Clone(w.Steps), Why: why, Mode: w.Mode, At: p.now}}
+		Unit: c.u, Steps: slices.Clone(w.Steps), Why: why, Mode: w.Mode, Marks: marksOf(w, facts), At: p.now}}
 	if ran {
 		pl.item.Attempts, pl.item.Error = run.Attempts, run.Error
 	}

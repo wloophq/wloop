@@ -43,6 +43,21 @@ var migrations = []migration{
 			SELECT 1 FROM drafts d WHERE d.provider = extraction_cursors.provider AND d.unit_key = extraction_cursors.unit_key
 			AND d.kind = 'close' AND d.state = 'sent')`,
 	)},
+	{to: 3, name: "unit_marks", up: execAll(
+		`CREATE TABLE unit_marks (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  mark TEXT NOT NULL CHECK (mark != ''),
+  value TEXT NOT NULL CHECK (value != ''),
+  PRIMARY KEY (provider, unit_key, mark)
+) WITHOUT ROWID`,
+		`INSERT INTO unit_marks (provider, unit_key, mark, value)
+		WITH m(mark) AS (VALUES ('reviewed'), ('addressed.reviews'), ('addressed.checks'))
+		SELECT r.provider, r.unit_key, m.mark, CASE m.mark WHEN 'addressed.checks' THEN r.checks_head ELSE r.fingerprint END AS value
+		FROM round_state r CROSS JOIN m WHERE value != ''
+		AND NOT (m.mark = 'addressed.reviews' AND instr(r.fingerprint, '@') > 0)`,
+		`ALTER TABLE round_state DROP COLUMN fingerprint`,
+		`ALTER TABLE round_state DROP COLUMN checks_head`,
+	)},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

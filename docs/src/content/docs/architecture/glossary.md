@@ -92,6 +92,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Plan**: what the next sweep would do, as plan items. `{{command}} plan` prints it without writing anything. See [The plan](/concepts/workflows/#the-plan).
 - **Plan item**: one workflow matched on one unit, with a decision: `pending`, `blocked`, `run` or `skipped`.
 - **Key**: the facts that identify one run of a workflow, by default the subject's `fingerprint`. A key that ran is not run again, and skipping or dismissing an item is final for its key.
+- **Mark**: what a unit's trigger already handled, such as the head whose conflict an address round covered, kept per unit and name until the unit ends. A string mark is a version and a time or an int a watermark; a workflow records its own with `[marks]` and reads any with `handled()`. See [Marks](/reference/workflow-manifest/#marks).
 - **Approval**: a workflow's `[approval]` table, which makes a plan item `pending`. With `default = "run"` it runs when its window ends; with `default = "wait"` it stays until you apply or dismiss it. See [Approval](/reference/workflow-manifest/#approval).
 - **Approval window**: the countdown during which a pending automatic round can be skipped, paused, steered or run now. See [The approval window](/concepts/approval/#the-approval-window).
 - **Ambiguity gate**: the rule inside a round's procedure that records `asked` with the full draft before publishing anything unsure, risky or contradicting another reviewer. See [The ambiguity gate](/concepts/approval/#the-ambiguity-gate).

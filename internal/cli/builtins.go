@@ -104,7 +104,7 @@ var onSent = []onSentEffect{
 				r.fingerprint = r.env.reviewFingerprint(r.ctx, r.cfg, r.ref)
 			}
 		},
-		state:    func(r *sentRound, st *round.Store) { st.SetFingerprint(r.ref.String(), r.fingerprint) },
+		state:    func(r *sentRound, st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, r.fingerprint) },
 		writesIf: func(r *sentRound) bool { return r.fingerprint != "" },
 	}}},
 	{name: "mark_addressed", on: map[route]effectRun{routeSession: markAddressed, routeAsked: markAddressed, routeLaunch: markAddressed}},

@@ -26,7 +26,12 @@ var (
 
 type ledgerBackend struct {
 	automation.Ledger
-	log *change.Log
+	marks *DB
+	log   *change.Log
+}
+
+func (b ledgerBackend) Marks(ctx context.Context, u unit.Unit) (map[string]string, error) {
+	return b.marks.Marks(ctx, u)
 }
 
 func (b ledgerBackend) Changes() port.Changes { return b.log }
@@ -72,7 +77,7 @@ func TestLedgerContract(t *testing.T) {
 	t.Parallel()
 	automationtest.RunLedger(t, func(t *testing.T) automationtest.LedgerBackend {
 		db, log := openLogged(t, filepath.Join(t.TempDir(), "ledger.db"))
-		return ledgerBackend{db.Ledger(), log}
+		return ledgerBackend{db.Ledger(), db, log}
 	})
 }
 
@@ -561,6 +566,8 @@ func TestRetentionPrunesUnitsWithoutAPullRequestRow(t *testing.T) {
 		exec(t, db, `INSERT INTO turn_answers (turn_seq, provider, unit_key, at, text, source, route) VALUES (?, 'github', ?, ?, 'yes', 'cli', 'r')`, seq, key, at(past))
 		exec(t, db, `INSERT INTO intakes (provider, unit_key, intent, source, request, state, accepted_at) VALUES ('github', ?, 'review', 'cli', '{}', 'started', ?)`, key, at(past))
 		event_(t, db, "github", key, "round_sent", "r", past)
+		exec(t, db, `INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('github', ?, 'h')`, key)
+		exec(t, db, `INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('github', ?, 'addressed.checks', 'h')`, key)
 		u := unit.Unit{Provider: unit.GitHub, Key: key}
 		recordRun(t, l, "review-follow-up", u, "dismissed", workflow.RunDismissed, past)
 		recordRun(t, l, "review-follow-up", u, "failed", workflow.RunFailed, past)
@@ -572,10 +579,10 @@ func TestRetentionPrunesUnitsWithoutAPullRequestRow(t *testing.T) {
 	event_(t, db, "session", "term_9", "turn_stopped", "term_9:p", past)
 
 	got := retain(t, db, Retention{UnitlessLoopRows: 30 * day})
-	if want := (Retained{UnitlessLoopRowsKey: 9}); !maps.Equal(got, want) {
-		t.Errorf("retained %v, want %v (a turn, its usage, a record, an answer, an intake, an event, two runs and an item)", got, want)
+	if want := (Retained{UnitlessLoopRowsKey: 11}); !maps.Equal(got, want) {
+		t.Errorf("retained %v, want %v (a turn, its usage, a record, an answer, an intake, an event, two runs, an item, its round state and a mark)", got, want)
 	}
-	for _, table := range []string{"turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items"} {
+	for _, table := range []string{"turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items", "round_state", "unit_marks"} {
 		keys := rowsOf(t, db, `SELECT DISTINCT unit_key FROM `+table+` WHERE provider = 'github' ORDER BY unit_key`)
 		if want := []string{tracked, touched, held}; !slices.Equal(keys, want) {
 			t.Errorf("%s keeps %v, want %v", table, keys, want)

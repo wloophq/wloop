@@ -126,7 +126,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		Log:   d.Log,
 	}
 	if d.DB != nil {
-		eng.Ledger, eng.Events = d.DB.Ledger(), d.DB.Events()
+		eng.Ledger, eng.Events, eng.Marks = d.DB.Ledger(), d.DB.Events(), d.DB
 	}
 	if e.WS.Len() > 0 {
 		eng.Reachable = e.WS.Reachable

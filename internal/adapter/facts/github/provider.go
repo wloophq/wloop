@@ -95,6 +95,7 @@ type Candidate struct {
 	Facts        sweep.Facts
 	Fingerprint  string
 	ChecksHead   string
+	ConflictHead string
 	LastReviewAt time.Time
 	Observed     bool
 }
@@ -243,7 +244,7 @@ func (p *Provider) Candidate(ctx context.Context, u unit.Unit, round string) (Ca
 		if !r.address.due {
 			return Candidate{}, false, nil
 		}
-		c.Workspace, c.Fingerprint, c.ChecksHead, c.Observed = r.address.ws, r.address.fingerprint, r.address.checksHead, r.address.observed
+		c.Workspace, c.Fingerprint, c.ChecksHead, c.ConflictHead, c.Observed = r.address.ws, r.address.fingerprint, r.address.checksHead, r.address.conflictHead, r.address.observed
 	default:
 		return Candidate{}, false, fmt.Errorf("no round %q of a pull request", round)
 	}

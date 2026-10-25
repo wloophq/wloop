@@ -91,6 +91,8 @@ func (p *PR) Fact(name string) (any, bool) {
 		return p.Address.ReviewerLogins(), true
 	case "pr.address.checks":
 		return p.Address.CheckNames(), true
+	case "pr.address.conflict":
+		return p.Address != nil && p.Address.Conflict != nil, true
 	}
 	return nil, false
 }

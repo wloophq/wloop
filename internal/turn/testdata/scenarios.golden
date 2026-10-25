@@ -2471,11 +2471,11 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 89ba33e9cef4
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 89ba33e9cef4 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4dd2545fea7f
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 4dd2545fea7f https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 89ba33e9cef4 for address in acme/api.
+Instructions 4dd2545fea7f for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
@@ -2535,7 +2535,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -2810,11 +2810,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: 239fa3f464bd
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 239fa3f464bd https://github.com/acme/api/pull/7` and follow what it prints.
+id: 58b4d86d468d
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 58b4d86d468d https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 239fa3f464bd for address in acme/api.
+Instructions 58b4d86d468d for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
@@ -2872,7 +2872,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -3160,11 +3160,11 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: 8b39f44bad29
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 8b39f44bad29 https://github.com/acme/api/pull/7` and follow what it prints.
+id: e41da2d2299e
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn e41da2d2299e https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 8b39f44bad29 for address in acme/api.
+Instructions e41da2d2299e for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
@@ -3218,7 +3218,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -3981,11 +3981,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: 4f7bfe9bf132
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 4f7bfe9bf132 https://github.com/acme/api/pull/7` and follow what it prints.
+id: a89f901e4f1a
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn a89f901e4f1a https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 4f7bfe9bf132 for address in acme/api.
+Instructions a89f901e4f1a for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
@@ -4054,7 +4054,7 @@ the report.
 ### 2. Collect what is open
 
 ```bash
-gh pr view <url> --json title,body,author,baseRefName,headRefOid,reviews,comments,reviewDecision
+gh pr view <url> --json title,body,author,baseRefName,headRefOid,mergeable,reviews,comments,reviewDecision
 gh api graphql -f query='query { repository(owner:"<owner>", name:"<repo>") { pullRequest(number:<n>) {
   reviewThreads(first:100) { nodes { id isResolved isOutdated path line
     comments(first:50) { nodes { databaseId author { login } body url createdAt } } } } } } }'
@@ -4627,7 +4627,7 @@ For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 id: fcc9db862869
 prompt: {{name}} probe loop-e2e/probe#1760000000, started by {{name}}. Run `'/opt/loop/bin/loop' instructions probe --turn fcc9db862869 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
-sources:
+sources: 
 Instructions fcc9db862869 for probe in loop-e2e/probe.
 
 # {{name}} probe loop-e2e/probe#1760000000, started by {{name}}.
@@ -4679,7 +4679,7 @@ prompt; a long one tells you to run `'/opt/loop/bin/loop' turn answer https://gi
 id: 1856c191bee9
 prompt: Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered. Run `'/opt/loop/bin/loop' instructions probe --turn 1856c191bee9 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
-sources:
+sources: 
 Instructions 1856c191bee9 for probe in loop-e2e/probe.
 
 # Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered.

@@ -88,7 +88,8 @@ func TestLoopTablesStoreANonGitHubUnit(t *testing.T) {
 	for _, q := range []string{
 		`INSERT INTO intakes (provider, unit_key, intent, source, request, state, accepted_at) VALUES ('thread', 'C1 thread 9', 'review', 'cli', '{}', 'accepted', '2026-10-20T12:00:00.000000000Z')`,
 		`INSERT INTO overrides (provider, unit_key, hold) VALUES ('thread', 'C1 thread 9', 1)`,
-		`INSERT INTO round_state (provider, unit_key, fingerprint) VALUES ('thread', 'C1 thread 9', 'f')`,
+		`INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('thread', 'C1 thread 9', 'f')`,
+		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('thread', 'C1 thread 9', 'reviewed', 'f')`,
 		`INSERT INTO round_day_prs (day, provider, unit_key, rounds) VALUES ('2026-10-20', 'thread', 'C1 thread 9', 1)`,
 	} {
 		if _, err := execW(e.db, q); err != nil {
@@ -107,7 +108,8 @@ func TestLoopTablesStoreANonGitHubUnit(t *testing.T) {
 	if err != nil || len(st.PRs) != 0 || len(st.Days["2026-10-20"].PerPR) != 0 {
 		t.Fatalf("round state of the thread read as a pull request's: %+v %v", st, err)
 	}
-	st.SetFingerprint(noteRef.String(), "g")
+	st.SetAgentHome(noteRef.String(), "/h")
+	st.SetMark(noteRef.String(), "reviewed", "g")
 	if err := r.Save(ctx, st); err != nil {
 		t.Fatal(err)
 	}

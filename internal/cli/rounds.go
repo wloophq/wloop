@@ -45,7 +45,10 @@ type step struct {
 
 	fingerprint string
 	// checksHead is the head whose failing checks a triage round covers.
-	checksHead   string
+	checksHead string
+	// conflictHead is the head whose conflict with the base a triage round
+	// resolves.
+	conflictHead string
 	lastReviewAt time.Time
 	read         *github.PullRequest // the pull request as the facts read it, for the turn
 	// briefMissing is why the round goes without its brief, "" with one.
@@ -71,6 +74,16 @@ func (s step) payload() turn.Payload {
 	p := turnPR(s.read)
 	p.Address = s.address
 	return p
+}
+
+// mark is the round mark the step's reviews fingerprint sets.
+func (s step) mark() string { return markOf(s.kind) }
+
+func markOf(k stepKind) string {
+	if k == stepAddress {
+		return round.AddressedReviews
+	}
+	return round.Reviewed
 }
 
 func (s step) roundKind() string {
@@ -173,13 +186,11 @@ func (s *sweep) skip(st step) {
 		s.st.SkipFirstRound(key)
 	case stepAddress:
 		if st.fingerprint != "" {
-			s.st.SetFingerprint(key, st.fingerprint)
+			s.st.SetMark(key, round.AddressedReviews, st.fingerprint)
 		}
-		if st.checksHead != "" {
-			s.st.SetChecksHead(key, st.checksHead)
-		}
+		s.st.SetHeads(key, st.checksHead, st.conflictHead)
 	default:
-		s.st.SetFingerprint(key, st.fingerprint)
+		s.st.SetMark(key, round.Reviewed, st.fingerprint)
 	}
 }
 
@@ -235,7 +246,7 @@ func (s *sweep) noteStartProblem(ctx context.Context, st step, err error) {
 		return
 	}
 	if untrusted != nil || st.kind == stepFirstRound || st.ws.ID == "" {
-		block.Round, block.Fingerprint, block.ChecksHead = st.roundKind(), st.fingerprint, st.checksHead
+		block.Round, block.Fingerprint, block.ChecksHead, block.ConflictHead = st.roundKind(), st.fingerprint, st.checksHead, st.conflictHead
 		s.blockRound(ctx, st.pr, st.roundKind(), why, block.Key(s.now))
 		return
 	}
@@ -264,6 +275,7 @@ type roundCall struct {
 	Reason       string
 	Fingerprint  string
 	ChecksHead   string
+	ConflictHead string
 	LastReviewAt time.Time
 	Guidance     string
 	// BriefMissing is why the round goes without its brief, "" with one.
@@ -289,7 +301,7 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent
 	}
 	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
-		fingerprint: c.Fingerprint, checksHead: c.ChecksHead, lastReviewAt: c.LastReviewAt,
+		fingerprint: c.Fingerprint, checksHead: c.ChecksHead, conflictHead: c.ConflictHead, lastReviewAt: c.LastReviewAt,
 		read: &github.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
 		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
 }
@@ -345,7 +357,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -395,7 +407,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -454,11 +466,9 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.fingerprint, s.now)
+	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
-	if st.checksHead != "" {
-		s.st.SetChecksHead(st.key(), st.checksHead)
-	}
+	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
 }

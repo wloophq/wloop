@@ -302,10 +302,10 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 		{name: "no review by me", edit: func(_ *dinv.PR, f *pr.Facts) { f.Reviews = nil }},
 		{name: "new commits", action: "follow-up"},
 		{name: "this head got its follow-up", setup: func(w *world) {
-			w.rounds.SetFingerprint(ref(7).String(), t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
+			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339)+"@c2")
 		}},
 		{name: "this review got its follow-up", setup: func(w *world) {
-			w.rounds.SetFingerprint(ref(7).String(), t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
+			w.rounds.SetMark(ref(7).String(), round.Reviewed, t0.Add(-2*time.Hour).UTC().Format(time.RFC3339))
 		}},
 		{name: "draft", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsDraft = true }},
 		{name: "fork", edit: func(row *dinv.PR, _ *pr.Facts) { row.IsFork = true }},
@@ -321,7 +321,7 @@ func TestFollowupFactsMatchChangeReviewer(t *testing.T) {
 				c.setup(w)
 			}
 			want := dchange.Reviewer(dchange.ReviewerInput{PR: w.details[r].Facts, Viewer: me, WorkspaceStatus: w.snap.Workspaces[1].Status,
-				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Fingerprint(r.String())})
+				CompletedStatus: "Done", TrustedOwners: []string{"acme"}, LastFingerprint: w.rounds.Mark(r.String(), round.Reviewed)})
 			f := facts(t, w.provider(), r.Unit())
 			if f["pr.review.action"] != c.action || f["pr.review.reason"] != want.Reason {
 				t.Fatalf("review = %q, %q; want %q, %q", f["pr.review.action"], f["pr.review.reason"], c.action, want.Reason)
@@ -428,13 +428,85 @@ func TestAddressFactsMatchReviewsToAddressAndFailingChecks(t *testing.T) {
 		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
 	}
 
-	w.rounds.SetFingerprint(r.String(), fp)
-	w.rounds.SetChecksHead(r.String(), "head")
+	w.rounds.SetMark(r.String(), round.AddressedReviews, fp)
+	w.rounds.SetHeads(r.String(), "head", "")
 	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" {
 		t.Fatalf("a handled pull request is due: %v", f)
 	}
 	if _, ok, _ := w.provider().Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress); ok {
 		t.Fatal("a handled pull request has a candidate")
+	}
+}
+
+func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	p := w.provider()
+	f := facts(t, p, r.Unit())
+	if f["pr.address.due"] != true || f["pr.address.reason"] != "conflicts with main" || f["pr.address.conflict"] != true {
+		t.Fatalf("a lasting conflict: %v", f)
+	}
+	if f["pr.head"] != "head" || f["pr.conflicting_for"] != time.Hour {
+		t.Fatalf("signals: head %v, conflicting for %v", f["pr.head"], f["pr.conflicting_for"])
+	}
+	c, ok, err := p.Candidate(context.Background(), r.Unit(), factsgithub.RoundAddress)
+	if err != nil || !ok || c.ConflictHead != "head" || c.ChecksHead != "" || c.Fingerprint != "" {
+		t.Fatalf("candidate = %+v, %v, %v", c, ok, err)
+	}
+	first := f["pr.fingerprint"]
+
+	w.rounds.SetHeads(r.String(), "", "head")
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
+		t.Fatalf("a handled conflict is due: %v", f)
+	}
+
+	row, d := w.rows[r], w.details[r]
+	row.HeadOid, d.HeadRefOid, d.Mergeable = "head2", "head2", "UNKNOWN"
+	w.rows[r], w.details[r] = row, d
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false {
+		t.Fatalf("a new head GitHub has not judged yet, under the stored conflict: %v", f)
+	}
+	d.Mergeable = "CONFLICTING"
+	w.details[r] = d
+	f = facts(t, w.provider(), r.Unit())
+	if f["pr.address.due"] != true || f["pr.fingerprint"] == first {
+		t.Fatalf("a conflict on a new head: %v", f)
+	}
+}
+
+func TestAddressConflictsOffStartsNoRoundForAConflict(t *testing.T) {
+	w := newWorld()
+	w.cfg.AddressConflicts = false
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+		t.Fatalf("address_conflicts off: %v", f)
+	}
+}
+
+func TestAConflictWithinItsWindowIsNoReason(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
+		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Minute), ""
+		f.Reviews, f.Checks = nil, nil
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.conflict"] != false {
+		t.Fatalf("a fresh conflict: %v", f)
+	}
+}
+
+func TestAConflictJoinsTheReviewsItCameWith(t *testing.T) {
+	w := newWorld()
+	r := w.mine(5, func(row *dinv.PR, _ *pr.Facts) {
+		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.reason"] != "reviewed by bob; failing checks: lint; conflicts with main" {
+		t.Fatalf("reason = %q", f["pr.address.reason"])
 	}
 }
 
@@ -444,8 +516,14 @@ func TestAddressWithoutAWorkspaceNeedsReviews(t *testing.T) {
 		row.ChecksState = "FAILURE"
 		f.Checks = []pr.Check{{Name: "lint", Failed: true}}
 	})
-	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks alone start no round without a workspace" {
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
 		t.Fatalf("checks alone without a workspace: %v", f)
+	}
+	r = w.add(7, me, func(row *dinv.PR, _ *pr.Facts) {
+		row.Mergeable, row.MergeableAt = "CONFLICTING", t0.Add(-time.Hour)
+	})
+	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "failing checks or a conflict alone start no round without a workspace" {
+		t.Fatalf("a conflict alone without a workspace: %v", f)
 	}
 	r = w.mine(6, nil)
 	w.snap.Workspaces = w.snap.Workspaces[:1]
@@ -544,7 +622,7 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	w := newWorld()
 	reviewed := w.review(7, nil)
 	reviewedAt := t0.Add(-2 * time.Hour).UTC().Format(time.RFC3339)
-	w.rounds.SetFingerprint(reviewed.String(), reviewedAt)
+	w.rounds.SetMark(reviewed.String(), round.Reviewed, reviewedAt)
 	skipped := w.requested(3, func(row *dinv.PR, _ *pr.Facts) { row.HeadBranch = "skipped" })
 	w.rounds.SkipFirstRound(skipped.String())
 	w.workspace(wsdomain.Workspace{ID: "rev3", DisplayName: "REVIEW skipped", Branch: "skipped"})
@@ -562,7 +640,7 @@ func TestSettleWritesTheBasesBookkeeping(t *testing.T) {
 	if err := w.provider().Settle(context.Background(), state{w.rounds}); err != nil {
 		t.Fatal(err)
 	}
-	if fp := w.rounds.Fingerprint(reviewed.String()); fp != reviewedAt+"@c2" {
+	if fp := w.rounds.Mark(reviewed.String(), round.Reviewed); fp != reviewedAt+"@c2" {
 		t.Fatalf("fingerprint = %q, want the head added", fp)
 	}
 	if w.rounds.FirstRoundSkipped(skipped.String()) {
@@ -738,7 +816,7 @@ func TestDueMatchesTheBasesNextDue(t *testing.T) {
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
 			for range w.cfg.Rounds.PerPRPerDay {
-				w.rounds.RecordFollowup(r.String(), "", t0)
+				w.rounds.RecordFollowup(r.String(), round.Reviewed, "", t0)
 			}
 		}, nextDay(t0)},
 		{"conflict window", func(w *world) {
