@@ -38,15 +38,15 @@ func run(args []string) error {
 	if css, err = designtokens.Splice(css, tok.CSS()); err != nil {
 		return err
 	}
-	if err := os.WriteFile(args[1], css, 0o644); err != nil {
-		return err
-	}
 	preview, err := os.ReadFile(args[2])
 	if err != nil {
 		return err
 	}
 	bundle, err := designtokens.Bundle(tok, css, preview)
 	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(args[1], css, 0o644); err != nil {
 		return err
 	}
 	return os.WriteFile(args[3], bundle, 0o644)
