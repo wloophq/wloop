@@ -86,25 +86,14 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
-	off := false
 	enabled := map[unit.Unit]bool{}
 	if err := s.writable(ctx, e, enabled); err != nil {
 		if req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
-		if hidden := s.hider(); hidden == nil || !hidden(e) {
-			switch res, got, err := s.detach(ctx, id, enabled); {
-			case err != nil:
-				return Result{}, err
-			case got == detached:
-				return res, nil
-			case got == nothingOff:
-				return s.Do(ctx, id, req)
-			}
-		}
-		off = true
+		return s.dismissOff(ctx, id, enabled)
 	}
-	if h := s.handler(e.Kind, req.Verb); h != nil && !off {
+	if h := s.handler(e.Kind, req.Verb); h != nil {
 		return h(ctx, e, req)
 	}
 	s.mu.Lock()
@@ -171,30 +160,30 @@ func (s *Service) project(ctx context.Context, e gtd.Entry, args map[string]stri
 	return append(cs, gtd.Change{Op: gtd.OpUpdate, Entry: e, Why: "project"}), nil
 }
 
-type detachment int
-
-const (
-	detached detachment = iota
-	nothingOff
-	whole
-)
-
-// detach removes from entry id the units of a disabled plugin and its items on them, and says detached; the
-// entry keeps its state. It says whole, with nothing written, when the entry must be dismissed whole: a derived
-// entry, whose id the unit it came from names, or one left without units. enabled caches the answers per unit.
-func (s *Service) detach(ctx context.Context, id gtd.ID, enabled map[unit.Unit]bool) (Result, detachment, error) {
+// dismissOff dismisses entry id, which has a unit or an item of a disabled plugin, with no handler: it detaches
+// the disabled plugins' units and the items on them, and the entry keeps its state. A derived entry, whose id the
+// unit it came from names, or one with no unit of an enabled plugin moves to the Trash whole. enabled caches the
+// answers per unit.
+func (s *Service) dismissOff(ctx context.Context, id gtd.ID, enabled map[unit.Unit]bool) (Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e, err := s.d.Store.Entry(ctx, id)
 	if err != nil {
-		return Result{}, 0, err
+		return Result{}, err
+	}
+	if err := accepts(e, gtd.VerbDismiss); err != nil {
+		return Result{}, err
+	}
+	units := slices.Clone(e.Units)
+	for _, r := range e.Items {
+		units = append(units, r.Unit)
 	}
 	var off []unit.ProviderID
-	for _, u := range e.Units {
+	for _, u := range units {
 		on, seen := enabled[u]
 		if !seen {
 			if _, on, err = s.d.Facts.UnitFacts(ctx, u); err != nil {
-				return Result{}, 0, err
+				return Result{}, err
 			}
 			enabled[u] = on
 		}
@@ -202,27 +191,26 @@ func (s *Service) detach(ctx context.Context, id gtd.ID, enabled map[unit.Unit]b
 			off = append(off, u.Provider)
 		}
 	}
-	if len(off) == 0 {
-		return Result{}, nothingOff, nil
-	}
 	isOff := func(u unit.Unit) bool { return slices.Contains(off, u.Provider) }
-	if e.Origin == gtd.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
-		return Result{}, whole, nil
+	now := s.now()
+	next, why := e, "detached"
+	if len(off) == 0 || e.Origin == gtd.OriginDerived || !slices.ContainsFunc(e.Units, func(u unit.Unit) bool { return !isOff(u) }) {
+		if next, err = transition(e, Request{Verb: gtd.VerbDismiss}, now); err != nil {
+			return Result{}, err
+		}
+		why = string(gtd.VerbDismiss)
+	} else {
+		next.Units = slices.DeleteFunc(slices.Clone(e.Units), isOff)
+		next.Items = slices.DeleteFunc(slices.Clone(e.Items), func(r gtd.ItemRef) bool { return isOff(r.Unit) })
+		next.Updated = now
+		for _, p := range off {
+			why += " " + string(p)
+		}
 	}
-	if err := accepts(e, gtd.VerbDismiss); err != nil {
-		return Result{}, 0, err
+	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: next, Why: why}}); err != nil {
+		return Result{}, err
 	}
-	e.Units = slices.DeleteFunc(slices.Clone(e.Units), isOff)
-	e.Items = slices.DeleteFunc(slices.Clone(e.Items), func(r gtd.ItemRef) bool { return isOff(r.Unit) })
-	e.Updated = s.now()
-	providers := make([]string, len(off))
-	for i, p := range off {
-		providers[i] = string(p)
-	}
-	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: e, Why: "detached " + strings.Join(providers, ", ")}}); err != nil {
-		return Result{}, 0, err
-	}
-	return Result{Entry: e}, detached, nil
+	return Result{Entry: next}, nil
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

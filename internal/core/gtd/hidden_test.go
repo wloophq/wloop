@@ -161,3 +161,17 @@ func TestDetachDropsItemsOnAnyUnitOfTheDisabledPlugin(t *testing.T) {
 		t.Fatalf("items %+v", got.Items)
 	}
 }
+
+func TestDetachDropsItemsOfADisabledPluginWithNoUnitOnTheEntry(t *testing.T) {
+	r := newRig()
+	r.facts.off["slack"], r.facts.off["jira"] = true, true
+	slack, ticket := unit.Unit{Provider: "slack", Key: "C1/1.1"}, unit.Unit{Provider: "jira", Key: "T-1"}
+	r.put(t, gtd.Entry{ID: "e-mixed", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{unitU, slack},
+		Items: []gtd.ItemRef{{Unit: unitU, Item: "x"}, {Unit: ticket, Item: "y"}}, Origin: gtd.OriginUser})
+	if _, err := r.svc.Do(context.Background(), "e-mixed", coregtd.Request{Verb: gtd.VerbDismiss}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.entry(t, "e-mixed"); !slices.Equal(got.Units, []unit.Unit{unitU}) || !slices.Equal(got.Items, []gtd.ItemRef{{Unit: unitU, Item: "x"}}) {
+		t.Fatalf("%+v", got)
+	}
+}
