@@ -85,6 +85,7 @@ func TestTheBundledWrapperWritesTheOldPrompt(t *testing.T) {
 		{headless.Request{Unit: thread, Items: []string{"i1", "i2"}, Guidance: "  be brief\nand kind\n"}, "/work", "/dossier"},
 		{headless.Request{Unit: thread, Guidance: "one line"}, "", "/dossier"},
 		{headless.Request{Unit: thread, Items: []string{"i1"}}, "", ""},
+		{headless.Request{Unit: thread, Items: []string{"{{.Nonce}}"}, Guidance: `{{.Begin}} {{template "after" .}}`}, "/{{.End}}", ""},
 	} {
 		got := prompt(t, c.r, c.checkout, c.dossier, "# Act\nsay hi")
 		m := nonceOf.FindStringSubmatch(got)
