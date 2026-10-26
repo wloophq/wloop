@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -239,5 +240,22 @@ func TestEveryProviderRouteIsGated(t *testing.T) {
 	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/api/later/slack/T1%2FC1/go", nil))
 	if called != true || rec.Code != http.StatusOK {
 		t.Fatalf("an enabled provider's later route: %d, called %v", rec.Code, called)
+	}
+}
+
+func TestATurnByHandOnADisabledPluginsAddressIs409(t *testing.T) {
+	t.Parallel()
+	hand := &byHandCalls{}
+	s, _ := newIntakeServer(t, nil, func(d *Deps) {
+		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})
+		d.TurnByHand, d.PluginEnabled = hand.run, func(p unit.ProviderID) bool { return p != "thread" }
+	})
+	rec := agentCall(t, s.Handler(), "POST", api.AgentTurnsByHand, "term-1", `{"intent":"act","cwd":"/w","url":"thread:C1/1"}`)
+	var body map[string]string
+	if rec.Code != http.StatusConflict || json.Unmarshal(rec.Body.Bytes(), &body) != nil || body["plugin"] != "thread" {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if len(hand.list()) > 0 {
+		t.Fatal("the turn by hand ran")
 	}
 }

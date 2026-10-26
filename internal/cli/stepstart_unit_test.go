@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -22,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -372,5 +374,40 @@ func TestAUserReviewIntentWithTheRoleReplacesTheBundledOne(t *testing.T) {
 	}
 	if sc.env.blockedIntent(inventory.StartBlock{Round: "follow-up"}) != "my-review" {
 		t.Fatal("a held follow-up is not my-review's")
+	}
+}
+
+func TestTheRoleHolderAnswersTurnStartsGuards(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	files := myReview(t)
+	files["intents/my-review/intent.toml"] += "\n[[refuse]]\nwhen = 'pr.repo == \"acme/api\"'\nwhy  = \"not on acme\"\n"
+	userProfile(t, sc.te, files)
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	if got := r.check(t, automation.CheckOpts{}); got != "not on acme" {
+		t.Fatalf("the holder's [[refuse]]: %q", got)
+	}
+	r.units.Set(r.u, "pr.repo", "acme/web")
+	r.rec.questions = map[github.Ref]map[string]bool{sc.ref: {"my-review": true}}
+	if got := r.check(t, automation.CheckOpts{}); got != "its my-review turn asks you something" {
+		t.Fatalf("the holder's open question: %q", got)
+	}
+	r.rec.questions = nil
+	r.briefs.intakes = []intake.Intake{{Unit: r.u, Intent: "my-review"}}
+	if got := r.check(t, automation.CheckOpts{}); got != "an intake of yours asks for it" {
+		t.Fatalf("the holder's open intake: %q", got)
+	}
+}
+
+func TestAWorkflowLaunchingARoleLaunchesItsHolder(t *testing.T) {
+	t.Parallel()
+	r := nudgeStartRig(t)
+	userProfile(t, r.sc.te, bundledIntentAs(t, "nudge", "my-nudge"))
+	if a := r.sc.env.startOf(r.st, r.u.Provider); a.intent != "my-nudge" || a.def.Name != "my-nudge" {
+		t.Fatalf("the nudge step starts %q (%q)", a.intent, a.def.Name)
+	}
+	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
+	if got := r.check(t, automation.CheckOpts{}); got != "it waits on you" {
+		t.Fatalf("the holder's refusal: %q", got)
 	}
 }

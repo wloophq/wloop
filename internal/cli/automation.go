@@ -372,7 +372,7 @@ func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, e
 		if i < 0 {
 			continue
 		}
-		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i]).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i], it.Unit.Provider).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
 	}
 	return out, nil
 }

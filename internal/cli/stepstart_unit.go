@@ -99,7 +99,7 @@ func (s *stepSet) automatedBudget(ctx context.Context) (string, error) {
 // unitStart checks again on current facts, then starts the turn in its
 // mode: a headless call, or a session where the intent runs.
 func (s *stepSet) unitStart(ctx context.Context, c stepCall, o automation.RunOpts) (string, error) {
-	refusal, p, err := s.unitGuards(ctx, c, startPlan{args: s.e.startOf(c.st)})
+	refusal, p, err := s.unitGuards(ctx, c, startPlan{args: s.e.startOf(c.st, c.u.Provider)})
 	if err != nil {
 		return "", err
 	}
