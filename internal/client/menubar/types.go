@@ -9,7 +9,10 @@ import (
 )
 
 type MenuItem struct {
-	Title     string
+	Title string
+	// Tooltip is what hovering the item says: what an action does, or why
+	// it is off.
+	Tooltip   string
 	Enabled   bool
 	Separator bool
 	Checked   bool

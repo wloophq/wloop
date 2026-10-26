@@ -752,7 +752,7 @@ func TestTheActionsCarryThePlanSpecs(t *testing.T) {
 	if code := get(t, r.s, api.Actions, &res); code != http.StatusOK {
 		t.Fatalf("GET %s: %d", api.Actions, code)
 	}
-	if len(res.Plan) != len(catalog.PlanSpecs()) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
+	if len(res.Plan) != len(catalog.PlanSpecs(bundledActions())) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
 		t.Fatalf("plan specs %+v", res.Plan)
 	}
 }

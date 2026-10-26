@@ -275,7 +275,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 			row = rd.Row.Actions
 		}
 	}
-	p.Actions = catalog.PlanStates(p, row)
+	p.Actions = catalog.PlanStates(s.loaded(), p, row)
 	return p
 }
 

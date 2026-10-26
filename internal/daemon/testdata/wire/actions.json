@@ -68,12 +68,12 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
         "enabled": true,
-        "note": "Starts a new round; the agent's open question is replaced"
+        "warning": "Starts a new round; the agent's open question is replaced"
       },
       {
         "id": "address",
@@ -101,7 +101,7 @@
       {
         "id": "dismiss",
         "enabled": true,
-        "hint": "Close the question; the pull request goes back to whoever it waits on"
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "id": "take_over",
@@ -127,10 +127,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -267,12 +267,12 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
         "enabled": true,
-        "note": "Starts a new round; the agent's open question is replaced"
+        "warning": "Starts a new round; the agent's open question is replaced"
       },
       {
         "id": "address",
@@ -300,7 +300,7 @@
       {
         "id": "dismiss",
         "enabled": true,
-        "hint": "Close the question; the pull request goes back to whoever it waits on"
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "id": "take_over",
@@ -326,10 +326,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "question": {
       "record_id": 1,
       "state": "asked",
@@ -447,7 +447,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -508,10 +508,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -619,18 +619,18 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "trust_run",
         "enabled": true,
-        "hint": "Trust /src/api in /home/.claude-work, then run the round",
+        "note": "Trust /src/api in /home/.claude-work, then run the round",
         "primary": true
       },
       {
         "id": "unblock",
         "enabled": true,
-        "hint": "Lift the block without trusting; the round waits for a new trigger"
+        "note": "Lift the block without trusting; the round waits for a new trigger"
       },
       {
         "id": "review",
@@ -691,10 +691,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -804,7 +804,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -865,10 +865,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -976,18 +976,18 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "trust_run",
         "enabled": true,
-        "hint": "Trust /src/api in /home/.claude, /home/orca/profiles/p1/home, then run the round",
+        "note": "Trust /src/api in /home/.claude, /home/orca/profiles/p1/home, then run the round",
         "primary": true
       },
       {
         "id": "unblock",
         "enabled": true,
-        "hint": "Lift the block without trusting; the round waits for a new trigger"
+        "note": "Lift the block without trusting; the round waits for a new trigger"
       },
       {
         "id": "review",
@@ -1048,10 +1048,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1161,7 +1161,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -1225,7 +1225,7 @@
         "reason": "the brief is off; set brief.enabled in the config"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1355,10 +1355,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1498,10 +1498,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -1599,7 +1599,7 @@
       {
         "id": "act",
         "enabled": true,
-        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
       },
       {
         "id": "nudge",
@@ -1635,7 +1635,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "me",
       "repo": "acme/web",
@@ -1727,7 +1727,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -1793,16 +1793,16 @@
       {
         "id": "remove_force",
         "enabled": true,
-        "hint": "Refused: the workspace holds uncommitted files",
+        "note": "Refused: the workspace holds uncommitted files",
         "confirm": "Force remove the workspace of acme/api#7?\n\nIt was refused:\nthe workspace holds uncommitted files\n\nForcing deletes its checkout with what is named above, for good."
       },
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -1973,10 +1973,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2091,7 +2091,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -2152,10 +2152,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2265,7 +2265,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -2326,7 +2326,7 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       },
       {
         "id": "intake_without",
@@ -2337,7 +2337,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2456,7 +2456,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -2517,7 +2517,7 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       },
       {
         "id": "intake_without",
@@ -2529,7 +2529,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2648,7 +2648,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -2662,12 +2662,12 @@
       {
         "id": "act",
         "enabled": true,
-        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
       },
       {
         "id": "nudge",
         "enabled": true,
-        "hint": "Nudge the maintainers (no reviewer requested)",
+        "note": "Nudge the maintainers (no reviewer requested)",
         "confirm": "Nudge the maintainers (no reviewer requested) on acme/api#10? An agent posts one comment under your name."
       },
       {
@@ -2709,10 +2709,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "me",
       "repo": "acme/api",
@@ -2814,7 +2814,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -2875,10 +2875,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -2990,7 +2990,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -3004,7 +3004,7 @@
       {
         "id": "act",
         "enabled": true,
-        "hint": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
       },
       {
         "id": "nudge",
@@ -3045,10 +3045,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3168,7 +3168,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -3229,10 +3229,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3413,10 +3413,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "pending": {
       "intent": "follow-up",
       "reason": "ana replied",
@@ -3605,10 +3605,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "pending": {
       "intent": "follow-up",
       "reason": "ana replied",
@@ -3753,7 +3753,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -3814,7 +3814,7 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       },
       {
         "id": "intake_without",
@@ -3825,7 +3825,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -3942,12 +3942,12 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
         "enabled": true,
-        "note": "Starts a new round; the agent's open question is replaced"
+        "warning": "Starts a new round; the agent's open question is replaced"
       },
       {
         "id": "address",
@@ -3975,7 +3975,7 @@
       {
         "id": "dismiss",
         "enabled": true,
-        "hint": "Close the question; the pull request goes back to whoever it waits on"
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "id": "take_over",
@@ -4001,10 +4001,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "question": {
       "record_id": 1,
       "state": "unrecorded",
@@ -4125,7 +4125,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -4186,10 +4186,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",
@@ -4340,7 +4340,7 @@
         "enabled": true
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "zoe",
       "repo": "acme/web",
@@ -4431,7 +4431,7 @@
       {
         "id": "guide",
         "enabled": true,
-        "hint": "Kept for the next automatic round"
+        "note": "Kept for the next automatic round"
       },
       {
         "id": "review",
@@ -4492,10 +4492,10 @@
       {
         "id": "brief_refresh",
         "enabled": true,
-        "hint": "Make this pull request's brief again now"
+        "note": "Make this pull request's brief again now"
       }
     ],
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "payload": {
       "author": "ana",
       "repo": "acme/api",

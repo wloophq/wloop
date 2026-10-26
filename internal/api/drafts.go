@@ -86,7 +86,7 @@ type DraftOrigin struct {
 
 type DraftApproval struct {
 	Mode   string `json:"mode"`
-	Window string `json:"window"` // a Go duration string, "" none
+	Window string `json:"window"` // a duration as duration.Format writes it ("10m", "2h", "1d"), "" none
 }
 
 type DraftWould struct {

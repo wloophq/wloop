@@ -13,4 +13,4 @@ text = "Ask the author of {{.PR.Slug}} one question."
 states = ["done", "asked", "failed"]
 
 [action]
-visible = "row.open"
+when = "row.open"

@@ -25,9 +25,11 @@ resumed = "act on {{.Wording.Ref}}"
 text = "Act on the open items of {{.Wording.Ref}}, {{.Who}}."
 
 [action]
-enabled    = "row.yours"
-reason_off = "Not yours: take it over first"
-hint = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+note = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval{{if .row.recommended}} (recommended: {{.row.recommended}}){{end}}"
+
+[[action.refuse]]
+when = "!(row.yours)"
+why  = "Not yours: take it over first"
 
 [record]
 states = ["done", "asked", "failed"]

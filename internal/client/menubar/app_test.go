@@ -455,6 +455,20 @@ func TestRowSubmenuIsTheRowsMenubarActions(t *testing.T) {
 			}
 			for _, st := range row.Actions {
 				spec := specOf(t, st.ID)
+				if !slices.Contains(spec.Surfaces, "menubar") || spec.Input != nil {
+					continue
+				}
+				child, _ := find(it.Children, menuTitle(spec, st))
+				want := spec.Summary
+				if !st.Enabled {
+					want = st.Reason
+				}
+				if child.Tooltip != want || want == "" {
+					t.Errorf("%s: tooltip %q, want %q", st.ID, child.Tooltip, want)
+				}
+			}
+			for _, st := range row.Actions {
+				spec := specOf(t, st.ID)
 				if !slices.Contains(spec.Surfaces, "menubar") || spec.Input != nil || !st.Enabled {
 					continue
 				}

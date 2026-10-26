@@ -140,7 +140,7 @@ func actionLiterals(fset *token.FileSet, file string, info *types.Info, f *ast.F
 	return out
 }
 
-var programFields = []string{"Visible", "Enabled", "Primary", "ActionTexts"}
+var programFields = []string{"When", "Refuse", "Primary", "ActionTexts"}
 
 // programField says whether v is one of programFields of internal/intent.Programs,
 // or of the ActionPrograms it embeds.

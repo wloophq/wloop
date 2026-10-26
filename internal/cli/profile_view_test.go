@@ -92,7 +92,7 @@ func TestProfileCheckPipedProblemsKeepTheirLines(t *testing.T) {
 	}
 	manifest := filepath.Join(dir, "intents", "broken", "intent.toml")
 	want := manifest + `:1:1: bogus: unknown key; did you mean board?
-` + manifest + `:16:11: action.visible: 13: unknown field pr.mien; did you mean pr.mine?
+` + manifest + `:16:8: action.when: 13: unknown field pr.mien; did you mean pr.mine?
 row.open && pr.mien
             ^
 2026-10-09 15:00:00 error: ` + dir + `: 2 problem(s)

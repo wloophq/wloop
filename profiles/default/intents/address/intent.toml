@@ -63,10 +63,12 @@ define  = "review-judgment"
 source_prefix = "review guide: "
 
 [action]
-enabled    = "pr.mine || pr.adopted || row.author_workspace"
-reason_off = "Not yours: take it over first"
-primary    = "!row.question && (pr.mine || pr.adopted)"
-note_when_question = "Starts a new round; the agent's open question is replaced"
+primary = { when = "!row.question && (pr.mine || pr.adopted)" }
+warning = "{{if .row.question}}Starts a new round; the agent's open question is replaced{{end}}"
+
+[[action.refuse]]
+when = "!(pr.mine || pr.adopted || row.author_workspace)"
+why  = "Not yours: take it over first"
 
 [join]
 differs_on = ["self_review"]

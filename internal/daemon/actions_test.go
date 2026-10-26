@@ -258,7 +258,7 @@ func TestAddressCarriesTheTakeOver(t *testing.T) {
 	fa := &fakeActions{}
 	s.deps.Actions = fa
 	address, _ := s.loaded().Registry.Get(dintent.Address)
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cockpit"}`); address.Action.ReasonOff.Src == "" || rec.Code != 409 || !strings.Contains(rec.Body.String(), address.Action.ReasonOff.Src) {
+	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cockpit"}`); len(address.Action.Refuse) == 0 || rec.Code != 409 || !strings.Contains(rec.Body.String(), address.Action.Refuse[0].Why.Src) {
 		t.Fatalf("address on a pull request not mine: %d %s", rec.Code, rec.Body)
 	}
 	post(t, s, "/api/units/github/acme%2Fapi%237/take_over", `{}`)

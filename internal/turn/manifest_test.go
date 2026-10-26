@@ -28,7 +28,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			t.Errorf("%s is not marked bundled", d.Name)
 		}
 		p := l.Programs[d.Name]
-		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.Visible == nil || p.Enabled == nil || p.Primary == nil)) {
+		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.When == nil || p.Primary == nil || len(p.Refuse) != len(d.Action.Refuse))) {
 			t.Errorf("%s: a predicate is not compiled: %+v", d.Name, p)
 		}
 		for i, c := range d.Headline.New {

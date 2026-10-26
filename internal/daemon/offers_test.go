@@ -272,7 +272,7 @@ func goldenJSON(t *testing.T, name string, v any) {
 func TestActionsGolden(t *testing.T) {
 	t.Parallel()
 	specs := catalogOf(bundledActions())
-	goldenJSON(t, "specs.json", api.ActionsResponse{Version: catalog.Version(specs), Specs: specs, Plan: catalog.PlanSpecs()})
+	goldenJSON(t, "specs.json", api.ActionsResponse{Version: catalog.Version(specs), Specs: specs, Plan: catalog.PlanSpecs(bundledActions())})
 	rows := map[string]api.Row{}
 	for _, f := range catalogFixtures {
 		_, rows[f.name] = seededRow(t, f)

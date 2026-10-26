@@ -1,17 +1,18 @@
 package catalog
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // The surfaces an action spec names.
@@ -65,25 +66,23 @@ func Rank(s api.ActionSpec, provider unit.ProviderID) int {
 }
 
 type builtinAction struct {
+	// spec is the action without its words, which actions.toml holds by
+	// its id.
 	spec api.ActionSpec
-	// offer is the action's state on the row; false leaves it out.
+	// offer is the action's state on the row, without its texts; false
+	// leaves it out.
 	offer func(f Facts) (api.ActionState, bool)
 }
 
 func on(id string) (api.ActionState, bool) { return api.ActionState{ID: id, Enabled: true}, true }
 
-func off(id, reason string) (api.ActionState, bool) {
-	return api.ActionState{ID: id, Reason: reason}, true
-}
+func off(id string) (api.ActionState, bool) { return api.ActionState{ID: id}, true }
 
 func absent() (api.ActionState, bool) { return api.ActionState{}, false }
 
-const (
-	reasonGateOff  = "the daemon plans no automatic round; see doctor"
-	reasonBriefOff = "the brief is off; set brief.enabled in the config"
-	// ReasonYours disables take_over on a pull request that is the user's.
-	ReasonYours = "It is yours already"
-)
+// ReasonYours is the bundled why of take_over on a pull request that is the
+// user's, which the command line recognizes.
+const ReasonYours = "It is yours already"
 
 // BasisPending and BasisHeld prefix a run_now basis.
 const (
@@ -94,7 +93,7 @@ const (
 func questionOffer(id string) func(f Facts) (api.ActionState, bool) {
 	return func(f Facts) (api.ActionState, bool) {
 		if !f.Question {
-			return off(id, fmt.Sprintf("%s on %s", turn.ErrNoQuestion, f.slug()))
+			return off(id)
 		}
 		return on(id)
 	}
@@ -109,168 +108,185 @@ func everywhere(extra ...string) []string {
 }
 
 // builtinActions is the catalog's Go table; the intents' actions go after
-// the round group.
+// the start group.
 var builtinActions = []builtinAction{
-	{api.ActionSpec{ID: "run_now", Label: "Run now", Group: "round", Key: "R", Verb: "approve", Surfaces: everywhere(), Intake: true}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "run_now", Group: builtin.GroupStart, Key: "R", Verb: "approve", Surfaces: everywhere(), Intake: true}, func(f Facts) (api.ActionState, bool) {
 		if p := f.Row.Pending; p != nil {
 			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisPending + p.Since.UTC().Format(time.RFC3339Nano)}, true
 		}
 		if f.HeldByCap {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason,
-				Confirm: fmt.Sprintf("Run the held round on %s now? It does not count against the cap.", f.slug())}, true
+			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason}, true
 		}
 		return absent()
 	}},
-	{api.ActionSpec{ID: "skip", Label: "Skip", Group: "round", Key: "S", Verb: "dismiss", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "skip", Group: builtin.GroupStart, Key: "S", Verb: "dismiss", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
 		if f.Row.Pending == nil {
 			return absent()
 		}
 		return on("skip")
 	}},
-	{api.ActionSpec{ID: "guide", Label: "Guide", Group: "round", Key: "G", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "text", Required: true, Label: "Guidance", Placeholder: "what the next round should look at"}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "guide", Group: builtin.GroupStart, Key: "G", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
+		Input: &api.InputSpec{Kind: "text", Required: true}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked || !f.Open {
 			return absent()
 		}
 		if !f.GateOn {
-			return off("guide", reasonGateOff)
+			return off("guide")
 		}
-		st, _ := on("guide")
-		if f.Row.Pending == nil {
-			st.Note = "Kept for the next automatic round"
-		}
-		return st, true
+		return on("guide")
 	}},
-	{api.ActionSpec{ID: "trust_run", Label: "Trust folder and run", Group: "round", Key: "T", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "trust_run", Group: builtin.GroupStart, Key: "T", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
 		if !f.StartBlocked || f.TrustFolder == "" || len(f.TrustHomes) == 0 || !f.Open {
 			return absent()
 		}
-		return api.ActionState{ID: "trust_run", Enabled: true, Primary: true,
-			Note: fmt.Sprintf("Trust %s in %s, then run the round", f.TrustFolder, strings.Join(f.TrustHomes, ", "))}, true
+		return api.ActionState{ID: "trust_run", Enabled: true, Primary: true}, true
 	}},
-	{api.ActionSpec{ID: "unblock", Label: "Dismiss block", Group: "round", Key: "D", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "unblock", Group: builtin.GroupStart, Key: "D", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
 		if !f.StartBlocked {
 			return absent()
 		}
-		st, _ := on("unblock")
-		st.Note = "Lift the block without trusting; the round waits for a new trigger"
-		return st, true
+		return on("unblock")
 	}},
-	{api.ActionSpec{ID: "answer", Label: "Answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "answer", Required: true, Label: "Answer"}}, questionOffer("answer")},
-	{api.ActionSpec{ID: "continue", Label: "Continue", Group: "turn", Key: "C", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("continue")},
-	{api.ActionSpec{ID: "dismiss", Label: "Dismiss", Group: "turn", Key: "X", Verb: "dismiss", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, func(f Facts) (api.ActionState, bool) {
-		st, ok := questionOffer("dismiss")(f)
-		if st.Enabled {
-			st.Note = "Close the question; the pull request goes back to whoever it waits on"
-		}
-		return st, ok
-	}},
-	{api.ActionSpec{ID: "take_over", Label: "Take over", Group: "control", Key: "A", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
+		Input: &api.InputSpec{Kind: "answer", Required: true}}, questionOffer("answer")},
+	{api.ActionSpec{ID: "continue", Group: "turn", Key: "C", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("continue")},
+	{api.ActionSpec{ID: "dismiss", Group: "turn", Key: "X", Verb: "dismiss", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("dismiss")},
+	{api.ActionSpec{ID: "take_over", Group: "control", Key: "A", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Open || f.Override.Adopted {
 			return absent()
 		}
 		if f.Mine {
-			return off("take_over", ReasonYours)
+			return off("take_over")
 		}
-		return api.ActionState{ID: "take_over", Enabled: true,
-			Confirm: fmt.Sprintf("Take over %s? It becomes yours to develop: "+brand.Name+" creates or renames its author workspace.", f.slug())}, true
+		return on("take_over")
 	}},
-	{api.ActionSpec{ID: "pause", Label: "Pause", Group: "control", Key: "H", Toggle: "resume", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "pause", Group: "control", Key: "H", Toggle: "resume", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked || !f.Open || f.Override.Hold {
 			return absent()
 		}
 		return on("pause")
 	}},
-	{api.ActionSpec{ID: "resume", Label: "Resume", Group: "control", Key: "H", Toggle: "pause", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "resume", Group: "control", Key: "H", Toggle: "pause", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked || !f.Open || !f.Override.Hold {
 			return absent()
 		}
 		return on("resume")
 	}},
-	{api.ActionSpec{ID: "mute", Label: "Mute", Group: "control", Key: "M", Toggle: "unmute", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI},
-		Input: &api.InputSpec{Kind: "duration", Required: true, Label: "Mute for", Placeholder: "2d, 36h", Default: "2d", UntilState: true}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "mute", Group: "control", Key: "M", Toggle: "unmute", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI},
+		Input: &api.InputSpec{Kind: "duration", Required: true, Default: "2d", UntilState: true}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked || !f.Open || f.Muted {
 			return absent()
 		}
 		return on("mute")
 	}},
-	{api.ActionSpec{ID: "unmute", Label: "Unmute", Group: "control", Key: "M", Toggle: "mute", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "unmute", Group: "control", Key: "M", Toggle: "mute", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked || (f.Open && !f.Muted) || (!f.Open && !f.MutedStored) {
 			return absent()
 		}
 		return on("unmute")
 	}},
-	{api.ActionSpec{ID: "track", Label: "Track", Group: "control", Toggle: "untrack", Surfaces: []string{SurfaceDetail, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "track", Group: "control", Toggle: "untrack", Surfaces: []string{SurfaceDetail, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
 		if f.Override.Tracked || !f.Open {
 			return absent()
 		}
 		return on("track")
 	}},
-	{api.ActionSpec{ID: "untrack", Label: "Untrack", Group: "control", Toggle: "track", Surfaces: []string{SurfaceDetail, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "untrack", Group: "control", Toggle: "track", Surfaces: []string{SurfaceDetail, SurfaceCLI, SurfaceExplore}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Override.Tracked {
 			return absent()
 		}
 		return on("untrack")
 	}},
-	{api.ActionSpec{ID: "open", Label: "Open", Group: "workspace", Key: "O", Surfaces: everywhere()}, func(Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "open", Group: "workspace", Key: "O", Surfaces: everywhere()}, func(Facts) (api.ActionState, bool) {
 		return on("open")
 	}},
-	{api.ActionSpec{ID: "remove", Label: "Remove", Group: "workspace", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "remove", Group: "workspace", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if !removable(f) {
 			return absent()
 		}
-		confirm := fmt.Sprintf("Remove the workspace of %s? Its checkout is deleted and its terminals are closed. It is refused while its agent works or waits, or when it holds uncommitted files, unpushed commits or ignored files outside build and dependency folders.", f.slug())
-		if f.Open {
-			confirm += " The pull request is still open: no automatic first round brings the workspace back; Review or Address does."
-		}
-		return api.ActionState{ID: "remove", Enabled: true, Confirm: confirm}, true
+		return on("remove")
 	}},
-	{api.ActionSpec{ID: "remove_force", Label: "Force remove", Group: "workspace", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "remove_force", Group: "workspace", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if !removable(f) || f.Forceable == "" {
 			return absent()
 		}
-		return api.ActionState{ID: "remove_force", Enabled: true, Note: "Refused: " + f.Forceable,
-			Confirm: fmt.Sprintf("Force remove the workspace of %s?\n\nIt was refused:\n%s\n\nForcing deletes its checkout with what is named above, for good.", f.slug(), f.Forceable)}, true
+		return on("remove_force")
 	}},
-	{api.ActionSpec{ID: "brief_refresh", Label: "Refresh brief", Group: "brief", Surfaces: []string{SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "brief_refresh", Group: "brief", Surfaces: []string{SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if !f.Tracked {
 			return absent()
 		}
 		if !f.BriefOn {
-			return off("brief_refresh", reasonBriefOff)
+			return off("brief_refresh")
 		}
-		st, _ := on("brief_refresh")
-		st.Note = "Make this pull request's brief again now"
-		return st, true
+		return on("brief_refresh")
 	}},
-	{api.ActionSpec{ID: "intake_without", Label: "Start without brief", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "intake_without", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		i := f.intake()
 		if i == nil || !i.Waiting() {
 			return absent()
 		}
 		if i.FromSession {
-			return off("intake_without", SessionWithout(i.Seq))
+			return off("intake_without")
 		}
 		return on("intake_without")
 	}},
-	{api.ActionSpec{ID: "intake_cancel", Label: "Cancel", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
+	{api.ActionSpec{ID: "intake_cancel", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
 		if i := f.intake(); i == nil || !i.Waiting() {
 			return absent()
 		}
 		return on("intake_cancel")
 	}},
-	draftAction("draft.approve", "Approve", "approve", nil),
-	draftAction("draft.edit", "Edit", "edit", &api.InputSpec{Kind: "text", Required: true, Label: "Text"}),
-	draftAction("draft.discard", "Discard", "dismiss", nil),
-	draftAction("draft.retry", "Retry", "retry", nil),
+	draftAction("draft.approve", "approve", nil),
+	draftAction("draft.edit", "edit", &api.InputSpec{Kind: "text", Required: true}),
+	draftAction("draft.discard", "dismiss", nil),
+	draftAction("draft.retry", "retry", nil),
 }
 
 // draftAction is an Outbox action: no row offers it, the draft's entry does (DraftStates).
-func draftAction(id, label, verb string, input *api.InputSpec) builtinAction {
-	spec := api.ActionSpec{ID: id, Label: label, Group: "draft", Scope: ScopeDraft, Verb: verb, Input: input,
+func draftAction(id, verb string, input *api.InputSpec) builtinAction {
+	spec := api.ActionSpec{ID: id, Group: "draft", Scope: ScopeDraft, Verb: verb, Input: input,
 		Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}
 	return builtinAction{spec, func(Facts) (api.ActionState, bool) { return absent() }}
+}
+
+// worded is spec with the words of its actions.toml table key.
+func worded(l *intentload.Loaded, key string, spec api.ActionSpec) api.ActionSpec {
+	a := actionWords(l, key)
+	spec.Label, spec.Summary = a.Label, a.Summary
+	if spec.Input != nil {
+		in := *spec.Input
+		in.Label, in.Placeholder = a.Input.Label, a.Input.Help
+		spec.Input = &in
+	}
+	return spec
+}
+
+func actionWords(l *intentload.Loaded, key string) intentload.BuiltinAction {
+	if l == nil {
+		return intentload.BuiltinAction{}
+	}
+	return l.Actions[key]
+}
+
+// texted is st with the texts of its actions.toml table key over facts:
+// note, confirm and warning when it is enabled, why when it is not. A
+// text that fails to render says so, so a refusal never reads empty.
+func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[string]any) api.ActionState {
+	a := actionWords(l, key)
+	render := func(name string) string {
+		out, err := a.Render(name, facts)
+		if err != nil {
+			return fmt.Sprintf("the profile has errors: %s: %s.%s: %v", intentload.ActionsFile, key, name, err)
+		}
+		return out
+	}
+	if !st.Enabled {
+		st.Reason = cmp.Or(render("why"), st.Reason)
+		return st
+	}
+	st.Note, st.Confirm, st.Warning = render("note"), render("confirm"), render("warning")
+	return st
 }
 
 // draftFrom are the draft states each draft action moves a draft from.
@@ -294,29 +310,37 @@ type DraftFacts struct {
 // postingDraftActions are the draft actions that lead to a post.
 var postingDraftActions = []string{"draft.approve", "draft.retry"}
 
-// DraftStates are the draft actions in catalog order as they stand on a draft: all disabled naming the plugin
-// when it is off.
-func DraftStates(f DraftFacts) []api.ActionState {
+// DraftStates are the draft actions in catalog order as they stand on a draft, worded by l: all disabled
+// when its plugin is off.
+func DraftStates(l *intentload.Loaded, f DraftFacts) []api.ActionState {
 	out := []api.ActionState{}
 	for _, b := range builtinActions {
 		if b.spec.Scope != ScopeDraft {
 			continue
 		}
-		st := api.ActionState{ID: b.spec.ID}
+		refusal := ""
 		switch {
 		case f.Disabled && b.spec.ID != "draft.discard":
-			st.Reason = string(f.Provider) + " is disabled"
+			refusal = "plugin_off"
 		case !slices.Contains(draftFrom[b.spec.ID], f.State):
-			st.Reason = "the draft is " + f.State
+			refusal = "state"
 		case f.NoPublisher && slices.Contains(postingDraftActions, b.spec.ID):
-			st.Reason = string(f.Provider) + " posts nothing"
-		default:
-			st.Enabled = true
+			refusal = "posts_nothing"
 		}
-		if st.Enabled && b.spec.ID == "draft.retry" && f.MayHaveBeenPosted {
-			st.Confirm = "This draft may have been posted already. Check its conversation first: retrying may post it twice."
-		}
-		out = append(out, st)
+		facts := intentload.DraftActionFactMap(func(name string) any {
+			switch name {
+			case "draft.state":
+				return f.State
+			case "draft.provider":
+				return string(f.Provider)
+			case "draft.refusal":
+				return refusal
+			case "draft.maybe_posted":
+				return f.MayHaveBeenPosted
+			}
+			return nil
+		})
+		out = append(out, texted(l, b.spec.ID, api.ActionState{ID: b.spec.ID, Enabled: refusal == ""}, facts))
 	}
 	return out
 }
@@ -339,12 +363,7 @@ func intentScope(d dintent.Def) string {
 	return ScopeUnit
 }
 
-// recommend marks an intent that runs headless with the mode recommended for the row's items: primary when
-// headless is, and the recommendation in its hint either way.
+// recommend makes an intent that runs headless primary on a row whose items are recommended to run headless.
 func recommend(st *api.ActionState, d dintent.Def, mode string) {
-	if mode == "" || !d.Runs("headless") {
-		return
-	}
-	st.Primary = st.Primary || mode == "headless"
-	st.Note = strings.TrimSpace(st.Note + " (recommended: " + mode + ")")
+	st.Primary = st.Primary || mode == "headless" && d.Runs("headless")
 }

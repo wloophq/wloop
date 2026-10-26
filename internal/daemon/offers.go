@@ -220,7 +220,7 @@ func (s *Server) waitingIntakes(ctx context.Context) (map[unit.Unit][]intake.Int
 func (s *Server) handleActions(w http.ResponseWriter, _ *http.Request) {
 	l := s.loaded()
 	off := s.disabledPlugins(l)
-	writeJSON(w, api.ActionsResponse{Version: catalog.VersionFor(l, off), Specs: catalog.SpecsFor(l, off), Plan: catalog.PlanSpecs()})
+	writeJSON(w, api.ActionsResponse{Version: catalog.VersionFor(l, off), Specs: catalog.SpecsFor(l, off), Plan: catalog.PlanSpecs(l)})
 }
 
 // disabledPlugins are the disabled plugins some action of l belongs to.

@@ -1,1 +1,1 @@
-testdata/bad/predicate-unquoted/intents/ask-author/intent.toml:15:11: action.enabled: unexpected character U+0021 '!' at start of value; a predicate is a string: quote it, as in enabled = '!pr.mine'
+testdata/bad/predicate-unquoted/intents/ask-author/intent.toml:17:8: action.refuse[0].when: unexpected character U+0021 '!' at start of value; a predicate is a string: quote it, as in when = '!pr.mine'

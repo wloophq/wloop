@@ -2,7 +2,8 @@
   {
     "id": "run_now",
     "label": "Run now",
-    "group": "round",
+    "summary": "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead.",
+    "group": "start",
     "key": "R",
     "surfaces": [
       "row",
@@ -18,7 +19,8 @@
   {
     "id": "skip",
     "label": "Skip",
-    "group": "round",
+    "summary": "Drop the round waiting on this pull request without running it. Run now starts it instead.",
+    "group": "start",
     "key": "S",
     "surfaces": [
       "row",
@@ -33,7 +35,8 @@
   {
     "id": "guide",
     "label": "Guide",
-    "group": "round",
+    "summary": "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits.",
+    "group": "start",
     "key": "G",
     "surfaces": [
       "detail",
@@ -51,7 +54,8 @@
   {
     "id": "trust_run",
     "label": "Trust folder and run",
-    "group": "round",
+    "summary": "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it.",
+    "group": "start",
     "key": "T",
     "surfaces": [
       "row",
@@ -65,7 +69,8 @@
   {
     "id": "unblock",
     "label": "Dismiss block",
-    "group": "round",
+    "summary": "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now.",
+    "group": "start",
     "key": "D",
     "surfaces": [
       "row",
@@ -79,7 +84,8 @@
   {
     "id": "review",
     "label": "Review",
-    "group": "round",
+    "summary": "Start or continue a review round on someone else's pull request, in a dedicated workspace",
+    "group": "start",
     "key": "V",
     "surfaces": [
       "row",
@@ -99,7 +105,8 @@
   {
     "id": "address",
     "label": "Address",
-    "group": "round",
+    "summary": "Triage the reviews and failing checks of a pull request you develop, in its workspace",
+    "group": "start",
     "key": "F",
     "surfaces": [
       "row",
@@ -119,7 +126,8 @@
   {
     "id": "act",
     "label": "Act",
-    "group": "round",
+    "summary": "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve",
+    "group": "start",
     "surfaces": [
       "row",
       "detail",
@@ -137,7 +145,8 @@
   {
     "id": "nudge",
     "label": "Nudge",
-    "group": "round",
+    "summary": "Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic",
+    "group": "start",
     "key": "N",
     "surfaces": [
       "row",
@@ -157,6 +166,7 @@
   {
     "id": "answer",
     "label": "Answer",
+    "summary": "Reply to the agent's open question with your text; the agent resumes from your answer.",
     "group": "turn",
     "key": "W",
     "surfaces": [
@@ -174,6 +184,7 @@
   {
     "id": "continue",
     "label": "Continue",
+    "summary": "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead.",
     "group": "turn",
     "key": "C",
     "surfaces": [
@@ -186,6 +197,7 @@
   {
     "id": "dismiss",
     "label": "Dismiss",
+    "summary": "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on.",
     "group": "turn",
     "key": "X",
     "surfaces": [
@@ -198,6 +210,7 @@
   {
     "id": "take_over",
     "label": "Take over",
+    "summary": "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it.",
     "group": "control",
     "key": "A",
     "surfaces": [
@@ -211,6 +224,7 @@
   {
     "id": "pause",
     "label": "Pause",
+    "summary": "Stop automatic rounds on this pull request until you resume it, and drop the one waiting; it stays in your lists. Mute hides it instead.",
     "group": "control",
     "key": "H",
     "surfaces": [
@@ -227,6 +241,7 @@
   {
     "id": "resume",
     "label": "Resume",
+    "summary": "Let automatic rounds run on this pull request again.",
     "group": "control",
     "key": "H",
     "surfaces": [
@@ -242,6 +257,7 @@
   {
     "id": "mute",
     "label": "Mute",
+    "summary": "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; rounds still run, unannounced. Pause stops the rounds instead.",
     "group": "control",
     "key": "M",
     "surfaces": [
@@ -264,6 +280,7 @@
   {
     "id": "unmute",
     "label": "Unmute",
+    "summary": "Bring this pull request back into the lists that wait on you.",
     "group": "control",
     "key": "M",
     "surfaces": [
@@ -278,6 +295,7 @@
   {
     "id": "track",
     "label": "Track",
+    "summary": "Follow this pull request like one in scope, though no other reason brings it in.",
     "group": "control",
     "surfaces": [
       "detail",
@@ -290,6 +308,7 @@
   {
     "id": "untrack",
     "label": "Untrack",
+    "summary": "Stop following this pull request because you tracked it; another reason may still keep it.",
     "group": "control",
     "surfaces": [
       "detail",
@@ -302,6 +321,7 @@
   {
     "id": "open",
     "label": "Open",
+    "summary": "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none.",
     "group": "workspace",
     "key": "O",
     "surfaces": [
@@ -317,6 +337,7 @@
   {
     "id": "remove",
     "label": "Remove",
+    "summary": "Delete this pull request's workspace when nothing in it would be lost. Force remove deletes it whatever it holds.",
     "group": "workspace",
     "surfaces": [
       "row",
@@ -328,6 +349,7 @@
   {
     "id": "remove_force",
     "label": "Force remove",
+    "summary": "Delete this pull request's workspace though a remove was refused; what it holds is lost for good.",
     "group": "workspace",
     "surfaces": [
       "row",
@@ -339,6 +361,7 @@
   {
     "id": "brief_refresh",
     "label": "Refresh brief",
+    "summary": "Make this pull request's brief again now, from what it holds today.",
     "group": "brief",
     "surfaces": [
       "detail",
@@ -349,6 +372,7 @@
   {
     "id": "intake_without",
     "label": "Start without brief",
+    "summary": "Start the turn this intake waits on now, without waiting for the brief. Cancel drops the intake instead.",
     "group": "intake",
     "surfaces": [
       "row",
@@ -362,6 +386,7 @@
   {
     "id": "intake_cancel",
     "label": "Cancel",
+    "summary": "Drop this intake: the turn it waits on never starts.",
     "group": "intake",
     "surfaces": [
       "row",
@@ -375,6 +400,7 @@
   {
     "id": "draft.approve",
     "label": "Approve",
+    "summary": "Send this draft as it stands.",
     "group": "draft",
     "surfaces": [
       "row",
@@ -387,6 +413,7 @@
   {
     "id": "draft.edit",
     "label": "Edit",
+    "summary": "Change the draft's text; it waits for your approval again.",
     "group": "draft",
     "surfaces": [
       "row",
@@ -404,6 +431,7 @@
   {
     "id": "draft.discard",
     "label": "Discard",
+    "summary": "Drop this draft for good; nothing is sent.",
     "group": "draft",
     "surfaces": [
       "row",
@@ -416,6 +444,7 @@
   {
     "id": "draft.retry",
     "label": "Retry",
+    "summary": "Send this draft again after its post failed.",
     "group": "draft",
     "surfaces": [
       "row",

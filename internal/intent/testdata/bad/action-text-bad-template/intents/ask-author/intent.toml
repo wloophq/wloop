@@ -12,6 +12,8 @@ text = "Ask the author of {{.PR.Slug}} one question."
 states = ["done", "asked", "failed"]
 
 [action]
-enabled = "pr.mine"
-reason_off = "Only {{.pr.authr}} can ask"
 confirm = "Ask {{.pr.slug"
+
+[[action.refuse]]
+when = "!pr.mine"
+why = "Only {{.pr.authr}} can ask"

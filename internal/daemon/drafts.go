@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -295,7 +296,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 		v.Effects = []string{}
 	}
 	if d.Approval.Window > 0 {
-		v.Approval.Window = d.Approval.Window.String()
+		v.Approval.Window = duration.Format(d.Approval.Window)
 	}
 	if !d.Deadline.IsZero() {
 		dl := d.Deadline
@@ -307,7 +308,7 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 		_, err := o.Effects(d.Unit.Provider)
 		f.NoPublisher = err != nil
 	}
-	v.Actions = catalog.DraftStates(f)
+	v.Actions = catalog.DraftStates(s.loaded(), f)
 	v.Where = s.draftWhere(ctx, d)
 	p := s.presentations([]unit.Unit{d.Unit})[d.Unit]
 	v.Label, v.Title, v.Link = p.Label, p.Title, p.Link

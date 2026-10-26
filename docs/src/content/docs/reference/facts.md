@@ -36,13 +36,23 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.muted` | bool | action | The pull request is muted, by the server clock. |
 | `row.question` | bool | action | A turn waits on the user's answer. |
 | `row.pending` | bool | action | A round is pending. |
+| `row.capped` | bool | action | The daily budget held the row's automatic round. |
 | `row.intake` | bool | action | An intake is open on the pull request. |
+| `row.intake_seq` | int | action | The number of the open intake, the waiting one first; 0 when none is open. |
 | `row.author_workspace` | bool | action | A linked workspace holds the author role. |
 | `row.yours` | bool | action | The row's unit is the viewer's to act on: any unit but a pull request, or a pull request that is the viewer's, taken over or held by an author workspace. |
 | `row.review_workspace` | bool | action | A linked workspace holds the review role. |
+| `row.trust_folder` | string | action | The folder whose trust lifts the row's start block; empty for a block on another question. |
+| `row.trust_homes` | list | action | The agent homes trusting row.trust_folder writes in. |
+| `row.remove_refusal` | string | action | What refused removing the row's workspace, which a force remove overrides; empty when nothing did. |
+| `row.recommended` | string | action | The runner recommended for the row's items: session or headless; empty when none is. |
 | `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
 | `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
 | `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
+| `draft.state` | string | draft_action | The draft's state. |
+| `draft.provider` | string | draft_action | The provider of the draft's unit. |
+| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
+| `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
 | `turn.trigger` | string | turn | by-hand or automated. |
 | `turn.automated` | bool | turn | The sweep started the turn. |
 | `turn.owned` | bool | turn | The viewer owns the pull request's loop. |

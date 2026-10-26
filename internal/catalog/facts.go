@@ -147,8 +147,23 @@ func (f Facts) Get(field string) any {
 		return f.Question
 	case "row.pending":
 		return f.Row.Pending != nil
+	case "row.capped":
+		return f.HeldByCap
 	case "row.intake":
 		return f.intake() != nil
+	case "row.intake_seq":
+		if i := f.intake(); i != nil {
+			return int(i.Seq)
+		}
+		return 0
+	case "row.trust_folder":
+		return f.TrustFolder
+	case "row.trust_homes":
+		return slices.Clone(f.TrustHomes)
+	case "row.remove_refusal":
+		return f.Forceable
+	case "row.recommended":
+		return f.Recommended
 	case "row.author_workspace":
 		return f.authorWorkspace()
 	case "row.yours":

@@ -7,7 +7,7 @@ import (
 func TestDraftStatesFollowTheDraft(t *testing.T) {
 	enabled := func(f DraftFacts) map[string]bool {
 		out := map[string]bool{}
-		for _, st := range DraftStates(f) {
+		for _, st := range DraftStates(bundled(t), f) {
 			out[st.ID] = st.Enabled
 		}
 		return out
@@ -28,7 +28,7 @@ func TestDraftStatesFollowTheDraft(t *testing.T) {
 			}
 		}
 	}
-	for _, st := range DraftStates(DraftFacts{State: "proposed", Provider: "slack", Disabled: true}) {
+	for _, st := range DraftStates(bundled(t), DraftFacts{State: "proposed", Provider: "slack", Disabled: true}) {
 		if st.ID == "draft.discard" {
 			if !st.Enabled {
 				t.Errorf("discard of a disabled plugin's draft: %+v", st)
@@ -41,7 +41,7 @@ func TestDraftStatesFollowTheDraft(t *testing.T) {
 	if quiet["draft.retry"] || !quiet["draft.edit"] || !quiet["draft.discard"] {
 		t.Errorf("no publisher: %v", quiet)
 	}
-	for _, st := range DraftStates(DraftFacts{State: "failed", MayHaveBeenPosted: true}) {
+	for _, st := range DraftStates(bundled(t), DraftFacts{State: "failed", MayHaveBeenPosted: true}) {
 		if (st.ID == "draft.retry") != (st.Confirm != "") {
 			t.Errorf("confirm on %+v", st)
 		}

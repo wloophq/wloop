@@ -288,11 +288,11 @@ function entryDrafts(e) {
 
 const MODE_NAMES = { headless: "draft headless", session: "run a session" };
 
-// delegateMode is the delegate's state in mode: the verb's own when the daemon sends no modes, else the
-// mode's, off when the action does not run in it.
+// delegateMode is the delegate's state in mode: the verb's own when the daemon sends no runners, else the
+// runner's, off when the action does not run on it.
 function delegateMode(st, mode) {
-  if (!st.enabled || !st.modes) return st;
-  const m = st.modes.find((x) => x.mode === mode);
+  if (!st.enabled || !st.runners) return st;
+  const m = st.runners.find((x) => x.runner === mode);
   return m || { enabled: false, reason: `This action does not ${MODE_NAMES[mode] || mode}` };
 }
 

@@ -12,4 +12,7 @@ text = "Ask the author of {{.PR.Slug}} one question."
 states = ["done", "asked", "failed"]
 
 [action]
-enabled = !pr.mine
+
+[[action.refuse]]
+when = !pr.mine
+why = "x"

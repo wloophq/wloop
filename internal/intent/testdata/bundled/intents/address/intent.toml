@@ -37,8 +37,10 @@ round   = "first"
 define  = "review-judgment"
 
 [action]
-enabled  = "pr.mine || pr.adopted || row.author_workspace"
-reason_off = "Not yours: take it over first"
+
+[[action.refuse]]
+when = "!(pr.mine || pr.adopted || row.author_workspace)"
+why  = "Not yours: take it over first"
 
 [join]
 differs_on = ["self_review"]

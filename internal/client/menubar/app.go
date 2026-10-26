@@ -448,7 +448,7 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 		}
 		if !st.Enabled {
 			title += " (" + st.Reason + ")"
-			items = append(items, MenuItem{Title: title})
+			items = append(items, MenuItem{Title: title, Tooltip: st.Reason})
 			continue
 		}
 		do := c.later(func(ctx context.Context) error {
@@ -456,10 +456,10 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 			return err
 		})
 		if st.Confirm == "" {
-			items = append(items, MenuItem{Title: title, Enabled: true, Action: do})
+			items = append(items, MenuItem{Title: title, Tooltip: spec.Summary, Enabled: true, Action: do})
 			continue
 		}
-		items = append(items, MenuItem{Title: title + "…", Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
+		items = append(items, MenuItem{Title: title + "…", Tooltip: spec.Summary, Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
 	}
 	return items
 }

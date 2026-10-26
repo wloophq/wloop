@@ -93,7 +93,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatalf("%d", code)
 	}
 	spec, ok := specOf(got.Specs, "ask-author")
-	want := api.ActionSpec{ID: "ask-author", Label: "Ask author", Group: "round", Key: "Q", Surfaces: []string{"row", "detail", "tui", "cli"},
+	want := api.ActionSpec{ID: "ask-author", Label: "Ask author", Summary: "Ask the author one question", Group: "start", Key: "Q", Surfaces: []string{"row", "detail", "tui", "cli"},
 		Input: &api.InputSpec{Kind: "text", Label: "Guidance"}, Source: filepath.Join(dir, "intents", "ask-author", "intent.toml"), Scope: "unit", Plugin: "github"}
 	if !ok || !reflect.DeepEqual(spec, want) {
 		t.Fatalf("spec %+v, want %+v", spec, want)
