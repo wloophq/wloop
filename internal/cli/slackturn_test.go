@@ -58,9 +58,9 @@ provider = "slack"
 session = { strategy = "new", title = "discuss" }
 
 [headline]
-resumed = "discussion of {{.Wording.Ref}}"
+resumed = "discussion of {{.unit.ref}}"
 [[headline.new]]
-text = "Discuss {{.Wording.Ref}}, {{.Who}}."
+line = 'Discuss {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
 surfaces = ["row", "cli"]

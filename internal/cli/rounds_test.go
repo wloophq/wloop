@@ -128,12 +128,12 @@ func TestOpenQuestionsAreTheIntentsWhoseNewestTurnAsks(t *testing.T) {
 	answered := unit.Unit{Provider: unit.GitHub, Key: "acme/api#8"}
 	books := map[unit.Unit]dturn.Book{
 		asked: {Unit: asked, Turns: []dturn.Turn{
-			{Seq: 1, Intent: dturn.Intent(dintent.Review), Role: "round.review", State: dturn.Done},
-			{Seq: 2, Intent: dturn.Intent(dintent.Address), Role: "round.address", State: dturn.Asked},
+			{Seq: 1, Intent: dturn.Intent(dintent.Review), Role: "pr.review", State: dturn.Done},
+			{Seq: 2, Intent: dturn.Intent(dintent.Address), Role: "pr.address", State: dturn.Asked},
 		}},
 		answered: {Unit: answered, Turns: []dturn.Turn{
-			{Seq: 1, Intent: dturn.Intent(dintent.Review), Role: "round.review", State: dturn.Asked},
-			{Seq: 2, Intent: dturn.Intent(dintent.Review), Role: "round.review", State: dturn.Done},
+			{Seq: 1, Intent: dturn.Intent(dintent.Review), Role: "pr.review", State: dturn.Asked},
+			{Seq: 2, Intent: dturn.Intent(dintent.Review), Role: "pr.review", State: dturn.Done},
 		}},
 	}
 	got := storeRecorder{}.OpenQuestions(books)

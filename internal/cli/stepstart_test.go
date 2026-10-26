@@ -668,18 +668,17 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 	}
 }
 
-func TestAUserReviewWithoutCapIsHeldByTheDailyCap(t *testing.T) {
+// TestAnyTurnOnAPullRequestSpendsTheDailyCap: the budget is the unit's
+// plugin's, so an intent holding no role spends it too.
+func TestAnyTurnOnAPullRequestSpendsTheDailyCap(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	files := myReview(t)
 	m := files["intents/my-review/intent.toml"]
-	for _, key := range []string{"cap         = \"rounds\"\n", "round_kind  = \"review\"\n"} {
-		if !strings.Contains(m, key) {
-			t.Fatalf("the bundled review no longer sets %q", key)
-		}
-		m = strings.Replace(m, key, "", 1)
+	if !strings.Contains(m, "role    = \"pr.review\"\n") {
+		t.Fatal("the bundled review holds no role")
 	}
-	files["intents/my-review/intent.toml"] = m
+	files["intents/my-review/intent.toml"] = strings.Replace(m, "role    = \"pr.review\"\n", "", 1)
 	userProfile(t, sc.te, files)
 	r := newStartRig(t, sc, "my-review", roundFollowup)
 	sc.te.cfg.Turns.PerUnitPerDay = 1

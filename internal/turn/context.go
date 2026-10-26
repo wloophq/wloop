@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -311,11 +310,3 @@ func (c Context) prior() *PriorReview {
 }
 
 func (c Context) Automated() bool { return c.Trigger == Automated }
-
-// Who says who started the turn, for headlines.
-func (c Context) Who() string {
-	if c.Automated() {
-		return "started by " + brand.Name
-	}
-	return "asked for by you"
-}

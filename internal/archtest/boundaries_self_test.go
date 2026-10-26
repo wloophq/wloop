@@ -167,12 +167,12 @@ func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
-const a = "record_round"
+const a = "pr.counted"
 const b = "nudge.prepare"
-const c = "pr_else_main"
-const d = "plan.drop_pending"
+const c = "linked_else_main"
+const d = "plan.cleared"
 const e = "review"
-const g = "record_round is fine inside a sentence"
+const g = "pr.counted is fine inside a sentence"
 var _ = builtin.Names
 `)
 	flagged(t, "daemon", builtinLiterals(fset, "internal/daemon/x.go", f), 4, "a builtin's name lives in its table")
@@ -210,7 +210,7 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
 	var missing, extra []string
-	for _, want := range []string{"record_round", "nudge.prepare", "pr_else_main", "mark_addressed"} {
+	for _, want := range []string{"pr.counted", "nudge.prepare", "linked_else_main", "pr.addressed"} {
 		if !names[want] {
 			missing = append(missing, want)
 		}
@@ -221,5 +221,5 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 		}
 	}
 	flagged(t, "builtin names missing", missing, 0, "")
-	flagged(t, "no on_sent, prepare or workspace names with . or _", extra, 0, "")
+	flagged(t, "no effect, prepare or workspace names with . or _", extra, 0, "")
 }

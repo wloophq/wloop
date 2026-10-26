@@ -325,7 +325,7 @@ func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
 	mu.Lock()
 	in := ask(t, s, "address", `{"source":"cli","inputs":{"self_review":true}}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Starting })
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), Role: "round.address", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
+	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), Role: "pr.address", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
 	mu.Unlock()
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Failed })
 	got := intakeOf(t, s, in.Seq)
@@ -559,7 +559,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 	r := newTurnRig(t)
 	at := r.s.deps.Now().Add(-time.Hour)
 	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{
-		{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "a", Trigger: turn.Automated, State: turn.Done, SentAt: at},
+		{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "a", Trigger: turn.Automated, State: turn.Done, SentAt: at},
 		{Intent: turn.Intent(dintent.Nudge), ID: "b", Trigger: turn.ByHand, State: turn.Sent, SentAt: at.Add(time.Minute)},
 	}})
 	bundled := r.s.loaded().Registry

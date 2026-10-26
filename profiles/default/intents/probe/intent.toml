@@ -5,16 +5,13 @@ role    = "probe"
 provider = "github"
 workspace = "given"
 session   = { strategy = "new", title = "probe" }
-context   = "synthetic"
-launch    = "probe"
-policy    = "probe"
 reports   = false
 brief     = { render = false, wait = false }
 
 [headline]
-resumed = "{{name}} probe {{.PR.Slug}}"
+resumed = "{{name}} probe {{.pr.slug}}"
 [[headline.new]]
-text = "{{name}} probe {{.PR.Slug}}, {{.Who}}."
+line = '{{name}} probe {{.pr.slug}}, {{template "started_by" .}}.'
 
 [record]
 states = ["done", "asked", "failed"]

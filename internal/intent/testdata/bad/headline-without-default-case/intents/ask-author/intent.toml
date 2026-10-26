@@ -4,10 +4,10 @@ workspace = "review"
 session = { strategy = "new", title = "ask" }
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
 when = "turn.owned"
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
 states = ["done", "asked", "failed"]

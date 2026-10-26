@@ -91,7 +91,7 @@ func TestProfileCheckPipedProblemsKeepTheirLines(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	manifest := filepath.Join(dir, "intents", "broken", "intent.toml")
-	want := manifest + `:1:1: bogus: unknown key; did you mean board?
+	want := manifest + `:1:1: bogus: unknown key
 ` + manifest + `:16:11: action.visible: 13: unknown field pr.mien; did you mean pr.mine?
 row.open && pr.mien
             ^

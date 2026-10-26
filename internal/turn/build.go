@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -192,8 +193,9 @@ func (b Builder) payload(ctx context.Context, r Request) (Payload, error) {
 	return p, nil
 }
 
-// compose reads the turn's guides: the intent's profile with the turn's
-// round, then each also_profiles entry whose when holds, with its round.
+// compose reads the turn's guides: the intent's profile at the turn's
+// stage, then each also_profile entry whose when holds, with the
+// dimensions it pins.
 func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 	d := c.Def
 	if d.Profile == "" {
@@ -201,7 +203,7 @@ func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 	}
 	dims := profile.Vocabulary(l.Registry)
 	var err error
-	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.facts(dims, c.Round))
+	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.dimFacts(dims, map[string]string{dintent.DimStage: c.Round}))
 	if err != nil {
 		return Context{}, err
 	}
@@ -211,7 +213,9 @@ func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 		if i < len(also) && also[i] != nil && !also[i].Eval(turnFacts{&c}) {
 			continue
 		}
-		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.facts(dims, a.Round))
+		pins := map[string]string{dintent.DimStage: ""}
+		maps.Copy(pins, a.Dims)
+		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.dimFacts(dims, pins))
 		if err != nil {
 			return Context{}, err
 		}
@@ -220,16 +224,20 @@ func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 	return c, nil
 }
 
-// facts are the values of the dimensions a guide is matched against, the
-// turn's round being round.
-func (c Context) facts(dims []profile.DimDef, round string) profile.Facts {
+// dimFacts are the values of the dimensions a guide is matched against,
+// with the dimensions pins names set to their pinned values.
+func (c Context) dimFacts(dims []profile.DimDef, pins map[string]string) profile.Facts {
 	f := profile.Facts{Values: map[string]any{}}
 	get := turnFacts{&c}
 	for _, d := range dims {
 		var v any
+		pin, pinned := pins[string(d.Name)]
 		switch {
-		case d.Fact == "turn.stage":
-			v = round
+		case pinned:
+			v = pin
+			if d.List {
+				v = []string{pin}
+			}
 		case d.Extra != "":
 			if c.Brief != nil {
 				v = c.Brief.Extra[d.Extra]

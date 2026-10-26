@@ -131,7 +131,7 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	reg := turnstest.Intents()
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },
-		Default: func(p unit.ProviderID) (dintent.Def, bool) { return reg.ByRole("headless.default", p) },
+		Default: func(p unit.ProviderID) (dintent.Def, bool) { return reg.ByRole("headless", p) },
 		Caps:    headless.Caps{PerCallUSD: 0.5, PerDayUSD: 5}, Spent: r.spent, Clock: r.clock, Go: func(run func()) { run() }, Log: t.Logf}
 	w := bundledWrapper(t)
 	r.svc.Wrapper = func() (headless.Wrapper, error) { return w, nil }

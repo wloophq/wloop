@@ -123,6 +123,8 @@ type Programs struct {
 	Records  *expr.Program
 	Headline []*expr.Program // per Headline.New case; nil for the unconditional last case
 	Also     []*expr.Program
+	// Refuse are the refusals' when, per Refuse of the definition.
+	Refuse []*expr.Program
 	ActionPrograms
 }
 
@@ -439,9 +441,6 @@ func (u *unit) load(base *template.Template, defaults manifestDefaults) {
 		s.problems = append(s.problems, problems...)
 	}()
 	s.at = positions(src)
-	if !u.bundled {
-		s.refuseBundledOnly(m)
-	}
 	d := s.define(u.name, m)
 	d.Source = u.source
 	d.Bundled = u.bundled
@@ -513,9 +512,7 @@ func crossCheck(units []*unit) {
 
 // takeRoles hands each bundled intent's role to the clean user intent that
 // holds the same role on one of its providers: the user's holder takes its
-// key and its row driving, and may set its reconcile; the bundled one keeps
-// loading without them. A user intent setting reconcile without taking a
-// bundled role is refused.
+// key and its row driving; the bundled one keeps loading without them.
 func takeRoles(ordered []*unit) {
 	for _, u := range ordered {
 		if !u.defined || u.broken() || u.bundled || u.def.Role == "" {
@@ -529,17 +526,10 @@ func takeRoles(ordered []*unit) {
 			}
 		}
 	}
-	taking := map[*unit]bool{}
 	for _, b := range ordered {
 		if b.takenBy != nil {
-			taking[b.takenBy] = true
 			b.declaredKey, b.declaredDrives = b.def.Key, b.def.DrivesRow
 			b.def.Key, b.def.DrivesRow = "", false
-		}
-	}
-	for _, u := range ordered {
-		if u.defined && !u.bundled && u.def.Role != "" && u.def.Reconcile != "" && !taking[u] {
-			u.sheet.add("reconcile", "is reserved for the bundled intents and the intents that take a bundled intent's role")
 		}
 	}
 }
@@ -561,16 +551,16 @@ func checkProfiles(u *unit, defs map[dintent.Name]dintent.Def) {
 	}
 	for i, a := range d.AlsoProfiles {
 		if o, ok := defs[dintent.Name(a.Profile)]; a.Profile != "" && (!ok || o.Profile == "") {
-			s.add(fmt.Sprintf("also_profiles[%d].profile", i), "%s is not an intent with judgment blocks", a.Profile)
+			s.add(fmt.Sprintf("also_profile[%d].profile", i), "%s is not an intent with judgment blocks", a.Profile)
 		}
 		if a.Define != "" && u.tmpl != nil && u.tmpl.Lookup(a.Define) == nil {
-			s.add(fmt.Sprintf("also_profiles[%d].define", i), "no template defines %s", a.Define)
+			s.add(fmt.Sprintf("also_profile[%d].define", i), "no template defines %s", a.Define)
 		}
 	}
 }
 
 // refusesBrokenProfiles breaks, until none is left, every clean intent whose
-// profile or also_profiles names a broken one, since that one's blocks are skipped.
+// profile or also_profile names a broken one, since that one's blocks are skipped.
 func refusesBrokenProfiles(ordered []*unit) {
 	byName := map[dintent.Name]*unit{}
 	for _, u := range ordered {
@@ -591,7 +581,7 @@ func refusesBrokenProfiles(ordered []*unit) {
 			}
 			for i, a := range u.def.AlsoProfiles {
 				if broken(a.Profile) {
-					u.sheet.add(fmt.Sprintf("also_profiles[%d].profile", i), "%s does not load; fix its manifest, or name another intent", a.Profile)
+					u.sheet.add(fmt.Sprintf("also_profile[%d].profile", i), "%s does not load; fix its manifest, or name another intent", a.Profile)
 				}
 			}
 			changed = changed || u.broken()
@@ -666,15 +656,15 @@ func (c *claims) check(u *unit, claim bool) {
 			u.def.Key = k
 			take = append(take, func() { c.keys[k] = string(d.Name) })
 		case u.bundled:
-			s.add("key", "%v", err)
+			s.add("shortcut", "%v", err)
 		default:
 			u.def.Key = ""
-			u.keyProblems = append(u.keyProblems, s.problem("key", "%v; the intent loads without a key (palette only)", err))
+			u.keyProblems = append(u.keyProblems, s.problem("shortcut", "%v; the intent loads without a shortcut (palette only)", err))
 		}
 	}
 	if d.DrivesRow {
 		if owner, taken := c.drivers[d.Workspace]; taken {
-			s.add("drives_row", "%s drives the rows of %s workspaces already; at most one intent per workspace", owner, d.Workspace)
+			s.add("workspace", "%s drives the rows of %s workspaces already: at most one intent per workspace, and %s drives them by its role %s", owner, d.Workspace, d.Name, d.Role)
 		} else {
 			take = append(take, func() { c.drivers[d.Workspace] = d.Name })
 		}

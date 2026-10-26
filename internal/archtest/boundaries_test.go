@@ -195,13 +195,17 @@ var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/int
 	"internal/intent/builtin/roles.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
 	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
 
-// builtinNames are the on_sent, prepare, workspace, workflow step and draft
-// effect names holding a . or _.
+// builtinNames are the effect, prepare, workspace and workflow step names
+// holding a . or _.
 func builtinNames() map[string]bool {
-	all := builtin.EffectNames()
-	for _, slot := range []builtin.Slot{builtin.SlotOnSent, builtin.SlotPrepare, builtin.SlotWorkspace} {
-		all = append(all, builtin.Names[slot]...)
+	var all []string
+	for _, e := range builtin.Effects {
+		all = append(all, e.Name)
 	}
+	for _, r := range builtin.Roles {
+		all = append(all, r.Prepare)
+	}
+	all = append(all, builtin.Names[builtin.SlotWorkspace]...)
 	for _, st := range builtin.Steps {
 		all = append(all, st.Name)
 	}

@@ -2,14 +2,18 @@ package intent
 
 import (
 	"fmt"
+	"io"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
 	"text/template/parse"
+	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // HeadlineName is the name a headline text is parsed under in an intent's template set:
@@ -54,19 +58,21 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 		}
 	}
 	ok := true
-	headline := func(path, name string, txt dintent.Text) {
+	text := func(path, name string, txt dintent.Text, env expr.Env) {
 		if txt.At.Line == 0 {
 			return
 		}
-		if _, err := set.New(name).Parse(txt.Src); err != nil {
-			_, msg := templateMsg(name, err)
-			s.add(path, "%s", msg)
-			ok = false
-		}
+		ok = s.parseText(set, path, name, txt, env) && ok
 	}
-	headline("headline.resumed", HeadlineName(-1), d.Headline.Resumed)
+	turn := TurnEnv(d)
+	text("headline.resumed", HeadlineName(-1), d.Headline.Resumed, turn)
 	for i, c := range d.Headline.New {
-		headline(fmt.Sprintf("headline.new[%d].text", i), HeadlineName(i), c.Text)
+		text(fmt.Sprintf("headline.new[%d].line", i), HeadlineName(i), c.Text, turn)
+	}
+	unit := unitEnv(d)
+	text("why", WhyName, d.Why, unit)
+	for i, r := range d.Refuse {
+		text(fmt.Sprintf("refuse[%d].why", i), RefuseWhyName(i), r.Why, unit)
 	}
 	if _, err := set.Parse(body); err != nil {
 		line, msg := templateMsg(file, err)
@@ -80,12 +86,19 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 	for _, in := range d.Inputs {
 		declared[in.Name] = true
 	}
-	headlinePaths := map[string]string{HeadlineName(-1): "headline.resumed"}
+	inline := map[string]string{HeadlineName(-1): "headline.resumed", WhyName: "why"}
 	for i := range d.Headline.New {
-		headlinePaths[HeadlineName(i)] = fmt.Sprintf("headline.new[%d].text", i)
+		inline[HeadlineName(i)] = fmt.Sprintf("headline.new[%d].line", i)
+	}
+	for i := range d.Refuse {
+		inline[RefuseWhyName(i)] = fmt.Sprintf("refuse[%d].why", i)
 	}
 	for _, t := range set.Templates() {
 		if t.Tree == nil || (baseNames[t.Name()] && t.Tree.ParseName != file) {
+			continue
+		}
+		if p, ok := inline[t.Tree.ParseName]; ok {
+			s.factReads(p, d, t.Tree)
 			continue
 		}
 		walk(t.Tree.Root, func(n parse.Node, chain []string) {
@@ -99,15 +112,25 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 				return
 			}
 			tree := t.Tree
-			if p, ok := headlinePaths[tree.ParseName]; ok {
-				s.add(p, "%s", msg)
-				return
-			}
 			line, col := place(body, int(n.Position()), "."+chain[0])
 			s.problems = append(s.problems, Problem{File: tree.ParseName, Line: line, Col: col, Msg: msg})
 		})
 	}
 	return set
+}
+
+// factReads refuses a fact of another provider's that the inline template
+// at path reads.
+func (s *sheet) factReads(path string, d dintent.Def, tree *parse.Tree) {
+	walk(tree.Root, func(_ parse.Node, chain []string) {
+		for n := len(chain); n > 0; n-- {
+			name := strings.Join(chain[:n], ".")
+			if fp := builtin.FactProvider(name); fp != "" && !onlyServes(d, fp) {
+				s.add(path, "%s is a %s fact; a %s intent cannot read it", name, fp, d.Provider)
+				return
+			}
+		}
+	})
 }
 
 // place is the 1-based line and column of the reference whose node sits at
@@ -173,3 +196,150 @@ func walkBranch(b *parse.BranchNode, f func(parse.Node, []string)) {
 	walk(b.List, f)
 	walk(b.ElseList, f)
 }
+
+// The names the manifest's other inline templates are parsed under in an
+// intent's template set.
+const WhyName = "manifest.why"
+
+// RefuseWhyName is the name refuse[i].why is parsed under.
+func RefuseWhyName(i int) string { return fmt.Sprintf("refuse[%d].why", i) }
+
+// NestFacts nests the dotted facts of env into the map an inline template
+// executes over, {"pr": {"slug": ...}}, each read by get; a fact get has
+// no value for reads as its type's zero value.
+func NestFacts(env expr.Env, get func(name string) any) map[string]any {
+	root := map[string]any{}
+	for _, name := range env.Names() {
+		parts := strings.Split(name, ".")
+		m := root
+		ok := true
+		for _, p := range parts[:len(parts)-1] {
+			next, isMap := m[p].(map[string]any)
+			if _, set := m[p]; set && !isMap {
+				ok = false
+				break
+			}
+			if !isMap {
+				next = map[string]any{}
+				m[p] = next
+			}
+			m = next
+		}
+		if !ok {
+			continue
+		}
+		v := get(name)
+		if v == nil {
+			v = zero(env[name])
+		}
+		m[parts[len(parts)-1]] = v
+	}
+	return root
+}
+
+func zero(t expr.Type) any {
+	switch t {
+	case expr.Bool:
+		return false
+	case expr.Int:
+		return 0
+	case expr.List:
+		return []string{}
+	case expr.Duration:
+		return time.Duration(0)
+	case expr.Time:
+		return time.Time{}
+	}
+	return ""
+}
+
+// TurnEnv is the env an intent's turn predicates and inline texts read:
+// the turn slot's facts and its inputs, turn.stage only with the stage
+// dimension.
+func TurnEnv(d dintent.Def) expr.Env {
+	env := builtin.Env(builtin.TurnSlot, d.Inputs)
+	if !slices.Contains(d.Dims, dintent.DimStage) {
+		delete(env, "turn.stage")
+	}
+	return env
+}
+
+// sample is the facts map of env with every fact set, for checking texts.
+func sample(env expr.Env) map[string]any {
+	return NestFacts(env, func(name string) any {
+		switch env[name] {
+		case expr.Bool:
+			return true
+		case expr.Int:
+			return 1
+		case expr.List:
+			return []string{"sample"}
+		case expr.Duration:
+			return time.Hour
+		case expr.Time:
+			return time.Unix(0, 0).UTC()
+		}
+		return "sample"
+	})
+}
+
+// parseText parses an inline template of d at path, under name in set, and
+// renders it over a fully set facts map of env; a problem is placed at path.
+func (s *sheet) parseText(set *template.Template, path, name string, txt dintent.Text, env expr.Env) bool {
+	if txt.At.Line == 0 && txt.Src == "" {
+		return true
+	}
+	t, err := set.New(name).Parse(txt.Src)
+	if err == nil {
+		err = t.Execute(io.Discard, sample(env))
+	}
+	if err != nil {
+		_, msg := templateMsg(name, err)
+		s.add(path, "%s", msg)
+		return false
+	}
+	return true
+}
+
+// Why renders the why of the intent name over facts, the unit's workflow
+// facts; "" for an intent without one.
+func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok || d.Why.Src == "" {
+		return "", nil
+	}
+	return l.render(name, WhyName, unitEnv(d), facts)
+}
+
+// Refusal is the why of the intent name's first refusal whose when holds
+// over facts, the unit's workflow facts; "" when none holds.
+func (l *Loaded) Refusal(name dintent.Name, facts map[string]any) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok {
+		return "", nil
+	}
+	p := l.Programs[name]
+	for i := range d.Refuse {
+		if i >= len(p.Refuse) || p.Refuse[i] == nil || !p.Refuse[i].Eval(mapFacts(facts)) {
+			continue
+		}
+		return l.render(name, RefuseWhyName(i), unitEnv(d), facts)
+	}
+	return "", nil
+}
+
+func (l *Loaded) render(name dintent.Name, text string, env expr.Env, facts map[string]any) (string, error) {
+	t := l.Templates[name].Lookup(text)
+	if t == nil {
+		return "", fmt.Errorf("%s: no %s", name, text)
+	}
+	var b strings.Builder
+	if err := t.Execute(&b, NestFacts(env, func(n string) any { return facts[n] })); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+type mapFacts map[string]any
+
+func (m mapFacts) Get(name string) any { return m[name] }

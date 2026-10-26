@@ -18,28 +18,29 @@ type Slot string
 
 const (
 	SlotWorkspace Slot = "workspace"
-	SlotLaunch    Slot = "launch"
-	SlotPrepare   Slot = "prepare"
 	SlotBefore    Slot = "before"
-	SlotOnSent    Slot = "on_sent"
-	SlotPolicy    Slot = "policy"
-	SlotContext   Slot = "context"
-	SlotReconcile Slot = "reconcile"
 )
 
-// LaunchProbe is the launch of a probe: a synthetic pull request in the
-// workspace the request names.
-const LaunchProbe = "probe"
+// WorkspaceLinkedElseMain runs a turn in the workspace linked to its unit,
+// else in the repository's main checkout.
+const WorkspaceLinkedElseMain = "linked_else_main"
 
+// Names are the builtins a manifest names, by the key that names them.
 var Names = map[Slot][]string{
-	SlotWorkspace: {"review", "author", "pr_else_main", "given"},
-	SlotLaunch:    {"", LaunchProbe},
-	SlotPrepare:   {"", "nudge.prepare"},
+	SlotWorkspace: {"review", "author", WorkspaceLinkedElseMain, "given"},
 	SlotBefore:    {"take_over"},
-	SlotOnSent:    OnSentNames,
-	SlotPolicy:    {"round", "probe"},
-	SlotContext:   {"pr", "synthetic"},
-	SlotReconcile: {"", "my_review"},
+}
+
+// Boards are the workspaces whose board an intent's turns move: a turn in
+// the review or the author workspace moves that board, any other none.
+var Boards = []string{"review", "author"}
+
+// BoardOf is the board a turn in workspace moves, "none" for none.
+func BoardOf(workspace string) string {
+	if slices.Contains(Boards, workspace) {
+		return workspace
+	}
+	return "none"
 }
 
 // ReservedNames are names a user intent may not take: CLI commands, built-in action ids, profile words, dimensions.
@@ -55,7 +56,7 @@ var ReservedNames = []string{
 
 	"eval", "intents", "settings", "tags", "try",
 
-	"association", "base", "kind", "label", "organization", "repo", "reviewer", "risk", "round", "size", "team", "user",
+	"association", "base", "kind", "label", "organization", "repo", "reviewer", "risk", "size", "stage", "team", "user",
 }
 
 // ActionKeys are the keys of the built-in actions, by id; internal/keys
@@ -87,8 +88,8 @@ const (
 	ActionSlot   FactSlot = "action"
 	TurnSlot     FactSlot = "turn"
 	WorkflowSlot FactSlot = "workflow"
-	// ApprovalSlot holds the draft's own facts a [draft_approval] rule reads
-	// besides its unit's.
+	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
+	// reads besides its unit's.
 	ApprovalSlot FactSlot = "approval"
 )
 
@@ -111,11 +112,12 @@ type Fact struct {
 	Enum map[unit.ProviderID][]string
 	// Untrusted says that a third party's text, read by the extraction, the
 	// proposing turn itself or an agent's brief sets the fact's value, so
-	// no [draft_approval] rule may read it.
+	// no [drafts.approval] rule may read it.
 	Untrusted bool
 }
 
-var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}
+// InputTypes are the types an input declares, with the type its fact has.
+var InputTypes = map[string]expr.Type{"bool": expr.Bool, "text": expr.String, "list": expr.List}
 
 // Env is the slot's facts plus, for the turn slot, the intent's declared inputs.
 func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
@@ -127,7 +129,7 @@ func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 	}
 	if slot == TurnSlot {
 		for _, in := range inputs {
-			if t, ok := inputTypes[in.Type]; ok {
+			if t, ok := InputTypes[in.Type]; ok {
 				env["inputs."+in.Name] = t
 			}
 		}
@@ -139,19 +141,19 @@ func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 var RecordStates = []string{string(record.Done), string(record.Settled), string(record.Asked), string(record.Failed)}
 
 // IntentDims are the profile dimensions a manifest's dims may list.
-var IntentDims = []string{dintent.DimRound, dintent.DimReviewer}
+var IntentDims = []string{dintent.DimStage, dintent.DimReviewer}
+
+// Stages are the passes over a unit: the first, and each one after.
+var Stages = []string{"first", "follow-up"}
 
 // ReservedFlags are flags the CLI owns; no input may declare them.
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
 
-// RoundProviders are the providers whose turn.start runs under the round
-// caps; a workflow starting turns on any other must set limits.per_day.
+// RoundProviders are the providers whose plugin keeps a per-unit count of
+// turns: every automated turn.start on their units spends
+// turns.per_unit_per_day; a workflow starting turns on any other must set
+// limits.per_day.
 var RoundProviders = []unit.ProviderID{unit.GitHub}
-
-// ContextProviders are the providers whose units a context builtin makes up,
-// which only an intent of that provider may set: synthetic is a made-up pull
-// request.
-var ContextProviders = map[string]unit.ProviderID{"synthetic": unit.GitHub}
 
 // PayloadProviders are the template roots a provider's payload alone holds,
 // which only an intent of that provider may read.

@@ -204,7 +204,7 @@ func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
 	te := newTestEnv(t, myPRManager())
 	withBundled(t, te, func(fsys fstest.MapFS) {
 		f := fsys["intents/address/intent.toml"]
-		f.Data = []byte(strings.Replace(string(f.Data), `"record_round", `, "", 1))
+		f.Data = []byte(strings.Replace(string(f.Data), `"pr.counted", `, "", 1))
 	})
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
 	te.git.branch["/worktrees/feat/mine"] = "feat/mine"

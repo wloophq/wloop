@@ -28,7 +28,7 @@ const profileUsage = `usage:
   profile check [<dir>] [--color auto|always|never]
   profile schema [--workflow]
   profile try <pr-url>
-conditions: --org, --repo, --user, --team, --association, --label, --base, --round, --kind, --size, --risk, --tag <key>=<value> (repeatable)`
+conditions: --organization, --repo, --user, --team, --association, --label, --base, --stage, --kind, --size, --risk, --tag <key>=<value> (repeatable)`
 
 type listFlag []string
 
@@ -71,13 +71,8 @@ type conditions struct {
 
 func addConditions(fs *flag.FlagSet) *conditions {
 	c := &conditions{dims: map[profile.Dim]*string{}}
-	names := map[profile.Dim]string{profile.DimOrganization: "org"}
 	for _, d := range profile.Dims {
-		name := names[d]
-		if name == "" {
-			name = string(d)
-		}
-		c.dims[d] = fs.String(name, "", string(d)+" condition")
+		c.dims[d] = fs.String(string(d), "", string(d)+" condition")
 	}
 	fs.Var(&c.tags, "tag", "tag condition <key>=<value>, repeatable")
 	return c
@@ -87,11 +82,11 @@ func addConditions(fs *flag.FlagSet) *conditions {
 // written in another spelling.
 func (c *conditions) path() (p profile.BlockPath, notes []string, err error) {
 	if *c.dims[profile.DimRepo] != "" && *c.dims[profile.DimOrganization] == "" {
-		return p, nil, errors.New("--repo needs --org: a repository block sits under its organization")
+		return p, nil, errors.New("--repo needs --organization: a repository block sits under its organization")
 	}
 	for _, d := range []profile.Dim{profile.DimOrganization, profile.DimRepo, profile.DimUser, profile.DimTeam} {
 		if v := *c.dims[d]; strings.Contains(v, "/") {
-			return p, nil, fmt.Errorf("%s %s: the value has no /; name a repository with --org <owner> --repo <repo>, a team as <org>-<slug>", d, v)
+			return p, nil, fmt.Errorf("%s %s: the value has no /; name a repository with --organization <owner> --repo <repo>, a team as <org>-<slug>", d, v)
 		}
 	}
 	if v := *c.dims[profile.DimAssociation]; v != "" {
@@ -304,10 +299,10 @@ func runProfileAdd(e *Env, args []string) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return usageError{usage: profileUsage}
 	}
-	if *conds.dims[profile.DimRound] != "" {
+	if *conds.dims[profile.DimStage] != "" {
 		for _, k := range kinds {
-			if !slices.Contains(profile.DimsOf(intents, k), string(profile.DimRound)) {
-				return fmt.Errorf("--round does not apply to %s: its manifest's dims do not list round", k)
+			if !slices.Contains(profile.DimsOf(intents, k), string(profile.DimStage)) {
+				return fmt.Errorf("--stage does not apply to %s: its manifest's dims do not list stage", k)
 			}
 		}
 	}

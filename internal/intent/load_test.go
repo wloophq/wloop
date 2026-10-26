@@ -48,9 +48,9 @@ workspace = "review"
 session = { strategy = "new", title = "ask" }
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
 states = ["done"]
@@ -163,17 +163,17 @@ func TestDefaultsAreTheSpecsTable(t *testing.T) {
 		Policy:     "round",
 		StartLine:  "starting the ask author",
 		Answerable: true,
-		Board:      "none",
+		Board:      "review",
 		Reports:    true,
 		Brief:      dintent.Brief{Render: true, Wait: true},
 		Records:    dintent.Pred{Src: "true", At: dintent.Pos{File: file}},
 		Headline: dintent.Headline{
-			Resumed: dintent.Text{Src: "ask round on {{.PR.Slug}}", At: dintent.Pos{File: file, Line: 7, Col: 11}},
-			New:     []dintent.Case{{Text: dintent.Text{Src: "Ask the author of {{.PR.Slug}} one question.", At: dintent.Pos{File: file, Line: 9, Col: 8}}}},
+			Resumed: dintent.Text{Src: "ask round on {{.pr.slug}}", At: dintent.Pos{File: file, Line: 7, Col: 11}},
+			New:     []dintent.Case{{Text: dintent.Text{Src: "Ask the author of {{.pr.slug}} one question.", At: dintent.Pos{File: file, Line: 9, Col: 8}}}},
 		},
 		Guidance: dintent.Guidance{Label: "Guidance"},
 		Record:   dintent.RecordRules{States: []string{"done"}},
-		Resume:   dintent.Resume{HeadMoved: DefaultHeadMoved},
+		Resume:   dintent.Resume{Changed: DefaultChanged},
 		Source:   dintent.Source{Layer: "user", Dir: filepath.Join(root, "intents", "ask-author")},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -187,7 +187,7 @@ func TestDefaultsAreTheSpecsTable(t *testing.T) {
 
 func TestDefaultsOfAnActionAndAnInput(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", minimal+"\n[action]\n\n[inputs.topic]\ntype = \"text\"\nflag = \"--topic\"\nhelp = \"what\"\n\n[[also_profiles]]\nprofile = \"review\"\nwhen = \"true\"\ndefine = \"review-judgment\"\n", "{{.Headline}}\n")
+	writeIntent(t, root, "ask-author", minimal+"\n[action]\n\n[inputs.topic]\ntype = \"text\"\nflag = \"--topic\"\nhelp = \"what\"\n\n[[also_profile]]\nprofile = \"review\"\nwhen = \"true\"\ndefine = \"review-judgment\"\n", "{{.Headline}}\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
@@ -202,7 +202,7 @@ func TestDefaultsOfAnActionAndAnInput(t *testing.T) {
 	if in.From != "user" || !slices.Equal(in.Surfaces, []string{"cli", "instructions"}) || in.At.Line != 16 {
 		t.Errorf("input %+v", in)
 	}
-	if d.AlsoProfiles[0].SourcePrefix != "review guide: " {
+	if d.AlsoProfiles[0].Prefix != "review guide: " {
 		t.Errorf("also %+v", d.AlsoProfiles[0])
 	}
 }
@@ -279,7 +279,7 @@ func TestUserOverridesABundledTemplateAndInheritsTheManifest(t *testing.T) {
 
 func TestUserOverridesABundledManifestWhole(t *testing.T) {
 	root := t.TempDir()
-	manifest := "context = \"pr\"\n" + strings.Replace(minimal, "one question", "two questions", 1)
+	manifest := "answerable = true\n" + strings.Replace(minimal, "one question", "two questions", 1)
 	writeFile(t, filepath.Join(root, "intents", "greet", "intent.toml"), manifest)
 	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
 	if len(problems) > 0 {
@@ -358,10 +358,10 @@ func TestReservedNamesApplyToUserLayersOnly(t *testing.T) {
 
 func TestLowercaseIntentKeyIsDroppedWithAProblem(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "key = \"a\"\nworkspace =", 1), "{{.Headline}}")
+	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "shortcut = \"a\"\nworkspace =", 1), "{{.Headline}}")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
-	if len(problems) != 1 || problems[0].Field != "key" || problems[0].Line != 3 ||
-		problems[0].Msg != "a is the core key of approve on web; the intent loads without a key (palette only)" {
+	if len(problems) != 1 || problems[0].Field != "shortcut" || problems[0].Line != 3 ||
+		problems[0].Msg != "a is the core key of approve on web; the intent loads without a shortcut (palette only)" {
 		t.Fatalf("%v", problems)
 	}
 	d, ok := l.Registry.Get("ask-author")
@@ -372,7 +372,7 @@ func TestLowercaseIntentKeyIsDroppedWithAProblem(t *testing.T) {
 
 func TestAnIntentKeyIsCanonical(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "key = \"shift+k\"\nworkspace =", 1), "{{.Headline}}")
+	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "shortcut = \"shift+k\"\nworkspace =", 1), "{{.Headline}}")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
@@ -630,12 +630,6 @@ func compareSchema(t *testing.T, path string, typ reflect.Type, node map[string]
 			f := typ.Field(i)
 			key := f.Tag.Get("toml")
 			seen[key] = true
-			if typ == reflect.TypeFor[manifest]() && slices.Contains(bundledOnlyKeys, key) {
-				if _, public := props[key]; public {
-					t.Errorf("%s%s: bundled only, yet in the public schema", path, key)
-				}
-				continue
-			}
 			sub, ok := props[key].(map[string]any)
 			if !ok {
 				t.Errorf("%s%s: in the decode struct, not in the schema", path, key)
@@ -697,16 +691,16 @@ func TestABrokenIntentsRulesCarryItsFirstProblem(t *testing.T) {
 }
 
 func TestABrokenIntentClaimsNoKeyFlagOrRowDriver(t *testing.T) {
-	claims := strings.Replace(minimal, `workspace = "review"`, `workspace = "pr_else_main"
-key = "Q"
-drives_row = true`, 1) + `
+	claims := strings.Replace(minimal, `workspace = "review"`, `workspace = "review"
+role = "pr.review"
+shortcut = "Q"`, 1) + `
 [inputs.topic]
 type = "text"
 flag = "--topic"
 help = "what to ask about"
 `
 	root := t.TempDir()
-	broken := strings.Replace(claims, `summary = `, `records = "pr.mien"
+	broken := strings.Replace(claims, `summary = `, `why = "{{.pr.mien}}"
 summary = `, 1)
 	writeIntent(t, root, "aa-broken", strings.Replace(broken, "[inputs.topic]", "[inputs.subject]", 1), "{{.Headline}}")
 	writeIntent(t, root, "bb-clean", claims, "{{.Headline}}")
@@ -956,7 +950,7 @@ func TestTheTreeIsReadWithItsRegistry(t *testing.T) {
 func TestProviderDefaultsToGitHub(t *testing.T) {
 	root := t.TempDir()
 	writeIntent(t, root, "ask-author", minimal, "{{.Headline}}\n")
-	thread := strings.ReplaceAll(minimal, "{{.PR.Slug}}", "{{.Wording.Ref}}")
+	thread := strings.ReplaceAll(minimal, "{{.pr.slug}}", "{{.unit.ref}}")
 	writeIntent(t, root, "ask-thread", strings.Replace(thread, `workspace = "review"`, "workspace = \"review\"\nprovider = \"thread\"", 1), "{{.Headline}}\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
@@ -975,25 +969,9 @@ func TestProviderDefaultsToGitHub(t *testing.T) {
 func TestThreadIntentCannotReadPRFacts(t *testing.T) {
 	_, problems := Load(userLayer("testdata/bad/provider-pr-fact"), bundledFS(), testBase(), nil)
 	got := problems.Error()
-	for _, want := range []string{"records: pr.author is a github fact; a thread intent cannot read it", ".PR.Author reads the github pull request; a thread intent cannot read it"} {
+	for _, want := range []string{"record.when: pr.author is a github fact; a thread intent cannot read it", ".PR.Author reads the github pull request; a thread intent cannot read it"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("lacks %q:\n%s", want, got)
 		}
-	}
-}
-
-func TestAUserIntentMayNotSetABundledOnlyKey(t *testing.T) {
-	root := t.TempDir()
-	m := strings.Replace(minimal, `workspace = "review"`, "workspace = \"review\"\ncontext = \"pr\"\nlaunch = \"probe\"\npolicy = \"probe\"\nreconcile = \"my_review\"", 1)
-	writeIntent(t, root, "ask-author", m, "{{.Headline}}")
-	_, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
-	e := problems.Error()
-	for _, key := range bundledOnlyKeys {
-		if !strings.Contains(e, ": "+key+": is reserved for the bundled intents") {
-			t.Errorf("%s not refused:\n%s", key, e)
-		}
-	}
-	if len(problems) != len(bundledOnlyKeys) {
-		t.Errorf("%d problems, want one per key:\n%s", len(problems), e)
 	}
 }

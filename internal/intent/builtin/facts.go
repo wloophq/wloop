@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -72,6 +73,10 @@ var (
 	EntryStates = []string{string(gtd.Inbox), string(gtd.Next), string(gtd.Waiting), string(gtd.Scheduled), string(gtd.Someday), string(gtd.Reference), string(gtd.Done), string(gtd.Trash)}
 )
 
+// TurnStates are the states a turn is in, and the empty value of none.
+var TurnStates = []string{"", string(dturn.Sent), string(dturn.Started), string(dturn.Asked), string(dturn.Done), string(dturn.Settled),
+	string(dturn.Failed), string(dturn.Unrecorded), string(dturn.Dismissed), string(dturn.Replaced), string(dturn.Withdrawn)}
+
 // Associations are GitHub's author associations.
 var Associations = []string{"OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE"}
 
@@ -129,14 +134,13 @@ var intentPRFacts = []Fact{
 // otherFacts are the turn slot's own facts, the config facts of the intent
 // slots, and every workflow and approval fact.
 var otherFacts = []Fact{
-	enum(fact("turn.trigger", expr.String, trn, "by-hand or automated."), enumOf("by-hand", "automated")),
 	fact("turn.automated", expr.Bool, trn, "The sweep started the turn."),
 	fact("turn.owned", expr.Bool, trn, "The viewer owns the pull request's loop."),
 	fact("turn.needs_take_over", expr.Bool, trn, "owner_only, not owned, and no input with before = \"take_over\" set."),
 	fact("turn.resume", expr.Bool, trn, "The turn resumes an earlier one."),
 	fact("turn.try", expr.Bool, trn, "The turn is a dry run (profile try)."),
 	enum(fact("turn.planned", expr.String, trn, "The round the request planned: first, follow-up, or empty for none."), enumOf("", "first", "follow-up")),
-	dim(enum(fact("turn.stage", expr.String, trn, "first or follow-up; only intents with dims = [\"round\"] may read it."), enumOf("first", "follow-up"))),
+	dim(enum(fact("turn.stage", expr.String, trn, "first or follow-up; only intents with dims = [\"stage\"] may read it."), enumOf(Stages...))),
 	fact("unit.ref", expr.String, trn, "The unit as the instructions name it, such as owner/repo#12."),
 	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
@@ -161,7 +165,7 @@ var otherFacts = []Fact{
 	wf("pr", "muted", expr.Bool, "The pull request is muted."),
 	wf("pr", "has_workspace", expr.Bool, "A linked workspace holds the pull request."),
 	wf("pr", "stale", expr.Bool, "The stored detail is older than sweep.slow + 2 x sweep.fast."),
-	untrusted(wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none.")),
+	untrusted(enum(wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none."), enumOf(TurnStates...))),
 	untrusted(wf("pr", "open_turn_seq", expr.Int, "The sequence of the book's open turn; 0 when none.")),
 	untrusted(wf("pr", "orphan_answer_id", expr.Int, "The id of an answer whose turn ended; 0 when none.")),
 	untrusted(enum(wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete."), enumOf("", "follow-up", "complete"))),
@@ -195,8 +199,8 @@ var otherFacts = []Fact{
 	wf("session", "user_typed_after_turn", expr.Bool, "The user typed in the session after the loop's last turn."),
 	wf("session", "prompt_knowable", expr.Bool, "Whether the user typed can be known, from the hook or the transcript."),
 	untrusted(wf("session", "prompted_while_idle", expr.Bool, "A manual session got a prompt during its idle period.")),
-	untrusted(wf("session", "open_turn", expr.String, "The state of the session's open turn; empty when none.")),
-	untrusted(wf("session", "newest_state", expr.String, "The state of the session's newest turn.")),
+	untrusted(enum(wf("session", "open_turn", expr.String, "The state of the session's open turn; empty when none."), enumOf(TurnStates...))),
+	untrusted(enum(wf("session", "newest_state", expr.String, "The state of the session's newest turn."), enumOf(TurnStates...))),
 	wf("session", "newest_age", expr.Duration, "Time since the newest turn was sent or started."),
 	wf("session", "newest_intent", expr.String, "The intent of the newest turn."),
 	wf("session", "closes_when_done", expr.Bool, "The newest turn's intent closes its session when done."),
@@ -221,7 +225,7 @@ var otherFacts = []Fact{
 	untrusted(wf("workspace", "dirty", expr.Int, "Modified tracked files.")),
 	untrusted(wf("workspace", "untracked", expr.Int, "Untracked files outside cleanup.disposable.")),
 	untrusted(wf("workspace", "unpushed", expr.Int, "Commits on no remote.")),
-	untrusted(wf("workspace", "newest_turn_state", expr.String, "The state of the newest turn of the linked pull request's book; empty when none.")),
+	untrusted(enum(wf("workspace", "newest_turn_state", expr.String, "The state of the newest turn of the linked pull request's book; empty when none."), enumOf(TurnStates...))),
 	untrusted(wf("workspace", "open_turn", expr.Bool, "The linked pull request's book has an open turn.")),
 	untrusted(wf("workspace", "pendency", expr.List, "What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open.")),
 	wf("workspace", "sessions", expr.Int, "Agent sessions in the workspace that are active, or dormant and active within cleanup.idle."),
@@ -240,7 +244,7 @@ var otherFacts = []Fact{
 	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled.")),
 	wf("entry", "muted", expr.Bool, "The entry is muted."),
 	wf("entry", "unit", expr.String, "The entry's unit as provider:key; empty for an entry with none."),
-	wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."),
+	enum(wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."), enumOf(append([]string{""}, providerIDs()...)...)),
 	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started the entry's unit, from the facts GTD receives.")),
 	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives.")),
 	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's unit.")),
@@ -332,6 +336,16 @@ func ApprovalEnv(auto bool, slots ...string) expr.Env {
 		}
 	}
 	return env
+}
+
+// providerIDs are the providers of Slots, sorted.
+func providerIDs() []string {
+	out := make([]string, 0, len(Slots))
+	for p := range Slots {
+		out = append(out, string(p))
+	}
+	slices.Sort(out)
+	return out
 }
 
 // UnitSlots are the workflow slots of every provider's units.

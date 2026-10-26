@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestV4BackfillsTheTurnsRoles(t *testing.T) {
+func TestV4RolesWritesTheFinalRoles(t *testing.T) {
 	t.Parallel()
 	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v3.sql"))
 	if err != nil {
@@ -31,7 +31,7 @@ func TestV4BackfillsTheTurnsRoles(t *testing.T) {
 	if err := db.r.QueryRow(`SELECT group_concat(intent || '=' || role, ' ') FROM (SELECT intent, role FROM turns ORDER BY seq)`).Scan(&got); err != nil {
 		t.Fatal(err)
 	}
-	if want := "review=round.review address=round.address nudge=nudge probe=probe act=headless.default my-review="; got != want {
+	if want := "review=pr.review address=pr.address nudge=pr.nudge probe=probe act=headless my-review="; got != want {
 		t.Fatalf("roles %q, want %q", got, want)
 	}
 }

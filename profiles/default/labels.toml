@@ -23,5 +23,5 @@ risk = "Risk {value}"
 
 # One condition's heading, by <dim>=<value>, over the dimension's.
 [values]
-"round=first" = "First rounds"
-"round=follow-up" = "Follow-up rounds"
+"stage=first" = "First rounds"
+"stage=follow-up" = "Follow-up rounds"

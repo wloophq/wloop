@@ -1,1 +1,1 @@
-testdata/bad/builtin-unknown/intents/ask-author/intent.toml:5:11: prepare: unknown prepare builtin "nudge.prepar"; the prepare builtins are "", "nudge.prepare"
+testdata/bad/builtin-unknown/intents/ask-author/intent.toml:3:13: workspace: unknown workspace builtin "pr_else_main"; the workspace builtins are "review", "author", "linked_else_main", "given"

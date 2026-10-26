@@ -1,24 +1,18 @@
 label   = "Review"
 summary = "Start or continue a review round on someone else's pull request, in a dedicated workspace"
 verb    = "delegate"
-key     = "V"
-role    = "round.review"
+shortcut = "V"
+role    = "pr.review"
 provider = "github"
 skill = true
-round_kind  = "review"
-cap         = "rounds"
-reason_fact = "pr.review.reason"
+why     = "{{.pr.review.reason}}"
 workspace = "review"
 session   = { strategy = "reuse_live", title = "review" }
 intake    = true
 start_line = "starting the review"
-board     = "review"
-drives_row = true
-reconcile = "my_review"
 profile   = "review"
-dims      = ["round"]
-records   = '!turn.try'
-on_sent   = ["mark_reviewed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
+dims      = ["stage"]
+effects   = ["pr.reviewed", "pr.counted", "guidance.handed", "pr.round_sent", "plan.cleared"]
 
 [help]
 target   = "a pull request URL"
@@ -31,21 +25,22 @@ docs     = "guides/review"
 help = "what the round should look at"
 
 [headline]
-resumed = "review of {{.PR.Slug}}"
+resumed = "review of {{.pr.slug}}"
 [[headline.new]]
 when = 'turn.try'
-text = "Dry-run review of {{.PR.Slug}}: trying a profile, nothing is published."
+line = "Dry-run review of {{.pr.slug}}: trying a profile, nothing is published."
 [[headline.new]]
 when = 'turn.stage == "follow-up"'
-text = "Follow-up review of {{.PR.Slug}}, {{.Who}}."
+line = 'Follow-up review of {{.pr.slug}}, {{template "started_by" .}}.'
 [[headline.new]]
-text = "First review of {{.PR.Slug}}, {{.Who}}."
+line = 'First review of {{.pr.slug}}, {{template "started_by" .}}.'
 
 [action]
 primary = "!row.question && !pr.mine && !pr.adopted"
 note_when_question = "Starts a new round; the agent's open question is replaced"
 
 [record]
+when      = '!turn.try'
 states    = ["done", "settled", "asked", "failed"]
 artifacts = ["review-draft"]
 outcome   = ["verdict", "url"]
@@ -59,4 +54,4 @@ require = [
 ]
 
 [resume]
-head_moved = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."
+changed = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."

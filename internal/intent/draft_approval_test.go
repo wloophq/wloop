@@ -11,6 +11,7 @@ import (
 func loadIntentWith(t *testing.T, extra string) (*Loaded, Problems) {
 	t.Helper()
 	root := t.TempDir()
+	extra = strings.ReplaceAll(extra, "[draft_approval", "[drafts.approval")
 	writeIntent(t, root, "ask-author", minimal+extra, "Ask.\n")
 	return Load(userLayer(root), nil, testBase(), nil)
 }
@@ -75,7 +76,8 @@ func TestManifestDraftApprovalRefusals(t *testing.T) {
 					t.Errorf("the manifest loaded")
 				}
 				for _, p := range problems {
-					if p.Field == c.field && strings.Contains(p.Msg, c.msg) && strings.HasSuffix(p.File, "toml") {
+					field := p.Field == c.field || loader == "intent" && p.Field == strings.Replace(c.field, "draft_approval", "drafts.approval", 1)
+					if field && strings.Contains(p.Msg, c.msg) && strings.HasSuffix(p.File, "toml") {
 						return
 					}
 				}

@@ -91,8 +91,8 @@ func TestAddRefusesFrontMatterTextAndRoundOutsideReview(t *testing.T) {
 	if _, err := (Addition{Intents: []Kind{Review}, Text: "+++\noverride = true\n+++\nX"}).Plan(d, testIntents); err == nil {
 		t.Fatal("accepted a front matter fence")
 	}
-	if _, err := (Addition{Intents: []Kind{Address}, Path: BlockPath{Conds: []Cond{{DimRound, "first"}}}, Text: "x"}).Plan(d, testIntents); err == nil {
-		t.Fatal("accepted round for address")
+	if _, err := (Addition{Intents: []Kind{Address}, Path: BlockPath{Conds: []Cond{{DimStage, "first"}}}, Text: "x"}).Plan(d, testIntents); err == nil {
+		t.Fatal("accepted stage for address")
 	}
 	e := dir(t, map[string]string{"intent=review.md": "X"})
 	if _, err := (Addition{Intents: []Kind{Review}, Override: true, Text: "x"}).Plan(e, testIntents); err == nil {

@@ -8,7 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-func TestEveryOnSentEffectRunsOnARoute(t *testing.T) {
+func TestEveryTurnEffectRunsOnARoute(t *testing.T) {
 	t.Parallel()
 	for _, e := range onSent {
 		runs := false
@@ -27,10 +27,10 @@ func TestEveryOnSentEffectRunsOnARoute(t *testing.T) {
 			}
 		}
 	}
-	theirs := daemon.Builtins()[builtin.SlotOnSent]
-	for _, name := range builtin.Names[builtin.SlotOnSent] {
+	theirs := daemon.Builtins().Effects
+	for _, name := range builtin.TurnEffectNames() {
 		if !slices.ContainsFunc(onSent, func(e onSentEffect) bool { return e.name == name }) && !slices.Contains(theirs, name) {
-			t.Errorf("on_sent %s is in neither the command line's table nor the daemon's", name)
+			t.Errorf("the turn effect %s is in neither the command line's table nor the daemon's", name)
 		}
 	}
 }

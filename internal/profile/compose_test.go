@@ -89,7 +89,7 @@ func TestNothingMatchesElsewhere(t *testing.T) {
 		"organization=acme/repo=x/intent=review.md":           "X",
 		"user=ana/intent=review.md":                           "ANA",
 		"base=main/intent=review.md":                          "MAIN",
-		"round=first/intent=review.md":                        "FIRST",
+		"stage=first/intent=review.md":                        "FIRST",
 		"association=first-time-contributor/intent=review.md": "WELCOME",
 	})
 	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "other", "pr.repo_name": "x", "pr.author": "bob", "pr.base": "dev", "turn.stage": "follow-up", "pr.association": "MEMBER"}})

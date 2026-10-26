@@ -1,25 +1,19 @@
 label   = "Address"
 summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace"
 verb    = "delegate"
-key     = "F"
-role    = "round.address"
+shortcut = "F"
+role    = "pr.address"
 provider = "github"
 skill = true
-round_kind  = "address"
-cap         = "rounds"
-reason_fact = "pr.address.reason"
-reason      = "address_round"
+why     = "{{.pr.address.reason}}"
 workspace = "author"
 session   = { strategy = "reuse_live", title = "triage" }
 intake    = true
 start_line = "starting the address round"
 owner_only = true
-board     = "author"
-drives_row = true
 profile   = "address"
 dims      = ["reviewer"]
-records   = '!turn.needs_take_over'
-on_sent   = ["mark_addressed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
+effects   = ["pr.addressed", "pr.counted", "guidance.handed", "pr.round_sent", "plan.cleared"]
 
 [help]
 target   = "a pull request URL"
@@ -32,35 +26,35 @@ docs     = "guides/address"
 help = "what the round should look at"
 
 [headline]
-resumed = "address round on {{.PR.Slug}}"
+resumed = "address round on {{.pr.slug}}"
 [[headline.new]]
 when = 'turn.needs_take_over'
-text = "Address round on {{.PR.Slug}}, which someone else opened: ask before taking it over."
+line = "Address round on {{.pr.slug}}, which someone else opened: ask before taking it over."
 [[headline.new]]
 when = 'inputs.take_over'
-text = "Take over {{.PR.Slug}} and address it, {{.Who}}."
+line = 'Take over {{.pr.slug}} and address it, {{template "started_by" .}}.'
 [[headline.new]]
-text = "Address round on {{.PR.Slug}}, {{.Who}}."
+line = 'Address round on {{.pr.slug}}, {{template "started_by" .}}.'
 
 [inputs.take_over]
-type   = "flag"
+type   = "bool"
 flag   = "--take-over"
 help   = "takes it over first"
 before = "take_over"
 
 [inputs.self_review]
-type = "flag"
+type = "bool"
 flag = "--self-review"
 help = "reviews the change with the review profile first, against the guidance as its plan, and fixes what it finds; nothing of that review is published"
 persist = true
 by_hand_only = true
 
-[[also_profiles]]
+[[also_profile]]
 profile = "review"
 when    = "inputs.self_review && !turn.needs_take_over"
-round   = "first"
+dims    = { stage = "first" }
 define  = "review-judgment"
-source_prefix = "review guide: "
+prefix  = "review guide: "
 
 [action]
 enabled    = "pr.mine || pr.adopted || row.author_workspace"
@@ -72,6 +66,7 @@ note_when_question = "Starts a new round; the agent's open question is replaced"
 differs_on = ["self_review"]
 
 [record]
+when      = '!turn.needs_take_over'
 states    = ["done", "asked", "failed"]
 artifacts = ["triage"]
 history_artifact = "triage"
