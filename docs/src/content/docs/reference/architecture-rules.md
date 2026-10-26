@@ -11,6 +11,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
 | `TestBuiltinNamesLiveInTheirTables` | Builtin names appear only in their table files. |
+| `TestClientsNameNoPlugin` | No client names a plugin: the terminal, the menu bar and the other Go clients spell no plugin's id or provider constant, and the cockpit's scripts and page quote no plugin's id. |
 | `TestCockpitScriptsNameNoPlugin` | The cockpit's scripts quote no plugin's id. |
 | `TestContractSkeletonDeclared` | The shared names other packages build on still exist. |
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
@@ -38,7 +39,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
-| `TestTheCoreNamesNoProvider` | The core spells no provider id. |
+| `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
 
 ## Allowlists
@@ -123,7 +124,33 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `coreProviderAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/core/port/port.go` `unit.GitHub` | 🧾 | PROf reads a pull request from a github event; a pluginDebt edge |
+| `internal/adapter/store/inventory/activity.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/briefruns.go` `"github"` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/inventory/timings.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/sqlite/marks.go` `unit.GitHub` | 🧾 | a round mark notes GitHub's rounds topic |
+| `internal/adapter/store/sqlite/registry.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/sqlite/retain.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/sqlite/retain.go` `unit.Workspace` | ✅ | the store keeps the workspaces the core keeps |
+| `internal/adapter/store/sqlite/slack.go` `"slack"` | ✅ | the store keeps the Slack plugin's tables |
+| `internal/adapter/store/sqlite/turns.go` `unit.GitHub` | 🧾 | a pull request's turns are keyed by owner, repository and number |
+| `internal/cli/actions.go` `unit.GitHub` | 🧾 | the GitHub viewer and actions read outside the plugin |
+| `internal/cli/cli.go` `"slack"` | ✅ | the slack command, the Slack plugin's own commands |
+| `internal/cli/facts.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/cli/help.go` `"slack"` | ✅ | the slack command, the Slack plugin's own commands |
+| `internal/cli/init_config.go` `"slack"` | ✅ | the slack section of the config init writes |
+| `internal/cli/intent_cmd.go` `unit.GitHub` | 🧾 | the usage line names a pull request's target |
+| `internal/cli/placement.go` `unit.GitHub` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
+| `internal/cli/serve.go` `unit.GitHub` | 🧾 | the daemon's wiring of the GitHub client, viewer and forge |
+| `internal/cli/serve_payloads.go` `unit.GitHub` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
+| `internal/cli/serve_plugins.go` `unit.GitHub` | 🧾 | the GitHub facilities the daemon holds go with the GitHub plugin |
+| `internal/cli/storedfacts.go` `unit.GitHub` | 🧾 | the stored facts of a pull request's turn |
+| `internal/cli/sweepinputs.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/cli/targets.go` `unit.GitHub` | 🧾 | GitHub's provider listed before the plugins |
+| `internal/cli/turn.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/core/turns/headless.go` `"entry"` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
+| `internal/meter/meter.go` `"github"` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
+| `skills/skills.go` `unit.GitHub` | 🧾 | a turn skill takes a pull request's URL |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.

@@ -24,6 +24,12 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Following units | `Track`, `Untrack` | `{{command}} track` and untrack go through it |
 | UI | `UI` (facets, saved views, notification templates, keys, menu bar sections, terminal views), `WebAssets` served under `/plugins/<id>/`, `CLI` | renders the declarative parts on every surface; mounts the plugin's own web module and terminal views |
 | Health | `Health` | shows it with the daemon's health |
+| Its checkouts | `Checkouts` | a session on its unit runs in the unit's own checkout, with no placer asked |
+| Its briefs | `Briefs`, a `brief.BriefSource` | the brief queue reads the unit's input, revision and staleness through it |
+| Links to other plugins' units | `Links`, a `LinkResolver` | resolves a link of its units to the unit another plugin names |
+| A detail page | `Detail` | a client opens the unit's detail in the cockpit, in place of its link |
+
+`Module.Capabilities()` names what a plugin can do (`checkouts`, `briefs`, `publishes`, `reacts`, `items`, `detail`), served in `api.Plugin.Capabilities`. The daemon and the clients ask a plugin what it can do, never which one it is (`api.PluginCan`). A unit's codec says the rest: `Equal` compares two keys of its provider, such as GitHub's without case, for units and person keys alike (`unit.Registry.Same`, `items.Identity.Codecs`); `URL` and `KeyOf` name a unit by its web address, so a unit with one is typed by its address (`unit.Registry.ParseURL`).
 
 The UI comes in three tiers: the card, which every surface renders the same way and which is kept as a stored snapshot; the declarative contributions the core renders; and the plugin's own views. Keys follow one map: the core owns every lowercase letter and digit, and a plugin or an intent gets one uppercase letter (`internal/keys`).
 
@@ -40,9 +46,9 @@ The core never imports a plugin package, and no plugin imports another. The core
 | `github` | `internal/adapter/source/github`, `internal/adapter/facts/github`, `internal/readmodel/prrow`, `internal/situation`, `internal/domain/github`, `internal/domain/pr`, `internal/domain/inventory`, `internal/domain/change`, `internal/github` |
 | `slack` | `internal/adapter/source/slack`, `internal/domain/slack`, `internal/slack` |
 
-Test imports count too, except a plugin's own test fake: a core test builds its units as `unit.Unit` values, and a test that exercises a plugin's behavior lives with the plugin, such as the read model's tests over GitHub rows in `internal/readmodel/prrow`. The cockpit's scripts never quote a plugin's id either: they read the provider from the data the daemon serves. The edges that break the rule today are listed in `pluginDebt` in `internal/archtest/rules_plugins_test.go`, mostly core packages that still name `domain/pr`. The list only shrinks: an entry that no longer matches an import fails the test. Loop code outside the GitHub plugin is keyed by `unit.Unit`, and the daemon files that still name a pull request are listed with their reason (`TestLoopCodeImportsNoPR`).
+Test imports count too, except a plugin's own test fake: a core test builds its units as `unit.Unit` values, and a test that exercises a plugin's behavior lives with the plugin, such as the read model's tests over GitHub rows in `internal/readmodel/prrow`. No client names a plugin either: the cockpit's scripts and page quote no plugin's id, and the terminal and the menu bar spell no plugin's id or provider constant (`TestClientsNameNoPlugin`); they read the provider and its capabilities from the data the daemon serves. Outside the core, a provider id appears only in its plugin's packages, the vocabulary tables of `internal/intent/builtin`, `internal/domain/unit`, the codecs of the providers the core keeps, `internal/cli/root.go`, `sources.go` and `slack*.go`; the files that still name one are listed with their reason in `coreProviderAllowlist` (`TestTheCoreNamesNoProvider`), and the list only shrinks. The edges that break the rule today are listed in `pluginDebt` in `internal/archtest/rules_plugins_test.go`, mostly core packages that still name `domain/pr`. The list only shrinks: an entry that no longer matches an import fails the test. Loop code outside the GitHub plugin is keyed by `unit.Unit`, and the daemon files that still name a pull request are listed with their reason (`TestLoopCodeImportsNoPR`).
 
-`session` and `workspace` are providers the core keeps for its own units. They have no plugin: their facts come from the turn registry and the workspace managers, through `internal/adapter/facts/session` and `internal/adapter/facts/workspace`.
+`session`, `workspace` and `entry` are providers the core keeps for its own units. They have no plugin: their facts come from the turn registry and the workspace managers, through `internal/adapter/facts/session` and `internal/adapter/facts/workspace`.
 
 ## Adding a source
 

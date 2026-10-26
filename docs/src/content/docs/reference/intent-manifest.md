@@ -22,7 +22,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 ## Fields
 
-`intent.toml` is TOML: every string is quoted, so a predicate such as `enabled = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and rejects any other key, and the keys only the bundled intents set (`context`, `launch`, `policy`, `reconcile`) in any intent of yours that does not override a bundled one.
+`intent.toml` is TOML: every string is quoted, so a predicate such as `enabled = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and rejects any other key, and the keys only the bundled intents set (`context`, `launch`, `policy`, `reconcile`) in any intent of yours that does not override a bundled one; an intent of yours that takes a bundled intent's role may set `reconcile`. A manifest without `provider` takes the one `defaults.toml` names at the profile's root; the bundled profile names `github`, and a layer's own `defaults.toml` overrides it.
 
 | Field | Required | Default | Values |
 |---|---|---|---|
@@ -32,7 +32,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `key` | | `""` | one uppercase letter, unique among intents and built-in actions; a refused key loads the intent without it, reachable from the palette |
 | `user_facing` | | `true` | `false` keeps the intent out of the CLI and by-hand sessions, and allows no `[action]` |
 | `workspace` | yes, unless `builds` | | `review`, `author`, `pr_else_main`, `given`, or a table: `{ repo = "<owner/name>" }` or `{ repo_input = "<input>" }`, see [Where a turn runs](#where-a-turn-runs) |
-| `provider` | | `"github"` | the provider whose units the turns run on, such as `github` or `slack`, or `any`; a list for several |
+| `provider` | | the profile's `defaults.toml` (`"github"`) | the provider whose units the turns run on, such as `github` or `slack`, or `any`; a list for several |
 | `modes` | | `["session"]` | `session`, `headless`, or both; the first is what `turn.start` runs without a `mode` |
 | `role` | | `""` | what {{name}} resolves the intent by, see [Roles](#roles) |
 | `builds` | | `""` | `brief`: the intent builds the brief and is never a turn |
@@ -126,7 +126,7 @@ The policy of the drafts the intent's turns propose. A workflow's own `[draft_ap
 
 ## Roles
 
-{{name}} finds the intents it runs on its own through their `role`, never by name: `round.review` sends the sweep's review rounds and reads their history, `round.address` the address rounds, `nudge` the nudges, `probe` the agent-home probe and `headless.default` a headless request that names no intent. Each turn stores the role its intent held, so history reads by role too. At most one intent of a layer holds a role on a provider; one of yours holding a bundled intent's role takes it over, so an intent `my-review` with `role = "round.review"` gets every automatic review round.
+{{name}} finds the intents it runs on its own through their `role`, never by name: `round.review` sends the sweep's review rounds and reads their history, `round.address` the address rounds, `nudge` the nudges, `probe` the agent-home probe and `headless.default` a headless request that names no intent. Each turn stores the role its intent held, so history reads by role too. At most one intent of a layer holds a role on a provider; one of yours holding a bundled intent's role takes it over, so an intent `my-review` with `role = "round.review"` gets every automatic review round. It also takes the bundled holder's key and its row driving, and may set the bundled holder's `reconcile`: a copy of the bundled `review` renamed `my-review` loads whole, and the bundled `review` keeps loading, for a turn by hand, without its key or `drives_row`. When yours does not load, the bundled holder keeps them.
 
 ## Where a turn runs
 
