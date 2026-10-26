@@ -7,12 +7,14 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/source"
 )
 
@@ -30,6 +32,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		}
 	}
 	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Policies: e.outboxPolicies(), Facts: e.draftFacts,
+		Broken: e.brokenWorkflows,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err
@@ -43,13 +46,28 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 
 var errNoEngine = errors.New("no workflow engine reads the unit's facts")
 
-// draftFacts are u's facts as the sweep's engine reads them, for the rules
-// of a turn's draft.
-func (e *Env) draftFacts(ctx context.Context, u unit.Unit) (map[string]any, error) {
+// draftFacts are u's facts as the sweep's engine reads them, scoped by
+// workflow when it is set, for the rules of a turn's draft.
+func (e *Env) draftFacts(ctx context.Context, u unit.Unit, workflow string) (draft.Subject, error) {
 	if e.engine == nil || e.engine.Units == nil {
-		return nil, errNoEngine
+		return draft.Subject{}, errNoEngine
 	}
-	return e.engine.Units.Facts(ctx, u)
+	return subjectFacts(ctx, e.engine.Units, u, workflow)
+}
+
+// subjectFacts are u's facts as the subject of its provider's slot, scoped
+// by workflow when it is set.
+func subjectFacts(ctx context.Context, units automation.Units, u unit.Unit, workflow string) (draft.Subject, error) {
+	facts, err := units.Facts(ctx, u)
+	if err != nil {
+		return draft.Subject{}, err
+	}
+	if sc, ok := units.(automation.Scoper); ok && workflow != "" {
+		if facts, err = sc.Scope(ctx, workflow, u, facts); err != nil {
+			return draft.Subject{}, err
+		}
+	}
+	return draft.Subject{Slot: builtin.Slots[u.Provider], Facts: facts}, nil
 }
 
 // publishers is the Effects of pubs: a provider with none is disabled, or publishes nothing.
@@ -74,6 +92,13 @@ type turnReader interface {
 type pinnedEffects struct {
 	port.Effects
 	turns turnReader
+}
+
+func (p pinnedEffects) Delivers(d draft.Delivery) draft.Delivery {
+	if dl, ok := p.Effects.(port.Deliverer); ok {
+		return dl.Delivers(d)
+	}
+	return d
 }
 
 func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {

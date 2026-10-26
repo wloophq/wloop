@@ -415,3 +415,12 @@ func TestGitHubWhereNamesThePullRequest(t *testing.T) {
 		t.Fatal("a draft that cannot post has a destination")
 	}
 }
+
+func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
+	p := &Publisher{}
+	for in, want := range map[draft.Delivery]draft.Delivery{draft.Message: draft.CommentDelivery, draft.CommentDelivery: draft.CommentDelivery, draft.Reaction: draft.Reaction} {
+		if got := p.Delivers(in); got != want {
+			t.Errorf("%s: %s, want %s", in, got, want)
+		}
+	}
+}

@@ -59,21 +59,24 @@ func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.P
 	case o.Intent != "" && o.Intent != intent, o.Workflow != "" && o.Workflow != workflow:
 		return alwaysPol, fmt.Errorf("turn %d of %s is not the draft's intent and workflow: %w", o.TurnSeq, u, ErrUnknownOrigin)
 	}
+	var wp *draft.Policy
 	if workflow != "" {
-		a, known := r.Manifests.WorkflowApproval(workflow)
-		if !known {
+		var known bool
+		if wp, known = r.Manifests.WorkflowApproval(workflow); !known {
 			return alwaysPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
 		}
-		if a != nil {
-			return *a, nil
-		}
 	}
-	a, known := r.Manifests.IntentApproval(intent)
+	ip, known := r.Manifests.IntentApproval(intent)
 	if !known {
 		return alwaysPol, fmt.Errorf("intent %s: %w", intent, ErrUnknownOrigin)
 	}
-	if a != nil {
-		return *a, nil
+	out := alwaysPol
+	switch {
+	case wp != nil:
+		out = *wp
+	case ip != nil:
+		out = *ip
 	}
-	return alwaysPol, nil
+	out.Scope = workflow
+	return out, nil
 }

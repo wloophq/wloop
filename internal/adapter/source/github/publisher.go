@@ -87,6 +87,15 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 	return ref.String(), nil
 }
 
+// Delivers is how GitHub posts a draft of delivery d: every draft but a
+// reaction, which it refuses, is a comment on the pull request.
+func (p *Publisher) Delivers(d draft.Delivery) draft.Delivery {
+	if d == draft.Reaction {
+		return d
+	}
+	return draft.CommentDelivery
+}
+
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (pr.Ref, string, error) {
 	if d.Unit.Provider != unit.GitHub {
 		return pr.Ref{}, "", fmt.Errorf("github publishes only github units, not %s", d.Unit.Label())

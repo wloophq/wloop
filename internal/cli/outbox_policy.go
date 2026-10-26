@@ -52,12 +52,10 @@ func (m outboxManifests) WorkflowApproval(name string) (*draft.Policy, bool) {
 		if w.Name != name {
 			continue
 		}
-		if m.config != nil {
-			if p := configPolicy(w, m.config().Workflows[name].DraftApproval); p != nil {
-				return p, true
-			}
+		if m.config == nil {
+			return w.DraftApproval, true
 		}
-		return w.DraftApproval, true
+		return workflowApproval(m.config(), w), true
 	}
 	return nil, false
 }

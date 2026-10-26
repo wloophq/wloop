@@ -10,6 +10,16 @@ import (
 type Policy struct {
 	Default Approval
 	Rules   []Rule
+	// Scope is the workflow whose scoped facts of the subject the rules
+	// read; "" reads the unit's facts unscoped.
+	Scope string
+}
+
+// Subject is the facts a policy's rules read beside the draft's own, and
+// the slot they are of.
+type Subject struct {
+	Slot  string
+	Facts map[string]any
 }
 
 // Rule is one [draft_approval] rule.
@@ -19,6 +29,9 @@ type Rule struct {
 	// NamesComment says that When holds only for a draft whose delivery is
 	// comment, so the rule may release one.
 	NamesComment bool
+	// Subjects are the slots of the subject facts When reads; the rule
+	// applies only to a draft whose subject is of that slot.
+	Subjects []string
 }
 
 // Condition is a rule's compiled when over the facts RuleFacts and the
@@ -47,6 +60,16 @@ func (p Policy) Validate() error {
 	return nil
 }
 
+// ReadsSubject says whether a rule of p reads a fact of the draft's subject.
+func (p Policy) ReadsSubject() bool {
+	for _, r := range p.Rules {
+		if len(r.Subjects) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Releases says whether a sends a draft with no person approving it.
 func (a Approval) Releases() bool { return a.Mode == None || a.Mode == Window }
 
@@ -60,18 +83,20 @@ type Decision struct {
 	CommentReleased bool
 }
 
-// Decide is d's approval under p: a rule that releases applies to a comment
-// draft only when it names comment delivery, and a comment draft no such
-// rule releases waits for a person unless the approval is observe.
-func (p Policy) Decide(d Draft, facts map[string]any, now time.Time) (Decision, error) {
+// Decide is d's approval under p over the facts of its subject s: a rule
+// applies only when the facts it reads are of s's slot, a rule that
+// releases applies to a comment draft only when it names comment delivery,
+// and a comment draft no such rule releases waits for a person unless the
+// approval is observe.
+func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 	comment := d.Delivery == CommentDelivery
 	var all map[string]any
 	for i, r := range p.Rules {
-		if comment && r.Approval.Releases() && !r.NamesComment {
+		if comment && r.Approval.Releases() && !r.NamesComment || !ofSlot(r.Subjects, s.Slot) {
 			continue
 		}
 		if all == nil {
-			all = withRuleFacts(d, facts)
+			all = withRuleFacts(d, s.Facts)
 		}
 		ok, err := r.When.Holds(all, now)
 		if err != nil {
@@ -87,6 +112,15 @@ func (p Policy) Decide(d Draft, facts map[string]any, now time.Time) (Decision, 
 	return Decision{Approval: p.Default, Rule: -1}, nil
 }
 
+func ofSlot(subjects []string, slot string) bool {
+	for _, s := range subjects {
+		if s != slot {
+			return false
+		}
+	}
+	return true
+}
+
 func withRuleFacts(d Draft, facts map[string]any) map[string]any {
 	out := make(map[string]any, len(facts)+4)
 	for k, v := range facts {
@@ -98,15 +132,15 @@ func withRuleFacts(d Draft, facts map[string]any) map[string]any {
 	return out
 }
 
-// RuleFacts are the facts of d a rule reads, those no agent chooses: its
-// delivery, its proposer and its effects, and its purpose only when a
-// workflow or a rule of the loop named it.
+// RuleFacts are the facts of d a rule reads: its delivery, as its plugin
+// publishes it, its proposer, and its purpose and effects only when a
+// workflow or a rule of the loop named them.
 func (d Draft) RuleFacts() map[string]any {
-	purpose := ""
+	purpose, effects := "", []string{}
 	if d.Origin.Kind == OriginAuto {
 		purpose = d.Purpose
+		effects = append(effects, d.Effects...)
 	}
-	effects := append([]string{}, d.Effects...)
 	return map[string]any{
 		"draft.delivery": string(d.Delivery),
 		"draft.proposer": d.Origin.Proposer(),

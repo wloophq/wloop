@@ -24,17 +24,25 @@ func (f factIs) Holds(facts map[string]any, _ time.Time) (bool, error) {
 // commentRule is a rule whose when names comment delivery, as the loader
 // marks one that tests draft.delivery == "comment".
 func commentRule(when draft.Condition, a draft.Approval) draft.Rule {
-	return draft.Rule{When: when, Approval: a, NamesComment: true}
+	return draft.Rule{When: when, Approval: a, NamesComment: true, Subjects: []string{"pr"}}
 }
 
 var (
-	noneA   = draft.Approval{Mode: draft.None}
-	window5 = draft.Approval{Mode: draft.Window, Window: 5 * time.Minute}
-	bot     = factIs{"pr.author", "dependabot[bot]"}
+	slackSubject = []string{"slack"}
+	noneA        = draft.Approval{Mode: draft.None}
+	window5      = draft.Approval{Mode: draft.Window, Window: 5 * time.Minute}
+	bot          = factIs{"pr.author", "dependabot[bot]"}
 )
 
-func botFacts(context.Context, unit.Unit) (map[string]any, error) {
-	return map[string]any{"pr.author": "dependabot[bot]", "pr.repo": "acme/docs"}, nil
+func botFacts(context.Context, unit.Unit, string) (draft.Subject, error) {
+	return draft.Subject{Slot: "pr", Facts: map[string]any{"pr.author": "dependabot[bot]", "pr.repo": "acme/docs"}}, nil
+}
+
+// subjectOf reads facts as the subject of slot.
+func subjectOf(slot string, facts map[string]any) Facts {
+	return func(context.Context, unit.Unit, string) (draft.Subject, error) {
+		return draft.Subject{Slot: slot, Facts: facts}, nil
+	}
 }
 
 func comment(text string) Proposal {
@@ -80,7 +88,7 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 	t.Run("a rule that does not name it is skipped", func(t *testing.T) {
 		e := newEnv()
 		e.svc.Facts = botFacts
-		withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{{When: bot, Approval: noneA}}})
+		withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{{When: bot, Approval: noneA, Subjects: []string{"pr"}}}})
 		if d := e.propose(comment("looks good")); d.State != draft.Proposed || d.Approval.Mode != draft.Always {
 			t.Fatalf("%+v", d)
 		}
@@ -89,21 +97,21 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 
 func TestRulesPickTheModeByTheUnitsFacts(t *testing.T) {
 	pol := &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{
-		{When: factIs{"slack.conversation", "dm"}, Approval: noneA},
-		{When: factIs{"slack.started_by_me", true}, Approval: window5},
-		{When: factIs{"slack.started_by_me", true}, Approval: noneA},
+		{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject},
+		{When: factIs{"slack.channel", "C0TEAM"}, Approval: window5, Subjects: slackSubject},
+		{When: factIs{"slack.channel", "C0TEAM"}, Approval: noneA, Subjects: slackSubject},
 	}}
 	for name, c := range map[string]struct {
 		facts map[string]any
 		want  draft.Approval
 	}{
-		"the first rule":         {map[string]any{"slack.conversation": "dm", "slack.started_by_me": true}, noneA},
-		"the first that matches": {map[string]any{"slack.conversation": "channel", "slack.started_by_me": true}, window5},
+		"the first rule":         {map[string]any{"slack.conversation": "dm", "slack.channel": "C0TEAM"}, noneA},
+		"the first that matches": {map[string]any{"slack.conversation": "channel", "slack.channel": "C0TEAM"}, window5},
 		"else the mode":          {map[string]any{"slack.conversation": "channel"}, draft.Approval{Mode: draft.Always}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv()
-			e.svc.Facts = func(context.Context, unit.Unit) (map[string]any, error) { return c.facts, nil }
+			e.svc.Facts = subjectOf("slack", c.facts)
 			withPolicy(e, pol)
 			if d := e.propose(reply("x")); d.Approval != c.want {
 				t.Fatalf("%+v, want %+v", d.Approval, c.want)
@@ -112,19 +120,19 @@ func TestRulesPickTheModeByTheUnitsFacts(t *testing.T) {
 	}
 	t.Run("a proposal's own facts are read instead of the unit's", func(t *testing.T) {
 		e := newEnv()
-		e.svc.Facts = func(context.Context, unit.Unit) (map[string]any, error) {
+		e.svc.Facts = func(context.Context, unit.Unit, string) (draft.Subject, error) {
 			t.Fatal("read the unit's facts")
-			return nil, nil
+			return draft.Subject{}, nil
 		}
 		p := reply("x")
-		p.Policy, p.Facts = pol, map[string]any{"slack.conversation": "dm"}
+		p.Policy, p.Subject = pol, &draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}
 		if d := e.propose(p); d.Approval != noneA {
 			t.Fatalf("%+v", d.Approval)
 		}
 	})
 	t.Run("facts that cannot be read hold the draft", func(t *testing.T) {
 		e := newEnv()
-		e.svc.Facts = func(context.Context, unit.Unit) (map[string]any, error) { return nil, errBoom }
+		e.svc.Facts = func(context.Context, unit.Unit, string) (draft.Subject, error) { return draft.Subject{}, errBoom }
 		withPolicy(e, &draft.Policy{Default: noneA, Rules: pol.Rules})
 		if d := e.propose(reply("x")); d.Approval.Mode != draft.Always {
 			t.Fatalf("%+v", d.Approval)

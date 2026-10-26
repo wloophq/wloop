@@ -47,7 +47,6 @@ type wManifest struct {
 	Approval      *wApproval        `toml:"approval"`
 	DraftApproval *mDraftApproval   `toml:"draft_approval"`
 	Withdraw      *wWithdraw        `toml:"withdraw"`
-	AutoSend      *bool             `toml:"auto_send"`
 }
 
 type wWithdraw struct {
@@ -325,7 +324,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
-	w.DraftApproval = s.draftApproval(m.DraftApproval, m.AutoSend, builtin.ApprovalEnv(true, slot))
+	w.DraftApproval = s.draftApproval(m.DraftApproval, builtin.ApprovalEnv(true, slot))
 	s.defineWithdraw(&w, m.Withdraw, slot)
 	s.turnBudget(w, m.Limits)
 	return w

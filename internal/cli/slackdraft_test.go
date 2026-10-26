@@ -386,28 +386,6 @@ func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 	}
 }
 
-func TestASlackDraftOfAnIntentThatSetsAutoSendFalseWaits(t *testing.T) {
-	t.Parallel()
-	w := newSessionWiring(t)
-	files := bundledIntentAs(t, "act", "careful-act")
-	m := strings.Replace(files["intents/careful-act/intent.toml"], "role    = \"headless.default\"\n", "auto_send = false\n", 1)
-	files["intents/careful-act/intent.toml"] = m + "\n[draft_approval]\nmode = \"none\"\n"
-	userProfile(t, w.te, files)
-	ctx := context.Background()
-	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
-	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
-		{Intent: "careful-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
-	}}); err != nil {
-		t.Fatal(err)
-	}
-	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
-		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
-	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Always {
-		t.Fatalf("drafts %+v", ds)
-	}
-}
-
 func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)

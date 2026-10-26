@@ -50,7 +50,6 @@ round = "follow-up"
 | `[approval]` | | none | `default`, `window`, `wait_when` |
 | `[draft_approval]` | | the intent's, else `always` | `mode`, `window` and `[[draft_approval.rule]]` (`when`, `mode`, `window`): the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; see [Draft approval](#draft-approval). `workflows.<name>.draft_approval` in the configuration replaces it, rules included |
 | `[withdraw]` | | none | `when`, a predicate over the subject's slot and `draft.*`, withdraws an open draft the workflow's `draft.propose` proposed; `reason` is `moot` (the default) or `assigned` |
-| `auto_send` | | unset | replaced by `[draft_approval]`; loads with a warning, `false` as `mode = "always"` with no rules, `true` as nothing |
 
 ## Steps
 

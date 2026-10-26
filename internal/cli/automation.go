@@ -132,7 +132,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
-		Broken:    func() []string { return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows)) },
+		Broken:    e.brokenWorkflows,
 		Units:     units,
 		Steps:     steps,
 		Guidance:  recGuidance{e},
@@ -164,6 +164,11 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 }
 
 // currentConfig is the config the daemon holds, the file's outside it.
+// brokenWorkflows are the user workflows that failed to load.
+func (e *Env) brokenWorkflows() []string {
+	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
+}
+
 func (e *Env) currentConfig() config.Config {
 	cfg, _ := e.loadConfig()
 	return cfg
@@ -209,7 +214,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
-		if p := configPolicy(w, wc.DraftApproval); p != nil {
+		if p, _ := configPolicy(w, wc.DraftApproval); p != nil {
 			w.DraftApproval = p
 		}
 		out = append(out, w)

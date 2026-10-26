@@ -81,25 +81,25 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.muted` | bool | The pull request is muted. |
 | `pr.has_workspace` | bool | A linked workspace holds the pull request. |
 | `pr.stale` | bool | The stored detail is older than sweep.slow + 2 x sweep.fast. |
-| `pr.open_turn` | string | The state of the book's open turn; empty when none. |
-| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. |
-| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. |
-| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. |
-| `pr.review.reason` | string | Why the review rules decide so. |
-| `pr.review.observed` | bool | The review rules observe without acting. |
-| `pr.first.due` | bool | A first round is due. |
-| `pr.first.reason` | string | Why a first round is due or not. |
-| `pr.address.due` | bool | An address round is due. |
-| `pr.address.reason` | string | Why an address round is due or not. |
-| `pr.address.reviewers` | list | The reviewers whose reviews the address round would answer. |
-| `pr.address.checks` | list | The failing checks the address round would fix. |
-| `pr.address.conflict` | bool | The head has conflicted with the base past the conflict window, and the address round would resolve it. |
-| `pr.address.observed` | bool | The address rules observe without acting. |
+| `pr.open_turn` | string | The state of the book's open turn; empty when none. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.review.reason` | string | Why the review rules decide so. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.review.observed` | bool | The review rules observe without acting. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.first.due` | bool | A first round is due. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.first.reason` | string | Why a first round is due or not. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.due` | bool | An address round is due. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.reason` | string | Why an address round is due or not. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.reviewers` | list | The reviewers whose reviews the address round would answer. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.checks` | list | The failing checks the address round would fix. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.conflict` | bool | The head has conflicted with the base past the conflict window, and the address round would resolve it. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `pr.address.observed` | bool | The address rules observe without acting. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. |
 | `pr.silent_days` | int | Calendar days since last_interaction_at. |
-| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. |
+| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `pr.nudge_refusal` | string | The text nudge.prepare would refuse with today; empty when a nudge may go. |
-| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. |
+| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `pr.repo` | string | owner/repo. |
 | `pr.owner` | string | The repository owner. |
 | `pr.author` | string | The pull request's author login; empty when not stored. |
@@ -112,25 +112,25 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `session.managed` | bool | The session was started by the loop (sessions.managed). |
 | `session.listed` | bool | The session's manager lists its process as usable. |
 | `session.orphaned` | bool | The session's manager lists its process as not usable. |
-| `session.agent_state` | string | The agent's state as the manager reports it. |
+| `session.agent_state` | string | The agent's state as the manager reports it. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `session.user_active` | bool | The user acts in the session now. |
 | `session.user_typed_after_turn` | bool | The user typed in the session after the loop's last turn. |
 | `session.prompt_knowable` | bool | Whether the user typed can be known, from the hook or the transcript. |
-| `session.prompted_while_idle` | bool | A manual session got a prompt during its idle period. |
-| `session.open_turn` | string | The state of the session's open turn; empty when none. |
-| `session.newest_state` | string | The state of the session's newest turn. |
+| `session.prompted_while_idle` | bool | A manual session got a prompt during its idle period. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `session.open_turn` | string | The state of the session's open turn; empty when none. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `session.newest_state` | string | The state of the session's newest turn. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `session.newest_age` | duration | Time since the newest turn was sent or started. |
 | `session.newest_intent` | string | The intent of the newest turn. |
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
-| `session.idle_since` | timestamp | When the current idle period started. |
-| `session.idle_for` | duration | Time since idle_since. |
+| `session.idle_since` | timestamp | When the current idle period started. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `session.pr_state` | string | The state of the book's pull request. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
 | `session.transcript_gone` | bool | The agent's transcript of the session, as its hooks reported it, no longer exists. |
 | `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager. |
-| `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. |
+| `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
 
 | `workspace` fact (subject `workspace`) | Type | Meaning |
@@ -143,52 +143,52 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `workspace.path_exists` | bool | The worktree path exists. |
 | `workspace.temporary` | bool | The worktree lives under a temporary path. |
 | `workspace.duplicate` | bool | Neither a main checkout nor the workspace the manager links to its pull request, while another non-main workspace is. |
-| `workspace.dirty` | int | Modified tracked files. |
-| `workspace.untracked` | int | Untracked files outside cleanup.disposable. |
-| `workspace.unpushed` | int | Commits on no remote. |
-| `workspace.newest_turn_state` | string | The state of the newest turn of the linked pull request's book; empty when none. |
-| `workspace.open_turn` | bool | The linked pull request's book has an open turn. |
-| `workspace.pendency` | list | What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open. |
+| `workspace.dirty` | int | Modified tracked files. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.untracked` | int | Untracked files outside cleanup.disposable. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.unpushed` | int | Commits on no remote. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.newest_turn_state` | string | The state of the newest turn of the linked pull request's book; empty when none. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.open_turn` | bool | The linked pull request's book has an open turn. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.pendency` | list | What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `workspace.sessions` | int | Agent sessions in the workspace that are active, or dormant and active within cleanup.idle. |
 | `workspace.manager` | string | The workspace manager that owns the worktree. |
-| `workspace.last_activity` | timestamp | The newest activity in the workspace. |
-| `workspace.quiet_for` | duration | Time since last_activity. |
-| `workspace.fingerprint` | string | The worktree path and its head. |
+| `workspace.last_activity` | timestamp | The newest activity in the workspace. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.quiet_for` | duration | Time since last_activity. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `workspace.fingerprint` | string | The worktree path and its head. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `workspace.repo` | string | owner/repo; empty when unknown. |
 
 | `entry` fact (subject `entry`) | Type | Meaning |
 |---|---|---|
 | `entry.id` | string | The entry's id. |
-| `entry.kind` | string | The entry's kind, such as action, waiting, close, message, capture or project. |
-| `entry.state` | string | The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash. |
-| `entry.waiting_on` | list | The person keys the entry waits on, such as slack:U0123. |
+| `entry.kind` | string | The entry's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.state` | string | The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.waiting_on` | list | The person keys the entry waits on, such as slack:U0123. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.resurface_at` | timestamp | When the entry resurfaces; zero when it has no date. |
-| `entry.waiting_days` | int | Working days the entry has waited, in the configured location, as the GTD rules count them. |
+| `entry.waiting_days` | int | Working days the entry has waited, in the configured location, as the GTD rules count them. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.since_nudge` | duration | Time since the entry's last nudge; very large when it was never nudged. |
-| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled. |
+| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.muted` | bool | The entry is muted. |
 | `entry.unit` | string | The entry's unit as provider:key; empty for an entry with none. |
 | `entry.unit_provider` | string | The provider of the entry's unit; empty for an entry with none. |
-| `entry.unit_started_by_me` | bool | The viewer started the entry's unit, from the facts GTD receives. |
-| `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. |
-| `entry.items_open` | int | Open items of the entry's unit. |
-| `entry.items_resolved` | int | Resolved items of the entry's unit. |
-| `entry.items_held` | int | Open items of the entry's unit that the entry holds. |
+| `entry.unit_started_by_me` | bool | The viewer started the entry's unit, from the facts GTD receives. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.items_open` | int | Open items of the entry's unit. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.items_resolved` | int | Resolved items of the entry's unit. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.items_held` | int | Open items of the entry's unit that the entry holds. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
-| `entry.fingerprint` | string | The entry's id, state and update time. |
+| `entry.fingerprint` | string | The entry's id, state and update time. **Untrusted**: no `[draft_approval]` rule reads it. |
 
 | `slack` fact (subject `slack`) | Type | Meaning |
 |---|---|---|
 | `slack.channel` | string | The conversation's channel id. |
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
-| `slack.started_by_me` | bool | The viewer started the thread. |
-| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. |
-| `slack.live_entry` | bool | A live entry, neither done nor in the trash and not muted, is attached to the unit. |
-| `slack.items_open` | int | Open items whose unit is this unit. |
-| `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. |
-| `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. |
+| `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `slack.live_entry` | bool | A live entry, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. |
-| `slack.fingerprint` | string | The unit, its newest message and the update time of its items. |
+| `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[draft_approval]` rule reads it. |
 
 | `brief` fact | Type | Meaning |
 |---|---|---|
@@ -228,13 +228,13 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 
 ## Draft approval facts
 
-A `[draft_approval]` rule's `when` reads these, the facts of the draft no agent chooses, plus the facts of the unit the draft is on (a workflow's: its subject's), never `brief.*`, `trigger.*` or `config.*`. A rule that releases a draft on its own (`none` or `window`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
+A `[draft_approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its subject's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another subject than the draft's does not apply to it. A rule that releases a draft on its own (`none` or `window`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
 
 | Approval fact | Type | Meaning |
 |---|---|---|
-| `draft.delivery` | string | How the draft is posted: message, reaction or comment. |
+| `draft.delivery` | string | How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for. |
 | `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's. |
-| `draft.effects` | list | The effects the draft applies once sent, which the proposing intent's draft_effects bound. |
+| `draft.effects` | list | The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not. |
 | `draft.purpose` | string | The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not. |
 
 ## Workflow steps

@@ -9,8 +9,11 @@ func (e *Env) wireWorkflows(w *serveWiring) {
 	if w.Log == nil {
 		return
 	}
-	for _, msg := range w.Cfg.Proposals.LegacyWarnings() {
+	for _, msg := range append(w.Cfg.Proposals.LegacyWarnings(), w.Cfg.DraftApprovalWarnings()...) {
 		w.Log("config: %s", msg)
+	}
+	for _, err := range configApprovalProblems(w.Cfg, e.loadedIntents().Workflows) {
+		w.Log("config: %v", err)
 	}
 	for _, p := range e.loadedIntents().Warnings.Sorted() {
 		w.Log("profile: %s", intentload.Problems{p}.Error())

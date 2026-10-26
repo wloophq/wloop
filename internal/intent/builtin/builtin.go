@@ -110,6 +110,10 @@ type Fact struct {
 	// Enum are the fact's values by provider, "" standing for every
 	// provider; a provider absent takes any value.
 	Enum map[unit.ProviderID][]string
+	// Untrusted says that a third party's text, read by the extraction, or
+	// the proposing turn itself sets the fact's value, so no
+	// [draft_approval] rule may read it.
+	Untrusted bool
 }
 
 var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}

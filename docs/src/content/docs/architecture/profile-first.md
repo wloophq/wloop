@@ -36,7 +36,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - working-day arithmetic and who owes an item;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a comment waits for your approval unless a rule of yours that names comment delivery releases it, and an agent never sets its own approval.
+- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction is a comment), a comment waits for your approval unless a rule of yours that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
 
 ## The rules that keep the line
 

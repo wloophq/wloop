@@ -152,7 +152,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	}
 	roleRound(&d)
 	s.provider(&d, m.Provider)
-	d.DraftApproval = s.draftApproval(m.DraftApproval, m.AutoSend, builtin.ApprovalEnv(false, servedSlots(d)...))
+	d.DraftApproval = s.draftApproval(m.DraftApproval, builtin.ApprovalEnv(false, servedSlots(d)...))
 	s.workspace(&d, m.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
 	if p := str(m.Profile, "none"); p != "none" {

@@ -27,3 +27,10 @@ type Validator interface {
 type Locator interface {
 	Where(ctx context.Context, d draft.Draft) (string, error)
 }
+
+// Deliverer is optional: an Effects value that implements it says how it
+// posts a draft whose proposer asked for delivery d, which the draft then
+// carries, so its approval reads what the provider will show.
+type Deliverer interface {
+	Delivers(d draft.Delivery) draft.Delivery
+}

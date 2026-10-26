@@ -182,7 +182,7 @@ func TestNoEffectIsDerivedFromKind(t *testing.T) {
 	}
 }
 
-func TestTheApprovalIsConfigThenLegacyThenManifestThenAlways(t *testing.T) {
+func TestTheApprovalIsConfigThenLegacyThenManifestElseNone(t *testing.T) {
 	t.Parallel()
 	a := func(m draft.ApprovalMode) *draft.Policy { return draft.Fixed(draft.Approval{Mode: m}) }
 	window := draft.Fixed(draft.Approval{Mode: draft.Window, Window: time.Hour})
@@ -194,11 +194,13 @@ func TestTheApprovalIsConfigThenLegacyThenManifestThenAlways(t *testing.T) {
 		{"config wins", a(draft.None), a(draft.Observe), window, draft.Approval{Mode: draft.None}},
 		{"then legacy", nil, a(draft.Observe), window, draft.Approval{Mode: draft.Observe}},
 		{"then the manifest", nil, nil, window, window.Default},
-		{"else always", nil, nil, nil, always},
 	} {
-		if got := ResolveApproval(c.config, c.legacy, c.manifest); got.Default != c.want || len(got.Rules) != 0 {
+		if got := ResolveApproval(c.config, c.legacy, c.manifest); got == nil || got.Default != c.want || len(got.Rules) != 0 {
 			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
 		}
+	}
+	if got := ResolveApproval(nil, nil, nil); got != nil {
+		t.Errorf("none set: %+v", got)
 	}
 }
 

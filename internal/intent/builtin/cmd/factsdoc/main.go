@@ -44,10 +44,18 @@ func workflowTable(slot string) string {
 	fmt.Fprintf(&b, "| `%s` fact%s | Type | Meaning |\n|---|---|---|\n", slot, provider(slot))
 	for _, f := range builtin.Facts {
 		if f.Slot == slot {
-			fmt.Fprintf(&b, "| `%s` | %s | %s |\n", f.Name, f.Type, cell(f.Doc))
+			fmt.Fprintf(&b, "| `%s` | %s | %s%s |\n", f.Name, f.Type, cell(f.Doc), untrusted(f))
 		}
 	}
 	return b.String()
+}
+
+// untrusted marks a fact no [draft_approval] rule may read.
+func untrusted(f builtin.Fact) string {
+	if !f.Untrusted {
+		return ""
+	}
+	return " **Untrusted**: no `[draft_approval]` rule reads it."
 }
 
 func approvalTable() string {

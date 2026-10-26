@@ -94,7 +94,6 @@
     "reason_fact": {"type": "string", "description": "The workflow fact that says why the intent's round is due or not."},
     "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
     "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
-    "auto_send": {"type": "boolean", "deprecated": true, "description": "Replaced by [draft_approval]; loads with a warning: false is read as mode always with no rules, true as nothing."},
     "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt."},
     "session": {
       "type": "object",

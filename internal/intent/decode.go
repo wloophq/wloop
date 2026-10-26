@@ -66,7 +66,6 @@ type manifest struct {
 	ReasonFact    string            `toml:"reason_fact"`
 	RefuseWhen    string            `toml:"refuse_when"`
 	Reason        string            `toml:"reason"`
-	AutoSend      *bool             `toml:"auto_send"`
 	Skill         bool              `toml:"skill"`
 }
 
@@ -194,15 +193,9 @@ func (s *sheet) modes(m []string) []string {
 var draftApprovalModes = []string{string(draft.Always), string(draft.Window), string(draft.None), string(draft.Observe)}
 
 // draftApproval is the policy of m, its rules' when compiled over env; nil
-// when m is. auto_send, which [draft_approval] replaced, loads with a
-// warning: false as mode always with no rules, true as nothing.
-func (s *sheet) draftApproval(m *mDraftApproval, autoSend *bool, env expr.Env) *draft.Policy {
-	if autoSend != nil {
-		s.warn("auto_send", "is replaced by [draft_approval]: auto_send = false is read as mode = \"always\" with no rules, and true as nothing; write [draft_approval] instead")
-		if !*autoSend {
-			return draft.Fixed(draft.Approval{Mode: draft.Always})
-		}
-	}
+// when m is. A rule that releases while reading draft.delivery in a form
+// that never names comment delivery loads with a warning.
+func (s *sheet) draftApproval(m *mDraftApproval, env expr.Env) *draft.Policy {
 	if m == nil {
 		return nil
 	}
@@ -226,19 +219,31 @@ func (s *sheet) draftApproval(m *mDraftApproval, autoSend *bool, env expr.Env) *
 			s.ruleProblem(path+".when", *r.When, err, env)
 			continue
 		}
+		if builtin.NeverReleasesComment(rule) {
+			s.warn(path+".when", "reads draft.delivery but never releases a comment draft; to release one, write %s", builtin.CommentForm)
+		}
 		p.Rules = append(p.Rules, rule)
 	}
 	return p
 }
 
-// ruleProblem places why a rule's when does not compile; one that reads
-// draft.purpose where an agent names it says so.
+// ruleProblem places why a rule's when does not compile; one that reads a
+// fact only the loop names where an agent names it says so.
 func (s *sheet) ruleProblem(path, when string, err error, env expr.Env) {
-	if _, ok := env[builtin.DraftPurpose]; !ok {
-		withPurpose := maps.Clone(env)
-		withPurpose[builtin.DraftPurpose] = expr.String
-		if _, perr := builtin.ApprovalRule(when, draft.Approval{Mode: draft.Always}, withPurpose); perr == nil {
-			s.add(path, "reads %s, which an intent's rule may not: its turns' agents name their drafts' purpose", builtin.DraftPurpose)
+	var untrusted *builtin.UntrustedError
+	var subjects *builtin.SubjectsError
+	if errors.As(err, &untrusted) || errors.As(err, &subjects) {
+		s.add(path, "%s", err.Error())
+		return
+	}
+	for _, name := range builtin.AutoOnly {
+		if _, ok := env[name]; ok {
+			continue
+		}
+		with := maps.Clone(env)
+		with[name] = builtin.ApprovalEnv(true)[name]
+		if _, perr := builtin.ApprovalRule(when, draft.Approval{Mode: draft.Always}, with); perr == nil {
+			s.add(path, "reads %s, which an intent's rule may not: its turns' agents name their drafts' purpose and effects", name)
 			return
 		}
 	}

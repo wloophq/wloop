@@ -34,6 +34,12 @@ func dim(f Fact) Fact {
 	return f
 }
 
+// untrusted flags f as a fact no [draft_approval] rule reads.
+func untrusted(f Fact) Fact {
+	f.Untrusted = true
+	return f
+}
+
 // enum declares the values f takes, by provider.
 func enum(f Fact, values map[unit.ProviderID][]string) Fact {
 	f.Enum = values
@@ -138,25 +144,25 @@ var Facts = []Fact{
 	wf("pr", "muted", expr.Bool, "The pull request is muted."),
 	wf("pr", "has_workspace", expr.Bool, "A linked workspace holds the pull request."),
 	wf("pr", "stale", expr.Bool, "The stored detail is older than sweep.slow + 2 x sweep.fast."),
-	wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none."),
-	wf("pr", "open_turn_seq", expr.Int, "The sequence of the book's open turn; 0 when none."),
-	wf("pr", "orphan_answer_id", expr.Int, "The id of an answer whose turn ended; 0 when none."),
-	wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete."),
-	wf("pr", "review.reason", expr.String, "Why the review rules decide so."),
-	wf("pr", "review.observed", expr.Bool, "The review rules observe without acting."),
-	wf("pr", "first.due", expr.Bool, "A first round is due."),
-	wf("pr", "first.reason", expr.String, "Why a first round is due or not."),
-	wf("pr", "address.due", expr.Bool, "An address round is due."),
-	wf("pr", "address.reason", expr.String, "Why an address round is due or not."),
-	wf("pr", "address.reviewers", expr.List, "The reviewers whose reviews the address round would answer."),
-	wf("pr", "address.checks", expr.List, "The failing checks the address round would fix."),
-	wf("pr", "address.conflict", expr.Bool, "The head has conflicted with the base past the conflict window, and the address round would resolve it."),
-	wf("pr", "address.observed", expr.Bool, "The address rules observe without acting."),
+	untrusted(wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none.")),
+	untrusted(wf("pr", "open_turn_seq", expr.Int, "The sequence of the book's open turn; 0 when none.")),
+	untrusted(wf("pr", "orphan_answer_id", expr.Int, "The id of an answer whose turn ended; 0 when none.")),
+	untrusted(wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete.")),
+	untrusted(wf("pr", "review.reason", expr.String, "Why the review rules decide so.")),
+	untrusted(wf("pr", "review.observed", expr.Bool, "The review rules observe without acting.")),
+	untrusted(wf("pr", "first.due", expr.Bool, "A first round is due.")),
+	untrusted(wf("pr", "first.reason", expr.String, "Why a first round is due or not.")),
+	untrusted(wf("pr", "address.due", expr.Bool, "An address round is due.")),
+	untrusted(wf("pr", "address.reason", expr.String, "Why an address round is due or not.")),
+	untrusted(wf("pr", "address.reviewers", expr.List, "The reviewers whose reviews the address round would answer.")),
+	untrusted(wf("pr", "address.checks", expr.List, "The failing checks the address round would fix.")),
+	untrusted(wf("pr", "address.conflict", expr.Bool, "The head has conflicted with the base past the conflict window, and the address round would resolve it.")),
+	untrusted(wf("pr", "address.observed", expr.Bool, "The address rules observe without acting.")),
 	wf("pr", "last_interaction_at", expr.Time, "The newest comment, review, push or review request, by anyone."),
 	wf("pr", "silent_days", expr.Int, "Calendar days since last_interaction_at."),
-	wf("pr", "waits_on_user", expr.Bool, "The row waits on the user, per situation.Derive."),
+	untrusted(wf("pr", "waits_on_user", expr.Bool, "The row waits on the user, per situation.Derive.")),
 	wf("pr", "nudge_refusal", expr.String, "The text nudge.prepare would refuse with today; empty when a nudge may go."),
-	wf("pr", "fingerprint", expr.String, "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips."),
+	untrusted(wf("pr", "fingerprint", expr.String, "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips.")),
 	wf("pr", "repo", expr.String, "owner/repo."),
 	wf("pr", "owner", expr.String, "The repository owner."),
 	wf("pr", "author", expr.String, "The pull request's author login; empty when not stored."),
@@ -166,25 +172,25 @@ var Facts = []Fact{
 	wf("session", "managed", expr.Bool, "The session was started by the loop (sessions.managed)."),
 	wf("session", "listed", expr.Bool, "The session's manager lists its process as usable."),
 	wf("session", "orphaned", expr.Bool, "The session's manager lists its process as not usable."),
-	wf("session", "agent_state", expr.String, "The agent's state as the manager reports it."),
+	untrusted(wf("session", "agent_state", expr.String, "The agent's state as the manager reports it.")),
 	wf("session", "user_active", expr.Bool, "The user acts in the session now."),
 	wf("session", "user_typed_after_turn", expr.Bool, "The user typed in the session after the loop's last turn."),
 	wf("session", "prompt_knowable", expr.Bool, "Whether the user typed can be known, from the hook or the transcript."),
-	wf("session", "prompted_while_idle", expr.Bool, "A manual session got a prompt during its idle period."),
-	wf("session", "open_turn", expr.String, "The state of the session's open turn; empty when none."),
-	wf("session", "newest_state", expr.String, "The state of the session's newest turn."),
+	untrusted(wf("session", "prompted_while_idle", expr.Bool, "A manual session got a prompt during its idle period.")),
+	untrusted(wf("session", "open_turn", expr.String, "The state of the session's open turn; empty when none.")),
+	untrusted(wf("session", "newest_state", expr.String, "The state of the session's newest turn.")),
 	wf("session", "newest_age", expr.Duration, "Time since the newest turn was sent or started."),
 	wf("session", "newest_intent", expr.String, "The intent of the newest turn."),
 	wf("session", "closes_when_done", expr.Bool, "The newest turn's intent closes its session when done."),
-	wf("session", "idle_since", expr.Time, "When the current idle period started."),
-	wf("session", "idle_for", expr.Duration, "Time since idle_since."),
+	untrusted(wf("session", "idle_since", expr.Time, "When the current idle period started.")),
+	untrusted(wf("session", "idle_for", expr.Duration, "Time since idle_since.")),
 	wf("session", "pr_state", expr.String, "The state of the book's pull request."),
 	wf("session", "duplicate", expr.Bool, "Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates."),
 	wf("session", "worktree_gone", expr.Bool, "The session's worktree path no longer exists."),
 	wf("session", "closed_by_manager", expr.Bool, "The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop."),
 	wf("session", "transcript_gone", expr.Bool, "The agent's transcript of the session, as its hooks reported it, no longer exists."),
 	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager."),
-	wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence."),
+	untrusted(wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence.")),
 	wf("session", "repo", expr.String, "owner/repo of the book's pull request; empty when none."),
 	wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."),
 	wf("workspace", "main", expr.Bool, "The workspace is the repository's main checkout."),
@@ -194,46 +200,46 @@ var Facts = []Fact{
 	wf("workspace", "path_exists", expr.Bool, "The worktree path exists."),
 	wf("workspace", "temporary", expr.Bool, "The worktree lives under a temporary path."),
 	wf("workspace", "duplicate", expr.Bool, "Neither a main checkout nor the workspace the manager links to its pull request, while another non-main workspace is."),
-	wf("workspace", "dirty", expr.Int, "Modified tracked files."),
-	wf("workspace", "untracked", expr.Int, "Untracked files outside cleanup.disposable."),
-	wf("workspace", "unpushed", expr.Int, "Commits on no remote."),
-	wf("workspace", "newest_turn_state", expr.String, "The state of the newest turn of the linked pull request's book; empty when none."),
-	wf("workspace", "open_turn", expr.Bool, "The linked pull request's book has an open turn."),
-	wf("workspace", "pendency", expr.List, "What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open."),
+	untrusted(wf("workspace", "dirty", expr.Int, "Modified tracked files.")),
+	untrusted(wf("workspace", "untracked", expr.Int, "Untracked files outside cleanup.disposable.")),
+	untrusted(wf("workspace", "unpushed", expr.Int, "Commits on no remote.")),
+	untrusted(wf("workspace", "newest_turn_state", expr.String, "The state of the newest turn of the linked pull request's book; empty when none.")),
+	untrusted(wf("workspace", "open_turn", expr.Bool, "The linked pull request's book has an open turn.")),
+	untrusted(wf("workspace", "pendency", expr.List, "What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open.")),
 	wf("workspace", "sessions", expr.Int, "Agent sessions in the workspace that are active, or dormant and active within cleanup.idle."),
 	wf("workspace", "manager", expr.String, "The workspace manager that owns the worktree."),
-	wf("workspace", "last_activity", expr.Time, "The newest activity in the workspace."),
-	wf("workspace", "quiet_for", expr.Duration, "Time since last_activity."),
-	wf("workspace", "fingerprint", expr.String, "The worktree path and its head."),
+	untrusted(wf("workspace", "last_activity", expr.Time, "The newest activity in the workspace.")),
+	untrusted(wf("workspace", "quiet_for", expr.Duration, "Time since last_activity.")),
+	untrusted(wf("workspace", "fingerprint", expr.String, "The worktree path and its head.")),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("entry", "id", expr.String, "The entry's id."),
-	wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project."),
-	wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."),
-	wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123."),
+	untrusted(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project.")),
+	untrusted(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash.")),
+	untrusted(wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123.")),
 	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
-	wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them."),
+	untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them.")),
 	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
-	wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled."),
+	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled.")),
 	wf("entry", "muted", expr.Bool, "The entry is muted."),
 	wf("entry", "unit", expr.String, "The entry's unit as provider:key; empty for an entry with none."),
 	wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."),
-	wf("entry", "unit_started_by_me", expr.Bool, "The viewer started the entry's unit, from the facts GTD receives."),
-	wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives."),
-	wf("entry", "items_open", expr.Int, "Open items of the entry's unit."),
-	wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's unit."),
-	wf("entry", "items_held", expr.Int, "Open items of the entry's unit that the entry holds."),
+	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started the entry's unit, from the facts GTD receives.")),
+	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives.")),
+	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's unit.")),
+	untrusted(wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's unit.")),
+	untrusted(wf("entry", "items_held", expr.Int, "Open items of the entry's unit that the entry holds.")),
 	wf("entry", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none."),
-	wf("entry", "fingerprint", expr.String, "The entry's id, state and update time."),
+	untrusted(wf("entry", "fingerprint", expr.String, "The entry's id, state and update time.")),
 	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
 	providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."),
-	providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread."),
-	providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed."),
-	providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "A live entry, neither done nor in the trash and not muted, is attached to the unit."),
-	providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit."),
-	providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis."),
-	providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."),
+	untrusted(providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread.")),
+	untrusted(providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed.")),
+	untrusted(providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "A live entry, neither done nor in the trash and not muted, is attached to the unit.")),
+	untrusted(providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit.")),
+	untrusted(providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis.")),
+	untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared.")),
 	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none."),
-	providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items."),
+	untrusted(providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items.")),
 	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
 	dim(enum(briefWF("risk", expr.String, "The brief's risk: low, medium or high."), map[unit.ProviderID][]string{anyProvider: facet.Risks})),
 	dim(enum(briefWF("kind", expr.String, "The brief's kind, from the provider's taxonomy."), map[unit.ProviderID][]string{unit.GitHub: facet.Kinds})),
@@ -244,9 +250,9 @@ var Facts = []Fact{
 	wf("draft", "items_held", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
 	wf("draft", "items_owned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
 	wf("draft", "subject_open", expr.Bool, "The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored."),
-	approvalFact("delivery", expr.String, "How the draft is posted: message, reaction or comment."),
+	approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
-	approvalFact("effects", expr.List, "The effects the draft applies once sent, which the proposing intent's draft_effects bound."),
+	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
 	approvalFact("purpose", expr.String, "The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not."),
 	wf("trigger", "kind", expr.String, "sweep, event or schedule."),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),
@@ -270,22 +276,29 @@ func approvalFact(name string, t expr.Type, doc string) Fact {
 	return Fact{Name: DraftSlot + "." + name, Type: t, Slots: []FactSlot{ApprovalSlot}, Doc: doc}
 }
 
-// DraftPurpose is the approval fact an intent's rules may not read: an agent
-// names the purpose of its turn's drafts.
-const DraftPurpose = "draft.purpose"
+// DraftPurpose and DraftEffects are the approval facts an intent's rules
+// may not read: a turn's agent names its drafts' purpose and effects.
+const (
+	DraftPurpose = "draft.purpose"
+	DraftEffects = "draft.effects"
+)
+
+// AutoOnly are the approval facts only a workflow's rules and the
+// configuration's read.
+var AutoOnly = []string{DraftPurpose, DraftEffects}
 
 // DraftDelivery is the approval fact a rule must pin to "comment" to release
 // a comment draft.
 const DraftDelivery = "draft.delivery"
 
 // ApprovalEnv is the env of a [draft_approval] rule's when: the approval
-// slot's facts, without draft.purpose unless purpose, and the facts of each
-// of slots, never a brief's, which an agent writes.
-func ApprovalEnv(purpose bool, slots ...string) expr.Env {
+// slot's facts, without AutoOnly unless auto, and the facts of each of
+// slots, never a brief's, which an agent writes.
+func ApprovalEnv(auto bool, slots ...string) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		switch {
-		case slices.Contains(f.Slots, ApprovalSlot) && (purpose || f.Name != DraftPurpose):
+		case slices.Contains(f.Slots, ApprovalSlot) && (auto || !slices.Contains(AutoOnly, f.Name)):
 			env[f.Name] = f.Type
 		case slices.Contains(f.Slots, WorkflowSlot) && f.Slot != "" && slices.Contains(slots, f.Slot):
 			env[f.Name] = f.Type

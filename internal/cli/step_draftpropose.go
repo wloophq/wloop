@@ -222,16 +222,14 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	}
 	now := deps.Now()
 	policy := draftApproval(deps.Config(), w)
-	var subjectFacts workflow.Facts
+	var subject *draft.Subject
 	if w.Withdraw != nil || len(policy.Rules) > 0 {
-		if subjectFacts, err = s.d.Units.Facts(ctx, c.u); err != nil {
+		read, err := subjectFacts(ctx, s.d.Units, c.u, w.Name)
+		if err != nil {
 			return nil, err
 		}
-		if sc, ok := s.d.Units.(automation.Scoper); ok {
-			if subjectFacts, err = sc.Scope(ctx, w.Name, c.u, subjectFacts); err != nil {
-				return nil, err
-			}
-		}
+		read.Slot = w.Slot
+		subject = &read
 	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
@@ -242,7 +240,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			key = sub.subject.Key + ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
-			Effects: a.effects, ObservedFor: a.hold, Policy: &policy, Facts: subjectFacts,
+			Effects: a.effects, ObservedFor: a.hold, Policy: &policy, Subject: subject,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
 		if sub.entry != nil {
 			cd.p.Entry = string(sub.entry.ID)
@@ -262,7 +260,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" && w.Withdraw != nil {
-			cd.refusal, err = withdrawnAtOnce(w, subjectFacts, draftFactsOf(sub, person.Key, cd.p.Items), deps.Config, now)
+			cd.refusal, err = withdrawnAtOnce(w, subject.Facts, draftFactsOf(sub, person.Key, cd.p.Items), deps.Config, now)
 			if err != nil {
 				return nil, err
 			}
@@ -406,32 +404,49 @@ func itemIDs(its []items.Item) []string {
 	return out
 }
 
-// draftApproval is the approval policy of w's drafts: the config's
-// workflows.<name>.draft_approval, then the proposals.<rule>.approval of the
-// rule w replaced, then the manifest's.
+// draftApproval is the approval policy of w's drafts: workflowApproval's,
+// else always.
 func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
-	return outbox.ResolveApproval(configPolicy(w, cfg.Workflows[w.Name].DraftApproval), cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
+	if p := workflowApproval(cfg, w); p != nil {
+		return *p
+	}
+	return draft.Policy{Default: draft.Approval{Mode: draft.Always}}
+}
+
+// workflowApproval is the approval policy of w's drafts and of the turns it
+// starts: the config's workflows.<name>.draft_approval, then the
+// proposals.<rule>.approval of the rule w replaced, then the manifest's;
+// nil when none is set.
+func workflowApproval(cfg config.Config, w workflow.Workflow) *draft.Policy {
+	p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval)
+	return outbox.ResolveApproval(p, cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
+}
+
+// configApprovalProblems are the config's draft_approval blocks that do not
+// load over their workflow's subject, each holding every draft of it.
+func configApprovalProblems(cfg config.Config, ws []workflow.Workflow) []error {
+	var out []error
+	for _, w := range ws {
+		if _, err := configPolicy(w, cfg.Workflows[w.Name].DraftApproval); err != nil {
+			out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
+		}
+	}
+	return out
 }
 
 // configPolicy is the config's draft_approval of w, its rules compiled over
-// w's subject; nil when a is. One that does not compile holds every draft,
-// and each proposal logs why.
-func configPolicy(w workflow.Workflow, a *config.DraftApprovalConfig) *draft.Policy {
+// w's subject; nil when a is. One that does not compile is refused, with
+// the error, and holds every draft of w.
+func configPolicy(w workflow.Workflow, a *config.DraftApprovalConfig) (*draft.Policy, error) {
 	if a == nil {
-		return nil
+		return nil, nil
 	}
 	p, err := a.Policy(builtin.ApprovalEnv(true, w.Slot))
 	if err != nil {
-		return &draft.Policy{Default: draft.Approval{Mode: draft.Always},
-			Rules: []draft.Rule{{When: refusedRule{fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)}, Approval: draft.Approval{Mode: draft.Always}}}}
+		return draft.Fixed(draft.Approval{Mode: draft.Always}), fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)
 	}
-	return &p
+	return &p, nil
 }
-
-// refusedRule is a rule that never holds and says why at each draft.
-type refusedRule struct{ err error }
-
-func (r refusedRule) Holds(map[string]any, time.Time) (bool, error) { return false, r.err }
 
 // holdOf says why a draft of the same workflow, subject and person holds p:
 // one open or failed, one sent within hold_after_sent (or ever, with

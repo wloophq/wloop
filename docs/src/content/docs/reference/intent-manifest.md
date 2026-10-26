@@ -44,7 +44,6 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `reason` | | `""` | `address_round`: the turn carries the reviewers, failing checks and conflict its round answers |
 | `draft_approval.mode`, `draft_approval.window` | | `always` | `always`, `window` (with a positive `window` such as `"10m"`), `none` or `observe` |
 | `[[draft_approval.rule]]` | | none | `when`, `mode`, `window`: tried in order before `mode`, see [`[draft_approval]`](#draft_approval) |
-| `auto_send` | | unset | replaced by `[draft_approval]`; loads with a warning, `false` as `mode = "always"` with no rules, `true` as nothing |
 | `session.strategy` | yes | | `reuse_live`, `new` |
 | `session.title` | yes | | 1 to 12 lower-case letters |
 | `session.close_when_done` | | `false` | |
@@ -125,7 +124,7 @@ mode = "window"
 window = "10m"
 ```
 
-The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`. A rule's `when` reads `draft.delivery`, `draft.proposer`, `draft.effects` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose`, which the turn's agent names, nor `brief.*`. A rule that sends on its own (`none` or `window`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. A workflow's own `[draft_approval]` wins over the intent's for the turns it starts. See [the Outbox](/concepts/approval/#the-outbox).
+The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`none` or `window`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. A workflow's own `[draft_approval]` wins over the intent's for the turns it starts. See [the Outbox](/concepts/approval/#the-outbox).
 
 ## Providers
 

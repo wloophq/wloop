@@ -81,12 +81,14 @@ The thresholds:
 "workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m" } } }
 ```
 
-A rule picks the mode by the subject's facts; this one sends closings at once on a thread you started and keeps the window elsewhere:
+A rule picks the mode by the draft's and the subject's facts; this one sends a closing reaction at once and keeps the window for a closing message:
 
 ```json
 "workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m",
-  "rule": [{ "when": "draft.delivery == \"message\" && entry.unit_started_by_me", "mode": "none" }] } } }
+  "rule": [{ "when": "draft.delivery == \"reaction\"", "mode": "none" }] } } }
 ```
+
+A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text.
 
 A workflow's `mode` and a draft's `observe` policy differ: `"mode": "observe"` plans the workflow and proposes nothing, while `"draft_approval": {"mode": "observe"}` proposes each draft and records it as what would have been sent, without sending it.
 

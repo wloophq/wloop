@@ -64,6 +64,29 @@ func (a DraftApprovalConfig) Policy(env expr.Env) (draft.Policy, error) {
 	return p, nil
 }
 
+// DraftApprovalWarnings name each rule of a workflows.<name>.draft_approval
+// that releases, reads draft.delivery and never releases a comment draft.
+func (c Config) DraftApprovalWarnings() []string {
+	var out []string
+	env := builtin.ApprovalEnv(true, builtin.UnitSlots()...)
+	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
+		a := c.Workflows[name].DraftApproval
+		if a == nil {
+			continue
+		}
+		p, err := a.Policy(env)
+		if err != nil {
+			continue
+		}
+		for i, r := range p.Rules {
+			if builtin.NeverReleasesComment(r) {
+				out = append(out, fmt.Sprintf("workflows.%s.draft_approval.rule[%d].when reads draft.delivery but never releases a comment draft; to release one, write %s", name, i, builtin.CommentForm))
+			}
+		}
+	}
+	return out
+}
+
 const renudgeAfterKey = "renudge_after"
 
 // Approval is rule's configured approval, always when the config sets none.

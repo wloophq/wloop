@@ -154,7 +154,6 @@
         "when": {"type": "string", "description": "A predicate over the subject's facts and draft.*; a match withdraws the draft."},
         "reason": {"type": "string", "enum": ["assigned", "moot"], "description": "The withdrawn draft's reason: assigned (its items got an owner) or moot, the default."}
       }
-    },
-    "auto_send": {"type": "boolean", "deprecated": true, "description": "Replaced by [draft_approval]; loads with a warning: false is read as mode always with no rules, true as nothing."}
+    }
   }
 }

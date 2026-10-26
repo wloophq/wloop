@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -49,14 +50,25 @@ func (s *Service) NextDeadline(ctx context.Context) (time.Time, bool, error) {
 	return next, true, nil
 }
 
+// windowDrafts are the proposed window drafts whose window may end: not one
+// of a workflow that failed to load, nor one stored with another delivery
+// than its publisher posts it as, which the comment floor never decided.
 func (s *Service) windowDrafts(ctx context.Context) ([]draft.Draft, error) {
 	proposed, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Proposed}})
 	if err != nil {
 		return nil, err
 	}
+	var broken []string
+	if s.Broken != nil {
+		broken = s.Broken()
+	}
 	out := proposed[:0]
 	for _, d := range proposed {
-		if d.Approval.Mode == draft.Window && !d.Deadline.IsZero() {
+		switch {
+		case d.Approval.Mode != draft.Window || d.Deadline.IsZero():
+		case d.Origin.Workflow != "" && slices.Contains(broken, d.Origin.Workflow):
+		case s.delivered(d).Delivery != d.Delivery:
+		default:
 			out = append(out, d)
 		}
 	}

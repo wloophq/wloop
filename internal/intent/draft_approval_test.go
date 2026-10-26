@@ -123,7 +123,7 @@ window = "10m"
 		"a message on the docs":           {draft.Draft{Delivery: draft.Message}, map[string]any{"pr.repo": "acme/docs"}, draft.Window},
 		"a comment on another repository": {comment, map[string]any{"pr.repo": "acme/widgets"}, draft.Always},
 	} {
-		got, err := p.Decide(c.d, c.facts, time.Time{})
+		got, err := p.Decide(c.d, draft.Subject{Slot: "pr", Facts: c.facts}, time.Time{})
 		if err != nil || got.Approval.Mode != c.want {
 			t.Errorf("%s: %+v %v, want %s", name, got, err, c.want)
 		}
@@ -146,47 +146,60 @@ func TestAnIntentsRuleMayNotReadThePurposeItsAgentNames(t *testing.T) {
 	}
 }
 
-func TestAutoSendLoadsWithAWarning(t *testing.T) {
-	for _, c := range []struct {
-		name, key string
-		want      *draft.Approval
+func TestAutoSendIsAnUnknownKey(t *testing.T) {
+	for _, key := range []string{"auto_send = false\n", "auto_send = true\n"} {
+		for loader, write := range map[string]func(root string){
+			"intent":   func(root string) { writeIntent(t, root, "ask-author", key+minimal, "Ask.\n") },
+			"workflow": func(root string) { writeWorkflow(t, root, "close-quiet", key+quietSession) },
+		} {
+			root := t.TempDir()
+			write(root)
+			_, problems := Load(userLayer(root), nil, testBase(), nil)
+			if len(problems) == 0 || problems[0].Field != "auto_send" || !strings.Contains(problems[0].Msg, "unknown key") {
+				t.Errorf("%s %s: %s", loader, strings.TrimSpace(key), problems.Error())
+			}
+		}
+	}
+}
+
+func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
+	for loader, c := range map[string]struct {
+		load       func(*testing.T, string) (*Loaded, Problems)
+		when, fact string
 	}{
-		{"false holds", "auto_send = false\n", &draft.Approval{Mode: draft.Always}},
-		{"true is ignored", "auto_send = true\n", nil},
+		"intent":   {loadIntentWith, `pr.waits_on_user && draft.delivery == "comment"`, "pr.waits_on_user"},
+		"workflow": {loadWorkflowWith, `session.agent_state == "idle"`, "session.agent_state"},
 	} {
-		for _, loader := range []string{"intent", "workflow"} {
-			t.Run(loader+"/"+c.name, func(t *testing.T) {
-				var l *Loaded
-				var problems Problems
-				if loader == "intent" {
-					root := t.TempDir()
-					writeIntent(t, root, "ask-author", c.key+minimal, "Ask.\n")
-					l, problems = Load(userLayer(root), nil, testBase(), nil)
-				} else {
-					root := t.TempDir()
-					writeWorkflow(t, root, "close-quiet", c.key+quietSession)
-					l, problems = Load(userLayer(root), nil, testBase(), nil)
-				}
-				if len(problems) > 0 {
-					t.Fatal(problems.Error())
-				}
-				if len(l.Warnings) != 1 || l.Warnings[0].Field != "auto_send" || !strings.Contains(l.Warnings[0].Msg, "[draft_approval]") {
-					t.Fatalf("warnings %+v", l.Warnings)
-				}
-				var got *draft.Policy
-				if loader == "intent" {
-					d, _ := l.Registry.Get("ask-author")
-					got = d.DraftApproval
-				} else {
-					got = l.Workflows[0].DraftApproval
-				}
-				switch {
-				case c.want == nil && got != nil:
-					t.Fatalf("%+v", got)
-				case c.want != nil && (got == nil || got.Default != *c.want || len(got.Rules) != 0):
-					t.Fatalf("%+v", got)
-				}
-			})
+		_, problems := c.load(t, "\n[draft_approval]\nmode = \"always\"\n[[draft_approval.rule]]\nwhen = '"+c.when+"'\nmode = \"none\"\n")
+		if len(problems) != 1 || problems[0].Field != "draft_approval.rule[0].when" || !strings.Contains(problems[0].Msg, c.fact) ||
+			!strings.Contains(problems[0].Msg, "no draft approval rule may") || !strings.HasSuffix(problems[0].File, ".toml") {
+			t.Errorf("%s: %s", loader, problems.Error())
+		}
+	}
+}
+
+func TestAnIntentsRuleMayNotReadTheEffectsItsAgentNames(t *testing.T) {
+	rule := "\n[draft_approval]\nmode = \"always\"\n[[draft_approval.rule]]\nwhen = '\"pr.nudged\" in draft.effects && draft.delivery == \"comment\"'\nmode = \"none\"\n"
+	_, problems := loadIntentWith(t, rule)
+	if len(problems) != 1 || !strings.Contains(problems[0].Msg, "draft.effects") || !strings.Contains(problems[0].Msg, "agents name") {
+		t.Fatalf("%s", problems.Error())
+	}
+}
+
+func TestAReleasingRuleThatNeverNamesCommentLoadsWithAWarning(t *testing.T) {
+	for when, warns := range map[string]bool{
+		`draft.delivery in ["comment"] && pr.author == "dependabot[bot]"`: true,
+		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`:   false,
+		`draft.delivery == "message"`:                                     false,
+		`pr.author == "dependabot[bot]"`:                                  false,
+	} {
+		l, problems := loadIntentWith(t, "\n[draft_approval]\nmode = \"always\"\n[[draft_approval.rule]]\nwhen = '"+when+"'\nmode = \"none\"\n")
+		if len(problems) > 0 {
+			t.Fatalf("%s: %s", when, problems.Error())
+		}
+		got := len(l.Warnings) == 1 && l.Warnings[0].Field == "draft_approval.rule[0].when" && strings.Contains(l.Warnings[0].Msg, `draft.delivery == "comment"`)
+		if got != warns || !warns && len(l.Warnings) != 0 {
+			t.Errorf("%s: warnings %+v", when, l.Warnings)
 		}
 	}
 }
