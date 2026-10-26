@@ -1,12 +1,8 @@
-description = "Dismiss an open turn on a merged or closed pull request"
-subject = "github"
+summary = "Dismiss an open turn on a merged or closed pull request"
+provider = "github"
 when = 'pr.open_turn != "" && pr.state in ["merged", "closed"]'
-mode = "apply"
 order = 30
 key = ["pr.open_turn_seq"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.dismiss"

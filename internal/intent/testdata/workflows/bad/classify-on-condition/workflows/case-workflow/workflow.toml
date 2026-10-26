@@ -1,11 +1,6 @@
-description = "Case"
-subject = "session"
+summary = "Case"
+provider = "session"
 when = 'session.managed && session.agent_state == "done"'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "classify"
-prompt = "is it done"
-

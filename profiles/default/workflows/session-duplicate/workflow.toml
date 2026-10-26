@@ -1,11 +1,7 @@
-description = "Close a session that resumes the same agent session as another live one"
-subject = "session"
+summary = "Close a session that resumes the same agent session as another live one"
+provider = "session"
 when = 'session.duplicate'
-mode = "apply"
 order = 10
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"

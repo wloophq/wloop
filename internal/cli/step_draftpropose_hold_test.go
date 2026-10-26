@@ -14,17 +14,17 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-func TestAHoldNamesADurationOfTheConfig(t *testing.T) {
+func TestRepeatAfterReadsTheConfigFact(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
 	cfg.Drafts.RepeatAfter = config.Days(36 * time.Hour)
 	for v, want := range map[string]time.Duration{"config.drafts.repeat_after": 36 * time.Hour, "2d": 48 * time.Hour, "90m": 90 * time.Minute} {
-		if got, err := holdDuration(v, cfg); err != nil || got != want {
+		if got, err := repeatDuration(v, cfg); err != nil || got != want {
 			t.Errorf("%s: %v, %v; want %v", v, got, err, want)
 		}
 	}
-	for _, v := range []string{"config.gtd.stale_waiting_days", "config.nope", "soon", "-1h"} {
-		if _, err := holdDuration(v, cfg); err == nil {
+	for _, v := range []string{"config.gtd.stale_waiting_days", "config.nope", "soon", "-1h", "0s"} {
+		if _, err := repeatDuration(v, cfg); err == nil {
 			t.Errorf("%s read as a duration", v)
 		}
 	}
@@ -35,7 +35,7 @@ func TestAHoldNamesADurationOfTheConfig(t *testing.T) {
 // so their nudge follows once the hold ends, as the job's did.
 func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	t.Parallel()
-	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "hold", "24h"), "{{.Person.Key}}")
+	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h"), "{{.Person.Key}}")
 	r.entries.m["e1"] = gtd.Entry{ID: "e1", Kind: gtd.KindWaiting, State: gtd.Waiting, Units: []unit.Unit{draftThread},
 		Items:   []gtd.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
 		Waiting: &gtd.WaitingOn{On: []items.Person{ana, bob}}}

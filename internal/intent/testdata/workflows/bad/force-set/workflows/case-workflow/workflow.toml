@@ -1,11 +1,7 @@
-description = "Case"
-subject = "workspace"
+summary = "Case"
+provider = "workspace"
 when = "workspace.main"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "workspace.remove"
 force = "true"
-

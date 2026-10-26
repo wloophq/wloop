@@ -1,0 +1,8 @@
+summary = "Case"
+provider = "entry"
+when = 'entry.items_resolved > 0'
+
+[[step]]
+use = "draft.propose"
+purpose = "close"
+effects = "unit.closed"

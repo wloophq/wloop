@@ -27,50 +27,34 @@ import (
 var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
 
 const (
-	waitingWorkflow = `description = "Watch waiting entries"
-subject = "entry"
+	waitingWorkflow = `summary = "Watch waiting entries"
+provider = "entry"
 when = 'entry.state == "waiting" && entry.items_owed > 0 && entry.settled_at < now'
 key = ["entry.settled_at", "entry.waiting_on"]
 
-[trigger]
-every = "sweep"
-
 [[step]]
 use = "notify.self"
-text = "waiting"
 `
-	closeWorkflow = `description = "Watch close entries with a resolved item"
-subject = "entry"
+	closeWorkflow = `summary = "Watch close entries with a resolved item"
+provider = "entry"
 when = 'entry.kind == "close" && entry.items_resolved > 0'
 
-[trigger]
-every = "sweep"
-
 [[step]]
 use = "notify.self"
-text = "resolved"
 `
-	slackWorkflow = `description = "Watch Slack units with unowned items"
-subject = "slack"
+	slackWorkflow = `summary = "Watch Slack units with unowned items"
+provider = "slack"
 when = 'slack.live_entry && slack.items_unowned > 0'
 
-[trigger]
-every = "sweep"
-
 [[step]]
 use = "notify.self"
-text = "unowned"
 `
-	githubWorkflow = `description = "Watch pull requests"
-subject = "github"
+	githubWorkflow = `summary = "Watch pull requests"
+provider = "github"
 when = 'pr.mine'
 
-[trigger]
-every = "sweep"
-
 [[step]]
 use = "notify.self"
-text = "mine"
 `
 )
 
@@ -93,6 +77,10 @@ func newSubjectsRig(t *testing.T) *subjectsRig {
 		"workflows/my-close/workflow.toml":   closeWorkflow,
 		"workflows/my-slack/workflow.toml":   slackWorkflow,
 		"workflows/my-prs/workflow.toml":     githubWorkflow,
+		"workflows/my-waiting/text.md.tmpl":  "waiting",
+		"workflows/my-close/text.md.tmpl":    "resolved",
+		"workflows/my-slack/text.md.tmpl":    "unowned",
+		"workflows/my-prs/text.md.tmpl":      "mine",
 	})
 	if l := te.loadedIntents(); len(l.Problems) > 0 {
 		t.Fatal(l.Problems.Error())

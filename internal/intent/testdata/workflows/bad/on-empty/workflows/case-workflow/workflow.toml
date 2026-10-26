@@ -1,5 +1,5 @@
-description = "Case"
-subject = "github"
+summary = "Case"
+provider = "github"
 when = "true"
 
 [trigger]

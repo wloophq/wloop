@@ -1,11 +1,8 @@
-description = "Remove a workspace under a temporary directory"
-subject = "workspace"
+summary = "Remove a workspace under a temporary directory"
+provider = "workspace"
 when = '!workspace.main && workspace.temporary && workspace.path_exists'
-mode = "observe"
+observe = true
 order = 23
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "workspace.remove"

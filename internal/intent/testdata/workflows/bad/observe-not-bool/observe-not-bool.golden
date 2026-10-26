@@ -1,0 +1,1 @@
+testdata/workflows/bad/observe-not-bool/workflows/case-workflow/workflow.toml:3:11: observe: must be true or false, not string

@@ -1,0 +1,1 @@
+testdata/workflows/bad/summary-missing/workflows/case-workflow/workflow.toml:1:1: summary: is required: one line saying what the workflow does

@@ -1,1 +1,1 @@
-testdata/workflows/bad/unknown-provider/workflows/case-workflow/workflow.toml:2:11: subject: unknown provider gmail; the providers are entry, github, session, slack, workspace
+testdata/workflows/bad/unknown-provider/workflows/case-workflow/workflow.toml:2:12: provider: unknown provider gmail; the providers are entry, github, session, slack, workspace

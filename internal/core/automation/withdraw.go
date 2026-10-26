@@ -10,7 +10,7 @@ import (
 )
 
 // withdraw discards every proposed draft whose applying workflow's
-// [withdraw] when matches it on fresh facts, with the workflow's reason,
+// [drafts.withdraw] when matches it on fresh facts, with the workflow's reason,
 // and every draft of a workflow no longer loaded as moot; a draft of a
 // disabled plugin's unit, or of a workflow that failed to load, is left as
 // it is.

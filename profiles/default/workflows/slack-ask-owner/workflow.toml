@@ -1,22 +1,18 @@
-description = "Ask who owns the open items of a Slack unit you track that nobody owns after a working day"
-subject = "slack"
+summary = "Ask who owns the open items of a Slack unit you track that nobody owns after a working day"
+provider = "slack"
 when = 'slack.live_entry && slack.items_unowned > 0 && slack.items_unowned_age_days >= 1'
-mode = "apply"
 order = 52
 key = ["slack.settled_at"]
 
-[draft_approval]
+[drafts.approval]
 mode = "wait"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "draft.propose"
 purpose = "ask_owner"
 items = "unowned_aged"
-hold = "config.drafts.repeat_after"
+repeat_after = "config.drafts.repeat_after"
 
-[withdraw]
+[drafts.withdraw]
 when = 'draft.items_assigned > 0'
 reason = "assigned"

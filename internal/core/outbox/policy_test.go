@@ -287,20 +287,20 @@ func TestAutoApprovalHonorsTheGate(t *testing.T) {
 	})
 }
 
-func TestObservedKeyRecordsAgainAfterRecordedFor(t *testing.T) {
+func TestObservedKeyRecordsAgainAfterRepeatAfter(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
-	e.svc.RecordedFor = 24 * time.Hour
+	e.svc.RepeatAfter = 24 * time.Hour
 	auto := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 	first := e.propose(auto)
 	e.clock.now = t0.Add(23 * time.Hour)
 	if again, err := e.svc.Propose(ctx, auto); !errors.Is(err, ErrDuplicate) || again.ID != first.ID {
-		t.Fatalf("within RecordedFor: %+v %v", again, err)
+		t.Fatalf("within RepeatAfter: %+v %v", again, err)
 	}
 	e.clock.now = t0.Add(24 * time.Hour)
 	second, err := e.svc.Propose(ctx, auto)
 	if err != nil || second.ID == first.ID || second.Reason != "record" {
-		t.Fatalf("after RecordedFor: %+v %v", second, err)
+		t.Fatalf("after RepeatAfter: %+v %v", second, err)
 	}
 }
 

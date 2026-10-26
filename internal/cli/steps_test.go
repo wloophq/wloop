@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -387,16 +388,37 @@ func (p *recordingPub) Publish(evs ...port.Event) {
 	p.evs = append(p.evs, evs...)
 }
 
+// besideWorkflow writes files beside workflow's manifest in a profile
+// directory te's config names.
+func besideWorkflow(t *testing.T, te *testEnv, workflow string, files map[string]string) {
+	t.Helper()
+	dir := t.TempDir()
+	wd := filepath.Join(dir, "workflows", workflow)
+	if err := os.MkdirAll(wd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(wd, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	te.cfg.Profile = dir
+}
+
 func TestNotifySelfPublishesItsText(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": "look at it", "named.md": "named text"})
 	pub := &recordingPub{}
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds, Pub: pub})
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
-	if _, err := s.Run(context.Background(), wfStep("notify.self", "text", "look at it"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+	if _, err := s.Run(context.Background(), wfStep("notify.self", "text", "named.md"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(pub.evs) != 1 || pub.evs[0].Kind != kindNotifySelf || pub.evs[0].Data != "look at it" || pub.evs[0].Unit != u {
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.evs) != 2 || pub.evs[0].Kind != kindNotifySelf || pub.evs[0].Data != "named text" || pub.evs[1].Data != "look at it" || pub.evs[0].Unit != u {
 		t.Fatalf("published %+v", pub.evs)
 	}
 }
@@ -444,8 +466,10 @@ func newClassifyRig(t *testing.T, limit int) *classifyRig {
 	}
 	t.Cleanup(func() { db.Close() })
 	r := &classifyRig{units: automationtest.NewUnits(), asker: &blockingAsker{release: make(chan struct{}), answer: `{"kind":"bug","urgent":true}`}, db: db, te: te,
-		u: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, st: wfStep("classify", "prompt", "what is it", "schema", `{"type":"object"}`),
+		u: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, st: wfStep("classify"),
 		why: workflow.Why{Workflow: "triage-bugs", Trigger: workflow.TriggerEvent}}
+	besideWorkflow(t, te, "triage-bugs", map[string]string{"prompt.md": "what is it", "schema.json": `{"type":"object"}`,
+		"strict.json": `{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["feature","chore"]},"urgent":{"type":"boolean"}}}`})
 	r.units.Put(r.u, workflow.Facts{"pr.fingerprint": "fp1", "pr.repo": "acme/api"})
 	r.s = newStepSet(te.Env, stepDeps{Units: r.units, Rounds: te.Rounds, Classify: classifyDeps{Store: db.Classifications(), Asker: r.asker}})
 	t.Cleanup(func() {
@@ -598,8 +622,7 @@ func TestAFailedClassifyIsAnAttemptNotAnotherCharge(t *testing.T) {
 func TestAClassifyAnswerOutsideItsSchemaIsRefused(t *testing.T) {
 	t.Parallel()
 	r := newClassifyRig(t, 5)
-	r.st = wfStep("classify", "prompt", "what is it", "schema",
-		`{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["feature","chore"]},"urgent":{"type":"boolean"}}}`)
+	r.st = wfStep("classify", "schema", "strict.json")
 	close(r.asker.release)
 	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
 		t.Fatalf("first run: %v", err)

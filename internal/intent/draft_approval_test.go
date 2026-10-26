@@ -22,8 +22,20 @@ func loadWorkflowWith(t *testing.T, extra string) (*Loaded, Problems) {
 	return Load(userLayer(root), nil, testBase(), nil)
 }
 
+// The draft approval table of each manifest.
+const (
+	intentDrafts   = "draft_approval"
+	workflowDrafts = "drafts.approval"
+)
+
+// drafts is block written at the draft approval table at, its rules
+// "[[rule]]" written at at.rule.
+func drafts(at, block string) string {
+	return "\n[" + at + "]\n" + strings.ReplaceAll(block, "[[rule]]", "[["+at+".rule]]") + "\n"
+}
+
 func TestManifestDraftApproval(t *testing.T) {
-	l, problems := loadIntentWith(t, "\n[draft_approval]\nmode = \"delay\"\nwindow = \"10m\"\n")
+	l, problems := loadIntentWith(t, drafts(intentDrafts, "mode = \"delay\"\nwindow = \"10m\""))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -32,7 +44,7 @@ func TestManifestDraftApproval(t *testing.T) {
 		t.Fatalf("intent: %+v", d.DraftApproval)
 	}
 
-	l, problems = loadWorkflowWith(t, "\n[draft_approval]\nmode = \"send\"\n")
+	l, problems = loadWorkflowWith(t, drafts(workflowDrafts, "mode = \"send\""))
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
@@ -52,51 +64,51 @@ func TestManifestDraftApproval(t *testing.T) {
 
 func TestManifestDraftApprovalRefusals(t *testing.T) {
 	for _, c := range []struct{ name, block, field, msg string }{
-		{"unknown mode", "mode = \"later\"", "draft_approval.mode", "not one of"},
-		{"no mode", "window = \"5m\"", "draft_approval.mode", "is required"},
-		{"window without a window", "mode = \"delay\"", "draft_approval.window", "is required with mode delay"},
-		{"a window on another mode", "mode = \"send\"\nwindow = \"5m\"", "draft_approval.window", "only with mode delay"},
-		{"a zero window", "mode = \"delay\"\nwindow = \"0s\"", "draft_approval.window", "longer than zero"},
-		{"a bad duration", "mode = \"delay\"\nwindow = \"soon\"", "draft_approval.window", "not a duration"},
-		{"an unknown key", "mode = \"send\"\nafter = \"5m\"", "draft_approval.after", "unknown key"},
-		{"a rule with no when", "mode = \"wait\"\n[[draft_approval.rule]]\nmode = \"send\"", "draft_approval.rule[0].when", "is required"},
-		{"a rule with no mode", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery == \"message\"'", "draft_approval.rule[0].mode", "is required"},
-		{"a rule's window without mode delay", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\nwindow = \"5m\"", "draft_approval.rule[0].window", "only with mode delay"},
-		{"a rule's bad predicate", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery =='\nmode = \"send\"", "draft_approval.rule[0].when", ""},
-		{"a rule reading a withdraw fact", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.items_owed > 0'\nmode = \"send\"", "draft_approval.rule[0].when", "draft.items_owed"},
-		{"a rule reading a brief", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'brief.risk == \"low\"'\nmode = \"send\"", "draft_approval.rule[0].when", "brief.risk"},
-		{"a rule reading marks", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'handled(\"x\", draft.delivery)'\nmode = \"send\"", "draft_approval.rule[0].when", "marks"},
+		{"unknown mode", "mode = \"later\"", "@.mode", "not one of"},
+		{"no mode", "window = \"5m\"", "@.mode", "is required"},
+		{"window without a window", "mode = \"delay\"", "@.window", "is required with mode delay"},
+		{"a window on another mode", "mode = \"send\"\nwindow = \"5m\"", "@.window", "only with mode delay"},
+		{"a zero window", "mode = \"delay\"\nwindow = \"0s\"", "@.window", "longer than zero"},
+		{"a bad duration", "mode = \"delay\"\nwindow = \"soon\"", "@.window", "not a duration"},
+		{"an unknown key", "mode = \"send\"\nafter = \"5m\"", "@.after", "unknown key"},
+		{"a rule with no when", "mode = \"wait\"\n[[rule]]\nmode = \"send\"", "@.rule[0].when", "is required"},
+		{"a rule with no mode", "mode = \"wait\"\n[[rule]]\nwhen = 'draft.delivery == \"message\"'", "@.rule[0].mode", "is required"},
+		{"a rule's window without mode delay", "mode = \"wait\"\n[[rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\nwindow = \"5m\"", "@.rule[0].window", "only with mode delay"},
+		{"a rule's bad predicate", "mode = \"wait\"\n[[rule]]\nwhen = 'draft.delivery =='\nmode = \"send\"", "@.rule[0].when", ""},
+		{"a rule reading a withdraw fact", "mode = \"wait\"\n[[rule]]\nwhen = 'draft.items_owed > 0'\nmode = \"send\"", "@.rule[0].when", "draft.items_owed"},
+		{"a rule reading a brief", "mode = \"wait\"\n[[rule]]\nwhen = 'brief.risk == \"low\"'\nmode = \"send\"", "@.rule[0].when", "brief.risk"},
+		{"a rule reading marks", "mode = \"wait\"\n[[rule]]\nwhen = 'handled(\"x\", draft.delivery)'\nmode = \"send\"", "@.rule[0].when", "marks"},
 	} {
-		block := "\n[draft_approval]\n" + c.block + "\n"
-		for loader, load := range map[string]func(*testing.T, string) (*Loaded, Problems){"intent": loadIntentWith, "workflow": loadWorkflowWith} {
+		for loader, m := range map[string]struct {
+			load func(*testing.T, string) (*Loaded, Problems)
+			at   string
+		}{"intent": {loadIntentWith, intentDrafts}, "workflow": {loadWorkflowWith, workflowDrafts}} {
 			t.Run(loader+"/"+c.name, func(t *testing.T) {
-				l, problems := load(t, block)
+				l, problems := m.load(t, drafts(m.at, c.block))
+				field := strings.Replace(c.field, "@", m.at, 1)
 				if len(l.Workflows) > 0 || l.Registry != nil && func() bool { _, ok := l.Registry.Get("ask-author"); return ok }() {
 					t.Errorf("the manifest loaded")
 				}
 				for _, p := range problems {
-					if p.Field == c.field && strings.Contains(p.Msg, c.msg) && strings.HasSuffix(p.File, "toml") {
+					if p.Field == field && strings.Contains(p.Msg, c.msg) && strings.HasSuffix(p.File, "toml") {
 						return
 					}
 				}
-				t.Fatalf("want %s: %s, got\n%s", c.field, c.msg, problems.Error())
+				t.Fatalf("want %s: %s, got\n%s", field, c.msg, problems.Error())
 			})
 		}
 	}
 }
 
 func TestManifestDraftApprovalRules(t *testing.T) {
-	rules := `
-[draft_approval]
-mode = "wait"
-[[draft_approval.rule]]
+	rules := drafts(intentDrafts, `mode = "wait"
+[[rule]]
 when = 'draft.delivery == "comment" && pr.author == "dependabot[bot]"'
 mode = "send"
-[[draft_approval.rule]]
+[[rule]]
 when = 'pr.repo == "acme/docs"'
 mode = "delay"
-window = "10m"
-`
+window = "10m"`)
 	l, problems := loadIntentWith(t, rules)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
@@ -131,13 +143,13 @@ window = "10m"
 }
 
 func TestAnIntentsRuleMayNotReadThePurposeItsAgentNames(t *testing.T) {
-	rule := "\n[draft_approval]\nmode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.purpose == \"thanks\"'\nmode = \"send\"\n"
-	_, problems := loadIntentWith(t, rule)
-	if len(problems) != 1 || problems[0].Field != "draft_approval.rule[0].when" || !strings.Contains(problems[0].Msg, "agents name") ||
+	rule := "mode = \"wait\"\n[[rule]]\nwhen = 'draft.purpose == \"thanks\"'\nmode = \"send\""
+	_, problems := loadIntentWith(t, drafts(intentDrafts, rule))
+	if len(problems) != 1 || problems[0].Field != intentDrafts+".rule[0].when" || !strings.Contains(problems[0].Msg, "agents name") ||
 		!strings.HasSuffix(problems[0].File, "intent.toml") {
 		t.Fatalf("%s", problems.Error())
 	}
-	l, problems := loadWorkflowWith(t, rule)
+	l, problems := loadWorkflowWith(t, drafts(workflowDrafts, rule))
 	if len(problems) > 0 {
 		t.Fatalf("a workflow's rule: %s", problems.Error())
 	}
@@ -164,14 +176,14 @@ func TestAutoSendIsAnUnknownKey(t *testing.T) {
 
 func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 	for loader, c := range map[string]struct {
-		load       func(*testing.T, string) (*Loaded, Problems)
-		when, fact string
+		load           func(*testing.T, string) (*Loaded, Problems)
+		at, when, fact string
 	}{
-		"intent":   {loadIntentWith, `pr.waits_on_user && draft.delivery == "comment"`, "pr.waits_on_user"},
-		"workflow": {loadWorkflowWith, `session.agent_state == "idle"`, "session.agent_state"},
+		"intent":   {loadIntentWith, intentDrafts, `pr.waits_on_user && draft.delivery == "comment"`, "pr.waits_on_user"},
+		"workflow": {loadWorkflowWith, workflowDrafts, `session.agent_state == "idle"`, "session.agent_state"},
 	} {
-		_, problems := c.load(t, "\n[draft_approval]\nmode = \"wait\"\n[[draft_approval.rule]]\nwhen = '"+c.when+"'\nmode = \"send\"\n")
-		if len(problems) != 1 || problems[0].Field != "draft_approval.rule[0].when" || !strings.Contains(problems[0].Msg, c.fact) ||
+		_, problems := c.load(t, drafts(c.at, "mode = \"wait\"\n[[rule]]\nwhen = '"+c.when+"'\nmode = \"send\""))
+		if len(problems) != 1 || problems[0].Field != c.at+".rule[0].when" || !strings.Contains(problems[0].Msg, c.fact) ||
 			!strings.Contains(problems[0].Msg, "no draft approval rule may") || !strings.HasSuffix(problems[0].File, ".toml") {
 			t.Errorf("%s: %s", loader, problems.Error())
 		}
@@ -179,8 +191,8 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 }
 
 func TestAnIntentsRuleMayNotReadTheEffectsItsAgentNames(t *testing.T) {
-	rule := "\n[draft_approval]\nmode = \"wait\"\n[[draft_approval.rule]]\nwhen = '\"pr.nudged\" in draft.effects && draft.delivery == \"comment\"'\nmode = \"send\"\n"
-	_, problems := loadIntentWith(t, rule)
+	rule := "mode = \"wait\"\n[[rule]]\nwhen = '\"pr.nudged\" in draft.effects && draft.delivery == \"comment\"'\nmode = \"send\""
+	_, problems := loadIntentWith(t, drafts(intentDrafts, rule))
 	if len(problems) != 1 || !strings.Contains(problems[0].Msg, "draft.effects") || !strings.Contains(problems[0].Msg, "agents name") {
 		t.Fatalf("%s", problems.Error())
 	}
@@ -193,11 +205,11 @@ func TestAReleasingRuleThatNeverNamesCommentLoadsWithAWarning(t *testing.T) {
 		`draft.delivery == "message"`:                                     false,
 		`pr.author == "dependabot[bot]"`:                                  false,
 	} {
-		l, problems := loadIntentWith(t, "\n[draft_approval]\nmode = \"wait\"\n[[draft_approval.rule]]\nwhen = '"+when+"'\nmode = \"send\"\n")
+		l, problems := loadIntentWith(t, drafts(intentDrafts, "mode = \"wait\"\n[[rule]]\nwhen = '"+when+"'\nmode = \"send\""))
 		if len(problems) > 0 {
 			t.Fatalf("%s: %s", when, problems.Error())
 		}
-		got := len(l.Warnings) == 1 && l.Warnings[0].Field == "draft_approval.rule[0].when" && strings.Contains(l.Warnings[0].Msg, `draft.delivery == "comment"`)
+		got := len(l.Warnings) == 1 && l.Warnings[0].Field == intentDrafts+".rule[0].when" && strings.Contains(l.Warnings[0].Msg, `draft.delivery == "comment"`)
 		if got != warns || !warns && len(l.Warnings) != 0 {
 			t.Errorf("%s: warnings %+v", when, l.Warnings)
 		}

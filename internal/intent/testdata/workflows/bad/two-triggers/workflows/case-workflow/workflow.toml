@@ -1,11 +1,10 @@
-description = "Case"
-subject = "session"
+summary = "Case"
+provider = "session"
 when = 'session.managed && session.agent_state == "done"'
 
 [trigger]
-every = "sweep"
 on = ["merged"]
+schedule = "0 9 * * *"
 
 [[step]]
 use = "session.close"
-

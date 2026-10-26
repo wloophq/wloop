@@ -1,0 +1,5 @@
+provider = "session"
+when = 'session.managed && session.agent_state == "done"'
+
+[[step]]
+use = "session.close"

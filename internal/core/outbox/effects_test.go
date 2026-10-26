@@ -182,33 +182,11 @@ func TestNoEffectIsDerivedFromKind(t *testing.T) {
 	}
 }
 
-func TestTheApprovalIsConfigThenLegacyThenManifestElseNone(t *testing.T) {
-	t.Parallel()
-	a := func(m draft.ApprovalMode) *draft.Policy { return draft.Fixed(draft.Approval{Mode: m}) }
-	window := draft.Fixed(draft.Approval{Mode: draft.Delay, Window: time.Hour})
-	for _, c := range []struct {
-		name                     string
-		config, legacy, manifest *draft.Policy
-		want                     draft.Approval
-	}{
-		{"config wins", a(draft.Send), a(draft.DryRun), window, draft.Approval{Mode: draft.Send}},
-		{"then legacy", nil, a(draft.DryRun), window, draft.Approval{Mode: draft.DryRun}},
-		{"then the manifest", nil, nil, window, window.Default},
-	} {
-		if got := ResolveApproval(c.config, c.legacy, c.manifest); got == nil || got.Default != c.want || len(got.Rules) != 0 {
-			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
-		}
-	}
-	if got := ResolveApproval(nil, nil, nil); got != nil {
-		t.Errorf("none set: %+v", got)
-	}
-}
-
-func TestDuplicateReadsPurposeDeliveryAndRecordedFor(t *testing.T) {
+func TestDuplicateReadsPurposeDeliveryAndRepeatAfter(t *testing.T) {
 	e := newEnv()
 	auto := func(purpose string, delivery draft.Delivery, a draft.ApprovalMode) Proposal {
 		return Proposal{Unit: thread, Purpose: purpose, Delivery: delivery, Text: "done", Reaction: "white_check_mark",
-			Policy: draft.Fixed(draft.Approval{Mode: a}), RecordedFor: time.Hour,
+			Policy: draft.Fixed(draft.Approval{Mode: a}), RepeatAfter: time.Hour,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "closure", Rule: "closure", Key: thread.String()}}
 	}
 	first := e.propose(auto("close", draft.Message, draft.Wait))
@@ -223,11 +201,11 @@ func TestDuplicateReadsPurposeDeliveryAndRecordedFor(t *testing.T) {
 	observed := e.propose(auto("observed", draft.Message, draft.DryRun))
 	e.clock.now = t0.Add(59 * time.Minute)
 	if _, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.DryRun)); !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("inside RecordedFor: %v", err)
+		t.Fatalf("inside RepeatAfter: %v", err)
 	}
 	e.clock.now = t0.Add(time.Hour)
 	if d, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.DryRun)); err != nil || d.ID == observed.ID {
-		t.Fatalf("past RecordedFor: %+v %v", d, err)
+		t.Fatalf("past RepeatAfter: %+v %v", d, err)
 	}
 }
 

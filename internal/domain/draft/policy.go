@@ -22,7 +22,7 @@ type Subject struct {
 	Facts map[string]any
 }
 
-// Rule is one [draft_approval] rule.
+// Rule is one [drafts.approval] rule.
 type Rule struct {
 	When     Condition
 	Approval Approval
@@ -87,7 +87,7 @@ type Decision struct {
 // applies only when the facts it reads are of s's slot, a rule that
 // releases applies to a comment draft only when it names comment delivery,
 // and a comment draft no such rule releases waits for a person unless the
-// approval is record.
+// approval is dry_run.
 func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 	comment := d.Delivery == CommentDelivery
 	var all map[string]any

@@ -37,7 +37,7 @@ func TestThePlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	}
 	want := []api.UnitWorkflow{
 		{Workflow: "after-merge", Trigger: "event", Outcome: "waits", Reason: "decides when a merged or closed event arrives"},
-		{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not matched",
+		{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not_matched",
 			Facts: []api.Fact{{Name: "pr.first.due", Value: "false"}, {Name: "pr.first.reason", Value: "the author is a bot"}}},
 	}
 	if len(res.Workflows) != len(want) {
@@ -92,7 +92,7 @@ func TestThePlanOfAUnitReadsMarksOnlyForAWorkflowThatCallsHandled(t *testing.T) 
 	for _, w := range res.Workflows {
 		got[w.Workflow] = w
 	}
-	if got["plain"].Outcome != "not matched" {
+	if got["plain"].Outcome != "not_matched" {
 		t.Errorf("a workflow without handled(): %+v", got["plain"])
 	}
 	if got["marked"].Outcome != "error" || !strings.Contains(got["marked"].Reason, "marks unreadable") {

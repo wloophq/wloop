@@ -1,0 +1,2 @@
+testdata/workflows/bad/trigger-every/workflows/case-workflow/workflow.toml:5:2: trigger: needs exactly one of on or schedule; it has 0; a workflow without [trigger] runs on every sweep
+testdata/workflows/bad/trigger-every/workflows/case-workflow/workflow.toml:6:1: trigger.every: unknown key

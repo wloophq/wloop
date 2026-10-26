@@ -1,0 +1,12 @@
+summary = "Case"
+provider = "workspace"
+when = '!workspace.main'
+
+[[step]]
+use = "workspace.remove"
+
+[approval]
+mode = "wait"
+[[approval.rule]]
+when = 'size(workspace.pendency) == 0'
+mode = "run"

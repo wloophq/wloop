@@ -1,10 +1,7 @@
-description = "Close an agent session that finished and stayed quiet"
-subject = "session"
+summary = "Close an agent session that finished and stayed quiet"
+provider = "session"
 when = 'session.managed && session.open_turn == "" && session.agent_state == "done" && !session.user_active && session.idle_for > config.cleanup.idle'
-mode = "observe"
-
-[trigger]
-every = "sweep"
+observe = true
 
 [[step]]
 use = "session.close"

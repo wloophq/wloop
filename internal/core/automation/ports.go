@@ -163,7 +163,7 @@ type Filter struct {
 }
 
 // Withdrawals are the open drafts a workflow proposed, which the sweep
-// withdraws when the workflow's [withdraw] when matches one, or when the
+// withdraws when the workflow's [drafts.withdraw] when matches one, or when the
 // workflow is no longer loaded; never those of a disabled plugin's units.
 type Withdrawals interface {
 	// Proposed are the proposed drafts of workflow; "" lists every

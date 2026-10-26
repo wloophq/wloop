@@ -1,0 +1,1 @@
+testdata/workflows/bad/approval-run-rule-untrusted/workflows/case-workflow/workflow.toml:11:8: approval.rule[0].when: reads workspace.pendency, which a rule that runs (mode run) may not: a third party's text or an agent sets its value; a wait rule may read it

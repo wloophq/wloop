@@ -1,5 +1,5 @@
-description = "Remove finished workspaces every weekday morning"
-subject = "workspace"
+summary = "Remove finished workspaces every weekday morning"
+provider = "workspace"
 when = 'workspace.pr_state == "merged" && workspace.pendency == []'
 
 [trigger]
@@ -9,6 +9,8 @@ schedule = "0 9 * * 1-5"
 use = "workspace.remove"
 
 [approval]
-default = "wait"
+mode = "delay"
 window = "1d"
-wait_when = 'workspace.untracked > 0'
+[[approval.rule]]
+when = 'workspace.untracked > 0'
+mode = "wait"

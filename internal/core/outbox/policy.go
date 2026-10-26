@@ -9,7 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Manifests reads the [draft_approval] blocks of the loaded intents and
+// Manifests reads the [drafts.approval] blocks of the loaded intents and
 // workflows, and the turns book.
 type Manifests interface {
 	// IntentApproval is the block of intent name, nil when it declares none; known is false for an unknown intent.

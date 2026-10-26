@@ -65,3 +65,36 @@ func TestVisibleWhenAStepIsVisible(t *testing.T) {
 		t.Error("a workflow with a visible step is not visible")
 	}
 }
+
+type always struct{}
+
+func (always) Match(workflow.Vars) (bool, error) { return true, nil }
+func (always) Reads() []string                   { return nil }
+
+func TestAnApprovalReadsItsWindowOnlyWithDelay(t *testing.T) {
+	for _, c := range []struct {
+		a  workflow.Approval
+		ok bool
+	}{
+		{workflow.Approval{Mode: workflow.ApprovalRun}, true},
+		{workflow.Approval{Mode: workflow.ApprovalWait}, true},
+		{workflow.Approval{Mode: workflow.ApprovalDelay, Window: time.Minute}, true},
+		{workflow.Approval{Mode: workflow.ApprovalDelay}, false},
+		{workflow.Approval{Mode: workflow.ApprovalRun, Window: time.Minute}, false},
+		{workflow.Approval{Mode: workflow.ApprovalWait, Window: time.Minute}, false},
+		{workflow.Approval{Mode: "send"}, false},
+		{workflow.Approval{Mode: workflow.ApprovalRun, Rules: []workflow.ApprovalRule{{When: always{}, Mode: workflow.ApprovalWait}}}, true},
+		{workflow.Approval{Mode: workflow.ApprovalRun, Rules: []workflow.ApprovalRule{{When: always{}, Mode: workflow.ApprovalWait, Window: time.Second}}}, false},
+		{workflow.Approval{Mode: workflow.ApprovalRun, Rules: []workflow.ApprovalRule{{Mode: workflow.ApprovalWait}}}, false},
+	} {
+		if err := c.a.Validate(); (err == nil) != c.ok {
+			t.Errorf("%+v: %v", c.a, err)
+		}
+	}
+}
+
+func TestOnlyRunAndDelayRelease(t *testing.T) {
+	if !workflow.ApprovalRun.Releases() || !workflow.ApprovalDelay.Releases() || workflow.ApprovalWait.Releases() {
+		t.Error("run and delay release, wait holds")
+	}
+}

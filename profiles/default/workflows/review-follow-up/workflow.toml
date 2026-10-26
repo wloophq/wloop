@@ -1,17 +1,14 @@
-description = "Follow up a review when its pull request moved since"
-subject = "github"
+summary = "Follow up a review when its pull request moved since"
+provider = "github"
 when = 'pr.review.action == "follow-up"'
 order = 10
 key = ["pr.fingerprint"]
 
-[trigger]
-every = "sweep"
-
 [[step]]
 use = "turn.start"
 intent = "review"
-round = "follow-up"
+stage = "follow-up"
 
 [approval]
-default = "run"
+mode = "delay"
 window = "60s"

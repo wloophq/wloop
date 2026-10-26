@@ -1,11 +1,7 @@
-description = "Close a session whose newest turn is done when its intent closes when done"
-subject = "session"
+summary = "Close a session whose newest turn is done when its intent closes when done"
+provider = "session"
 when = 'session.newest_state == "done" && session.closes_when_done'
-mode = "apply"
 order = 12
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"

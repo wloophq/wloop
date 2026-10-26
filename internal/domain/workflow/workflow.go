@@ -5,6 +5,7 @@ package workflow
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/url"
 	"slices"
@@ -23,7 +24,7 @@ const (
 	ModeApply   Mode = "apply"
 )
 
-// ModeOf is how a manifest, the configuration and the store spell observe.
+// ModeOf is how the configuration and the store spell observe.
 func ModeOf(observe bool) Mode {
 	if observe {
 		return ModeObserve
@@ -85,9 +86,16 @@ func MarkNames(p Predicate) []string {
 	return nil
 }
 
-// ReadsMarks says whether p reads the unit's marks, so a caller loads them
-// only then.
-func ReadsMarks(p Predicate) bool { return len(MarkNames(p)) > 0 }
+// ReadsMarks says whether one of ps reads the unit's marks, so a caller
+// loads them only then.
+func ReadsMarks(ps ...Predicate) bool {
+	for _, p := range ps {
+		if len(MarkNames(p)) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // All is a predicate that matches when every one of ps does; a nil one
 // matches.
@@ -147,7 +155,7 @@ type Facts map[string]any
 type Step struct {
 	Use   string         // a name of builtin.Steps
 	Reach Reach          // from the vocabulary, never from the manifest
-	Args  map[string]any // e.g. {"intent": "review", "round": "follow-up"}
+	Args  map[string]any // e.g. {"intent": "review", "stage": "follow-up"}
 }
 
 type Limits struct {
@@ -155,24 +163,90 @@ type Limits struct {
 	Cooldown                      time.Duration
 }
 
+// ApprovalMode is how a workflow's matched item runs: at once, when its
+// window ends unless a person stops it, or when a person applies it.
+type ApprovalMode string
+
+const (
+	ApprovalRun   ApprovalMode = "run"
+	ApprovalDelay ApprovalMode = "delay"
+	ApprovalWait  ApprovalMode = "wait"
+)
+
+// ApprovalModes are the run approval's modes.
+var ApprovalModes = []ApprovalMode{ApprovalRun, ApprovalDelay, ApprovalWait}
+
+// Releases says whether m runs an item with no person applying it.
+func (m ApprovalMode) Releases() bool { return m == ApprovalRun || m == ApprovalDelay }
+
+// ApprovalRule is one [[approval.rule]]: its mode and window when its When
+// holds. A matched wait rule also makes pending an item a guard refuses.
+type ApprovalRule struct {
+	When   Predicate
+	Mode   ApprovalMode
+	Window time.Duration
+}
+
+// Approval is a workflow's run approval: the first rule whose When holds,
+// else Mode and Window.
 type Approval struct {
-	Default  Outcome
-	Window   time.Duration
-	WaitWhen Predicate // a match makes the item pending with default wait, even when a guard refuses
+	Mode   ApprovalMode
+	Window time.Duration
+	Rules  []ApprovalRule
+}
+
+// ErrWindow refuses a window off the delay mode, or a delay with none.
+var ErrWindow = errors.New("window is read only with mode delay, which needs one longer than zero")
+
+// ValidApproval refuses a mode outside ApprovalModes and a window off delay.
+func ValidApproval(m ApprovalMode, window time.Duration) error {
+	switch {
+	case !slices.Contains(ApprovalModes, m):
+		return fmt.Errorf("mode %q is not one of run, delay or wait", m)
+	case (m == ApprovalDelay) != (window > 0):
+		return ErrWindow
+	}
+	return nil
+}
+
+// Validate refuses a's mode or a rule's when ValidApproval does, or a rule
+// with no When.
+func (a Approval) Validate() error {
+	if err := ValidApproval(a.Mode, a.Window); err != nil {
+		return err
+	}
+	for i, r := range a.Rules {
+		if r.When == nil {
+			return fmt.Errorf("rule[%d] has no when", i)
+		}
+		if err := ValidApproval(r.Mode, r.Window); err != nil {
+			return fmt.Errorf("rule[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// Predicates are a's rules' whens.
+func (a Approval) Predicates() []Predicate {
+	out := make([]Predicate, len(a.Rules))
+	for i, r := range a.Rules {
+		out[i] = r.When
+	}
+	return out
 }
 
 type Workflow struct {
-	Name, Description string
-	Provider          unit.ProviderID // the manifest's `subject`
-	Slot              string          // the provider's fact slot: "pr" for github, else the provider id
-	Trigger           Trigger
-	When              Predicate
-	Steps             []Step
-	Limits            Limits
-	Observe           bool
-	AllowVisible      bool
-	Order             int
-	Key               []string // fact names; empty means the slot's fingerprint fact
+	Name, Summary string
+	Provider      unit.ProviderID
+	Slot          string // the provider's fact slot: "pr" for github, else the provider id
+	Trigger       Trigger
+	When          Predicate
+	Steps         []Step
+	Limits        Limits
+	// Observe plans items pending and never runs them by itself.
+	Observe bool
+	Order   int
+	Key     []string // fact names; empty means the slot's fingerprint fact
 	// Marks are the facts whose values a done or dismissed item records as
 	// the unit's marks, by the mark's name under the workflow (mark.Of).
 	Marks    map[string]string
@@ -181,9 +255,9 @@ type Workflow struct {
 	Bundled  bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
-	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
+	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
 	DraftApproval *draft.Policy
-	// Withdraw is the manifest's [withdraw] when, over the subject's facts
+	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.
 	Withdraw Predicate

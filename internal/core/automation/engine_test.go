@@ -227,7 +227,7 @@ func scheduleWF(t *testing.T, name, spec string) workflow.Workflow {
 }
 
 func windowed(w workflow.Workflow, d time.Duration) workflow.Workflow {
-	w.Approval = workflow.Approval{Default: workflow.OutcomeRun, Window: d}
+	w.Approval = workflow.Approval{Mode: workflow.ApprovalDelay, Window: d}
 	return w
 }
 
@@ -541,9 +541,14 @@ func TestObserveOnlyPlans(t *testing.T) {
 	}
 }
 
-func TestWaitWhenMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
+// waitRule is a wait rule whose when is m.
+func waitRule(m workflow.Predicate) []workflow.ApprovalRule {
+	return []workflow.ApprovalRule{{When: m, Mode: workflow.ApprovalWait}}
+}
+
+func TestAWaitRuleMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
 	w := sweepWF("finished", idle, "workspace.remove")
-	w.Approval.WaitWhen = automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["session.dirty"] == true }, "session.dirty")
+	w.Approval.Rules = waitRule(automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["session.dirty"] == true }, "session.dirty"))
 	r := newRig(t, w)
 	r.put(s1, "a", "session.dirty", true)
 	r.put(s2, "b")
@@ -554,13 +559,13 @@ func TestWaitWhenMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
 	r.steps.Refuse("workspace.remove", s2, refusal)
 	r.sweep()
 	if it := r.mustItem("finished", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
-		t.Errorf("wait_when item = %+v", it)
+		t.Errorf("wait rule item = %+v", it)
 	}
 	if it := r.mustItem("finished", s2); it.Decision != workflow.DecisionBlocked {
-		t.Errorf("without wait_when = %+v", it)
+		t.Errorf("without a matched wait rule = %+v", it)
 	}
 	if it := r.mustItem("finished", s3); it.Decision != workflow.DecisionBlocked || it.Reason != "git status failed" {
-		t.Errorf("wait_when over a check error = %+v; want blocked", it)
+		t.Errorf("a wait rule over a check error = %+v; want blocked", it)
 	}
 	_, err := r.e.Act(context.Background(), r.mustItem("finished", s1).ID, workflow.ActionApply, "")
 	if !errors.As(err, new(automation.Refused)) || len(r.steps.Ran()) != 0 {
@@ -570,10 +575,10 @@ func TestWaitWhenMakesAPendingItemEvenWhenAGuardRefuses(t *testing.T) {
 
 func TestAWaitNamesWhatItWaitsOn(t *testing.T) {
 	w := sweepWF("finished", idle, "workspace.remove")
-	w.Approval.WaitWhen = automationtest.MatchFunc(func(v workflow.Vars) bool {
+	w.Approval.Rules = waitRule(automationtest.MatchFunc(func(v workflow.Vars) bool {
 		p, _ := v.Facts["session.pendency"].([]string)
 		return len(p) > 0
-	}, "session.dirty", "session.pendency")
+	}, "session.dirty", "session.pendency"))
 	r := newRig(t, w)
 	r.put(s1, "a", "session.pendency", []string{"turn asked unanswered"}, "session.dirty", 0)
 	r.put(s2, "b", "session.pendency", []string{"modified files", "commits on no remote"}, "session.dirty", 1)
@@ -588,18 +593,57 @@ func TestAWaitNamesWhatItWaitsOn(t *testing.T) {
 	}
 }
 
-func TestAVisibleStepWaitsUnlessAllowed(t *testing.T) {
+func TestAVisibleStepAlwaysWaits(t *testing.T) {
 	w := sweepWF("label", idle, "label.add")
-	allowed := sweepWF("label-ok", idle, "label.add")
-	allowed.AllowVisible = true
-	r := newRig(t, w, allowed)
+	ruled := sweepWF("label-run", idle, "label.add")
+	ruled.Approval.Rules = []workflow.ApprovalRule{{When: always, Mode: workflow.ApprovalRun}}
+	r := newRig(t, w, ruled)
 	r.put(s1, "a")
 	r.sweep()
-	if it := r.mustItem("label", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait {
-		t.Errorf("a visible step = %+v", it)
+	for _, name := range []string{"label", "label-run"} {
+		if it := r.mustItem(name, s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "a visible step waits for you" {
+			t.Errorf("%s: a visible step = %+v", name, it)
+		}
 	}
-	if got := r.ran("label.add"); !slices.Equal(got, []unit.Unit{s1}) {
-		t.Errorf("ran %v; want only the allowed workflow", got)
+	if got := r.ran("label.add"); len(got) != 0 {
+		t.Errorf("ran %v; a visible step runs only when a person applies it", got)
+	}
+}
+
+func TestRunRulesAreFirstMatch(t *testing.T) {
+	dirty := automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["session.dirty"] == true }, "session.dirty")
+	refusal := "unpushed commits"
+	shadowed := sweepWF("shadowed", idle, "workspace.remove")
+	shadowed.Approval.Rules = []workflow.ApprovalRule{{When: always, Mode: workflow.ApprovalRun}, {When: dirty, Mode: workflow.ApprovalWait}}
+	waits := sweepWF("waits", idle, "workspace.remove")
+	waits.Approval.Rules = []workflow.ApprovalRule{{When: dirty, Mode: workflow.ApprovalWait}, {When: always, Mode: workflow.ApprovalRun}}
+	delayed := sweepWF("delayed", idle, "session.close")
+	delayed.Approval = workflow.Approval{Mode: workflow.ApprovalWait, Rules: []workflow.ApprovalRule{{When: dirty, Mode: workflow.ApprovalDelay, Window: 5 * time.Minute}}}
+	tableWait := sweepWF("table-wait", idle, "workspace.remove")
+	tableWait.Approval.Mode = workflow.ApprovalWait
+	r := newRig(t, shadowed, waits, delayed, tableWait)
+	r.put(s1, "a", "session.dirty", true)
+	r.put(s2, "b", "session.dirty", false)
+	r.steps.Refuse("workspace.remove", s1, refusal)
+	r.sweep()
+
+	if it := r.mustItem("shadowed", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {
+		t.Errorf("a run rule before a wait rule shadows it: %+v", it)
+	}
+	if it := r.mustItem("waits", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "session.dirty true: "+refusal {
+		t.Errorf("a matched wait rule holds a refused item: %+v", it)
+	}
+	if it := r.mustItem("table-wait", s1); it.Decision != workflow.DecisionBlocked || it.Reason != refusal {
+		t.Errorf("a table wait does not hold a refused item: %+v", it)
+	}
+	if it := r.mustItem("delayed", s1); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeRun || !it.Deadline.Equal(t0.Add(5*time.Minute)) {
+		t.Errorf("a matched delay rule takes its window: %+v", it)
+	}
+	if it := r.mustItem("delayed", s2); it.Decision != workflow.DecisionPending || it.Default != workflow.OutcomeWait || it.Reason != "waits for you" {
+		t.Errorf("no rule matched gives the table's mode: %+v", it)
+	}
+	if got := r.ran("workspace.remove"); !slices.Equal(got, []unit.Unit{s2, s2}) {
+		t.Errorf("ran %v; want s2 once by each workflow whose next rule or table runs it", got)
 	}
 }
 
@@ -1278,7 +1322,7 @@ func TestDueRunHoldsUnderPauseAndOutsideApply(t *testing.T) {
 
 func TestItemsWaitingForTheUserTakeNoSlot(t *testing.T) {
 	wait := sweepWF("wait", idle, "session.close")
-	wait.Approval.Default = workflow.OutcomeWait
+	wait.Approval.Mode = workflow.ApprovalWait
 	wait.Limits = workflow.Limits{PerRun: 1, PerDay: 1}
 	observe := sweepWF("observe", idle, "session.close")
 	observe.Observe = true

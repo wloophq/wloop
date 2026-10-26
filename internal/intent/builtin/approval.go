@@ -29,7 +29,7 @@ func (e *SubjectsError) Error() string {
 	return fmt.Sprintf("reads facts of %v, but a draft has one subject, so it never applies", e.Subjects)
 }
 
-// ApprovalRule is the [draft_approval] rule of a whose when is compiled
+// ApprovalRule is the [drafts.approval] rule of a whose when is compiled
 // over env. It names comment delivery when its top-level conjunction holds
 // draft.delivery == "comment", the only way a rule releases a comment.
 func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, error) {

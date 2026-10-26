@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
@@ -203,13 +204,12 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.Mode != "" {
 			w.Observe = wc.Mode == string(workflow.ModeObserve)
 		}
-		if a := wc.Approval; a != nil {
-			if a.Default != "" {
-				w.Approval.Default = workflow.Outcome(a.Default)
+		if o, ok := runOverlay(wc.Approval); ok {
+			a, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras))
+			if err != nil {
+				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.approval: %w", w.Name, err)}
 			}
-			if a.Window != nil {
-				w.Approval.Window = time.Duration(*a.Window)
-			}
+			w.Approval = a
 		}
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
@@ -225,15 +225,51 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 // onlyWhen is the config's only_when of w compiled over w's facts; one that
 // does not compile refuses every unit, so the workflow runs nowhere.
 func onlyWhen(w workflow.Workflow, src string, extras func(unit.ProviderID) expr.Env) workflow.Predicate {
-	env := builtin.WorkflowEnv(w.Slot)
-	if extras != nil && slices.Contains(builtin.BriefSubjects, w.Slot) {
-		maps.Copy(env, extras(w.Provider))
-	}
-	p, err := expr.CompileWorkflow(src, env)
+	p, err := expr.CompileWorkflow(src, workflowEnv(w, extras))
 	if err != nil {
 		return workflow.Refused{Err: fmt.Errorf("workflows.%s.only_when: %w", w.Name, err)}
 	}
 	return p
+}
+
+// workflowEnv is w's facts, with the brief.extra.* facts extras gives for
+// its provider.
+func workflowEnv(w workflow.Workflow, extras func(unit.ProviderID) expr.Env) expr.Env {
+	env := builtin.WorkflowEnv(w.Slot)
+	if extras != nil && slices.Contains(builtin.BriefSubjects, w.Slot) {
+		maps.Copy(env, extras(w.Provider))
+	}
+	return env
+}
+
+// runOverlay is the config's approval block as an overlay; false when it
+// sets none.
+func runOverlay(a *config.ApprovalConfig) (intentload.ApprovalOverlay, bool) {
+	if a == nil {
+		return intentload.ApprovalOverlay{}, false
+	}
+	o := intentload.ApprovalOverlay{Mode: a.Default}
+	if a.Window != nil {
+		d := time.Duration(*a.Window)
+		o.Window = &d
+	}
+	return o, true
+}
+
+// draftOverlay is the config's drafts approval block as an overlay.
+func draftOverlay(a config.DraftApprovalConfig) intentload.ApprovalOverlay {
+	o := intentload.ApprovalOverlay{Mode: a.Mode}
+	if a.Window != 0 {
+		d := time.Duration(a.Window)
+		o.Window = &d
+	}
+	if a.Rule != nil {
+		o.Rules = make([]intentload.RuleOverlay, len(a.Rule))
+		for i, r := range a.Rule {
+			o.Rules[i] = intentload.RuleOverlay{When: r.When, Mode: r.Mode, Window: time.Duration(r.Window)}
+		}
+	}
+	return o
 }
 
 // briefExtrasOf are the brief.extra.* facts of each provider's brief intent

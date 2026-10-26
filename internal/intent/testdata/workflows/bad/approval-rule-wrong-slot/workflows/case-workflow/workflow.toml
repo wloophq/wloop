@@ -1,0 +1,11 @@
+summary = "Case"
+provider = "github"
+when = 'pr.review.action == "follow-up"'
+
+[[step]]
+use = "turn.start"
+intent = "review"
+
+[[approval.rule]]
+when = "session.managed"
+mode = "wait"
