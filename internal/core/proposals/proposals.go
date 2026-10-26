@@ -383,7 +383,7 @@ func (j *Job) askOwner(ctx context.Context, rd *reader, open []gtd.Entry, now ti
 			continue
 		}
 		out = append(out, outbox.Proposal{
-			Unit: u, Items: ids(orphans), Kind: draft.AskOwner, Text: askText(orphans),
+			Unit: u, Items: ids(orphans), Kind: draft.AskOwner, Text: askText(orphans), HoldAutoSend: true,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: RuleAskOwner, Key: u.String()},
 		})
 	}
@@ -515,7 +515,7 @@ func (j *Job) mootClosure(ctx context.Context, d draft.Draft) (string, error) {
 }
 
 // fromSources is what each enabled plugin proposes, keeping of its Origin only the rule id: the job sets the
-// kind, the key and, in Run, the rule's configured approval.
+// key and, in Run, the rule's configured approval.
 func (j *Job) fromSources(ctx context.Context, now time.Time) ([]outbox.Proposal, error) {
 	var out []outbox.Proposal
 	var errs []error
@@ -540,6 +540,7 @@ func (j *Job) fromSources(ctx context.Context, now time.Time) ([]outbox.Proposal
 			}
 			out = append(out, outbox.Proposal{
 				Unit: p.Unit, Items: slices.Clone(p.Items), Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
+				Purpose: p.Purpose, Delivery: p.Delivery, Effects: slices.Clone(p.Effects),
 				Origin: draft.Origin{Kind: draft.OriginAuto, Rule: rule, Key: p.Unit.String()},
 			})
 		}

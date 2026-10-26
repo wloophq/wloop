@@ -10,7 +10,7 @@ import (
 
 func TestEveryDraftEffectHasAnImplementation(t *testing.T) {
 	t.Parallel()
-	got, want := slices.Sorted(maps.Keys(draftEffects())), slices.Sorted(slices.Values(builtin.EffectNames()))
+	got, want := slices.Sorted(maps.Keys(draftEffects(effectDeps{}))), slices.Sorted(slices.Values(builtin.EffectNames()))
 	if !slices.Equal(got, want) {
 		t.Fatalf("implemented %v, builtin.Effects %v", got, want)
 	}

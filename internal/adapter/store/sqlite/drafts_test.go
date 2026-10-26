@@ -199,7 +199,7 @@ func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
 		t.Fatalf("after %+v %v", after, err)
 	}
 	got, was := after[0], before[0]
-	if len(got.Trail) != 1 || got.Trail[0].Kind != items.EvidenceSentDraft || got.Trail[0].Anchor.Ref != fmt.Sprintf("draft:%d:reply", d.ID) {
+	if len(got.Trail) != 1 || got.Trail[0].Kind != items.EvidenceSentDraft || got.Trail[0].Anchor.Ref != fmt.Sprintf("draft:%d", d.ID) {
 		t.Fatalf("trail %+v", got.Trail)
 	}
 	got.Trail, was.Trail = nil, nil

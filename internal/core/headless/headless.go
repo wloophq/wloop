@@ -311,6 +311,7 @@ type proposed struct {
 	Items    []string   `json:"items"`
 	Reaction string     `json:"reaction"`
 	Unit     string     `json:"unit"`
+	Effects  []string   `json:"effects"`
 }
 
 func (s *Service) finish(ctx context.Context, st started) (Result, error) {
@@ -443,6 +444,9 @@ func (s *Service) screen(ctx context.Context, st started, ps []proposed) ([]prop
 			why = "the unit's items cannot be read, so the draft's items cannot be checked"
 		}
 		if why == "" {
+			why = undeclared(st.def, p.Effects)
+		}
+		if why == "" {
 			for _, id := range p.Items {
 				if !known[id] {
 					why = fmt.Sprintf("item %s is not an item of this unit", id)
@@ -465,7 +469,7 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 	var out []draft.Draft
 	for _, p := range ps {
 		d, err := s.Outbox.Propose(ctx, outbox.Proposal{Unit: st.req.Unit, Items: p.Items, Entry: st.req.Entry, Kind: p.Kind,
-			Target: p.Target, Text: p.Text, Reaction: p.Reaction, Origin: origin})
+			Target: p.Target, Text: p.Text, Reaction: p.Reaction, Effects: p.Effects, Origin: origin})
 		if err != nil {
 			s.logf("headless turn %d: a %s draft on %s was refused: %v", st.seq, p.Kind, st.req.Unit, err)
 			continue
@@ -473,6 +477,17 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 		out = append(out, d)
 	}
 	return out
+}
+
+// undeclared says why effects are refused: one the intent's draft_effects
+// does not list; "" when it lists them all.
+func undeclared(def intent.Def, effects []string) string {
+	for _, e := range effects {
+		if !slices.Contains(def.DraftEffects, e) {
+			return fmt.Sprintf("it declares the effect %s, which the %s intent does not list in draft_effects", e, def.Name)
+		}
+	}
+	return ""
 }
 
 func (s *Service) unitItems(ctx context.Context, u unit.Unit) (map[string]bool, error) {

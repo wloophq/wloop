@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
@@ -22,6 +23,9 @@ import (
 
 // NudgeRule is the Origin.Rule of the nudge drafts the plugin proposes.
 const NudgeRule = "github-nudge"
+
+// nudgePurpose is the purpose of the plugin's nudge drafts.
+const nudgePurpose = "nudge"
 
 // nudges proposes a nudge draft per stalled pull request the nudge intent
 // would nudge, reading rows as the daemon's read model does.
@@ -125,11 +129,12 @@ func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, viewer string, ignore
 		return outbox.Proposal{}, false
 	}
 	return outbox.Proposal{
-		Unit:   row.Unit,
-		Items:  waitingItems(row, who),
-		Kind:   draft.Nudge,
-		Text:   nudgeText(who, unmuted),
-		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: row.Unit.String()},
+		Unit:    row.Unit,
+		Items:   waitingItems(row, who),
+		Purpose: nudgePurpose,
+		Effects: []string{builtin.EffectPRNudged, builtin.EffectEntryNudged},
+		Text:    nudgeText(who, unmuted),
+		Origin:  draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: row.Unit.String()},
 	}, true
 }
 

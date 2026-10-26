@@ -108,7 +108,7 @@ func TestEditADraftFromItsDetail(t *testing.T) {
 
 	one := entry("draft:12", "Thanks", "inbox")
 	one.Kind, one.Verbs = "draft", []api.VerbState{{Verb: "edit", Enabled: true}}
-	one.Draft = &api.Draft{ID: 12, Rev: 1, Kind: "reply", Text: "Thanks!", State: "proposed"}
+	one.Draft = &api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "proposed"}
 	m.SetEntries("outbox", []api.EntryView{one}, gtdCounters())
 	m.Done(c, nil, nil)
 	press(m, Key{Name: KeyEnter}, Key{Rune: 'i'})
@@ -127,9 +127,9 @@ func TestEntryDetailListsAndPicksItsDrafts(t *testing.T) {
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Entry: e.ID, Kind: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
+		{ID: 4, Entry: e.ID, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
 			Actions: []api.ActionState{{ID: "draft.approve", Enabled: true}, {ID: "draft.edit", Enabled: true}, {ID: "draft.discard", Enabled: true}}},
-		{ID: 3, Entry: e.ID, Kind: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}}},
+		{ID: 3, Entry: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}}},
 	})
 	screen := screenOf(m, 100, 40)
 	for _, s := range []string{"drafts", "1. reply · proposed · from turn", "Friday works", "2. react · sent", ":eyes:"} {

@@ -231,7 +231,7 @@ func replyTarget(e api.EntryView) string {
 func (m *Model) draftLines(fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
 	for i, d := range m.listedDrafts() {
-		head := fmt.Sprintf("%d. %s · %s", i+1, d.Kind, d.State)
+		head := fmt.Sprintf("%d. %s · %s", i+1, d.Purpose, d.State)
 		if d.Origin.Kind != "" {
 			head += " · from " + d.Origin.Kind
 		}
@@ -245,7 +245,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 		}
 		fact(label, head, style)
 		text := d.Text
-		if d.Kind == "react" {
+		if d.Reaction != "" {
 			text = ":" + d.Reaction + ":"
 		}
 		para("", text)

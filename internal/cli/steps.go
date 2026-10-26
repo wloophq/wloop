@@ -50,8 +50,10 @@ type stepDeps struct {
 	Changes  port.Changes
 	Removal  removalPorts
 	Classify classifyDeps
-	Pub      port.Publisher
-	Log      func(format string, args ...any)
+	// Drafts are what draft.propose reads; nil refuses it.
+	Drafts *draftDeps
+	Pub    port.Publisher
+	Log    func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the
 	// automated turns turns.automated_per_day caps.
 	Headless headlessStarter

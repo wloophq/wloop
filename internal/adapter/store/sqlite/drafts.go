@@ -65,11 +65,13 @@ func draftArgs(d draft.Draft) []any {
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
-// neither, as a draft an older release wrote does, and Effects never nil.
+// neither, as a draft an older release wrote does, its kind theirs, and
+// Effects never nil.
 func shaped(d draft.Draft) draft.Draft {
 	if d.Purpose == "" && d.Delivery == "" {
 		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
 	}
+	d.Kind = draft.KindOf(d.Purpose, d.Delivery)
 	if d.Effects == nil {
 		d.Effects = []string{}
 	}

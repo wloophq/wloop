@@ -152,6 +152,13 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Consequence**: a broken partial or wrapper of the user's falls back to the bundled one with a problem, so a profile edit never stops a turn from ending; the rendered turns of the bundled profile are unchanged.
 - **Enforced by**: `TestProseIsEmbeddedOnlyFromProfiles`, `TestARecordPartialMissingTheProtocolLoadsTheBundledOne`, `TestTheBundledWrapperWritesTheOldPrompt`, the scenario goldens. See [Profile first](/architecture/profile-first/).
 
+## A draft is what its proposer declares
+
+- **Context**: what sending a draft did, and whether it was held, followed its kind, so a closing message posted by a session closed its unit and a renamed purpose lost its behavior.
+- **Decision**: a draft carries a purpose, a delivery and its effects; the Outbox applies the declared effects once each draft is sent, by name, a plugin's own first, and stores when (`drafts.effects_applied_at`), so a restart applies only what is pending. An agent declares only the effects its intent's `draft_effects` lists. A Slack unit's closure is its own column (`extraction_cursors.closure_marked`), which no extraction pass writes. Workflows hold their drafts from the drafts themselves, per workflow, subject and person, and withdraw them by their `[withdraw] when`; a draft that `[withdraw] when` would withdraw at once is not proposed, so the pair never cycles.
+- **Consequence**: the kind survives only as the input word of agents and the API, mapped once, and as what the API serves; the clients group drafts by purpose.
+- **Enforced by**: `TestNoDraftKindComparisons`, `TestASentDraftAppliesItsEffectsOnce`, `TestEffectsAreAppliedOnceAcrossARestart`, `TestASubjectMatchingWhenAndWithdrawWhenIsProposedOnce`. See [The Outbox](/concepts/approval/#the-outbox).
+
 ## Intents by role
 
 - **Context**: Go started the review, address, nudge and probe intents and read their history by name, so a renamed or replaced intent lost every automatic behavior.

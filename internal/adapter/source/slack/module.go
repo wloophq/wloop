@@ -94,6 +94,7 @@ func (p *plugin) module() sourcereg.Module {
 
 		Publisher: p.publisher(),
 		Reacts:    true,
+		OnPosted:  p.onPosted(),
 	}
 	if p.cfg.Configured() {
 		m.Identity = p.identity

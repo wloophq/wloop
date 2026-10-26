@@ -3,6 +3,7 @@ package proposals
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"testing"
@@ -278,11 +279,10 @@ func TestSentClosureEndsTheUnit(t *testing.T) {
 	if sent, _, err := e.svc.Send(ctx); sent != 1 || err != nil {
 		t.Fatalf("sent %d: %v", sent, err)
 	}
-	// The plugin's card reads the close evidence on the unit's items.
 	its, _ := e.ledger.Items(ctx, thread)
 	posted := slices.ContainsFunc(its, func(it items.Item) bool {
 		return slices.ContainsFunc(it.Trail, func(ev items.Evidence) bool {
-			return ev.Kind == items.EvidenceSentDraft && len(ev.Anchor.Ref) > 6 && ev.Anchor.Ref[len(ev.Anchor.Ref)-6:] == ":close"
+			return ev.Kind == items.EvidenceSentDraft && ev.Anchor.Ref == fmt.Sprintf("draft:%d", d.ID)
 		})
 	})
 	if !posted {

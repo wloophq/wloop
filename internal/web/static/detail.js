@@ -249,7 +249,7 @@ function wouldLine(d) {
 function draftCard(e, scope) {
   const d = e.draft;
   const editing = detailState.editing.has(e.id);
-  const head = `Draft ${d.kind || ""}`.trim() + (d.state && d.state !== "proposed" ? ` (${d.state})` : "");
+  const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "proposed" ? ` (${d.state})` : "");
   const buttons = editing ? [
     verbButton(e, "approve", "Approve edited", () => approveEdited(e), { scope, primary: true }),
     h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),

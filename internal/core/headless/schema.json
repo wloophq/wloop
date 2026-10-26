@@ -65,7 +65,8 @@
           "text": {"type": "string", "description": "Markdown; empty only for react"},
           "items": {"type": "array", "items": {"type": "string"}, "description": "the ids of the items it serves"},
           "reaction": {"type": "string", "description": "react only: the emoji name without colons"},
-          "unit": {"type": "string", "description": "leave out: drafts go on this turn's unit only"}
+          "unit": {"type": "string", "description": "leave out: drafts go on this turn's unit only"},
+          "effects": {"type": "array", "items": {"type": "string"}, "description": "what sending it does besides posting, among the intent's draft_effects; empty for none"}
         }
       }
     },

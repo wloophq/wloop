@@ -119,7 +119,8 @@
       "description": "When an open draft the workflow proposed is withdrawn.",
       "required": ["when"],
       "properties": {
-        "when": {"type": "string", "description": "A predicate over the subject's facts and draft.*; a match withdraws the draft."}
+        "when": {"type": "string", "description": "A predicate over the subject's facts and draft.*; a match withdraws the draft."},
+        "reason": {"type": "string", "enum": ["assigned", "moot"], "description": "The withdrawn draft's reason: assigned (its items got an owner) or moot, the default."}
       }
     },
     "auto_send": {"type": "boolean", "description": "false keeps the workflow's drafts for the user's approval whatever their draft approval."}
