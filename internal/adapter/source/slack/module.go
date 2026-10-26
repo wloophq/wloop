@@ -148,7 +148,7 @@ func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	a.users = &userCache{db: db, client: s.Client, now: p.now}
 	heat := HeatScheduler{DB: db, Heat: sqlite.HeatReader{DB: d.DB, Clock: clockFunc(p.now)}, Segments: segs, Log: p.logf}
 	src := &Source{db: db, store: &Store{DB: db, Segments: segs, Scheduler: heat, Now: p.now}, client: s.Client, admit: a, segments: segs,
-		links: d.Links != nil, log: p.logf}
+		links: d.Links != nil, units: d.Units, log: p.logf}
 	a.viewer = func() string { _, u := src.viewer(); return u }
 	if s.Client != nil {
 		src.search = newSearcher(s.Client, db, cfg.Ingest.Terms, cfg.Ingest.Since, src.viewer, p.now, p.slack.Metrics, p.logf)

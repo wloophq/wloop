@@ -59,7 +59,7 @@ func (p *plugin) extraction(cfg config.Config) []sourcereg.Job {
 // parseTarget is the unit an extracted link names: a pull request URL, or
 // "<provider>:<key>" of a registered codec.
 func (p *plugin) parseTarget(target string) (unit.Unit, bool) {
-	if u, ok := pullUnit(target); ok {
+	if u, ok := linkedUnit(p.deps.Units, target); ok {
 		return u, true
 	}
 	provider, key, ok := strings.Cut(target, ":")

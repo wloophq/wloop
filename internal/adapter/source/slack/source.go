@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"regexp"
 	"slices"
-	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -38,7 +36,9 @@ type Source struct {
 	search   *searcher
 	segments dslack.Segments
 	links    bool
-	log      func(format string, args ...any)
+	// units are the codecs a link's unit is read through.
+	units func() *unit.Registry
+	log   func(format string, args ...any)
 
 	mu         sync.Mutex
 	team, user string
@@ -540,8 +540,6 @@ func (s *Source) logf(format string, args ...any) {
 	}
 }
 
-var pullURL = regexp.MustCompile(`^https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)(?:[/?#].*)?$`)
-
 // linksOf are the mention links of every unit the facts name, over the
 // unit's stored messages with the facts' on top, so a pass that reads one
 // reply keeps the links of the earlier ones.
@@ -604,7 +602,7 @@ func (s *Source) unitLinks(ctx context.Context, u unit.Unit, conv string, read [
 			continue
 		}
 		for _, raw := range m.Links {
-			to, ok := pullUnit(raw)
+			to, ok := linkedUnit(s.units, raw)
 			if !ok || seen[to] {
 				continue
 			}
@@ -617,15 +615,15 @@ func (s *Source) unitLinks(ctx context.Context, u unit.Unit, conv string, read [
 	return out, nil
 }
 
-// pullUnit is the github unit of a pull request URL, "owner/repo#n".
-func pullUnit(raw string) (unit.Unit, bool) {
-	m := pullURL.FindStringSubmatch(raw)
-	if m == nil {
+// linkedUnit is the unit of another plugin a URL names, through the codecs
+// of units; nil reads none.
+func linkedUnit(units func() *unit.Registry, raw string) (unit.Unit, bool) {
+	if units == nil {
 		return unit.Unit{}, false
 	}
-	n, err := strconv.Atoi(m[3])
-	if err != nil || n <= 0 {
+	u, ok := units().ParseURL(strings.TrimSpace(raw))
+	if !ok || u.Provider == dslack.Provider {
 		return unit.Unit{}, false
 	}
-	return unit.Unit{Provider: unit.GitHub, Key: fmt.Sprintf("%s/%s#%d", m[1], m[2], n)}, true
+	return u, true
 }
