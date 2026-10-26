@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,13 +20,13 @@ func outboxFixture() []api.Draft {
 			Label: "#ops", Title: "When does the export ship?", Link: "https://acme.slack.com/archives/C1/p1700000000000100",
 			Text: "Friday, after the freeze.\nI will post the notes here.", Origin: api.DraftOrigin{Kind: "user"}, Actions: actions,
 			CreatedAt: outboxNow.Add(-5 * time.Minute)},
-		{ID: 12, Unit: "github/acme/api#7", Kind: "nudge", Purpose: "nudge", State: "proposed", Approval: api.DraftApproval{Mode: "always"},
+		{ID: 12, Unit: "github/acme/api#7", Kind: "nudge", Purpose: "nudge", Effects: []string{"entry.nudged"}, State: "proposed", Approval: api.DraftApproval{Mode: "always"},
 			Label: "acme/api#7", Title: "Batch export for large accounts", Link: "https://github.com/acme/api/pull/7",
 			Text: "@{github:ana}, any news on this?\n\n- Review the schema change", Names: map[string]string{"github:ana": "ana"},
 			Items:       []string{"i1"},
 			ItemDetails: []api.ItemView{{ID: "i1", Summary: "Review the schema change", State: "open"}},
 			Origin:      api.DraftOrigin{Kind: "auto", Rule: "stalled-nudge"}, Actions: actions, CreatedAt: outboxNow.Add(-26 * time.Hour)},
-		{ID: 11, Unit: "slack/T1/D9", Kind: "close", Purpose: "close", State: "proposed", Approval: api.DraftApproval{Mode: "always"},
+		{ID: 11, Unit: "slack/T1/D9", Kind: "close", Purpose: "close", Effects: []string{"unit.closed"}, State: "proposed", Approval: api.DraftApproval{Mode: "always"},
 			Label: "DM with Ana Lima", Title: "DM with Ana Lima: rollout", Items: []string{"i2", "i3"},
 			Text:   "Closing this out:\n\n- Rollout date: resolved\n- Feature flag owner: answered",
 			Origin: api.DraftOrigin{Kind: "auto", Rule: "closure"}, Actions: actions, CreatedAt: outboxNow.Add(-3 * time.Hour)},
@@ -81,4 +82,18 @@ func TestOutboxShowReadsTheDraft(t *testing.T) {
 	var closing bytes.Buffer
 	writeDraftView(&closing, termfmt.Term{Width: 80}, outboxFixture()[2], outboxNow)
 	golden(t, "outbox_show_closing.golden", closing.String())
+}
+
+func TestADraftClosesWhatItsEffectsSayWhateverItsPurpose(t *testing.T) {
+	t.Parallel()
+	closing := outboxFixture()[2]
+	wrapUp := closing
+	wrapUp.Purpose = "wrap_up"
+	if got := gist(wrapUp); !strings.HasPrefix(got, "closes 2 items") {
+		t.Errorf("a wrap_up draft that closes its unit: %q", got)
+	}
+	closing.Effects = nil
+	if got := gist(closing); strings.HasPrefix(got, "closes") {
+		t.Errorf("a close draft that closes nothing: %q", got)
+	}
 }

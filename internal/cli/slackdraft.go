@@ -67,11 +67,13 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := s.checkItems(ctx, b.Unit, its); err != nil {
 		return mcp.DraftResult{}, err
 	}
-	if err := s.checkEffects(string(t.Intent), a.Effects); err != nil {
+	def := s.intentDef(string(t.Intent))
+	if err := checkEffects(def, string(t.Intent), a.Effects); err != nil {
 		return mcp.DraftResult{}, err
 	}
 	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Target: a.Target, Text: a.Text,
-		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
+		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow},
+		HoldAutoSend: def.HoldsDrafts()})
 	if err != nil {
 		if errors.Is(err, send.ErrNotLoggedIn) {
 			s.sender.loggedOut()
@@ -85,19 +87,24 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}, nil
 }
 
-// checkEffects refuses an effect the session's intent does not list in its
-// draft_effects: an agent never grants itself what sending does.
-func (s *slackDrafts) checkEffects(intent string, effects []string) error {
-	var allowed []string
+// intentDef is the loaded definition of intent; the zero Def, which allows
+// no effect, when none is loaded.
+func (s *slackDrafts) intentDef(intent string) dintent.Def {
 	if s.intents != nil {
 		if r := s.intents(); r != nil {
 			if def, ok := r.Get(dintent.Name(intent)); ok {
-				allowed = def.DraftEffects
+				return def
 			}
 		}
 	}
+	return dintent.Def{}
+}
+
+// checkEffects refuses an effect the session's intent does not list in its
+// draft_effects: an agent never grants itself what sending does.
+func checkEffects(def dintent.Def, intent string, effects []string) error {
 	for _, e := range effects {
-		if !slices.Contains(allowed, e) {
+		if !slices.Contains(def.DraftEffects, e) {
 			return fmt.Errorf("the effect %s is not one the %s intent lists in draft_effects", e, intent)
 		}
 	}

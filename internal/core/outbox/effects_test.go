@@ -106,10 +106,29 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	if got := l.names(); len(got) != 2 {
 		t.Fatalf("applied again: %v", got)
 	}
-	unknown := reply("an effect nobody implements")
-	unknown.Effects = []string{"unknown.effect"}
-	if d := e.sendNow(t, unknown); !d.EffectsAppliedAt.IsZero() {
+	stored, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
+		State: draft.Approved, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.Send(ctx); !errors.Is(err, ErrUnknownEffect) {
+		t.Fatalf("send: %v", err)
+	}
+	if d := e.get(stored.ID); d.State != draft.Sent || !d.EffectsAppliedAt.IsZero() {
 		t.Fatalf("a draft whose effect has no implementation is marked applied: %+v", d)
+	}
+}
+
+func TestADraftDeclaringAnEffectItsProviderDoesNotImplementIsRefused(t *testing.T) {
+	e := newEnv()
+	withApplier(e)
+	p := reply("an effect nobody implements")
+	p.Effects = []string{"unknown.effect"}
+	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) || !errors.Is(err, ErrUnknownEffect) {
+		t.Fatalf("propose: %v", err)
+	}
+	if ds, _ := e.svc.List(ctx, Filter{}); len(ds) != 0 {
+		t.Fatalf("drafts %+v", ds)
 	}
 }
 
@@ -228,5 +247,21 @@ func TestDuplicateReadsPurposeDeliveryAndObservedFor(t *testing.T) {
 	e.clock.now = t0.Add(time.Hour)
 	if d, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.Observe)); err != nil || d.ID == observed.ID {
 		t.Fatalf("past ObservedFor: %+v %v", d, err)
+	}
+}
+
+func TestACommentDraftWaitsForAPersonWhateverItsApproval(t *testing.T) {
+	e := newEnv()
+	for _, mode := range []draft.Approval{{Mode: draft.None}, {Mode: draft.Window, Window: time.Minute}} {
+		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Approval: &mode,
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
+		d := e.propose(p)
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {
+			t.Fatalf("%s: %+v", mode.Mode, d)
+		}
+	}
+	e.clock.now = t0.Add(time.Hour)
+	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
+		t.Fatalf("tick approved %d %v", n, err)
 	}
 }

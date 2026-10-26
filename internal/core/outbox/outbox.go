@@ -36,7 +36,8 @@ type Proposal struct {
 	// proposal from being proposed again; zero keeps Service.ObservedFor.
 	ObservedFor time.Duration
 	// HoldAutoSend keeps the draft for a person's approval whatever its
-	// approval: its proposer's manifest sets auto_send = false.
+	// approval: its proposer's manifest sets auto_send = false. A comment
+	// is held whatever it says.
 	HoldAutoSend bool
 }
 
@@ -136,7 +137,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if (targetsOutside(d) || p.HoldAutoSend) && approval.Mode != draft.Observe {
+	if (targetsOutside(d) || p.HoldAutoSend || d.Delivery == draft.CommentDelivery) && approval.Mode != draft.Observe {
 		approval = always
 	}
 	d.Approval = approval
@@ -144,6 +145,9 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		return dup, err
 	}
 	if err := s.publishable(ctx, d); err != nil {
+		return draft.Draft{}, err
+	}
+	if err := s.implemented(d); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Would = s.would(ctx, d, p.HoldAutoSend)
@@ -234,6 +238,21 @@ func checkContent(d draft.Draft) error {
 		return fmt.Errorf("%w: empty text", ErrInvalid)
 	case strings.TrimSpace(d.Purpose) == "":
 		return fmt.Errorf("%w: no purpose", ErrInvalid)
+	}
+	return nil
+}
+
+// implemented refuses an effect of d its Applier has no implementation of
+// for d's provider, which sending would leave pending for good.
+func (s *Service) implemented(d draft.Draft) error {
+	im, ok := s.Applier.(Implementer)
+	if !ok {
+		return nil
+	}
+	for _, name := range d.Effects {
+		if !im.Implements(d.Unit.Provider, name) {
+			return fmt.Errorf("%w: %s on %s: %w", ErrInvalid, name, d.Unit.Provider, ErrUnknownEffect)
+		}
 	}
 	return nil
 }

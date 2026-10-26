@@ -209,6 +209,18 @@ const (
 	ReasonAddressRound = "address_round"
 )
 
+// RoleRound is the round kind and cap an intent holding a role has when its
+// manifest leaves them out.
+type RoleRound struct{ RoundKind, Cap string }
+
+// RoleRounds are the defaults by role; every intent with a round kind spends
+// the round budget too, so no round or nudge goes out uncapped.
+var RoleRounds = map[string]RoleRound{
+	RoleReview:  {RoundKindReview, CapRounds},
+	RoleAddress: {RoundKindAddress, CapRounds},
+	RoleNudge:   {"", CapRounds},
+}
+
 var (
 	RoundKinds  = []string{RoundKindReview, RoundKindAddress}
 	Caps        = []string{CapRounds}
@@ -255,6 +267,9 @@ type Effect struct {
 	// Provider is the provider whose drafts alone may declare it; "" any.
 	Provider unit.ProviderID
 	Doc      string
+	// Plugin says it applies through the unit's plugin, so it waits while
+	// that plugin is not built.
+	Plugin bool
 }
 
 // The effects code applies by name: a plugin's Module.OnPosted keys and the
@@ -267,9 +282,9 @@ const (
 
 // Effects is the effect vocabulary of drafts.
 var Effects = []Effect{
-	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none."},
-	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin."},
-	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts."},
+	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.", false},
+	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.", true},
+	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts.", false},
 }
 
 // EffectNames are the names of Effects.

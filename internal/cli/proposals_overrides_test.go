@@ -101,3 +101,83 @@ func TestALegacyProposalApprovalLoadsWithAWarningAndApplies(t *testing.T) {
 		t.Errorf("a rule the config leaves alone: %+v", a)
 	}
 }
+
+func TestAnAskOwnerDraftWaitsForAPersonUnderAWindowApproval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {DraftApproval: &config.ProposalApproval{Mode: "window", Window: config.Days(time.Hour)}}}
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ds, err := r.svc.List(ctx, outbox.Filter{Workflow: "slack-ask-owner"})
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("ask-owner drafts %+v, %v", ds, err)
+	}
+	for _, d := range ds {
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() {
+			t.Errorf("an ask-owner draft goes out on its own: %+v", d)
+		}
+	}
+}
+
+func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	b, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "slack-ask-owner", "workflow.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "workflows", "slack-ask-owner", "text.md.tmpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := userProfile(t, r.te, map[string]string{"workflows/my-ask/workflow.toml": string(b), "workflows/my-ask/text.md.tmpl": string(text)})
+	manifest := filepath.Join(dir, "workflows", "my-ask", "workflow.toml")
+	off := false
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {Enabled: &off}}
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mine := func() []draft.Draft {
+		t.Helper()
+		ds, err := r.svc.List(ctx, outbox.Filter{Workflow: "my-ask"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ds
+	}
+	if ds := mine(); len(ds) == 0 || ds[0].State != draft.Proposed {
+		t.Fatalf("my-ask proposed %+v; broken %v", ds, r.te.loadedIntents().BrokenWorkflows)
+	}
+	if err := os.WriteFile(manifest, append(b, []byte("\nwhen_typo = true\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, broken := r.te.loadedIntents().BrokenWorkflows["my-ask"]; !broken {
+		t.Fatal("the typo did not break my-ask")
+	}
+	for _, d := range mine() {
+		if d.State != draft.Proposed {
+			t.Fatalf("a workflow that failed to load lost its draft: %+v", d)
+		}
+	}
+	if err := os.RemoveAll(filepath.Dir(manifest)); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range mine() {
+		if d.State != draft.Discarded || d.Reason != draft.WithdrawMoot {
+			t.Fatalf("a removed workflow kept its draft: %+v", d)
+		}
+	}
+}

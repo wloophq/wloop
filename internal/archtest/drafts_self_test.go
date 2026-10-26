@@ -30,15 +30,16 @@ func f(d draft.Draft, k draft.Kind) bool {
 	if d.Kind == "reply" || k != "" { return true }
 	switch d.Purpose { case "close": return true }
 	if d.Purpose == "" || d.Reaction != "" { return false }
+	if map[string]bool{"close": true}[d.Purpose] { return true }
 	return d.Delivery == draft.Reaction
 }
 `
 	f, info, _ := planted(t, fset, module+"internal/x", "x.go", src, deps)
 	hits := draftKindHits(fset, "internal/x/x.go", info, f)
-	if len(hits) != 4 {
-		t.Fatalf("want 4 hits, got %q", hits)
+	if len(hits) != 5 {
+		t.Fatalf("want 5 hits, got %q", hits)
 	}
-	for _, want := range []string{"names the draft kind Reply", "compares a draft's kind", "purpose with a value", "delivery outside"} {
+	for _, want := range []string{"names the draft kind Reply", "compares a draft's kind", "purpose with a value", "delivery outside", "keys a table by a draft's purpose"} {
 		flagged(t, want, filter(hits, want), 1, want)
 	}
 	f, info, _ = planted(t, fset, module+"internal/adapter/source/x", "publisher.go", src, deps)

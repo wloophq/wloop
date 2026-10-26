@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cmp"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -142,6 +144,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		Reason:        m.Reason,
 		AutoSend:      m.AutoSend,
 	}
+	roleRound(&d)
 	s.provider(&d, m.Provider)
 	s.workspace(&d, m.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
@@ -286,4 +289,13 @@ func (s *sheet) inputs(in map[string]mInput) []dintent.Input {
 		})
 	}
 	return out
+}
+
+func roleRound(d *dintent.Def) {
+	r := builtin.RoleRounds[d.Role]
+	d.RoundKind = cmp.Or(d.RoundKind, r.RoundKind)
+	if d.RoundKind != "" {
+		r.Cap = builtin.CapRounds
+	}
+	d.Cap = cmp.Or(d.Cap, r.Cap)
 }

@@ -1,13 +1,13 @@
 [bold]Outbox[/]  [dim]4 drafts waiting on you[/]
 
-[bold]NUDGES[/] [dim]1[/]
-  [cyan]#12[/]  acme/api#7 · Batch export for large accoun…  [dim]@ana[/]       [dim]26h[/]  @ana, any news on this?
-
-[bold]CLOSINGS[/] [dim]1[/]
-  [cyan]#11[/]  DM with Ana Lima: rollout                                [dim]3h[/]  closes 2 items: Rollout date; Feature fla…
-
-[bold]REPLIES[/] [dim]2[/]
+[bold]REPLY[/] [dim]2[/]
   [cyan]#14[/]  #ops · When does the export ship?                        [dim]5m[/]  Friday, after the freeze.
    [cyan]#9[/]  #ops · When does the export ship?            [dim]@Bob Reis[/]   [dim]2d[/]  cc @Bob Reis for the notes
+
+[bold]NUDGE[/] [dim]1[/]
+  [cyan]#12[/]  acme/api#7 · Batch export for large accoun…  [dim]@ana[/]       [dim]26h[/]  @ana, any news on this?
+
+[bold]CLOSE[/] [dim]1[/]
+  [cyan]#11[/]  DM with Ana Lima: rollout                                [dim]3h[/]  closes 2 items: Rollout date; Feature fla…
 
 [dim]Next: {{command}} outbox show <id> · approve <id> · discard <id>[/]

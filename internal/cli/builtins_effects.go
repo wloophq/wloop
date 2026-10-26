@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -27,9 +28,9 @@ type effectDeps struct {
 // sent, by name; a plugin's own come from its Module.OnPosted and win.
 func draftEffects(d effectDeps) map[string]outbox.Effect {
 	return map[string]outbox.Effect{
-		"entry.nudged": d.entryNudged,
-		"unit.closed":  noPluginClosure,
-		"pr.nudged":    appliedByPublisher,
+		builtin.EffectEntryNudged: d.entryNudged,
+		builtin.EffectUnitClosed:  noPluginClosure,
+		builtin.EffectPRNudged:    appliedByPublisher,
 	}
 }
 
@@ -37,7 +38,7 @@ func draftEffects(d effectDeps) map[string]outbox.Effect {
 // posts, so applying it after the send does nothing.
 func appliedByPublisher(context.Context, draft.Draft) error { return nil }
 
-// noPluginClosure is unit.closed on a unit whose plugin records no closure.
+// noPluginClosure is unit.closed on a unit whose built plugin records no closure.
 func noPluginClosure(context.Context, draft.Draft) error { return nil }
 
 // entryNudged stamps the draft's entry, or every live waiting entry of its
@@ -58,19 +59,27 @@ func (d effectDeps) entryNudged(ctx context.Context, dr draft.Draft) error {
 }
 
 // effectLookup finds an effect for a draft of provider p: its plugin's
-// own, else the daemon's; none when the effect belongs to another provider.
+// own, else the daemon's; none when the effect belongs to another provider,
+// or applies through a plugin p has not built.
 func effectLookup(d effectDeps) outbox.EffectLookup {
 	core := draftEffects(d)
 	return func(p unit.ProviderID, name string) (outbox.Effect, bool) {
-		for _, e := range builtin.Effects {
-			if e.Name == name && e.Provider != "" && e.Provider != p {
-				return nil, false
-			}
+		i := slices.IndexFunc(builtin.Effects, func(e builtin.Effect) bool { return e.Name == name })
+		if i >= 0 && builtin.Effects[i].Provider != "" && builtin.Effects[i].Provider != p {
+			return nil, false
 		}
+		built := false
 		for _, m := range d.Modules {
-			if fx, ok := m.OnPosted[name]; ok && m.ID == p {
+			if m.ID != p {
+				continue
+			}
+			built = true
+			if fx, ok := m.OnPosted[name]; ok {
 				return fx, true
 			}
+		}
+		if i >= 0 && builtin.Effects[i].Plugin && !built {
+			return nil, false
 		}
 		fx, ok := core[name]
 		return fx, ok

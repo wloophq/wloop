@@ -1,13 +1,13 @@
 Outbox  4 drafts waiting on you
 
-NUDGES 1
-  #12  acme/api#7 · Batch export f…  @ana       26h  @ana, any news on …
-
-CLOSINGS 1
-  #11  DM with Ana Lima: rollout                 3h  closes 2 items: Ro…
-
-REPLIES 2
+REPLY 2
   #14  #ops · When does the export…              5m  Friday, after the …
    #9  #ops · When does the export…  @Bob Reis   2d  cc @Bob Reis for t…
+
+NUDGE 1
+  #12  acme/api#7 · Batch export f…  @ana       26h  @ana, any news on …
+
+CLOSE 1
+  #11  DM with Ana Lima: rollout                 3h  closes 2 items: Ro…
 
 Next: {{command}} outbox show <id> · approve <id> · discard <id>

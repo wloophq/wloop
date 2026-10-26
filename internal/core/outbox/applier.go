@@ -31,7 +31,19 @@ type EffectApplier struct {
 	Clock   port.Clock
 }
 
-var _ Applier = EffectApplier{}
+var _ Implementer = EffectApplier{}
+
+// Implementer is an Applier that says whether it has effect name for the
+// drafts of provider p, so Propose refuses a draft it could never apply.
+type Implementer interface {
+	Applier
+	Implements(p unit.ProviderID, name string) bool
+}
+
+func (a EffectApplier) Implements(p unit.ProviderID, name string) bool {
+	_, ok := a.Effects(p, name)
+	return ok
+}
 
 // ErrUnknownEffect is an effect a draft declares that has no implementation
 // for its provider.

@@ -310,13 +310,20 @@ func TestTheNudgeSaysByHandOnlyWhenAPersonStartedIt(t *testing.T) {
 // role, without what only one intent, or only a bundled one, may hold.
 func myReview(t *testing.T) map[string]string {
 	t.Helper()
+	return bundledIntentAs(t, "review", "my-review")
+}
+
+// bundledIntentAs is the files of the bundled intent from as a user's
+// intent named as.
+func bundledIntentAs(t *testing.T, from, as string) map[string]string {
+	t.Helper()
 	files := map[string]string{}
 	for _, name := range []string{"intent.toml", "instructions.md.tmpl"} {
-		b, err := fs.ReadFile(profiles.Default, "default/intents/review/"+name)
+		b, err := fs.ReadFile(profiles.Default, "default/intents/"+from+"/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		files["intents/my-review/"+name] = string(b)
+		files["intents/"+as+"/"+name] = string(b)
 	}
 	return files
 }

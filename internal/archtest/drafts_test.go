@@ -29,8 +29,9 @@ func deliveryReader(rel string) bool {
 var draftKindAllowlist = map[string]string{}
 
 // TestNoDraftKindComparisons checks that Go names no draft kind, compares
-// no draft's purpose with a value, and compares its delivery only in the
-// publishers and the Outbox: a draft is what its proposer declares.
+// no draft's purpose with a value nor keys a table by it, and compares its
+// delivery only in the publishers and the Outbox: a draft is what its
+// proposer declares.
 func TestNoDraftKindComparisons(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -121,6 +122,14 @@ func draftKindHits(fset *token.FileSet, rel string, info *types.Info, f *ast.Fil
 		case *ast.Ident:
 			if c, ok := info.Uses[n].(*types.Const); ok && c.Pkg() != nil && c.Pkg().Path() == draftPkg && slices.Contains(draftKindConsts, c.Name()) {
 				hit(n, "names the draft kind %s", c.Name())
+			}
+		case *ast.IndexExpr:
+			if tv, ok := info.Types[n.X]; ok {
+				if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
+					if field := shapeField(info, n.Index); field == "Purpose" || field == "Kind" {
+						hit(n, "keys a table by a draft's %s", strings.ToLower(field))
+					}
+				}
 			}
 		case *ast.BinaryExpr:
 			if n.Op != token.EQL && n.Op != token.NEQ {
