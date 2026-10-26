@@ -22,7 +22,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
 | `TestMeterIsALeaf` | `internal/meter` imports only the standard library. |
-| `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
+| `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value nor keys a table by it, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
 | `TestNoProviderKindsInAPI` | A provider's kinds live in its own package, never in the API. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
