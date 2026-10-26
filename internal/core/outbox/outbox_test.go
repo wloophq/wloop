@@ -416,7 +416,7 @@ func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (dra
 func TestProposeDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	if d.Approval != (draft.Approval{Mode: draft.Always}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
+	if d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
 		t.Fatalf("%+v", d)
 	}
 	pol := &fixedPolicy{p: *window(10 * time.Minute)}
@@ -426,11 +426,11 @@ func TestProposeDefaultsToAlways(t *testing.T) {
 		t.Fatalf("window %+v", w)
 	}
 	p := reply("z")
-	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Always})
-	if got := e.propose(p); got.Approval.Mode != draft.Always || len(pol.seen) != 1 {
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Wait})
+	if got := e.propose(p); got.Approval.Mode != draft.Wait || len(pol.seen) != 1 {
 		t.Fatalf("explicit approval %+v, policies asked %d times", got, len(pol.seen))
 	}
-	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Window})
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Delay})
 	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("bad approval: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestWouldRecordsPolicyAndOutcome(t *testing.T) {
 	over := func() Proposal { p := reply("done"); p.Items = []string{"i1", "i2"}; return p }
 	asIs, edited, gone := e.propose(over()), e.propose(over()), e.propose(over())
 	for _, d := range []draft.Draft{asIs, edited, gone} {
-		if d.Would.Policy != draft.WouldSend || d.Would.Outcome != "" {
+		if d.Would.Policy != draft.WouldRelease || d.Would.Outcome != "" {
 			t.Fatalf("at proposal %+v", d.Would)
 		}
 	}
@@ -451,7 +451,7 @@ func TestWouldRecordsPolicyAndOutcome(t *testing.T) {
 	e.svc.Approve(ctx, edited.ID, &text)
 	e.svc.Discard(ctx, gone.ID, "")
 	for id, want := range map[draft.ID]draft.Outcome{asIs.ID: draft.OutcomeAsIs, edited.ID: draft.OutcomeEdited, gone.ID: draft.OutcomeDiscarded} {
-		if got := e.get(id).Would; got.Policy != draft.WouldSend || got.Outcome != want {
+		if got := e.get(id).Would; got.Policy != draft.WouldRelease || got.Outcome != want {
 			t.Errorf("draft %d would %+v, want outcome %s", id, got, want)
 		}
 	}
@@ -479,7 +479,7 @@ func TestWouldHoldsOnDoubt(t *testing.T) {
 	}
 	high := reply("x")
 	high.Items = []string{"i1"}
-	if d := e.propose(high); d.Would.Policy != draft.WouldSend {
+	if d := e.propose(high); d.Would.Policy != draft.WouldRelease {
 		t.Errorf("high: %+v", d.Would)
 	}
 }

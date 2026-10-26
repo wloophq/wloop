@@ -43,7 +43,7 @@ func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T
 		withPolicy(e, draft.Fixed(mode))
 		d := e.propose(prReply("LGTM, merging"))
 		if d.Delivery != draft.CommentDelivery || d.Kind != draft.Comment || d.State != draft.Proposed ||
-			d.Approval.Mode != draft.Always || d.Would.Policy != draft.WouldHold {
+			d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldHold {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
 	}
@@ -52,8 +52,8 @@ func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T
 func TestARuleReleasingMessagesNeverReleasesWhatItsPluginPostsAsAComment(t *testing.T) {
 	e := newEnv()
 	withCommentingPulls(e)
-	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{{When: factIs{"draft.delivery", "message"}, Approval: noneA}}})
-	if d := e.propose(prReply("ok")); d.State != draft.Proposed || d.Approval.Mode != draft.Always {
+	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{{When: factIs{"draft.delivery", "message"}, Approval: noneA}}})
+	if d := e.propose(prReply("ok")); d.State != draft.Proposed || d.Approval.Mode != draft.Wait {
 		t.Fatalf("%+v", d)
 	}
 	nudge := Proposal{Unit: pull, Purpose: "nudge", Text: "any news?", Policy: draft.Fixed(noneA),
@@ -92,14 +92,14 @@ func TestADraftStoredWithAnotherDeliveryReadsAsItsPluginPostsIt(t *testing.T) {
 func TestARuleOverTheUnitsFactsWithNoFactsReaderWaits(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, &draft.Policy{Default: noneA, Rules: []draft.Rule{{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}}})
-	if d := e.propose(reply("x")); d.Approval.Mode != draft.Always {
+	if d := e.propose(reply("x")); d.Approval.Mode != draft.Wait {
 		t.Fatalf("%+v", d.Approval)
 	}
-	if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "always") }) {
+	if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "resolved to wait") }) {
 		t.Fatalf("logs %q", e.logs)
 	}
 	e = newEnv()
-	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{{When: factIs{"draft.delivery", "message"}, Approval: noneA}}})
+	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{{When: factIs{"draft.delivery", "message"}, Approval: noneA}}})
 	if d := e.propose(reply("x")); d.Approval != noneA {
 		t.Fatalf("a rule over the draft's own facts: %+v", d.Approval)
 	}
@@ -108,10 +108,10 @@ func TestARuleOverTheUnitsFactsWithNoFactsReaderWaits(t *testing.T) {
 func TestARuleOverAnotherProvidersFactsFallsThrough(t *testing.T) {
 	e := newEnv()
 	e.svc.Facts = subjectOf("pr", map[string]any{"pr.author": "someone"})
-	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{
+	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{
 		{When: notFact{"slack.conversation", "channel"}, Approval: noneA, Subjects: slackSubject},
 	}})
-	if d := e.propose(prReply("x")); d.Approval.Mode != draft.Always {
+	if d := e.propose(prReply("x")); d.Approval.Mode != draft.Wait {
 		t.Fatalf("%+v", d.Approval)
 	}
 }
@@ -124,7 +124,7 @@ func TestATurnDraftReadsTheFactsOfTheWorkflowThatStartedIt(t *testing.T) {
 		return draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}, nil
 	}
 	m := manifests()
-	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Always}, Rules: []draft.Rule{{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}}}
+	rule := &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}}}
 	m.intents["reply"], m.workflows["plain"] = rule, nil
 	e.svc.Policies = Resolver{Manifests: m}
 	for _, seq := range []int64{13, 4} {

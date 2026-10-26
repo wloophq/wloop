@@ -185,14 +185,14 @@ func TestNoEffectIsDerivedFromKind(t *testing.T) {
 func TestTheApprovalIsConfigThenLegacyThenManifestElseNone(t *testing.T) {
 	t.Parallel()
 	a := func(m draft.ApprovalMode) *draft.Policy { return draft.Fixed(draft.Approval{Mode: m}) }
-	window := draft.Fixed(draft.Approval{Mode: draft.Window, Window: time.Hour})
+	window := draft.Fixed(draft.Approval{Mode: draft.Delay, Window: time.Hour})
 	for _, c := range []struct {
 		name                     string
 		config, legacy, manifest *draft.Policy
 		want                     draft.Approval
 	}{
-		{"config wins", a(draft.None), a(draft.Observe), window, draft.Approval{Mode: draft.None}},
-		{"then legacy", nil, a(draft.Observe), window, draft.Approval{Mode: draft.Observe}},
+		{"config wins", a(draft.Send), a(draft.Record), window, draft.Approval{Mode: draft.Send}},
+		{"then legacy", nil, a(draft.Record), window, draft.Approval{Mode: draft.Record}},
 		{"then the manifest", nil, nil, window, window.Default},
 	} {
 		if got := ResolveApproval(c.config, c.legacy, c.manifest); got == nil || got.Default != c.want || len(got.Rules) != 0 {
@@ -204,40 +204,40 @@ func TestTheApprovalIsConfigThenLegacyThenManifestElseNone(t *testing.T) {
 	}
 }
 
-func TestDuplicateReadsPurposeDeliveryAndObservedFor(t *testing.T) {
+func TestDuplicateReadsPurposeDeliveryAndRecordedFor(t *testing.T) {
 	e := newEnv()
 	auto := func(purpose string, delivery draft.Delivery, a draft.ApprovalMode) Proposal {
 		return Proposal{Unit: thread, Purpose: purpose, Delivery: delivery, Text: "done", Reaction: "white_check_mark",
-			Policy: draft.Fixed(draft.Approval{Mode: a}), ObservedFor: time.Hour,
+			Policy: draft.Fixed(draft.Approval{Mode: a}), RecordedFor: time.Hour,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "closure", Rule: "closure", Key: thread.String()}}
 	}
-	first := e.propose(auto("close", draft.Message, draft.Always))
-	if d, err := e.svc.Propose(ctx, auto("close", draft.Message, draft.Always)); !errors.Is(err, ErrDuplicate) || d.ID != first.ID {
+	first := e.propose(auto("close", draft.Message, draft.Wait))
+	if d, err := e.svc.Propose(ctx, auto("close", draft.Message, draft.Wait)); !errors.Is(err, ErrDuplicate) || d.ID != first.ID {
 		t.Fatalf("same purpose and delivery: %+v %v", d, err)
 	}
-	for _, p := range []Proposal{auto("close", draft.Reaction, draft.Always), auto("thanks", draft.Message, draft.Always)} {
+	for _, p := range []Proposal{auto("close", draft.Reaction, draft.Wait), auto("thanks", draft.Message, draft.Wait)} {
 		if _, err := e.svc.Propose(ctx, p); err != nil {
 			t.Fatalf("%s %s: %v", p.Purpose, p.Delivery, err)
 		}
 	}
-	observed := e.propose(auto("observed", draft.Message, draft.Observe))
+	observed := e.propose(auto("observed", draft.Message, draft.Record))
 	e.clock.now = t0.Add(59 * time.Minute)
-	if _, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.Observe)); !errors.Is(err, ErrDuplicate) {
-		t.Fatalf("inside ObservedFor: %v", err)
+	if _, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.Record)); !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("inside RecordedFor: %v", err)
 	}
 	e.clock.now = t0.Add(time.Hour)
-	if d, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.Observe)); err != nil || d.ID == observed.ID {
-		t.Fatalf("past ObservedFor: %+v %v", d, err)
+	if d, err := e.svc.Propose(ctx, auto("observed", draft.Message, draft.Record)); err != nil || d.ID == observed.ID {
+		t.Fatalf("past RecordedFor: %+v %v", d, err)
 	}
 }
 
 func TestACommentDraftWaitsForAPersonWhateverItsMode(t *testing.T) {
 	e := newEnv()
-	for _, mode := range []draft.Approval{{Mode: draft.None}, {Mode: draft.Window, Window: time.Minute}} {
+	for _, mode := range []draft.Approval{{Mode: draft.Send}, {Mode: draft.Delay, Window: time.Minute}} {
 		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Policy: draft.Fixed(mode),
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
 		d := e.propose(p)
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
 	}

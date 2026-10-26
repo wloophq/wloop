@@ -92,7 +92,7 @@ var skeleton = map[string][]string{
 	"internal/core/outbox": {"Proposal", "Filter", "Store", "Effects", "Evidence", "Service", "Service.Propose",
 		"Service.Edit", "Service.Approve", "Service.Discard", "Service.Retry", "Service.List", "Service.RecordSent",
 		"Service.Send", "Service.Recover", "Service.Tick", "Service.NextDeadline", "ErrNotFound", "ErrConflict",
-		"ErrDisabled", "ErrDuplicate", "ErrNeedsConfirm", "Policies", "Proposal.Purpose", "Proposal.Delivery", "Proposal.Effects", "Proposal.ObservedFor", "Proposal.Policy", "Proposal.Subject", "Service.Broken", "Facts", "Service.Facts", "Filter.Workflow", "Effect", "Applier", "Service.Applier"},
+		"ErrDisabled", "ErrDuplicate", "ErrNeedsConfirm", "Policies", "Proposal.Purpose", "Proposal.Delivery", "Proposal.Effects", "Proposal.RecordedFor", "Proposal.Policy", "Proposal.Subject", "Service.Broken", "Facts", "Service.Facts", "Filter.Workflow", "Effect", "Applier", "Service.Applier"},
 	"internal/domain/workflow": {"Workflow.DraftApproval", "Workflow.Withdraw"},
 	"internal/core/headless":   {"Request", "Result", "Builder", "Placer", "Service", "ErrBusy"},
 	"internal/domain/dossier":  {"Owner", "Status", "Dossier", "Policy", "Dir"},

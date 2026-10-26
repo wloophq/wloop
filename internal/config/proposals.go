@@ -89,11 +89,11 @@ func (c Config) DraftApprovalWarnings() []string {
 
 const renudgeAfterKey = "renudge_after"
 
-// Approval is rule's configured approval, always when the config sets none.
+// Approval is rule's configured approval, wait when the config sets none.
 func (p Proposals) Approval(rule string) draft.Approval {
 	r, ok := p.Rules[rule]
 	if !ok || r.Approval == nil {
-		return draft.Approval{Mode: draft.Always}
+		return draft.Approval{Mode: draft.Wait}
 	}
 	return r.Approval.Approval()
 }

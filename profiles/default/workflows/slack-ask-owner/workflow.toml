@@ -6,7 +6,7 @@ order = 52
 key = ["slack.settled_at"]
 
 [draft_approval]
-mode = "always"
+mode = "wait"
 
 [trigger]
 every = "sweep"

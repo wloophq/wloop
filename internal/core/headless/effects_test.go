@@ -58,7 +58,7 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 type approveAll struct{}
 
 func (approveAll) For(context.Context, unit.Unit, draft.Origin) (draft.Policy, error) {
-	return draft.Policy{Default: draft.Approval{Mode: draft.None}}, nil
+	return draft.Policy{Default: draft.Approval{Mode: draft.Send}}, nil
 }
 
 func TestAHeadlessDraftTakesItsProposersPolicy(t *testing.T) {
@@ -68,7 +68,7 @@ func TestAHeadlessDraftTakesItsProposersPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := r.outbox.List(context.Background(), outbox.Filter{})
-	if len(drafts) != 1 || drafts[0].Approval.Mode != draft.None || drafts[0].State == draft.Proposed {
+	if len(drafts) != 1 || drafts[0].Approval.Mode != draft.Send || drafts[0].State == draft.Proposed {
 		t.Fatalf("drafts %+v", drafts)
 	}
 }

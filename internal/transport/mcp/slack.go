@@ -40,7 +40,7 @@ type DraftArgs struct {
 }
 
 // DraftResult is the proposed draft: where it posts once approved, and its
-// state: proposed, approved by its policy, or discarded when only observed.
+// state: proposed, approved by its policy, or discarded when only recorded.
 type DraftResult struct {
 	ID           int64
 	Unit         string

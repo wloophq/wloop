@@ -86,7 +86,7 @@ func TestEditStopsTheWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Approval != always || !got.Deadline.IsZero() {
+	if got.Approval != waiting || !got.Deadline.IsZero() {
 		t.Fatalf("after the edit %+v", got)
 	}
 	e.clock.now = t0.Add(time.Hour)
@@ -110,7 +110,7 @@ func TestEditStopsTheWindow(t *testing.T) {
 	if n, _ := e.svc.Tick(ctx); n != 0 {
 		t.Fatalf("tick approved a draft edited under it: %d", n)
 	}
-	if got := e.get(raced.ID); got.State != draft.Proposed || got.Approval != always {
+	if got := e.get(raced.ID); got.State != draft.Proposed || got.Approval != waiting {
 		t.Fatalf("%+v", got)
 	}
 }

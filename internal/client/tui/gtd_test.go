@@ -69,7 +69,7 @@ func gtdEntries() map[string][]api.EntryView {
 	draft := entry("draft:11", "Reply in the release thread", "outbox")
 	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")
 	draft.Draft = &api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
-		State: "pending", Approval: api.DraftApproval{Mode: "always"}, Origin: api.DraftOrigin{Kind: "turn"}}
+		State: "pending", Approval: api.DraftApproval{Mode: "wait"}, Origin: api.DraftOrigin{Kind: "turn"}}
 	return map[string][]api.EntryView{
 		"focus":  {focus},
 		"inbox":  {asked, captured},

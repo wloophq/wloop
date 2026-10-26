@@ -40,12 +40,12 @@ func (f fakeManifests) Turn(ctx context.Context, u unit.Unit, seq int64) (string
 }
 
 func window(d time.Duration) *draft.Policy {
-	return draft.Fixed(draft.Approval{Mode: draft.Window, Window: d})
+	return draft.Fixed(draft.Approval{Mode: draft.Delay, Window: d})
 }
 
 var (
-	none    = draft.Fixed(draft.Approval{Mode: draft.None})
-	observe = draft.Fixed(draft.Approval{Mode: draft.Observe})
+	none    = draft.Fixed(draft.Approval{Mode: draft.Send})
+	observe = draft.Fixed(draft.Approval{Mode: draft.Record})
 )
 
 func manifests() fakeManifests {
@@ -69,12 +69,12 @@ func TestPolicyResolutionOrder(t *testing.T) {
 		{"workflow wins over intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 10, Intent: "quick", Workflow: "timed"}, nil, window(10 * time.Minute).Default},
 		{"a workflow without a block falls to the intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 11, Intent: "quick", Workflow: "plain"}, nil, none.Default},
 		{"intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 12, Intent: "watch"}, nil, observe.Default},
-		{"neither has a block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 13, Intent: "reply", Workflow: "plain"}, nil, always},
-		{"an auto rule without approval", draft.Origin{Kind: draft.OriginAuto, Rule: "closure"}, nil, always},
-		{"a user draft", draft.Origin{Kind: draft.OriginUser}, nil, always},
+		{"neither has a block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 13, Intent: "reply", Workflow: "plain"}, nil, waiting},
+		{"an auto rule without approval", draft.Origin{Kind: draft.OriginAuto, Rule: "closure"}, nil, waiting},
+		{"a user draft", draft.Origin{Kind: draft.OriginUser}, nil, waiting},
 		{"a session draft reads its turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}, nil, none.Default},
 		{"a session draft reads its turn's workflow", draft.Origin{Kind: draft.OriginSession, TurnSeq: 8}, nil, window(10 * time.Minute).Default},
-		{"a session draft without a turn", draft.Origin{Kind: draft.OriginSession}, nil, always},
+		{"a session draft without a turn", draft.Origin{Kind: draft.OriginSession}, nil, waiting},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e := newEnv()
@@ -100,7 +100,7 @@ func TestPolicyLookupFailureIsAlways(t *testing.T) {
 		{"unknown workflow", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 15, Intent: "quick", Workflow: "gone"}, nil, "gone"},
 		{"unknown turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 99}, nil, "turn 99"},
 		{"the book errs", draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}, func(m *fakeManifests) { m.turnErr = errBoom }, "boom"},
-		{"a malformed block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 16, Intent: "bad"}, func(m *fakeManifests) { m.intents["bad"] = draft.Fixed(draft.Approval{Mode: draft.Window}) }, "window"},
+		{"a malformed block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 16, Intent: "bad"}, func(m *fakeManifests) { m.intents["bad"] = draft.Fixed(draft.Approval{Mode: draft.Delay}) }, "window"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e := newEnv()
@@ -112,10 +112,10 @@ func TestPolicyLookupFailureIsAlways(t *testing.T) {
 			p := reply("x")
 			p.Origin = c.origin
 			d := e.propose(p)
-			if d.Approval != always || d.State != draft.Proposed {
+			if d.Approval != waiting || d.State != draft.Proposed {
 				t.Fatalf("%+v", d)
 			}
-			if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "always") && strings.Contains(l, c.logged) }) {
+			if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "resolved to wait") && strings.Contains(l, c.logged) }) {
 				t.Fatalf("logs %q", e.logs)
 			}
 		})
@@ -141,14 +141,14 @@ func TestOriginCannotPickThePolicy(t *testing.T) {
 			p := reply("x")
 			p.Origin = c.origin
 			d := e.propose(p)
-			if d.Approval != always || d.State != draft.Proposed {
+			if d.Approval != waiting || d.State != draft.Proposed {
 				t.Fatalf("%+v", d)
 			}
 			e.svc.Send(ctx)
 			if len(e.fx.published) != 0 {
 				t.Fatalf("published %v", e.fx.published)
 			}
-			if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "always") && strings.Contains(l, c.logged) }) {
+			if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "resolved to wait") && strings.Contains(l, c.logged) }) {
 				t.Fatalf("logs %q", e.logs)
 			}
 		})
@@ -178,7 +178,7 @@ func TestDraftPolicyDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	e.svc.Policies = Resolver{Manifests: manifests()}
 	d := e.propose(reply("x"))
-	if d.Approval != always || d.State != draft.Proposed || !d.Deadline.IsZero() || d.Would.Outcome != "" {
+	if d.Approval != waiting || d.State != draft.Proposed || !d.Deadline.IsZero() || d.Would.Outcome != "" {
 		t.Fatalf("%+v", d)
 	}
 	e.clock.now = t0.Add(48 * time.Hour)
@@ -189,7 +189,7 @@ func TestDraftPolicyDefaultsToAlways(t *testing.T) {
 		t.Fatalf("sent %d, %s", sent, e.get(d.ID).State)
 	}
 	if _, ok, err := e.svc.NextDeadline(ctx); ok || err != nil {
-		t.Fatalf("an always draft has a deadline: %v", err)
+		t.Fatalf("a wait draft has a deadline: %v", err)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
 	d := e.propose(reply("x"))
-	if d.State != draft.Discarded || d.Reason != "observe" || d.Would.Outcome != draft.OutcomeObserved || d.Would.Policy != draft.WouldSend {
+	if d.State != draft.Discarded || d.Reason != "record" || d.Would.Outcome != draft.OutcomeRecorded || d.Would.Policy != draft.WouldRelease {
 		t.Fatalf("%+v", d)
 	}
 	if got, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Proposed, draft.Failed}}); len(got) != 0 {
@@ -287,20 +287,20 @@ func TestAutoApprovalHonorsTheGate(t *testing.T) {
 	})
 }
 
-func TestObservedKeyRecordsAgainAfterObservedFor(t *testing.T) {
+func TestObservedKeyRecordsAgainAfterRecordedFor(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
-	e.svc.ObservedFor = 24 * time.Hour
+	e.svc.RecordedFor = 24 * time.Hour
 	auto := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 	first := e.propose(auto)
 	e.clock.now = t0.Add(23 * time.Hour)
 	if again, err := e.svc.Propose(ctx, auto); !errors.Is(err, ErrDuplicate) || again.ID != first.ID {
-		t.Fatalf("within ObservedFor: %+v %v", again, err)
+		t.Fatalf("within RecordedFor: %+v %v", again, err)
 	}
 	e.clock.now = t0.Add(24 * time.Hour)
 	second, err := e.svc.Propose(ctx, auto)
-	if err != nil || second.ID == first.ID || second.Reason != "observe" {
-		t.Fatalf("after ObservedFor: %+v %v", second, err)
+	if err != nil || second.ID == first.ID || second.Reason != "record" {
+		t.Fatalf("after RecordedFor: %+v %v", second, err)
 	}
 }
 
@@ -313,7 +313,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 				p := reply("x")
 				p.Origin.Kind, p.Target = kind, "#general"
 				d := e.propose(p)
-				if d.Approval != always || d.State != draft.Proposed || !d.Deadline.IsZero() ||
+				if d.Approval != waiting || d.State != draft.Proposed || !d.Deadline.IsZero() ||
 					d.Would.Policy != draft.WouldHold || d.Would.Reason != "targets outside its unit" {
 					t.Fatalf("%+v", d)
 				}
@@ -330,7 +330,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		e := newEnv()
 		p := reply("x")
 		p.Target, p.Policy = "U0OTHER", none
-		if d := e.propose(p); d.Approval != always || d.State != draft.Proposed {
+		if d := e.propose(p); d.Approval != waiting || d.State != draft.Proposed {
 			t.Fatalf("%+v", d)
 		}
 	})

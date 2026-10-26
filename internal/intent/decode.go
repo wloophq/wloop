@@ -199,7 +199,7 @@ func (s *sheet) modes(m []string) []string {
 	return slices.Clone(m)
 }
 
-var draftApprovalModes = []string{string(draft.Always), string(draft.Window), string(draft.None), string(draft.Observe)}
+var draftApprovalModes = []string{string(draft.Wait), string(draft.Delay), string(draft.Send), string(draft.Record)}
 
 // draftApproval is the policy of m, its rules' when compiled over env; nil
 // when m is. A rule that releases while reading draft.delivery in a form
@@ -251,7 +251,7 @@ func (s *sheet) ruleProblem(path, when string, err error, env expr.Env) {
 		}
 		with := maps.Clone(env)
 		with[name] = builtin.ApprovalEnv(true)[name]
-		if _, perr := builtin.ApprovalRule(when, draft.Approval{Mode: draft.Always}, with); perr == nil {
+		if _, perr := builtin.ApprovalRule(when, draft.Approval{Mode: draft.Wait}, with); perr == nil {
 			s.add(path, "reads %s, which an intent's rule may not: its turns' agents name their drafts' purpose and effects", name)
 			return
 		}
@@ -272,11 +272,11 @@ func (s *sheet) approval(path string, mode, window *string) (draft.Approval, boo
 	case !slices.Contains(draftApprovalModes, *mode):
 		s.oneOf(path+".mode", *mode, draftApprovalModes)
 		return draft.Approval{}, false
-	case a.Mode == draft.Window && window == nil:
-		s.add(path+".window", "is required with mode window: how long the user has before the draft is sent, such as 10m")
+	case a.Mode == draft.Delay && window == nil:
+		s.add(path+".window", "is required with mode delay: how long the user has before the draft is sent, such as 10m")
 		return draft.Approval{}, false
-	case a.Mode != draft.Window && window != nil:
-		s.add(path+".window", "is read only with mode window, not with %s", a.Mode)
+	case a.Mode != draft.Delay && window != nil:
+		s.add(path+".window", "is read only with mode delay, not with %s", a.Mode)
 		return draft.Approval{}, false
 	case window != nil:
 		a.Window = s.duration(path+".window", *window)

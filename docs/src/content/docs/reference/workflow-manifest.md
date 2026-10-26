@@ -48,7 +48,7 @@ round = "follow-up"
 | `[[step]]` | at least one | | `use` names a builtin step; other keys are its arguments, all strings |
 | `[limits]` | | none | `per_run`, `per_day`, `per_unit_per_day`, `cooldown` |
 | `[approval]` | | none | `default`, `window`, `wait_when` |
-| `[draft_approval]` | | the intent's, else `always` | `mode`, `window` and `[[draft_approval.rule]]` (`when`, `mode`, `window`): the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; see [Draft approval](#draft-approval). `workflows.<name>.draft_approval` in the configuration replaces it, rules included |
+| `[draft_approval]` | | the intent's, else `wait` | `mode`, `window` and `[[draft_approval.rule]]` (`when`, `mode`, `window`): the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; see [Draft approval](#draft-approval). `workflows.<name>.draft_approval` in the configuration replaces it, rules included |
 | `[withdraw]` | | none | `when`, a predicate over the subject's slot and `draft.*`, withdraws an open draft the workflow's `draft.propose` proposed; `reason` is `moot` (the default) or `assigned` |
 
 ## Steps
@@ -76,14 +76,14 @@ A workflow with no `window` runs a `default = "run"` item at once; the bundled `
 
 ```toml
 [draft_approval]
-mode = "always"
+mode = "wait"
 
 [[draft_approval.rule]]
 when = 'draft.purpose == "thanks" && slack.conversation == "dm"'
-mode = "none"
+mode = "send"
 ```
 
-A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the subject's slot, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`none` or `window`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment.
+A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the subject's slot, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment.
 
 ## Predicates
 

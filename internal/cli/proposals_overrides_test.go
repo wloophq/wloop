@@ -77,8 +77,8 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 func TestALegacyProposalApprovalLoadsWithAWarningAndApplies(t *testing.T) {
 	t.Parallel()
 	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"proposals": {"closure": {"approval": {"mode": "window", "window": "2h"}},
-		"github-nudge": {"approval": {"mode": "none"}}}, "workflows": {"slack-ask-owner": {"draft_approval": {"mode": "none"}}}}`), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte(`{"proposals": {"closure": {"approval": {"mode": "delay", "window": "2h"}},
+		"github-nudge": {"approval": {"mode": "send"}}}, "workflows": {"slack-ask-owner": {"draft_approval": {"mode": "send"}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := config.LoadFile(file, Defaults())
@@ -91,18 +91,18 @@ func TestALegacyProposalApprovalLoadsWithAWarningAndApplies(t *testing.T) {
 	if len(logged) != 1 || !strings.Contains(logged[0], "proposals.closure.approval") || !strings.Contains(logged[0], "workflows.slack-closure.draft_approval") {
 		t.Fatalf("warnings %q", logged)
 	}
-	always := draft.Fixed(draft.Approval{Mode: draft.Always})
-	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-closure", Slot: "slack", DraftApproval: always}).Default; a.Mode != draft.Window || a.Window != 2*time.Hour {
+	always := draft.Fixed(draft.Approval{Mode: draft.Wait})
+	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-closure", Slot: "slack", DraftApproval: always}).Default; a.Mode != draft.Delay || a.Window != 2*time.Hour {
 		t.Errorf("the legacy approval does not apply: %+v", a)
 	}
-	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-ask-owner", Slot: "slack", DraftApproval: always}).Default; a.Mode != draft.None {
+	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-ask-owner", Slot: "slack", DraftApproval: always}).Default; a.Mode != draft.Send {
 		t.Errorf("the workflow's own key loses to the manifest: %+v", a)
 	}
-	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "entry"}).Default; a.Mode != draft.Always {
+	if a := draftApproval(cfg, workflow.Workflow{Name: "slack-stalled-nudge", Slot: "entry"}).Default; a.Mode != draft.Wait {
 		t.Errorf("a rule the config leaves alone: %+v", a)
 	}
 	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
-	if p, ok := m.WorkflowApproval("slack-closure"); !ok || p == nil || p.Default.Mode != draft.Window || p.Default.Window != 2*time.Hour {
+	if p, ok := m.WorkflowApproval("slack-closure"); !ok || p == nil || p.Default.Mode != draft.Delay || p.Default.Window != 2*time.Hour {
 		t.Errorf("a turn the workflow starts does not take the legacy approval: %+v", p)
 	}
 }
@@ -111,7 +111,7 @@ func TestAnAskOwnerDraftTakesTheConfiguredWindow(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newReplay(t)
-	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {DraftApproval: &config.DraftApprovalConfig{Mode: "window", Window: config.Days(time.Hour)}}}
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {DraftApproval: &config.DraftApprovalConfig{Mode: "delay", Window: config.Days(time.Hour)}}}
 	p := newWorkflowProposer(r)
 	r.scenario(r.now)
 	if err := p.pass(ctx); err != nil {
@@ -122,7 +122,7 @@ func TestAnAskOwnerDraftTakesTheConfiguredWindow(t *testing.T) {
 		t.Fatalf("ask-owner drafts %+v, %v", ds, err)
 	}
 	for _, d := range ds {
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Window || !d.Deadline.Equal(d.CreatedAt.Add(time.Hour)) {
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Delay || !d.Deadline.Equal(d.CreatedAt.Add(time.Hour)) {
 			t.Errorf("an ask-owner draft ignores the configured window: %+v", d)
 		}
 	}
@@ -201,10 +201,10 @@ purpose = "thanks"
 items = "all"
 
 [draft_approval]
-mode = "always"
+mode = "wait"
 [[draft_approval.rule]]
 when = 'slack.conversation == "dm"'
-mode = "none"
+mode = "send"
 `
 
 func loadConfigJSON(t *testing.T, body string) (config.Config, error) {
@@ -226,8 +226,8 @@ func TestTheConfigsDraftApprovalReplacesTheManifestsRules(t *testing.T) {
 		t.Fatalf("not loaded: %v", l.Problems.Error())
 	}
 	w := l.Workflows[i]
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "always",
-		"rule": [{"when": "slack.channel == \"C0TEAM\" && draft.purpose == \"thanks\"", "mode": "window", "window": "1h"}]}}}}`)
+	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "wait",
+		"rule": [{"when": "slack.channel == \"C0TEAM\" && draft.purpose == \"thanks\"", "mode": "delay", "window": "1h"}]}}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,32 +237,32 @@ func TestTheConfigsDraftApprovalReplacesTheManifestsRules(t *testing.T) {
 		facts map[string]any
 		want  draft.Approval
 	}{
-		"the manifest's rule is gone": {map[string]any{"slack.conversation": "dm"}, draft.Approval{Mode: draft.Always}},
-		"the config's rule applies":   {map[string]any{"slack.channel": "C0TEAM"}, draft.Approval{Mode: draft.Window, Window: time.Hour}},
+		"the manifest's rule is gone": {map[string]any{"slack.conversation": "dm"}, draft.Approval{Mode: draft.Wait}},
+		"the config's rule applies":   {map[string]any{"slack.channel": "C0TEAM"}, draft.Approval{Mode: draft.Delay, Window: time.Hour}},
 	} {
 		if got, err := pol.Decide(d, draft.Subject{Slot: "slack", Facts: c.facts}, time.Time{}); err != nil || got.Approval != c.want {
 			t.Errorf("%s: %+v %v", name, got, err)
 		}
 	}
-	if got, _ := draftApproval(Defaults(), w).Decide(d, draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}, time.Time{}); got.Approval.Mode != draft.None {
+	if got, _ := draftApproval(Defaults(), w).Decide(d, draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}, time.Time{}); got.Approval.Mode != draft.Send {
 		t.Errorf("without the config, the manifest's rule: %+v", got)
 	}
 	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
-	if p, ok := m.WorkflowApproval("slack-thanks"); !ok || p == nil || len(p.Rules) != 1 || p.Rules[0].Approval.Mode != draft.Window {
+	if p, ok := m.WorkflowApproval("slack-thanks"); !ok || p == nil || len(p.Rules) != 1 || p.Rules[0].Approval.Mode != draft.Delay {
 		t.Errorf("a turn's draft of the workflow does not take the config's: %+v", p)
 	}
 }
 
 func TestAConfigRuleOverAnotherSubjectIsRefusedAndHolds(t *testing.T) {
 	t.Parallel()
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "none",
-		"rule": [{"when": "pr.author == \"dependabot[bot]\"", "mode": "none"}]}}}}`)
+	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "send",
+		"rule": [{"when": "pr.author == \"dependabot[bot]\"", "mode": "send"}]}}}}`)
 	if err != nil {
 		t.Fatalf("a rule over one subject's facts loads: %v", err)
 	}
 	w := workflow.Workflow{Name: "slack-thanks", Slot: "slack"}
 	pol := draftApproval(cfg, w)
-	if got, err := pol.Decide(draft.Draft{Delivery: draft.Message}, draft.Subject{Slot: "slack"}, time.Time{}); err != nil || got.Approval.Mode != draft.Always || len(pol.Rules) != 0 {
+	if got, err := pol.Decide(draft.Draft{Delivery: draft.Message}, draft.Subject{Slot: "slack"}, time.Time{}); err != nil || got.Approval.Mode != draft.Wait || len(pol.Rules) != 0 {
 		t.Fatalf("%+v %v", got, err)
 	}
 	problems := configApprovalProblems(cfg, []workflow.Workflow{w, {Name: "other", Slot: "pr"}})
@@ -274,14 +274,14 @@ func TestAConfigRuleOverAnotherSubjectIsRefusedAndHolds(t *testing.T) {
 func TestTheConfigRefusesAnInvalidDraftApprovalRule(t *testing.T) {
 	t.Parallel()
 	for name, rule := range map[string]string{
-		"a bad predicate":         `{"when": "draft.delivery ==", "mode": "none"}`,
-		"a window with mode none": `{"when": "draft.delivery == \"message\"", "mode": "none", "window": "1h"}`,
-		"a brief fact":            `{"when": "brief.risk == \"low\"", "mode": "none"}`,
-		"no when":                 `{"mode": "none"}`,
-		"an untrusted fact":       `{"when": "slack.started_by_me", "mode": "none"}`,
-		"two subjects":            `{"when": "pr.author == \"x\" && slack.conversation == \"dm\"", "mode": "none"}`,
+		"a bad predicate":         `{"when": "draft.delivery ==", "mode": "send"}`,
+		"a window with mode none": `{"when": "draft.delivery == \"message\"", "mode": "send", "window": "1h"}`,
+		"a brief fact":            `{"when": "brief.risk == \"low\"", "mode": "send"}`,
+		"no when":                 `{"mode": "send"}`,
+		"an untrusted fact":       `{"when": "slack.started_by_me", "mode": "send"}`,
+		"two subjects":            `{"when": "pr.author == \"x\" && slack.conversation == \"dm\"", "mode": "send"}`,
 	} {
-		_, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "always", "rule": [`+rule+`]}}}}`)
+		_, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "wait", "rule": [`+rule+`]}}}}`)
 		if err == nil || !strings.Contains(err.Error(), "workflows.slack-thanks.draft_approval: rule[0]") {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -297,8 +297,8 @@ func TestARuleThatNeverReleasesACommentIsReportedAtLoad(t *testing.T) {
 		!strings.Contains(te.err.String(), "never releases a comment draft") {
 		t.Fatalf("code %d\n%s", code, te.err.String())
 	}
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "always",
-		"rule": [{"when": "draft.delivery != \"reaction\"", "mode": "none"}]}}}}`)
+	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"draft_approval": {"mode": "wait",
+		"rule": [{"when": "draft.delivery != \"reaction\"", "mode": "send"}]}}}}`)
 	if err != nil {
 		t.Fatal(err)
 	}

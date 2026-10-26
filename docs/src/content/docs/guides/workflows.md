@@ -78,19 +78,19 @@ The thresholds:
 `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `draft_approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`:
 
 ```json
-"workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m" } } }
+"workflows": { "slack-closure": { "draft_approval": { "mode": "delay", "window": "10m" } } }
 ```
 
 A rule picks the mode by the draft's and the subject's facts; this one sends a closing reaction at once and keeps the window for a closing message:
 
 ```json
-"workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m",
-  "rule": [{ "when": "draft.delivery == \"reaction\"", "mode": "none" }] } } }
+"workflows": { "slack-closure": { "draft_approval": { "mode": "delay", "window": "10m",
+  "rule": [{ "when": "draft.delivery == \"reaction\"", "mode": "send" }] } } }
 ```
 
 A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text.
 
-A workflow's `mode` and a draft's `observe` policy differ: `"mode": "observe"` plans the workflow and proposes nothing, while `"draft_approval": {"mode": "observe"}` proposes each draft and records it as what would have been sent, without sending it.
+A workflow's `mode` and a draft's `record` policy differ: `"mode": "observe"` plans the workflow and proposes nothing, while `"draft_approval": {"mode": "record"}` proposes each draft and records it as what would have been sent, without sending it.
 
 Their texts are `text.md.tmpl` in each workflow's directory, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
 

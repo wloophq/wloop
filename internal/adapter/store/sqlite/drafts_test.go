@@ -67,9 +67,9 @@ func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
 	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Entry: "e1", Kind: draft.Nudge, Target: "#general",
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true,
 		Origin:   draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA"},
-		Approval: draft.Approval{Mode: draft.Window, Window: 10 * time.Minute}, Deadline: at.Add(10 * time.Minute),
+		Approval: draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}, Deadline: at.Add(10 * time.Minute),
 		State: draft.Proposed, Error: "", Reason: "",
-		Would:     draft.Would{Policy: draft.WouldSend, Reason: "a nudge", Outcome: ""},
+		Would:     draft.Would{Policy: draft.WouldRelease, Reason: "a nudge", Outcome: ""},
 		CreatedAt: at, UpdatedAt: at}
 }
 
@@ -122,7 +122,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	discarded := sampleDraft(ghPull, at)
 	discarded.State, discarded.Reason, discarded.Entry = draft.Discarded, "observe", ""
 	discarded.Origin = draft.Origin{Kind: draft.OriginTurn, TurnSeq: 8}
-	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.Observe}, time.Time{}
+	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.Record}, time.Time{}
 	d2, _ := s.Insert(ctx, discarded)
 	d3, _ := s.Insert(ctx, sampleDraft(slackThread, at))
 

@@ -199,7 +199,7 @@ func TestDraftWireShape(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	d := r.stored(t, draft.Draft{Unit: r7u, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Effects: []string{"unit.closed"},
-		Text: "Closing this out", State: draft.Proposed, Approval: draft.Approval{Mode: draft.Always},
+		Text: "Closing this out", State: draft.Proposed, Approval: draft.Approval{Mode: draft.Wait},
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-closure", Rule: "slack-closure", Key: "acme/api#7"}})
 	var got api.Draft
 	if code := get(t, r.s, api.DraftPath(int64(d.ID)), &got); code != 200 {

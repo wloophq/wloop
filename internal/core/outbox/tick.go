@@ -9,7 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 )
 
-// Tick approves every proposed window draft whose Deadline passed, through the
+// Tick approves every proposed delay draft whose Deadline passed, through the
 // same gate as Approve; a draft the gate refuses stays proposed.
 func (s *Service) Tick(ctx context.Context) (approved int, err error) {
 	pending, err := s.windowDrafts(ctx)
@@ -35,7 +35,7 @@ func (s *Service) Tick(ctx context.Context) (approved int, err error) {
 	return approved, errors.Join(errs...)
 }
 
-// NextDeadline is the earliest Deadline of a proposed window draft; false when there is none.
+// NextDeadline is the earliest Deadline of a proposed delay draft; false when there is none.
 func (s *Service) NextDeadline(ctx context.Context) (time.Time, bool, error) {
 	pending, err := s.windowDrafts(ctx)
 	if err != nil || len(pending) == 0 {
@@ -50,7 +50,7 @@ func (s *Service) NextDeadline(ctx context.Context) (time.Time, bool, error) {
 	return next, true, nil
 }
 
-// windowDrafts are the proposed window drafts whose window may end: not one
+// windowDrafts are the proposed delay drafts whose window may end: not one
 // of a workflow that failed to load, nor one stored with another delivery
 // than its publisher posts it as, which the comment floor never decided.
 func (s *Service) windowDrafts(ctx context.Context) ([]draft.Draft, error) {
@@ -65,7 +65,7 @@ func (s *Service) windowDrafts(ctx context.Context) ([]draft.Draft, error) {
 	out := proposed[:0]
 	for _, d := range proposed {
 		switch {
-		case d.Approval.Mode != draft.Window || d.Deadline.IsZero():
+		case d.Approval.Mode != draft.Delay || d.Deadline.IsZero():
 		case d.Origin.Workflow != "" && slices.Contains(broken, d.Origin.Workflow):
 		case s.delivered(d).Delivery != d.Delivery:
 		default:

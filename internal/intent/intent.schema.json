@@ -572,28 +572,28 @@
     "draft_approval": {
       "type": "object",
       "additionalProperties": false,
-      "description": "When the drafts this proposes are sent without the user's click. Absent: always.",
+      "description": "When the drafts this proposes are sent without the user's click. Absent: wait.",
       "required": [
         "mode"
       ],
       "properties": {
         "mode": {
           "type": "string",
-          "description": "always: the user approves each draft; window: sent when the window ends unless the user discards or edits it first; none: sent at once; observe: recorded, never sent.",
+          "description": "wait: the user approves each draft; delay: sent when the window ends unless the user discards or edits it first; send: sent at once; record: recorded as what would have been sent, never sent.",
           "enum": [
-            "always",
-            "window",
-            "none",
-            "observe"
+            "wait",
+            "delay",
+            "send",
+            "record"
           ]
         },
         "window": {
           "type": "string",
-          "description": "With mode window only: how long the user has, such as 10m."
+          "description": "With mode delay only: how long the user has, such as 10m."
         },
         "rule": {
           "type": "array",
-          "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (none or window) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+          "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (send or delay) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -609,16 +609,16 @@
               "mode": {
                 "type": "string",
                 "enum": [
-                  "always",
-                  "window",
-                  "none",
-                  "observe"
+                  "wait",
+                  "delay",
+                  "send",
+                  "record"
                 ],
                 "description": "The mode of a draft the rule matches."
               },
               "window": {
                 "type": "string",
-                "description": "With mode window only: how long the user has, such as 10m."
+                "description": "With mode delay only: how long the user has, such as 10m."
               }
             }
           }

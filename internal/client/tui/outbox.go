@@ -63,7 +63,7 @@ func draftState(e api.EntryView) string {
 		return e.State
 	}
 	parts := []string{d.State}
-	if d.Approval.Mode != "" && d.Approval.Mode != "always" {
+	if d.Approval.Mode != "" && d.Approval.Mode != "wait" {
 		parts = append(parts, d.Approval.Mode)
 	}
 	return strings.Join(parts, " · ")

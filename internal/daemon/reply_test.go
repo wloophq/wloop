@@ -55,7 +55,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	}
 	d := ds[0]
 	if d.Unit != r7u || d.Entry != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
-		d.Origin.Kind != draft.OriginUser || d.Approval.Mode != draft.Always || d.State != draft.Proposed {
+		d.Origin.Kind != draft.OriginUser || d.Approval.Mode != draft.Wait || d.State != draft.Proposed {
 		t.Fatalf("draft %+v", d)
 	}
 	var listed api.DraftsResponse
@@ -73,7 +73,7 @@ func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	d := r.drafts(t)[0]
-	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeAsIs || d.Approval.Mode != draft.Always || d.Origin.Kind != draft.OriginUser {
+	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeAsIs || d.Approval.Mode != draft.Wait || d.Origin.Kind != draft.OriginUser {
 		t.Fatalf("draft %+v", d)
 	}
 	sent, failed, err := r.o.Send(context.Background())

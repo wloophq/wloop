@@ -86,7 +86,7 @@ func insertDraft(t *testing.T, db *sqlite.DB, d draft.Draft) draft.Draft {
 		d.Original = d.Text
 	}
 	if d.Approval.Mode == "" {
-		d.Approval.Mode = draft.Always
+		d.Approval.Mode = draft.Wait
 	}
 	if d.CreatedAt.IsZero() {
 		d.CreatedAt, d.UpdatedAt = testNow, testNow

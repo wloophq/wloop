@@ -141,7 +141,7 @@ func newOutboxRig(t *testing.T, off ...unit.ProviderID) *outboxRig {
 func (r *outboxRig) propose(t *testing.T, u unit.Unit, text string, mode draft.ApprovalMode) draft.Draft {
 	t.Helper()
 	a := draft.Approval{Mode: mode}
-	if mode == draft.Window {
+	if mode == draft.Delay {
 		a.Window = time.Minute
 	}
 	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Reply, Text: text,
@@ -182,10 +182,10 @@ func (r *outboxRig) act(t *testing.T, id draft.ID, action, body string) (int, ap
 func TestDraftsListByState(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	first := r.propose(t, r7u, "first", draft.Always)
+	first := r.propose(t, r7u, "first", draft.Wait)
 	r.clock.set(entriesNow.Add(time.Minute))
-	second := r.propose(t, r7u, "second\nmore", draft.Always)
-	r.propose(t, r7u, "watched", draft.Observe)
+	second := r.propose(t, r7u, "second\nmore", draft.Wait)
+	r.propose(t, r7u, "watched", draft.Record)
 	var res api.DraftsResponse
 	if code := get(t, r.s, api.Drafts+"?state=proposed", &res); code != 200 {
 		t.Fatalf("GET: %d", code)
@@ -193,7 +193,7 @@ func TestDraftsListByState(t *testing.T) {
 	var ids []int64
 	for _, d := range res.Drafts {
 		ids = append(ids, d.ID)
-		if d.State != "proposed" || d.Unit != "github/acme/api#7" || d.Approval.Mode != "always" || len(d.Actions) != 4 {
+		if d.State != "proposed" || d.Unit != "github/acme/api#7" || d.Approval.Mode != "wait" || len(d.Actions) != 4 {
 			t.Errorf("draft %+v", d)
 		}
 	}
@@ -212,7 +212,7 @@ func TestDraftsListByState(t *testing.T) {
 func TestApproveWithEditedText(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "Thanks, merging", draft.Always)
+	d := r.propose(t, r7u, "Thanks, merging", draft.Wait)
 	code, got, body := r.act(t, d.ID, "approve", `{"rev":0,"text":"Thanks! Merging now."}`)
 	if code != 200 {
 		t.Fatalf("%d %s", code, body)
@@ -243,7 +243,7 @@ func TestApproveAnswers409WhenPluginDisabled(t *testing.T) {
 func TestDraftActionStatuses(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "hello", draft.Always)
+	d := r.propose(t, r7u, "hello", draft.Wait)
 	cases := []struct {
 		name   string
 		id     draft.ID
@@ -327,7 +327,7 @@ func TestApprovedDraftPublishesOnWake(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.posted = make(chan draft.ID, 4)
-	d := r.propose(t, r7u, "ship it", draft.Always)
+	d := r.propose(t, r7u, "ship it", draft.Wait)
 	clock := r.startSender(t)
 	if w := clock.next(t); w != draftWatchdog {
 		t.Fatalf("idle wait %v", w)
@@ -355,7 +355,7 @@ func TestApprovedDraftPublishesOnWake(t *testing.T) {
 func TestSenderWakesAtTheDeadline(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "auto", draft.Window)
+	d := r.propose(t, r7u, "auto", draft.Delay)
 	clock := r.startSender(t)
 	if w := clock.next(t); w != time.Minute {
 		t.Fatalf("waits %v, want the window", w)
@@ -377,7 +377,7 @@ func TestSenderWakesAtTheDeadline(t *testing.T) {
 func TestSenderClampsAPastDeadline(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "auto", draft.Window)
+	d := r.propose(t, r7u, "auto", draft.Delay)
 	r.fx.refuse = errors.New("unknown person")
 	r.clock.set(entriesNow.Add(time.Hour))
 	clock := r.startSender(t)
@@ -412,9 +412,9 @@ func TestSenderRecoversBeforePublishing(t *testing.T) {
 func TestOutboxViewListsOpenDrafts(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	a := r.propose(t, r7u, "one", draft.Always)
-	b := r.propose(t, r7u, "two\nsecond line", draft.Always)
-	sent := r.propose(t, r7u, "three", draft.Always)
+	a := r.propose(t, r7u, "one", draft.Wait)
+	b := r.propose(t, r7u, "two\nsecond line", draft.Wait)
+	sent := r.propose(t, r7u, "three", draft.Wait)
 	if _, err := r.o.Approve(context.Background(), sent.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +478,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	ctx := context.Background()
-	a := r.propose(t, r7u, "approve me", draft.Always)
+	a := r.propose(t, r7u, "approve me", draft.Wait)
 	if code, body := r.verb(t, a.ID, "approve", `{"rev":"0","text":"approved text"}`); code != 200 || !strings.Contains(body, `"state":"next"`) {
 		t.Fatalf("approve: %d %s", code, body)
 	}
@@ -488,7 +488,7 @@ func TestOutboxVerbsActOnTheDraft(t *testing.T) {
 	if code, body := r.verb(t, a.ID, "approve", `{"rev":"1","text":"again"}`); code != 409 {
 		t.Fatalf("approve twice: %d %s", code, body)
 	}
-	b := r.propose(t, r7u, "drop me", draft.Always)
+	b := r.propose(t, r7u, "drop me", draft.Wait)
 	if code, body := r.verb(t, b.ID, "dismiss", `{}`); code != 200 {
 		t.Fatalf("dismiss: %d %s", code, body)
 	}
@@ -527,7 +527,7 @@ func TestOutboxVerbsRefuseADisabledPlugin(t *testing.T) {
 func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.propose(t, r7u, "watch only", draft.Observe)
+	r.propose(t, r7u, "watch only", draft.Record)
 	p := r.page(t, "view=outbox")
 	if len(p.Entries) != 0 || p.Counters.Views["outbox"] != 0 {
 		t.Fatalf("entries %v counters %+v", entryIDs(p.Entries), p.Counters)
@@ -595,7 +595,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
 			r := newOutboxRig(t)
-			d := r.propose(t, r7u, "as seen", draft.Always)
+			d := r.propose(t, r7u, "as seen", draft.Wait)
 			var seen api.Draft
 			get(t, r.s, api.DraftPath(int64(d.ID)), &seen)
 			if code, _, body := r.act(t, d.ID, "edit", `{"text":"swapped by someone"}`); code != 200 {
@@ -621,7 +621,7 @@ func TestApproveRefusesAStaleRev(t *testing.T) {
 func TestApproveWithRevPostsTheTextAtThatRev(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "as seen", draft.Always)
+	d := r.propose(t, r7u, "as seen", draft.Wait)
 	var seen api.Draft
 	get(t, r.s, api.DraftPath(int64(d.ID)), &seen)
 	code, got, body := r.act(t, d.ID, "approve", fmt.Sprintf(`{"rev":%d}`, seen.Rev))
@@ -633,7 +633,7 @@ func TestApproveWithRevPostsTheTextAtThatRev(t *testing.T) {
 func TestApproveNeedsTheRev(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	d := r.propose(t, r7u, "x", draft.Always)
+	d := r.propose(t, r7u, "x", draft.Wait)
 	if code, _, body := r.act(t, d.ID, "approve", `{}`); code != 400 || !strings.Contains(body, "takes the rev") {
 		t.Fatalf("route: %d %s", code, body)
 	}
@@ -670,7 +670,7 @@ func TestDraftsShowWhereTheyPost(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
 	r.fx.whereErr = errors.New("not logged in")
-	failed := r.propose(t, r7u, "hi", draft.Always)
+	failed := r.propose(t, r7u, "hi", draft.Wait)
 	var one api.Draft
 	for range 2 {
 		if code := get(t, r.s, api.DraftPath(int64(failed.ID)), &one); code != 200 || one.Where != "" {
@@ -681,7 +681,7 @@ func TestDraftsShowWhereTheyPost(t *testing.T) {
 		t.Fatalf("a failed lookup ran %d times, want it kept for a while", n)
 	}
 	r.fx.whereErr = nil
-	d := r.propose(t, r7u, "there", draft.Always)
+	d := r.propose(t, r7u, "there", draft.Wait)
 	want := `#general in the thread "acme/api#7"`
 	var res api.DraftsResponse
 	if code := get(t, r.s, api.Drafts, &res); code != 200 || len(res.Drafts) != 2 || res.Drafts[0].Where != want || res.Drafts[1].Where != "" {
@@ -704,7 +704,7 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 	r.s.whereLookup, r.s.wherePage = time.Second, 200*time.Millisecond
 	r.fx.whereHangs = true
 	for i := range 5 {
-		r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Always)
+		r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Wait)
 	}
 	for _, read := range []func(){
 		func() { r.page(t, "view=outbox") },

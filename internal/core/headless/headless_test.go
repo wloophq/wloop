@@ -387,7 +387,7 @@ func TestHeadlessResultAppliesOpsAndDrafts(t *testing.T) {
 	}
 	d := drafts[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: got.Seq, Intent: string(dintent.Act), Workflow: "triage"}
-	if d.Unit != thread || d.Origin != want || d.State != draft.Proposed || d.Approval.Mode != draft.Always || !slices.Equal(d.Items, []string{"i1"}) {
+	if d.Unit != thread || d.Origin != want || d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !slices.Equal(d.Items, []string{"i1"}) {
 		t.Fatalf("draft %+v", d)
 	}
 	if b := r.book(t, thread); b.Turns[0].Workflow != "triage" {
@@ -399,7 +399,7 @@ func TestUnfitAnswerAppliesNothing(t *testing.T) {
 	for name, raw := range map[string]string{
 		"not json":                   "{nope",
 		"unknown field":              `{"record":{"state":"done","summary":"s"},"drafts":[],"log":"","extra":1}`,
-		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"none"}}],"log":""}`,
+		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"send"}}],"log":""}`,
 		"a draft names its origin":   `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","origin":{"kind":"auto","turn_seq":9}}],"log":""}`,
 		"bad record":                 `{"record":{"state":"settled","summary":"s","ledger":[{"op":"resolve","item":"i1","anchor":{"ref":"x"}}]},"drafts":[{"kind":"reply","text":"hi"}],"log":""}`,
 	} {

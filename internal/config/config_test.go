@@ -489,7 +489,7 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	t.Parallel()
 	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"turns": {"automated_per_day": 7}, "workflows": {"slack-closure": {"draft_approval": {"mode": "window", "window": "10m"}}}}`), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte(`{"turns": {"automated_per_day": 7}, "workflows": {"slack-closure": {"draft_approval": {"mode": "delay", "window": "10m"}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(file, tools())
@@ -499,14 +499,14 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	if c.Turns.AutomatedPerDay != 7 {
 		t.Errorf("turns %+v", c.Turns)
 	}
-	if a := c.Workflows["slack-closure"].DraftApproval; a.Mode != "window" || time.Duration(a.Window) != 10*time.Minute {
+	if a := c.Workflows["slack-closure"].DraftApproval; a.Mode != "delay" || time.Duration(a.Window) != 10*time.Minute {
 		t.Errorf("draft approval %+v", a)
 	}
 	if Defaults().Turns.AutomatedPerDay != 20 {
 		t.Error("the default daily cap is not 20")
 	}
 	bad := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"draft_approval": {"mode": "window"}}}}`), 0o600); err != nil {
+	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"draft_approval": {"mode": "delay"}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.draft_approval") {

@@ -27,3 +27,17 @@ func v4Effects(ctx context.Context, tx *sql.Tx) error {
   AND state IN ('proposed', 'approved', 'sending', 'failed') AND NOT EXISTS (SELECT 1 FROM json_each(effects) WHERE value = 'pr.nudged')`,
 	)(ctx, tx)
 }
+
+// v4Approval renames the draft approval modes (always, window, none,
+// observe to wait, delay, send, record), the reason and outcome of a
+// recorded draft (observe to record, observed to recorded) and the would
+// policy send, which read as the mode, to release.
+func v4Approval(ctx context.Context, tx *sql.Tx) error {
+	return execAll(
+		`UPDATE drafts SET approval_mode = CASE approval_mode WHEN 'always' THEN 'wait' WHEN 'window' THEN 'delay'
+  WHEN 'none' THEN 'send' WHEN 'observe' THEN 'record' ELSE approval_mode END`,
+		`UPDATE drafts SET reason = 'record' WHERE state = 'discarded' AND reason = 'observe'`,
+		`UPDATE drafts SET would_outcome = 'recorded' WHERE would_outcome = 'observed'`,
+		`UPDATE drafts SET would_policy = 'release' WHERE would_policy = 'send'`,
+	)(ctx, tx)
+}

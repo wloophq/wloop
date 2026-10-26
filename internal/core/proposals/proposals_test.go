@@ -32,7 +32,7 @@ func (g *githubSource) Proposals(ctx context.Context, now time.Time) ([]outbox.P
 func ghNudge(u unit.Unit) outbox.Proposal {
 	return outbox.Proposal{Unit: u, Kind: draft.Nudge, Text: "@{github:bob}, any news?", Entry: "e-forged",
 		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 9, Intent: "autopost", Workflow: "w", Rule: "github-nudge", Key: "forged"},
-		Policy: draft.Fixed(draft.Approval{Mode: draft.None})}
+		Policy: draft.Fixed(draft.Approval{Mode: draft.Send})}
 }
 
 func TestGitHubUnitGetsOneNudgeDraft(t *testing.T) {
@@ -46,7 +46,7 @@ func TestGitHubUnitGetsOneNudgeDraft(t *testing.T) {
 	}
 	d := all[0]
 	want := draft.Origin{Kind: draft.OriginAuto, Rule: "github-nudge", Key: pull.String()}
-	if d.Origin != want || d.Approval != (draft.Approval{Mode: draft.Always}) || d.State != draft.Proposed || d.Entry != "" {
+	if d.Origin != want || d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || d.Entry != "" {
 		t.Fatalf("the plugin's self-declared origin or approval leaked: %+v", d)
 	}
 }
@@ -81,14 +81,14 @@ func TestRuleApprovalFromConfig(t *testing.T) {
 	e := newEnv(t)
 	e.job.Approval = func(rule string) draft.Approval {
 		if rule == "github-nudge" {
-			return draft.Approval{Mode: draft.Window, Window: time.Hour}
+			return draft.Approval{Mode: draft.Delay, Window: time.Hour}
 		}
-		return draft.Approval{Mode: draft.Always}
+		return draft.Approval{Mode: draft.Wait}
 	}
 	src := &githubSource{out: []outbox.Proposal{ghNudge(pull)}}
 	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
 	e.run()
-	if g := e.list("github-nudge")[0]; g.Approval != (draft.Approval{Mode: draft.Window, Window: time.Hour}) || !g.Deadline.Equal(t0.Add(time.Hour)) {
+	if g := e.list("github-nudge")[0]; g.Approval != (draft.Approval{Mode: draft.Delay, Window: time.Hour}) || !g.Deadline.Equal(t0.Add(time.Hour)) {
 		t.Fatalf("configured rule %+v", g)
 	}
 }
@@ -153,16 +153,16 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 	})
 	t.Run("observed", func(t *testing.T) {
 		e, _ := setup(t)
-		e.job.Approval = func(string) draft.Approval { return draft.Approval{Mode: draft.Observe} }
+		e.job.Approval = func(string) draft.Approval { return draft.Approval{Mode: draft.Record} }
 		e.run()
 		e.clock.set(t0.Add(23 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != "observe" {
+		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != "record" {
 			t.Fatalf("observed twice within renudge_after: %+v", all)
 		}
 		e.clock.set(t0.Add(24 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != "observe" {
+		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != "record" {
 			t.Fatalf("an observed key is suppressed for good: %+v", all)
 		}
 	})

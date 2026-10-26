@@ -144,7 +144,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Entry: c.Entry, Kind: kind, Text: c.Text,
-		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Policy: draft.Fixed(draft.Approval{Mode: draft.Always})})
+		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}

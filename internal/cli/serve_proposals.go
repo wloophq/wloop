@@ -44,7 +44,7 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) *proposals.Job {
 	renudge := time.Duration(cfg.Proposals.RenudgeAfter)
 	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: e.itemsLedger(db, cfg, logf), Clock: clockFunc(e.Now), Log: logf,
-		ObservedFor: renudge}
+		RecordedFor: renudge}
 	var srcs []proposals.Source
 	for _, m := range mods {
 		if m.Proposals != nil {

@@ -8,9 +8,10 @@ import (
 
 // v4 keys briefs and tags by unit, makes brief_runs provider-neutral, keeps
 // a sent draft's closure and when its effects were applied, records each
-// turn's role and drops items.waiting_on, which nothing reads. It declares
-// no compatible version: a v3 release refuses the store. Its data steps run
-// between the additions and the drops, so each reads the columns and tables
+// turn's role, renames the draft approval modes and drops items.waiting_on,
+// which nothing reads. It declares no compatible version: a v3 release
+// refuses the store. Its data steps run between the additions and the
+// drops, so each reads the columns and tables
 // v4 drops.
 func v4(ctx context.Context, tx *sql.Tx) error {
 	if err := execAll(v4Add...)(ctx, tx); err != nil {
@@ -23,6 +24,7 @@ func v4(ctx context.Context, tx *sql.Tx) error {
 		{"briefs", v4Briefs},
 		{"closure", v4Closure},
 		{"effects", v4Effects},
+		{"approval", v4Approval},
 		{"roles", v4Roles},
 		{"adopt", v4Adopt},
 	} {

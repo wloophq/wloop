@@ -37,9 +37,9 @@ type Proposal struct {
 	Delivery draft.Delivery
 	// Effects are applied once the draft is sent, names of builtin.Effects.
 	Effects []string
-	// ObservedFor is how long a settled draft of the same origin holds this
-	// proposal from being proposed again; zero keeps Service.ObservedFor.
-	ObservedFor time.Duration
+	// RecordedFor is how long a settled draft of the same origin holds this
+	// proposal from being proposed again; zero keeps Service.RecordedFor.
+	RecordedFor time.Duration
 }
 
 type Filter struct {
@@ -96,9 +96,9 @@ type ItemReader interface {
 type Service struct {
 	Store    Store
 	Effects  Effects
-	Policies Policies // nil resolves every proposal to always
-	Facts    Facts    // nil: a policy whose rules read the unit's facts resolves to always
-	// Broken names the workflows that failed to load; a window draft of one
+	Policies Policies // nil resolves every proposal to wait
+	Facts    Facts    // nil: a policy whose rules read the unit's facts resolves to wait
+	// Broken names the workflows that failed to load; a delay draft of one
 	// waits for a person until it loads again.
 	Broken   func() []string
 	Evidence Evidence   // nil none
@@ -108,9 +108,9 @@ type Service struct {
 	Log      func(format string, args ...any) // ids, states and kinds only; never text or tokens
 	// OnSent runs after a draft is stored as sent and its Evidence call (last-nudge stamps, plugin bookkeeping).
 	OnSent []func(ctx context.Context, d draft.Draft) error
-	// ObservedFor is how long an observed draft keeps an auto proposal of its key from being observed again;
+	// RecordedFor is how long a recorded draft keeps an auto proposal of its key from being recorded again;
 	// zero keeps it for good.
-	ObservedFor time.Duration
+	RecordedFor time.Duration
 	// Applier applies a sent draft's Effects; nil applies none.
 	Applier Applier
 }
@@ -147,11 +147,11 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		return draft.Draft{}, err
 	}
 	approval := dec.Approval
-	if targetsOutside(d) && approval.Mode != draft.Observe {
-		approval = always
+	if targetsOutside(d) && approval.Mode != draft.Record {
+		approval = waiting
 	}
 	d.Approval = approval
-	if dup, ok, err := s.duplicate(ctx, d, p.ObservedFor, now); err != nil || ok {
+	if dup, ok, err := s.duplicate(ctx, d, p.RecordedFor, now); err != nil || ok {
 		return dup, err
 	}
 	if err := s.publishable(ctx, d); err != nil {
@@ -162,17 +162,17 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	}
 	d.Would = s.would(ctx, d, dec)
 	switch approval.Mode {
-	case draft.Window:
+	case draft.Delay:
 		d.Deadline = now.Add(approval.Window)
-	case draft.Observe:
-		d.State, d.Reason, d.Would.Outcome = draft.Discarded, string(draft.Observe), draft.OutcomeObserved
+	case draft.Record:
+		d.State, d.Reason, d.Would.Outcome = draft.Discarded, string(draft.Record), draft.OutcomeRecorded
 	}
 	d, err = s.Store.Insert(ctx, d)
 	if err != nil {
 		return draft.Draft{}, err
 	}
 	s.logf("draft %d proposed: %s on %s by %s, approval %s, would %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind, d.Approval.Mode, d.Would.Policy)
-	if approval.Mode == draft.None {
+	if approval.Mode == draft.Send {
 		approved, err := s.markAuto(ctx, d)
 		if err != nil {
 			return d, err
@@ -224,28 +224,28 @@ func ResolveApproval(config, legacy, manifest *draft.Policy) *draft.Policy {
 }
 
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
-// one of the same rule, key, purpose and delivery; under observe, an
-// observed one younger than observedFor (zero: Service.ObservedFor) counts too.
-func (s *Service) duplicate(ctx context.Context, d draft.Draft, observedFor time.Duration, now time.Time) (draft.Draft, bool, error) {
+// one of the same rule, key, purpose and delivery; under record, a
+// recorded one younger than recordedFor (zero: Service.RecordedFor) counts too.
+func (s *Service) duplicate(ctx context.Context, d draft.Draft, recordedFor time.Duration, now time.Time) (draft.Draft, bool, error) {
 	if d.Origin.Kind != draft.OriginAuto {
 		return draft.Draft{}, false, nil
 	}
 	states := draft.Open
-	if d.Approval.Mode == draft.Observe {
+	if d.Approval.Mode == draft.Record {
 		states = append(slices.Clone(states), draft.Discarded)
 	}
 	found, err := s.Store.List(ctx, Filter{States: states, Unit: &d.Unit, Rule: d.Origin.Rule, Key: d.Origin.Key})
 	if err != nil {
 		return draft.Draft{}, false, err
 	}
-	if observedFor <= 0 {
-		observedFor = s.ObservedFor
+	if recordedFor <= 0 {
+		recordedFor = s.RecordedFor
 	}
 	for _, o := range found {
 		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
-		if o.State != draft.Discarded || o.Reason == string(draft.Observe) && (observedFor <= 0 || now.Sub(o.UpdatedAt) < observedFor) {
+		if o.State != draft.Discarded || o.Reason == string(draft.Record) && (recordedFor <= 0 || now.Sub(o.UpdatedAt) < recordedFor) {
 			return o, true, ErrDuplicate
 		}
 	}
@@ -296,9 +296,9 @@ var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDe
 
 // decide is the approval of d under p's policy. A policy that does not
 // validate, a rule that cannot be read, or a rule that reads the unit's
-// facts while they cannot be read resolves to always.
+// facts while they cannot be read resolves to wait.
 func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now time.Time) (draft.Decision, error) {
-	held := draft.Decision{Approval: always, Rule: -1}
+	held := draft.Decision{Approval: waiting, Rule: -1}
 	pol, err := s.policy(ctx, p)
 	if err != nil {
 		return held, err
@@ -309,17 +309,17 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 		sub = *p.Subject
 	case !pol.ReadsSubject():
 	case s.Facts == nil:
-		s.logf("draft approval of a %s proposal on %s resolved to always: its rules read the unit's facts, which nothing reads", d.Purpose, d.Unit)
+		s.logf("draft approval of a %s proposal on %s resolved to wait: its rules read the unit's facts, which nothing reads", d.Purpose, d.Unit)
 		return held, nil
 	default:
 		if sub, err = s.Facts(ctx, d.Unit, pol.Scope); err != nil {
-			s.logf("draft approval of a %s proposal on %s resolved to always: reading its unit's facts: %v", d.Purpose, d.Unit, err)
+			s.logf("draft approval of a %s proposal on %s resolved to wait: reading its unit's facts: %v", d.Purpose, d.Unit, err)
 			return held, nil
 		}
 	}
 	dec, err := pol.Decide(d, sub, now)
 	if err != nil {
-		s.logf("draft approval of a %s proposal on %s resolved to always: %v", d.Purpose, d.Unit, err)
+		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)
 		return held, nil
 	}
 	return dec, nil
@@ -332,7 +332,7 @@ func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) 
 		}
 		return *p.Policy, nil
 	}
-	fixed := draft.Policy{Default: always}
+	fixed := draft.Policy{Default: waiting}
 	if s.Policies == nil {
 		return fixed, nil
 	}
@@ -341,7 +341,7 @@ func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) 
 		err = pol.Validate()
 	}
 	if err != nil {
-		s.logf("draft approval of a %s proposal on %s resolved to always: %v", cmp.Or(p.Purpose, string(p.Kind)), p.Unit, err)
+		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", cmp.Or(p.Purpose, string(p.Kind)), p.Unit, err)
 		return fixed, nil
 	}
 	return pol, nil
@@ -377,7 +377,7 @@ func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision) 
 			}
 		}
 	}
-	return draft.Would{Policy: draft.WouldSend, Reason: fmt.Sprintf("a %s %s from a %s over confident items", d.Purpose, d.Delivery, d.Origin.Kind)}
+	return draft.Would{Policy: draft.WouldRelease, Reason: fmt.Sprintf("a %s %s from a %s over confident items", d.Purpose, d.Delivery, d.Origin.Kind)}
 }
 
 // publishable refuses d when its provider has no enabled publisher, or its Validator refuses d.
@@ -453,8 +453,8 @@ func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Dra
 	if err := setText(&d, text); err != nil {
 		return draft.Draft{}, err
 	}
-	if d.Approval.Mode == draft.Window {
-		d.Approval, d.Deadline = always, time.Time{}
+	if d.Approval.Mode == draft.Delay {
+		d.Approval, d.Deadline = waiting, time.Time{}
 	}
 	return s.save(ctx, d, d.State)
 }

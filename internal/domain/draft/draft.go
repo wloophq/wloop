@@ -113,21 +113,21 @@ type Evidence struct {
 	At        time.Time
 }
 
-type WouldPolicy string // "send", "hold"
+type WouldPolicy string // "release", "hold"
 
 const (
-	WouldSend WouldPolicy = "send"
-	WouldHold WouldPolicy = "hold"
+	WouldRelease WouldPolicy = "release"
+	WouldHold    WouldPolicy = "hold"
 )
 
-type Outcome string // "", "as_is", "edited", "discarded", "auto" (approved by its policy), "observed" (recorded only)
+type Outcome string // "", "as_is", "edited", "discarded", "auto" (approved by its policy), "recorded" (recorded only)
 
 const (
 	OutcomeAsIs      Outcome = "as_is"
 	OutcomeEdited    Outcome = "edited"
 	OutcomeDiscarded Outcome = "discarded"
 	OutcomeAuto      Outcome = "auto"
-	OutcomeObserved  Outcome = "observed"
+	OutcomeRecorded  Outcome = "recorded"
 )
 
 type Would struct {
@@ -152,11 +152,11 @@ type Draft struct {
 	Edited   bool     // Text != Original
 	Origin   Origin
 	Approval Approval  // fixed at proposal
-	Deadline time.Time // Approval.Mode "window": when Tick approves it; zero otherwise
+	Deadline time.Time // Approval.Mode "delay": when Tick approves it; zero otherwise
 	State    State
 	Evidence Evidence // State "sent" only
 	Error    string   // State "failed" only, never a token
-	Reason   string   // State "discarded": "user", "assigned", "observe", ...
+	Reason   string   // State "discarded": "user", "assigned", "record", ...
 	Would    Would
 	Rev      int64 // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
@@ -193,28 +193,28 @@ const (
 	WithdrawMoot     = "moot"
 )
 
-type ApprovalMode string // "always" (default), "window", "none", "observe"
+type ApprovalMode string // "wait" (default), "delay", "send", "record"
 
 const (
-	Always  ApprovalMode = "always"
-	Window  ApprovalMode = "window"
-	None    ApprovalMode = "none"
-	Observe ApprovalMode = "observe"
+	Wait   ApprovalMode = "wait"
+	Delay  ApprovalMode = "delay"
+	Send   ApprovalMode = "send"
+	Record ApprovalMode = "record"
 )
 
 type Approval struct {
 	Mode   ApprovalMode
-	Window time.Duration // Mode "window" only, > 0
+	Window time.Duration // Mode "delay" only, > 0
 }
 
-// Validate refuses an unknown mode, a window <= 0 with window, a window set without window.
+// Validate refuses an unknown mode, a window <= 0 with delay, a window set without delay.
 func (a Approval) Validate() error {
 	switch {
-	case !slices.Contains([]ApprovalMode{Always, Window, None, Observe}, a.Mode):
+	case !slices.Contains([]ApprovalMode{Wait, Delay, Send, Record}, a.Mode):
 		return fmt.Errorf("unknown draft approval mode %q", a.Mode)
-	case a.Mode == Window && a.Window <= 0:
-		return errors.New("draft approval window needs a positive window")
-	case a.Mode != Window && a.Window != 0:
+	case a.Mode == Delay && a.Window <= 0:
+		return errors.New("draft approval delay needs a positive window")
+	case a.Mode != Delay && a.Window != 0:
 		return fmt.Errorf("draft approval %s takes no window", a.Mode)
 	}
 	return nil

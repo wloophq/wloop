@@ -10,7 +10,7 @@ Asks about  Review the schema change (open)
 Mentions    @ana
 To          acme/api#7
 Origin      rule stalled-nudge, 26h ago
-Approval    always
+Approval    wait
 
 {{command}} outbox approve 12
 {{command}} outbox edit 12 <markdown>

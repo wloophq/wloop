@@ -228,7 +228,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 
 ## Draft approval facts
 
-A `[draft_approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its subject's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another subject than the draft's does not apply to it. A rule that releases a draft on its own (`none` or `window`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
+A `[draft_approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its subject's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another subject than the draft's does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
 
 | Approval fact | Type | Meaning |
 |---|---|---|

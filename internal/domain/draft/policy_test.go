@@ -21,9 +21,9 @@ type failing struct{}
 func (failing) Holds(map[string]any, time.Time) (bool, error) { return false, errors.New("boom") }
 
 var (
-	none   = Approval{Mode: None}
-	always = Approval{Mode: Always}
-	window = Approval{Mode: Window, Window: 10 * time.Minute}
+	none   = Approval{Mode: Send}
+	always = Approval{Mode: Wait}
+	window = Approval{Mode: Delay, Window: 10 * time.Minute}
 )
 
 func TestADefaultThatReleasesNeverReleasesAComment(t *testing.T) {
@@ -37,7 +37,7 @@ func TestADefaultThatReleasesNeverReleasesAComment(t *testing.T) {
 			t.Errorf("%s on a message: %+v", def.Mode, got)
 		}
 	}
-	if got, _ := (Policy{Default: Approval{Mode: Observe}}).Decide(Draft{Delivery: CommentDelivery}, Subject{Facts: nil}, time.Time{}); got.Approval.Mode != Observe {
+	if got, _ := (Policy{Default: Approval{Mode: Record}}).Decide(Draft{Delivery: CommentDelivery}, Subject{Facts: nil}, time.Time{}); got.Approval.Mode != Record {
 		t.Errorf("observe on a comment: %+v", got)
 	}
 }

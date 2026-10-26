@@ -24,53 +24,53 @@ type Manifests interface {
 var ErrUnknownOrigin = errors.New("unknown proposer")
 
 // Resolver is the Policies of the manifests, for turn and session drafts only:
-// the proposing turn's workflow block, then its intent's, else always. The
+// the proposing turn's workflow block, then its intent's, else wait. The
 // intent and workflow come from the turn in the book; an Origin that names
-// others than the book's resolves to always. Every other origin resolves to
-// always, so a rule's policy reaches a draft only through Proposal.Policy.
+// others than the book's resolves to wait. Every other origin resolves to
+// wait, so a rule's policy reaches a draft only through Proposal.Policy.
 type Resolver struct {
 	Manifests Manifests
 }
 
 var (
-	always    = draft.Approval{Mode: draft.Always}
-	alwaysPol = draft.Policy{Default: always}
+	waiting = draft.Approval{Mode: draft.Wait}
+	waitPol = draft.Policy{Default: waiting}
 )
 
 func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Policy, error) {
 	switch {
 	case o.Kind != draft.OriginTurn && o.Kind != draft.OriginSession:
 		if o.Intent != "" || o.Workflow != "" {
-			return alwaysPol, fmt.Errorf("a %s draft names a manifest: %w", o.Kind, ErrUnknownOrigin)
+			return waitPol, fmt.Errorf("a %s draft names a manifest: %w", o.Kind, ErrUnknownOrigin)
 		}
-		return alwaysPol, nil
+		return waitPol, nil
 	case o.TurnSeq <= 0:
 		if o.Intent != "" || o.Workflow != "" {
-			return alwaysPol, fmt.Errorf("a %s draft with no turn names a manifest: %w", o.Kind, ErrUnknownOrigin)
+			return waitPol, fmt.Errorf("a %s draft with no turn names a manifest: %w", o.Kind, ErrUnknownOrigin)
 		}
-		return alwaysPol, nil
+		return waitPol, nil
 	}
 	intent, workflow, ok, err := r.Manifests.Turn(ctx, u, o.TurnSeq)
 	switch {
 	case err != nil:
-		return alwaysPol, fmt.Errorf("reading turn %d of %s: %w", o.TurnSeq, u, err)
+		return waitPol, fmt.Errorf("reading turn %d of %s: %w", o.TurnSeq, u, err)
 	case !ok:
-		return alwaysPol, fmt.Errorf("turn %d of %s: %w", o.TurnSeq, u, ErrUnknownOrigin)
+		return waitPol, fmt.Errorf("turn %d of %s: %w", o.TurnSeq, u, ErrUnknownOrigin)
 	case o.Intent != "" && o.Intent != intent, o.Workflow != "" && o.Workflow != workflow:
-		return alwaysPol, fmt.Errorf("turn %d of %s is not the draft's intent and workflow: %w", o.TurnSeq, u, ErrUnknownOrigin)
+		return waitPol, fmt.Errorf("turn %d of %s is not the draft's intent and workflow: %w", o.TurnSeq, u, ErrUnknownOrigin)
 	}
 	var wp *draft.Policy
 	if workflow != "" {
 		var known bool
 		if wp, known = r.Manifests.WorkflowApproval(workflow); !known {
-			return alwaysPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
+			return waitPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
 		}
 	}
 	ip, known := r.Manifests.IntentApproval(intent)
 	if !known {
-		return alwaysPol, fmt.Errorf("intent %s: %w", intent, ErrUnknownOrigin)
+		return waitPol, fmt.Errorf("intent %s: %w", intent, ErrUnknownOrigin)
 	}
-	out := alwaysPol
+	out := waitPol
 	switch {
 	case wp != nil:
 		out = *wp

@@ -287,7 +287,7 @@ func TestEntrySettledAtIsTheWorkflowsOwn(t *testing.T) {
 	put := func(wf string, s draft.State, at time.Time) {
 		t.Helper()
 		d := draft.Draft{Unit: chatA, Entry: "e-01", Kind: draft.Nudge, Purpose: "nudge", Delivery: draft.Message, Text: "x", Original: "x",
-			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "e-01:chat:U1"}, Approval: draft.Approval{Mode: draft.Always},
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "e-01:chat:U1"}, Approval: draft.Approval{Mode: draft.Wait},
 			State: s, CreatedAt: at, UpdatedAt: at}
 		if s == draft.Discarded {
 			d.Reason = draft.WithdrawMoot

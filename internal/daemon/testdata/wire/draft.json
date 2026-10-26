@@ -22,7 +22,7 @@
     "rule": "slack-closure"
   },
   "approval": {
-    "mode": "always",
+    "mode": "wait",
     "window": ""
   },
   "deadline": null,

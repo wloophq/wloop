@@ -218,7 +218,7 @@ func TestSlackSettledAtIsTheWorkflowsOwn(t *testing.T) {
 		{"ask-b", thread, draft.Discarded, monday.Add(-time.Minute)},
 	} {
 		if _, err := e.db.Drafts().Insert(ctx, draft.Draft{Unit: d.u, Kind: draft.AskOwner, Purpose: "ask_owner", Delivery: draft.Message, Text: "x", Original: "x",
-			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: d.wf, Rule: d.wf, Key: d.u.String()}, Approval: draft.Approval{Mode: draft.Always},
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: d.wf, Rule: d.wf, Key: d.u.String()}, Approval: draft.Approval{Mode: draft.Wait},
 			State: d.s, CreatedAt: d.at, UpdatedAt: d.at}); err != nil {
 			t.Fatal(err)
 		}

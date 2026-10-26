@@ -71,7 +71,7 @@ func (p Policy) ReadsSubject() bool {
 }
 
 // Releases says whether a sends a draft with no person approving it.
-func (a Approval) Releases() bool { return a.Mode == None || a.Mode == Window }
+func (a Approval) Releases() bool { return a.Mode == Send || a.Mode == Delay }
 
 // Decision is the approval Decide picked and why.
 type Decision struct {
@@ -87,7 +87,7 @@ type Decision struct {
 // applies only when the facts it reads are of s's slot, a rule that
 // releases applies to a comment draft only when it names comment delivery,
 // and a comment draft no such rule releases waits for a person unless the
-// approval is observe.
+// approval is record.
 func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 	comment := d.Delivery == CommentDelivery
 	var all map[string]any
@@ -100,14 +100,14 @@ func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 		}
 		ok, err := r.When.Holds(all, now)
 		if err != nil {
-			return Decision{Approval: Approval{Mode: Always}, Rule: i}, fmt.Errorf("draft approval rule %d: %w", i, err)
+			return Decision{Approval: Approval{Mode: Wait}, Rule: i}, fmt.Errorf("draft approval rule %d: %w", i, err)
 		}
 		if ok {
 			return Decision{Approval: r.Approval, Rule: i, CommentReleased: comment && r.Approval.Releases()}, nil
 		}
 	}
 	if comment && p.Default.Releases() {
-		return Decision{Approval: Approval{Mode: Always}, Rule: -1}, nil
+		return Decision{Approval: Approval{Mode: Wait}, Rule: -1}, nil
 	}
 	return Decision{Approval: p.Default, Rule: -1}, nil
 }

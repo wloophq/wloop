@@ -240,7 +240,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			key = sub.subject.Key + ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
-			Effects: a.effects, ObservedFor: a.hold, Policy: &policy, Subject: subject,
+			Effects: a.effects, RecordedFor: a.hold, Policy: &policy, Subject: subject,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
 		if sub.entry != nil {
 			cd.p.Entry = string(sub.entry.ID)
@@ -405,12 +405,12 @@ func itemIDs(its []items.Item) []string {
 }
 
 // draftApproval is the approval policy of w's drafts: workflowApproval's,
-// else always.
+// else wait.
 func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
 	if p := workflowApproval(cfg, w); p != nil {
 		return *p
 	}
-	return draft.Policy{Default: draft.Approval{Mode: draft.Always}}
+	return draft.Policy{Default: draft.Approval{Mode: draft.Wait}}
 }
 
 // workflowApproval is the approval policy of w's drafts and of the turns it
@@ -443,7 +443,7 @@ func configPolicy(w workflow.Workflow, a *config.DraftApprovalConfig) (*draft.Po
 	}
 	p, err := a.Policy(builtin.ApprovalEnv(true, w.Slot))
 	if err != nil {
-		return draft.Fixed(draft.Approval{Mode: draft.Always}), fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)
+		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)
 	}
 	return &p, nil
 }

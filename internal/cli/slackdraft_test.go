@@ -210,7 +210,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	}
 	d := ds[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: newest.Seq, Intent: "reply", Workflow: newest.Workflow}
-	if d.Unit != u || d.State != draft.Proposed || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || d.Approval.Mode != draft.Always {
+	if d.Unit != u || d.State != draft.Proposed || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || d.Approval.Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
@@ -416,10 +416,10 @@ func TestASlackDraftOfAnIntentTakesTheRuleItsUnitMatches(t *testing.T) {
 	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless.default\"\n", "", 1)
 	files["intents/quick-act/intent.toml"] = m + `
 [draft_approval]
-mode = "always"
+mode = "wait"
 [[draft_approval.rule]]
 when = 'draft.delivery == "message" && slack.channel == "` + sessChannel + `"'
-mode = "window"
+mode = "delay"
 window = "10m"
 `
 	userProfile(t, w.te, files)
@@ -433,7 +433,7 @@ window = "10m"
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
 		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Window {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Delay {
 		t.Fatalf("drafts %+v", ds)
 	}
 }

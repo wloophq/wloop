@@ -69,3 +69,49 @@ func TestV4MarksClosuresAndAppliedEffects(t *testing.T) {
 		t.Errorf("a draft sent before v4 waits for its effects: %+v %v", pending, err)
 	}
 }
+
+func TestV4RenamesTheDraftApprovalModesAndWhatTheyRecorded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v3.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := storeAt(t, schemaSet{3, string(frozen), nil})
+	var stmts []string
+	for _, d := range []struct{ unit, mode, state, reason, policy, outcome string }{
+		{"C1/1", "always", "proposed", "", "hold", ""}, {"C1/2", "window", "proposed", "", "send", ""},
+		{"C1/3", "none", "sent", "", "send", "auto"}, {"C1/4", "observe", "discarded", "observe", "send", "observed"},
+		{"C1/5", "always", "discarded", "user", "hold", "discarded"}, {"C1/6", "", "sent", "", "", ""},
+	} {
+		stmts = append(stmts, `INSERT INTO drafts (provider, unit_key, kind, origin_kind, state, approval_mode, reason, would_policy, would_outcome, created_at, updated_at)
+			VALUES ('slack', '`+d.unit+`', 'reply', 'auto', '`+d.state+`', '`+d.mode+`', '`+d.reason+`', '`+d.policy+`', '`+d.outcome+`', '2026-10-01T10:00:00Z', '2026-10-02T10:00:00Z')`)
+	}
+	rawExec(t, path, stmts...)
+	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
+		t.Fatal(err)
+	}
+	db, err := current.open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows, err := db.r.Query(`SELECT unit_key, approval_mode, reason, would_policy, would_outcome FROM drafts ORDER BY unit_key`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for rows.Next() {
+		var u, m, r, p, o string
+		if err := rows.Scan(&u, &m, &r, &p, &o); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, strings.Join([]string{u, m, r, p, o}, "|"))
+	}
+	rows.Close()
+	want := []string{"C1/1|wait||hold|", "C1/2|delay||release|", "C1/3|send||release|auto", "C1/4|record|record|release|recorded",
+		"C1/5|wait|user|hold|discarded", "C1/6||||"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

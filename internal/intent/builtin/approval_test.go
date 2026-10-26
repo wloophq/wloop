@@ -45,7 +45,7 @@ func TestAnApprovalEnvReadsItsSlotsAndNeverABrief(t *testing.T) {
 
 func TestAnApprovalRuleNamesCommentDeliveryByItsConjunction(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
-	none := draft.Approval{Mode: draft.None}
+	none := draft.Approval{Mode: draft.Send}
 	for when, want := range map[string]bool{
 		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: true,
 		`pr.repo == "acme/docs"`:                                false,
@@ -73,7 +73,7 @@ func TestAnApprovalRuleNamesCommentDeliveryByItsConjunction(t *testing.T) {
 
 func TestAnApprovalRuleNamesTheSubjectsItReads(t *testing.T) {
 	env := ApprovalEnv(true, UnitSlots()...)
-	none := draft.Approval{Mode: draft.None}
+	none := draft.Approval{Mode: draft.Send}
 	for when, want := range map[string][]string{
 		`pr.author == "dependabot[bot]" && draft.delivery == "comment"`: {"pr"},
 		`slack.conversation == "dm"`:                                    {"slack"},
@@ -103,7 +103,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 			continue
 		}
 		var ue *UntrustedError
-		if _, err := ApprovalRule(f.Name+" == "+zeroLiteral(f), draft.Approval{Mode: draft.None}, env); !errors.As(err, &ue) || ue.Fact != f.Name {
+		if _, err := ApprovalRule(f.Name+" == "+zeroLiteral(f), draft.Approval{Mode: draft.Send}, env); !errors.As(err, &ue) || ue.Fact != f.Name {
 			t.Errorf("%s: %v", f.Name, err)
 		}
 	}
@@ -144,14 +144,14 @@ func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *
 		`draft.delivery == "reaction"`:                          false,
 		`pr.author == "x"`:                                      false,
 	} {
-		r, err := ApprovalRule(when, draft.Approval{Mode: draft.None}, env)
+		r, err := ApprovalRule(when, draft.Approval{Mode: draft.Send}, env)
 		if err != nil {
 			t.Fatalf("%s: %v", when, err)
 		}
 		if got := NeverReleasesComment(r); got != want {
 			t.Errorf("%s: %v", when, got)
 		}
-		r.Approval = draft.Approval{Mode: draft.Always}
+		r.Approval = draft.Approval{Mode: draft.Wait}
 		if NeverReleasesComment(r) {
 			t.Errorf("%s holding: flagged", when)
 		}

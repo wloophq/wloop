@@ -69,7 +69,7 @@ func (j *Job) enabled(p unit.ProviderID) bool { return j.Enabled == nil || j.Ena
 
 func (j *Job) approval(rule string) draft.Approval {
 	if j.Approval == nil {
-		return draft.Approval{Mode: draft.Always}
+		return draft.Approval{Mode: draft.Wait}
 	}
 	return j.Approval(rule)
 }
