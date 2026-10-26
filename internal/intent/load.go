@@ -353,9 +353,15 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem, l.briefExtras)
 	l.Problems = append(l.Problems, wfProblems...)
 	return l, broken
+}
+
+// briefExtras are the brief.extra.* facts of p's brief intent.
+func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
+	d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
+	return builtin.ExtraFacts(d.Extra)
 }
 
 func (l *Loaded) intentProblem(name string) string {
