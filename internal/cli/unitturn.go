@@ -95,7 +95,7 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 		return err
 	}
 	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, resumeOf: run.resumeOf, unit: u})
-	ws, shared, err := e.placedWorkspace(ctx, run.cfg, u, opts)
+	ws, shared, err := e.runWorkspace(ctx, run, opts)
 	if err != nil {
 		return err
 	}
@@ -137,6 +137,63 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	}
 	fmt.Fprintf(e.Out, "%s of %s in %s, %s\n", run.def.Name, u.Label(), ws.DisplayName, verb)
 	return nil
+}
+
+// runWorkspace is where run's turn goes: the repository its intent's
+// workspace table names, else u's placement.
+func (e *Env) runWorkspace(ctx context.Context, run unitRun, opts roundOptions) (wsdomain.Workspace, bool, error) {
+	w := run.def.WorkspaceRepo
+	if w == nil {
+		return e.placedWorkspace(ctx, run.cfg, run.r.Unit, opts)
+	}
+	name := w.Repo
+	if w.RepoInput != "" {
+		name, _ = run.r.Inputs[w.RepoInput].(string)
+		if name == "" {
+			return wsdomain.Workspace{}, false, fmt.Errorf("%s runs in the repository its input %s names, and the turn has none", run.def.Name, w.RepoInput)
+		}
+	}
+	return e.repoWorkspace(ctx, run.cfg, run.r.Unit, run.def, name, opts)
+}
+
+// repoWorkspace is a workspace of the repository name (owner/name) for u:
+// the main checkout for an intent that reuses its live session, else u's
+// own worktree, created and kept by the manager that creates it.
+func (e *Env) repoWorkspace(ctx context.Context, cfg config.Config, u unit.Unit, d dintent.Def, name string, opts roundOptions) (wsdomain.Workspace, bool, error) {
+	repos, err := e.WS.Repos(ctx)
+	if err != nil {
+		return wsdomain.Workspace{}, false, err
+	}
+	repo, ok := placedRepo(repos, name)
+	if !ok {
+		return wsdomain.Workspace{}, false, fmt.Errorf("%s runs in the repository %q, which %s does not know", d.Name, name, e.managerDisplay())
+	}
+	all, err := e.WS.List(ctx)
+	if err != nil {
+		return wsdomain.Workspace{}, false, err
+	}
+	if d.Session.Strategy != sessionNew {
+		i := slices.IndexFunc(all, func(w wsdomain.Workspace) bool {
+			return w.RepoID == repo.ID && (w.IsMain || filepath.Clean(w.Path) == filepath.Clean(repo.Path))
+		})
+		if i < 0 {
+			return wsdomain.Workspace{}, false, fmt.Errorf("%s runs in the main checkout of %s, which %s does not list", d.Name, name, e.managerDisplay())
+		}
+		return all[i], true, nil
+	}
+	if ws, ok, err := e.unitWorkspace(ctx, u, repo, all); err != nil || ok {
+		return ws, false, err
+	}
+	m, err := e.chooseManager(ctx, cfg, opts)
+	if err != nil {
+		return wsdomain.Workspace{}, false, err
+	}
+	in, err := e.repoIn(ctx, m, repo)
+	if err != nil {
+		return wsdomain.Workspace{}, false, err
+	}
+	ws, err := e.createUnitWorkspace(ctx, m, in, repo.Path, u)
+	return ws, false, err
 }
 
 // placedWorkspace is the workspace u's placement names, and whether that

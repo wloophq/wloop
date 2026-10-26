@@ -260,7 +260,7 @@ func TestTransitionsResolveItems(t *testing.T) {
 		{"closed", func(s *ghsourcetest.Situation) { s.PR.State, s.PR.ClosedAt = "CLOSED", ghsourcetest.Now }, items.Moot},
 		{"loop working", func(s *ghsourcetest.Situation) {
 			s.PR.Workspace = ghsourcetest.ReviewWorkspace
-			s.Turn = &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
+			s.Turn = &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "round.review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
 		}, items.Superseded},
 	}
 	for i, tc := range cases {

@@ -36,6 +36,9 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 	if err != nil {
 		return err
 	}
+	if d.Builds != "" {
+		return fmt.Errorf("the intent %s builds a %s and starts no turn", d.Name, d.Builds)
+	}
 	if d.Launch == builtin.LaunchProbe {
 		return c.probe(ctx, d, l)
 	}

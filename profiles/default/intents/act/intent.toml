@@ -1,6 +1,7 @@
 label   = "Act"
 summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
 verb    = "delegate"
+role    = "headless.default"
 workspace = "pr_else_main"
 provider  = "any"
 modes     = ["headless", "session"]

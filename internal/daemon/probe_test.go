@@ -11,6 +11,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/profile"
+	turnpkg "github.com/wloophq/wloop/internal/turn"
 )
 
 // probeLauncher sends the turn it is asked for and names term_probe as its
@@ -35,6 +38,7 @@ func (l *probeLauncher) Launch(ctx context.Context, x turns.Launch) error {
 func TestProbeAPI(t *testing.T) {
 	t.Parallel()
 	s, svc := agentServer(t)
+	s.deps.Intents = bundledIntents(t).Get
 	l := &probeLauncher{svc: svc}
 	svc.Launcher = l
 	rec := agentCall(t, s.Handler(), "POST", api.AdminProbe, "", `{"workspace_id":"ws-e2e","home":"/homes/a","model":"haiku"}`)
@@ -66,13 +70,24 @@ func TestProbeAPI(t *testing.T) {
 func TestProbeAPIRefusesWithoutAWorkspaceAndReportsALaunchFailure(t *testing.T) {
 	t.Parallel()
 	s, svc := agentServer(t)
+	s.deps.Intents = bundledIntents(t).Get
 	l := &probeLauncher{svc: svc}
 	svc.Launcher = l
 	if rec := agentCall(t, s.Handler(), "POST", api.AdminProbe, "", `{}`); rec.Code != http.StatusBadRequest || len(l.launches) != 0 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	l.err = errors.New("no workspace ws-gone in Orca")
-	if rec := agentCall(t, s.Handler(), "POST", api.AdminProbe, "", `{"workspace_id":"ws-gone"}`); rec.Code != http.StatusInternalServerError {
+	if rec := agentCall(t, s.Handler(), "POST", api.AdminProbe, "", `{"workspace_id":"ws-gone"}`); rec.Code != http.StatusInternalServerError || len(l.launches) != 1 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
+}
+
+// bundledIntents are the bundled profile's intents.
+func bundledIntents(t *testing.T) *intentload.Cache {
+	t.Helper()
+	c, err := turnpkg.NewCache(func() []profile.Layer { return nil }, intentload.CacheOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }

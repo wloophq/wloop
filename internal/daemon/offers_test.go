@@ -140,7 +140,7 @@ func (c catalogRig) override(t *testing.T, o dinv.Override) {
 func (c catalogRig) asks(t *testing.T, state turn.State, rec record.Record) {
 	t.Helper()
 	at := catalogNow.Add(-30 * time.Minute)
-	b := turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term",
+	b := turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term",
 		State: state, SentAt: at, StartedAt: at}},
 		Records: []turn.Record{{Session: "term", Hash: "x", At: at, Record: rec}}}
 	if _, err := c.repo.Save(context.Background(), b, port.Event{Unit: pr.Ref(r7).Unit(), Kind: turns.KindTurnSent, Key: "r", At: at}); err != nil {

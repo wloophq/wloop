@@ -310,7 +310,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 	if out.Records && e.Turns != nil {
 		sent.send = &turns.SendRequest{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Turn: out.ID, Trigger: turnTrigger(r.Trigger),
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
-			Items: r.Items, Entry: r.Entry}
+			Items: r.Items, Entry: r.Entry, Role: c.Def.Role}
 		if r.Why != nil {
 			sent.send.Workflow = r.Why.Workflow
 		}

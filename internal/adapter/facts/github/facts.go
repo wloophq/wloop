@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/sweep"
 	dchange "github.com/wloophq/wloop/internal/domain/change"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -24,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
 )
@@ -280,7 +280,7 @@ func (pl *planner) recorded(ref pr.Ref) dchange.RecordedReview {
 	if !ok {
 		return dchange.RecordedReview{}
 	}
-	if v, ok := b.LastVerdict(turn.Intent(dintent.Review)); ok {
+	if v, ok := b.LastRoleVerdict(builtin.RoleReview); ok {
 		return dchange.RecordedReview{Head: v.Head, At: v.At}
 	}
 	return dchange.RecordedReview{}
@@ -320,7 +320,7 @@ func newestReview(b turn.Book) (time.Time, bool) {
 	var at time.Time
 	found := false
 	for _, t := range b.Turns {
-		if t.Intent == turn.Intent(dintent.Review) && t.State != turn.Withdrawn {
+		if t.Role == builtin.RoleReview && t.State != turn.Withdrawn {
 			found = true
 			if t.SentAt.After(at) {
 				at = t.SentAt

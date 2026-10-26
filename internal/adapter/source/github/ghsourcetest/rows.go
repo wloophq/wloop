@@ -163,7 +163,7 @@ func (s *Situation) add(kind, actor string, at time.Time, data string) {
 // reviewTurn is a review turn in state; an asked or stopped one holds its question, as an answerable turn's
 // facts do.
 func reviewTurn(state string) *prrow.TurnFact {
-	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
+	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "round.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
 	if state != "started" {
 		f.Question = &api.QuestionView{State: state, RecordID: 1, Kind: "choice", Text: "which branch?"}
 	}

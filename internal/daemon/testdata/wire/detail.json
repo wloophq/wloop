@@ -308,6 +308,7 @@
       "head": "h2",
       "id": "r1",
       "intent": "review",
+      "role": "round.review",
       "sent_at": "2026-10-08T09:00:00Z",
       "sent_to": "term-1",
       "seq": 1,

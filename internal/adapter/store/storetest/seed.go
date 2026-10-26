@@ -320,6 +320,7 @@ func seedTurns(ctx context.Context, f *Fixture, s Sizes, l layout) error {
 			sent := within(s, i, k+1, count+1)
 			t := turn.Turn{
 				Intent:       turn.Intent([]string{"review", "address"}[j%2]),
+				Role:         []string{"round.review", "round.address"}[j%2],
 				ID:           fmt.Sprintf("round-%03d", n+1),
 				Trigger:      []turn.Trigger{turn.Automated, turn.ByHand}[n%2],
 				Head:         oid(i, k),

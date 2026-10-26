@@ -362,7 +362,7 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sc := c.sc(t)
 			r := newStartRig(t, sc, c.intent, c.round)
-			cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, roundOf(c.intent, c.round))
+			cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, sc.env.startOf(r.st).candidate())
 			r.load(t)
 			if err := r.steps.Dismiss(context.Background(), r.st, r.u, r.why); err != nil {
 				t.Fatal(err)

@@ -361,8 +361,12 @@ func (l *Loaded) intentProblem(name string) string {
 	if _, ok := l.Broken[dintent.Name(name)]; ok {
 		return fmt.Sprintf("the intent %q does not load", name)
 	}
-	if _, ok := l.Registry.Get(dintent.Name(name)); !ok {
+	d, ok := l.Registry.Get(dintent.Name(name))
+	if !ok {
 		return fmt.Sprintf("unknown intent %q; the intents are %s", name, l.Registry.AllNames())
+	}
+	if d.Builds != "" {
+		return fmt.Sprintf("the intent %q builds a %s and is never a turn", name, d.Builds)
 	}
 	return ""
 }
