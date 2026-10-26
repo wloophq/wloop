@@ -62,9 +62,12 @@ func providerWF(p unit.ProviderID, slot, name string, t expr.Type, doc string) F
 // read the brief slot's facts.
 var BriefSubjects = []string{"pr", "slack", "entry"}
 
+// BriefSlot is the slot of the facts of a unit's brief.
+const BriefSlot = "brief"
+
 // briefWF is a fact of the unit's brief, read by every slot of BriefSubjects.
 func briefWF(name string, t expr.Type, doc string) Fact {
-	f := wf("brief", name, t, doc)
+	f := wf(BriefSlot, name, t, doc)
 	f.Subjects = BriefSubjects
 	return f
 }

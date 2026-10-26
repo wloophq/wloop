@@ -118,7 +118,7 @@ func (d DimDef) closedFor(providers []unit.ProviderID) (vals []string, ok bool) 
 }
 
 func factDef(f builtin.Fact, name Dim) DimDef {
-	d := DimDef{Name: name, Fact: f.Name, List: f.Type == expr.List, Brief: f.Slot == "brief",
+	d := DimDef{Name: name, Fact: f.Name, List: f.Type == expr.List, Brief: f.Slot == builtin.BriefSlot,
 		Gated: slices.Contains(builtin.IntentDims, string(name))}
 	if f.Provider != "" {
 		d.Providers = []unit.ProviderID{f.Provider}
@@ -176,7 +176,7 @@ func extras(intents *dintent.Registry) []DimDef {
 	}
 	var out []DimDef
 	for _, d := range intents.All() {
-		if d.Builds != "brief" {
+		if d.Builds != builtin.BuildsBrief {
 			continue
 		}
 		providers := d.Providers
