@@ -182,7 +182,7 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	if ms := mentionsOf(text); len(ms) > 0 {
 		fmt.Fprintf(w, "mentions: %s\n", strings.Join(ms, ", "))
 	}
-	if d.Kind == "react" {
+	if d.Reaction != "" {
 		fmt.Fprintf(w, "reaction: :%s:\n", d.Reaction)
 		return
 	}

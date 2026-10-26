@@ -319,12 +319,12 @@ func (ev *entryViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
 
 func draftBody(d draft.Draft) string {
 	text := d.Text
-	if d.Kind == draft.React {
+	if d.Reaction != "" {
 		text = ":" + d.Reaction + ":"
 	}
 	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
 	if r := []rune(line); len(r) > 200 {
 		line = string(r[:200]) + "…"
 	}
-	return string(d.Kind) + ": " + line
+	return d.Purpose + ": " + line
 }
