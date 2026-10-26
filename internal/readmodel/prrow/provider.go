@@ -73,6 +73,9 @@ var _ readmodel.Provider = (*Provider)(nil)
 
 func (p *Provider) Provider() unit.ProviderID { return unit.GitHub }
 
+// OffersActions says the deriver offers the whole catalog on its rows.
+func (p *Provider) OffersActions() bool { return true }
+
 // Listed lists every pull request of the inventory but the lapsed ones
 // nobody adopted, the most recently updated first.
 func (p *Provider) Listed(ctx context.Context) ([]unit.Unit, error) {

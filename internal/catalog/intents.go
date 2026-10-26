@@ -11,7 +11,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -97,10 +96,7 @@ func pluginOf(d dintent.Def) string {
 func (r registryActions) States(f Facts) []api.ActionState {
 	var out []api.ActionState
 	facts := intentload.ActionFactMap(f.Get)
-	provider := f.Row.Unit.Provider
-	if provider == "" {
-		provider = unit.GitHub
-	}
+	provider := cmp.Or(f.Row.Unit, f.Ref.Unit()).Provider
 	for _, d := range r.offering() {
 		if !d.Serves(provider) {
 			continue

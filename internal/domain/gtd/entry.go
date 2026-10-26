@@ -96,20 +96,5 @@ func sortRefs(rs []ItemRef) {
 	})
 }
 
-// isMe says whether p is the user. It also matches p's keys itself, so it holds before items.Person.Is does.
-func isMe(p items.Person, me Me) bool {
-	if p.Is(me) {
-		return true
-	}
-	for _, k := range append([]string{p.Key}, p.Aliases...) {
-		if k == "" {
-			continue
-		}
-		for _, m := range me.Keys {
-			if k == m || (strings.HasPrefix(k, "github:") && strings.EqualFold(k, m)) {
-				return true
-			}
-		}
-	}
-	return false
-}
+// isMe says whether p is the user.
+func isMe(p items.Person, me Me) bool { return p.Is(me) }

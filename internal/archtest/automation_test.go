@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -44,15 +45,48 @@ var coreProviderAllowlist = []allowed{
 	{"internal/core/turns/headless.go", `"entry"`, "the headless turn's entry input, which shares the entry provider's spelling"},
 }
 
-// coreLiterals flags a provider id spelled in a non-test file of the
-// core, as a string literal or as a unit provider constant; the core's fakes,
-// packages named <x>test, are excluded. used marks the allowlist entries that
-// matched.
+// providerHomes are the packages a provider id may appear in outside the
+// core: each plugin's own packages, the vocabulary tables and the unit
+// package that declares the ids. A provider's adapters (provider() names
+// one), the composition root and the files that name the sources are
+// allowed too.
+var providerHomes = []string{
+	"internal/domain/unit",
+	"internal/domain/pr", "internal/readmodel/prrow", "internal/situation", "internal/github",
+	"internal/slack", "internal/domain/slack",
+	"internal/intent/builtin",
+	"internal/e2e",
+}
+
+// providerHome says whether file may spell a provider id.
+func providerHome(file string) bool {
+	dir := filepath.Dir(file)
+	if under(dir, providerHomes...) || provider(dir) != "" || compositionRoot(file) || file == sourceRoot {
+		return true
+	}
+	wiring, _ := filepath.Match(slackWiring, file)
+	return wiring
+}
+
+// coreLiterals flags a provider id spelled in a non-test file: in the core,
+// any provider id as a string literal or a unit provider constant; outside
+// it and outside the providers' homes, a unit provider constant or a
+// plugin's id as a literal or a person key's prefix. Fakes, packages named
+// <x>test, are excluded. used marks the allowlist entries that matched.
 func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed, used map[int]bool) []string {
 	dir := filepath.Dir(file)
-	if testFile(file) || !under(dir, "internal/core") || strings.HasSuffix(filepath.Base(dir), "test") {
+	if testFile(file) || strings.HasSuffix(filepath.Base(dir), "test") {
 		return nil
 	}
+	core := under(dir, "internal/core")
+	if !core && providerHome(file) {
+		return nil
+	}
+	imports := map[*ast.BasicLit]bool{}
+	for _, imp := range f.Imports {
+		imports[imp.Path] = true
+	}
+	plugin := func(s string) bool { return slices.Contains(pluginIDs(), s) }
 	var out []string
 	flag := func(pos token.Pos, spelled string) {
 		for i, a := range allow {
@@ -61,12 +95,21 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 				return
 			}
 		}
-		out = append(out, fmt.Sprintf("%s: %s; the core names no provider", fset.Position(pos), spelled))
+		where := "the core names no provider"
+		if !core {
+			where = "a provider id lives in its plugin, the vocabulary tables and the composition root"
+		}
+		out = append(out, fmt.Sprintf("%s: %s; %s", fset.Position(pos), spelled, where))
 	}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.BasicLit:
-			if s, err := strconv.Unquote(n.Value); err == nil && n.Kind == token.STRING && providerIDs[s] {
+			s, err := strconv.Unquote(n.Value)
+			if err != nil || n.Kind != token.STRING || imports[n] {
+				return true
+			}
+			prefix, _, keyed := strings.Cut(s, ":")
+			if (core && providerIDs[s]) || (!core && (plugin(s) || keyed && plugin(prefix))) {
 				flag(n.Pos(), strconv.Quote(s))
 			}
 		case *ast.SelectorExpr:
@@ -79,7 +122,10 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 	return out
 }
 
-// TestTheCoreNamesNoProvider checks that the core spells no provider id.
+// TestTheCoreNamesNoProvider checks that the core spells no provider id,
+// and that outside the core a provider id appears only in its plugin's
+// packages, the vocabulary tables, the unit package and the composition
+// root.
 func TestTheCoreNamesNoProvider(t *testing.T) {
 	t.Parallel()
 	used := map[int]bool{}

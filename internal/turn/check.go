@@ -83,7 +83,7 @@ func samples(d dintent.Def) []Context {
 	pr := PR{URL: "https://github.com/acme/api/pull/7", Owner: "acme", Repo: "api", Number: 7, Title: "sample", Author: "sample", State: "OPEN",
 		Association: "MEMBER", Head: "a1", Base: "main", Labels: []string{"sample"}, Prior: &PriorReview{Verdict: "APPROVED", Head: "a0"}}
 	var payload Payload = &pr
-	if p := d.ProviderOrDefault(); p != unit.GitHub {
+	if p := d.ProviderOrDefault(); p != pr.Unit().Provider {
 		payload = samplePayload{p}
 	}
 	base := Context{Intent: Intent(d.Name), Payload: payload, Unit: payload.Unit(), Wording: payload.Wording(), Def: d, Headline: "sample", Records: true, Guidance: "sample", Agent: "sample", Command: brand.Name,

@@ -8,7 +8,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
@@ -99,7 +98,7 @@ func (f Facts) authorWorkspace() bool {
 // yours says the row's unit is the user's to act on: any unit but a pull request, or a pull request that
 // is the user's, taken over or held by an author workspace.
 func (f Facts) yours() bool {
-	if p := f.Row.Unit.Provider; p != "" && p != unit.GitHub {
+	if !f.Row.Unit.IsZero() && f.Row.Unit != f.Ref.Unit() {
 		return true
 	}
 	return f.Mine || f.Override.Adopted || f.authorWorkspace()
