@@ -29,16 +29,13 @@ var draftKinds = func() []string {
 func slackDraftTool() tool {
 	return tool{
 		Name: slackDraftName,
-		Description: fmt.Sprintf("Propose a Slack message, or a reaction, on this session's Slack unit, to be posted as the user once they approve it in the %s Outbox. "+
-			"It posts nothing itself. Name people as @{slack:<user id>}.", brand.Name),
 		InputSchema: object(map[string]*schema{
-			"text":     str(0, "the message, in Markdown; empty for a reaction"),
-			"kind":     enum("what the draft is; defaults to reply", draftKinds...),
-			"target":   str(0, "where it posts: empty for the unit's thread or direct message, else a message permalink, #channel, channel id or user id"),
-			"items":    {Type: "array", Items: str(0, "an item id of the unit"), Description: "the unit's items the draft answers"},
-			"reaction": str(0, "the emoji name of a react draft, without colons"),
-			"effects": {Type: "array", Items: str(0, "an effect name your intent lists in drafts.allowed_effects"),
-				Description: "what sending it does besides posting, such as unit.closed for a closing post; empty for none"},
+			"text":     str(0),
+			"kind":     enum(draftKinds...),
+			"target":   str(0),
+			"items":    {Type: "array", Items: str(0)},
+			"reaction": str(0),
+			"effects":  {Type: "array", Items: str(0)},
 		}),
 	}
 }
@@ -83,6 +80,10 @@ func (s *Server) slackDraft(ctx context.Context, handle string, arguments json.R
 	if len(problems) > 0 {
 		return text("Nothing was drafted; fix these and call "+slackDraftName+" again:\n"+strings.Join(problems, "\n"), true)
 	}
+	return s.draft(ctx, handle, args)
+}
+
+func (s *Server) draft(ctx context.Context, handle string, args DraftArgs) any {
 	if s.Slack != nil && !s.Slack.LoggedIn() {
 		return text(notLoggedIn(), true)
 	}

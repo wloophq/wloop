@@ -17,6 +17,7 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Judgment blocks | `profiles/default/intent=<name>.md` |
 | Partials every intent's instructions share | `profiles/default/partials/` |
 | Prompts of the loop's own calls (the headless wrapper) | `profiles/default/prompts/` |
+| What an agent reads about each MCP tool | `profiles/default/tools.toml`; the tool names in `builtin.Tools` |
 | Facts a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go` |
 | Workflow steps | `builtin.Steps` in `internal/intent/builtin/builtin.go`, adapted in `internal/cli/steps.go` |
 | Workflow providers | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
@@ -38,9 +39,9 @@ These stay in Go and are exposed as facts for the profile to act on:
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
+- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, an edit always waits for a person, and no agent or thread text sets an approval (no rule reads an untrusted fact).
 
-Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), and the notification titles, the digest and the menu bar's copy.
+Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, and what an MCP tool answers.
 
 ## Conventions
 

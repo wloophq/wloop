@@ -35,8 +35,8 @@ func (k Agent) defaultHome() string {
 // without CLAUDE_CONFIG_DIR; an Orca terminal sets it to its profile home.
 func (k Agent) usesDefault(home string) bool { return isDefault(home, k.defaultHome()) }
 
-// SlackDraftTool only stores a draft the user approves, so a session policy may allow it.
-var SlackDraftTool = brand.ToolPrefix() + "slack_draft"
+// SlackDraftTools only store drafts the user approves, so a session policy may allow them.
+var SlackDraftTools = []string{brand.ToolPrefix() + "slack_draft", brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit"}
 
 func (Agent) Name() string { return "claude" }
 
@@ -140,7 +140,7 @@ func (Agent) Settings(p turns.Policy) string {
 		settings.Permissions.Allow = append(settings.Permissions.Allow, TurnEndTool)
 	}
 	if p.Drafts {
-		settings.Permissions.Allow = append(settings.Permissions.Allow, SlackDraftTool)
+		settings.Permissions.Allow = append(settings.Permissions.Allow, SlackDraftTools...)
 	}
 	for _, d := range p.WritePaths {
 		settings.Permissions.Allow = append(settings.Permissions.Allow, "Edit(./"+d+"/**)")

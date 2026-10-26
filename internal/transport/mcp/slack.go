@@ -27,10 +27,13 @@ type SlackDrafts interface {
 	Draft(ctx context.Context, handle string, a DraftArgs) (DraftResult, error)
 }
 
-// DraftArgs are slack_draft's arguments.
+// DraftArgs are the draft slack_draft, slack_react or slack_edit proposes:
+// its kind, the agent's word, or the purpose and delivery it declares.
 type DraftArgs struct {
 	Text     string   `json:"text"`
 	Kind     string   `json:"kind,omitempty"`
+	Purpose  string   `json:"purpose,omitempty"`
+	Delivery string   `json:"delivery,omitempty"`
 	Target   string   `json:"target,omitempty"`
 	Items    []string `json:"items,omitempty"`
 	Reaction string   `json:"reaction,omitempty"`
@@ -52,13 +55,12 @@ const slackSendName = "slack_send_message"
 
 func slackSendTool() tool {
 	return tool{
-		Name:        slackSendName,
-		Description: "Post a message to Slack as the user, at once and without their approval. When it is unclear whether the user wants this message posted in their name, ask them first.",
+		Name: slackSendName,
 		InputSchema: object(map[string]*schema{
-			"target":    str(0, "a message permalink, #channel, channel id, @handle, email or user id"),
-			"text":      str(0, "the message, in Markdown"),
-			"thread":    boolean("reply in the thread; defaults to true for a permalink, false otherwise"),
-			"broadcast": boolean("also send a thread reply to the conversation"),
+			"target":    str(0),
+			"text":      str(0),
+			"thread":    boolean(),
+			"broadcast": boolean(),
 		}, "target", "text"),
 	}
 }

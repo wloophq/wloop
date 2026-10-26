@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,8 +22,10 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -76,6 +79,13 @@ type sessionWiring struct {
 
 	mu      sync.Mutex
 	methods []string
+	logs    []string
+}
+
+func (w *sessionWiring) logf(format string, args ...any) {
+	w.mu.Lock()
+	w.logs = append(w.logs, fmt.Sprintf(format, args...))
+	w.mu.Unlock()
 }
 
 func newSessionWiring(t *testing.T) *sessionWiring {
@@ -91,7 +101,7 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 	for _, id := range []string{draftHandle, "term_other1"} {
 		te.registerSession(t, dturn.Session{ID: id, WorkspaceID: "ws-1"})
 	}
-	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }}).wire(serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
 	sender, ok := w.srv.Slack.(*slackSender)
 	if !ok {
@@ -158,7 +168,18 @@ func (w *sessionWiring) draftTool(t *testing.T, handle, args string) (string, bo
 	if sid == "" {
 		t.Fatalf("initialize: %d %s", init.Code, init.Body)
 	}
-	rec := rpc(t, w.srv, sid, handle, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"slack_draft","arguments":`+args+`}}`)
+	return w.callTool(t, sid, handle, "slack_draft", args)
+}
+
+func (w *sessionWiring) callTool(t *testing.T, sid, handle, name, args string) (string, bool) {
+	t.Helper()
+	if sid == "" {
+		init := rpc(t, w.srv, "", handle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`)
+		if sid = init.Header().Get("Mcp-Session-Id"); sid == "" {
+			t.Fatalf("initialize: %d %s", init.Code, init.Body)
+		}
+	}
+	rec := rpc(t, w.srv, sid, handle, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"`+name+`","arguments":`+args+`}}`)
 	var res struct {
 		Result struct {
 			Content []struct{ Text string } `json:"content"`
@@ -435,5 +456,164 @@ window = "10m"
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Delay {
 		t.Fatalf("drafts %+v", ds)
+	}
+}
+
+func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit(), Turns: []dturn.Turn{
+		{Intent: "address", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out"}`); !isErr || !strings.Contains(got, "permalink") {
+		t.Fatalf("no permalink: %q", got)
+	}
+	for _, args := range []string{`{"text":"x","target":"` + link + `","items":["i1"]}`, `{"text":"x","target":"` + link + `","effects":["unit.closed"]}`} {
+		if got, isErr := w.draftTool(t, draftHandle, args); !isErr || !strings.Contains(got, "outside") {
+			t.Fatalf("%s: %q", args, got)
+		}
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a refused call stored a draft")
+	}
+
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"release 1.2 is out","target":"`+link+`"}`)
+	if isErr || !strings.Contains(got, "once the user approves it") || !strings.Contains(got, "#random") {
+		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	}
+	ds := w.drafts(t)
+	if len(ds) != 1 {
+		t.Fatalf("drafts %d", len(ds))
+	}
+	d := ds[0]
+	if d.Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Target != link ||
+		d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
+		t.Fatalf("draft %+v", d)
+	}
+	if _, err := w.deps.Outbox.Approve(ctx, d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v; draft %+v", sent, err, w.drafts(t)[0])
+	}
+	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessThreaded || posts[0].Get("thread_ts") != sessParent {
+		t.Fatalf("posts %v", posts)
+	}
+}
+
+func TestSlackEditFromAPullRequestTurnUpdatesTheUsersMessageOnceApproved(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit(), Turns: []dturn.Turn{
+		{Intent: "address", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	tok := fakeToken()
+	tok.Scopes = append(tok.Scopes, "reactions:write")
+	w.st.saveToken(t, tok)
+	author := "U000"
+	w.st.srv.Handle("conversations.replies", func(v url.Values) any {
+		return map[string]any{"messages": []map[string]any{{"ts": sessParent, "thread_ts": sessParent, "text": "parent"},
+			{"ts": sessReply, "thread_ts": sessParent, "user": author, "text": "release 1.2 :hourglass:"}}}
+	})
+	w.st.srv.Handle("chat.update", func(v url.Values) any { return map[string]any{"channel": v.Get("channel"), "ts": v.Get("ts")} })
+	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
+
+	got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"permalink":"`+link+`","text":"release 1.2 :white_check_mark:"}`)
+	if isErr {
+		t.Fatalf("slack_edit = %q", got)
+	}
+	got, isErr = w.callTool(t, "", draftHandle, "slack_react", `{"permalink":"`+link+`","emoji":"white_check_mark"}`)
+	if isErr {
+		t.Fatalf("slack_react = %q", got)
+	}
+	ds := w.drafts(t)
+	slices.SortFunc(ds, func(a, b draft.Draft) int { return int(a.ID - b.ID) })
+	if len(ds) != 2 || ds[0].Kind != draft.Edit || ds[0].Delivery != draft.EditDelivery || ds[0].State != draft.Proposed || ds[1].Kind != draft.React || ds[1].State != draft.Proposed {
+		t.Fatalf("drafts %+v", ds)
+	}
+	if n := len(w.st.srv.Calls("chat.update")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
+		t.Fatalf("proposing wrote to Slack %d times", n)
+	}
+	if _, err := w.deps.Outbox.Approve(ctx, ds[0].ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v; drafts %+v", sent, err, w.drafts(t))
+	}
+	if ups := w.st.srv.Calls("chat.update"); len(ups) != 1 || ups[0].Get("channel") != sessThreaded || ups[0].Get("ts") != sessReply {
+		t.Fatalf("chat.update %v", ups)
+	}
+
+	author = "U0000000077"
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"permalink":"`+link+`","text":"hijacked"}`); !isErr || !strings.Contains(got, "only the user's own") {
+		t.Fatalf("another's message: %q", got)
+	}
+}
+
+func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	w.st.srv.Handle("users.list", func(url.Values) any {
+		return map[string]any{"members": []map[string]any{{"id": sessUser, "name": "dana"}}}
+	})
+	w.st.srv.Handle("users.lookupByEmail", func(url.Values) any {
+		return map[string]any{"user": map[string]any{"id": sessUser, "name": "dana"}}
+	})
+	ctx := context.Background()
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: dslack.ThreadUnit("T000", sessChannel, sessParent), Turns: []dturn.Turn{
+		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"@dana and dana@example.com, see `+"`@dana`"+`"}`); isErr {
+		t.Fatalf("slack_draft = %q", got)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Text != "@{slack:"+sessUser+"} and @{slack:"+sessUser+"}, see `@dana`" {
+		t.Fatalf("drafts %+v", ds)
+	}
+}
+
+func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	if w.srv.Inbox == nil || w.srv.SlackSearch == nil || w.srv.SlackDraft == nil {
+		t.Fatal("the wiring serves only some tools")
+	}
+	init := rpc(t, w.srv, "", draftHandle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
+	rec := rpc(t, w.srv, init.Header().Get("Mcp-Session-Id"), draftHandle, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
+	var got struct {
+		Result struct {
+			Tools []struct {
+				Name        string `json:"name"`
+				Description string `json:"description"`
+			} `json:"tools"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, tl := range got.Result.Tools {
+		names = append(names, tl.Name)
+		if tl.Description == "" || strings.Contains(tl.Description, "{{") {
+			t.Errorf("%s: description %q", tl.Name, tl.Description)
+		}
+	}
+	if want := builtin.ValueNames(builtin.Tools); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
+		t.Errorf("listed %v, tools.toml describes %v", names, want)
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, l := range w.logs {
+		if strings.Contains(l, "tools.toml") {
+			t.Errorf("logged %q", l)
+		}
 	}
 }

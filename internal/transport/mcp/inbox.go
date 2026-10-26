@@ -24,19 +24,17 @@ const inboxPostName = "inbox_post"
 
 func inboxPostTool() tool {
 	option := object(map[string]*schema{
-		"id":          str(20, "lowercase letters, digits and dashes"),
-		"label":       str(record.LabelMax, ""),
-		"consequence": str(record.ConsequenceMax, "what choosing this option does"),
+		"id":          str(20),
+		"label":       str(record.LabelMax),
+		"consequence": str(record.ConsequenceMax),
 	}, "id", "label", "consequence")
 	return tool{
 		Name: inboxPostName,
-		Description: fmt.Sprintf("Post a message to the user's %s Inbox during your turn, without ending it: a question or a note the user answers later. "+
-			"At most %d of your messages wait at once. It posts only; it cannot move, list or close Inbox entries.", brand.Name, messages.PostsPerTurn),
 		InputSchema: object(map[string]*schema{
-			"text":      str(record.TextMax, "the message"),
-			"options":   {Type: "array", Items: option, MinItems: 2, MaxItems: 5, Description: "the choices, when the user picks one"},
-			"recommend": str(record.RecommendMax, "an option id, or yes or no with confirm"),
-			"confirm":   boolean("a yes or no question"),
+			"text":      str(record.TextMax),
+			"options":   {Type: "array", Items: option, MinItems: 2, MaxItems: 5},
+			"recommend": str(record.RecommendMax),
+			"confirm":   boolean(),
 		}, "text"),
 	}
 }

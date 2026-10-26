@@ -15,6 +15,7 @@ const (
 	SurfaceActions  Surface = "actions"  // actions.toml
 	SurfaceDefaults Surface = "defaults" // defaults.toml
 	SurfaceLabels   Surface = "labels"   // labels.toml
+	SurfaceTools    Surface = "tools"    // tools.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
 	SurfaceConfig   Surface = "config"   // config.json
 )
@@ -68,7 +69,7 @@ type Value struct {
 }
 
 // Grammar is every reserved key of the language.
-var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar)
+var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actionsGrammar, configGrammar, profileGrammar, toolsGrammar)
 
 // Problem is a key Check refuses, at its dotted path in the document.
 type Problem struct {

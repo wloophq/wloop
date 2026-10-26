@@ -115,6 +115,11 @@ func (c *Client) PostMessage(ctx context.Context, a PostArgs) (Posted, error) {
 	return Posted{Channel: out.Channel, TS: out.TS}, nil
 }
 
+// UpdateMessage replaces the text of the message at ts in channel (chat.update).
+func (c *Client) UpdateMessage(ctx context.Context, channel, ts, text string) error {
+	return c.Call(ctx, "chat.update", url.Values{"channel": {channel}, "ts": {ts}, "text": {text}}, nil)
+}
+
 func (c *Client) Permalink(ctx context.Context, channel, ts string) (string, error) {
 	var out struct {
 		Permalink string `json:"permalink"`

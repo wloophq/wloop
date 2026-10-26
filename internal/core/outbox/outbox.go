@@ -278,7 +278,7 @@ func checkKind(k draft.Kind) error {
 	return nil
 }
 
-var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery}
+var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery, draft.EditDelivery}
 
 // decide is the approval of d under p's policy. A policy that does not
 // validate, a rule that cannot be read, or a rule that reads the unit's

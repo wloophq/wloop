@@ -27,7 +27,8 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 	sender := &slackSender{kit: m.slack.kit(cfg.Slack, m.log)}
 	srv.Slack = sender
 	if db, ok := d.Snapshot.(*sqlite.DB); ok {
-		srv.SlackRead = &slackReading{sender: sender, read: slacksource.ReaderOver(db, sender.kit.Client)}
+		reading := &slackReading{sender: sender, read: slacksource.ReaderOver(db, sender.kit.Client)}
+		srv.SlackRead, srv.SlackSearch = reading, reading
 		if d.Outbox == nil {
 			return
 		}
@@ -93,14 +94,22 @@ type slackReading struct {
 }
 
 func (r *slackReading) Read(ctx context.Context, target string, limit int) (string, error) {
+	return r.loggedIn(func() (string, error) { return r.read.Read(ctx, target, limit) })
+}
+
+func (r *slackReading) Search(ctx context.Context, a mcp.SearchArgs) (string, error) {
+	return r.loggedIn(func() (string, error) {
+		return r.read.Search(ctx, slacksource.SearchQuery{Query: a.Query, Channel: a.Channel, From: a.From, After: a.After, Before: a.Before, Limit: a.Limit})
+	})
+}
+
+func (r *slackReading) loggedIn(read func() (string, error)) (string, error) {
 	if !r.sender.LoggedIn() {
 		return "", send.ErrNotLoggedIn
 	}
-	out, err := r.read.Read(ctx, target, limit)
+	out, err := read()
 	if errors.Is(err, auth.ErrNotLoggedIn) {
-		r.sender.mu.Lock()
-		r.sender.loggedIn, r.sender.checkedAt = false, time.Now()
-		r.sender.mu.Unlock()
+		r.sender.loggedOut()
 		return "", send.ErrNotLoggedIn
 	}
 	return out, err

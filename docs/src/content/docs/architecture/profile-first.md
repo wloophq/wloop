@@ -18,6 +18,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Partials: the text every intent's instructions share, such as the record protocol, the history and the brief | `profiles/default/partials/<name>.md.tmpl` | replaces a partial for every intent under `partials/<name>.md.tmpl`, and adds partials its intents call |
 | Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
+| What an agent reads about each MCP tool: its `description` and its parameters' (`params`, by path) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 
@@ -39,7 +40,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - working-day arithmetic and who owes an item;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction is a comment), a comment waits for your approval unless a rule of yours that names comment delivery releases it, and no agent or thread text sets an approval (no draft rule, nor a run rule that runs, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's approval).
+- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for your approval unless a rule of yours that names comment delivery releases it, an edit always waits for you, and no agent or thread text sets an approval (no draft rule, nor a run rule that runs, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's approval).
 
 ## The rules that keep the line
 
@@ -61,7 +62,8 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 - the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
 - the workflow providers, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
-- notification titles, the digest and the menu bar's copy.
+- notification titles, the digest and the menu bar's copy;
+- what an MCP tool answers: its results and refusals (`internal/transport/mcp`).
 
 ## Direction
 

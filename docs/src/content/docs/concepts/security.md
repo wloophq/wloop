@@ -39,6 +39,15 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 - **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `github.address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
 - **Review rounds open the pull request's checkout.** An automated review round starts Claude Code in a worktree at the pull request's head. Claude Code loads that checkout's project settings, so a pull request that changes `.claude/settings.json` (hooks, permissions), `.mcp.json`, `CLAUDE.md` or `AGENTS.md` can run code or steer the agent as you. Claude Code's folder trust is recorded for the repository and covers every pull request worktree of it; where project settings are off, trusting a blocked round from the cockpit trusts that worktree alone. Automated review rounds skip forks and authors outside the members, collaborators, owners and `trusted_authors`, so the author needs push access to the repository; a round you start by hand has no such filter, but its session never loads the checkout's project settings for such a pull request.
 
+## What agents read from Slack
+
+Every agent session the MCP server serves reads Slack as you, within what your user token can read:
+
+- `slack_read` reads a stored unit, or the thread of any channel message whose permalink the agent holds, private channels and Slack Connect channels included; a direct message or a group DM only when {{name}} tracks it.
+- `slack_search` runs Slack's search over every channel you can read, and returns the permalink, author, time and first line of each match. An agent no longer needs a permalink handed to it to find a channel's messages: one query reaches any channel you are in. Direct messages and group DMs are left out unless tracked, the same line `slack_read` draws, and the result says how many it left out.
+
+What an agent reads this way is other people's text, and reaches it as data it may follow: a message found by search can ask for anything. Every post that follows still goes through the Outbox (`slack_draft`, `slack_react`, `slack_edit`) or Claude Code's permission prompt (`slack_send_message`), and `slack.post_allowlist` bounds where any of them lands. Nothing bounds what a session reads; turning the Slack plugin off (`slack.enabled = false`) removes these tools.
+
 ## The settings that limit it
 
 Two settings control what reaches an agent from other people:

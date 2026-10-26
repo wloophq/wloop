@@ -190,10 +190,3 @@ func TestSlackSendMessageRefusesBroadcasts(t *testing.T) {
 		t.Fatalf("sent %+v", f.sent)
 	}
 }
-
-func TestSlackSendToolTellsTheAgentToAskWhenUnsure(t *testing.T) {
-	d := slackSendTool().Description
-	if !strings.Contains(d, "without their approval") || !strings.Contains(d, "ask them first") {
-		t.Fatalf("description %q", d)
-	}
-}

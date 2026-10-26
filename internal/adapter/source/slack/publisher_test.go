@@ -626,3 +626,67 @@ func TestFinalTextKeepsOnlyConvertedMentions(t *testing.T) {
 		}
 	}
 }
+
+func editDraft(text string) draft.Draft {
+	d := threadDraft(draft.Edit, text)
+	d.Target = "https://acme.slack.com/archives/" + pubConv + "/p" + strings.ReplaceAll(pubReply, ".", "") + "?thread_ts=" + pubParent + "&cid=" + pubConv
+	return d
+}
+
+func (ps *pubSlack) updates() []url.Values { return ps.calls("chat.update") }
+
+func newEditSlack(t *testing.T, author string) *pubSlack {
+	t.Helper()
+	ps := newPubSlack(t)
+	ps.f.api.Handle("chat.update", func(v url.Values) any {
+		return map[string]any{"channel": v.Get("channel"), "ts": v.Get("ts")}
+	})
+	ps.stored(map[string]any{"ts": pubReply, "thread_ts": pubParent, "user": author, "text": "release 1.2 :hourglass:"})
+	return ps
+}
+
+func TestEditUpdatesTheUsersMessage(t *testing.T) {
+	ps := newEditSlack(t, me)
+	ev, err := ps.publisher().Publish(context.Background(), editDraft("release 1.2 **done**"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ups := ps.updates()
+	if len(ups) != 1 || ups[0].Get("channel") != pubConv || ups[0].Get("ts") != pubReply || ups[0].Get("text") != send.Mrkdwn("release 1.2 **done**") {
+		t.Fatalf("chat.update %v", ups)
+	}
+	if n := len(ps.calls("chat.postMessage")); n != 0 || ev.Ref != pubReply || ev.Permalink == "" {
+		t.Fatalf("posts %d, evidence %+v", n, ev)
+	}
+}
+
+func TestValidateRefusesAnEditOfAnotherOrNoMessage(t *testing.T) {
+	ps := newEditSlack(t, other)
+	if err := ps.publisher().Validate(context.Background(), editDraft("done")); err == nil || !strings.Contains(err.Error(), "only the user's own") {
+		t.Fatalf("another's message: %v", err)
+	}
+	ps.stored()
+	if err := ps.publisher().Validate(context.Background(), editDraft("done")); err == nil || !errors.Is(err, send.ErrCannotPost) {
+		t.Fatalf("no message: %v", err)
+	}
+	d := editDraft("done")
+	d.Target = ""
+	if err := ps.publisher().Validate(context.Background(), d); err == nil || !strings.Contains(err.Error(), "permalink") {
+		t.Fatalf("no permalink: %v", err)
+	}
+	if n := len(ps.updates()); n != 0 {
+		t.Fatalf("validation edited %d times", n)
+	}
+}
+
+func TestVerifyEdit(t *testing.T) {
+	ps := newEditSlack(t, me)
+	if _, ok, err := ps.publisher().Verify(context.Background(), editDraft("release 1.2 done"), time.Unix(1700000300, 0)); err != nil || ok {
+		t.Fatalf("before the edit: %v %v", ok, err)
+	}
+	ps.stored(map[string]any{"ts": pubReply, "thread_ts": pubParent, "user": me, "text": "release 1.2 done", "edited": map[string]any{"ts": "1700000400.000000"}})
+	ev, ok, err := ps.publisher().Verify(context.Background(), editDraft("release 1.2 done"), time.Unix(1700000300, 0))
+	if err != nil || !ok || ev.Ref != pubReply {
+		t.Fatalf("after the edit: %+v %v %v", ev, ok, err)
+	}
+}

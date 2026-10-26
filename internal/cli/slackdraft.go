@@ -46,6 +46,13 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if !s.sender.LoggedIn() {
 		return mcp.DraftResult{}, send.ErrNotLoggedIn
 	}
+	if a.Text != "" {
+		text, err := s.sender.kit.Send.Mentions(ctx, a.Text, func(user string) string { return "@{" + string(slackPlugin) + ":" + user + "}" })
+		if err != nil {
+			return mcp.DraftResult{}, err
+		}
+		a.Text = text
+	}
 	b, ok, err := s.books.BookOf(ctx, turns.Key{Session: handle})
 	if err != nil {
 		return mcp.DraftResult{}, err
@@ -54,11 +61,14 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if ok {
 		t, ok = b.OfSession(handle)
 	}
-	if !ok {
+	switch {
+	case ok && b.Unit.Provider == slackPlugin:
+	case slacksource.IsPermalink(a.Target):
+		return s.draftOutside(ctx, a)
+	case !ok:
 		return mcp.DraftResult{}, errNoDraftTurn
-	}
-	if b.Unit.Provider != slackPlugin {
-		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts only on a Slack unit", b.Unit.Label())
+	default:
+		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message permalink target", b.Unit.Label())
 	}
 	its := a.Items
 	if len(its) == 0 {
@@ -71,19 +81,49 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := checkEffects(def, string(t.Intent), a.Effects); err != nil {
 		return mcp.DraftResult{}, err
 	}
-	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Target: a.Target, Text: a.Text,
-		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
+	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Purpose: a.Purpose,
+		Delivery: draft.Delivery(a.Delivery), Target: a.Target, Text: a.Text, Reaction: a.Reaction, Effects: a.Effects,
+		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
 	if err != nil {
 		if errors.Is(err, send.ErrNotLoggedIn) {
 			s.sender.loggedOut()
 		}
 		return mcp.DraftResult{}, err
 	}
+	return s.result(ctx, d), nil
+}
+
+// draftOutside proposes a on the thread of its permalink target, a unit no
+// turn of the session is on: as the session's, with no items or effects, so
+// it waits for the user whatever an intent's policy says.
+func (s *slackDrafts) draftOutside(ctx context.Context, a mcp.DraftArgs) (mcp.DraftResult, error) {
+	switch {
+	case len(a.Items) > 0:
+		return mcp.DraftResult{}, errors.New("items: a draft outside the turn's Slack unit answers none of its items")
+	case len(a.Effects) > 0:
+		return mcp.DraftResult{}, errors.New("effects: a draft outside the turn's Slack unit declares none")
+	}
+	u, err := slackThreadOf(ctx, s.sender.kit, a.Target)
+	if err != nil {
+		return mcp.DraftResult{}, err
+	}
+	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: u, Kind: draft.Kind(a.Kind), Purpose: a.Purpose, Delivery: draft.Delivery(a.Delivery),
+		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Origin: draft.Origin{Kind: draft.OriginSession}})
+	if err != nil {
+		if errors.Is(err, send.ErrNotLoggedIn) {
+			s.sender.loggedOut()
+		}
+		return mcp.DraftResult{}, err
+	}
+	return s.result(ctx, d), nil
+}
+
+func (s *slackDrafts) result(ctx context.Context, d draft.Draft) mcp.DraftResult {
 	where, err := s.pub.Where(ctx, d)
 	if err != nil {
 		where = ""
 	}
-	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}, nil
+	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}
 }
 
 // intentDef is the loaded definition of intent; the zero Def, which allows

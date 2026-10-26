@@ -98,13 +98,20 @@ func (s *Service) Allowed(res Resolved) error {
 	return fmt.Errorf("%w: conversation %s (%s)", ErrNotAllowed, res.Channel, res.Conversation)
 }
 
-// Send resolves r, checks the allowlist and posts. Once chat.postMessage succeeded it never fails:
+// Send resolves r and the mentions of its text, checks the allowlist and posts. Once chat.postMessage succeeded it never fails:
 // a permalink it cannot read is left empty, so a caller never retries a message that went out.
 func (s *Service) Send(ctx context.Context, r Request) (Sent, error) {
-	text := Mrkdwn(r.Text)
-	if strings.TrimSpace(text) == "" {
+	if strings.TrimSpace(r.Text) == "" {
 		return Sent{}, errors.New("the message is empty")
 	}
+	if s.Client == nil {
+		return Sent{}, ErrNotLoggedIn
+	}
+	markdown, err := s.Mentions(ctx, r.Text, func(user string) string { return "<@" + user + ">" })
+	if err != nil {
+		return Sent{}, err
+	}
+	text := Mrkdwn(markdown)
 	res, err := s.Resolve(ctx, r)
 	if err != nil {
 		return Sent{}, err

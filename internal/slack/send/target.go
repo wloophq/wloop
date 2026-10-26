@@ -31,3 +31,9 @@ func parsePermalink(s string) (permalink, bool) {
 	}
 	return link, true
 }
+
+// IsPermalink says whether s is a Slack message permalink.
+func IsPermalink(s string) bool {
+	_, ok := parsePermalink(strings.TrimSpace(s))
+	return ok
+}

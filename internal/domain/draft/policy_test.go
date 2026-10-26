@@ -175,3 +175,20 @@ func TestRuleFactsJoinNoFactsAndKeepTheCallersMap(t *testing.T) {
 		t.Fatalf("facts %v, joined %v", facts, got)
 	}
 }
+
+func TestNoPolicyReleasesAnEdit(t *testing.T) {
+	edit := Draft{Delivery: EditDelivery}
+	isEdit := factIs{"draft.delivery", "edit"}
+	for _, p := range []Policy{
+		{Default: none},
+		{Default: window},
+		{Default: always, Rules: []Rule{{When: isEdit, Approval: none, NamesComment: true}}},
+	} {
+		if got, err := p.Decide(edit, Subject{}, time.Time{}); err != nil || got.Approval.Mode != Wait {
+			t.Errorf("%+v released an edit: %+v %v", p, got, err)
+		}
+	}
+	if got, _ := (Policy{Default: Approval{Mode: DryRun}}).Decide(edit, Subject{}, time.Time{}); got.Approval.Mode != DryRun {
+		t.Errorf("dry_run on an edit: %+v", got)
+	}
+}

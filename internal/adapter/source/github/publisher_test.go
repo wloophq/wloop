@@ -418,7 +418,8 @@ func TestGitHubWhereNamesThePullRequest(t *testing.T) {
 
 func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
 	p := &Publisher{}
-	for in, want := range map[draft.Delivery]draft.Delivery{draft.Message: draft.CommentDelivery, draft.CommentDelivery: draft.CommentDelivery, draft.Reaction: draft.Reaction} {
+	for in, want := range map[draft.Delivery]draft.Delivery{draft.Message: draft.CommentDelivery, draft.CommentDelivery: draft.CommentDelivery, draft.Reaction: draft.Reaction,
+		draft.EditDelivery: draft.EditDelivery} {
 		if got := p.Delivers(in); got != want {
 			t.Errorf("%s: %s, want %s", in, got, want)
 		}
