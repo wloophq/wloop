@@ -72,6 +72,9 @@ func TestReaderIsQueryOnly(t *testing.T) {
 	}
 }
 
+// hangGuard only stops a blocked call from hanging the test; under -race on a loaded runner an unblocked call can take seconds.
+const hangGuard = time.Minute
+
 func TestReadDoesNotBlockWrite(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
@@ -88,7 +91,7 @@ func TestReadDoesNotBlockWrite(t *testing.T) {
 	})
 	defer close(release)
 	<-held
-	wctx, cancel := context.WithTimeout(ctx, time.Second)
+	wctx, cancel := context.WithTimeout(ctx, hangGuard)
 	defer cancel()
 	if _, err := db.Write(wctx, func(tx *Tx) error {
 		_, err := tx.ExecContext(wctx, `INSERT INTO meta (key, value) VALUES ('k', 'v')`)
@@ -115,7 +118,7 @@ func TestWriteDoesNotBlockRead(t *testing.T) {
 		done <- err
 	}()
 	<-held
-	rctx, cancel := context.WithTimeout(ctx, time.Second)
+	rctx, cancel := context.WithTimeout(ctx, hangGuard)
 	defer cancel()
 	var wg sync.WaitGroup
 	for range ReadConns {
