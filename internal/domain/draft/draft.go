@@ -28,6 +28,16 @@ var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
+// ConversationKinds are the kinds a draft on a conversation takes, as an
+// agent names them: all but a review comment.
+var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
+
+// Emoji says whether a draft of kind k posts an emoji, and no text.
+func (k Kind) Emoji() bool {
+	_, d := ShapeOf(k)
+	return d == Reaction
+}
+
 // Delivery is how a draft reaches the provider.
 type Delivery string // "message", "reaction", "comment"
 

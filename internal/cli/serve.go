@@ -161,7 +161,13 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
 	e.Rounds = sqlite.NewRounds(db)
-	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey}
+	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey,
+		intents: func() *dintent.Registry {
+			if l := e.loadedIntents(); l != nil {
+				return l.Registry
+			}
+			return nil
+		}}
 	e.observeGit(ctx, &daemon.GitAccessLog{Store: store}, logf)
 	startCfg, err := e.readConfig()
 	if err != nil {
@@ -241,6 +247,9 @@ type mcpEndpoint struct {
 	// key is read on each request, so a key install writes later applies
 	// without a restart.
 	key func() string
+	// intents is the loaded registry, whose draft_effects bound an agent's
+	// drafts; nil allows no effect.
+	intents func() *dintent.Registry
 }
 
 func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {

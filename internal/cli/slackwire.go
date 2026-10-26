@@ -36,7 +36,7 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 		if d.Turns != nil && d.Turns.Store != nil {
 			books = d.Turns.Store
 		}
-		srv.SlackDraft = &slackDrafts{sender: sender, books: books, items: d.Items, outbox: d.Outbox, pub: pub}
+		srv.SlackDraft = &slackDrafts{sender: sender, books: books, items: d.Items, outbox: d.Outbox, pub: pub, intents: m.intents}
 		sender.record = sessionSends{token: sender.kit.Store.Load, landing: slacksource.LandingOver(db), outbox: d.Outbox, log: m.log}.record
 	}
 }

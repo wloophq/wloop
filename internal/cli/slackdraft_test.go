@@ -359,3 +359,28 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 		t.Fatalf("posts %d", n)
 	}
 }
+
+func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close","effects":["unit.closed"]}`)
+	if !isErr || !strings.Contains(got, "the reply intent lists in draft_effects") {
+		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a refused effect stored a draft")
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close"}`); isErr {
+		t.Fatalf("a close draft with no effect: %q", got)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || len(ds[0].Effects) != 0 {
+		t.Fatalf("drafts %+v", ds)
+	}
+}

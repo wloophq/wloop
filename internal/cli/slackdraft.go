@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -36,6 +37,9 @@ type slackDrafts struct {
 	items  unitItems // nil checks no item id
 	outbox *outbox.Service
 	pub    *slacksource.Publisher
+	// intents is the loaded registry whose draft_effects bound a draft's
+	// effects; nil allows none.
+	intents func() *dintent.Registry
 }
 
 func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs) (mcp.DraftResult, error) {
@@ -63,8 +67,11 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := s.checkItems(ctx, b.Unit, its); err != nil {
 		return mcp.DraftResult{}, err
 	}
+	if err := s.checkEffects(string(t.Intent), a.Effects); err != nil {
+		return mcp.DraftResult{}, err
+	}
 	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Target: a.Target, Text: a.Text,
-		Reaction: a.Reaction, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
+		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
 	if err != nil {
 		if errors.Is(err, send.ErrNotLoggedIn) {
 			s.sender.loggedOut()
@@ -76,6 +83,25 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		where = ""
 	}
 	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}, nil
+}
+
+// checkEffects refuses an effect the session's intent does not list in its
+// draft_effects: an agent never grants itself what sending does.
+func (s *slackDrafts) checkEffects(intent string, effects []string) error {
+	var allowed []string
+	if s.intents != nil {
+		if r := s.intents(); r != nil {
+			if def, ok := r.Get(dintent.Name(intent)); ok {
+				allowed = def.DraftEffects
+			}
+		}
+	}
+	for _, e := range effects {
+		if !slices.Contains(allowed, e) {
+			return fmt.Errorf("the effect %s is not one the %s intent lists in draft_effects", e, intent)
+		}
+	}
+	return nil
 }
 
 func (s *slackDrafts) checkItems(ctx context.Context, u unit.Unit, ids []string) error {
@@ -93,6 +119,9 @@ func (s *slackDrafts) checkItems(ctx context.Context, u unit.Unit, ids []string)
 	}
 	return nil
 }
+
+// sentPurpose is the purpose of a post a session made itself.
+const sentPurpose = "reply"
 
 // sessionSends records a session's slack_send_message post as a sent draft
 // when it landed in a tracked unit; it never changes or fails the post.
@@ -118,7 +147,7 @@ func (r sessionSends) record(ctx context.Context, req send.Request, sent send.Se
 	if !ok {
 		return
 	}
-	d, err := r.outbox.RecordSent(ctx, outbox.Proposal{Unit: u, Kind: draft.Reply, Target: req.Target, Text: req.Text},
+	d, err := r.outbox.RecordSent(ctx, outbox.Proposal{Unit: u, Purpose: sentPurpose, Delivery: draft.Message, Target: req.Target, Text: req.Text},
 		draft.Evidence{Ref: sent.TS, Permalink: sent.Permalink})
 	if err != nil {
 		r.logf("slack_sent_unrecorded channel=%s ts=%s error=%v", sent.Channel, sent.TS, err)
