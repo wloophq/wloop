@@ -51,7 +51,6 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 These texts and decisions are still in Go, and are moving to the profile:
 
-- the Slack extraction prompt (`internal/adapter/source/slack/extract/prompt.md`), and the brief's prompt and taxonomy (`internal/brief`);
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
 - what sending a draft does, which follows its kind and not its declared effects: a sent nudge stamps the entries it served (`internal/core/proposals`), and a nudge on a pull request records the event the next nudge's refusal reads (the GitHub plugin's publisher);
 - the Outbox's verdict, shown beside each draft, of whether it would send the draft on its own, which holds a question to an owner and a comment by their kind (`internal/core/outbox`);
@@ -66,4 +65,3 @@ Drafts already carry a purpose, a delivery and the effects of sending them, apar
 - the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
 - a sent draft does what its declared effects say, and an agent's draft declares only the effects its intent's manifest allows;
 - workflows start any intent on any unit, each under its own daily limit and all under one daily budget, in the repository the intent names;
-- the Slack extraction prompt and the brief's prompt and taxonomy move to `profiles/default/prompts/`.
