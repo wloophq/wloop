@@ -50,7 +50,6 @@ type Config struct {
 	// Views holds each view sink's own settings by sink name.
 	Views    map[string]SinkConfig `json:"views"`
 	Cleanup  Cleanup               `json:"cleanup"`
-	Nudge    Nudge                 `json:"nudge"`
 	Classify Classify              `json:"classify"`
 	// Workflows override each workflow's manifest by workflow name.
 	Workflows map[string]WorkflowConfig `json:"workflows"`
@@ -119,6 +118,10 @@ type GitHub struct {
 	Scope            Scope        `json:"scope"`
 	Stalled          Stalled      `json:"stalled"`
 	Drafts           PluginDrafts `json:"drafts"`
+	Nudge            Nudge        `json:"nudge"`
+	// RateLimitFraction is the share of the GitHub rate limit the sweeps
+	// may spend.
+	RateLimitFraction float64 `json:"rate_limit_fraction"`
 }
 
 // Drafts holds the settings every proposer's drafts share.
@@ -240,9 +243,8 @@ type Stalled struct {
 }
 
 type Sweep struct {
-	Fast              Days    `json:"fast"`
-	Slow              Days    `json:"slow"`
-	RateLimitFraction float64 `json:"rate_limit_fraction"`
+	Fast Days `json:"fast"`
+	Slow Days `json:"slow"`
 }
 
 type HTTP struct {
@@ -406,8 +408,10 @@ func Defaults() Config {
 			ReviewPrefix:       "REVIEW ",
 			AutomatedReviewers: []string{},
 			Stalled:            Stalled{Review: Days(48 * time.Hour), Reply: Days(24 * time.Hour), Merge: Days(24 * time.Hour)},
+			Nudge:              Nudge{SilentDays: 30},
+			RateLimitFraction:  0.5,
 		},
-		Sweep: Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour), RateLimitFraction: 0.5},
+		Sweep: Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour)},
 		Brief: Brief{Tier: turns.TierFast, MaxInputBytes: 60000},
 		MCP:   MCP{Port: DefaultMCPPort},
 		Views: map[string]SinkConfig{},
@@ -423,7 +427,6 @@ func Defaults() Config {
 				".DS_Store", ".coverage", dturn.ScratchDir,
 			},
 		},
-		Nudge:         Nudge{SilentDays: 30},
 		Classify:      Classify{PerDay: 50},
 		GTD:           GTD{StaleWaitingDays: 2},
 		Notifications: Notifications{DigestAt: "09:00"},
@@ -558,8 +561,8 @@ func (c Config) validateCockpit() error {
 			return fmt.Errorf("notifications.digest_at must be a local time HH:MM or empty, got %q", at)
 		}
 	}
-	if f := c.Sweep.RateLimitFraction; f < 0 || f > 1 {
-		return fmt.Errorf("sweep.rate_limit_fraction must be between 0 and 1, got %v", f)
+	if f := c.GitHub.RateLimitFraction; f < 0 || f > 1 {
+		return fmt.Errorf("github.rate_limit_fraction must be between 0 and 1, got %v", f)
 	}
 	if c.HTTP.Port < 0 || c.HTTP.Port > 65535 {
 		return fmt.Errorf("http.port must be between 0 and 65535, got %d", c.HTTP.Port)
@@ -608,8 +611,8 @@ func (c Config) validateWorkflows() error {
 			return fmt.Errorf("%s must be positive, got %s", d.key, time.Duration(d.v))
 		}
 	}
-	if c.Nudge.SilentDays < 1 {
-		return fmt.Errorf("nudge.silent_days must be positive, got %d", c.Nudge.SilentDays)
+	if c.GitHub.Nudge.SilentDays < 1 {
+		return fmt.Errorf("github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
 	}
 	if c.Classify.PerDay < 0 {
 		return fmt.Errorf("classify.per_day must not be negative, got %d", c.Classify.PerDay)

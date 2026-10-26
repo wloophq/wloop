@@ -288,7 +288,7 @@ func (f clockFunc) Now() time.Time { return f() }
 // restoreBudget sets the client's floors from cfg and seeds its budget with
 // the one the last sweep kept.
 func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
-	e.GitHub.SetFloors(github.DefaultFloors(cfg.Sweep.RateLimitFraction))
+	e.GitHub.SetFloors(github.DefaultFloors(cfg.GitHub.RateLimitFraction))
 	limits, err := storedGitHubBudget(ctx, inventory.New(db))
 	if err != nil {
 		logf("GitHub budget: %v", err)

@@ -232,7 +232,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `config.cleanup.workspace_grace` | duration | The cleanup.workspace_grace setting, in working time. |
 | `config.cleanup.manual_idle` | duration | The cleanup.manual_idle setting. |
 | `config.cleanup.stale_workspace` | duration | The cleanup.stale_workspace setting. |
-| `config.nudge.silent_days` | int | The nudge.silent_days setting, in calendar days. |
+| `config.github.nudge.silent_days` | int | The github.nudge.silent_days setting, in calendar days. |
 | `config.gtd.stale_waiting_days` | int | The gtd.stale_waiting_days setting, in working days. |
 | `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
 | `config.turns.per_day` | int | The turns.per_day setting: automated turns on units other than pull requests, all workflows together. |

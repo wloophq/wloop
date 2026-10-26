@@ -20,7 +20,7 @@ Every command that reads or writes {{name}}'s state goes through the daemon. Wit
 | slow | every `sweep.slow` (1 hour) | team members, the repositories of your area, every open pull request in scope and those closed or merged in the last 14 days |
 | brief | after each fast job | writes the [brief](/concepts/brief/) of up to 5 pull requests, when briefs are on |
 
-When the GitHub rate limit falls below `sweep.rate_limit_fraction` (half) of the hour's budget, the fast job waits for the reset and the cockpit shows "slow sync". A failing job is logged to `serve.err.log`, shown in the cockpit and reported by `doctor`.
+When the GitHub rate limit falls below `github.rate_limit_fraction` (half) of the hour's budget, the fast job waits for the reset and the cockpit shows "slow sync". A failing job is logged to `serve.err.log`, shown in the cockpit and reported by `doctor`.
 
 Sweep now in the menu bar asks the daemon for one sweep now; `{{command}} plan` prints what a sweep would do.
 

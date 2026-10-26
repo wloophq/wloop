@@ -219,7 +219,7 @@ func TestCockpitDefaults(t *testing.T) {
 	if time.Duration(c.GitHub.Stalled.Review) != 48*time.Hour || time.Duration(c.GitHub.Stalled.Reply) != 24*time.Hour || time.Duration(c.GitHub.Stalled.Merge) != 24*time.Hour {
 		t.Fatalf("stalled defaults: %+v", c.GitHub.Stalled)
 	}
-	if time.Duration(c.Sweep.Fast) != 2*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.Sweep.RateLimitFraction != 0.5 {
+	if time.Duration(c.Sweep.Fast) != 2*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.GitHub.RateLimitFraction != 0.5 {
 		t.Fatalf("sweep defaults: %+v", c.Sweep)
 	}
 	if c.HTTP.Port != 0 {
@@ -252,11 +252,11 @@ func TestLoadCockpitKeys(t *testing.T) {
     "stalled": {
       "review": "3d",
       "reply": "12h"
-    }
+    },
+    "rate_limit_fraction": 0.3
   },
   "sweep": {
-    "fast": "5m",
-    "rate_limit_fraction": 0.3
+    "fast": "5m"
   },
   "http": {
     "port": 4242
@@ -275,7 +275,7 @@ func TestLoadCockpitKeys(t *testing.T) {
 	if time.Duration(c.GitHub.Stalled.Review) != 72*time.Hour || time.Duration(c.GitHub.Stalled.Reply) != 12*time.Hour || time.Duration(c.GitHub.Stalled.Merge) != 24*time.Hour {
 		t.Fatalf("stalled: %+v", c.GitHub.Stalled)
 	}
-	if time.Duration(c.Sweep.Fast) != 5*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.Sweep.RateLimitFraction != 0.3 {
+	if time.Duration(c.Sweep.Fast) != 5*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.GitHub.RateLimitFraction != 0.3 {
 		t.Fatalf("sweep: %+v", c.Sweep)
 	}
 	if c.HTTP.Port != 4242 || c.MCP.Port != 47899 {
@@ -287,7 +287,7 @@ func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	for _, body := range []string{
 		`{"sweep": {"fast": "0s"}}`,
 		`{"github": {"stalled": {"review": "-1d"}}}`,
-		`{"sweep": {"rate_limit_fraction": 2}}`,
+		`{"github": {"rate_limit_fraction": 2}}`,
 		`{"http": {"port": 70000}}`,
 		`{"mcp": {"port": 0}}`,
 		`{"mcp": {"port": 65536}}`,
@@ -574,5 +574,17 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	}
 	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.drafts.approval") {
 		t.Fatalf("a window without one loaded: %v", err)
+	}
+}
+
+func TestTheGitHubNudgeAndRateLimitKeysLiveUnderGitHub(t *testing.T) {
+	for _, body := range []string{`{"nudge": {"silent_days": 10}}`, `{"sweep": {"rate_limit_fraction": 0.3}}`} {
+		file := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "unknown key") {
+			t.Errorf("%s: %v", body, err)
+		}
 	}
 }

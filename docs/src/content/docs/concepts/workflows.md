@@ -14,7 +14,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `review-first-round` | starts a first review round on a pull request that requests your review by name | runs after a 60 s delay |
 | `review-follow-up` | starts a follow-up round when the author pushed, replied or re-requested you | runs after a 60 s delay |
 | `address` | starts an address round on your pull request when reviews arrive, checks fail or it conflicts with its base | runs after a 60 s delay |
-| `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `nudge.silent_days` (30) of silence | waits for you |
+| `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `github.nudge.silent_days` (30) of silence | waits for you |
 | `session-pr-finished`, `session-duplicate`, `session-worktree-gone`, `session-finished-quiet`, `session-asked-quiet`, `session-close-when-done` | close agent sessions that are finished, duplicated or quiet, whose worktree or transcript is gone, or that their manager closed (a session you archived in Claude Desktop) | runs |
 | `session-manual-quiet` | offers to close a session you started that went quiet | waits for you |
 | `workspace-review-finished`, `workspace-author-finished`, `workspace-temporary`, `workspace-duplicate` | remove workspaces of finished pull requests, under temporary paths, or duplicated | **observe** |

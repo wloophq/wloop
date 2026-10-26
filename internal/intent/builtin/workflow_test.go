@@ -28,7 +28,7 @@ var workflowTable = map[string]string{
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",
 	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B",
 	"trigger": "kind:S event.kind:S event.key:S event.data:S fired_at:T",
-	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D nudge.silent_days:I " +
+	"config": "cleanup.idle:D cleanup.asked_idle:D cleanup.workspace_grace:D cleanup.manual_idle:D cleanup.stale_workspace:D github.nudge.silent_days:I " +
 		"gtd.stale_waiting_days:I drafts.repeat_after:D turns.per_day:I",
 }
 

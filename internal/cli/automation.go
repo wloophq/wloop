@@ -280,15 +280,15 @@ func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
 func configFacts(cfg config.Config) workflow.Facts {
 	c := cfg.Cleanup
 	return workflow.Facts{
-		"config.cleanup.idle":            time.Duration(c.Idle),
-		"config.cleanup.asked_idle":      time.Duration(c.AskedIdle),
-		"config.cleanup.workspace_grace": time.Duration(c.WorkspaceGrace),
-		"config.cleanup.manual_idle":     time.Duration(c.ManualIdle),
-		"config.cleanup.stale_workspace": time.Duration(c.StaleWorkspace),
-		"config.nudge.silent_days":       cfg.Nudge.SilentDays,
-		"config.gtd.stale_waiting_days":  cfg.GTD.StaleWaitingDays,
-		"config.drafts.repeat_after":     time.Duration(cfg.Drafts.RepeatAfter),
-		"config.turns.per_day":           cfg.Turns.PerDay,
+		"config.cleanup.idle":             time.Duration(c.Idle),
+		"config.cleanup.asked_idle":       time.Duration(c.AskedIdle),
+		"config.cleanup.workspace_grace":  time.Duration(c.WorkspaceGrace),
+		"config.cleanup.manual_idle":      time.Duration(c.ManualIdle),
+		"config.cleanup.stale_workspace":  time.Duration(c.StaleWorkspace),
+		"config.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
+		"config.gtd.stale_waiting_days":   cfg.GTD.StaleWaitingDays,
+		"config.drafts.repeat_after":      time.Duration(cfg.Drafts.RepeatAfter),
+		"config.turns.per_day":            cfg.Turns.PerDay,
 	}
 }
 

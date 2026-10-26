@@ -27,8 +27,8 @@ func TestCleanupDefaults(t *testing.T) {
 			t.Errorf("disposable lacks %s: %v", name, cl.Disposable)
 		}
 	}
-	if c.Classify.PerDay != 50 || c.Nudge.SilentDays != 30 {
-		t.Errorf("classify = %+v, nudge = %+v", c.Classify, c.Nudge)
+	if c.Classify.PerDay != 50 || c.GitHub.Nudge.SilentDays != 30 {
+		t.Errorf("classify = %+v, nudge = %+v", c.Classify, c.GitHub.Nudge)
 	}
 
 	refused := map[string]string{
@@ -105,8 +105,10 @@ func TestLoadWorkflowConfig(t *testing.T) {
 						"tmp"
 				]
 		},
-		"nudge": {
-				"silent_days": 10
+		"github": {
+				"nudge": {
+						"silent_days": 10
+				}
 		},
 		"classify": {
 				"per_day": 5
@@ -131,8 +133,8 @@ func TestLoadWorkflowConfig(t *testing.T) {
 	}
 	x := c.Workflows["x"]
 	if time.Duration(c.Cleanup.Idle) != 3*time.Hour || time.Duration(c.Cleanup.AskedIdle) != 4*time.Hour ||
-		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
-		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.Nudge, c.Classify)
+		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.GitHub.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
+		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.GitHub.Nudge, c.Classify)
 	}
 	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "wait" ||
 		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
