@@ -26,8 +26,11 @@ func (f fakeManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	return a, ok
 }
 
-func (f fakeManifests) WorkflowApproval(name string) (*draft.Policy, bool) {
+func (f fakeManifests) WorkflowApproval(name string, intent *draft.Policy) (*draft.Policy, bool) {
 	a, ok := f.workflows[name]
+	if a == nil {
+		return intent, ok
+	}
 	return a, ok
 }
 

@@ -544,13 +544,16 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 	}
 }
 
-func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
+func TestTheConfigsDraftApprovalIsLaidOnce(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
 	manifest := draft.Fixed(draft.Approval{Mode: draft.Wait})
 	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Observe: false, DraftApproval: manifest}}, cfg)
-	if a := out[0].DraftApproval; a == nil || a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
+	if out[0].DraftApproval != manifest {
+		t.Fatalf("applyConfig laid the drafts approval its resolver lays: %+v", out[0].DraftApproval)
+	}
+	if a := draftApproval(cfg, out[0]); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}
 	if manifest.Default.Mode != draft.Wait {

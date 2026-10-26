@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
@@ -214,10 +215,64 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
-		if p, _ := configPolicy(w, wc.DraftApproval()); p != nil {
-			w.DraftApproval = p
-		}
 		out = append(out, w)
+	}
+	return out
+}
+
+// configWorkflowProblems are the config's workflows.<name> blocks that do
+// not load over the workflow they change: its only_when and its approval,
+// which stop the workflow, and its drafts.approval over each block it may
+// overlay, which holds every draft of it.
+func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
+	extras := briefExtrasOf(l.Registry)
+	var out []error
+	for _, w := range l.Workflows {
+		wc, ok := cfg.Workflows[w.Name]
+		if !ok {
+			continue
+		}
+		if wc.OnlyWhen != "" {
+			if _, err := expr.CompileWorkflow(wc.OnlyWhen, workflowEnv(w, extras)); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.only_when: %w; the workflow runs nowhere", w.Name, err))
+			}
+		}
+		if o, ok := runOverlay(wc.Approval); ok {
+			if _, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras)); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.approval: %w; the workflow runs nowhere", w.Name, err))
+			}
+		}
+		for _, base := range draftBases(w, l.Registry) {
+			if _, err := configPolicy(w.Name, w.Slot, base, wc.DraftApproval()); err != nil {
+				out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
+				break
+			}
+		}
+	}
+	return out
+}
+
+// draftBases are the blocks the config's drafts.approval of w may be laid
+// over: its manifest's; without one, wait for the drafts its steps propose
+// and the block of each intent its turn.start steps name.
+func draftBases(w workflow.Workflow, reg *dintent.Registry) []*draft.Policy {
+	if w.DraftApproval != nil {
+		return []*draft.Policy{w.DraftApproval}
+	}
+	var out []*draft.Policy
+	for _, st := range w.Steps {
+		switch st.Use {
+		case builtin.StepDraftPropose:
+			out = append(out, nil)
+		case builtin.StepTurnStart:
+			name, _ := st.Args["intent"].(string)
+			if d, ok := reg.Get(dintent.Name(name)); ok {
+				out = append(out, d.DraftApproval)
+			}
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, nil)
 	}
 	return out
 }

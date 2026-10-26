@@ -94,8 +94,61 @@ func TestTheConfigsDraftApprovalOverlaysTheWorkflows(t *testing.T) {
 	}
 	te := newTestEnv(t, nil)
 	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
-	if p, ok := m.WorkflowApproval("slack-closure"); !ok || p == nil || p.Default != (draft.Approval{Mode: draft.Delay, Window: 2 * time.Hour}) {
+	if p, ok := m.WorkflowApproval("slack-closure", nil); !ok || p == nil || p.Default != (draft.Approval{Mode: draft.Delay, Window: 2 * time.Hour}) {
 		t.Errorf("a turn the workflow starts does not take the config's approval: %+v", p)
+	}
+}
+
+func TestAConfigOverlayOnAWorkflowWithoutABlockOverlaysTheIntents(t *testing.T) {
+	t.Parallel()
+	cfg, err := loadConfigJSON(t, `{"workflows": {"review-first-round": {"drafts": {"approval": {"rule": [{"when": "pr.draft", "mode": "wait"}]}}},
+		"review-follow-up": {"drafts": {"approval": {"window": "30m"}}}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	te := newTestEnv(t, nil)
+	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
+	sends := draft.Fixed(draft.Approval{Mode: draft.Send})
+	if p, _ := m.WorkflowApproval("review-first-round", sends); p == nil || p.Default.Mode != draft.Send || len(p.Rules) != 1 {
+		t.Errorf("a rule-only overlay replaced the intent's mode: %+v", p)
+	}
+	delays := draft.Fixed(draft.Approval{Mode: draft.Delay, Window: time.Hour})
+	if p, _ := m.WorkflowApproval("review-follow-up", delays); p == nil || p.Default != (draft.Approval{Mode: draft.Delay, Window: 30 * time.Minute}) {
+		t.Errorf("a window overlay over the intent's delay: %+v", p)
+	}
+	if p, _ := m.WorkflowApproval("review-follow-up", sends); p == nil || p.Default.Mode != draft.Wait {
+		t.Errorf("a window over an intent that sends holds every draft: %+v", p)
+	}
+	if p, _ := m.WorkflowApproval("nudge-silent-30d", sends); p != sends {
+		t.Errorf("a workflow the config leaves alone takes the intent's block: %+v", p)
+	}
+}
+
+func TestConfigWorkflowProblemsCheckTheMergedBlocks(t *testing.T) {
+	t.Parallel()
+	cfg, err := loadConfigJSON(t, `{"workflows": {
+		"nudge-silent-30d": {"approval": {"window": "5m"}},
+		"review-first-round": {"approval": {"window": "5m"}, "drafts": {"approval": {"mode": "delay"}}},
+		"slack-closure": {"drafts": {"approval": {"window": "30m"}}},
+		"slack-ask-owner": {"drafts": {"approval": {"rule": []}}},
+		"address": {"only_when": "brief.extra.nope == true"}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	te := newTestEnv(t, nil)
+	var got []string
+	for _, err := range configWorkflowProblems(cfg, te.loadedIntents()) {
+		got = append(got, err.Error())
+	}
+	for _, want := range []string{"workflows.nudge-silent-30d.approval", "workflows.review-first-round.drafts.approval", "workflows.slack-closure.drafts.approval", "workflows.address.only_when"} {
+		if !slices.ContainsFunc(got, func(s string) bool { return strings.HasPrefix(s, want) }) {
+			t.Errorf("no problem for %s in %q", want, got)
+		}
+	}
+	for _, clean := range []string{"workflows.review-first-round.approval", "workflows.slack-ask-owner"} {
+		if slices.ContainsFunc(got, func(s string) bool { return strings.HasPrefix(s, clean) }) {
+			t.Errorf("%s merges cleanly, yet %q", clean, got)
+		}
 	}
 }
 
@@ -242,7 +295,7 @@ func TestTheConfigsDraftApprovalReplacesTheManifestsRules(t *testing.T) {
 		t.Errorf("without the config, the manifest's rule: %+v", got)
 	}
 	m := outboxManifests{loaded: te.loadedIntents, config: func() config.Config { return cfg }}
-	if p, ok := m.WorkflowApproval("slack-thanks"); !ok || p == nil || len(p.Rules) != 1 || p.Rules[0].Approval.Mode != draft.Delay {
+	if p, ok := m.WorkflowApproval("slack-thanks", nil); !ok || p == nil || len(p.Rules) != 1 || p.Rules[0].Approval.Mode != draft.Delay {
 		t.Errorf("a turn's draft of the workflow does not take the config's: %+v", p)
 	}
 }
@@ -259,7 +312,9 @@ func TestAConfigRuleOverAnotherSubjectIsRefusedAndHolds(t *testing.T) {
 	if got, err := pol.Decide(draft.Draft{Delivery: draft.Message}, draft.Subject{Slot: "slack"}, time.Time{}); err != nil || got.Approval.Mode != draft.Wait || len(pol.Rules) != 0 {
 		t.Fatalf("%+v %v", got, err)
 	}
-	problems := configApprovalProblems(cfg, []workflow.Workflow{w, {Name: "other", Slot: "pr"}})
+	l := *newTestEnv(t, nil).loadedIntents()
+	l.Workflows = []workflow.Workflow{w, {Name: "other", Slot: "pr"}}
+	problems := configWorkflowProblems(cfg, &l)
 	if len(problems) != 1 || !strings.Contains(problems[0].Error(), "workflows.slack-thanks.drafts.approval") || !strings.Contains(problems[0].Error(), "pr.author") {
 		t.Fatalf("problems %v", problems)
 	}
@@ -276,7 +331,7 @@ func TestTheConfigRefusesAnInvalidDraftApprovalRule(t *testing.T) {
 		"two subjects":            `{"when": "pr.author == \"x\" && slack.conversation == \"dm\"", "mode": "send"}`,
 	} {
 		_, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"drafts": {"approval": {"mode": "wait", "rule": [`+rule+`]}}}}}`)
-		if err == nil || !strings.Contains(err.Error(), "workflows.slack-thanks.drafts.approval: rule[0]") {
+		if err == nil || !strings.Contains(err.Error(), "workflows.slack-thanks.drafts.approval.rule[0]") {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

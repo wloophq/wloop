@@ -188,6 +188,20 @@ func TestDoctorWarnsOnAnUnknownWorkflowConfig(t *testing.T) {
 	}
 }
 
+func TestDoctorReportsARunOverlayThatDoesNotMerge(t *testing.T) {
+	t.Parallel()
+	te, db := workflowDoctorEnv(t)
+	te.cfg.Workflows["session-manual-quiet"] = config.WorkflowConfig{Approval: &config.ApprovalConfig{Window: new(config.Days(5 * time.Minute))}}
+	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := checkNamed(rep.Workflows, "config workflows")
+	if !ok || got.Mark != api.DoctorMissing || !strings.Contains(got.Info, "workflows.session-manual-quiet.approval") || !strings.Contains(got.Info, "runs nowhere") {
+		t.Fatalf("%+v in %+v", got, rep.Workflows)
+	}
+}
+
 // failingReads fails every workflow read.
 type failingReads struct{ workflowReads }
 
