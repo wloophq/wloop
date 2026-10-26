@@ -2,6 +2,7 @@ package builtin
 
 import (
 	"maps"
+	"slices"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
@@ -21,8 +22,20 @@ func TestExtraFactsAreTypedFromTheSchema(t *testing.T) {
 	}
 	want := expr.Env{"brief.extra.solution": expr.String, "brief.extra.approach": expr.String, "brief.extra.files": expr.Int,
 		"brief.extra.breaking": expr.Bool, "brief.extra.areas": expr.List}
-	if got := ExtraFacts(s.Properties()); !maps.Equal(got, want) {
-		t.Fatalf("%v", got)
+	got := ExtraFacts(s.Properties())
+	for _, name := range got.Names() {
+		if got[name] != want[name] {
+			t.Errorf("%s: %v, want %v", name, got[name], want[name])
+		}
+	}
+	if len(got.Names()) != len(want) {
+		t.Fatalf("%v", got.Names())
+	}
+	if e := got.Enum("brief.extra.approach"); !slices.Equal(e, []string{"patch", "rewrite"}) {
+		t.Errorf("approach's values %v", e)
+	}
+	if _, err := expr.Compile(`brief.extra.approach == "patches"`, got); err == nil {
+		t.Error("a value the schema does not list compiles")
 	}
 	env := WorkflowEnv("pr")
 	maps.Copy(env, ExtraFacts(s.Properties()))

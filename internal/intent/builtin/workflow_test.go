@@ -83,7 +83,7 @@ func TestEveryWorkflowFactHasASlotAndAType(t *testing.T) {
 
 func TestWorkflowEnvIsOneSlotWithTriggerAndConfig(t *testing.T) {
 	env := WorkflowEnv(Slots[unit.Session])
-	for name := range env {
+	for _, name := range env.Names() {
 		slot, _, _ := strings.Cut(name, ".")
 		if slot != "session" && slot != "trigger" && slot != "config" {
 			t.Errorf("session env holds %s", name)

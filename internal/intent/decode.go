@@ -13,6 +13,7 @@ import (
 	"github.com/pelletier/go-toml/v2/unstable"
 
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -293,12 +294,28 @@ func blankKeyValue(src []byte, row, col int) ([]byte, bool) {
 	return out, true
 }
 
+// unknownKey says what an unknown key of the manifest type t is: a removed
+// key with the one that replaced it, else the closest key.
 func unknownKey(t reflect.Type, key []string) string {
+	if msg := builtin.KeyMessage(surfaceOf(t), key); msg != "" {
+		return msg
+	}
 	known := keysAt(t, key[:len(key)-1])
-	if s := closest(key[len(key)-1], known); s != "" {
+	if s := builtin.Closest(key[len(key)-1], known); s != "" {
 		return "unknown key; did you mean " + s + "?"
 	}
 	return "unknown key"
+}
+
+// surfaceOf is the grammar's surface of the manifest type t.
+func surfaceOf(t reflect.Type) builtin.Surface {
+	switch t {
+	case reflect.TypeFor[manifest]():
+		return builtin.SurfaceIntent
+	case reflect.TypeFor[wManifest]():
+		return builtin.SurfaceWorkflow
+	}
+	return ""
 }
 
 // keysAt lists the toml keys of the table at path, following map values and slice elements.
@@ -330,36 +347,6 @@ func keysAt(t reflect.Type, path []string) []string {
 	return nil
 }
 
-func closest(s string, options []string) string {
-	best, bestD := "", len(s)/2+2
-	for _, o := range options {
-		if d := distance(s, o); d < bestD {
-			best, bestD = o, d
-		}
-	}
-	return best
-}
-
-func distance(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
-}
-
 var mismatch = regexp.MustCompile(`cannot decode TOML (\S+) into .* of type (\S+)$`)
 
 func typeMismatch(msg string) string {
@@ -387,8 +374,6 @@ var (
 	assignment = regexp.MustCompile(`^\s*([A-Za-z0-9_.-]+)\s*=`)
 	header     = regexp.MustCompile(`^\s*\[\[?\s*([A-Za-z0-9_.-]+)\s*\]\]?`)
 )
-
-var predicateKeys = map[string]bool{"records": true, "when": true, "visible": true, "enabled": true, "primary": true, "wait_when": true}
 
 // syntaxError names the key on the error's line and, for a predicate written
 // without quotes, says to quote it.
@@ -422,7 +407,7 @@ func syntaxError(src []byte, row int, msg string) (string, string) {
 		break
 	}
 	last := key[strings.LastIndex(key, ".")+1:]
-	if predicateKeys[last] {
+	if builtin.IsPredKey(last) {
 		msg += "; a predicate is a string: quote it, as in " + last + " = '!pr.mine'"
 	}
 	return field, msg

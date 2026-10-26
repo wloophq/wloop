@@ -907,7 +907,7 @@ func TestEveryFactIsDeclaredWithItsType(t *testing.T) {
 			t.Errorf("%s = %#v: declared %v, %v", name, v, typ, ok)
 		}
 	}
-	for name := range builtin.WorkflowEnv("pr") {
+	for _, name := range builtin.WorkflowEnv("pr").Names() {
 		if _, ok := f[name]; !ok && name[:3] == "pr." {
 			t.Errorf("%s is declared and never set", name)
 		}

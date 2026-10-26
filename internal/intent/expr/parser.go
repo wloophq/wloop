@@ -28,13 +28,19 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	ast, iss := ce.Compile(src)
+	cs, shifts := withHours(src)
+	fail := func(pos int, msg string) error { return newError(src, back(pos, shifts), "%s", msg) }
+	ast, iss := ce.Compile(cs)
 	if iss.Err() != nil {
-		parsed, _ := ce.Parse(src)
-		return nil, issueError(src, env, parsed, iss.Errors())
+		parsed, _ := ce.Parse(cs)
+		return nil, fail(issueError(cs, env, parsed, iss.Errors()))
 	}
-	if e := checkLiterals(src, ast.NativeRep()); e != nil {
-		return nil, e
+	if pos, msg, bad := checkLiterals(cs, ast.NativeRep()); bad {
+		return nil, fail(pos, msg)
+	}
+	if id, msg, bad := checkEnums(ast.NativeRep(), env); bad {
+		loc := ast.NativeRep().SourceInfo().GetStartLocation(id)
+		return nil, fail(offset(cs, loc.Line(), loc.Column()), msg)
 	}
 	if out := ast.OutputType(); !out.IsExactType(cel.BoolType) {
 		start := len(src) - len(strings.TrimLeftFunc(src, unicode.IsSpace))
@@ -56,11 +62,7 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 var envs sync.Map
 
 func celEnv(env Env, marks bool) (*cel.Env, error) {
-	names := make([]string, 0, len(env))
-	for k := range env {
-		names = append(names, k)
-	}
-	sort.Strings(names)
+	names := env.Names()
 	var key strings.Builder
 	opts := make([]cel.EnvOption, 0, len(names))
 	for _, n := range names {
@@ -106,11 +108,11 @@ func reads(a *celast.AST, env Env) []string {
 	return out
 }
 
-// checkLiterals refuses at load a duration or timestamp literal that could only fail at evaluation.
-func checkLiterals(src string, a *celast.AST) *Error {
-	var bad *Error
+// checkLiterals refuses at load a duration or timestamp literal that could
+// only fail at evaluation: where, and why.
+func checkLiterals(src string, a *celast.AST) (pos int, msg string, bad bool) {
 	celast.PostOrderVisit(a.Expr(), celast.NewExprVisitor(func(e celast.Expr) {
-		if bad != nil || e.Kind() != celast.CallKind {
+		if bad || e.Kind() != celast.CallKind {
 			return
 		}
 		call := e.AsCall()
@@ -123,19 +125,19 @@ func checkLiterals(src string, a *celast.AST) *Error {
 			return
 		}
 		loc := a.SourceInfo().GetStartLocation(arg.ID())
-		pos := offset(src, loc.Line(), loc.Column())
+		at := offset(src, loc.Line(), loc.Column())
 		switch call.FunctionName() {
 		case "duration":
 			if _, err := time.ParseDuration(string(s)); err != nil {
-				bad = newError(src, pos, "invalid duration %q", string(s))
+				pos, msg, bad = at, fmt.Sprintf("invalid duration %q", string(s)), true
 			}
 		case "timestamp":
 			if _, err := time.Parse(time.RFC3339, string(s)); err != nil {
-				bad = newError(src, pos, "invalid timestamp %q; use RFC 3339, as in \"2026-10-21T09:00:00-03:00\"", string(s))
+				pos, msg, bad = at, fmt.Sprintf("invalid timestamp %q; use RFC 3339, as in \"2026-10-21T09:00:00-03:00\"", string(s)), true
 			}
 		}
 	}))
-	return bad
+	return pos, msg, bad
 }
 
 // offset turns CEL's location (1-based line, 0-based code point column) into a byte offset of src.
@@ -168,7 +170,8 @@ var (
 	cmpOps       = map[string]string{"_==_": "==", "_!=_": "!=", "_<_": "<", "_<=_": "<=", "_>_": ">", "_>=_": ">="}
 )
 
-func issueError(src string, env Env, parsed *cel.Ast, errs []*cel.Error) *Error {
+// issueError is where CEL's first error is and what it says, worded for an author.
+func issueError(src string, env Env, parsed *cel.Ast, errs []*cel.Error) (int, string) {
 	sort.SliceStable(errs, func(i, j int) bool {
 		a, b := errs[i].Location, errs[j].Location
 		return a.Line() < b.Line() || a.Line() == b.Line() && a.Column() < b.Column()
@@ -182,6 +185,10 @@ func issueError(src string, env Env, parsed *cel.Ast, errs []*cel.Error) *Error 
 	switch {
 	case reUndeclared.MatchString(msg):
 		name := fieldAt(src, pos)
+		if renamed := env.Was(name); renamed != "" {
+			msg = "unknown field " + name + "; it was renamed " + renamed
+			break
+		}
 		msg = "unknown field " + name + suggest(name, env)
 	case reOverload.MatchString(msg):
 		m := reOverload.FindStringSubmatch(msg)
@@ -226,7 +233,7 @@ func issueError(src string, env Env, parsed *cel.Ast, errs []*cel.Error) *Error 
 	case reMissing.MatchString(msg):
 		msg = reMissing.FindStringSubmatch(msg)[1]
 	}
-	return newError(src, pos, "%s", msg)
+	return pos, msg
 }
 
 // fieldStart moves a position CEL gives at a field's dot to the field's start.

@@ -154,7 +154,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"config.github.address_without_workspace":   func(f *Facts) { f.Config.AddressWithoutWorkspace = true },
 	}
 	zero := Facts{NudgeWho: []string{}}
-	for name := range builtin.Env(builtin.ActionSlot, nil) {
+	for _, name := range builtin.Env(builtin.ActionSlot, nil).Names() {
 		set, ok := sources[name]
 		if !ok {
 			t.Errorf("%s has no source in this table", name)

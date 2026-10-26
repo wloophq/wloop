@@ -125,7 +125,7 @@ func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		if slices.Contains(f.Slots, slot) {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	if slot == TurnSlot {

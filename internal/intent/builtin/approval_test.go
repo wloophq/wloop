@@ -4,6 +4,7 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -119,6 +120,9 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 }
 
 func zeroLiteral(f Fact) string {
+	if vs := f.Enum[anyProvider]; len(vs) > 0 {
+		return strconv.Quote(vs[0])
+	}
 	switch f.Type {
 	case expr.Bool:
 		return "true"

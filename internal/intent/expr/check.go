@@ -2,7 +2,6 @@ package expr
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -46,13 +45,8 @@ func newError(src string, pos int, format string, args ...any) *Error {
 }
 
 func suggest(name string, env Env) string {
-	names := make([]string, 0, len(env))
-	for k := range env {
-		names = append(names, k)
-	}
-	sort.Strings(names)
 	best, bestD := "", 3
-	for _, k := range names {
+	for _, k := range env.Names() {
 		if d := levenshtein(name, k); d < bestD {
 			best, bestD = k, d
 		}

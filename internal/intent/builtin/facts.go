@@ -295,6 +295,18 @@ var otherFacts = []Fact{
 	was(wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units other than pull requests, all workflows together."), "config.turns.automated_per_day"),
 }
 
+// put declares f in env with its closed values, when they hold for every
+// provider, and the names it replaced.
+func put(env expr.Env, f Fact) {
+	env[f.Name] = f.Type
+	if vs, ok := f.Enum[anyProvider]; ok {
+		env.SetEnum(f.Name, vs)
+	}
+	for _, old := range f.Was {
+		env.SetWas(old, f.Name)
+	}
+}
+
 // approvalFact is a fact of the draft a [draft_approval] rule reads,
 // named draft.<name>.
 func approvalFact(name string, t expr.Type, doc string) Fact {
@@ -324,9 +336,9 @@ func ApprovalEnv(auto bool, slots ...string) expr.Env {
 	for _, f := range Facts {
 		switch {
 		case slices.Contains(f.Slots, ApprovalSlot) && (auto || !slices.Contains(AutoOnly, f.Name)):
-			env[f.Name] = f.Type
+			put(env, f)
 		case slices.Contains(f.Slots, WorkflowSlot) && f.Slot != "" && slices.Contains(slots, f.Slot):
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	return env
@@ -356,7 +368,7 @@ func WorkflowEnv(slot string) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		if slices.Contains(f.Slots, WorkflowSlot) && (f.Slot == slot || slices.Contains(f.Subjects, slot) || f.Slot == "trigger" || f.Slot == "config") {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	return env
@@ -368,7 +380,7 @@ func WithdrawEnv(slot string) expr.Env {
 	env := WorkflowEnv(slot)
 	for _, f := range Facts {
 		if f.Slot == DraftSlot {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	return env
@@ -385,6 +397,9 @@ func ExtraFacts(props []jsonschema.Property) expr.Env {
 		t, ok := map[string]expr.Type{"string": expr.String, "integer": expr.Int, "boolean": expr.Bool, "array": expr.List}[p.Type]
 		if ok {
 			env[ExtraPrefix+p.Name] = t
+			if p.Type == "string" && len(p.Enum) > 0 {
+				env.SetEnum(ExtraPrefix+p.Name, p.Enum)
+			}
 		}
 	}
 	return env
@@ -417,7 +432,7 @@ func PREnv() expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		if f.Provider == unit.GitHub && slices.Contains(f.Slots, TurnSlot) {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	return env
@@ -429,7 +444,7 @@ func WorkflowEnvAll() expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		if slices.Contains(f.Slots, WorkflowSlot) {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	return env

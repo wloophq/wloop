@@ -1,6 +1,9 @@
 package builtin
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 // Surface is a file kind of the profile language, or the configuration.
 type Surface string
@@ -31,6 +34,7 @@ const (
 	KindList // a list of Elem
 	KindTable
 	KindMap // a table whose keys an author names
+	KindAny // more than one form, which its decoder reads
 )
 
 // Key is one reserved key of the language. Path is dotted, "[]" marks an
@@ -73,7 +77,31 @@ type Problem struct {
 
 // Check walks doc, a document of surface decoded without a schema (a TOML
 // table or a JSON object as map[string]any), against the grammar: unknown
-// and removed keys and values, with did-you-mean, kinds and enums.
+// and removed keys and values, with did-you-mean, kinds and enums. A
+// surface the grammar has no row of is not checked.
 func Check(surface Surface, doc map[string]any) []Problem {
-	return nil
+	return check(Grammar, surface, doc)
+}
+
+// CheckUser is Check on a user layer's document, which may not set a key
+// only the bundled profile sets.
+func CheckUser(surface Surface, doc map[string]any) []Problem {
+	return checkUser(Grammar, surface, doc)
+}
+
+// KeyMessage says which key replaced the removed key at path of surface;
+// "" when path names no removed key.
+func KeyMessage(surface Surface, path []string) string {
+	return keyMessage(Grammar, surface, path)
+}
+
+// IsPredKey says whether a key named last holds a predicate somewhere in
+// the language, so a value written without quotes gets the quoting hint.
+func IsPredKey(last string) bool {
+	for _, k := range Grammar {
+		if k.Kind == KindPred && k.Path[strings.LastIndex(k.Path, ".")+1:] == last {
+			return true
+		}
+	}
+	return false
 }

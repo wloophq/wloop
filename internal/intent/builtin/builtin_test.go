@@ -34,8 +34,8 @@ func TestEnvHasEveryFactOfTheSlotAndTheInputs(t *testing.T) {
 				}
 			}
 		}
-		if len(env) != want {
-			t.Errorf("%s env has %d fields, want %d", slot, len(env), want)
+		if n := len(env.Names()); n != want {
+			t.Errorf("%s env has %d fields, want %d", slot, n, want)
 		}
 	}
 	if _, ok := Env(ActionSlot, inputs)["inputs.take_over"]; ok {
