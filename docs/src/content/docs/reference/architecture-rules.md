@@ -108,10 +108,10 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/facts/session/facts.go` `repoOf` `port.PROf` `1` | 🧾 | a session's facts read its linked pull request |
 | `internal/adapter/store/inventory/byunit.go` `unitRef` `port.PROf` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/brief/github_source.go` `GitHubSource.ref` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
+| `internal/brief/queue.go` `Queue.intent` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief intent outside the plugin |
 | `internal/brief/queue.go` `Queue.source` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
 | `internal/brief/units.go` `refOf` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
 | `internal/catalog/catalog.go` `withSource` `pr.Codec{}.Provider` `1` | 🧾 | the catalog's built-in actions name the GitHub plugin |
-| `internal/cli/brief_intent.go` `Env.resolveBriefIntent` `pr.Codec{}.Provider` `1` | 🧾 | the brief intent falls back to the GitHub plugin's provider |
 | `internal/cli/launcher.go` `cliLauncher.Launch` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
@@ -182,7 +182,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/init_config.go` `mergeInitConfig` `"slack"` `1` | ✅ | the slack section of the config init writes |
 | `internal/cli/placement.go` `Env.placements` `unit.GitHub` `1` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
 | `internal/cli/placement.go` `githubPlacement.Default` `unit.GitHub` `2` | 🧾 | GitHub's default placement reads the pull request and the viewer outside the plugin |
-| `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `4` | 🧾 | the daemon's wiring of the brief queue, the GitHub viewer and the forge |
+| `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `3` | 🧾 | the daemon's wiring of the GitHub viewer and the forge |
 | `internal/cli/serve.go` `trackedBooks.Books` `unit.GitHub` `1` | 🧾 | a carded pull request without a turn still gets an empty book, so its card stays |
 | `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
 | `internal/cli/serve_plugins.go` `withoutGitHub` `unit.GitHub` `1` | 🧾 | the GitHub facilities the daemon holds go with the GitHub plugin |

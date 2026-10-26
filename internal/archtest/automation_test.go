@@ -83,7 +83,7 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/cli/init_config.go", "mergeInitConfig", `"slack"`, 1, "the slack section of the config init writes"},
 	{"internal/cli/placement.go", "Env.placements", "unit.GitHub", 1, "debt: GitHub's default placement, wired outside the plugin's PlacementDefaults"},
 	{"internal/cli/placement.go", "githubPlacement.Default", "unit.GitHub", 2, "debt: GitHub's default placement reads the pull request and the viewer outside the plugin"},
-	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 4, "debt: the daemon's wiring of the brief queue, the GitHub viewer and the forge"},
+	{"internal/cli/serve.go", "serveAllDeps", "unit.GitHub", 3, "debt: the daemon's wiring of the GitHub viewer and the forge"},
 	{"internal/cli/serve.go", "trackedBooks.Books", "unit.GitHub", 1, "debt: a carded pull request without a turn still gets an empty book, so its card stays"},
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
 	{"internal/cli/serve_plugins.go", "withoutGitHub", "unit.GitHub", 1, "debt: the GitHub facilities the daemon holds go with the GitHub plugin"},
