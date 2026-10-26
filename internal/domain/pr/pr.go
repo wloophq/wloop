@@ -27,7 +27,7 @@ func (r Ref) URL() string {
 	return fmt.Sprintf("https://github.com/%s/%s/pull/%d", r.Owner, r.Repo, r.Number)
 }
 
-var prURL = regexp.MustCompile(`^https://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)(?:[/?#].*)?$`)
+var prURL = regexp.MustCompile(`^https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)(?:[/?#].*)?$`)
 
 func ParseURL(raw string) (Ref, error) {
 	m := prURL.FindStringSubmatch(strings.TrimSpace(raw))
