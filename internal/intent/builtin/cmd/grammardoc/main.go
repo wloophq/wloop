@@ -66,7 +66,11 @@ func outputs(root string) ([]output, error) {
 		}
 		out = append(out, output{path, doc})
 	}
-	out = append(out, output{filepath.Join(root, referenceDir, "language.md"), []byte(languagePage())})
+	lang, err := languagePage()
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, output{filepath.Join(root, referenceDir, "language.md"), []byte(lang)})
 	slices.SortFunc(out, func(a, b output) int { return strings.Compare(a.path, b.path) })
 	return out, nil
 }
@@ -192,7 +196,7 @@ func line(k builtin.Key) string {
 	return s + "): " + cell(k.Doc)
 }
 
-func languagePage() string {
+func languagePage() (string, error) {
 	out := []string{
 		"---",
 		"title: Profile language",
@@ -203,6 +207,21 @@ func languagePage() string {
 	}
 	for _, s := range sections {
 		out = append(out, "", "## "+s.title, "")
+		if gs, ok := groups[s.surface]; ok {
+			parts, err := grouped(rows(s.surface), gs)
+			if err != nil {
+				return "", err
+			}
+			for i, g := range gs {
+				out = append(out, "### "+g.title, "")
+				for _, k := range parts[i] {
+					out = append(out, line(k))
+				}
+				out = append(out, "")
+			}
+			out = out[:len(out)-1]
+			continue
+		}
 		if s.surface != builtin.SurfaceStep {
 			for _, k := range rows(s.surface) {
 				out = append(out, line(k))
@@ -224,7 +243,7 @@ func languagePage() string {
 		}
 	}
 	out = append(out, "", "This page is generated from the grammar table by `make docs-ref`.")
-	return strings.Join(out, "\n") + "\n"
+	return strings.Join(out, "\n") + "\n", nil
 }
 
 var schemas = []struct {
