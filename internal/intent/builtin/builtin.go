@@ -267,6 +267,9 @@ type Effect struct {
 	// Provider is the provider whose drafts alone may declare it; "" any.
 	Provider unit.ProviderID
 	Doc      string
+	// Plugin says it applies through the unit's plugin, so it waits while
+	// that plugin is not built.
+	Plugin bool
 }
 
 // The effects code applies by name: a plugin's Module.OnPosted keys and the
@@ -279,9 +282,9 @@ const (
 
 // Effects is the effect vocabulary of drafts.
 var Effects = []Effect{
-	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none."},
-	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin."},
-	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts."},
+	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.", false},
+	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.", true},
+	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts.", false},
 }
 
 // EffectNames are the names of Effects.
