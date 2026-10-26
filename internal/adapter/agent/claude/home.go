@@ -116,8 +116,13 @@ type jsonFile struct {
 	doc    map[string]any
 }
 
+// readJSON refuses a relative path: a home reaches the daemon from its
+// clients, whose working directory is not the daemon's.
 func readJSON(path string) (jsonFile, error) {
 	f := jsonFile{path: path, doc: map[string]any{}}
+	if !strings.HasPrefix(path, string(filepath.Separator)) {
+		return f, fmt.Errorf("%s is not an absolute path", path)
+	}
 	raw, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):

@@ -681,3 +681,23 @@ func TestUnansweredMCPWithoutAReadableMCPJSONWaitsForAnyAnswer(t *testing.T) {
 		t.Fatal("unanswered though the settings record an answer")
 	}
 }
+
+func TestARelativeHomeIsRefused(t *testing.T) {
+	isolate(t)
+	base, dir := t.TempDir(), t.TempDir()
+	t.Chdir(base)
+	file := filepath.Join(base, "relative", ".claude.json")
+	write(t, file, `{}`)
+	for _, home := range []string{"relative", "./relative"} {
+		if _, err := (Agent{}).Trust(context.Background(), dir, home, true); err == nil {
+			t.Errorf("Trust in the home %q succeeded", home)
+		}
+		s := turns.AgentSession{Home: home, Worktree: dir, Trusted: true}
+		if err := (Agent{}).Preflight(context.Background(), s); err == nil || errors.As(err, new(*turns.UntrustedError)) {
+			t.Errorf("Preflight in the home %q: %v, want the home refused", home, err)
+		}
+	}
+	if raw, _ := os.ReadFile(file); string(raw) != `{}` {
+		t.Errorf("%s was rewritten: %s", file, raw)
+	}
+}
