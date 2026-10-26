@@ -72,7 +72,7 @@ The thresholds:
 "workflows": { "nudge-silent-30d": { "approval": { "mode": "delay", "window": "5m" } } }
 ```
 
-`nudge.silent_days` (30) sets the silence before a nudge.
+`github.nudge.silent_days` (30) sets the silence before a nudge.
 
 ## Tune the Slack proposals
 

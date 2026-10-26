@@ -277,9 +277,7 @@ func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[stri
 		return out
 	}
 	if !st.Enabled {
-		if why := render("why"); why != "" {
-			st.Reason, st.Refusal = why, api.BuiltinWhy(key)
-		}
+		st.Reason, st.Refusal = render("why"), api.BuiltinWhy(key)
 		return st
 	}
 	st.Note, st.Confirm, st.Warning = render("note"), render("confirm"), render("warning")

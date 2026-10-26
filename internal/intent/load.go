@@ -97,6 +97,9 @@ type Loaded struct {
 
 	// Actions are the built-in actions' texts from actions.toml, by catalog id.
 	Actions map[string]BuiltinAction
+	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
+	// from defaults.toml.
+	EmptyRefusal string
 
 	skipped  []dintent.Name // kinds whose blocks need what a reverted override declared
 	layers   []profile.Layer
@@ -345,11 +348,12 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	crossCheck(units)
 	l := &Loaded{
-		Templates: map[dintent.Name]*template.Template{},
-		Programs:  map[dintent.Name]Programs{},
-		Broken:    map[dintent.Name]Problems{},
-		Problems:  dirProblems,
-		layers:    layers,
+		Templates:    map[dintent.Name]*template.Template{},
+		Programs:     map[dintent.Name]Programs{},
+		Broken:       map[dintent.Name]Problems{},
+		Problems:     dirProblems,
+		EmptyRefusal: defaults.Refusal,
+		layers:       layers,
 	}
 	var defs []dintent.Def
 	broken := brokenBy(units)

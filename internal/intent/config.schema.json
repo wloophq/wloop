@@ -232,12 +232,29 @@
           },
           "type": "array"
         },
+        "nudge": {
+          "additionalProperties": false,
+          "description": "The nudges on pull requests.",
+          "properties": {
+            "silent_days": {
+              "default": 30,
+              "description": "Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days.",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
         "owners": {
           "description": "The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "rate_limit_fraction": {
+          "default": 0.5,
+          "description": "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.",
+          "type": "number"
         },
         "review_prefix": {
           "default": "REVIEW ",
@@ -436,18 +453,6 @@
           "default": "09:00",
           "description": "The local HH:MM of the daily digest; empty for none.",
           "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "nudge": {
-      "additionalProperties": false,
-      "description": "The nudges.",
-      "properties": {
-        "silent_days": {
-          "default": 30,
-          "description": "Calendar days of silence after which a nudge stops.",
-          "type": "integer"
         }
       },
       "type": "object"
@@ -733,11 +738,6 @@
           "description": "The fast sweep's interval.",
           "type": "string"
         },
-        "rate_limit_fraction": {
-          "default": 0.5,
-          "description": "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.",
-          "type": "number"
-        },
         "slow": {
           "default": "1h",
           "description": "The slow sweep's interval.",
@@ -757,7 +757,7 @@
         },
         "per_unit_per_day": {
           "default": 5,
-          "description": "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today).",
+          "description": "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect.",
           "type": "integer"
         }
       },

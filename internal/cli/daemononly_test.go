@@ -98,7 +98,7 @@ func TestDoctorReadsStateThroughTheDaemon(t *testing.T) {
 	out := te.out.String()
 	for _, want := range []string{
 		"[missing] automated rounds held by a cap today: " + r7.String(),
-		"[info   ] paused: every workflow in apply mode and board moves paused on acme/sandbox since",
+		"[info   ] paused: every workflow that does not observe and board moves paused on acme/sandbox since",
 		"; " + brand.Command + " resume restarts them",
 		"[info   ] reconcile: at start-up",
 	} {

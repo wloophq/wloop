@@ -286,7 +286,7 @@ var otherFacts = []Fact{
 	wf("config", "cleanup.workspace_grace", expr.Duration, "The cleanup.workspace_grace setting, in working time."),
 	wf("config", "cleanup.manual_idle", expr.Duration, "The cleanup.manual_idle setting."),
 	wf("config", "cleanup.stale_workspace", expr.Duration, "The cleanup.stale_workspace setting."),
-	wf("config", "nudge.silent_days", expr.Int, "The nudge.silent_days setting, in calendar days."),
+	wf("config", "github.nudge.silent_days", expr.Int, "The github.nudge.silent_days setting, in calendar days."),
 	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
 	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units other than pull requests, all workflows together."),

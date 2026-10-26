@@ -568,7 +568,7 @@ func (e *Env) daemonHealthChecks(ctx context.Context, cfg config.Config, c *clie
 		out = append(out, check{markMissing, "daemon warning", w, ""})
 	}
 	if h.SlowSync {
-		info := "GitHub rate limit below sweep.rate_limit_fraction; the fast sweep waits"
+		info := "GitHub rate limit below github.rate_limit_fraction; the fast sweep waits"
 		if !h.RateLimit.ResetAt.IsZero() {
 			info += " until " + h.RateLimit.ResetAt.Local().Format("15:04")
 		}

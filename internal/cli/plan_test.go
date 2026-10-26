@@ -30,7 +30,7 @@ func planFixture() []api.PlanItem {
 	manual.Default, manual.Steps, manual.Gain = "wait", []string{"session.close"}, api.Gain{MemoryBytes: 300 << 20}
 	temp := planItem("workspace-temporary", unit.Unit{Provider: unit.Workspace, Key: "wt-9"}, "0099887766554433", "pending", "workspace.temporary = true")
 	temp.Default, temp.Observe, temp.Steps, temp.Gain = "wait", true, []string{"workspace.remove"}, api.Gain{DiskBytes: 2 << 30}
-	capped := planItem("address", unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}, "3c3c3c3c3c3c3c3c", "blocked", "per-PR daily cap reached (3)")
+	capped := planItem("address", unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}, "3c3c3c3c3c3c3c3c", "blocked", "turns.per_unit_per_day reached (3)")
 	capped.Steps, capped.Attempts, capped.Error = []string{"turn.start"}, 1, "launching: the app\nwas closed"
 	first := planItem("review-first-round", unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, "7a7a7a7a7a7a7a7a", "run", "my review was requested")
 	first.Steps = []string{"turn.start"}
@@ -189,7 +189,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 	}
 
 	te.err.Reset()
-	if code := te.run("plan", "apply", "3c3c3c3c"); code == 0 || !strings.Contains(te.err.String(), "per-PR daily cap reached (3)") || !strings.Contains(te.err.String(), "1 of 1 item(s) not applied") {
+	if code := te.run("plan", "apply", "3c3c3c3c"); code == 0 || !strings.Contains(te.err.String(), "turns.per_unit_per_day reached (3)") || !strings.Contains(te.err.String(), "1 of 1 item(s) not applied") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	for _, args := range [][]string{{"apply", "ffffffff"}, {"apply", "1f2e3d4"}, {"dismiss", "1f2e"}, {"apply"}} {

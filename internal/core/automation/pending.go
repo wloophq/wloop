@@ -33,7 +33,7 @@ func (e *Engine) DueRun(ctx context.Context) (err error) {
 	return err
 }
 
-// dueRun runs the due items of workflows still loaded in apply mode whose
+// dueRun runs the due items of workflows still loaded and not observing whose
 // unit the pause does not hold.
 func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	var t tally

@@ -17,7 +17,7 @@ func TestConfigGet(t *testing.T) {
 	for key, want := range map[string]string{
 		"views.orca.columns.needs-me": "waiting-me\n",
 		"views.orca.columns.reviewed": "reviewed\n",
-		"sweep.rate_limit_fraction":   "0.5\n",
+		"github.rate_limit_fraction":  "0.5\n",
 		"turns.per_unit_per_day":      "5\n",
 		"brief.enabled":               "false\n",
 		"github.automated_reviewers":  "[]\n",

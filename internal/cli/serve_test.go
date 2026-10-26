@@ -793,7 +793,7 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 
 	te.Env.GitHub = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
 		Token: func(context.Context) (string, error) { return "t", nil }})
-	cfg.Sweep.RateLimitFraction = 0.7
+	cfg.GitHub.RateLimitFraction = 0.7
 	te.Env.restoreBudget(ctx, db, cfg, t.Logf)
 	if got := te.Env.GitHub.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
 		t.Fatalf("restored %+v", got)

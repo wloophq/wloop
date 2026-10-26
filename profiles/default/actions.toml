@@ -1,6 +1,7 @@
 # The built-in actions' words, one table per action id. label and summary
 # are required; note, warning, confirm and why are templates over the action
-# facts, and an empty one shows nothing.
+# facts. An empty note, warning or confirm shows nothing; why may not be
+# empty.
 
 [run_now]
 label   = "Run now"
@@ -66,7 +67,7 @@ summary = "Let automatic rounds run on this pull request again."
 
 [mute]
 label   = "Mute"
-summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; rounds still run, unannounced. Pause stops the rounds instead."
+summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
 
 [mute.input]
 label = "Mute for"

@@ -249,6 +249,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 ## Defaults (`defaults.toml`)
 
 - `provider` (string): The provider of an intent whose manifest names none.
+- `refusal` (string): What a [[refuse]] case whose when holds says when its why renders empty.
 
 ## Block headings (`labels.toml`)
 
@@ -317,6 +318,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `github.trusted_authors` (list of strings): Logins whose pull requests pass the author association check of automated rounds.
 - `github.followups_without_workspace` (bool, default `false`): A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it.
 - `github.address_without_workspace` (bool, default `false`): An address round creates its author workspace when it has none; off, the sweep only records it.
+- `github.rate_limit_fraction` (number, default `0.5`): The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.
 - `github.drafts` (table): The drafts the plugin's own rules propose.
 - `github.drafts.approval` (table): Their approval; left out, each waits for you.
 - `github.drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`): The approval mode.
@@ -330,7 +332,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `github.ignore_checks` (list of strings): Checks whose failure never starts an address round.
 - `github.address_conflicts` (bool, default `true`): A pull request you develop that conflicts with its base past the conflict window starts an address round.
 
-### GitHub scope and stalls
+### GitHub scope, stalls and nudges
 
 - `github.scope` (table): Whose pull requests the GitHub plugin follows.
 - `github.scope.people` (list of strings): Logins whose pull requests it follows.
@@ -341,6 +343,8 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `github.stalled.review` (duration, default `2d`): Waiting on a review for this long.
 - `github.stalled.reply` (duration, default `1d`): Waiting on a reply for this long.
 - `github.stalled.merge` (duration, default `1d`): Approved and unmerged for this long.
+- `github.nudge` (table): The nudges on pull requests.
+- `github.nudge.silent_days` (integer, default `30`): Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days.
 
 ### Slack
 
@@ -414,7 +418,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `turns` (table): The automated turn budgets.
 - `turns.per_day` (integer, default `20`): Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).
-- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today).
+- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect.
 - `headless` (table): The headless turns' caps; a cost of zero leaves it uncapped.
 - `headless.tier` (one of `fast`, `balanced`, `frontier`, default `balanced`): The model tier of their calls.
 - `headless.per_call_usd` (number, default `0.5`): What one call may cost, in USD.
@@ -430,8 +434,6 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `drafts` (table): The settings every proposer's drafts share.
 - `drafts.repeat_after` (duration, default `1d`): The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.
-- `nudge` (table): The nudges.
-- `nudge.silent_days` (integer, default `30`): Calendar days of silence after which a nudge stops.
 - `notifications` (table): The notifications.
 - `notifications.digest_at` (string, default `09:00`): The local HH:MM of the daily digest; empty for none.
 
@@ -470,7 +472,6 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `sweep` (table): How often the sweeps run.
 - `sweep.fast` (duration, default `2m`): The fast sweep's interval.
 - `sweep.slow` (duration, default `1h`): The slow sweep's interval.
-- `sweep.rate_limit_fraction` (number, default `0.5`): The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.
 - `http` (table): The daemon's web cockpit.
 - `http.port` (integer, default `0`): The cockpit's port; 0 is none.
 - `mcp` (table): The daemon's MCP endpoint, which agent homes register.

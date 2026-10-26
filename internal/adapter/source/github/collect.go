@@ -525,7 +525,7 @@ func (c *Collector) budgetLow() string {
 		return ""
 	}
 	rl := c.GH.Budget()[dgh.ResourceGraphQL]
-	return fmt.Sprintf("rate limit at %d of %d, below %.0f%%, until %s", rl.Remaining, rl.Limit, c.Cfg.Sweep.RateLimitFraction*100, rl.ResetAt.UTC().Format(time.RFC3339))
+	return fmt.Sprintf("rate limit at %d of %d, below %.0f%%, until %s", rl.Remaining, rl.Limit, c.Cfg.GitHub.RateLimitFraction*100, rl.ResetAt.UTC().Format(time.RFC3339))
 }
 
 // cutShort turns a sweep the client refused mid-run into a skip, keeping

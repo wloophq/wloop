@@ -22,8 +22,8 @@ const nudgedWho = "who"
 
 // The workspace builtins whose role links a worktree to the pull request.
 const (
-	workspaceReview = "review"
-	workspaceAuthor = "author"
+	workspaceReview = builtin.WorkspaceReview
+	workspaceAuthor = builtin.WorkspaceAuthor
 )
 
 // beforeTakeOver is the before builtin that takes the pull request over.

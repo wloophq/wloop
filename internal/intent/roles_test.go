@@ -6,14 +6,14 @@ import (
 )
 
 func TestARoleImpliesItsRound(t *testing.T) {
-	for _, c := range []struct{ role, kind, reconcile, prepare string }{
-		{"pr.review", "review", "my_review", ""},
-		{"pr.address", "address", "", ""},
-		{"pr.nudge", "", "", "nudge.prepare"},
-		{"headless", "", "", ""},
+	for _, c := range []struct{ role, workspace, kind, reconcile, prepare string }{
+		{"pr.review", "review", "review", "my_review", ""},
+		{"pr.address", "author", "address", "", ""},
+		{"pr.nudge", "given", "", "", "nudge.prepare"},
+		{"headless", "given", "", "", ""},
 	} {
 		root := t.TempDir()
-		writeIntent(t, root, "implement", strings.Replace(minimal, `workspace = "review"`, "workspace = \"given\"\nrole = \""+c.role+"\"", 1), "{{.Headline}}")
+		writeIntent(t, root, "implement", strings.Replace(minimal, `workspace = "review"`, "workspace = \""+c.workspace+"\"\nrole = \""+c.role+"\"", 1), "{{.Headline}}")
 		l, problems := Load(userLayer(root), nil, testBase(), nil)
 		if len(problems) > 0 {
 			t.Fatalf("%s: %s", c.role, problems.Error())
@@ -69,6 +69,15 @@ func TestAPullRequestRoleNeedsGitHubUnits(t *testing.T) {
 	writeIntent(t, root, "implement", m, "{{.Headline}}")
 	_, problems := Load(userLayer(root), nil, testBase(), nil)
 	if !strings.Contains(problems.Error(), "role: pr.nudge runs on github units; a slack intent cannot hold it") {
+		t.Fatal(problems.Error())
+	}
+}
+
+func TestARoundRoleNeedsItsWorkspace(t *testing.T) {
+	root := t.TempDir()
+	writeIntent(t, root, "my-review", strings.Replace(minimal, `workspace = "review"`, "workspace = \"linked_else_main\"\nrole = \"pr.review\"", 1), "{{.Headline}}")
+	_, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
+	if !strings.Contains(problems.Error(), `workspace: pr.review runs in review workspaces: an intent holding it names workspace = "review"`) {
 		t.Fatal(problems.Error())
 	}
 }

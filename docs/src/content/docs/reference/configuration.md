@@ -43,6 +43,9 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `github.stalled.review` | duration | `2d` | Waiting on a review for this long. |
 | `github.stalled.reply` | duration | `1d` | Waiting on a reply for this long. |
 | `github.stalled.merge` | duration | `1d` | Approved and unmerged for this long. |
+| `github.nudge` | table |  | The nudges on pull requests. |
+| `github.nudge.silent_days` | integer | `30` | Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days. |
+| `github.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
 | `projects[]` | table |  | Settings for the pull requests of matching repositories; the first match wins. |
 | `projects[].match` | string |  | An owner/repo pattern, such as acme/* or acme/api. |
 | `projects[].projects_dir` | string |  | The project's projects_dir. |
@@ -56,7 +59,6 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `sweep` | table |  | How often the sweeps run. |
 | `sweep.fast` | duration | `2m` | The fast sweep's interval. |
 | `sweep.slow` | duration | `1h` | The slow sweep's interval. |
-| `sweep.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
 | `http` | table |  | The daemon's web cockpit. |
 | `http.port` | integer | `0` | The cockpit's port; 0 is none. |
 | `mcp` | table |  | The daemon's MCP endpoint, which agent homes register. |
@@ -76,8 +78,6 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `cleanup.manual_idle` | duration | `1d` | How long a session you started stays idle before it closes. |
 | `cleanup.stale_workspace` | duration | `14d` | How long an untouched workspace stays. |
 | `cleanup.disposable` | list of strings |  | Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing. |
-| `nudge` | table |  | The nudges. |
-| `nudge.silent_days` | integer | `30` | Calendar days of silence after which a nudge stops. |
 | `classify` | table |  | The classify step. |
 | `classify.per_day` | integer | `50` | Classify calls per day. |
 | `workflows` | table by name |  | Overrides of each workflow's manifest, by workflow name. |
@@ -134,7 +134,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `headless.per_day_usd` | number | `5` | What they may cost in a day, in USD. |
 | `turns` | table |  | The automated turn budgets. |
 | `turns.per_day` | integer | `20` | Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today). |
-| `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today). |
+| `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect. |
 | `slack` | table |  | The Slack plugin's settings; no secret lives here. |
 | `slack.enabled` | bool |  | Switches the Slack plugin; left out, it is on. |
 | `slack.client_id` | string |  | The Slack app's client id; empty leaves Slack unconfigured. |

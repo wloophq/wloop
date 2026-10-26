@@ -459,10 +459,7 @@ func TestRowSubmenuIsTheRowsMenubarActions(t *testing.T) {
 					continue
 				}
 				child, _ := find(it.Children, menuTitle(spec, st))
-				want := spec.Summary
-				if !st.Enabled {
-					want = st.Reason
-				}
+				want := strings.Join(slices.DeleteFunc([]string{spec.Summary, map[bool]string{true: st.Note, false: st.Reason}[st.Enabled]}, func(s string) bool { return s == "" }), "\n")
 				if child.Tooltip != want || want == "" {
 					t.Errorf("%s: tooltip %q, want %q", st.ID, child.Tooltip, want)
 				}

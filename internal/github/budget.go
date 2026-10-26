@@ -12,7 +12,7 @@ import (
 // priority is refused until the bucket resets.
 type Floors struct{ User, Background float64 }
 
-// DefaultFloors takes sweep.rate_limit_fraction as f.
+// DefaultFloors takes github.rate_limit_fraction as f.
 func DefaultFloors(f float64) Floors { return Floors{User: 0.02, Background: f} }
 
 func (f Floors) of(p dgh.Priority) float64 {

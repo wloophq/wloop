@@ -1,1 +1,2 @@
+testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:3:13: workspace: review drives the rows of review workspaces already: at most one intent per workspace, and ask-author drives them by its role pr.review
 testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:6:8: role: pr.review runs on github units; a thread intent cannot hold it

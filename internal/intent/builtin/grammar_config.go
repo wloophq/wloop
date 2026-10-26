@@ -97,6 +97,9 @@ var configGrammar = slices.Concat(
 		cfgKey("github.stalled.review", KindDur, "2d", "Waiting on a review for this long."),
 		cfgKey("github.stalled.reply", KindDur, "1d", "Waiting on a reply for this long."),
 		cfgKey("github.stalled.merge", KindDur, "1d", "Approved and unmerged for this long."),
+		cfgKey("github.nudge", KindTable, "", "The nudges on pull requests."),
+		cfgKey("github.nudge.silent_days", KindInt, "30", "Calendar days of silence on a pull request before a nudge is due; workflows read it as config.github.nudge.silent_days."),
+		cfgKey("github.rate_limit_fraction", KindNumber, "0.5", "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1."),
 
 		cfgKey("projects[]", KindTable, "", "Settings for the pull requests of matching repositories; the first match wins."),
 		cfgKey("projects[].match", KindText, "", "An owner/repo pattern, such as acme/* or acme/api."),
@@ -112,7 +115,6 @@ var configGrammar = slices.Concat(
 		cfgKey("sweep", KindTable, "", "How often the sweeps run."),
 		cfgKey("sweep.fast", KindDur, "2m", "The fast sweep's interval."),
 		cfgKey("sweep.slow", KindDur, "1h", "The slow sweep's interval."),
-		cfgKey("sweep.rate_limit_fraction", KindNumber, "0.5", "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1."),
 		cfgKey("http", KindTable, "", "The daemon's web cockpit."),
 		cfgKey("http.port", KindInt, "0", "The cockpit's port; 0 is none."),
 		cfgKey("mcp", KindTable, "", "The daemon's MCP endpoint, which agent homes register."),
@@ -133,8 +135,6 @@ var configGrammar = slices.Concat(
 		cfgKey("cleanup.manual_idle", KindDur, "1d", "How long a session you started stays idle before it closes."),
 		cfgKey("cleanup.stale_workspace", KindDur, "14d", "How long an untouched workspace stays."),
 		cfgList("cleanup.disposable", "Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing."),
-		cfgKey("nudge", KindTable, "", "The nudges."),
-		cfgKey("nudge.silent_days", KindInt, "30", "Calendar days of silence after which a nudge stops."),
 		cfgKey("classify", KindTable, "", "The classify step."),
 		cfgKey("classify.per_day", KindInt, "50", "Classify calls per day."),
 
@@ -185,7 +185,7 @@ var configGrammar = slices.Concat(
 		cfgKey("headless.per_day_usd", KindNumber, "5", "What they may cost in a day, in USD."),
 		cfgKey("turns", KindTable, "", "The automated turn budgets."),
 		cfgKey("turns.per_day", KindInt, "20", "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today)."),
-		cfgKey("turns.per_unit_per_day", KindInt, "5", "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today)."),
+		cfgKey("turns.per_unit_per_day", KindInt, "5", "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect."),
 
 		cfgKey("slack", KindTable, "", "The Slack plugin's settings; no secret lives here."),
 		cfgKey("slack.enabled", KindBool, "", "Switches the Slack plugin; left out, it is on."),

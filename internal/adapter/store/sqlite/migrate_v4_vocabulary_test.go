@@ -29,7 +29,9 @@ func TestV4WritesTheLanguagesStoredValues(t *testing.T) {
 			('b', 'slack-closure', 'slack', 'C1/1', 'k', 'done',
 				'[{"use":"draft.propose","args":{"purpose":"close","on_posted":"unit.closed, entry.nudged","hold":"config.proposals.renudge_after","hold_after_sent":"forever","per":"subject"}}]', 'apply', '2026-10-01T10:00:00.000000000Z'),
 			('c', 'slack-reply', 'slack', 'C1/2', 'k', 'blocked',
-				'[{"use":"draft.propose","args":{"purpose":"reply","on_posted":"","per":"person","hold":"2h"}},{"use":"session.close"}]', 'apply', '2026-10-01T10:00:00.000000000Z')`,
+				'[{"use":"draft.propose","args":{"purpose":"reply","on_posted":"","per":"person","hold":"2h"}},{"use":"session.close"}]', 'apply', '2026-10-01T10:00:00.000000000Z'),
+			('d', 'triage-mail', 'slack', 'C1/3', 'k', 'pending',
+				'[{"use":"classify","args":{"prompt":"Is it urgent?","schema":"{}","into":"x"}},{"use":"notify.self","args":{"text":"Look at {{.unit.ref}}"}}]', 'apply', '2026-10-01T10:00:00.000000000Z')`,
 	}
 	rawExec(t, path, stmts...)
 	if _, err := current.migrate(ctx, path, migrateOpts(path)); err != nil {
@@ -70,6 +72,7 @@ func TestV4WritesTheLanguagesStoredValues(t *testing.T) {
 		`a|observe|[{"use":"turn.start","reach":"visible","args":{"intent":"review","runner":"headless","stage":"follow-up"}}]`,
 		`b|apply|[{"use":"draft.propose","args":{"effects":["unit.closed","entry.nudged"],"per":"unit","purpose":"close","repeat_after":"config.drafts.repeat_after","repeat_after_sent":"forever"}}]`,
 		`c|apply|[{"use":"draft.propose","args":{"effects":[],"per":"person","purpose":"reply","repeat_after":"2h"}},{"use":"session.close"}]`,
+		`d|apply|[{"use":"classify","args":{"into":"x"}},{"use":"notify.self"}]`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("migrated\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -78,7 +81,7 @@ func TestV4WritesTheLanguagesStoredValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 3 || !items[0].Observe || items[1].Observe {
+	if len(items) != 4 || !items[0].Observe || items[1].Observe {
 		t.Fatalf("the ledger reads %+v", items)
 	}
 	if got := items[1].Steps[0].Args["effects"]; !reflect.DeepEqual(got, []any{"unit.closed", "entry.nudged"}) {

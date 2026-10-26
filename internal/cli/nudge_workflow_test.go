@@ -171,9 +171,9 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		{"muted until", func() {
 			r.units.Set(r.u, "pr.mute.refusal", dinv.Override{PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}.MuteRefusal(testNow))
 		}, func() { r.units.Set(r.u, "pr.mute.refusal", "") }},
-		{"per-PR daily cap reached (1)", func() {
+		{"turns.per_unit_per_day reached (1)", func() {
 			sc.te.cfg.Turns.PerUnitPerDay = 1
-			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+			st.Count(sc.ref.String(), testNow)
 		}, func() { sc.te.cfg.Turns = Defaults().Turns }},
 	}
 	for _, g := range guards {

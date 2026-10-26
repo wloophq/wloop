@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -21,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/core/turns"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/slack/slacktest"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -598,4 +600,35 @@ func TestProfileExamplesAreInert(t *testing.T) {
 	if err := te.checkProfile(dir); err != nil {
 		t.Fatalf("a renamed example does not load: %v", err)
 	}
+}
+
+func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
+	raw, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Agent: "claude", Profile: "/profile",
+		Repos: []string{"acme/api"}, Teams: []string{"acme/backend"}, People: []string{"ana"}, SlackClientID: "123.456"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	known := map[string]bool{}
+	for _, k := range builtin.Grammar {
+		if k.In == builtin.SurfaceConfig {
+			known[k.Path] = true
+		}
+	}
+	var walk func(prefix string, v map[string]any)
+	walk = func(prefix string, v map[string]any) {
+		for k, sub := range v {
+			path := prefix + k
+			if !known[path] {
+				t.Errorf("init writes %s, which the grammar does not know", path)
+			}
+			if m, ok := sub.(map[string]any); ok {
+				walk(path+".", m)
+			}
+		}
+	}
+	walk("", doc)
 }

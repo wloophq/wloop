@@ -56,10 +56,23 @@ func TestInstructionsByHandResolvesAnyProvider(t *testing.T) {
 		{"", "/src/api-7/pkg", unit.Unit{Provider: "github", Key: "acme/api#7"}},
 	} {
 		ws, repo, inWS := workspaceAt(c.cwd, repos, all)
-		got, err := te.handUnit(ctx, c.target, ws, repo, inWS)
+		got, err := te.handUnit(ctx, c.target, c.cwd, ws, repo, inWS)
 		if err != nil || got != c.want {
 			t.Errorf("%q in %s: %v %v, want %v", c.target, c.cwd, got, err, c.want)
 		}
+	}
+}
+
+func TestTheUnitHereIsReadInTheCallersDirectory(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.gh.prView = "https://github.com/acme/web/pull/3\n"
+	got, err := te.handUnit(context.Background(), "", "/src/web", wsdomain.Workspace{}, wsdomain.Repo{}, false)
+	if err != nil || got != (unit.Unit{Provider: "github", Key: "acme/web#3"}) {
+		t.Fatalf("%v %v", got, err)
+	}
+	if te.gh.prViewDir != "/src/web" {
+		t.Fatalf("gh pr view ran in %q", te.gh.prViewDir)
 	}
 }
 

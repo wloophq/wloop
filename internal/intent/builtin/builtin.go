@@ -25,9 +25,16 @@ const (
 // else in the repository's main checkout.
 const WorkspaceLinkedElseMain = "linked_else_main"
 
+// The workspaces of a round on someone else's pull request and on one you
+// develop.
+const (
+	WorkspaceReview = "review"
+	WorkspaceAuthor = "author"
+)
+
 // Names are the builtins a manifest names, by the key that names them.
 var Names = map[Slot][]string{
-	SlotWorkspace: {"review", "author", WorkspaceLinkedElseMain, "given"},
+	SlotWorkspace: {WorkspaceReview, WorkspaceAuthor, WorkspaceLinkedElseMain, "given"},
 	SlotBefore:    {"take_over"},
 }
 
@@ -150,8 +157,8 @@ var Stages = []string{"first", "follow-up"}
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
 
 // RoundProviders are the providers whose plugin keeps a per-unit count of
-// turns: every automated turn.start on their units spends
-// turns.per_unit_per_day; a workflow starting turns on any other must set
+// turns: an automated turn.start on their units of an intent declaring
+// pr.counted spends turns.per_unit_per_day; a workflow starting turns on any other must set
 // limits.per_day.
 var RoundProviders = []unit.ProviderID{unit.GitHub}
 

@@ -1,9 +1,12 @@
 [bold]Intents[/] [dim]7[/]
-  act         [dim]bundled[/]                         Act on the open items of a unit: resolve what you can,
-                                              and propose the replies it needs as drafts for you to
-                                              approve
+  act         [dim]bundled[/]                         Act on the open items of a unit without touching its
+                                              code: settle what you can and propose the replies it
+                                              needs as drafts for you to approve; Address works on
+                                              the code of a pull request you develop
   address     [dim]bundled[/]                         Triage the reviews and failing checks of a pull
-                                              request you develop, in its workspace
+                                              request you develop, in its workspace, changing its
+                                              code where they call for it; Act only settles open
+                                              items and drafts replies
   ask-author  [dim]intents/ask-author/intent.toml[/]  Ask the author one question
   brief       [dim]bundled[/]                         One brief per unit: goal, context, kind, size, risk,
                                               open questions and tags

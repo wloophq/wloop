@@ -78,7 +78,7 @@ func (e *Env) byHand(loopMu *sync.Mutex) func(ctx context.Context, r api.ByHandR
 func (e *Env) byHandRef(ctx context.Context, r api.ByHandRequest, _ string) (unit.Unit, error) {
 	repos, all := e.workspaceState(ctx)
 	ws, repo, inWS := workspaceAt(r.Cwd, repos, all)
-	return e.handUnit(ctx, r.URL, ws, repo, inWS)
+	return e.handUnit(ctx, r.URL, r.Cwd, ws, repo, inWS)
 }
 
 // turnByHand runs a round from the agent session the user is in: it writes
@@ -88,7 +88,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 	d, cwd := h.def, h.cwd
 	repos, all := e.workspaceState(ctx)
 	ws, repo, inWS := workspaceAt(cwd, repos, all)
-	u, err := e.handUnit(ctx, h.url, ws, repo, inWS)
+	u, err := e.handUnit(ctx, h.url, cwd, ws, repo, inWS)
 	if err != nil {
 		return err
 	}
@@ -189,9 +189,9 @@ func (e *Env) workspaceState(ctx context.Context) ([]wsdomain.Repo, []wsdomain.W
 
 // handUnit is the unit a turn by hand is about: the target given, as any
 // <intent> <target> command resolves it; else the pull request the
-// workspace holding the caller's directory is linked to; else the unit a
-// provider says the directory holds.
-func (e *Env) handUnit(ctx context.Context, target string, ws wsdomain.Workspace, repo wsdomain.Repo, inWS bool) (unit.Unit, error) {
+// workspace holding the caller's directory cwd is linked to; else the
+// unit a provider says cwd holds.
+func (e *Env) handUnit(ctx context.Context, target, cwd string, ws wsdomain.Workspace, repo wsdomain.Repo, inWS bool) (unit.Unit, error) {
 	if target != "" {
 		return e.unitTarget(ctx, target)
 	}
@@ -201,7 +201,7 @@ func (e *Env) handUnit(ctx context.Context, target string, ws wsdomain.Workspace
 		}
 	}
 	for p, l := range e.locators() {
-		key, ok, err := l.UnitAt(ctx, ".")
+		key, ok, err := l.UnitAt(ctx, cwd)
 		if err != nil {
 			return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
 		}

@@ -68,14 +68,19 @@ type startArgs struct {
 	def                   dintent.Def
 }
 
-// startOf is st's arguments and the manifest of its intent.
-func (e *Env) startOf(st workflow.Step) startArgs {
+// startOf is st's arguments and the manifest of the intent it starts on
+// units of p: the holder of the named intent's role, which is a user's
+// intent when one takes the role.
+func (e *Env) startOf(st workflow.Step, p unit.ProviderID) startArgs {
 	a := startArgs{}
 	a.intent, _ = st.Args["intent"].(string)
 	a.round, _ = st.Args["stage"].(string)
 	a.runner, _ = st.Args["runner"].(string)
 	if l := e.loadedIntents(); l != nil {
 		a.def, _ = l.Registry.Get(dintent.Name(a.intent))
+		if h, ok := l.Registry.ByRole(a.def.Role, p); a.def.Role != "" && ok {
+			a.def, a.intent = h, string(h.Name)
+		}
 	}
 	return a
 }
@@ -131,8 +136,8 @@ func (s *stepSet) reason(p startPlan) string {
 	return cmp.Or(why, p.args.kindName())
 }
 
-// mode is the step's mode, else the intent's first mode.
-func (a startArgs) runMode() string {
+// runnerName is the step's runner, else the intent's first runner.
+func (a startArgs) runnerName() string {
 	if a.runner != "" {
 		return a.runner
 	}
@@ -183,7 +188,7 @@ func (s *stepSet) startCheck(ctx context.Context, c stepCall, o automation.Check
 // the loop lock, asks the brief queue for the brief and counts the caps in
 // the bound round state; otherwise it starts nothing and writes nothing.
 func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool) (string, startPlan, error) {
-	p := startPlan{args: s.e.startOf(c.st)}
+	p := startPlan{args: s.e.startOf(c.st, c.u.Provider)}
 	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
 		return s.unitGuards(ctx, c, p)
 	}
@@ -377,7 +382,7 @@ func (s *stepSet) refusal(p startPlan) (string, error) {
 	return l.Refusal(p.args.def.Name, p.facts)
 }
 
-func isCapRefusal(refusal string) bool { return strings.Contains(refusal, "daily cap reached") }
+func isCapRefusal(refusal string) bool { return strings.HasPrefix(refusal, round.CapReached) }
 
 // startNote is what the sweep wrote on a round it held: a first round
 // waiting for its brief starts it and says so; a cap's first hit of the day
@@ -421,7 +426,7 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if err != nil {
 		return err
 	}
-	args := s.e.startOf(c.st)
+	args := s.e.startOf(c.st, c.u.Provider)
 	cand, _, err := s.candidate(ctx, c.u, args.candidate())
 	if err != nil || cand.Observed {
 		return err
@@ -433,8 +438,8 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if s.e.Rec != nil {
 		errs = append(errs, s.e.Rec.Record(ctx, dinv.Event{PR: ref, Kind: dinv.KindRoundHeld, At: s.e.Now(), Data: why}))
 	}
-	fmt.Fprintf(s.e.Err, "%s held: %s %s, %s; raise the cap in %s or run '"+brand.Command+" review %s'\n",
-		s.e.stamp(), args.kindName(), ref, why, s.e.ConfigPath, ref.URL())
+	fmt.Fprintf(s.e.Err, "%s held: %s %s, %s; raise the cap in %s or run '"+brand.Command+" %s %s'\n",
+		s.e.stamp(), args.kindName(), ref, why, s.e.ConfigPath, args.intent, ref.URL())
 	if cand.Workspace.ID != "" {
 		errs = append(errs, s.e.setCard(ctx, cand.Workspace, "", true))
 	}
@@ -474,15 +479,18 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	}
 	why := c.why
 	if !p.round {
-		err := cliLauncher{s.e}.Launch(ctx, turns.Launch{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: guidance, Trigger: dturn.Automated, Why: &why})
+		started, err := s.startTurn(ctx, c.u, p.args, guidance, &why)
 		if err != nil {
 			if taken {
 				s.e.keepGuidance(ctx, p.ref, guidance)
 			}
 			return "", startError(err)
 		}
-		st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
-		return "started a " + p.args.intent + " turn", nil
+		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		if counted(p.args.def) {
+			st.Count(p.ref.String(), s.e.Now())
+		}
+		return started, nil
 	}
 	reason := s.reason(p)
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
@@ -533,7 +541,7 @@ func (s *stepSet) startDismiss(ctx context.Context, c stepCall) error {
 	if err != nil {
 		return err
 	}
-	args := s.e.startOf(c.st)
+	args := s.e.startOf(c.st, c.u.Provider)
 	if r := args.candidate(); r != "" {
 		cand, ok, err := s.candidate(ctx, c.u, r)
 		if err != nil {
