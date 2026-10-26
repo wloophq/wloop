@@ -158,6 +158,8 @@ type Queue struct {
 	versions map[string]string // by prompt and taxonomy
 	inflight map[github.Ref]bool
 	waiters  map[unit.Unit][]chan struct{}
+	// srcMu guards Deps.Sources, which Register adds to.
+	srcMu sync.RWMutex
 	// demand is when a first turn first wanted an on-demand unit's brief,
 	// and filling which pull requests' fields failed at which version.
 	demand     map[unit.Unit]time.Time
@@ -290,7 +292,10 @@ func (q *Queue) attemptKey(pr dinv.PR, version string) string {
 // source is the BriefSource of p's units; a pull request without one in
 // Deps.Sources has the GitHub rules with the queue's retry.
 func (q *Queue) source(p unit.ProviderID) BriefSource {
-	if s, ok := q.d.Sources[p]; ok {
+	q.srcMu.RLock()
+	s, ok := q.d.Sources[p]
+	q.srcMu.RUnlock()
+	if ok {
 		return s
 	}
 	if p == unit.GitHub {

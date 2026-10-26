@@ -64,6 +64,7 @@ type plugin struct {
 	log     func(format string, args ...any)
 	logins  logins
 	started time.Time
+	briefs  *briefs
 }
 
 // Module is the Slack source: an ingestion job every minute, the socket
@@ -72,6 +73,9 @@ func Module(cfg config.Config, d sourcereg.Deps, s Slack) (sourcereg.Module, err
 	p := newPlugin(cfg.Slack, d, s)
 	m := p.module()
 	m.Jobs = append(m.Jobs, p.extraction(cfg)...)
+	if p.briefs.job != nil {
+		m.Briefs = p.briefs
+	}
 	if p.src != nil {
 		m.Payload = p.payloads(cfg.Slack.Turns.MaxChars)
 		pl := p.places(cfg)
@@ -114,6 +118,7 @@ func (p *plugin) rows(readmodel.RowDeps) readmodel.Provider {
 
 func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	p := &plugin{cfg: cfg, deps: d, slack: s, log: d.Log}
+	p.briefs = &briefs{p: p}
 	switch {
 	case s.Now != nil:
 		p.now = s.Now

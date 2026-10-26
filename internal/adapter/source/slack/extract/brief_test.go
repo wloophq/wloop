@@ -81,3 +81,62 @@ func TestAnExtractionBriefOutsideTheSchemaIsRefused(t *testing.T) {
 		}
 	}
 }
+
+func TestAWantedThreadIsReadBeforeItIsQuiet(t *testing.T) {
+	r := newRig(t)
+	u := thread(ts(1))
+	var briefed []unit.Unit
+	r.job.Briefed = func(b unit.Unit) { briefed = append(briefed, b) }
+	if r.job.Want(u) {
+		t.Fatal("a want before anything is waiting to be read")
+	}
+	r.facts.post(jChan, ts(1), "", jOther, "please review", jT0)
+	r.run(jT0.Add(time.Second))
+	if r.asker.calls() != 0 {
+		t.Fatalf("%d calls before quiet_for", r.asker.calls())
+	}
+	if !r.job.Want(u) {
+		t.Fatal("the waiting thread was not wanted")
+	}
+	if r.job.Want(segUnit(jTeam, jDM, "1700000000000100")) {
+		t.Fatal("a DM with nothing to read was wanted")
+	}
+	r.run(jT0.Add(2 * time.Second))
+	if r.asker.calls() != 1 || len(briefed) != 1 || briefed[0] != u {
+		t.Fatalf("%d calls, briefed %v", r.asker.calls(), briefed)
+	}
+	if r.job.Want(u) {
+		t.Fatal("a read thread is still wanted")
+	}
+}
+
+func TestTheBriefIntentsExtrasJoinTheExtraction(t *testing.T) {
+	in := loadInput(t)
+	in.Extra = &Extra{Schema: []byte(`{"type":"object","additionalProperties":false,"required":["approach"],"properties":{"approach":{"type":"string","enum":["patch","rewrite"]}}}`),
+		Versions: map[string]string{"approach": "f1-abc"}}
+	asked, _, err := schemaFor(in.Extra)
+	if err != nil || !strings.Contains(asked, `"approach"`) {
+		t.Fatalf("the asked schema: %v", err)
+	}
+	b := briefObj("g")
+	b["extra"] = obj{"approach": "rewrite"}
+	r, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": b}), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got storedBrief
+	if err := json.Unmarshal([]byte(r.Brief), &got); err != nil || got.Extra["approach"] != "rewrite" || got.ExtraVersions["approach"] != "f1-abc" {
+		t.Fatalf("stored %s %v", r.Brief, err)
+	}
+	b["extra"] = obj{"approach": "magic"}
+	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": b}), in); err == nil {
+		t.Fatal("an extra outside its enum decoded")
+	}
+	delete(b, "extra")
+	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": b}), in); err == nil {
+		t.Fatal("a brief without its extra decoded")
+	}
+	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": briefObj("g")}), loadInput(t)); err != nil {
+		t.Fatalf("without extras: %v", err)
+	}
+}

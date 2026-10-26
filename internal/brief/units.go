@@ -23,17 +23,26 @@ type OnDemand interface {
 	Watch(noted func(u unit.Unit))
 }
 
-// Register adds p's BriefSource, watching an OnDemand one, before Start.
+// Register adds p's BriefSource, watching an OnDemand one.
 func (q *Queue) Register(p unit.ProviderID, s BriefSource) {
-	q.mu.Lock()
+	q.srcMu.Lock()
 	if q.d.Sources == nil {
 		q.d.Sources = map[unit.ProviderID]BriefSource{}
 	}
 	q.d.Sources[p] = s
-	q.mu.Unlock()
+	q.srcMu.Unlock()
 	if od, ok := s.(OnDemand); ok {
 		od.Watch(q.Noted)
 	}
+	if iu, ok := s.(IntentUser); ok {
+		iu.UseIntent(q.intent)
+	}
+}
+
+// IntentUser is a BriefSource whose job asks the brief intent's extra
+// fields itself, such as the Slack extraction.
+type IntentUser interface {
+	UseIntent(intent func() Intent)
 }
 
 // Noted wakes the Changed of u once another job wrote its brief.
@@ -148,8 +157,8 @@ func (q *Queue) onDemand(ctx context.Context, u unit.Unit, first, live bool) (Re
 	if !first {
 		return without(ReasonNone), nil
 	}
+	src := q.source(u.Provider)
 	q.mu.Lock()
-	src := q.d.Sources[u.Provider]
 	since, asked := q.demand[u]
 	q.mu.Unlock()
 	od, ok := src.(OnDemand)

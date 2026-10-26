@@ -31,6 +31,7 @@ type Input struct {
 	Ledger       []items.Item // the unit's current items, rendered by their own Item.ID
 	Brief        string       // the unit's brief in use, as stored; the prompt reads its goal
 	Vocabulary   string       // the tag vocabulary in use, tag.Vocabulary's lines
+	Extra        *Extra       // the brief intent's extra fields every brief carries; nil asks none
 	Contexts     []string     // placement contexts offered (context map keys)
 	Segments     []slack.Span // a DM's current spans, ascending, rendered s1, s2...
 	WindowChars  int          // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
@@ -91,7 +92,11 @@ func Extract(ctx context.Context, a turns.Asker, ask turns.Ask, in Input) (Resul
 	if err != nil {
 		return Result{}, turns.Answer{}, err
 	}
-	ask.Prompt, ask.Schema = prompt, Schema()
+	schemaJSON, _, err := schemaFor(in.Extra)
+	if err != nil {
+		return Result{}, turns.Answer{}, err
+	}
+	ask.Prompt, ask.Schema = prompt, schemaJSON
 	ans, err := a.Ask(ctx, ask)
 	if err != nil {
 		return Result{}, ans, err
@@ -178,14 +183,18 @@ type wireLinkTo struct {
 }
 
 func decode(raw []byte, in Input) (Result, error) {
-	if err := schema.ValidateJSON(raw); err != nil {
+	_, s, err := schemaFor(in.Extra)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := s.ValidateJSON(raw); err != nil {
 		return Result{}, err
 	}
 	var w wireResult
 	if err := json.Unmarshal(raw, &w); err != nil {
 		return Result{}, err
 	}
-	brief, err := briefJSON(w.Brief)
+	brief, err := briefJSON(w.Brief, in.Extra)
 	if err != nil {
 		return Result{}, err
 	}
@@ -249,7 +258,7 @@ func decode(raw []byte, in Input) (Result, error) {
 				return Result{}, fmt.Errorf("segment %q is not one of the %d rendered", s.Ref, len(in.Segments))
 			}
 		}
-		brief, err := briefJSON(s.Brief)
+		brief, err := briefJSON(s.Brief, in.Extra)
 		if err != nil {
 			return Result{}, err
 		}
