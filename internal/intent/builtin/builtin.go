@@ -11,7 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -37,7 +36,7 @@ var Names = map[Slot][]string{
 	SlotLaunch:    {"", LaunchProbe},
 	SlotPrepare:   {"", "nudge.prepare"},
 	SlotBefore:    {"take_over"},
-	SlotOnSent:    {"plan.drop_pending", "event.round_sent", "event.nudged", "record_round", "keeps_guidance", "mark_reviewed", "mark_addressed"},
+	SlotOnSent:    OnSentNames,
 	SlotPolicy:    {"round", "probe"},
 	SlotContext:   {"pr", "synthetic"},
 	SlotReconcile: {"", "my_review"},
@@ -145,24 +144,6 @@ var IntentDims = []string{dintent.DimRound, dintent.DimReviewer}
 // ReservedFlags are flags the CLI owns; no input may declare them.
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
 
-// StepDef is a workflow step the engine can run: the providers whose units it
-// acts on, its reach, the arguments a manifest may set, the triggers it runs
-// under and what it does.
-type StepDef struct {
-	Name      string
-	Providers []unit.ProviderID // empty means any
-	Reach     workflow.Reach    // "" for turn.start: the intent decides
-	Args      []string
-	Trigger   []workflow.TriggerKind // empty means any
-	Doc       string
-}
-
-// StepTurnStart is the step that starts an agent turn: its reach is its intent's.
-const StepTurnStart = "turn.start"
-
-// StepDraftPropose is the step that proposes a draft in the Outbox.
-const StepDraftPropose = "draft.propose"
-
 // RoundProviders are the providers whose turn.start runs under the round
 // caps; a workflow starting turns on any other must set limits.per_day.
 var RoundProviders = []unit.ProviderID{unit.GitHub}
@@ -176,129 +157,6 @@ var ContextProviders = map[string]unit.ProviderID{"synthetic": unit.GitHub}
 // which only an intent of that provider may read.
 var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 
-// The values of draft.propose's arguments.
-var (
-	DraftDeliveries = []string{"message", "reaction", "comment"}
-	// DraftEmojiDeliveries are the deliveries that post an emoji, which
-	// need the reaction argument, and no text.
-	DraftEmojiDeliveries = []string{"reaction"}
-	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
-	DraftPer             = []string{"subject", "person"}
-	DraftTargets         = []string{"unit", "item"}
-	// HoldForever is hold_after_sent's value that never proposes again
-	// after a draft was sent.
-	HoldForever = "forever"
-)
-
-// The roles Go resolves an intent by (Registry.ByRole).
-const (
-	RoleReview   = "round.review"
-	RoleAddress  = "round.address"
-	RoleNudge    = "nudge"
-	RoleProbe    = "probe"
-	RoleHeadless = "headless.default"
-)
-
-// Roles are what Go resolves an intent by, a manifest's role.
-var Roles = []string{RoleReview, RoleAddress, RoleNudge, RoleProbe, RoleHeadless}
-
-// BuildsBrief is what the brief intent builds.
-const BuildsBrief = "brief"
-
-// Builds are what a builder intent may build.
-var Builds = []string{BuildsBrief}
-
-// The values of a manifest's round_kind, cap and reason.
-const (
-	RoundKindReview    = "review"
-	RoundKindAddress   = "address"
-	CapRounds          = "rounds"
-	ReasonAddressRound = "address_round"
-)
-
-// RoleRound is the round kind and cap an intent holding a role has when its
-// manifest leaves them out.
-type RoleRound struct{ RoundKind, Cap string }
-
-// RoleRounds are the defaults by role; every intent with a round kind spends
-// the round budget too, so no round or nudge goes out uncapped.
-var RoleRounds = map[string]RoleRound{
-	RoleReview:  {RoundKindReview, CapRounds},
-	RoleAddress: {RoundKindAddress, CapRounds},
-	RoleNudge:   {"", CapRounds},
-}
-
-var (
-	RoundKinds  = []string{RoundKindReview, RoundKindAddress}
-	Caps        = []string{CapRounds}
-	TurnReasons = []string{ReasonAddressRound}
-)
-
-// TurnModes are the values of turn.start's mode.
-var TurnModes = []string{"session", "headless"}
-
-// Steps is the step vocabulary of workflow manifests.
-var Steps = []StepDef{
-	{"session.close", providers(unit.Session), workflow.ReachLocal, nil, nil,
-		"Closes the agent session."},
-	{"workspace.remove", providers(unit.Workspace), workflow.ReachLocal, nil, nil,
-		"Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load."},
-	{"workspace.unregister", providers(unit.Workspace), workflow.ReachLocal, nil, nil,
-		"Unregisters a workspace whose path is gone."},
-	{"turn.dismiss", providers(unit.Session, unit.GitHub), workflow.ReachLocal, []string{"reason"}, nil,
-		"Dismisses the open turn, recording the reason."},
-	{"answer.refuse", providers(unit.GitHub), workflow.ReachLocal, []string{"reason"}, nil,
-		"Refuses a queued answer whose route is gone."},
-	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil, nil,
-		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
-	{StepTurnStart, nil, "", []string{"intent", "round", "mode"}, nil,
-		"Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`."},
-	{StepDraftPropose, nil, workflow.ReachLocal, []string{"purpose", "delivery", "text", "reaction", "items", "per", "target", "on_posted", "hold", "hold_after_sent"}, nil,
-		"Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled, or a duration of the config such as `config.proposals.renudge_after`) and `hold_after_sent` (likewise, or `forever`). Holds while a draft of the workflow, subject and person is open or failed; a run that leaves a person under a hold that ends with time stays pending until it ends."},
-	{"classify", nil, workflow.ReachLocal, []string{"prompt", "schema"}, []workflow.TriggerKind{workflow.TriggerEvent},
-		"A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`."},
-	{"notify.self", nil, workflow.ReachPrivate, []string{"text"}, nil,
-		"A private notification."},
-}
-
-func providers(ps ...unit.ProviderID) []unit.ProviderID { return ps }
-
 // Slots name each provider's fact slot.
 var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
 	unit.Entry: "entry", dslack.Provider: "slack"}
-
-// Effect is an effect a sent draft applies: the name a draft's effects, a
-// draft.propose's on_posted and an intent's draft_effects list.
-type Effect struct {
-	Name string
-	// Provider is the provider whose drafts alone may declare it; "" any.
-	Provider unit.ProviderID
-	Doc      string
-	// Plugin says it applies through the unit's plugin, so it waits while
-	// that plugin is not built.
-	Plugin bool
-}
-
-// The effects code applies by name: a plugin's Module.OnPosted keys and the
-// publishers that apply one as they post.
-const (
-	EffectEntryNudged = "entry.nudged"
-	EffectUnitClosed  = "unit.closed"
-	EffectPRNudged    = "pr.nudged"
-)
-
-// Effects is the effect vocabulary of drafts.
-var Effects = []Effect{
-	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.", false},
-	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.", true},
-	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts.", false},
-}
-
-// EffectNames are the names of Effects.
-func EffectNames() []string {
-	out := make([]string, len(Effects))
-	for i, e := range Effects {
-		out[i] = e.Name
-	}
-	return out
-}

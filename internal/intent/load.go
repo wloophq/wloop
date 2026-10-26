@@ -117,13 +117,10 @@ func (l *Loaded) Tree() (profile.Tree, error) {
 }
 
 type Programs struct {
-	Records     *expr.Program
-	Headline    []*expr.Program // per Headline.New case; nil for the unconditional last case
-	Also        []*expr.Program
-	Visible     *expr.Program
-	Enabled     *expr.Program
-	Primary     *expr.Program
-	ActionTexts map[string]*template.Template // reason_off, confirm, hint over the action fact map
+	Records  *expr.Program
+	Headline []*expr.Program // per Headline.New case; nil for the unconditional last case
+	Also     []*expr.Program
+	ActionPrograms
 }
 
 // unit is one intents/<name>/ directory on its way to a definition.

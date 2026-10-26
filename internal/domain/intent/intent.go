@@ -208,18 +208,6 @@ type AlsoProfile struct {
 	When                                 Pred
 }
 
-type Action struct {
-	Group            string
-	Surfaces         []string
-	Visible          Pred
-	Enabled          Pred
-	ReasonOff        Text
-	Primary          Pred
-	Confirm          Text
-	Hint             Text
-	NoteWhenQuestion string
-}
-
 type Join struct{ DiffersOn []string }
 
 type RecordRules struct {

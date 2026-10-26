@@ -80,7 +80,10 @@ func briefWF(name string, t expr.Type, doc string) Fact {
 
 // Facts are the fields predicates read, by slot; inputs.<name> are added per
 // intent by Env. A workflow fact may share a name with an intent fact.
-var Facts = []Fact{
+var Facts = slices.Concat(intentPRFacts, ActionFacts, otherFacts)
+
+// intentPRFacts are the pull request facts of the action and turn slots.
+var intentPRFacts = []Fact{
 	prFact("pr.mine", expr.Bool, both, "The pull request's author is the viewer."),
 	dim(prFact("pr.author", expr.String, both, "The pull request's author login.")),
 	prFact("pr.state", expr.String, both, "The pull request's state on GitHub."),
@@ -91,28 +94,16 @@ var Facts = []Fact{
 	dim(enum(prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."), map[unit.ProviderID][]string{anyProvider: Associations})),
 	prFact("pr.cross_repository", expr.Bool, both, "The head branch lives in a fork."),
 	prFact("pr.visibility", expr.String, trn, "The repository's visibility: public, private or internal, from the Basics read."),
-	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
-	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
 	dim(prFact("pr.requested_teams", expr.List, trn, "The teams a review of the pull request was requested through, as <org>-<slug>.")),
 	dim(prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read.")),
 	dim(prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn.")),
 	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
 	prFact("pr.address.conflict", expr.Bool, trn, "The head conflicts with the base and the address round resolves it; false on any other turn."),
-	fact("row.kind", expr.String, act, "The row's situation kind."),
-	fact("row.open", expr.Bool, act, "The pull request is open: kind is not done, or, untracked, its GitHub state is open."),
-	fact("row.tracked", expr.Bool, act, "The pull request is in the inventory."),
-	fact("row.adopted", expr.Bool, act, "The pull request was taken over into the loop."),
-	fact("row.held", expr.Bool, act, "Rounds on the pull request are held."),
-	fact("row.muted", expr.Bool, act, "The pull request is muted, by the server clock."),
-	fact("row.question", expr.Bool, act, "A turn waits on the user's answer."),
-	fact("row.pending", expr.Bool, act, "A round is pending."),
-	fact("row.intake", expr.Bool, act, "An intake is open on the pull request."),
-	fact("row.author_workspace", expr.Bool, act, "A linked workspace holds the author role."),
-	fact("row.yours", expr.Bool, act, "The row's unit is the viewer's to act on: any unit but a pull request, or a pull request that is the viewer's, taken over or held by an author workspace."),
-	fact("row.review_workspace", expr.Bool, act, "A linked workspace holds the review role."),
-	fact("row.nudge.who", expr.List, act, "Whom a nudge would address, from nudge.targets."),
-	fact("row.nudge.why", expr.String, act, "Why the pull request waits on them, from nudge.targets."),
-	fact("row.nudge.refusal", expr.String, act, "The text nudge.prepare would refuse with now; empty when allowed."),
+}
+
+// otherFacts are the turn slot's own facts, the config facts of the intent
+// slots, and every workflow and approval fact.
+var otherFacts = []Fact{
 	fact("turn.trigger", expr.String, trn, "by-hand or automated."),
 	fact("turn.automated", expr.Bool, trn, "The sweep started the turn."),
 	fact("turn.owned", expr.Bool, trn, "The viewer owns the pull request's loop."),

@@ -19,14 +19,12 @@ var (
 	flagRe      = regexp.MustCompile(`^--[a-z][a-z0-9-]*$`)
 	titleRe     = regexp.MustCompile(`^[a-z]{1,12}$`)
 
-	strategies     = []string{"reuse_live", "new"}
-	boards         = []string{"review", "author", "none"}
-	inputTypes     = []string{"flag", "text", "list"}
-	inputFroms     = []string{"user", "prepare"}
-	inputSurfaces  = []string{"cli", "instructions", "try"}
-	actionGroups   = []string{"round", "turn", "control", "workspace", "brief", "intake"}
-	actionSurfaces = []string{"row", "detail", "tui", "menubar", "notification", "cli", "explore"}
-	rounds         = []string{"", "first", "follow-up"}
+	strategies    = []string{"reuse_live", "new"}
+	boards        = []string{"review", "author", "none"}
+	inputTypes    = []string{"flag", "text", "list"}
+	inputFroms    = []string{"user", "prepare"}
+	inputSurfaces = []string{"cli", "instructions", "try"}
+	rounds        = []string{"", "first", "follow-up"}
 )
 
 func quoted(vs []string) string {
@@ -135,16 +133,7 @@ func (s *sheet) validate(d dintent.Def) {
 	if d.Skill && d.Help.Target == "" {
 		s.add("help.target", "is required when skill is true: the turn skill says what its target is")
 	}
-	if a := d.Action; a != nil {
-		if !d.UserFacing {
-			s.add("action", "applies to user-facing intents only")
-		}
-		s.oneOf("action.group", a.Group, actionGroups)
-		s.eachOneOf("action.surfaces", a.Surfaces, actionSurfaces)
-		if a.Enabled.Src != "true" && a.ReasonOff.Src == "" {
-			s.add("action.reason_off", "is required when enabled is not \"true\"")
-		}
-	}
+	s.validateAction(d)
 }
 
 func (s *sheet) validateInputs(d dintent.Def) {
@@ -246,7 +235,6 @@ func (s *sheet) compile(d dintent.Def) Programs {
 	if !slices.Contains(d.Dims, dintent.DimRound) {
 		delete(turn, "turn.round")
 	}
-	action := builtin.Env(builtin.ActionSlot, nil)
 	one := func(path string, p dintent.Pred, env expr.Env) *expr.Program {
 		prog, err := expr.Compile(p.Src, env)
 		if err != nil {
@@ -278,11 +266,9 @@ func (s *sheet) compile(d dintent.Def) Programs {
 		}
 		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profiles[%d].when", i), a.When, turn))
 	}
-	if a := d.Action; a != nil {
-		ps.Visible = one("action.visible", a.Visible, action)
-		ps.Enabled = one("action.enabled", a.Enabled, action)
-		ps.Primary = one("action.primary", a.Primary, action)
-	}
+	ps.ActionPrograms = compileAction(d.Action, func(path string, p dintent.Pred) *expr.Program {
+		return one(path, p, builtin.Env(builtin.ActionSlot, nil))
+	})
 	return ps
 }
 

@@ -142,22 +142,25 @@ func actionLiterals(fset *token.FileSet, file string, info *types.Info, f *ast.F
 
 var programFields = []string{"Visible", "Enabled", "Primary", "ActionTexts"}
 
-// programField says whether v is one of programFields of internal/intent.Programs.
+// programField says whether v is one of programFields of internal/intent.Programs,
+// or of the ActionPrograms it embeds.
 func programField(v *types.Var) bool {
 	if !v.IsField() || v.Pkg() == nil || v.Pkg().Path() != module+"internal/intent" || !slices.Contains(programFields, v.Name()) {
 		return false
 	}
-	obj := v.Pkg().Scope().Lookup("Programs")
-	if obj == nil {
-		return false
-	}
-	st, ok := obj.Type().Underlying().(*types.Struct)
-	if !ok {
-		return false
-	}
-	for i := range st.NumFields() {
-		if st.Field(i) == v {
-			return true
+	for _, name := range []string{"Programs", "ActionPrograms"} {
+		obj := v.Pkg().Scope().Lookup(name)
+		if obj == nil {
+			continue
+		}
+		st, ok := obj.Type().Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		for i := range st.NumFields() {
+			if st.Field(i) == v {
+				return true
+			}
 		}
 	}
 	return false
@@ -188,7 +191,8 @@ func programReads(fset *token.FileSet, file string, info *types.Info, f *ast.Fil
 }
 
 // builtinTables are the files that may spell a builtin's dotted or snake name.
-var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
+var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/intent/builtin/steps.go", "internal/intent/builtin/effects.go",
+	"internal/intent/builtin/roles.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
 	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
 
 // builtinNames are the on_sent, prepare, workspace, workflow step and draft

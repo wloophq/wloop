@@ -2,22 +2,15 @@ package intent
 
 import (
 	"fmt"
-	"io"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"text/template"
 	"text/template/parse"
 
-	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/intent/expr"
 )
-
-// ActionFuncs are the functions action texts may call.
-var ActionFuncs = template.FuncMap{"join": strings.Join, "name": func() string { return brand.Name }}
 
 // HeadlineName is the name a headline text is parsed under in an intent's template set:
 // "headline.resumed", "headline.new[0]", ...
@@ -179,79 +172,4 @@ func walkBranch(b *parse.BranchNode, f func(parse.Node, []string)) {
 	walk(b.Pipe, f)
 	walk(b.List, f)
 	walk(b.ElseList, f)
-}
-
-var actionTexts = []string{"reason_off", "confirm", "hint"}
-
-// parseActionTexts parses reason_off, confirm and hint and renders each over a
-// fully populated action fact map.
-func (s *sheet) parseActionTexts(a *dintent.Action) map[string]*template.Template {
-	if a == nil {
-		return nil
-	}
-	sample := SampleActionFacts()
-	out := map[string]*template.Template{}
-	for _, k := range actionTexts {
-		txt := map[string]dintent.Text{"reason_off": a.ReasonOff, "confirm": a.Confirm, "hint": a.Hint}[k]
-		if txt.Src == "" {
-			continue
-		}
-		path := "action." + k
-		t, err := template.New(path).Funcs(ActionFuncs).Option("missingkey=error").Parse(txt.Src)
-		if err == nil {
-			err = t.Execute(io.Discard, sample)
-		}
-		if err != nil {
-			_, msg := templateMsg(path, err)
-			s.add(path, "%s", msg)
-			continue
-		}
-		out[k] = t
-	}
-	return out
-}
-
-// ActionFactMap nests dotted action facts into the map action texts execute over:
-// {"pr": {"slug": ...}, "row": {"nudge": {"who": ...}}}.
-func ActionFactMap(get func(name string) any) map[string]any {
-	root := map[string]any{}
-	for _, f := range builtin.Facts {
-		if !slices.Contains(f.Slots, builtin.ActionSlot) {
-			continue
-		}
-		parts := strings.Split(f.Name, ".")
-		m := root
-		for _, p := range parts[:len(parts)-1] {
-			next, ok := m[p].(map[string]any)
-			if !ok {
-				next = map[string]any{}
-				m[p] = next
-			}
-			m = next
-		}
-		m[parts[len(parts)-1]] = get(f.Name)
-	}
-	return root
-}
-
-// SampleActionFacts is the action fact map with every fact set, for checking texts.
-func SampleActionFacts() map[string]any {
-	types := map[string]expr.Type{}
-	for _, f := range builtin.Facts {
-		if slices.Contains(f.Slots, builtin.ActionSlot) {
-			types[f.Name] = f.Type
-		}
-	}
-	return ActionFactMap(func(name string) any {
-		switch types[name] {
-		case expr.Bool:
-			return true
-		case expr.Int:
-			return 1
-		case expr.List:
-			return []string{"sample"}
-		default:
-			return "sample"
-		}
-	})
 }

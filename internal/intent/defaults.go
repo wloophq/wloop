@@ -18,8 +18,7 @@ import (
 const DefaultHeadMoved = "The head moved since the question: re-check what changed before acting on the answer."
 
 var (
-	defaultActionSurfaces = []string{"row", "detail", "tui", "cli", "explore"}
-	defaultInputSurfaces  = []string{"cli", "instructions"}
+	defaultInputSurfaces = []string{"cli", "instructions"}
 )
 
 // sheet places problems of one intent.toml by key path.
@@ -200,19 +199,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		ap.SourcePrefix = str(a.SourcePrefix, ap.Profile+" guide: ")
 		d.AlsoProfiles = append(d.AlsoProfiles, ap)
 	}
-	if a := m.Action; a != nil {
-		d.Action = &dintent.Action{
-			Group:            str(a.Group, "round"),
-			Surfaces:         orEmpty(a.Surfaces, defaultActionSurfaces),
-			Visible:          s.pred("action.visible", a.Visible, "row.open"),
-			Enabled:          s.pred("action.enabled", a.Enabled, "true"),
-			ReasonOff:        s.text("action.reason_off", a.ReasonOff, ""),
-			Primary:          s.pred("action.primary", a.Primary, "false"),
-			Confirm:          s.text("action.confirm", a.Confirm, ""),
-			Hint:             s.text("action.hint", a.Hint, ""),
-			NoteWhenQuestion: a.NoteWhenQuestion,
-		}
-	}
+	d.Action = s.decodeAction(m.Action)
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}

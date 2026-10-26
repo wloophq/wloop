@@ -21,13 +21,13 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.association` | string | turn | The author's association with the repository, from the Basics read. |
 | `pr.cross_repository` | bool | action, turn | The head branch lives in a fork. |
 | `pr.visibility` | string | turn | The repository's visibility: public, private or internal, from the Basics read. |
-| `pr.draft` | bool | action | The pull request is a draft, from the inventory row. |
-| `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
 | `pr.requested_teams` | list | turn | The teams a review of the pull request was requested through, as <org>-<slug>. |
 | `pr.labels` | list | turn | The pull request's labels, from the Basics read. |
 | `pr.address.reviewers` | list | turn | The reviewers an address round answers; empty on any other turn. |
 | `pr.address.checks` | list | turn | The failing checks an address round fixes; empty on any other turn. |
 | `pr.address.conflict` | bool | turn | The head conflicts with the base and the address round resolves it; false on any other turn. |
+| `pr.draft` | bool | action | The pull request is a draft, from the inventory row. |
+| `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
 | `row.kind` | string | action | The row's situation kind. |
 | `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
 | `row.tracked` | bool | action | The pull request is in the inventory. |
