@@ -401,48 +401,38 @@ func itemIDs(its []items.Item) []string {
 	return out
 }
 
-// draftApproval is the approval policy of w's drafts: workflowApproval's,
-// else wait.
+// draftApproval is the approval policy of the drafts w's steps propose:
+// workflowApproval's over no intent, else wait.
 func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
-	if p := workflowApproval(cfg, w); p != nil {
+	if p := workflowApproval(cfg, w, nil); p != nil {
 		return *p
 	}
 	return draft.Policy{Default: draft.Approval{Mode: draft.Wait}}
 }
 
 // workflowApproval is the approval policy of w's drafts and of the turns it
-// starts: the config's workflows.<name>.drafts.approval laid over the
-// manifest's [drafts.approval] field by field; nil when neither is set, so
-// the intent's applies.
-func workflowApproval(cfg config.Config, w workflow.Workflow) *draft.Policy {
-	if p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval()); p != nil {
+// starts of an intent whose block is intent: the config's
+// workflows.<name>.drafts.approval laid over the manifest's
+// [drafts.approval], else over intent, field by field; nil when none is
+// set.
+func workflowApproval(cfg config.Config, w workflow.Workflow, intent *draft.Policy) *draft.Policy {
+	base := cmp.Or(w.DraftApproval, intent)
+	if p, _ := configPolicy(w.Name, w.Slot, base, cfg.Workflows[w.Name].DraftApproval()); p != nil {
 		return p
 	}
-	return w.DraftApproval
+	return base
 }
 
-// configApprovalProblems are the config's drafts approval blocks that do not
-// load over their workflow's unit, each holding every draft of it.
-func configApprovalProblems(cfg config.Config, ws []workflow.Workflow) []error {
-	var out []error
-	for _, w := range ws {
-		if _, err := configPolicy(w, cfg.Workflows[w.Name].DraftApproval()); err != nil {
-			out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
-		}
-	}
-	return out
-}
-
-// configPolicy is the config's drafts approval of w laid over its
-// manifest's, its rules compiled over w's unit; nil when a is. One that
-// does not load is refused, with the error, and holds every draft of w.
-func configPolicy(w workflow.Workflow, a *config.ApprovalConfig) (*draft.Policy, error) {
+// configPolicy is a, the config's drafts approval of workflow name, laid
+// over base, its rules compiled over the unit slot's facts; nil when a is.
+// One that does not load is refused, with the error, and holds every draft.
+func configPolicy(name, slot string, base *draft.Policy, a *config.ApprovalConfig) (*draft.Policy, error) {
 	if a == nil {
 		return nil, nil
 	}
-	p, err := intentload.OverlayDraftApproval(w.DraftApproval, overlay(*a), builtin.ApprovalEnv(true, w.Slot))
+	p, err := intentload.OverlayDraftApproval(base, overlay(*a), builtin.ApprovalEnv(true, slot))
 	if err != nil {
-		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", w.Name, err)
+		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", name, err)
 	}
 	return &p, nil
 }

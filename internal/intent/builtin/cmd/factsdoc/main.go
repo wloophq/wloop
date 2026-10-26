@@ -50,12 +50,13 @@ func workflowTable(slot string) string {
 	return b.String()
 }
 
-// untrusted marks a fact no [drafts.approval] rule may read.
+// untrusted marks a fact no [drafts.approval] rule, nor a run rule that
+// runs, may read.
 func untrusted(f builtin.Fact) string {
 	if !f.Untrusted {
 		return ""
 	}
-	return " **Untrusted**: no `[drafts.approval]` rule reads it."
+	return " **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it."
 }
 
 func approvalTable() string {

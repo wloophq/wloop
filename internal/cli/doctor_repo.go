@@ -432,8 +432,8 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflow " + name + " override",
 			Info: "runs as bundled, the override does not load: " + oneLine(l.RevertedWorkflows[name].Error()), Fix: brand.Command + " profile check"})
 	}
-	for _, err := range configApprovalProblems(cfg, l.Workflows) {
-		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows drafts.approval",
+	for _, err := range configWorkflowProblems(cfg, l) {
+		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows",
 			Info: oneLine(err.Error()), Fix: "fix it in " + e.ConfigPath})
 	}
 	for _, name := range slices.Sorted(maps.Keys(cfg.Workflows)) {

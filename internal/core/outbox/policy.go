@@ -14,8 +14,11 @@ import (
 type Manifests interface {
 	// IntentApproval is the block of intent name, nil when it declares none; known is false for an unknown intent.
 	IntentApproval(name string) (p *draft.Policy, known bool)
-	// WorkflowApproval is the block of workflow name, nil when it declares none; known is false for an unknown workflow.
-	WorkflowApproval(name string) (p *draft.Policy, known bool)
+	// WorkflowApproval is the policy of the drafts of a turn workflow name
+	// started, of an intent whose block is intent: the workflow's block, else
+	// intent, with what the configuration lays over it; nil when none
+	// applies. known is false for an unknown workflow.
+	WorkflowApproval(name string, intent *draft.Policy) (p *draft.Policy, known bool)
 	// Turn is the intent of turn seq in u's book and the workflow that started it; ok is false when the book has no such turn.
 	Turn(ctx context.Context, u unit.Unit, seq int64) (intent, workflow string, ok bool, err error)
 }
@@ -24,7 +27,8 @@ type Manifests interface {
 var ErrUnknownOrigin = errors.New("unknown proposer")
 
 // Resolver is the Policies of the manifests, for turn and session drafts only:
-// the proposing turn's workflow block, then its intent's, else wait. The
+// the proposing turn's workflow's policy laid over its intent's block, else
+// wait. The
 // intent and workflow come from the turn in the book; an Origin that names
 // others than the book's resolves to wait. Every other origin resolves to
 // wait, so a rule's policy reaches a draft only through Proposal.Policy.
@@ -59,23 +63,18 @@ func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.P
 	case o.Intent != "" && o.Intent != intent, o.Workflow != "" && o.Workflow != workflow:
 		return waitPol, fmt.Errorf("turn %d of %s is not the draft's intent and workflow: %w", o.TurnSeq, u, ErrUnknownOrigin)
 	}
-	var wp *draft.Policy
-	if workflow != "" {
-		var known bool
-		if wp, known = r.Manifests.WorkflowApproval(workflow); !known {
-			return waitPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
-		}
-	}
-	ip, known := r.Manifests.IntentApproval(intent)
+	p, known := r.Manifests.IntentApproval(intent)
 	if !known {
 		return waitPol, fmt.Errorf("intent %s: %w", intent, ErrUnknownOrigin)
 	}
+	if workflow != "" {
+		if p, known = r.Manifests.WorkflowApproval(workflow, p); !known {
+			return waitPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
+		}
+	}
 	out := waitPol
-	switch {
-	case wp != nil:
-		out = *wp
-	case ip != nil:
-		out = *ip
+	if p != nil {
+		out = *p
 	}
 	out.Scope = workflow
 	return out, nil

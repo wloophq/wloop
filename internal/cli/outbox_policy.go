@@ -47,15 +47,16 @@ func (m outboxManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	return d.DraftApproval, ok
 }
 
-func (m outboxManifests) WorkflowApproval(name string) (*draft.Policy, bool) {
+func (m outboxManifests) WorkflowApproval(name string, intent *draft.Policy) (*draft.Policy, bool) {
 	for _, w := range m.loaded().Workflows {
 		if w.Name != name {
 			continue
 		}
-		if m.config == nil {
-			return w.DraftApproval, true
+		var cfg config.Config
+		if m.config != nil {
+			cfg = m.config()
 		}
-		return workflowApproval(m.config(), w), true
+		return workflowApproval(cfg, w, intent), true
 	}
 	return nil, false
 }

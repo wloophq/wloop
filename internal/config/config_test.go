@@ -568,11 +568,4 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	if Defaults().Turns.PerDay != 20 {
 		t.Error("the default daily cap is not 20")
 	}
-	bad := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"drafts": {"approval": {"mode": "delay"}}}}}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.drafts.approval") {
-		t.Fatalf("a window without one loaded: %v", err)
-	}
 }

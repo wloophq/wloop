@@ -33,13 +33,18 @@ var (
 )
 
 // draftApprovalAt is the draft policy of m at at, its rules' when compiled
-// over env; nil when m is. A rule that releases while reading draft.delivery
+// over env; nil when m is, wait when m sets no mode. A rule that releases while reading draft.delivery
 // in a form that never names comment delivery loads with a warning.
 func (s *sheet) draftApprovalAt(at string, m *mApproval, env expr.Env) *draft.Policy {
 	if m == nil {
 		return nil
 	}
-	a, ok := s.approval(at, m.Mode, m.Window)
+	mode := m.Mode
+	if mode == nil {
+		wait := string(draft.Wait)
+		mode = &wait
+	}
+	a, ok := s.approval(at, mode, m.Window)
 	if !ok {
 		return nil
 	}

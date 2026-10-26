@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -686,27 +687,57 @@ func (s *stepSet) unregisterRun(ctx context.Context, c stepCall, _ automation.Ru
 }
 
 func (s *stepSet) notifyCheck(_ context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
-	text, err := s.file(c, "text")
-	if err != nil {
+	t, err := s.notifyTemplate(c)
+	switch {
+	case err != nil:
 		return "", err
-	}
-	if strings.TrimSpace(text) == "" {
+	case t == nil:
 		return "no text to notify", nil
 	}
 	return "", nil
 }
 
-func (s *stepSet) notifyRun(_ context.Context, c stepCall, _ automation.RunOpts) (string, error) {
-	text, err := s.file(c, "text")
-	if err != nil {
-		return "", err
+func (s *stepSet) notifyRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
+	t, err := s.notifyTemplate(c)
+	if err != nil || t == nil {
+		return "", cmp.Or(err, errors.New("no text to notify"))
 	}
 	if s.d.Pub == nil {
 		return "", errors.New("no notifier")
 	}
+	facts, err := s.facts(ctx, c.u)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	if err := t.Execute(&b, notifyTextData{Workflow: c.why.Workflow, Unit: c.u.String(), Facts: facts}); err != nil {
+		return "", fmt.Errorf("%s: rendering %s: %w", c.st.Use, t.Name(), err)
+	}
+	text := b.String()
 	now := s.e.Now()
 	s.d.Pub.Publish(port.Event{Unit: c.u, Kind: kindNotifySelf, Key: notifyKey(c.why.Workflow, now), Data: text, At: now})
 	return text, nil
+}
+
+// notifyTextData is what a notify.self text renders: the workflow, the
+// unit and the unit's facts, by name.
+type notifyTextData struct {
+	Workflow, Unit string
+	Facts          workflow.Facts
+}
+
+// notifyTemplate is c's text file parsed as a template; nil when the file
+// holds no text.
+func (s *stepSet) notifyTemplate(c stepCall) (*template.Template, error) {
+	text, err := s.file(c, "text")
+	if err != nil || strings.TrimSpace(text) == "" {
+		return nil, err
+	}
+	t, err := template.New(c.st.Use).Option("missingkey=error").Parse(text)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", c.st.Use, err)
+	}
+	return t, nil
 }
 
 // boundRounds opts a pull request out of its first round in the bound round

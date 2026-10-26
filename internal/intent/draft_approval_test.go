@@ -52,6 +52,14 @@ func TestManifestDraftApproval(t *testing.T) {
 		t.Fatalf("workflow: %+v", w.DraftApproval)
 	}
 
+	l, problems = loadWorkflowWith(t, drafts(workflowDrafts, "[[rule]]\nwhen = 'session.managed'\nmode = \"dry_run\""))
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if w := l.Workflows[0]; w.DraftApproval == nil || w.DraftApproval.Default != (draft.Approval{Mode: draft.Wait}) || len(w.DraftApproval.Rules) != 1 {
+		t.Fatalf("a block with no mode waits: %+v", w.DraftApproval)
+	}
+
 	l, _ = loadIntentWith(t, "")
 	if d, _ := l.Registry.Get("ask-author"); d.DraftApproval != nil {
 		t.Fatalf("intent without a block: %+v", d.DraftApproval)
@@ -65,7 +73,7 @@ func TestManifestDraftApproval(t *testing.T) {
 func TestManifestDraftApprovalRefusals(t *testing.T) {
 	for _, c := range []struct{ name, block, field, msg string }{
 		{"unknown mode", "mode = \"later\"", "@.mode", "not one of"},
-		{"no mode", "window = \"5m\"", "@.mode", "is required"},
+		{"a window with no mode", "window = \"5m\"", "@.window", "only with mode delay"},
 		{"window without a window", "mode = \"delay\"", "@.window", "is required with mode delay"},
 		{"a window on another mode", "mode = \"send\"\nwindow = \"5m\"", "@.window", "only with mode delay"},
 		{"a zero window", "mode = \"delay\"\nwindow = \"0s\"", "@.window", "longer than zero"},
