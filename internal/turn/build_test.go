@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -111,13 +112,14 @@ func TestBuildComposesWithTheStoredFacts(t *testing.T) {
 	if err != nil || c.Brief != br || c.BriefMissing != "" || st.calls != 1 {
 		t.Fatalf("%+v %v", c, err)
 	}
-	if seen.Owner != "acme" || seen.Repo != "api" || seen.Author != "ana" || seen.Association != "FIRST_TIME_CONTRIBUTOR" || seen.Base != "main" ||
-		seen.Round != "follow-up" || !seen.HasBrief || seen.Kind != "fix" || seen.Size != "s" || seen.Risk != "low" ||
-		strings.Join(seen.Tags, ",") != "lang:go" || strings.Join(seen.Files, ",") != "a.go" || strings.Join(seen.Teams, ",") != "acme-platform" || strings.Join(seen.Labels, ",") != "hotfix" {
+	want := map[string]any{"pr.owner": "acme", "pr.repo": "api", "pr.author": "ana", "pr.association": "FIRST_TIME_CONTRIBUTOR", "pr.base": "main",
+		"turn.round": "follow-up", "brief.kind": "fix", "brief.size": "s", "brief.risk": "low", "pr.requested_teams": []string{"acme-platform"},
+		"pr.labels": []string{"hotfix"}, "pr.address.reviewers": []string{}}
+	if !reflect.DeepEqual(seen.Values, want) || !seen.HasBrief || strings.Join(seen.Tags, ",") != "lang:go" || strings.Join(seen.Files, ",") != "a.go" {
 		t.Fatalf("%+v", seen)
 	}
-	if _, err := (Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: st}).Build(context.Background(), Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: &PR{}}); err != nil || seen.Round != "" {
-		t.Fatalf("an address round has a round fact: %q %v", seen.Round, err)
+	if _, err := (Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: st}).Build(context.Background(), Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: &PR{}}); err != nil || seen.Values["turn.round"] != "" {
+		t.Fatalf("an address round has a round fact: %q %v", seen.Values["turn.round"], err)
 	}
 }
 
@@ -133,7 +135,7 @@ func TestBuildWithoutABrief(t *testing.T) {
 		{Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: &facts{err: errors.New("disk")}}, "", "reading it failed (disk)"},
 	} {
 		got, err := c.b.Build(context.Background(), Request{Intent: Intent(dintent.Review), Unit: ref7.Unit(), Payload: &PR{}, BriefMissing: c.reason})
-		if err != nil || got.Brief != nil || got.BriefMissing != c.want || seen.HasBrief || seen.Round != "first" {
+		if err != nil || got.Brief != nil || got.BriefMissing != c.want || seen.HasBrief || seen.Values["turn.round"] != "first" {
 			t.Errorf("%+v %v %+v", got.BriefMissing, err, seen)
 		}
 	}
@@ -226,7 +228,7 @@ func TestASelfReviewComposesTheReviewGuideForAFirstRound(t *testing.T) {
 	if err != nil || c.Inputs["self_review"] != true || !slices.Equal(seen, []profile.Kind{addressKind, reviewKind}) {
 		t.Fatalf("%v %v %v", seen, c.Inputs, err)
 	}
-	if facts[1].Round != "first" || c.Guides["review"].Kind != reviewKind {
+	if facts[1].Values["turn.round"] != "first" || c.Guides["review"].Kind != reviewKind {
 		t.Fatalf("facts %+v guides %v", facts, c.Guides)
 	}
 }
@@ -286,7 +288,7 @@ func TestAnAddressRoundComposesWithItsReviewers(t *testing.T) {
 	p := &PR{Address: &RoundReason{Reviewers: []RoundReviewer{{Login: "review-helper[bot]"}}}}
 	_, err := Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}}.Build(context.Background(),
 		Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: p})
-	if err != nil || !slices.Equal(seen.Reviewers, []string{"review-helper[bot]"}) {
+	if err != nil || !reflect.DeepEqual(seen.Values["pr.address.reviewers"], []string{"review-helper[bot]"}) {
 		t.Fatalf("%+v %v", seen, err)
 	}
 }

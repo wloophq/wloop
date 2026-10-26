@@ -5,7 +5,7 @@ description: How your judgment reaches every round, and how a profile adds kinds
 
 A turn's instructions have two parts:
 
-- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It comes from the intent's instructions, rendered for each turn with only the steps that turn runs. The bundled intents are defaults: your profile overrides any of their files, as [Change a bundled intent](/guides/custom-intent/#change-a-bundled-intent) shows. The shared partials, such as the record protocol, are still fixed.
+- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It comes from the intent's instructions, rendered for each turn with only the steps that turn runs. The bundled intents are defaults: your profile overrides any of their files, as [Change a bundled intent](/guides/custom-intent/#change-a-bundled-intent) shows. The shared partials, such as the record protocol, are files of the profile too: a `partials/<name>.md.tmpl` of yours replaces the bundled one for every intent, as [Change a partial](/guides/custom-intent/#change-a-partial) shows.
 - The **judgment** is yours: what a review looks for, the labels and what blocks, the risky surfaces, the shape of the body, the voice; how you answer reviews of your pull requests, commit and test the fixes, and whom you ask for another look; what a nudge says and its tone.
 
 ## The review profile

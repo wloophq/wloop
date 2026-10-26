@@ -142,16 +142,24 @@ type unit struct {
 func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 
 // Load reads intents/ of the bundled FS and of each directory layer; check may be nil.
+// The partials under partials/ of each directory layer are parsed over base's;
+// one that does not parse, or that a problem names, is left out and the
+// bundled partials load instead.
 // Layers with an empty Dir are skipped: the bundled intents come from bundled only.
 // A user directory named as a bundled intent overrides its files one by one;
 // when the result does not load, the bundled intent stays and the problems
 // name the user's files.
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
 	reverted := brokenOverlays{}
+	partials := revertedPartials{}
 	for {
-		l, broken := load(layers, bundled, base, check, reverted)
+		set, problems := withPartials(base, layers, partials)
+		l, broken := load(layers, bundled, set, check, reverted)
+		if partials.breaking(layers, append(problems, l.Problems...)) {
+			continue
+		}
 		if len(broken) == 0 {
-			l.Problems = append(reverted.problems(), l.Problems...)
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
