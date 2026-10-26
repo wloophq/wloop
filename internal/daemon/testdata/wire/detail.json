@@ -62,7 +62,7 @@
       {
         "enabled": true,
         "id": "review",
-        "note": "Starts a new round; the agent's open question is replaced"
+        "warning": "Starts a new round; the agent's open question is replaced"
       },
       {
         "enabled": false,
@@ -89,8 +89,8 @@
       },
       {
         "enabled": true,
-        "hint": "Close the question; the pull request goes back to whoever it waits on",
-        "id": "dismiss"
+        "id": "dismiss",
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace.",
@@ -120,8 +120,8 @@
       },
       {
         "enabled": true,
-        "hint": "Make this pull request's brief again now",
-        "id": "brief_refresh"
+        "id": "brief_refresh",
+        "note": "Make this pull request's brief again now"
       }
     ],
     "facets": {
@@ -244,7 +244,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "ac084b8d934b",
+    "specs_version": "9fb034e714b6",
     "summary": {
       "closed": false,
       "line": "muted",

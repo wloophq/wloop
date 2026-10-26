@@ -139,22 +139,22 @@ func TestProgramReadsFlagsAPredicateEvaluatedOutsideTheCatalog(t *testing.T) {
 	_, _, loader := planted(t, fset, module+"internal/intent", "load.go", `package intent
 type Program struct{}
 func (*Program) Eval() bool { return true }
-type Programs struct { Records, Visible, Enabled, Primary *Program; ActionTexts map[string]string }
+type Programs struct { Records, When, Primary *Program; Refuse []*Program; ActionTexts map[string]string }
 type Loaded struct { Programs map[string]Programs }
-type Other struct { Visible bool }
+type Other struct { When bool }
 `, nil)
 	deps := map[string]*types.Package{module + "internal/intent": loader}
 	f, info, _ := planted(t, fset, module+"internal/daemon", "x.go", `package daemon
 import "github.com/wloophq/wloop/internal/intent"
 type wrap struct { intent.Programs }
 func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
-	_ = p.ActionTexts["hint"]
-	_ = l.Programs["review"].Enabled.Eval()
+	_ = p.ActionTexts["note"]
+	_ = l.Programs["review"].Refuse[0].Eval()
 	_ = w.Primary
 	_ = p.Records
-	_ = o.Visible
-	_ = intent.Programs{Visible: nil}
-	return p.Visible != nil
+	_ = o.When
+	_ = intent.Programs{When: nil}
+	return p.When != nil
 }
 `, deps)
 	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 4, "only the loader and the catalog evaluate an intent's predicates")

@@ -38,13 +38,13 @@ func TestServedKeysPassTheCoreRule(t *testing.T) {
 		}
 	}
 	check(catalogOf(bundledActions()), keys.List)
-	check(catalog.PlanSpecs(), keys.Plan)
-	for _, s := range catalog.PlanSpecs() {
+	check(catalog.PlanSpecs(bundledActions()), keys.Plan)
+	for _, s := range catalog.PlanSpecs(bundledActions()) {
 		if s.ID == catalog.PlanApply && (s.Key != "Enter" || !coreBinding(s.Key, s.Verb, keys.Plan, keys.TUI)) {
 			t.Errorf("plan apply: %q", s.Key)
 		}
 	}
-	for _, s := range append(catalogOf(bundledActions()), catalog.PlanSpecs()...) {
+	for _, s := range append(catalogOf(bundledActions()), catalog.PlanSpecs(bundledActions())...) {
 		if len(s.Key) == 1 && s.Key[0] >= 'a' && s.Key[0] <= 'z' {
 			t.Errorf("%s has the lowercase key %q", s.ID, s.Key)
 		}
@@ -65,7 +65,24 @@ func TestKeysEndpoint(t *testing.T) {
 	if code := get(t, s, api.Keys+"?surface=web", &got); code != 200 {
 		t.Fatalf("%d", code)
 	}
-	has := func(v api.KeyView) bool { return slices.Contains(got.Bindings, v) }
+	summary := map[string]string{}
+	for _, b := range got.Bindings {
+		summary[b.Context+" "+b.Action] = b.Summary
+	}
+	for _, k := range []string{"list run_now", "list address", "plan plan_apply"} {
+		if summary[k] == "" {
+			t.Errorf("%s has no summary", k)
+		}
+	}
+	if summary["list next"] != "" {
+		t.Errorf("the core key x has the summary %q", summary["list next"])
+	}
+	has := func(v api.KeyView) bool {
+		return slices.ContainsFunc(got.Bindings, func(b api.KeyView) bool {
+			b.Summary = ""
+			return b == v
+		})
+	}
 	for _, want := range []api.KeyView{
 		{Key: "x", Action: "next", Context: "list", Owner: "core", Help: "to Next"},
 		{Key: "Cmd+K", Action: "palette", Context: "global", Owner: "core", Help: "every action and its key"},

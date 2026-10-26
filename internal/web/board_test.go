@@ -793,7 +793,7 @@ const document = { getElementById: () => null };
 			Body map[string]any `json:"body"`
 		} `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const view = (n) => { const all = walk(n); return {
@@ -864,7 +864,7 @@ const document = { getElementById: () => null };
 		Ready bool             `json:"ready"`
 		Posts []map[string]any `json:"posts"`
 	}
-	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
+	nodeRun(t, prelude, []string{"apiError", "isSet", "questionRecord", "answerNote", "actionTitle", "turnButton", "answerBlock", "guidanceBox", "recommendedLabel", "optionButton", "questionChoices", "artifactBlock", "questionBlock", "guidanceLabel", "act"}, `(async () => {
   const walk = (n, out = []) => { if (n && typeof n === "object") { out.push(n); n.children.forEach((c) => walk(c, out)); } return out; };
   const text = (n) => (n && typeof n === "object" ? n.children.map(text).join("") : String(n));
   const click = async (label, note) => {
@@ -1032,6 +1032,7 @@ type wireInput struct {
 type wireSpec struct {
 	ID       string     `json:"id"`
 	Label    string     `json:"label"`
+	Summary  string     `json:"summary"`
 	Group    string     `json:"group"`
 	Surfaces []string   `json:"surfaces"`
 	Input    *wireInput `json:"input"`
@@ -1041,12 +1042,22 @@ type wireState struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
 	Reason  string `json:"reason"`
-	Hint    string `json:"hint"`
+	Note    string `json:"note"`
 	Label   string `json:"label"`
 	Primary bool   `json:"primary"`
 	Confirm string `json:"confirm"`
 	Basis   string `json:"basis"`
-	Note    string `json:"note"`
+	Warning string `json:"warning"`
+}
+
+// wantTitle is an action button's tooltip: its summary, then its note when
+// enabled or its reason when not.
+func wantTitle(sp wireSpec, st wireState) string {
+	second := st.Note
+	if !st.Enabled {
+		second = st.Reason
+	}
+	return strings.Join(slices.DeleteFunc([]string{sp.Summary, second}, func(x string) bool { return x == "" }), "\n")
 }
 
 type wireButton struct {
@@ -1140,16 +1151,16 @@ func TestActionButtonsRenderTheServedStates(t *testing.T) {
 				if !ok || !slices.Contains(sp.Surfaces, surface) || (surface == "detail" && slices.Contains(cardGroups, sp.Group)) {
 					continue
 				}
-				b := wireButton{Label: cmpOr(st.Label, sp.Label), Disabled: !st.Enabled, Title: st.Hint, Class: "act"}
+				b := wireButton{Label: cmpOr(st.Label, sp.Label), Disabled: !st.Enabled, Title: wantTitle(sp, st), Class: "act"}
 				if !st.Enabled {
-					b.Title, b.Class = st.Reason, "act off"
+					b.Class = "act off"
 				} else if st.Primary {
 					b.Class = "act primary"
 				}
 				want = append(want, b)
 				if surface == "detail" && st.Enabled {
-					if st.Note != "" {
-						wantNotes = append(wantNotes, st.Note)
+					if st.Warning != "" {
+						wantNotes = append(wantNotes, st.Warning)
 					}
 					if st.Confirm != "" {
 						wantConfirms = append(wantConfirms, st.Confirm)
@@ -1188,10 +1199,10 @@ func cmpOr(a, b string) string {
 }
 
 func TestADisabledActionLooksNotAllowed(t *testing.T) {
-	specs, _, _, _ := wireFixtures(t)
+	specs, _, byID, _ := wireFixtures(t)
 	row := map[string]any{"ref": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}, "actions": []wireState{
 		{ID: "address", Enabled: false, Primary: true, Reason: "Not yours: take it over first"},
-		{ID: "open", Enabled: true, Hint: "Open the workspace"},
+		{ID: "open", Enabled: true, Note: "Open the workspace"},
 	}}
 	var got []map[string]any
 	nodeRun(t, buttonPrelude(t), buttonFuncs, `useSpecs(input.specs);
@@ -1200,10 +1211,10 @@ process.stdout.write(JSON.stringify(actionButtons(input.row, "row").map((b) => (
 	if len(got) != 2 {
 		t.Fatalf("%v", got)
 	}
-	if got[0]["disabled"] != true || got[0]["title"] != "Not yours: take it over first" || got[0]["class"] != "act off" {
+	if got[0]["disabled"] != true || got[0]["title"] != wantTitle(byID["address"], wireState{Reason: "Not yours: take it over first"}) || got[0]["class"] != "act off" {
 		t.Errorf("a disabled action renders %v", got[0])
 	}
-	if got[1]["disabled"] != false || got[1]["title"] != "Open the workspace" || got[1]["class"] != "act" {
+	if got[1]["disabled"] != false || got[1]["title"] != wantTitle(byID["open"], wireState{Enabled: true, Note: "Open the workspace"}) || got[1]["class"] != "act" {
 		t.Errorf("an enabled action renders %v", got[1])
 	}
 	raw, err := fs.ReadFile(files, "static/app.css")
@@ -1318,9 +1329,9 @@ func TestExploreCandidatesUseTheirActions(t *testing.T) {
 			if !slices.Contains(sp.Surfaces, "explore") {
 				continue
 			}
-			b := wireButton{Label: cmpOr(st.Label, sp.Label), Disabled: !st.Enabled, Title: st.Hint, Class: "act"}
+			b := wireButton{Label: cmpOr(st.Label, sp.Label), Disabled: !st.Enabled, Title: wantTitle(sp, st), Class: "act"}
 			if !st.Enabled {
-				b.Title, b.Class = st.Reason, "act off"
+				b.Class = "act off"
 			} else {
 				wantRan = append(wantRan, st.ID)
 				if st.Primary {
@@ -1372,7 +1383,7 @@ const buttonsOf = (n) => walk(n).filter((x) => x.tag === "button").map((b) => ({
 `
 
 func TestTheQuestionCardFollowsTheServedStates(t *testing.T) {
-	specs, rows, _, states := wireFixtures(t)
+	specs, rows, byID, states := wireFixtures(t)
 	fixtures := []string{"asked_choice", "blocked"}
 	in := map[string]any{"specs": specs, "rows": map[string]any{
 		"asked_choice": rows["asked_choice"],
@@ -1395,9 +1406,12 @@ process.stdout.write(JSON.stringify(out));`, in, &got)
 			if st.ID != "answer" && st.ID != "continue" && st.ID != "dismiss" {
 				continue
 			}
-			want := wireButton{Label: st.ID, Disabled: !st.Enabled, Title: cmpOr(st.Hint, "card title"), Class: "act"}
+			want := wireButton{Label: st.ID, Disabled: !st.Enabled, Title: wantTitle(byID[st.ID], st), Class: "act"}
+			if st.Enabled && st.Note == "" {
+				want.Title = "card title"
+			}
 			if !st.Enabled {
-				want.Title, want.Class = st.Reason, "act off"
+				want.Class = "act off"
 			}
 			if g := got[f][st.ID]; g == nil || *g != want {
 				t.Errorf("%s %s: got %+v, want %+v", f, st.ID, g, want)
@@ -1463,9 +1477,9 @@ func TestIntakeAndBriefButtonsFollowTheServedStates(t *testing.T) {
 			if st.ID != "intake_without" && st.ID != "intake_cancel" && st.ID != "brief_refresh" {
 				continue
 			}
-			b := wireButton{Label: cmpOr(st.Label, byID[st.ID].Label), Disabled: !st.Enabled, Title: st.Hint, Class: "act"}
+			b := wireButton{Label: cmpOr(st.Label, byID[st.ID].Label), Disabled: !st.Enabled, Title: wantTitle(byID[st.ID], st), Class: "act"}
 			if !st.Enabled {
-				b.Title, b.Class = st.Reason, "act off"
+				b.Class = "act off"
 			}
 			if st.Enabled {
 				body := `{"source":"cockpit"`

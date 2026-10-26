@@ -180,7 +180,7 @@ func TestDefaultsAreTheSpecsTable(t *testing.T) {
 		t.Errorf("got\n%#v\nwant\n%#v", got, want)
 	}
 	ps := l.Programs["ask-author"]
-	if ps.Records == nil || len(ps.Headline) != 1 || ps.Headline[0] != nil || ps.Visible != nil {
+	if ps.Records == nil || len(ps.Headline) != 1 || ps.Headline[0] != nil || ps.When != nil {
 		t.Errorf("%+v", ps)
 	}
 }
@@ -194,8 +194,8 @@ func TestDefaultsOfAnActionAndAnInput(t *testing.T) {
 	}
 	d, _ := l.Registry.Get("ask-author")
 	a := d.Action
-	if a == nil || a.Group != "round" || !slices.Equal(a.Surfaces, []string{"row", "detail", "tui", "cli", "explore"}) ||
-		a.When.Src != "row.open" || a.Enabled.Src != "true" || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Note.Src != "" {
+	if a == nil || a.Group != "start" || !slices.Equal(a.Surfaces, []string{"row", "detail", "tui", "cli", "explore"}) ||
+		a.When.Src != "row.open" || len(a.Refuse) != 0 || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Note.Src != "" {
 		t.Errorf("action %+v", a)
 	}
 	in := d.Inputs[0]
@@ -217,11 +217,11 @@ func TestGoodManifestLoads(t *testing.T) {
 		t.Fatalf("%+v", d)
 	}
 	ps := l.Programs["ask-author"]
-	if ps.Visible == nil || ps.Enabled == nil || ps.Primary == nil || ps.ActionTexts["hint"] == nil {
+	if ps.When == nil || ps.Primary == nil || ps.ActionTexts["note"] == nil {
 		t.Fatalf("%+v", ps)
 	}
 	var b strings.Builder
-	if err := ps.ActionTexts["hint"].Execute(&b, ActionFactMap(func(n string) any {
+	if err := ps.ActionTexts["note"].Execute(&b, ActionFactMap(func(n string) any {
 		if n == "pr.author" {
 			return "octo"
 		}
@@ -687,7 +687,7 @@ func TestATypeMismatchInsideAnInlineTableKeepsTheOtherChecks(t *testing.T) {
 func TestABrokenIntentsRulesCarryItsFirstProblem(t *testing.T) {
 	l, _ := Load(userLayer("testdata/bad/predicate-typo"), bundledFS(), testBase(), nil)
 	_, err := l.Rules("ask-author")
-	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:11: action.visible: 13: unknown field pr.mien; did you mean pr.mine?`
+	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean pr.mine?`
 	if err == nil || err.Error() != want {
 		t.Fatalf("got  %v\nwant %s", err, want)
 	}

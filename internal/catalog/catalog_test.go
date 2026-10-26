@@ -61,7 +61,7 @@ func TestBuiltinVerbs(t *testing.T) {
 		}
 	}
 	plan := map[string]string{PlanApply: "approve", PlanDismiss: "dismiss"}
-	for _, s := range PlanSpecs() {
+	for _, s := range PlanSpecs(bundled(t)) {
 		if s.Verb != plan[s.ID] {
 			t.Errorf("plan %s: verb %q, want %q", s.ID, s.Verb, plan[s.ID])
 		}
@@ -91,7 +91,7 @@ func TestEveryActionHasItsKey(t *testing.T) {
 		served[s.ID] = s.Key
 	}
 	planned := map[string]string{}
-	for _, s := range PlanSpecs() {
+	for _, s := range PlanSpecs(bundled(t)) {
 		planned[s.ID] = s.Key
 	}
 	for _, c := range []struct {
@@ -141,7 +141,13 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"pr.muted":                      func(f *Facts) { f.Muted = true },
 		"row.question":                  func(f *Facts) { f.Question = true },
 		"row.pending":                   func(f *Facts) { f.Row.Pending = &api.PendingRound{} },
+		"row.capped":                    func(f *Facts) { f.HeldByCap = true },
 		"row.intake":                    func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 1}}} },
+		"row.intake_seq":                func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 4}}} },
+		"row.trust_folder":              func(f *Facts) { f.TrustFolder = "/src/api" },
+		"row.trust_homes":               func(f *Facts) { f.TrustHomes = []string{"~/.claude"} },
+		"row.remove_refusal":            func(f *Facts) { f.Forceable = "uncommitted files" },
+		"row.recommended":               func(f *Facts) { f.Recommended = "headless" },
 		"row.author_workspace":          func(f *Facts) { f.Workspace.ID = "w" },
 		"row.yours":                     func(f *Facts) { f.Mine = true },
 		"row.review_workspace":          func(f *Facts) { f.Workspace = api.Workspace{ID: "w", IsReview: true} },
@@ -153,7 +159,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"config.github.followups_without_workspace": func(f *Facts) { f.Config.FollowupsWithoutWorkspace = true },
 		"config.github.address_without_workspace":   func(f *Facts) { f.Config.AddressWithoutWorkspace = true },
 	}
-	zero := Facts{NudgeWho: []string{}}
+	zero := Facts{NudgeWho: []string{}, TrustHomes: []string{}}
 	for _, name := range builtin.Env(builtin.ActionSlot, nil).Names() {
 		set, ok := sources[name]
 		if !ok {
@@ -169,10 +175,10 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 }
 
 func TestAnActionTextThatFailsToRenderSaysSo(t *testing.T) {
-	tmpl := template.Must(template.New("reason_off").Option("missingkey=error").Parse(`{{index .pr.nudge.who 3}}`))
-	p := intentload.Programs{ActionPrograms: intentload.ActionPrograms{ActionTexts: map[string]*template.Template{"reason_off": tmpl}}}
-	got := actionText("ask-author", p, "reason_off", intentload.ActionFactMap(Facts{}.Get))
-	if !strings.HasPrefix(got, "the profile has errors: ask-author: action.reason_off: ") {
+	tmpl := template.Must(template.New("refuse[0].why").Option("missingkey=error").Parse(`{{index .pr.nudge.who 3}}`))
+	p := intentload.Programs{ActionPrograms: intentload.ActionPrograms{ActionTexts: map[string]*template.Template{"refuse[0].why": tmpl}}}
+	got := actionText("ask-author", p, "refuse[0].why", intentload.ActionFactMap(Facts{}.Get))
+	if !strings.HasPrefix(got, "the profile has errors: ask-author: action.refuse[0].why: ") {
 		t.Fatalf("%q", got)
 	}
 }

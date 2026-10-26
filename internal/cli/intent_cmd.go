@@ -210,7 +210,8 @@ func flagError(reg *dintent.Registry, d dintent.Def, flag string) error {
 // with the command that takes it over first and asks again with the same
 // persisted flags.
 func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]any) error {
-	if err == nil || d.Action == nil || d.Action.ReasonOff.Src == "" || !strings.HasSuffix(err.Error(), d.Action.ReasonOff.Src) {
+	why := actionRefusal(err, d)
+	if why == "" {
 		return err
 	}
 	var takeOver string
@@ -226,7 +227,21 @@ func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]an
 	if takeOver == "" {
 		return err
 	}
-	return fmt.Errorf("%s; run '"+brand.Command+" %s %s %s'", d.Action.ReasonOff.Src, d.Name, strings.Join(append([]string{takeOver}, flags...), " "), ref.URL())
+	return fmt.Errorf("%s; run '"+brand.Command+" %s %s %s'", why, d.Name, strings.Join(append([]string{takeOver}, flags...), " "), ref.URL())
+}
+
+// actionRefusal is the why of d's [[action.refuse]] case, as written, that err
+// ends with; "" for none.
+func actionRefusal(err error, d dintent.Def) string {
+	if err == nil || d.Action == nil {
+		return ""
+	}
+	for _, r := range d.Action.Refuse {
+		if r.Why.Src != "" && strings.HasSuffix(err.Error(), r.Why.Src) {
+			return r.Why.Src
+		}
+	}
+	return ""
 }
 
 // inputFlag is the command line words that set an input to v.

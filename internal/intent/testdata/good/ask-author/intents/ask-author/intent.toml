@@ -17,8 +17,8 @@ persist = true
 
 [action]
 surfaces = ["row", "detail", "tui", "cli"]
-visible = "row.open && !pr.mine"
-hint = "Ask {{.pr.author}} one question"
+when = "row.open && !pr.mine"
+note = "Ask {{.pr.author}} one question"
 
 [headline]
 resumed = "ask round on {{.PR.Slug}}"

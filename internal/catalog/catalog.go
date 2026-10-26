@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 type memoEntry struct {
@@ -85,7 +86,7 @@ func disabledKey(disabled []unit.ProviderID) string {
 	return strings.Join(slices.Compact(ids), "\x00")
 }
 
-// Specs are the specs in render order: the built-in round group, the
+// Specs are the specs in render order: the built-in start group, the
 // intents of l, then the other built-ins. The slice is shared: callers
 // must not change it.
 func Specs(l *intentload.Loaded) []api.ActionSpec { return memoized(l).specs }
@@ -108,12 +109,12 @@ func VersionFor(l *intentload.Loaded, disabled []unit.ProviderID) string {
 func buildSpecs(l *intentload.Loaded) []api.ActionSpec {
 	var out []api.ActionSpec
 	i := 0
-	for ; i < len(builtinActions) && builtinActions[i].spec.Group == "round"; i++ {
-		out = append(out, withSource(builtinActions[i].spec))
+	for ; i < len(builtinActions) && builtinActions[i].spec.Group == builtin.GroupStart; i++ {
+		out = append(out, withSource(worded(l, builtinActions[i].spec.ID, builtinActions[i].spec)))
 	}
 	out = append(out, registryActions{l}.Specs()...)
 	for ; i < len(builtinActions); i++ {
-		out = append(out, withSource(builtinActions[i].spec))
+		out = append(out, withSource(worded(l, builtinActions[i].spec.ID, builtinActions[i].spec)))
 	}
 	return out
 }
@@ -141,10 +142,16 @@ func States(f Facts) []api.ActionState {
 		intents[st.ID] = st
 	}
 	out := []api.ActionState{}
+	var facts map[string]any
 	for _, spec := range Specs(f.Intents) {
 		st, ok := intents[spec.ID]
 		if i := slices.IndexFunc(builtinActions, func(b builtinAction) bool { return b.spec.ID == spec.ID }); i >= 0 {
-			st, ok = builtinActions[i].offer(f)
+			if st, ok = builtinActions[i].offer(f); ok {
+				if facts == nil {
+					facts = intentload.ActionFactMap(f.Get)
+				}
+				st = texted(f.Intents, spec.ID, st, facts)
+			}
 		}
 		if !ok {
 			continue

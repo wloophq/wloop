@@ -118,7 +118,7 @@ func servedKeys(specs api.ActionsResponse) []api.KeyView {
 	add := func(specs []api.ActionSpec, ctx keys.Context) {
 		for _, s := range specs {
 			if s.Key != "" && slices.Contains(keys.SurfacesOf(s.Surfaces), keys.TUI) {
-				out = append(out, api.KeyView{Key: s.Key, Action: s.ID, Context: string(ctx), Owner: cmp.Or(s.Plugin, "core"), Help: s.Label})
+				out = append(out, api.KeyView{Key: s.Key, Action: s.ID, Context: string(ctx), Owner: cmp.Or(s.Plugin, "core"), Help: s.Label, Summary: s.Summary})
 			}
 		}
 	}

@@ -49,10 +49,12 @@ persist = true
 hidden  = true
 
 [action]
-enabled    = 'pr.nudge.refusal == ""'
-reason_off = "{{.pr.nudge.refusal}}"
-hint       = "Nudge {{join .pr.nudge.who \", \"}}"
-confirm    = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+note    = "Nudge {{join .pr.nudge.who \", \"}}"
+confirm = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+
+[[action.refuse]]
+when = '!(pr.nudge.refusal == "")'
+why  = "{{.pr.nudge.refusal}}"
 
 [record]
 states  = ["done", "failed"]

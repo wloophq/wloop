@@ -15,7 +15,7 @@ resumed = "review round on {{.PR.Slug}}"
 text = "Review {{.PR.Slug}}."
 
 [action]
-primary = "!row.question && !pr.mine"
+primary = { when = "!row.question && !pr.mine" }
 
 [record]
 states = ["done", "asked", "failed"]

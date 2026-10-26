@@ -21,9 +21,11 @@ type = "list"
 from = "prepare"
 
 [action]
-enabled = 'pr.nudge.refusal == ""'
-reason_off = "{{.pr.nudge.refusal}}"
 confirm = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}?"
+
+[[action.refuse]]
+when = '!(pr.nudge.refusal == "")'
+why  = "{{.pr.nudge.refusal}}"
 
 [record]
 states = ["done", "failed"]

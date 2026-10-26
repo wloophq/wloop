@@ -42,8 +42,8 @@ text = "Follow-up review of {{.PR.Slug}}, {{.Who}}."
 text = "First review of {{.PR.Slug}}, {{.Who}}."
 
 [action]
-primary = "!row.question && !pr.mine && !pr.adopted"
-note_when_question = "Starts a new round; the agent's open question is replaced"
+primary = { when = "!row.question && !pr.mine && !pr.adopted" }
+warning = "{{if .row.question}}Starts a new round; the agent's open question is replaced{{end}}"
 
 [record]
 states    = ["done", "settled", "asked", "failed"]

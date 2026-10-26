@@ -16,8 +16,8 @@ type ActionsResponse struct {
 type ActionSpec struct {
 	ID       string     `json:"id"`
 	Label    string     `json:"label"`
-	Summary  string     `json:"summary,omitempty"` // what the action does
-	Group    string     `json:"group"`             // round | turn | control | workspace | brief | intake
+	Summary  string     `json:"summary,omitempty"` // what pressing it does, from the profile
+	Group    string     `json:"group"`             // start | turn | control | workspace | brief | intake; draft and plan for theirs
 	Key      string     `json:"key,omitempty"`     // TUI key
 	Surfaces []string   `json:"surfaces"`          // row, detail, tui, menubar, notification, cli, explore
 	Input    *InputSpec `json:"input,omitempty"`
@@ -43,11 +43,14 @@ type InputSpec struct {
 type ActionState struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
-	Reason  string `json:"reason,omitempty"`
-	Note    string `json:"hint,omitempty"`
+	// Reason is why a disabled action is off: the profile's why.
+	Reason string `json:"reason,omitempty"`
+	// Note is what an enabled action would do on this row.
+	Note    string `json:"note,omitempty"`
 	Label   string `json:"label,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 	Confirm string `json:"confirm,omitempty"`
 	Basis   string `json:"basis,omitempty"`
-	Warning string `json:"note,omitempty"`
+	// Warning is shown under an enabled action.
+	Warning string `json:"warning,omitempty"`
 }

@@ -402,9 +402,9 @@
       "properties": {
         "group": {
           "type": "string",
-          "description": "Default round.",
+          "description": "Default start.",
           "enum": [
-            "round",
+            "start",
             "turn",
             "control",
             "workspace",
@@ -428,32 +428,51 @@
           },
           "description": "Default [\"row\", \"detail\", \"tui\", \"cli\", \"explore\"]."
         },
-        "visible": {
+        "when": {
           "type": "string",
           "description": "Action slot. Default \"row.open\". A predicate: a quoted CEL-subset expression."
         },
-        "enabled": {
-          "type": "string",
-          "description": "Action slot. Default \"true\". A predicate: a quoted CEL-subset expression."
-        },
-        "reason_off": {
-          "type": "string",
-          "description": "Template over the action facts; required when enabled is not \"true\"."
-        },
         "primary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "when": {
+              "type": "string",
+              "description": "Action slot. Default \"false\". A predicate: a quoted CEL-subset expression."
+            }
+          },
+          "description": "When the action is the row's primary one."
+        },
+        "refuse": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["when", "why"],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "Action slot. A predicate: a quoted CEL-subset expression."
+              },
+              "why": {
+                "type": "string",
+                "description": "Template over the action facts: why the action is disabled."
+              }
+            }
+          },
+          "description": "The cases that offer the action disabled; the first that holds says why."
+        },
+        "note": {
           "type": "string",
-          "description": "Action slot. Default \"false\". A predicate: a quoted CEL-subset expression."
+          "description": "Template over the action facts: what the action would do on this row."
+        },
+        "warning": {
+          "type": "string",
+          "description": "Template over the action facts, shown under the action; empty shows nothing."
         },
         "confirm": {
           "type": "string",
           "description": "Template over the action facts."
-        },
-        "hint": {
-          "type": "string",
-          "description": "Template over the action facts."
-        },
-        "note_when_question": {
-          "type": "string"
         }
       },
       "description": "Absent: not offered anywhere."
