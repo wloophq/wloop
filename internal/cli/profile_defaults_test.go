@@ -29,7 +29,7 @@ func TestAProfileDefaultProviderLeavesTheBundledIntentsTheirOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
-		filepath.Join(dir, "defaults.toml"):      "provider = \"slack\"\n",
+		filepath.Join(dir, "defaults.toml"):       "provider = \"slack\"\n",
 		filepath.Join(at, "intent.toml"):          threadIntent,
 		filepath.Join(at, "instructions.md.tmpl"): "Sum up {{.Wording.This}}.\n",
 	} {
