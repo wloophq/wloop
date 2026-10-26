@@ -101,3 +101,24 @@ func TestALegacyProposalApprovalLoadsWithAWarningAndApplies(t *testing.T) {
 		t.Errorf("a rule the config leaves alone: %+v", a)
 	}
 }
+
+func TestAnAskOwnerDraftWaitsForAPersonUnderAWindowApproval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newReplay(t)
+	r.te.cfg.Workflows = map[string]config.WorkflowConfig{"slack-ask-owner": {DraftApproval: &config.ProposalApproval{Mode: "window", Window: config.Days(time.Hour)}}}
+	p := newWorkflowProposer(r)
+	r.scenario(r.now)
+	if err := p.pass(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ds, err := r.svc.List(ctx, outbox.Filter{Workflow: "slack-ask-owner"})
+	if err != nil || len(ds) == 0 {
+		t.Fatalf("ask-owner drafts %+v, %v", ds, err)
+	}
+	for _, d := range ds {
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() {
+			t.Errorf("an ask-owner draft goes out on its own: %+v", d)
+		}
+	}
+}

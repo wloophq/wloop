@@ -41,6 +41,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `reason_fact` | | `""` | the workflow fact that says why the round is due; a review's first round says why itself |
 | `refuse_when` | | `""` | a string workflow fact whose non-empty value refuses `turn.start` with that text; on a pull request, a mute refuses too |
 | `reason` | | `""` | `address_round`: the turn carries the reviewers, failing checks and conflict its round answers |
+| `auto_send` | | unset | `false` keeps the drafts of the intent's turns for your approval whatever their policy; a comment draft waits whatever it says |
 | `draft_approval.mode`, `draft_approval.window` | | `always` | `always`, `window` (with a positive `window` such as `"10m"`), `none` or `observe` |
 | `session.strategy` | yes | | `reuse_live`, `new` |
 | `session.title` | yes | | 1 to 12 lower-case letters |

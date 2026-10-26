@@ -230,3 +230,19 @@ func TestDuplicateReadsPurposeDeliveryAndObservedFor(t *testing.T) {
 		t.Fatalf("past ObservedFor: %+v %v", d, err)
 	}
 }
+
+func TestACommentDraftWaitsForAPersonWhateverItsApproval(t *testing.T) {
+	e := newEnv()
+	for _, mode := range []draft.Approval{{Mode: draft.None}, {Mode: draft.Window, Window: time.Minute}} {
+		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Approval: &mode,
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
+		d := e.propose(p)
+		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {
+			t.Fatalf("%s: %+v", mode.Mode, d)
+		}
+	}
+	e.clock.now = t0.Add(time.Hour)
+	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
+		t.Fatalf("tick approved %d %v", n, err)
+	}
+}

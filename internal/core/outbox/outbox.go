@@ -36,7 +36,8 @@ type Proposal struct {
 	// proposal from being proposed again; zero keeps Service.ObservedFor.
 	ObservedFor time.Duration
 	// HoldAutoSend keeps the draft for a person's approval whatever its
-	// approval: its proposer's manifest sets auto_send = false.
+	// approval: its proposer's manifest sets auto_send = false. A comment
+	// is held whatever it says.
 	HoldAutoSend bool
 }
 
@@ -136,7 +137,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if (targetsOutside(d) || p.HoldAutoSend) && approval.Mode != draft.Observe {
+	if (targetsOutside(d) || p.HoldAutoSend || d.Delivery == draft.CommentDelivery) && approval.Mode != draft.Observe {
 		approval = always
 	}
 	d.Approval = approval
