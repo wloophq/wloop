@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/record"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -136,7 +137,7 @@ func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
 
 	te = newTestEnv(t, &fake.Manager{})
 	ref := pr.Ref(r7)
-	b := dturn.Book{Unit: ref.Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), ID: "r1", Trigger: dturn.ByHand, Head: "c1", State: dturn.Done, SentAt: testNow}}}
+	b := dturn.Book{Unit: ref.Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), Role: builtin.RoleReview, ID: "r1", Trigger: dturn.ByHand, Head: "c1", State: dturn.Done, SentAt: testNow}}}
 	saved, err := te.repo.Save(ctx, b, port.Event{Unit: ref.Unit(), Kind: turns.KindTurnSent, Key: "r1", At: testNow})
 	if err != nil {
 		t.Fatal(err)
@@ -156,5 +157,31 @@ func TestAFollowUpDiffsFromTheHeadItsRecordPublishedOn(t *testing.T) {
 	resumed := turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted, History: []instructions.PastTurn{}}
 	if sent, err = te.sendTurn(ctx, te.cfg, resumed); err != nil || !strings.Contains(sent.Text, "git diff c3..HEAD") {
 		t.Fatalf("a turn that brings its history lost the recorded head: %v\n%s", err, sent.Text)
+	}
+}
+
+func TestARenamedReviewKeepsTheVerdictTheBundledReviewRecorded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	te := newTestEnv(t, &fake.Manager{})
+	userProfile(t, te, myReview(t))
+	ref := pr.Ref(r7)
+	b := dturn.Book{Unit: ref.Unit(), Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Review), Role: builtin.RoleReview, ID: "r1", Trigger: dturn.ByHand, Head: "c1", State: dturn.Done, SentAt: testNow}}}
+	saved, err := te.repo.Save(ctx, b, port.Event{Unit: ref.Unit(), Kind: turns.KindTurnSent, Key: "r1", At: testNow})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved.Records = []dturn.Record{{TurnSeq: saved.Turns[0].Seq, Head: "c3", Hash: "h", At: testNow,
+		Record: record.Record{State: record.Done, Summary: "approved", Outcome: &record.Outcome{Verdict: "APPROVE"}}}}
+	if _, err := te.repo.Save(ctx, saved); err != nil {
+		t.Fatal(err)
+	}
+	drifted := &turn.PR{Title: "Add x", Head: "c9", Prior: &turn.PriorReview{Verdict: pr.ReviewApproved, Head: "m8"}}
+	sent, err := te.sendTurn(ctx, te.cfg, turn.Request{Intent: "my-review", Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: r7.Unit(), Payload: drifted})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sent.Text, "git diff c3..HEAD") {
+		t.Fatalf("my-review lost the verdict the review recorded:\n%s", sent.Text)
 	}
 }
