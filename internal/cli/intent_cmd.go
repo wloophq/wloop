@@ -247,12 +247,16 @@ func intentUsage(d dintent.Def) string {
 }
 
 // intentTarget is the target of d's command as a usage line names it: the
-// units d serves, as their provider's codec names them.
+// units d serves, as their providers' codecs name them.
 func intentTarget(d dintent.Def) string {
-	if p := d.ProviderOrDefault(); p != dintent.AnyProvider {
-		return pluginCodecs().Target(p)
+	ps := d.Providers
+	if ps == nil {
+		ps = []unit.ProviderID{d.ProviderOrDefault()}
 	}
-	return "<url|permalink|provider:key>"
+	if slices.Contains(ps, dintent.AnyProvider) {
+		return pluginCodecs().Targets()
+	}
+	return pluginCodecs().Targets(ps...)
 }
 
 // intentFlags lists the flags of d a surface takes, as a usage line shows them.

@@ -173,7 +173,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true), Need: m.Brief.Need}
 	}
 	if h := m.Help; h != nil {
-		d.Help = dintent.Help{Target: h.Target}
+		d.Help = dintent.Help{Target: h.Target, Summary: h.Summary, Group: h.Group, Examples: h.Examples, Docs: h.Docs}
 	}
 	if g := m.Guidance; g != nil {
 		d.Guidance = dintent.Guidance{Label: str(g.Label, "Guidance"), Help: g.Help, Max: g.Max}

@@ -118,6 +118,15 @@ type Help struct {
 	// Target says what the command's target is, such as "a pull request
 	// URL"; the turn skill and the command's help read it.
 	Target string
+	// Summary is the main help's line for the command, Summary when empty.
+	Summary string
+	// Group is the title of the main help's group the command joins, in
+	// any case; "" or a title the help has not joins the user's intents.
+	Group string
+	// Examples are command lines without the command's name.
+	Examples []string
+	// Docs is a page path of the documentation site.
+	Docs string
 }
 
 // WorkspaceRepo is where a turn runs when its manifest names a repository:

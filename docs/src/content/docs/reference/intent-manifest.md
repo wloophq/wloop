@@ -32,7 +32,11 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `key` | | `""` | one uppercase letter, unique among intents and built-in actions; a refused key loads the intent without it, reachable from the palette |
 | `user_facing` | | `true` | `false` keeps the intent out of the CLI and by-hand sessions, and allows no `[action]` or `skill` |
 | `skill` | | `false` | `true` has `install` write the intent a turn skill, `/{{name}}-<intent>` and the target as the provider names it, such as `<url>`; needs `help.target`; the bundled `review`, `address` and `nudge` set it |
-| `help.target` | with `skill` | `""` | what the target is, such as `"a pull request URL"`; the turn skill says it |
+| `help.target` | with `skill` | `""` | what the target is, such as `"a pull request URL"`; the turn skill and the command's help say it |
+| `help.summary` | | `summary` | the command's line in the main help |
+| `help.group` | | your intents' group | the title of a group of the main help, in any case, such as `"pull requests"`; the command leads it |
+| `help.examples` | | `[]` | command lines of the help, without the command's name |
+| `help.docs` | | the guide to your own intents | a page path of the documentation site, such as `"guides/review"` |
 | `workspace` | yes, unless `builds` | | `review`, `author`, `pr_else_main`, `given`, or a table: `{ repo = "<owner/name>" }` or `{ repo_input = "<input>" }`, see [Where a turn runs](#where-a-turn-runs) |
 | `provider` | | the profile's `defaults.toml` (`"github"`) | the provider whose units the turns run on, such as `github` or `slack`, or `any`; a list for several |
 | `modes` | | `["session"]` | `session`, `headless`, or both; the first is what `turn.start` runs without a `mode` |

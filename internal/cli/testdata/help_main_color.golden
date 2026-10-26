@@ -9,11 +9,11 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]doctor[/]                 Diagnose the setup without changing anything
 
 [bold]PULL REQUESTS[/]
-  [cyan]review[/]                 Review someone else's pull request in its own worktree
-  [cyan]address[/]                Triage the reviews and failing checks of yours
-  [cyan]take-over[/]              Make a pull request someone else opened yours
-  [cyan]nudge[/]                  Ask whoever it waits on for the next step
   [cyan]act[/]                    Resolve a unit's open items, replies as drafts
+  [cyan]address[/]                Triage the reviews and failing checks of yours
+  [cyan]nudge[/]                  Ask whoever it waits on for the next step
+  [cyan]review[/]                 Review someone else's pull request in its own worktree
+  [cyan]take-over[/]              Make a pull request someone else opened yours
   [cyan]remove[/]                 Delete the workspace of a merged or closed one
 
 [bold]WHAT WAITS ON YOU[/]

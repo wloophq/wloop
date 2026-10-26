@@ -21,7 +21,11 @@ records   = '!turn.plain'
 on_sent   = ["mark_reviewed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
 
 [help]
-target = "a pull request URL"
+target   = "a pull request URL"
+summary  = "Review someone else's pull request in its own worktree"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://github.com/acme/api/pull/7 look at the migration first"]
+docs     = "guides/review"
 
 [guidance]
 help = "what the round should look at"

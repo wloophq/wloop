@@ -70,29 +70,24 @@ See [Troubleshooting](/guides/troubleshooting/).
 
 ## Pull requests
 
-### review
+### act
 
-Review someone else's pull request in its own worktree.
+Resolve a unit's open items, replies as drafts.
 
 ```sh
-{{command}} review <url> [--no-wait] [--no-brief] [guidance...]
+{{command}} act <url|permalink|slack:key> [guidance...]
 ```
 
-Start or continue a review round on someone else's pull request, in a dedicated workspace. Words after the URL are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
-
-| Flag | Description |
-| --- | --- |
-| `--no-wait` | Print the intake's number instead of following it |
-| `--no-brief` | Start the round without its brief |
+Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
 ```sh
-{{command}} review https://github.com/acme/api/pull/7
-{{command}} review https://github.com/acme/api/pull/7 look at the migration first
+{{command}} act https://github.com/acme/api/pull/7
+{{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
 ```
 
-See [Review someone else's pull request](/guides/review/).
+See [Inbox, entries and work units](/concepts/gtd/).
 
 ### address
 
@@ -102,7 +97,7 @@ Triage the reviews and failing checks of yours.
 {{command}} address <url> [--self-review] [--take-over] [--no-wait] [--no-brief] [guidance...]
 ```
 
-Triage the reviews and failing checks of a pull request you develop, in its workspace. Words after the URL are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
+Triage the reviews and failing checks of a pull request you develop, in its workspace. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
 
 | Flag | Description |
 | --- | --- |
@@ -119,6 +114,49 @@ Examples:
 ```
 
 See [Address reviews on your pull request](/guides/address/).
+
+### nudge
+
+Ask whoever it waits on for the next step.
+
+```sh
+{{command}} nudge <url> [guidance...]
+```
+
+Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic. The target is a pull request URL; words after it are guidance for the turn.
+
+Examples:
+
+```sh
+{{command}} nudge https://github.com/acme/api/pull/7
+{{command}} nudge https://github.com/acme/api/pull/7 the release is on Friday
+```
+
+See [Nudge whoever a pull request waits on](/guides/nudge/).
+
+### review
+
+Review someone else's pull request in its own worktree.
+
+```sh
+{{command}} review <url> [--no-wait] [--no-brief] [guidance...]
+```
+
+Start or continue a review round on someone else's pull request, in a dedicated workspace. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
+
+| Flag | Description |
+| --- | --- |
+| `--no-wait` | Print the intake's number instead of following it |
+| `--no-brief` | Start the round without its brief |
+
+Examples:
+
+```sh
+{{command}} review https://github.com/acme/api/pull/7
+{{command}} review https://github.com/acme/api/pull/7 look at the migration first
+```
+
+See [Review someone else's pull request](/guides/review/).
 
 ### take-over
 
@@ -137,44 +175,6 @@ Examples:
 ```
 
 See [Take over a pull request](/guides/take-over/).
-
-### nudge
-
-Ask whoever it waits on for the next step.
-
-```sh
-{{command}} nudge <url> [guidance...]
-```
-
-Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic. Words after the URL are guidance for the turn.
-
-Examples:
-
-```sh
-{{command}} nudge https://github.com/acme/api/pull/7
-{{command}} nudge https://github.com/acme/api/pull/7 the release is on Friday
-```
-
-See [Nudge whoever a pull request waits on](/guides/nudge/).
-
-### act
-
-Resolve a unit's open items, replies as drafts.
-
-```sh
-{{command}} act <url|permalink|provider:key> [guidance...]
-```
-
-Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
-
-Examples:
-
-```sh
-{{command}} act https://github.com/acme/api/pull/7
-{{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
-```
-
-See [Inbox, entries and work units](/concepts/gtd/).
 
 ### remove
 

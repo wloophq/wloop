@@ -15,7 +15,11 @@ prepare   = "nudge.prepare"
 on_sent   = ["event.nudged"]
 
 [help]
-target = "a pull request URL"
+target   = "a pull request URL"
+summary  = "Ask whoever it waits on for the next step"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://github.com/acme/api/pull/7 the release is on Friday"]
+docs     = "guides/nudge"
 
 [guidance]
 help  = "what to ask about"

@@ -85,7 +85,16 @@ Include `{{template "history" .}}` and `{{template "record" .}}` in any intent t
 {{command}} profile show acme/api --show
 ```
 
-`profile check` loads the manifest and renders the templates against sample turns, so a template that would fail at run time fails here, as `file:line:col: field: message`. `--help` now lists `ask-author <url> [--topic <topic>] [guidance...]`, and `profile show --show` renders its instructions for a placeholder pull request.
+`profile check` loads the manifest and renders the templates against sample turns, so a template that would fail at run time fails here, as `file:line:col: field: message`. `--help` now lists `ask-author <url> [--topic <topic>] [guidance...]` under your intents, and `profile show --show` renders its instructions for a placeholder pull request.
+
+A `[help]` table shapes the command's help: `target` says what the target is, `summary` replaces the summary in the main help, `group` moves the command into a group of the main help such as `"pull requests"`, and `examples` and `docs` give its examples and documentation page:
+
+```toml
+[help]
+target   = "a pull request URL"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/4610 --topic 'the retry cap'"]
+```
 
 ## 4. Run it
 

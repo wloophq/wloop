@@ -9,6 +9,13 @@ session   = { strategy = "new", title = "act", close_when_done = true }
 brief     = { render = true, wait = false }
 draft_effects = ["entry.nudged", "unit.closed"]
 
+[help]
+target   = "a pull request URL, a Slack message permalink or <provider>:<key> of a unit the intent serves"
+summary  = "Resolve a unit's open items, replies as drafts"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday"]
+docs     = "concepts/gtd"
+
 [guidance]
 help = "what to do about the items"
 

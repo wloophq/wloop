@@ -148,7 +148,8 @@ func TestHelpListsTheRegistrysIntents(t *testing.T) {
 	}
 	out := te.out.String()
 	for _, want := range []string{
-		"\nPULL REQUESTS\n  review ",
+		"\nPULL REQUESTS\n  act ",
+		"\n  review ",
 		"\n  address ",
 		"\n  nudge ",
 		"\n" + groupYourIntents + "\n  ask-author ",

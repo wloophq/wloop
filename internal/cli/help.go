@@ -22,37 +22,23 @@ const (
 // helpFlags are the arguments that ask a command for its help.
 var helpFlags = []string{"-h", "--help", "-help"}
 
-// helpGroups is the main help's groups with the registry's intents: the
-// bundled ones filled in place, the user's in their own group.
+// helpGroups is the main help's groups with the registry's intents, each
+// first in the group its manifest names, else in the user's own group.
 func (e *Env) helpGroups() []helpGroup {
 	groups := helpGroups(e.configuredManagerDisplay())
 	l := e.loadedIntents()
-	bundled := map[string]bool{}
-	for gi := range groups {
-		topics := groups[gi].Topics[:0]
-		for _, tp := range groups[gi].Topics {
-			if tp.intent {
-				d, ok := l.Registry.Get(dintent.Name(tp.Names[0]))
-				if !ok || !d.UserFacing {
-					continue
-				}
-				bundled[tp.Names[0]] = true
-				tp = withIntent(tp, d)
-			}
-			topics = append(topics, tp)
-		}
-		groups[gi].Topics = topics
-	}
+	joined := map[int][]helpTopic{}
 	var mine []helpTopic
 	for _, d := range l.Registry.UserFacing() {
-		if !bundled[string(d.Name)] {
-			mine = append(mine, withIntent(helpTopic{
-				Names:    []string{string(d.Name)},
-				Summary:  d.Summary,
-				Examples: []string{string(d.Name) + " https://github.com/acme/api/pull/7"},
-				Docs:     "guides/custom-intent",
-			}, d))
+		tp := intentTopic(d)
+		if gi := slices.IndexFunc(groups, func(g helpGroup) bool { return d.Help.Group != "" && strings.EqualFold(g.Title, d.Help.Group) }); gi >= 0 {
+			joined[gi] = append(joined[gi], tp)
+			continue
 		}
+		mine = append(mine, tp)
+	}
+	for gi, topics := range joined {
+		groups[gi].Topics = append(topics, groups[gi].Topics...)
 	}
 	for _, broken := range slices.Sorted(maps.Keys(l.Broken)) {
 		name := string(broken)
@@ -71,19 +57,28 @@ func (e *Env) helpGroups() []helpGroup {
 	return groups
 }
 
-// withIntent fills an intent's topic from its manifest.
-func withIntent(tp helpTopic, d dintent.Def) helpTopic {
+// intentTopic is an intent's topic, from its manifest.
+func intentTopic(d dintent.Def) helpTopic {
 	name := string(d.Name)
-	target := intentTarget(d)
-	tp.Usage = []string{name + " " + target + intentFlags(d, surfaceCLI) + " [guidance...]"}
+	tp := helpTopic{Names: []string{name}, Summary: d.Help.Summary, Docs: d.Help.Docs}
+	if tp.Summary == "" {
+		tp.Summary = d.Summary
+	}
+	if tp.Docs == "" && !d.Bundled {
+		tp.Docs = "guides/custom-intent"
+	}
+	for _, ex := range d.Help.Examples {
+		tp.Examples = append(tp.Examples, name+" "+ex)
+	}
+	tp.Usage = []string{name + " " + intentTarget(d) + intentFlags(d, surfaceCLI) + " [guidance...]"}
 	about := strings.TrimSpace(d.Summary)
 	if about != "" && !strings.HasSuffix(about, ".") {
 		about += "."
 	}
-	if target == "<url>" {
-		about += " Words after the URL are guidance for the turn."
+	if d.Help.Target != "" {
+		about += " The target is " + d.Help.Target + "; words after it are guidance for the turn."
 	} else {
-		about += " The target is a pull request URL, a Slack message permalink or <provider>:<key> of a unit the intent serves; words after it are guidance for the turn."
+		about += " Words after the target are guidance for the turn."
 	}
 	if d.Intake {
 		about += " It runs as an intake this command follows; Ctrl-C stops following, not the intake."

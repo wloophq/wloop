@@ -76,4 +76,16 @@ func TestATargetIsHowACommandLineNamesAProvidersUnit(t *testing.T) {
 	if got := (*unit.Registry)(nil).Target("forge"); got != "<forge:key>" {
 		t.Errorf("a nil registry's target %q", got)
 	}
+	for _, c := range []struct {
+		ps   []unit.ProviderID
+		want string
+	}{
+		{nil, "<url|thread:key>"},
+		{[]unit.ProviderID{"thread"}, "<thread:key>"},
+		{[]unit.ProviderID{"thread", "forge", "thread"}, "<thread:key|url>"},
+	} {
+		if got := reg.Targets(c.ps...); got != c.want {
+			t.Errorf("Targets(%v) = %q, want %q", c.ps, got, c.want)
+		}
+	}
 }

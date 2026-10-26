@@ -22,7 +22,11 @@ records   = '!turn.needs_take_over'
 on_sent   = ["mark_addressed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
 
 [help]
-target = "a pull request URL"
+target   = "a pull request URL"
+summary  = "Triage the reviews and failing checks of yours"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "--self-review https://github.com/acme/api/pull/7 the plan is in the description"]
+docs     = "guides/address"
 
 [guidance]
 help = "what the round should look at"

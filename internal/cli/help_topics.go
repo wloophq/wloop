@@ -22,9 +22,6 @@ type helpTopic struct {
 	Flags    []helpFlag
 	Examples []string
 	Docs     string
-	// intent fills Usage, About and Flags from the registry's manifest of
-	// Names[0]; the topic is left out when the registry has none.
-	intent bool
 }
 
 type helpGroup struct {
@@ -100,10 +97,6 @@ func helpGroups(manager string) []helpGroup {
 			},
 		}},
 		{"PULL REQUESTS", []helpTopic{
-			{Names: []string{"review"}, Summary: "Review someone else's pull request in its own worktree", intent: true,
-				Examples: []string{"review " + pr, "review " + pr + " look at the migration first"}, Docs: "guides/review"},
-			{Names: []string{"address"}, Summary: "Triage the reviews and failing checks of yours", intent: true,
-				Examples: []string{"address " + pr, "address --self-review " + pr + " the plan is in the description"}, Docs: "guides/address"},
 			{
 				Names:    []string{"take-over"},
 				Summary:  "Make a pull request someone else opened yours",
@@ -112,10 +105,6 @@ func helpGroups(manager string) []helpGroup {
 				Examples: []string{"take-over " + pr},
 				Docs:     "guides/take-over",
 			},
-			{Names: []string{"nudge"}, Summary: "Ask whoever it waits on for the next step", intent: true,
-				Examples: []string{"nudge " + pr, "nudge " + pr + " the release is on Friday"}, Docs: "guides/nudge"},
-			{Names: []string{"act"}, Summary: "Resolve a unit's open items, replies as drafts", intent: true,
-				Examples: []string{"act " + pr, "act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday"}, Docs: "concepts/gtd"},
 			{
 				Names:   []string{"remove"},
 				Summary: "Delete the workspace of a merged or closed one",

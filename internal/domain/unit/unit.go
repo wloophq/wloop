@@ -145,6 +145,29 @@ func (r *Registry) Target(p ProviderID) string {
 	return "<" + string(p) + ":key>"
 }
 
+// Targets is how a command line names a unit of any of ps, or of any
+// provider of r when ps is empty: their targets as one, such as
+// <url|permalink|slack:key>.
+func (r *Registry) Targets(ps ...ProviderID) string {
+	if len(ps) == 0 && r != nil {
+		for p := range r.codecs {
+			ps = append(ps, p)
+		}
+		sort.Slice(ps, func(i, j int) bool { return ps[i] < ps[j] })
+	}
+	var parts []string
+	seen := map[string]bool{}
+	for _, p := range ps {
+		for _, part := range strings.Split(strings.TrimSuffix(strings.TrimPrefix(r.Target(p), "<"), ">"), "|") {
+			if !seen[part] {
+				seen[part] = true
+				parts = append(parts, part)
+			}
+		}
+	}
+	return "<" + strings.Join(parts, "|") + ">"
+}
+
 // Codec is p's codec.
 func (r *Registry) Codec(p ProviderID) (Codec, bool) {
 	if r == nil {

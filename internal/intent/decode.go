@@ -71,7 +71,11 @@ type manifest struct {
 }
 
 type mHelp struct {
-	Target string `toml:"target"`
+	Target   string   `toml:"target"`
+	Summary  string   `toml:"summary"`
+	Group    string   `toml:"group"`
+	Examples []string `toml:"examples"`
+	Docs     string   `toml:"docs"`
 }
 
 type mSession struct {
