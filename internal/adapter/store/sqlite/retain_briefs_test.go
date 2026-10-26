@@ -56,3 +56,29 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 		t.Errorf("a second pass retained %v", again)
 	}
 }
+
+func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
+	t.Parallel()
+	db, _ := openTemp(t)
+	old, fresh := at(retainNow.Add(-8*day)), at(retainNow.Add(-day))
+	exec(t, db, `INSERT INTO extraction_cursors (provider, unit_key, at) VALUES ('github', 'acme/api#9', ?)`, fresh)
+	for id, trigger := range map[int]string{1: "wanted", 2: "fields"} {
+		exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome, brief)
+			VALUES (?, 'github', 'acme/api#1', 'brief', ?, 'v', '', ?, 'ok', '{"goal":"g"}')`, id, trigger, old)
+	}
+	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#1', 1, 2)`)
+	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', 'acme/api#1', 'domain', 'billing', 1)`)
+
+	if got := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(got) != 0 {
+		t.Errorf("retained %v", got)
+	}
+	if left := column(t, db, `SELECT id FROM brief_runs ORDER BY id`); !slices.Equal(left, []string{"1", "2"}) {
+		t.Errorf("runs left %q", left)
+	}
+	if left := column(t, db, `SELECT count(*) FROM unit_briefs`); !slices.Equal(left, []string{"1"}) {
+		t.Errorf("briefs left %q", left)
+	}
+	if left := column(t, db, `SELECT count(*) FROM unit_tags`); !slices.Equal(left, []string{"1"}) {
+		t.Errorf("tags left %q", left)
+	}
+}
