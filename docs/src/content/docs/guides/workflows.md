@@ -130,6 +130,24 @@ use = "notify.self"
 text = "This pull request has waited on you for two days"
 ```
 
+A workflow can also look at your GTD entries, `subject = "entry"`, every entry neither done nor in the trash of an enabled plugin, or at the Slack units a live entry is attached to, `subject = "slack"`. This one tells you about a waiting entry once its stalled nudge is due:
+
+```toml
+description = "Tell me when a waiting entry is due a nudge"
+subject = "entry"
+when = 'entry.nudge_due_at != timestamp("0001-01-01T00:00:00Z") && entry.items_held > 0'
+key = ["entry.nudge_due_at"]
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "notify.self"
+text = "A waiting entry is due a nudge"
+```
+
+`<slot>.settled_at` is the newest draft the workflow itself proposed on the subject that was sent or discarded, so a key of `["entry.settled_at"]` opens a new run after each settlement.
+
 The [workflow manifest](/reference/workflow-manifest/) lists every field and the [facts](/reference/facts/) every condition can read. `{{command}} profile check` loads it; a broken workflow disables only itself.
 
 ## Rewrite a bundled one

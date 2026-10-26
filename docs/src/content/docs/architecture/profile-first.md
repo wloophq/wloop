@@ -54,7 +54,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
 - what sending a draft does, which follows its kind and not its declared effects: a sent nudge stamps the entries it served (`internal/core/proposals`), and a nudge on a pull request records the event the next nudge's refusal reads (the GitHub plugin's publisher);
 - the Outbox's verdict, shown beside each draft, of whether it would send the draft on its own, which holds a question to an owner and a comment by their kind (`internal/core/outbox`);
-- the workflow subjects, pull requests, sessions and workspaces (`builtin.Slots`), and `turn.start`, which starts turns on pull requests only;
+- the workflow subjects, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`), and `turn.start`, which starts turns on pull requests only;
 - where a turn on a unit other than a pull request runs: placement decides, and the intent's `workspace` is read for pull requests only;
 - notification titles, the digest and the menu bar's copy.
 
