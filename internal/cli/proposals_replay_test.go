@@ -335,8 +335,18 @@ func (r *replay) settleQueued() {
 // run replays the fourteen days through p and returns the record.
 func (r *replay) run(p proposer) string {
 	r.t.Helper()
+	return r.runFrom(p, time.Time{}, nil)
+}
+
+// runFrom replays the fourteen days through p until at, then through the
+// proposer then returns.
+func (r *replay) runFrom(p proposer, at time.Time, then func() proposer) string {
+	r.t.Helper()
 	ctx := context.Background()
 	for r.now = replayStart; r.now.Before(replayStart.AddDate(0, 0, replayDays)); r.now = r.now.Add(replayTick) {
+		if then != nil && !r.now.Before(at) {
+			p, then = then(), nil
+		}
 		r.scenario(r.now)
 		r.settleQueued()
 		if err := p.pass(ctx); err != nil {

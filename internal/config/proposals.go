@@ -86,3 +86,35 @@ func (p Proposals) validate() error {
 	}
 	return nil
 }
+
+// legacyDraftWorkflows are the proposals job's rules a default workflow
+// replaced, by rule id, and that workflow.
+var legacyDraftWorkflows = map[string]string{
+	"stalled-nudge": "slack-stalled-nudge",
+	"closure":       "slack-closure",
+	"ask-owner":     "slack-ask-owner",
+}
+
+// LegacyDraftApproval is the proposals.<rule>.approval of the rule the
+// workflow replaced, nil when the config sets none.
+func (p Proposals) LegacyDraftApproval(workflow string) *draft.Approval {
+	for rule, w := range legacyDraftWorkflows {
+		if r, ok := p.Rules[rule]; ok && w == workflow && r.Approval != nil {
+			a := r.Approval.Approval()
+			return &a
+		}
+	}
+	return nil
+}
+
+// LegacyWarnings name the key that replaced each proposals.<rule>.approval
+// the config still sets for a rule a workflow replaced.
+func (p Proposals) LegacyWarnings() []string {
+	var out []string
+	for _, rule := range slices.Sorted(maps.Keys(legacyDraftWorkflows)) {
+		if r, ok := p.Rules[rule]; ok && r.Approval != nil {
+			out = append(out, fmt.Sprintf("proposals.%s.approval is read as workflows.%s.draft_approval; move it there", rule, legacyDraftWorkflows[rule]))
+		}
+	}
+	return out
+}
