@@ -19,7 +19,7 @@ import (
 var (
 	brt, _ = time.LoadLocation("America/Sao_Paulo")
 	t0     = time.Date(2026, 10, 20, 10, 0, 0, 0, brt)
-	me     = gtd.Me{Keys: []string{"github:me"}}
+	me     = gtd.Me{Keys: []string{"github:me"}, Codecs: unit.NewRegistry(foldCodec{unit.GitHub})}
 	meP    = items.Person{Key: "github:me"}
 	ana    = items.Person{Key: "github:ana", Name: "Ana"}
 	unitU  = unit.Unit{Provider: unit.GitHub, Key: "acme/api#1"}
@@ -444,3 +444,10 @@ func TestRetitleUpdatesAnOpenedEntry(t *testing.T) {
 		t.Fatalf("retitle of a derived entry: %v", err)
 	}
 }
+
+// foldCodec compares its provider's keys without case, as GitHub's does.
+type foldCodec struct{ id unit.ProviderID }
+
+func (c foldCodec) Provider() unit.ProviderID { return c.id }
+func (foldCodec) Valid(string) error          { return nil }
+func (foldCodec) Equal(a, b string) bool      { return strings.EqualFold(a, b) }

@@ -91,6 +91,8 @@ type Module struct {
 	Briefs brief.BriefSource
 	// Links resolves the units of other plugins the plugin's units link to.
 	Links LinkResolver
+	// Detail says the cockpit shows a detail of the plugin's units.
+	Detail bool
 }
 
 // Checkout is the repository a unit's work checks out.
@@ -126,6 +128,7 @@ func (m Module) Capabilities() []string {
 		{CapabilityPublishes, m.Publisher != nil},
 		{CapabilityReacts, m.Reacts},
 		{CapabilityItems, m.Items != nil},
+		{CapabilityDetail, m.Detail},
 	} {
 		if c.has {
 			out = append(out, c.name)
@@ -141,6 +144,7 @@ const (
 	CapabilityPublishes = api.CapabilityPublishes
 	CapabilityReacts    = api.CapabilityReacts
 	CapabilityItems     = api.CapabilityItems
+	CapabilityDetail    = api.CapabilityDetail
 )
 
 // Plugin is a compiled-in plugin: its codec is registered even when it is disabled.

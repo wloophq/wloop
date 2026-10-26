@@ -27,6 +27,8 @@ type sheet struct {
 	// extras are the brief.extra.* facts of a provider's brief intent, which
 	// a workflow's predicates over a briefed subject read; nil reads none.
 	extras func(dunit.ProviderID) expr.Env
+	// defaults are the profile's defaults.toml.
+	defaults manifestDefaults
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -108,7 +110,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		Key:           m.Key,
 		Verb:          m.Verb,
 		UserFacing:    boolOr(m.UserFacing, true),
-		Provider:      dunit.GitHub,
+		Provider:      s.defaults.Provider,
 		Context:       str(m.Context, "pr"),
 		Launch:        m.Launch,
 		Policy:        str(m.Policy, "round"),

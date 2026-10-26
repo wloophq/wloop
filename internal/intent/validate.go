@@ -97,7 +97,7 @@ func (s *sheet) validate(d dintent.Def) {
 		s.add("session.title", "%q must be 1 to 12 lowercase letters", d.Session.Title)
 	}
 	s.validateKeys(d)
-	if !dunit.ValidProvider(string(d.Provider)) {
+	if d.Provider != "" && !dunit.ValidProvider(string(d.Provider)) {
 		s.add("provider", "%q is not a provider id: lowercase letters, digits, _ and -, starting with a letter", d.Provider)
 	}
 	if d.Provider != dunit.GitHub && d.Context == "synthetic" {

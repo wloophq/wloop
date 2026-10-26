@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -261,27 +260,26 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	return Command{}, false, true
 }
 
-// navigate shows a GTD view, or the first view of the GitHub views.
+// navigate shows a GTD view, or the first view of a plugin named by its
+// provider id.
 func (m *Model) navigate(to string) {
-	switch to {
-	case "cycle":
+	if to == "cycle" {
 		m.cycle()
 		return
-	case "github":
-		i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider == string(unit.GitHub) })
-		if i < 0 {
-			m.status = "no GitHub views: the plugin is disabled or not loaded"
-			return
-		}
+	}
+	if i := slices.IndexFunc(m.gtd, func(v View) bool { return v.ID == to }); i >= 0 {
+		m.setView(m.gtdBase() + i)
+		return
+	}
+	if i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider == to }); i >= 0 {
 		m.setView(i)
 		return
 	}
-	i := slices.IndexFunc(m.gtd, func(v View) bool { return v.ID == to })
-	if i < 0 {
-		m.status = "no " + to + " view here"
+	if p := slices.IndexFunc(m.served, func(p api.Plugin) bool { return string(p.ID) == to }); p >= 0 {
+		m.status = "no " + cmp.Or(m.served[p].Name, to) + " views: the plugin is disabled or not loaded"
 		return
 	}
-	m.setView(m.gtdBase() + i)
+	m.status = "no " + to + " view here"
 }
 
 // pickArea makes the lists follow area n of the served areas.

@@ -1,0 +1,2 @@
+# The provider whose units an intent's turns run on when its manifest names none.
+provider = "github"

@@ -35,7 +35,7 @@ func TestAUnitIntentRefusesWhatOnlyPullRequestsTake(t *testing.T) {
 			t.Errorf("%s: %v", what, err)
 		}
 	}
-	github := dintent.Def{Name: "review"}
+	github := dintent.Def{Name: "review", Provider: unit.GitHub}
 	if err := unitIntent(github, th); err == nil || !strings.Contains(err.Error(), "serves github units") {
 		t.Errorf("a github intent on a thread: %v", err)
 	}

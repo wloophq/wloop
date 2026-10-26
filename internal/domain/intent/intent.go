@@ -393,13 +393,10 @@ func (r *Registry) Builder(what string, p unit.ProviderID) (Def, bool) {
 	return found, ok
 }
 
-// ProviderOrDefault is the provider whose units the intent's turns run on.
-func (d Def) ProviderOrDefault() unit.ProviderID {
-	if d.Provider == "" {
-		return unit.GitHub
-	}
-	return d.Provider
-}
+// ProviderOrDefault is the provider whose units the intent's turns run on;
+// the loader fills it from the profile's defaults when the manifest names
+// none.
+func (d Def) ProviderOrDefault() unit.ProviderID { return d.Provider }
 
 // ForProvider is the intents whose turns run on units of p.
 func (r *Registry) ForProvider(p unit.ProviderID) []Def {

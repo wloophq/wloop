@@ -33,6 +33,9 @@ const (
 	CapabilityReacts = "reacts"
 	// CapabilityItems: the plugin's rows derive items.
 	CapabilityItems = "items"
+	// CapabilityDetail: the cockpit shows a detail of the plugin's units,
+	// which a client opens in place of the unit's link.
+	CapabilityDetail = "detail"
 )
 
 // Can says whether the plugin is enabled and serves capability c.

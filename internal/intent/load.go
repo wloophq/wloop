@@ -328,8 +328,10 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			})
 		}
 	}
+	defaults, defaultProblems := readDefaults(layers, bundled)
+	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
-		u.load(base)
+		u.load(base, defaults)
 		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
@@ -402,9 +404,9 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) load(base *template.Template) {
+func (u *unit) load(base *template.Template, defaults manifestDefaults) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file}
+	s := &sheet{file: file, defaults: defaults}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})

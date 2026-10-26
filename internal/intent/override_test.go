@@ -149,7 +149,7 @@ func TestAnUnreadableWorkflowOverrideIsAProblemOnTheUserFile(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root reads a mode 000 file")
 	}
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", quietSession)
 	file := filepath.Join(root, "workflows", "close-quiet", "workflow.toml")
@@ -203,7 +203,7 @@ func TestDotfilesDoNotOverride(t *testing.T) {
 	writeFile(t, filepath.Join(root, "intents", "address", ".DS_Store"), "x")
 	writeFile(t, filepath.Join(root, "intents", "address", "instructions.md.tmpl"), "{{.Headline}}\n")
 	writeFile(t, filepath.Join(root, "workflows", "close-quiet", ".DS_Store"), "x")
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	if err := fs.WalkDir(bundledFS(), ".", func(p string, e fs.DirEntry, err error) error {
 		if err == nil && !e.IsDir() {
 			bundled[p] = &fstest.MapFile{Data: []byte(bundledFile(t, p))}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -29,7 +30,15 @@ func testBase() *template.Template {
 
 func bundledFS() fs.FS { return os.DirFS("testdata/bundled") }
 
+// testDefaults is the bundled profile's defaults.toml.
+const testDefaults = "provider = \"github\"\n"
+
+// userLayer is the layers of a user profile in dir; dir holds the bundled
+// defaults unless it has its own.
 func userLayer(dir string) []profile.Layer {
+	if _, err := os.Stat(filepath.Join(dir, DefaultsFile)); errors.Is(err, fs.ErrNotExist) {
+		_ = os.WriteFile(filepath.Join(dir, DefaultsFile), []byte(testDefaults), 0o644)
+	}
 	return []profile.Layer{{Name: "bundled", Source: "embedded"}, {Name: "user", Source: dir, Dir: dir}}
 }
 
@@ -232,6 +241,7 @@ func TestGoodManifestLoads(t *testing.T) {
 
 func greetBundle() fstest.MapFS {
 	return fstest.MapFS{
+		DefaultsFile: {Data: []byte(testDefaults)},
 		"intents/greet/intent.toml":          {Data: []byte(minimal)},
 		"intents/greet/instructions.md.tmpl": {Data: []byte("{{.Headline}}")},
 	}
@@ -329,7 +339,7 @@ func TestLoadKeepsCleanUserIntentsAndReportsTheRest(t *testing.T) {
 }
 
 func TestReservedNamesApplyToUserLayersOnly(t *testing.T) {
-	bundled := fstest.MapFS{}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}}
 	for _, n := range []string{"review", "address", "nudge", "probe", "pause"} {
 		bundled["intents/"+n+"/intent.toml"] = &fstest.MapFile{Data: []byte(minimal)}
 		bundled["intents/"+n+"/instructions.md.tmpl"] = &fstest.MapFile{Data: []byte("{{.Headline}}")}

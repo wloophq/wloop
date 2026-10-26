@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func TestParsePath(t *testing.T) {
@@ -107,9 +108,9 @@ func TestPathOfRoundTrips(t *testing.T) {
 
 func TestRoundIsValidOnlyWhereDimsListsIt(t *testing.T) {
 	intents := dintent.NewRegistry([]dintent.Def{
-		{Name: "review", Profile: "review", Dims: []string{"round"}},
-		{Name: "ask-author", Profile: "ask-author", Dims: []string{"round"}},
-		{Name: "address", Profile: "address"},
+		{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
+		{Name: "ask-author", Profile: "ask-author", Dims: []string{"round"}, Provider: unit.GitHub},
+		{Name: "address", Profile: "address", Provider: unit.GitHub},
 	})
 	for rel, valid := range map[string]bool{
 		"round=first/intent=review.md":         true,
@@ -133,9 +134,9 @@ func TestProbeHasNoBlocks(t *testing.T) {
 
 func TestIntentBlocksForAUserIntentLoad(t *testing.T) {
 	intents := dintent.NewRegistry([]dintent.Def{
-		{Name: "review", Profile: "review", Dims: []string{"round"}},
-		{Name: "ask-author", Profile: "ask-author"},
-		{Name: "borrow", Profile: "review"},
+		{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
+		{Name: "ask-author", Profile: "ask-author", Provider: unit.GitHub},
+		{Name: "borrow", Profile: "review", Provider: unit.GitHub},
 	})
 	d := dir(t, map[string]string{"organization=acme/intent=ask-author.md": "Ask kindly.", "intents/ask-author/intent.toml": "label = 1\n", "intents/ask-author/instructions.md.tmpl": "x"})
 	tr, err := Load([]Layer{user(d)}, intents, nil)

@@ -91,8 +91,10 @@ type Controller struct {
 	health    api.Health
 	hasHealth bool
 	sections  []api.MenubarSection
-	entries   map[gtd.View][]api.EntryView
-	counters  *api.Counters
+	// plugins are the served plugins, read with the sections.
+	plugins  []api.Plugin
+	entries  map[gtd.View][]api.EntryView
+	counters *api.Counters
 }
 
 func New(cfg Config) *Controller {
@@ -317,7 +319,7 @@ func (c *Controller) loadSections(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.sections = nil
+	c.sections, c.plugins = nil, ps
 	for _, p := range ps {
 		if p.Enabled && p.UI != nil {
 			c.sections = append(c.sections, p.UI.Menubar...)
@@ -419,7 +421,7 @@ func (c *Controller) section(name, view string, rows []api.Row, open string) []M
 
 func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	action := func(context.Context) error { return c.open(viewRoute(view) + "&" + unitRoute(r.Unit)) }
-	if r.Unit.Provider != unit.GitHub && strings.HasPrefix(r.Link, "https://") {
+	if !api.PluginCan(c.plugins, r.Unit.Provider, api.CapabilityDetail) && strings.HasPrefix(r.Link, "https://") {
 		action = func(context.Context) error { return c.cfg.OpenURL(r.Link) }
 	}
 	return MenuItem{

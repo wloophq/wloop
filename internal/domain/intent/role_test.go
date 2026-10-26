@@ -9,8 +9,8 @@ import (
 func TestByRoleTakesTheUsersIntentOverTheBundledOne(t *testing.T) {
 	t.Parallel()
 	r := NewRegistry([]Def{
-		{Name: "review", Role: "round.review", Bundled: true},
-		{Name: "my-review", Role: "round.review"},
+		{Name: "review", Role: "round.review", Bundled: true, Provider: unit.GitHub},
+		{Name: "my-review", Role: "round.review", Provider: unit.GitHub},
 		{Name: "act", Role: "headless.default", Provider: AnyProvider, Bundled: true},
 	})
 	if d, ok := r.ByRole("round.review", unit.GitHub); !ok || d.Name != "my-review" {

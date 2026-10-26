@@ -95,7 +95,7 @@ func withDimFacts(t *testing.T, fs ...builtin.Fact) {
 const chat unit.ProviderID = "chat"
 
 var chatIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}},
+	{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
 	{Name: "triage", Profile: "triage", Provider: chat},
 })
 
@@ -185,7 +185,7 @@ func TestTheBundledLabelsNameEveryAlias(t *testing.T) {
 }
 
 var briefIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}},
+	{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
 	{Name: "triage", Profile: "triage", Provider: chat},
 	{Name: "brief", Builds: "brief", Provider: unit.GitHub, Extra: []jsonschema.Property{
 		{Name: "solution", Type: "string"},

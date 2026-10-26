@@ -13,10 +13,14 @@ import (
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
-// provider reads provider as one id or a list of ids; absent is github.
+// provider reads provider as one id or a list of ids; absent is the
+// profile's default provider.
 func (s *sheet) provider(d *dintent.Def, v any) {
 	switch v := v.(type) {
 	case nil:
+		if d.Provider == "" {
+			s.add("provider", "is required: name it here, or set provider in %s", DefaultsFile)
+		}
 	case string:
 		d.Provider = dunit.ProviderID(v)
 	case []any:

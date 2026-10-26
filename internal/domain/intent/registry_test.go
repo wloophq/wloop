@@ -112,7 +112,7 @@ func TestClosesWhenDoneReconcileAndSessionTitles(t *testing.T) {
 }
 
 func TestForProviderListsTheProvidersIntentsAndAnyOnes(t *testing.T) {
-	r := NewRegistry([]Def{{Name: "review"}, {Name: "discuss", Provider: "thread"}, {Name: "act", Provider: AnyProvider}})
+	r := NewRegistry([]Def{{Name: "review", Provider: unit.GitHub}, {Name: "discuss", Provider: "thread"}, {Name: "act", Provider: AnyProvider}})
 	names := func(p unit.ProviderID) []Name {
 		var out []Name
 		for _, d := range r.ForProvider(p) {

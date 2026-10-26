@@ -170,7 +170,7 @@ func TestBadWorkflowsGolden(t *testing.T) {
 }
 
 func TestAnInvalidUserWorkflowDisablesOnlyItself(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "mine-ok", quietSession)
 	writeWorkflow(t, root, "mine-typo", strings.Replace(quietSession, "session.managed", "session.manged", 1))
@@ -202,7 +202,7 @@ func mapKeys[V any](m map[string]V) func(func(string) bool) {
 }
 
 func TestAUserWorkflowOverridesABundledManifest(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", strings.Replace(quietSession, "config.cleanup.idle", "duration(\"2h\")", 1))
 	l, problems := Load(userLayer(root), bundled, testBase(), nil)
@@ -216,7 +216,7 @@ func TestAUserWorkflowOverridesABundledManifest(t *testing.T) {
 }
 
 func TestABrokenWorkflowOverrideKeepsTheBundledOne(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", quietSession+"bogus = 1\n")
 	l, problems := Load(userLayer(root), bundled, testBase(), nil)
