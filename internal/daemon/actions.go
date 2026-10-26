@@ -331,7 +331,7 @@ func isBuiltin(name string) bool {
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
-	if d, ok := s.loaded().Registry.Get(dintent.Name(r.PathValue("action"))); ok && d.Runs(string(turn.ModeHeadless)) {
+	if d, ok := s.loaded().Registry.Get(dintent.Name(r.PathValue("action"))); ok && d.Runs(string(turn.RunnerHeadless)) {
 		s.runModes(w, r, d)
 		return
 	}

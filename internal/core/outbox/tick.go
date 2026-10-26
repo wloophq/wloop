@@ -90,6 +90,6 @@ func (s *Service) approveByPolicy(ctx context.Context, d draft.Draft) (draft.Dra
 }
 
 func (s *Service) markAuto(ctx context.Context, d draft.Draft) (draft.Draft, error) {
-	d.State, d.Would.Outcome = draft.Approved, draft.OutcomeAuto
+	d.State, d.Would.Outcome = draft.Approved, draft.OutcomeReleased
 	return s.save(ctx, d, draft.Proposed)
 }

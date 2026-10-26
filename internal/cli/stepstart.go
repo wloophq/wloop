@@ -61,11 +61,11 @@ type roundCandidates interface {
 // ready.
 const refusalBriefNotReady = "brief not ready"
 
-// startArgs are a turn.start step's intent, round and mode, with the
+// startArgs are a turn.start step's intent, round and runner, with the
 // intent's manifest; def is zero when the intent does not load.
 type startArgs struct {
-	intent, round, mode string
-	def                 dintent.Def
+	intent, round, runner string
+	def                   dintent.Def
 }
 
 // startOf is st's arguments and the manifest of its intent.
@@ -73,7 +73,7 @@ func (e *Env) startOf(st workflow.Step) startArgs {
 	a := startArgs{}
 	a.intent, _ = st.Args["intent"].(string)
 	a.round, _ = st.Args["round"].(string)
-	a.mode, _ = st.Args["mode"].(string)
+	a.runner, _ = st.Args["mode"].(string)
 	if l := e.loadedIntents(); l != nil {
 		a.def, _ = l.Registry.Get(dintent.Name(a.intent))
 	}
@@ -129,13 +129,13 @@ func (a startArgs) reason(f workflow.Facts, cand roundCandidate) string {
 
 // mode is the step's mode, else the intent's first mode.
 func (a startArgs) runMode() string {
-	if a.mode != "" {
-		return a.mode
+	if a.runner != "" {
+		return a.runner
 	}
-	if len(a.def.Modes) > 0 {
-		return a.def.Modes[0]
+	if len(a.def.Runners) > 0 {
+		return a.def.Runners[0]
 	}
-	return string(dturn.ModeSession)
+	return string(dturn.RunnerSession)
 }
 
 // startPlan is what the guards of a turn.start read, for its run.

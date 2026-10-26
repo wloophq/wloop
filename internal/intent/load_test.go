@@ -195,7 +195,7 @@ func TestDefaultsOfAnActionAndAnInput(t *testing.T) {
 	d, _ := l.Registry.Get("ask-author")
 	a := d.Action
 	if a == nil || a.Group != "round" || !slices.Equal(a.Surfaces, []string{"row", "detail", "tui", "cli", "explore"}) ||
-		a.Visible.Src != "row.open" || a.Enabled.Src != "true" || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Hint.Src != "" {
+		a.When.Src != "row.open" || a.Enabled.Src != "true" || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Note.Src != "" {
 		t.Errorf("action %+v", a)
 	}
 	in := d.Inputs[0]

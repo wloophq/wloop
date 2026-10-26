@@ -111,7 +111,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		}
 	}()
 	for _, pl := range ev.items {
-		if pl.refusedStep < 0 || pl.w.Mode != workflow.ModeApply {
+		if pl.refusedStep < 0 || pl.w.Observe {
 			continue
 		}
 		if err := e.Steps.Note(ctx, pl.w.Steps[pl.refusedStep], pl.item.Unit, pl.item.Why, pl.refusal); err != nil {
@@ -209,7 +209,7 @@ func (e *Engine) live() map[string]workflow.Workflow {
 func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*planned, error) {
 	var runs []*planned
 	for _, pl := range items {
-		if pl.item.Decision == workflow.DecisionRun && pl.item.Mode == workflow.ModeApply && !pl.carried {
+		if pl.item.Decision == workflow.DecisionRun && !pl.item.Observe && !pl.carried {
 			runs = append(runs, pl)
 		}
 	}
@@ -326,7 +326,7 @@ func (e *Engine) schedule(ctx context.Context, ev *evaluation) error {
 		return err
 	}
 	for _, it := range pending {
-		if it.Default == workflow.OutcomeRun && it.Mode == workflow.ModeApply && it.Deadline.After(now) {
+		if it.Default == workflow.OutcomeRun && !it.Observe && it.Deadline.After(now) {
 			due = earliest(due, it.Deadline)
 		}
 	}

@@ -229,7 +229,7 @@ func loadChunk(ctx context.Context, tx *sql.Tx, provider unit.ProviderID, keys [
 			&t.Agent, &t.BriefRun, &t.AgentSession, &inputs, &mode, &t.Workflow, &t.Role); err != nil {
 			return err
 		}
-		t.Mode = turn.Mode(mode)
+		t.Runner = turn.Runner(mode)
 		var err error
 		if t.Inputs, err = decodeInputs(inputs); err != nil {
 			return fmt.Errorf("inputs of turn %d of %s: %w", t.Seq, r, err)
@@ -410,7 +410,7 @@ func turnColumns(t turn.Turn) ([]any, string, error) {
 		return nil, "", err
 	}
 	return []any{string(t.Intent), t.ID, string(t.Trigger), t.Guidance, t.Head, t.SentTo, t.Session, string(t.State),
-		formatTime(t.SentAt), formatTime(t.StartedAt), formatTime(t.EndedAt), t.ResumeOf, t.ReplacedBy, string(t.Before), t.Agent, t.BriefRun, t.AgentSession, inputs, string(t.Mode), t.Workflow, t.Role}, inputs, nil
+		formatTime(t.SentAt), formatTime(t.StartedAt), formatTime(t.EndedAt), t.ResumeOf, t.ReplacedBy, string(t.Before), t.Agent, t.BriefRun, t.AgentSession, inputs, string(t.Runner), t.Workflow, t.Role}, inputs, nil
 }
 
 // storedTurn is t as a reload would return it.

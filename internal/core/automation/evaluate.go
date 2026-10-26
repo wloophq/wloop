@@ -315,7 +315,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 		return nil
 	}
 	pl := &planned{w: w, facts: facts, refusedStep: -1, item: workflow.Item{ID: id, Key: key, Workflow: w.Name,
-		Unit: c.u, Steps: slices.Clone(w.Steps), Why: why, Mode: w.Mode, Marks: marksOf(w, facts), At: p.now}}
+		Unit: c.u, Steps: slices.Clone(w.Steps), Why: why, Observe: w.Observe, Marks: marksOf(w, facts), At: p.now}}
 	if ran {
 		pl.item.Attempts, pl.item.Error = run.Attempts, run.Error
 	}
@@ -348,7 +348,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		decide(workflow.DecisionPending, reason)
 		it.Default = workflow.OutcomeWait
 	}
-	if w.Mode == workflow.ModeApply && p.paused(w, pl.facts) {
+	if !w.Observe && p.paused(w, pl.facts) {
 		decide(workflow.DecisionSkipped, "paused")
 		return
 	}
@@ -368,7 +368,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		}
 	}
 	for i, st := range w.Steps {
-		refusal, err := p.e.Steps.Check(p.ctx, st, it.Unit, it.Why, CheckOpts{Mode: w.Mode})
+		refusal, err := p.e.Steps.Check(p.ctx, st, it.Unit, it.Why, CheckOpts{Observe: w.Observe})
 		if err != nil {
 			decide(workflow.DecisionBlocked, err.Error())
 			return
@@ -397,7 +397,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 	case waitWhen:
 		wait(waitReason(w.Approval.WaitWhen, vars, pl.refusal))
 		return
-	case w.Mode == workflow.ModeObserve:
+	case w.Observe:
 		wait("observe mode")
 		return
 	case w.Visible() && !w.AllowVisible:

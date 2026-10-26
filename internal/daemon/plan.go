@@ -254,7 +254,7 @@ func itemUnits(items []workflow.Item) []unit.Unit {
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
-		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
+		Observe: api.ObserveMode(it.Observe), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
 	for _, st := range it.Steps {
@@ -344,7 +344,7 @@ func (s *Server) dropPaused(ctx context.Context, p round.Pause, why string) erro
 	var errs []error
 	seen := map[unit.Unit]bool{}
 	for _, it := range items {
-		if it.Mode == workflow.ModeObserve {
+		if it.Observe {
 			seen[it.Unit] = true
 		}
 	}

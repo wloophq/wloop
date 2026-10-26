@@ -110,11 +110,11 @@ func (r registryActions) States(f Facts) []api.ActionState {
 			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, "reason_off", facts)})
 			continue
 		}
-		st := api.ActionState{ID: id, Enabled: true, Hint: actionText(d.Name, p, "hint", facts), Confirm: actionText(d.Name, p, "confirm", facts)}
+		st := api.ActionState{ID: id, Enabled: true, Note: actionText(d.Name, p, "hint", facts), Confirm: actionText(d.Name, p, "confirm", facts)}
 		st.Primary = p.Primary != nil && p.Primary.Eval(f)
 		recommend(&st, d, f.Recommended)
 		if f.Question {
-			st.Note = d.Action.NoteWhenQuestion
+			st.Warning = d.Action.Warning
 		}
 		out = append(out, st)
 	}

@@ -143,7 +143,7 @@ func (c countingDrafts) Update(ctx context.Context, d draft.Draft, from draft.St
 }
 
 func draftWF(name string, args ...string) workflow.Workflow {
-	return workflow.Workflow{Name: name, Mode: workflow.ModeApply, Steps: []workflow.Step{wfStep("draft.propose", args...)}}
+	return workflow.Workflow{Name: name, Observe: false, Steps: []workflow.Step{wfStep("draft.propose", args...)}}
 }
 
 func (r *draftRig) check(u unit.Unit) string {

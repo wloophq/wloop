@@ -185,7 +185,7 @@ func TestDraftsListByState(t *testing.T) {
 	first := r.propose(t, r7u, "first", draft.Wait)
 	r.clock.set(entriesNow.Add(time.Minute))
 	second := r.propose(t, r7u, "second\nmore", draft.Wait)
-	r.propose(t, r7u, "watched", draft.Record)
+	r.propose(t, r7u, "watched", draft.DryRun)
 	var res api.DraftsResponse
 	if code := get(t, r.s, api.Drafts+"?state=proposed", &res); code != 200 {
 		t.Fatalf("GET: %d", code)
@@ -367,7 +367,7 @@ func TestSenderWakesAtTheDeadline(t *testing.T) {
 	clock.fire <- entriesNow.Add(time.Minute)
 	waitUntil(t, "the window draft is sent", func() bool {
 		got, _ := r.o.Store.Get(context.Background(), d.ID)
-		return got.State == draft.Sent && got.Would.Outcome == draft.OutcomeAuto
+		return got.State == draft.Sent && got.Would.Outcome == draft.OutcomeReleased
 	})
 	if calls := r.fx.seen(); !slices.Equal(calls, []string{fmt.Sprintf("publish %d", d.ID)}) {
 		t.Fatalf("calls %v", calls)
@@ -527,7 +527,7 @@ func TestOutboxVerbsRefuseADisabledPlugin(t *testing.T) {
 func TestObservedDraftIsNotInTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.propose(t, r7u, "watch only", draft.Record)
+	r.propose(t, r7u, "watch only", draft.DryRun)
 	p := r.page(t, "view=outbox")
 	if len(p.Entries) != 0 || p.Counters.Views["outbox"] != 0 {
 		t.Fatalf("entries %v counters %+v", entryIDs(p.Entries), p.Counters)

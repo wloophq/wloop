@@ -117,7 +117,7 @@ type WouldPolicy string // "release", "hold"
 
 const (
 	WouldRelease WouldPolicy = "release"
-	WouldHold    WouldPolicy = "hold"
+	WouldWait    WouldPolicy = "hold"
 )
 
 type Outcome string // "", "as_is", "edited", "discarded", "auto" (approved by its policy), "recorded" (recorded only)
@@ -126,8 +126,8 @@ const (
 	OutcomeAsIs      Outcome = "as_is"
 	OutcomeEdited    Outcome = "edited"
 	OutcomeDiscarded Outcome = "discarded"
-	OutcomeAuto      Outcome = "auto"
-	OutcomeRecorded  Outcome = "recorded"
+	OutcomeReleased  Outcome = "auto"
+	OutcomeDryRun    Outcome = "recorded"
 )
 
 type Would struct {
@@ -199,7 +199,7 @@ const (
 	Wait   ApprovalMode = "wait"
 	Delay  ApprovalMode = "delay"
 	Send   ApprovalMode = "send"
-	Record ApprovalMode = "record"
+	DryRun ApprovalMode = "record"
 )
 
 type Approval struct {
@@ -210,7 +210,7 @@ type Approval struct {
 // Validate refuses an unknown mode, a window <= 0 with delay, a window set without delay.
 func (a Approval) Validate() error {
 	switch {
-	case !slices.Contains([]ApprovalMode{Wait, Delay, Send, Record}, a.Mode):
+	case !slices.Contains([]ApprovalMode{Wait, Delay, Send, DryRun}, a.Mode):
 		return fmt.Errorf("unknown draft approval mode %q", a.Mode)
 	case a.Mode == Delay && a.Window <= 0:
 		return errors.New("draft approval delay needs a positive window")

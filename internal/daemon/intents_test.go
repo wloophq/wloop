@@ -102,7 +102,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatal("the specs version ignores the user intent")
 	}
 	st, ok := offerOf(rowOf(t, s, r7), "ask-author")
-	if !ok || !st.Enabled || st.Hint != "Ask ana one question" {
+	if !ok || !st.Enabled || st.Note != "Ask ana one question" {
 		t.Fatalf("on someone else's pull request: %+v %v", st, ok)
 	}
 	ctx := context.Background()

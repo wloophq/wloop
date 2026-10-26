@@ -37,8 +37,8 @@ func TestDelegateTabHandsToAnAgent(t *testing.T) {
 func TestDelegateSaysWhyNoAgentSessionCanRun(t *testing.T) {
 	m := gtdModel(t)
 	focus := gtdEntries()["focus"][0]
-	focus.Verbs = append(focus.Verbs, api.VerbState{Verb: "delegate", Enabled: true, Modes: []api.ModeState{
-		{Mode: "headless", Enabled: true}, {Mode: "session", Reason: "no workspace manager is enabled"}}})
+	focus.Verbs = append(focus.Verbs, api.VerbState{Verb: "delegate", Enabled: true, Runners: []api.RunnerState{
+		{Runner: "headless", Enabled: true}, {Runner: "session", Reason: "no workspace manager is enabled"}}})
 	m.SetEntries("focus", []api.EntryView{focus}, gtdCounters())
 	press(m, Key{Rune: 'd'})
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "no agent session: no workspace manager is enabled") {

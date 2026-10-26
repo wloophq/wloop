@@ -263,7 +263,7 @@ func planDetails(it api.PlanItem, now time.Time) string {
 	if when := planWhen(it, now); when != "" {
 		parts = append(parts, when)
 	}
-	if it.Mode == string(workflow.ModeObserve) {
+	if it.Observe {
 		parts = append(parts, "observe")
 	}
 	if len(it.Steps) > 0 {

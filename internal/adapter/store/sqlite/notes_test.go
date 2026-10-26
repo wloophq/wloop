@@ -285,7 +285,7 @@ var writes = []writeCase{
 
 func noteItem(d workflow.Decision) workflow.Item {
 	k := workflow.Key{Workflow: "w", Unit: term1, Value: "v"}
-	it := workflow.Item{ID: k.ID(), Key: k, Workflow: "w", Unit: term1, Decision: d, Mode: workflow.ModeApply, At: noteAt}
+	it := workflow.Item{ID: k.ID(), Key: k, Workflow: "w", Unit: term1, Decision: d, Observe: false, At: noteAt}
 	if d == workflow.DecisionPending {
 		it.Default, it.Deadline = workflow.OutcomeRun, noteAt.Add(time.Minute)
 	}

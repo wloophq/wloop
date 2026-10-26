@@ -85,8 +85,8 @@ func TestDelegateBoxShowsWhyItIsOff(t *testing.T) {
 }
 
 func TestHandToAnAgentIsOffWithThePlacementReason(t *testing.T) {
-	e := threadEntry(api.VerbState{Verb: "delegate", Enabled: true, Modes: []api.ModeState{
-		{Mode: "headless", Enabled: true}, {Mode: "session", Reason: "no workspace manager is enabled"}}})
+	e := threadEntry(api.VerbState{Verb: "delegate", Enabled: true, Runners: []api.RunnerState{
+		{Runner: "headless", Enabled: true}, {Runner: "session", Reason: "no workspace manager is enabled"}}})
 	var got struct {
 		Text              string
 		Headless, Session bool

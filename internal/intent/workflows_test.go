@@ -91,7 +91,7 @@ func TestAWorkflowManifestBecomesTheDomainWorkflow(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Name != "close-quiet" || w.Provider != dunit.Session || w.Slot != "session" || w.Mode != workflow.ModeObserve || w.Order != 100 {
+	if w.Name != "close-quiet" || w.Provider != dunit.Session || w.Slot != "session" || !w.Observe || w.Order != 100 {
 		t.Errorf("%+v", w)
 	}
 	if w.Trigger.Kind != workflow.TriggerSweep || w.Limits != (workflow.Limits{PerRun: 5, PerDay: 50, Cooldown: time.Hour}) {

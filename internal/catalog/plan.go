@@ -40,7 +40,7 @@ func PlanStates(it api.PlanItem, row []api.ActionState) []api.ActionState {
 	case "pending":
 		out = append(out, api.ActionState{ID: PlanApply, Enabled: true, Primary: true}, api.ActionState{ID: PlanDismiss, Enabled: true})
 		if turnStart {
-			out = append(out, api.ActionState{ID: "guide", Enabled: true, Hint: "Runs the round now with your guidance"})
+			out = append(out, api.ActionState{ID: "guide", Enabled: true, Note: "Runs the round now with your guidance"})
 		}
 	case "blocked":
 		out = append(out, api.ActionState{ID: PlanApply, Reason: it.Reason}, api.ActionState{ID: PlanDismiss, Enabled: true})

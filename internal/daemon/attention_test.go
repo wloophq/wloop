@@ -212,15 +212,15 @@ func TestNudgeComputedOnce(t *testing.T) {
 		got[rowNumber(r)], _ = offerOf(r, "nudge")
 	}
 	want := map[int]api.ActionState{
-		50: {ID: "nudge", Enabled: true, Hint: "Nudge @ana"},
-		51: {ID: "nudge", Enabled: true, Hint: "Nudge " + prrow.NudgeMaintainers},
+		50: {ID: "nudge", Enabled: true, Note: "Nudge @ana"},
+		51: {ID: "nudge", Enabled: true, Note: "Nudge " + prrow.NudgeMaintainers},
 		52: {ID: "nudge", Reason: "acme/api#52 waits on you (review requested"},
 		53: {},
-		54: {ID: "nudge", Enabled: true, Hint: "Nudge @bob"},
+		54: {ID: "nudge", Enabled: true, Note: "Nudge @bob"},
 	}
 	for n, w := range want {
 		g := got[n]
-		if g.ID != w.ID || g.Enabled != w.Enabled || g.Hint != w.Hint || !strings.HasPrefix(g.Reason, w.Reason) {
+		if g.ID != w.ID || g.Enabled != w.Enabled || g.Note != w.Note || !strings.HasPrefix(g.Reason, w.Reason) {
 			t.Errorf("#%d nudge %+v, want %+v", n, g, w)
 		}
 	}

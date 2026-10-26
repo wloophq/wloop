@@ -452,20 +452,20 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Workflow, a sqlite.WorkflowActivity, now time.Time) (api.DoctorCheck, error) {
 	var info string
 	mark := api.DoctorOK
-	if w.Mode == workflow.ModeObserve {
+	if w.Observe {
 		items, err := db.Ledger().Items(ctx, automation.Filter{Workflow: w.Name})
 		if err != nil {
 			return api.DoctorCheck{}, err
 		}
 		mark = api.DoctorInfo
 		info = fmt.Sprintf("%s, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Mode, w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"mode": "apply"`), e.ConfigPath)
+			workflow.ModeOf(w.Observe), w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"mode": "apply"`), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
 			last = "last ran " + shortAge(now.Sub(a.LastRun), false) + " ago"
 		}
-		info = fmt.Sprintf("%s, %s, %s, %d refusal(s) in the last day", w.Mode, w.Trigger.Kind, last, a.Refusals)
+		info = fmt.Sprintf("%s, %s, %s, %d refusal(s) in the last day", workflow.ModeOf(w.Observe), w.Trigger.Kind, last, a.Refusals)
 	}
 	if w.Approval.Default == workflow.OutcomeWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",

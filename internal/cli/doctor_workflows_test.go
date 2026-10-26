@@ -88,14 +88,14 @@ use = "session.explode"
 	}
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	other := workflow.Key{Workflow: "hygiene-orphan-answer", Unit: pr, Value: "fedcba9876543210"}
-	if err := db.Ledger().Record(ctx, workflow.Run{Key: other, Status: workflow.RunRefused, At: now}, workflow.Item{ID: other.ID(), Key: other, Workflow: other.Workflow, Unit: pr, Decision: workflow.DecisionBlocked, Mode: workflow.ModeApply, At: now},
+	if err := db.Ledger().Record(ctx, workflow.Run{Key: other, Status: workflow.RunRefused, At: now}, workflow.Item{ID: other.ID(), Key: other, Workflow: other.Workflow, Unit: pr, Decision: workflow.DecisionBlocked, Observe: false, At: now},
 		port.Event{Unit: pr, Kind: "merged", Key: "m1", At: now.Add(-2 * time.Hour)}, port.Event{Unit: pr, Kind: "closed", Key: "c1", At: now.Add(-time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
 	ws := unit.Unit{Provider: unit.Workspace, Key: "wt-1"}
 	planned := workflow.Key{Workflow: "workspace-review-finished", Unit: ws, Value: "00112233aabbccdd"}
 	if err := db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{planned.Workflow}, Items: []workflow.Item{{ID: planned.ID(), Key: planned,
-		Workflow: planned.Workflow, Unit: ws, Decision: workflow.DecisionPending, Default: workflow.OutcomeWait, Reason: "observe mode", Mode: workflow.ModeObserve, At: now}}}); err != nil {
+		Workflow: planned.Workflow, Unit: ws, Decision: workflow.DecisionPending, Default: workflow.OutcomeWait, Reason: "observe mode", Observe: true, At: now}}}); err != nil {
 		t.Fatal(err)
 	}
 	return te, db

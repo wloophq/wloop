@@ -118,11 +118,11 @@ func (r *planRig) engine(d *Deps) *automation.Engine {
 	return &automation.Engine{
 		Workflows: func() []workflow.Workflow {
 			return []workflow.Workflow{
-				{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply, AllowVisible: true,
+				{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Observe: false, AllowVisible: true,
 					Trigger:  workflow.Trigger{Kind: workflow.TriggerSweep},
 					Steps:    []workflow.Step{r.steps.Step(builtin.StepTurnStart, "intent", "review", "round", "follow-up")},
 					Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: 5 * time.Minute}},
-				{Name: "session-quiet", Provider: unit.Session, Slot: "session", Mode: workflow.ModeObserve,
+				{Name: "session-quiet", Provider: unit.Session, Slot: "session", Observe: true,
 					Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.steps.Step("session.close")},
 					Approval: workflow.Approval{Default: workflow.OutcomeRun}},
 			}

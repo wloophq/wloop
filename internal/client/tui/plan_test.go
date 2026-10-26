@@ -14,7 +14,7 @@ import (
 )
 
 func planOf(id, wf string, u unit.Unit, decision, reason string) api.PlanItem {
-	it := api.PlanItem{ID: id, Workflow: wf, Unit: u, Decision: decision, Reason: reason, Mode: "apply", Steps: []string{"session.close"}}
+	it := api.PlanItem{ID: id, Workflow: wf, Unit: u, Decision: decision, Reason: reason, Steps: []string{"session.close"}}
 	switch decision {
 	case "pending":
 		it.Actions = []api.ActionState{{ID: "plan_apply", Enabled: true, Primary: true}, {ID: "plan_dismiss", Enabled: true}}

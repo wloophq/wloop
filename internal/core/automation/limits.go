@@ -72,7 +72,7 @@ type unitOf struct {
 // pending in apply mode with default run. Only those take a slot.
 func runsAlone(it workflow.Item) bool {
 	return it.Decision == workflow.DecisionRun ||
-		it.Decision == workflow.DecisionPending && it.Default == workflow.OutcomeRun && it.Mode == workflow.ModeApply
+		it.Decision == workflow.DecisionPending && it.Default == workflow.OutcomeRun && !it.Observe
 }
 
 // count reserves the item's slots in the limits.

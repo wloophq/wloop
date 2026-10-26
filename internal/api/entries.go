@@ -115,13 +115,13 @@ type VerbState struct {
 	Verb    string `json:"verb"`
 	Enabled bool   `json:"enabled"`
 	Reason  string `json:"reason,omitempty"`
-	// Modes are, on an enabled delegate, the modes of the action it runs: headless, session or both.
-	Modes []ModeState `json:"modes,omitempty"`
+	// Runners are, on an enabled delegate, the modes of the action it runs: headless, session or both.
+	Runners []RunnerState `json:"modes,omitempty"`
 }
 
-// ModeState is a mode a delegate runs in; a session is disabled when the unit has nowhere to run one.
-type ModeState struct {
-	Mode    string `json:"mode"`
+// RunnerState is a mode a delegate runs in; a session is disabled when the unit has nowhere to run one.
+type RunnerState struct {
+	Runner  string `json:"mode"`
 	Enabled bool   `json:"enabled"`
 	Reason  string `json:"reason,omitempty"`
 }

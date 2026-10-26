@@ -153,7 +153,7 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 	})
 	t.Run("observed", func(t *testing.T) {
 		e, _ := setup(t)
-		e.job.Approval = func(string) draft.Approval { return draft.Approval{Mode: draft.Record} }
+		e.job.Approval = func(string) draft.Approval { return draft.Approval{Mode: draft.DryRun} }
 		e.run()
 		e.clock.set(t0.Add(23 * time.Hour))
 		e.run()

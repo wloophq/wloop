@@ -147,7 +147,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		return draft.Draft{}, err
 	}
 	approval := dec.Approval
-	if targetsOutside(d) && approval.Mode != draft.Record {
+	if targetsOutside(d) && approval.Mode != draft.DryRun {
 		approval = waiting
 	}
 	d.Approval = approval
@@ -164,8 +164,8 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	switch approval.Mode {
 	case draft.Delay:
 		d.Deadline = now.Add(approval.Window)
-	case draft.Record:
-		d.State, d.Reason, d.Would.Outcome = draft.Discarded, string(draft.Record), draft.OutcomeRecorded
+	case draft.DryRun:
+		d.State, d.Reason, d.Would.Outcome = draft.Discarded, string(draft.DryRun), draft.OutcomeDryRun
 	}
 	d, err = s.Store.Insert(ctx, d)
 	if err != nil {
@@ -231,7 +231,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, recordedFor time
 		return draft.Draft{}, false, nil
 	}
 	states := draft.Open
-	if d.Approval.Mode == draft.Record {
+	if d.Approval.Mode == draft.DryRun {
 		states = append(slices.Clone(states), draft.Discarded)
 	}
 	found, err := s.Store.List(ctx, Filter{States: states, Unit: &d.Unit, Rule: d.Origin.Rule, Key: d.Origin.Key})
@@ -245,7 +245,7 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, recordedFor time
 		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
-		if o.State != draft.Discarded || o.Reason == string(draft.Record) && (recordedFor <= 0 || now.Sub(o.UpdatedAt) < recordedFor) {
+		if o.State != draft.Discarded || o.Reason == string(draft.DryRun) && (recordedFor <= 0 || now.Sub(o.UpdatedAt) < recordedFor) {
 			return o, true, ErrDuplicate
 		}
 	}
@@ -357,7 +357,7 @@ func targetsOutside(d draft.Draft) bool {
 // would is what auto-send would do with d: a comment only once a rule that
 // names comment delivery released it.
 func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision) draft.Would {
-	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldHold, Reason: reason} }
+	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldWait, Reason: reason} }
 	switch {
 	case targetsOutside(d):
 		return hold("targets outside its unit")

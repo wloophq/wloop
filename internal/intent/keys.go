@@ -113,7 +113,7 @@ func (s *sheet) validateKeys(d dintent.Def) {
 			}
 		}
 	}
-	for i, e := range d.DraftEffects {
+	for i, e := range d.AllowedEffects {
 		if !slices.Contains(builtin.EffectNames(), e) {
 			s.add(fmt.Sprintf("draft_effects[%d]", i), "%q is not an effect; the effects are %s", e, quoted(builtin.EffectNames()))
 		}

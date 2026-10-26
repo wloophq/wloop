@@ -199,7 +199,7 @@ func TestHeadlessRunIsATurn(t *testing.T) {
 		t.Fatalf("book %+v", b)
 	}
 	tu := b.Turns[0]
-	if tu.Seq != got.Seq || tu.Mode != turn.ModeHeadless || tu.Intent != turn.Intent(dintent.Act) || tu.ID == "" || tu.Trigger != turn.ByHand ||
+	if tu.Seq != got.Seq || tu.Runner != turn.RunnerHeadless || tu.Intent != turn.Intent(dintent.Act) || tu.ID == "" || tu.Trigger != turn.ByHand ||
 		tu.Guidance != "keep it short" || tu.State != turn.Done || tu.Session != "" || tu.SentTo != "" || !slices.Equal(turns.ItemsOf(tu), []string{"i1"}) {
 		t.Fatalf("turn %+v", tu)
 	}
@@ -529,7 +529,7 @@ func TestHeadlessAnswerRunsAgain(t *testing.T) {
 	}
 	b := r.book(t, thread)
 	again := b.Turns[len(b.Turns)-1]
-	if len(b.Turns) != 2 || again.Mode != turn.ModeHeadless || again.ResumeOf != first.Seq || again.Trigger != turn.Automated || again.Workflow != "triage" ||
+	if len(b.Turns) != 2 || again.Runner != turn.RunnerHeadless || again.ResumeOf != first.Seq || again.Trigger != turn.Automated || again.Workflow != "triage" ||
 		again.State != turn.Done || !slices.Equal(turns.ItemsOf(again), []string{"i1", "i2"}) || !strings.Contains(again.Guidance, "Monday") {
 		t.Fatalf("the run again %+v", again)
 	}

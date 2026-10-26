@@ -23,6 +23,14 @@ const (
 	ModeApply   Mode = "apply"
 )
 
+// ModeOf is how a manifest, the configuration and the store spell observe.
+func ModeOf(observe bool) Mode {
+	if observe {
+		return ModeObserve
+	}
+	return ModeApply
+}
+
 type Reach string
 
 const (
@@ -161,7 +169,7 @@ type Workflow struct {
 	When              Predicate
 	Steps             []Step
 	Limits            Limits
-	Mode              Mode
+	Observe           bool
 	AllowVisible      bool
 	Order             int
 	Key               []string // fact names; empty means the slot's fingerprint fact
@@ -270,7 +278,7 @@ type Item struct {
 	Marks    map[string]mark.Value
 	Attempts int
 	Error    string
-	Mode     Mode
+	Observe  bool
 	At       time.Time
 }
 

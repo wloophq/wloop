@@ -24,7 +24,7 @@ func TestProposalsDefaultsAndParsing(t *testing.T) {
 	if got := p.Approval("closure"); got != (draft.Approval{Mode: draft.Delay, Window: time.Hour}) {
 		t.Fatalf("closure %+v", got)
 	}
-	if got := p.Approval("github-nudge"); got != (draft.Approval{Mode: draft.Record}) {
+	if got := p.Approval("github-nudge"); got != (draft.Approval{Mode: draft.DryRun}) {
 		t.Fatalf("github-nudge %+v", got)
 	}
 	if got := p.Approval("ask-owner"); got != (draft.Approval{Mode: draft.Wait}) {

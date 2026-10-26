@@ -56,7 +56,7 @@ func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workfl
 	switch {
 	case !ok:
 		return draft.WithdrawMoot, nil
-	case w.Withdraw == nil || w.Mode != workflow.ModeApply:
+	case w.Withdraw == nil || w.Observe:
 		return "", nil
 	}
 	facts, err := e.factsFor(ctx, d.Workflow, d.Subject)

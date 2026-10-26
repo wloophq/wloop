@@ -372,7 +372,7 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 		t.Fatal("the unit's messages follow the schema")
 	}
 	b := slackBook(t, te, slackThread2)
-	if len(b.Turns) != 1 || b.Turns[0].Mode != dturn.ModeHeadless || b.Turns[0].State != dturn.Done {
+	if len(b.Turns) != 1 || b.Turns[0].Runner != dturn.RunnerHeadless || b.Turns[0].State != dturn.Done {
 		t.Fatalf("turns %+v", b.Turns)
 	}
 }

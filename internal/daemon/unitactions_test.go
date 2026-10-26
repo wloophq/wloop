@@ -24,7 +24,7 @@ func TestAUnitIntentRefusesWhatOnlyPullRequestsTake(t *testing.T) {
 	}
 	for what, edit := range map[string]func(*dintent.Def){
 		"prepare": func(d *dintent.Def) { d.Prepare = "nudge.prepare" },
-		"on_sent": func(d *dintent.Def) { d.OnSent = []string{"plan.drop_pending", "event.round_sent"} },
+		"on_sent": func(d *dintent.Def) { d.Effects = []string{"plan.drop_pending", "event.round_sent"} },
 		"intake":  func(d *dintent.Def) { d.Intake = true },
 		"launch":  func(d *dintent.Def) { d.Launch = "probe" },
 	} {

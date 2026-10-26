@@ -1192,7 +1192,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	deadline := testNow.Add(4 * time.Minute)
 	it := workflow.Item{ID: "review-follow-up/github/acme%2Fapi%237/k", Workflow: "review-follow-up", Unit: r7.Unit(), Decision: workflow.DecisionPending,
-		Reason: "runs when its window ends", Default: workflow.OutcomeRun, Deadline: deadline, At: testNow, Mode: workflow.ModeApply,
+		Reason: "runs when its window ends", Default: workflow.OutcomeRun, Deadline: deadline, At: testNow, Observe: false,
 		Key:   workflow.Key{Workflow: "review-follow-up", Unit: r7.Unit(), Value: "k"},
 		Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review), "round": "follow-up"}}}}
 	if err := storeDB.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{"review-follow-up"}, Items: []workflow.Item{it}}); err != nil {

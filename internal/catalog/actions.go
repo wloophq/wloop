@@ -137,7 +137,7 @@ var builtinActions = []builtinAction{
 		}
 		st, _ := on("guide")
 		if f.Row.Pending == nil {
-			st.Hint = "Kept for the next automatic round"
+			st.Note = "Kept for the next automatic round"
 		}
 		return st, true
 	}},
@@ -146,14 +146,14 @@ var builtinActions = []builtinAction{
 			return absent()
 		}
 		return api.ActionState{ID: "trust_run", Enabled: true, Primary: true,
-			Hint: fmt.Sprintf("Trust %s in %s, then run the round", f.TrustFolder, strings.Join(f.TrustHomes, ", "))}, true
+			Note: fmt.Sprintf("Trust %s in %s, then run the round", f.TrustFolder, strings.Join(f.TrustHomes, ", "))}, true
 	}},
 	{api.ActionSpec{ID: "unblock", Label: "Dismiss block", Group: "round", Key: "D", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
 		if !f.StartBlocked {
 			return absent()
 		}
 		st, _ := on("unblock")
-		st.Hint = "Lift the block without trusting; the round waits for a new trigger"
+		st.Note = "Lift the block without trusting; the round waits for a new trigger"
 		return st, true
 	}},
 	{api.ActionSpec{ID: "answer", Label: "Answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
@@ -162,7 +162,7 @@ var builtinActions = []builtinAction{
 	{api.ActionSpec{ID: "dismiss", Label: "Dismiss", Group: "turn", Key: "X", Verb: "dismiss", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, func(f Facts) (api.ActionState, bool) {
 		st, ok := questionOffer("dismiss")(f)
 		if st.Enabled {
-			st.Hint = "Close the question; the pull request goes back to whoever it waits on"
+			st.Note = "Close the question; the pull request goes back to whoever it waits on"
 		}
 		return st, ok
 	}},
@@ -230,7 +230,7 @@ var builtinActions = []builtinAction{
 		if !removable(f) || f.Forceable == "" {
 			return absent()
 		}
-		return api.ActionState{ID: "remove_force", Enabled: true, Hint: "Refused: " + f.Forceable,
+		return api.ActionState{ID: "remove_force", Enabled: true, Note: "Refused: " + f.Forceable,
 			Confirm: fmt.Sprintf("Force remove the workspace of %s?\n\nIt was refused:\n%s\n\nForcing deletes its checkout with what is named above, for good.", f.slug(), f.Forceable)}, true
 	}},
 	{api.ActionSpec{ID: "brief_refresh", Label: "Refresh brief", Group: "brief", Surfaces: []string{SurfaceDetail, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
@@ -241,7 +241,7 @@ var builtinActions = []builtinAction{
 			return off("brief_refresh", reasonBriefOff)
 		}
 		st, _ := on("brief_refresh")
-		st.Hint = "Make this pull request's brief again now"
+		st.Note = "Make this pull request's brief again now"
 		return st, true
 	}},
 	{api.ActionSpec{ID: "intake_without", Label: "Start without brief", Group: "intake", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceMenubar, SurfaceCLI}}, func(f Facts) (api.ActionState, bool) {
@@ -346,5 +346,5 @@ func recommend(st *api.ActionState, d dintent.Def, mode string) {
 		return
 	}
 	st.Primary = st.Primary || mode == "headless"
-	st.Hint = strings.TrimSpace(st.Hint + " (recommended: " + mode + ")")
+	st.Note = strings.TrimSpace(st.Note + " (recommended: " + mode + ")")
 }

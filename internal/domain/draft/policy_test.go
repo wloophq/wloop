@@ -37,7 +37,7 @@ func TestADefaultThatReleasesNeverReleasesAComment(t *testing.T) {
 			t.Errorf("%s on a message: %+v", def.Mode, got)
 		}
 	}
-	if got, _ := (Policy{Default: Approval{Mode: Record}}).Decide(Draft{Delivery: CommentDelivery}, Subject{Facts: nil}, time.Time{}); got.Approval.Mode != Record {
+	if got, _ := (Policy{Default: Approval{Mode: DryRun}}).Decide(Draft{Delivery: CommentDelivery}, Subject{Facts: nil}, time.Time{}); got.Approval.Mode != DryRun {
 		t.Errorf("observe on a comment: %+v", got)
 	}
 }

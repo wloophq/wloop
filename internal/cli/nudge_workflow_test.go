@@ -181,12 +181,12 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		g.set()
 	}
 	for _, g := range guards {
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); !strings.HasPrefix(got, g.want) {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); !strings.HasPrefix(got, g.want) {
 			t.Fatalf("refusal %q, want %q", got, g.want)
 		}
 		g.off()
 	}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); got != "" {
+	if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); got != "" {
 		t.Fatalf("with every guard off: %q", got)
 	}
 }
@@ -195,7 +195,7 @@ func TestNudgeSilentHonorsTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -221,7 +221,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	for name, w := range want {
 		got := bundledWorkflow(t, te, name)
 		args := got.Steps[0].Args
-		if got.Provider != unit.GitHub || got.Trigger.Kind != workflow.TriggerSweep || got.Order != w.order || got.Mode != workflow.ModeApply ||
+		if got.Provider != unit.GitHub || got.Trigger.Kind != workflow.TriggerSweep || got.Order != w.order || got.Observe ||
 			len(got.Steps) != 1 || got.Steps[0].Use != builtin.StepTurnStart || args["intent"] != w.intent || (w.round != "" && args["round"] != w.round) {
 			t.Errorf("%s: %+v", name, got)
 		}

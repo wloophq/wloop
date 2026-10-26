@@ -2,6 +2,7 @@ package api
 
 import (
 	"cmp"
+	"encoding/json"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -14,7 +15,7 @@ type PlanItem struct {
 	Decision string        `json:"decision"`
 	Reason   string        `json:"reason,omitempty"`
 	Default  string        `json:"default,omitempty"`
-	Mode     string        `json:"mode"`
+	Observe  ObserveMode   `json:"mode"`
 	Error    string        `json:"error,omitempty"`
 	Unit     unit.Unit     `json:"unit"`
 	Label    string        `json:"label"`           // Unit as a person reads it
@@ -93,4 +94,24 @@ type PlanActRequest struct {
 	IDs      []string `json:"ids"`
 	Action   string   `json:"action"`
 	Guidance string   `json:"guidance,omitempty"`
+}
+
+// ObserveMode is a plan item's observe flag, which the wire spells mode:
+// observe or apply.
+type ObserveMode bool
+
+func (o ObserveMode) MarshalJSON() ([]byte, error) {
+	if o {
+		return []byte(`"observe"`), nil
+	}
+	return []byte(`"apply"`), nil
+}
+
+func (o *ObserveMode) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*o = s == "observe"
+	return nil
 }

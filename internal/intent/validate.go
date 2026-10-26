@@ -113,7 +113,7 @@ func (s *sheet) validate(d dintent.Def) {
 		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
 	}
 	s.builtinRef("prepare", builtin.SlotPrepare, d.Prepare)
-	for i, e := range d.OnSent {
+	for i, e := range d.Effects {
 		s.builtinRef(fmt.Sprintf("on_sent[%d]", i), builtin.SlotOnSent, e)
 	}
 	s.oneOf("board", d.Board, boards)

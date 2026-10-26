@@ -301,7 +301,7 @@ func itemArgs(it workflow.Item) ([]any, error) {
 	}
 	return []any{it.ID, it.Workflow, string(it.Unit.Provider), it.Unit.Key, it.Key.Value, string(it.Decision), it.Reason,
 		string(stepsJSON), string(whyJSON), string(it.Default), eventTime(it.Deadline), it.Guidance, it.Attempts, it.Error,
-		string(it.Mode), eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
+		string(workflow.ModeOf(it.Observe)), eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
 }
 
 // stringArgs stores step arguments as the manifest gives them, strings; a
@@ -402,7 +402,7 @@ func scanItem(row scanner) (workflow.Item, error) {
 		return workflow.Item{}, err
 	}
 	it.Key.Workflow, it.Key.Unit = it.Workflow, it.Unit
-	it.Decision, it.Default, it.Mode = workflow.Decision(decision), workflow.Outcome(def), workflow.Mode(mode)
+	it.Decision, it.Default, it.Observe = workflow.Decision(decision), workflow.Outcome(def), mode == string(workflow.ModeObserve)
 	fail := func(what string, err error) (workflow.Item, error) {
 		return workflow.Item{}, fmt.Errorf("the %s of plan item %s: %w", what, it.ID, err)
 	}

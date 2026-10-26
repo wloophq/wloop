@@ -211,9 +211,9 @@ type Turn struct {
 	Agent        string `json:"agent,omitempty"`
 	BriefRun     int64  `json:"brief_run,omitempty"`
 	AgentSession string `json:"agent_session,omitempty"`
-	// Mode is "" for a session turn; Workflow the workflow that started it;
+	// Runner is "" for a session turn; Workflow the workflow that started it;
 	// Role the role its intent held.
-	Mode     string `json:"mode,omitempty"`
+	Runner   string `json:"mode,omitempty"`
 	Workflow string `json:"workflow,omitempty"`
 	Role     string `json:"role,omitempty"`
 }

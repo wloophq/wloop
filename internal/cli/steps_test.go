@@ -73,7 +73,7 @@ func TestASessionCloseRefusedAtRunIsAGuardRefusal(t *testing.T) {
 	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", StartedAt: testNow})
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
 	u := unit.Unit{Provider: unit.Session, Key: "term-1"}
-	refusal, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{Observe: false})
 	if err != nil || refusal == "" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -113,9 +113,9 @@ func newRemovalRig(t *testing.T, c wt.Checkout) *removalRig {
 	return r
 }
 
-func (r *removalRig) check(t *testing.T, mode workflow.Mode) string {
+func (r *removalRig) check(t *testing.T, observe bool) string {
 	t.Helper()
-	refusal, err := r.s.Check(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, automation.CheckOpts{Mode: mode})
+	refusal, err := r.s.Check(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, automation.CheckOpts{Observe: observe})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,10 +125,10 @@ func (r *removalRig) check(t *testing.T, mode workflow.Mode) string {
 func TestWorkspaceRemoveSkipsTheFetchDayInObserve(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
-	if got := r.check(t, workflow.ModeApply); got != workspaces.NotFetchedToday {
+	if got := r.check(t, false); got != workspaces.NotFetchedToday {
 		t.Fatalf("apply: %q", got)
 	}
-	if got := r.check(t, workflow.ModeObserve); got != "" {
+	if got := r.check(t, true); got != "" {
 		t.Fatalf("observe: %q", got)
 	}
 	if len(r.world.Remote.(*wt.Git).Fetches()) != 0 {
@@ -145,7 +145,7 @@ func TestWorkspaceRemoveNoteFetchesTheItemsPullRequest(t *testing.T) {
 	if got := r.world.Remote.(*wt.Git).Fetches(); len(got) != 1 || r.fetches.Marks() != 1 {
 		t.Fatalf("fetches %v, marks %d", got, r.fetches.Marks())
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("after the fetch: %q", got)
 	}
 	if err := r.s.Note(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, "1 modified tracked file in /w/ws"); err != nil {
@@ -162,7 +162,7 @@ func TestWorkspaceRemoveAppendsTheBackupCommand(t *testing.T) {
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "2 commits not pushed") || !strings.Contains(got, "; back them up with: git push origin HEAD:refs/heads/") {
+	if got := r.check(t, false); !strings.Contains(got, "2 commits not pushed") || !strings.Contains(got, "; back them up with: git push origin HEAD:refs/heads/") {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -175,33 +175,33 @@ func TestWorkspaceRemoveCheckReusesItsLookWhileTheFactsHold(t *testing.T) {
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("first look: %q", got)
 	}
 	dir := r.world.Tree.(*wt.Git).Dirs[r.world.Dir]
 	dir.Untracked = append(dir.Untracked, "threads.txt")
 	r.world.Files.(*wt.Files).Put(r.world.Dir+"/threads.txt", "notes")
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("the facts did not move, yet it looked again: %q", got)
 	}
 	r.sessions.Refuse = map[string]string{"ws1": "its agent is working"}
-	if got := r.check(t, workflow.ModeApply); got != "its agent is working" {
+	if got := r.check(t, false); got != "its agent is working" {
 		t.Fatalf("the sessions are always asked: %q", got)
 	}
 	r.sessions.Refuse = nil
 	r.units.Put(r.u, workflow.Facts{"workspace.pr": "acme/api#7", "workspace.pr_state": "OPEN", "workspace.repo": "acme/api", "workspace.untracked": 1})
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "threads.txt") {
+	if got := r.check(t, false); !strings.Contains(got, "threads.txt") {
 		t.Fatalf("moved facts: %q", got)
 	}
 	dir.Untracked = nil
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "threads.txt") {
+	if got := r.check(t, false); !strings.Contains(got, "threads.txt") {
 		t.Fatalf("a refusal is reused too: %q", got)
 	}
 	now = now.Add(2 * time.Hour)
 	if err := r.fetches.Mark(context.Background(), "ws1", now); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("a look older than sweep.slow: %q", got)
 	}
 }
@@ -318,7 +318,7 @@ func TestWorkspaceRemoveForgetsTheLookOfAWorkspaceThatLeft(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.s.looks["gone"] = removeLook{}
-	r.check(t, workflow.ModeObserve)
+	r.check(t, true)
 	if _, ok := r.s.looks["gone"]; ok {
 		t.Fatal("kept the look of a workspace the manager no longer lists")
 	}
@@ -359,7 +359,7 @@ func TestWorkspaceUnregisterRefusesWhatItWouldRefuseToRun(t *testing.T) {
 		edit(&r.mgr.Workspaces[0])
 		r.u = wsdomain.UnitOf(r.mgr.Workspaces[0].Path)
 		r.units.Put(r.u, workflow.Facts{"workspace.pr": "acme/api#7", "workspace.pr_state": "OPEN", "workspace.repo": "acme/api"})
-		refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+		refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Observe: false})
 		if err != nil || refusal != want {
 			t.Errorf("check %q %v, want %q", refusal, err, want)
 		}
@@ -370,7 +370,7 @@ func TestWorkspaceUnregisterRefusesAnExistingPath(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.world.Files.(*wt.Files).Put(r.world.Dir+"/README", "x")
-	refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Observe: false})
 	if err != nil || refusal != "its path still exists" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -540,7 +540,7 @@ func TestClassifyStopsAtTheDailyCap(t *testing.T) {
 	}
 	r.s.classify.wait()
 	r.units.Set(r.u, "pr.fingerprint", "fp2")
-	refusal, err := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Observe: false})
 	if err != nil || refusal != "daily classify cap 1 reached" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -554,7 +554,7 @@ func TestClassifyStopsAtTheDailyCap(t *testing.T) {
 	}
 	r.s.d.Classify.BreakerOpen = func() bool { return true }
 	r.te.cfg.Classify.DailyCap = 5
-	if refusal, _ := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Mode: workflow.ModeApply}); refusal != "the brief breaker is open" {
+	if refusal, _ := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Observe: false}); refusal != "the brief breaker is open" {
 		t.Fatalf("breaker: %q", refusal)
 	}
 }

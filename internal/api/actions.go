@@ -16,9 +16,10 @@ type ActionsResponse struct {
 type ActionSpec struct {
 	ID       string     `json:"id"`
 	Label    string     `json:"label"`
-	Group    string     `json:"group"`         // round | turn | control | workspace | brief | intake
-	Key      string     `json:"key,omitempty"` // TUI key
-	Surfaces []string   `json:"surfaces"`      // row, detail, tui, menubar, notification, cli, explore
+	Summary  string     `json:"summary,omitempty"` // what the action does
+	Group    string     `json:"group"`             // round | turn | control | workspace | brief | intake
+	Key      string     `json:"key,omitempty"`     // TUI key
+	Surfaces []string   `json:"surfaces"`          // row, detail, tui, menubar, notification, cli, explore
 	Input    *InputSpec `json:"input,omitempty"`
 	Intake   bool       `json:"intake,omitempty"`
 	Toggle   string     `json:"toggle,omitempty"` // paired id sharing the key: hold<->release
@@ -43,10 +44,10 @@ type ActionState struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
 	Reason  string `json:"reason,omitempty"`
-	Hint    string `json:"hint,omitempty"`
+	Note    string `json:"hint,omitempty"`
 	Label   string `json:"label,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 	Confirm string `json:"confirm,omitempty"`
 	Basis   string `json:"basis,omitempty"`
-	Note    string `json:"note,omitempty"`
+	Warning string `json:"note,omitempty"`
 }

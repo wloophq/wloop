@@ -54,7 +54,7 @@ const (
 // ErrHeadlessBusy is BeginHeadless's refusal while the unit has a headless turn started.
 var ErrHeadlessBusy = errors.New("the unit already has a headless turn started")
 
-func headless(t turn.Turn) bool { return t.Mode == turn.ModeHeadless }
+func headless(t turn.Turn) bool { return t.Runner == turn.RunnerHeadless }
 
 // running is a headless turn whose call has not ended.
 func running(t turn.Turn) bool {
@@ -127,14 +127,14 @@ func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, er
 	}
 	now := s.now()
 	b.Send(turn.Turn{Intent: h.Intent, ID: h.Turn, Trigger: h.Trigger, Guidance: h.Guidance, ResumeOf: h.ResumeOf,
-		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Entry), SentAt: now, Mode: turn.ModeHeadless, Workflow: h.Workflow, Role: h.Role})
+		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Entry), SentAt: now, Runner: turn.RunnerHeadless, Workflow: h.Workflow, Role: h.Role})
 	if _, err := b.Start(h.Turn, "", now); err != nil {
 		s.mu.Unlock()
 		return 0, err
 	}
 	evs := []port.Event{
 		s.event(h.Unit, KindTurnSent, h.Turn, string(h.Intent)),
-		s.event(h.Unit, KindTurnStarted, h.Turn, string(turn.ModeHeadless)),
+		s.event(h.Unit, KindTurnStarted, h.Turn, string(turn.RunnerHeadless)),
 	}
 	saved, err := s.Store.Save(ctx, b, evs...)
 	if err != nil {

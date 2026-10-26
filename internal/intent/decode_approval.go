@@ -24,7 +24,7 @@ type mApprovalRule struct {
 	Window *string `toml:"window"`
 }
 
-var draftApprovalModes = []string{string(draft.Wait), string(draft.Delay), string(draft.Send), string(draft.Record)}
+var draftApprovalModes = []string{string(draft.Wait), string(draft.Delay), string(draft.Send), string(draft.DryRun)}
 
 // draftApproval is the policy of m, its rules' when compiled over env; nil
 // when m is. A rule that releases while reading draft.delivery in a form

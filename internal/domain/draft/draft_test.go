@@ -40,7 +40,7 @@ func TestApprovalValidate(t *testing.T) {
 	}{
 		{Approval{Mode: Wait}, true},
 		{Approval{Mode: Send}, true},
-		{Approval{Mode: Record}, true},
+		{Approval{Mode: DryRun}, true},
 		{Approval{Mode: Delay, Window: time.Minute}, true},
 		{Approval{Mode: Delay}, false},
 		{Approval{Mode: Delay, Window: -time.Second}, false},

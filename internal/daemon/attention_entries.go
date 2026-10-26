@@ -111,7 +111,7 @@ func (s *Server) draftsHeadless(ctx context.Context, g *coregtd.Service, e gtd.E
 		return false
 	}
 	st, runs := b.runs()
-	return runs && s.bridgeMode(st.ID, string(turn.ModeHeadless)) == nil
+	return runs && s.bridgeMode(st.ID, string(turn.RunnerHeadless)) == nil
 }
 
 // rowNotice is the notice of e's first unit's row; served says the unit is a pull request the read model

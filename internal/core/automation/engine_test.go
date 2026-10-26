@@ -203,7 +203,7 @@ func (l *stateLoader) Load(context.Context) (automation.State, error) {
 
 func sweepWF(name string, when workflow.Predicate, steps ...string) workflow.Workflow {
 	w := workflow.Workflow{Name: name, Provider: unit.Session, Slot: "session", Trigger: workflow.Trigger{Kind: workflow.TriggerSweep},
-		When: when, Mode: workflow.ModeApply}
+		When: when, Observe: false}
 	for _, s := range steps {
 		w.Steps = append(w.Steps, workflow.Step{Use: s, Reach: reach[s]})
 	}
@@ -525,7 +525,7 @@ func TestStepsRunInOrderAndStopAtTheFirstFailure(t *testing.T) {
 
 func TestObserveOnlyPlans(t *testing.T) {
 	w := sweepWF("close", idle, "session.close")
-	w.Mode = workflow.ModeObserve
+	w.Observe = true
 	r := newRig(t, w)
 	r.put(s1, "a")
 	r.put(s2, "b")
@@ -722,7 +722,7 @@ func TestPendingServesTheReadModel(t *testing.T) {
 
 func TestPauseStopsApplyNotObserve(t *testing.T) {
 	observe := sweepWF("watch", idle, "session.close")
-	observe.Mode = workflow.ModeObserve
+	observe.Observe = true
 	r := newRig(t, sweepWF("close", idle, "session.close"), observe)
 	r.put(s1, "a")
 	r.pause = automation.Pause{On: true}
@@ -824,7 +824,7 @@ func TestOrderAcrossWorkflows(t *testing.T) {
 
 func TestNoteRunsOnlyUnderTheLockInApply(t *testing.T) {
 	observe := sweepWF("watch", idle, "notify.self")
-	observe.Mode = workflow.ModeObserve
+	observe.Observe = true
 	r := newRig(t, sweepWF("close", idle, "session.close"), observe)
 	r.put(s1, "a")
 	r.steps.Refuse("session.close", s1, "brief not ready")
@@ -1266,7 +1266,7 @@ func TestDueRunHoldsUnderPauseAndOutsideApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.pause = automation.Pause{}
-	w.Mode = workflow.ModeObserve
+	w.Observe = true
 	r.wfs = []workflow.Workflow{w}
 	if err := r.e.DueRun(ctx); err != nil {
 		t.Fatal(err)
@@ -1281,7 +1281,7 @@ func TestItemsWaitingForTheUserTakeNoSlot(t *testing.T) {
 	wait.Approval.Default = workflow.OutcomeWait
 	wait.Limits = workflow.Limits{PerRun: 1, PerDay: 1}
 	observe := sweepWF("observe", idle, "session.close")
-	observe.Mode = workflow.ModeObserve
+	observe.Observe = true
 	observe.Limits.PerRun = 1
 	runs := sweepWF("runs", idle, "session.close")
 	runs.Order = -1

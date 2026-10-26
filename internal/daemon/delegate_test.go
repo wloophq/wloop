@@ -129,19 +129,19 @@ func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
 	t.Parallel()
 	r, _, fa := newDelegateRig(t)
 	r.put(t, unitEntry("e-a", gtd.KindAction, actThread))
-	modes := func() []api.ModeState {
+	modes := func() []api.RunnerState {
 		var v api.EntryView
 		if code := get(t, r.s, api.EntryPath("e-a"), &v); code != 200 {
 			t.Fatalf("%d", code)
 		}
-		return verbState(v, "delegate").Modes
+		return verbState(v, "delegate").Runners
 	}
 	r.s.deps.Placer = placerFunc(func(unit.Unit) (string, error) { return "a neutral directory with no checkout", nil })
-	if got := modes(); !slices.Equal(got, []api.ModeState{{Mode: "headless", Enabled: true}, {Mode: "session", Enabled: true}}) {
+	if got := modes(); !slices.Equal(got, []api.RunnerState{{Runner: "headless", Enabled: true}, {Runner: "session", Enabled: true}}) {
 		t.Fatalf("placed: %+v", got)
 	}
 	r.s.deps.Placer = placerFunc(func(unit.Unit) (string, error) { return "", errors.New("no workspace manager is enabled") })
-	want := []api.ModeState{{Mode: "headless", Enabled: true}, {Mode: "session", Reason: "no workspace manager is enabled"}}
+	want := []api.RunnerState{{Runner: "headless", Enabled: true}, {Runner: "session", Reason: "no workspace manager is enabled"}}
 	if got := modes(); !slices.Equal(got, want) {
 		t.Fatalf("unplaceable: %+v", got)
 	}

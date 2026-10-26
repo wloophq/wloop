@@ -61,7 +61,7 @@ func TestTheSweepWithdrawsADraftByItsWorkflowsWithdrawWhen(t *testing.T) {
 	}
 
 	observe := withdrawWF("ask", draft.WithdrawAssigned)
-	observe.Mode = workflow.ModeObserve
+	observe.Observe = true
 	o := newRig(t, observe)
 	ows := withWithdrawals(o)
 	o.put(s1, "a")

@@ -26,7 +26,7 @@ func Intents() *dintent.Registry {
 				Require: []dintent.Require{{State: "done", Fields: []string{"url"}}},
 			}},
 		{Name: dintent.Probe, Role: "probe", Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
-		{Name: dintent.Act, Role: "headless.default", UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Modes: []string{"headless", "session"}, Verb: "delegate",
+		{Name: dintent.Act, Role: "headless.default", UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Runners: []string{"headless", "session"}, Verb: "delegate",
 			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 		{Name: "brief", Builds: "brief", Prompt: "prompts/brief.md", Provider: "github", Providers: []unit.ProviderID{"github", "slack"}},
 	})

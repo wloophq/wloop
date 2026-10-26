@@ -125,7 +125,7 @@ help = "owner/name"
 	}
 	d, ok := l.Registry.Get("implement")
 	if !ok || d.WorkspaceRepo == nil || d.WorkspaceRepo.RepoInput != "repo" || d.Provider != "github" || len(d.Providers) != 2 ||
-		d.Role != "nudge" || len(d.DraftEffects) != 2 || d.RoundKind != "address" || d.Cap != "rounds" || d.ReasonFact != "pr.address.reason" ||
+		d.Role != "nudge" || len(d.AllowedEffects) != 2 || d.RoundKind != "address" || d.Cap != "rounds" || d.ReasonFact != "pr.address.reason" ||
 		d.RefuseWhen != "pr.nudge.refusal" || d.Reason != "address_round" || d.Brief.Need[0] != "solution" {
 		t.Fatalf("%+v", d)
 	}

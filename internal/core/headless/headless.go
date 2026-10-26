@@ -166,7 +166,7 @@ func (s *Service) Start(ctx context.Context, r Request) (int64, error) {
 // Again runs q's intent on q's unit, items and entry (kept in q.Inputs) with said as Guidance, q.Trigger
 // and q.Workflow; ErrNotHeadless when q.Mode is not headless. The route is Resumed.
 func (s *Service) Again(ctx context.Context, q turn.Turn, said string) (turns.AnswerResult, error) {
-	if q.Mode != turn.ModeHeadless {
+	if q.Runner != turn.RunnerHeadless {
 		return turns.AnswerResult{}, ErrNotHeadless
 	}
 	u, err := s.unitOf(ctx, q)
@@ -204,7 +204,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 	switch {
 	case !ok:
 		return started{}, fmt.Errorf("no intent %s", r.Intent)
-	case !def.Runs(string(turn.ModeHeadless)):
+	case !def.Runs(string(turn.RunnerHeadless)):
 		return started{}, fmt.Errorf("%w: %s does not run headless (its manifest's modes)", ErrNotHeadless, r.Intent)
 	case !def.Serves(r.Unit.Provider):
 		return started{}, fmt.Errorf("%s does not act on %s units", r.Intent, r.Unit.Provider)
@@ -487,7 +487,7 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 // does not list; "" when it lists them all.
 func undeclared(def intent.Def, effects []string) string {
 	for _, e := range effects {
-		if !slices.Contains(def.DraftEffects, e) {
+		if !slices.Contains(def.AllowedEffects, e) {
 			return fmt.Sprintf("it declares the effect %s, which the %s intent does not list in draft_effects", e, def.Name)
 		}
 	}

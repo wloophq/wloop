@@ -122,7 +122,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	discarded := sampleDraft(ghPull, at)
 	discarded.State, discarded.Reason, discarded.Entry = draft.Discarded, "observe", ""
 	discarded.Origin = draft.Origin{Kind: draft.OriginTurn, TurnSeq: 8}
-	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.Record}, time.Time{}
+	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.DryRun}, time.Time{}
 	d2, _ := s.Insert(ctx, discarded)
 	d3, _ := s.Insert(ctx, sampleDraft(slackThread, at))
 

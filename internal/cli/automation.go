@@ -201,7 +201,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 			continue
 		}
 		if wc.Mode != "" {
-			w.Mode = workflow.Mode(wc.Mode)
+			w.Observe = wc.Mode == string(workflow.ModeObserve)
 		}
 		if a := wc.Approval; a != nil {
 			if a.Default != "" {

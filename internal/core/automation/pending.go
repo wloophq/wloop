@@ -45,7 +45,7 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	live := e.live()
 	for _, it := range items {
 		w, ok := live[it.Workflow]
-		if !ok || w.Mode != workflow.ModeApply || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
+		if !ok || w.Observe || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
 			continue
 		}
 		facts, err := e.factsFor(ctx, w.Name, it.Unit)

@@ -109,7 +109,7 @@ func (s *stepSet) unitStart(ctx context.Context, c stepCall, o automation.RunOpt
 		return "", automation.Refused{Reason: refusal}
 	}
 	d, why := p.args.def, c.why
-	if p.args.runMode() == string(dturn.ModeHeadless) {
+	if p.args.runMode() == string(dturn.RunnerHeadless) {
 		if s.d.Headless == nil {
 			return "", errors.New("no headless runner is configured")
 		}

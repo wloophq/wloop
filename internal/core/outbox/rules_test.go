@@ -54,7 +54,7 @@ func TestACommentDraftUnderACatchAllNoneWaits(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, draft.Fixed(noneA))
 	d := e.propose(comment("looks good"))
-	if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldHold {
+	if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
 		t.Fatalf("%+v", d)
 	}
 	e.svc.Send(ctx)
@@ -174,8 +174,8 @@ func TestARuleNeverReleasesADraftAimedOutsideItsUnit(t *testing.T) {
 
 func TestARuleThatObservesRecordsAComment(t *testing.T) {
 	e := newEnv()
-	withPolicy(e, &draft.Policy{Default: noneA, Rules: []draft.Rule{{When: factIs{"draft.delivery", "comment"}, Approval: draft.Approval{Mode: draft.Record}}}})
-	if d := e.propose(comment("x")); d.State != draft.Discarded || d.Reason != string(draft.Record) {
+	withPolicy(e, &draft.Policy{Default: noneA, Rules: []draft.Rule{{When: factIs{"draft.delivery", "comment"}, Approval: draft.Approval{Mode: draft.DryRun}}}})
+	if d := e.propose(comment("x")); d.State != draft.Discarded || d.Reason != string(draft.DryRun) {
 		t.Fatalf("%+v", d)
 	}
 }

@@ -110,7 +110,7 @@ func (r *unitStartRig) created() bool {
 func TestTurnStartLaunchesASlackIntentInTheRepositoryItNames(t *testing.T) {
 	r := newUnitStartRig(t, implementIntent)
 	ctx := context.Background()
-	if got, err := r.steps.Check(ctx, r.st, thread1, r.why, automation.CheckOpts{Mode: workflow.ModeApply}); err != nil || got != "" {
+	if got, err := r.steps.Check(ctx, r.st, thread1, r.why, automation.CheckOpts{Observe: false}); err != nil || got != "" {
 		t.Fatalf("check %q %v", got, err)
 	}
 	got, err := r.steps.Run(ctx, r.st, thread1, r.why, automation.RunOpts{})
@@ -127,7 +127,7 @@ func TestTurnStartLaunchesASlackIntentInTheRepositoryItNames(t *testing.T) {
 	if text := storedText(t, r.te, b.Turns[0].ID); !strings.Contains(text, "Add a retry to the export job") {
 		t.Fatalf("the thread's items are not in the instructions:\n%s", text)
 	}
-	again, err := r.steps.Check(ctx, r.st, thread1, r.why, automation.CheckOpts{Mode: workflow.ModeApply})
+	again, err := r.steps.Check(ctx, r.st, thread1, r.why, automation.CheckOpts{Observe: false})
 	if err != nil || !strings.HasPrefix(again, "its implement turn is ") {
 		t.Fatalf("a second start on the open turn: %q %v", again, err)
 	}
@@ -140,7 +140,7 @@ type = "text"
 flag = "--repo"
 help = "owner/name"
 `)
-	got, err := r.steps.Check(context.Background(), r.st, thread1, r.why, automation.CheckOpts{Mode: workflow.ModeApply})
+	got, err := r.steps.Check(context.Background(), r.st, thread1, r.why, automation.CheckOpts{Observe: false})
 	if err != nil || !strings.Contains(got, "input repo") {
 		t.Fatalf("check %q %v", got, err)
 	}
@@ -183,7 +183,7 @@ func (r *unitStartRig) sweep(t *testing.T, eng *automation.Engine) {
 func TestTheWorkflowLimitAndTheAutomatedBudgetStopTheNextTurn(t *testing.T) {
 	w := workflow.Workflow{Name: implementWorkflow, Provider: ingesttest.Provider, Slot: string(ingesttest.Provider), Trigger: workflow.Trigger{Kind: workflow.TriggerSweep},
 		When: automationtest.MatchFunc(func(workflow.Vars) bool { return true }), Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": "implement"}}},
-		Mode: workflow.ModeApply, Approval: workflow.Approval{Default: workflow.OutcomeRun}, Limits: workflow.Limits{PerDay: 1}}
+		Observe: false, Approval: workflow.Approval{Default: workflow.OutcomeRun}, Limits: workflow.Limits{PerDay: 1}}
 
 	r := newUnitStartRig(t, implementIntent)
 	eng := r.engine(w)
@@ -277,7 +277,7 @@ func TestANudgeWithoutRefuseWhenIgnoresTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("the bundled nudge: %q", got)
 	}
 	b, err := fs.ReadFile(profiles.Default, "default/intents/nudge/intent.toml")
@@ -285,7 +285,7 @@ func TestANudgeWithoutRefuseWhenIgnoresTheNudgeRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": strings.Replace(string(b), "refuse_when = \"pr.nudge.refusal\"\n", "", 1)})
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got == "it waits on you" {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got == "it waits on you" {
 		t.Fatal("a nudge whose manifest sets no refuse_when read the refusal")
 	}
 }

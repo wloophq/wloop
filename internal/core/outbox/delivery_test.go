@@ -43,7 +43,7 @@ func TestAMessageItsPluginPostsAsACommentWaitsUnderACatchAllRelease(t *testing.T
 		withPolicy(e, draft.Fixed(mode))
 		d := e.propose(prReply("LGTM, merging"))
 		if d.Delivery != draft.CommentDelivery || d.Kind != draft.Comment || d.State != draft.Proposed ||
-			d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldHold {
+			d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
 			t.Fatalf("%s: %+v", mode.Mode, d)
 		}
 	}

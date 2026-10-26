@@ -31,7 +31,7 @@ func TestAPendingItemOffersApplyAndDismiss(t *testing.T) {
 }
 
 func TestAStartBlockedItemOffersTheRowsTrustActionsOnly(t *testing.T) {
-	row := []api.ActionState{{ID: "trust_run", Enabled: true, Primary: true, Hint: "Trust /w in ~/.claude, then run the round"}, {ID: "unblock", Enabled: true}, {ID: "mute", Enabled: true}}
+	row := []api.ActionState{{ID: "trust_run", Enabled: true, Primary: true, Note: "Trust /w in ~/.claude, then run the round"}, {ID: "unblock", Enabled: true}, {ID: "mute", Enabled: true}}
 	it := api.PlanItem{Decision: "blocked", Reason: "round blocked: trust this folder?", Steps: []string{builtin.StepTurnStart}}
 	got := PlanStates(it, row)
 	if !slices.Equal(ids(got), []string{PlanApply, PlanDismiss, "trust_run", "unblock"}) || got[0].Enabled || got[0].Reason != it.Reason || got[2] != row[0] {

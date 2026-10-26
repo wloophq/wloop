@@ -521,7 +521,7 @@ func (s *stepSet) removeCheck(ctx context.Context, c stepCall, o automation.Chec
 	if why, err := s.d.Removal.Guard.Refusal(ctx, w.ID); err != nil || why != "" {
 		return why, err
 	}
-	key, err := s.lookKey(ctx, c, w, info, o.Mode)
+	key, err := s.lookKey(ctx, c, w, info, o.Observe)
 	if err != nil {
 		return "", err
 	}
@@ -535,7 +535,7 @@ func (s *stepSet) removeCheck(ctx context.Context, c stepCall, o automation.Chec
 	}
 	svc := s.removal(s.d.Removal.Guard, nil)
 	check := svc.RemoveRefusal
-	if o.Mode == workflow.ModeObserve {
+	if o.Observe {
 		check = svc.RemoveRefusalAsFetched
 	}
 	refusal, backup, err := check(ctx, w, info)
@@ -561,7 +561,7 @@ type removeLook struct {
 // lookKey is what moves when a workspace's removal check may answer
 // otherwise, its sessions aside: the facts its local reads give, the pull
 // request's head, the last fetch, the day and the disposable list.
-func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace, info workspaces.PRInfo, mode workflow.Mode) (string, error) {
+func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace, info workspaces.PRInfo, observe bool) (string, error) {
 	f, err := s.facts(ctx, c.u)
 	if err != nil {
 		return "", err
@@ -576,7 +576,7 @@ func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace,
 	for _, name := range []string{"workspace.fingerprint", "workspace.dirty", "workspace.untracked", "workspace.unpushed", "workspace.last_activity", "workspace.path_exists"} {
 		facts = append(facts, fmt.Sprint(f[name]))
 	}
-	return fmt.Sprint(mode, w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
+	return fmt.Sprint(workflow.ModeOf(observe), w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
 }
 
 // forgetLeft drops the looks of the workspaces the listing no longer has.

@@ -81,8 +81,8 @@ type Events interface {
 }
 
 type CheckOpts struct {
-	Mode   workflow.Mode
-	ByHand bool
+	Observe bool
+	ByHand  bool
 }
 
 type RunOpts struct {

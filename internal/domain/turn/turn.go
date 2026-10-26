@@ -64,8 +64,8 @@ type Turn struct {
 	AgentSession string
 	// Inputs are the intent's inputs the turn was sent with.
 	Inputs map[string]any
-	// Mode is empty for a session turn.
-	Mode Mode `json:",omitempty"`
+	// Runner is empty for a session turn.
+	Runner Runner `json:"Mode,omitempty"`
 	// Workflow is the workflow whose turn.start step started it, "" none.
 	Workflow string `json:",omitempty"`
 	// Role is the role its intent held when it was sent, so the history
@@ -73,11 +73,11 @@ type Turn struct {
 	Role string `json:",omitempty"`
 }
 
-type Mode string
+type Runner string
 
 const (
-	ModeSession  Mode = "session"
-	ModeHeadless Mode = "headless"
+	RunnerSession  Runner = "session"
+	RunnerHeadless Runner = "headless"
 )
 
 type Record struct {

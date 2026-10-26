@@ -38,7 +38,7 @@ import (
 )
 
 func turnStartWorkflow(name string) workflow.Workflow {
-	return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+	return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Observe: false,
 		Trigger:  workflow.Trigger{Kind: workflow.TriggerSweep},
 		Steps:    []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": "review", "round": "follow-up"}}},
 		Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: time.Minute}}
@@ -53,8 +53,8 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 		"watched": {Mode: "observe"},
 		"waits":   {Approval: &config.ApprovalConfig{Default: "wait", Window: &window}},
 	}
-	clean := workflow.Workflow{Name: "watched", Mode: workflow.ModeApply, Approval: workflow.Approval{Default: workflow.OutcomeRun}}
-	in := []workflow.Workflow{{Name: "gone", Mode: workflow.ModeApply}, clean, turnStartWorkflow("waits"), {Name: "kept", Mode: workflow.ModeApply}}
+	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Default: workflow.OutcomeRun}}
+	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), {Name: "kept", Observe: false}}
 	out := applyConfig(in, cfg)
 	var names []string
 	for _, w := range out {
@@ -63,13 +63,13 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	if !slices.Equal(names, []string{"watched", "waits", "kept"}) {
 		t.Fatalf("workflows %v", names)
 	}
-	if out[0].Mode != workflow.ModeObserve {
-		t.Errorf("mode %q", out[0].Mode)
+	if !out[0].Observe {
+		t.Error("the config did not make it observe")
 	}
 	if a := out[1].Approval; a.Default != workflow.OutcomeWait || a.Window != 10*time.Minute {
 		t.Errorf("approval %+v", a)
 	}
-	if in[1].Mode != workflow.ModeApply {
+	if in[1].Observe {
 		t.Error("applyConfig changed the loaded workflow")
 	}
 }
@@ -141,7 +141,7 @@ func TestOneStateLoadPerSweep(t *testing.T) {
 	r.units.Set(r.u, "workspace.fingerprint", "ws1:c0ffee")
 	eng := &automation.Engine{
 		Workflows: func() []workflow.Workflow {
-			return []workflow.Workflow{{Name: "workspace-review-finished", Provider: unit.Workspace, Slot: "workspace", Mode: workflow.ModeApply,
+			return []workflow.Workflow{{Name: "workspace-review-finished", Provider: unit.Workspace, Slot: "workspace", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{wfStep("workspace.remove")},
 				Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
 		},
@@ -171,7 +171,7 @@ func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
 	ledger := automationtest.NewLedger()
 	eng := meteredEngine{&automation.Engine{
 		Workflows: func() []workflow.Workflow {
-			return []workflow.Workflow{{Name: "session-done", Provider: unit.Session, Slot: "session", Mode: workflow.ModeApply,
+			return []workflow.Workflow{{Name: "session-done", Provider: unit.Session, Slot: "session", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{steps.Step("session.close")},
 				Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: time.Minute}}}
 		},
@@ -334,7 +334,7 @@ func threeProviders(t *testing.T) (sweepCase, engineDeps) {
 }
 
 func everyUnit(p unit.ProviderID, slot string) workflow.Workflow {
-	return workflow.Workflow{Name: "watch-" + slot, Provider: p, Slot: slot, Mode: workflow.ModeObserve,
+	return workflow.Workflow{Name: "watch-" + slot, Provider: p, Slot: slot, Observe: true,
 		Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{wfStep("notify.self", "text", "seen")},
 		Approval: workflow.Approval{Default: workflow.OutcomeRun}}
 }
@@ -479,7 +479,7 @@ func appliedEngine(t *testing.T, step workflow.Step, pub port.Publisher) (*testE
 	facts.Put(u, workflow.Facts{"workspace.path_exists": false})
 	eng := te.newEngine(engineDeps{DB: db, WorkspaceFacts: facts, Pub: pub})
 	eng.Workflows = func() []workflow.Workflow {
-		return []workflow.Workflow{{Name: "gone", Provider: unit.Workspace, Slot: "workspace", Mode: workflow.ModeApply,
+		return []workflow.Workflow{{Name: "gone", Provider: unit.Workspace, Slot: "workspace", Observe: false,
 			Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{step}, Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
 	}
 	return te, db, eng, u
@@ -544,7 +544,7 @@ func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
 	cfg := Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {DraftApproval: &config.DraftApprovalConfig{Mode: "delay", Window: config.Days(5 * time.Minute)}}}
 	manifest := draft.Fixed(draft.Approval{Mode: draft.Wait})
-	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Mode: workflow.ModeApply, DraftApproval: manifest}}, cfg)
+	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Observe: false, DraftApproval: manifest}}, cfg)
 	if a := out[0].DraftApproval; a == nil || a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}

@@ -282,7 +282,7 @@ func providerNames() []string {
 }
 
 func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(string) string) workflow.Workflow {
-	w := workflow.Workflow{Name: name, Description: m.Description, AllowVisible: m.AllowVisible, Order: 100, Mode: workflow.ModeApply}
+	w := workflow.Workflow{Name: name, Description: m.Description, AllowVisible: m.AllowVisible, Order: 100, Observe: false}
 	slot := ""
 	switch m.Subject {
 	case nil:
@@ -316,7 +316,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	}
 	if m.Mode != nil {
 		s.oneOf("mode", *m.Mode, workflowModes)
-		w.Mode = workflow.Mode(*m.Mode)
+		w.Observe = *m.Mode == string(workflow.ModeObserve)
 	}
 	if m.Order != nil {
 		w.Order = *m.Order

@@ -215,12 +215,12 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 		g.set()
 	}
 	for _, g := range guards {
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); !strings.HasPrefix(got, g.want) {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); !strings.HasPrefix(got, g.want) {
 			t.Fatalf("refusal %q, want %q", got, g.want)
 		}
 		g.off()
 	}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); got != "" {
+	if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); got != "" {
 		t.Fatalf("with every guard off: %q", got)
 	}
 }
@@ -239,7 +239,7 @@ func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
 		"waiting":     {wsdomain.Activity{Waiting: true}, errWaiting.Error()},
 	} {
 		sc.ws.Activity = map[string]wsdomain.Activity{cand.Workspace.ID: c.a}
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != c.want {
+		if got := r.check(t, automation.CheckOpts{Observe: false}); got != c.want {
 			t.Errorf("%s: refusal %q, want %q", name, got, c.want)
 		}
 	}
@@ -261,7 +261,7 @@ func TestReviewRefusesBusyAndUserActive(t *testing.T) {
 		"busy by hand":        {wsdomain.Activity{Busy: true}, true, errBusy.Error()},
 	} {
 		sc.ws.Activity = map[string]wsdomain.Activity{"ws-rev": c.a}
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: c.byHand}); got != c.want {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: c.byHand}); got != c.want {
 			t.Errorf("%s: refusal %q, want %q", name, got, c.want)
 		}
 	}
@@ -271,7 +271,7 @@ func TestAStaleDetailRefuses(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.units.Set(r.u, "pr.stale", true)
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "its stored detail is stale" {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "its stored detail is stale" {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -280,7 +280,7 @@ func TestCheckNeverStartsABrief(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); !strings.HasPrefix(got, "brief not ready") {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); !strings.HasPrefix(got, "brief not ready") {
 		t.Fatalf("refusal %q", got)
 	}
 	if r.briefs.peeks != 1 || r.briefs.gets != 0 {
@@ -295,7 +295,7 @@ func TestNoteStartsTheBriefAndRecordsBriefWaiting(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
 	r.load(t)
 	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
 		t.Fatal(err)
@@ -317,7 +317,7 @@ func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
 	st := r.load(t)
 	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 	r.save(t)
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
 	if refusal != "per-PR daily cap reached (1)" {
 		t.Fatalf("refusal %q", refusal)
 	}
@@ -502,7 +502,7 @@ func TestAStartBlockIsABlockedItemNeverTrusted(t *testing.T) {
 	ledger := automationtest.NewLedger()
 	eng := &automation.Engine{
 		Workflows: func() []workflow.Workflow {
-			return []workflow.Workflow{{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+			return []workflow.Workflow{{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.st}, Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
 		},
 		Units: r.units, Steps: r.steps, Ledger: ledger, Clock: clockFunc(sc.env.Now), State: r.steps.states(),
@@ -543,7 +543,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	st := r.load(t)
 	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 	r.save(t)
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
 	if refusal != "per-PR daily cap reached (1)" {
 		t.Fatalf("observed address: %q", refusal)
 	}
@@ -567,7 +567,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	fst := fr.load(t)
 	fst.RecordFollowup(fsc.ref.String(), round.Reviewed, "", testNow)
 	fr.save(t)
-	if got := fr.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "" {
+	if got := fr.check(t, automation.CheckOpts{Observe: false}); got != "" {
 		t.Fatalf("observed follow-up: %q", got)
 	}
 }
@@ -686,7 +686,7 @@ func TestAUserReviewWithoutCapIsHeldByTheDailyCap(t *testing.T) {
 	st := r.load(t)
 	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
 	r.save(t)
-	if refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); refusal != "per-PR daily cap reached (1)" {
+	if refusal := r.check(t, automation.CheckOpts{Observe: false}); refusal != "per-PR daily cap reached (1)" {
 		t.Fatalf("refusal %q; broken %v", refusal, sc.env.loadedIntents().Broken)
 	}
 }

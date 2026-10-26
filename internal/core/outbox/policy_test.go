@@ -45,7 +45,7 @@ func window(d time.Duration) *draft.Policy {
 
 var (
 	none    = draft.Fixed(draft.Approval{Mode: draft.Send})
-	observe = draft.Fixed(draft.Approval{Mode: draft.Record})
+	observe = draft.Fixed(draft.Approval{Mode: draft.DryRun})
 )
 
 func manifests() fakeManifests {
@@ -197,10 +197,10 @@ func TestDraftPolicyNoneAutoApproves(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, none)
 	d := e.propose(reply("x"))
-	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeAuto || !d.Deadline.IsZero() {
+	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeReleased || !d.Deadline.IsZero() {
 		t.Fatalf("%+v", d)
 	}
-	if got := e.get(d.ID); got.State != draft.Approved || got.Would.Outcome != draft.OutcomeAuto {
+	if got := e.get(d.ID); got.State != draft.Approved || got.Would.Outcome != draft.OutcomeReleased {
 		t.Fatalf("stored %+v", got)
 	}
 	for range 3 {
@@ -215,7 +215,7 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
 	d := e.propose(reply("x"))
-	if d.State != draft.Discarded || d.Reason != "record" || d.Would.Outcome != draft.OutcomeRecorded || d.Would.Policy != draft.WouldRelease {
+	if d.State != draft.Discarded || d.Reason != "record" || d.Would.Outcome != draft.OutcomeDryRun || d.Would.Policy != draft.WouldRelease {
 		t.Fatalf("%+v", d)
 	}
 	if got, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Proposed, draft.Failed}}); len(got) != 0 {
@@ -314,7 +314,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 				p.Origin.Kind, p.Target = kind, "#general"
 				d := e.propose(p)
 				if d.Approval != waiting || d.State != draft.Proposed || !d.Deadline.IsZero() ||
-					d.Would.Policy != draft.WouldHold || d.Would.Reason != "targets outside its unit" {
+					d.Would.Policy != draft.WouldWait || d.Would.Reason != "targets outside its unit" {
 					t.Fatalf("%+v", d)
 				}
 				e.clock.now = t0.Add(time.Hour)
@@ -339,7 +339,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 		withPolicy(e, observe)
 		p := reply("x")
 		p.Target = "#general"
-		if d := e.propose(p); d.State != draft.Discarded || d.Would.Policy != draft.WouldHold {
+		if d := e.propose(p); d.State != draft.Discarded || d.Would.Policy != draft.WouldWait {
 			t.Fatalf("%+v", d)
 		}
 	})

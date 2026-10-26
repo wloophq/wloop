@@ -103,7 +103,7 @@ func (s *slackDrafts) intentDef(intent string) dintent.Def {
 // draft_effects: an agent never grants itself what sending does.
 func checkEffects(def dintent.Def, intent string, effects []string) error {
 	for _, e := range effects {
-		if !slices.Contains(def.DraftEffects, e) {
+		if !slices.Contains(def.AllowedEffects, e) {
 			return fmt.Errorf("the effect %s is not one the %s intent lists in draft_effects", e, intent)
 		}
 	}

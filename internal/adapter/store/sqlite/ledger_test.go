@@ -107,7 +107,7 @@ func pendingItem(wf string, u unit.Unit) workflow.Item {
 				{Name: "session.state", Value: "done"},
 			}},
 		Default: workflow.OutcomeRun, Deadline: wfAt.Add(5 * time.Minute), Guidance: "careful",
-		Mode: workflow.ModeApply, Attempts: 1, Error: "e", At: wfAt}
+		Observe: false, Attempts: 1, Error: "e", At: wfAt}
 }
 
 func TestAPlanSurvivesReopeningTheStore(t *testing.T) {
@@ -124,7 +124,7 @@ func TestAPlanSurvivesReopeningTheStore(t *testing.T) {
 	}
 	run := workflow.Run{Key: workflow.Key{Workflow: "w", Unit: wfUnit, Value: "v"}, Status: workflow.RunFailed, Attempts: 2, Error: "boom", At: wfAt}
 	if err := db.Ledger().Record(ctx, run, workflow.Item{ID: run.Key.ID(), Key: run.Key, Workflow: "w", Unit: wfUnit,
-		Decision: workflow.DecisionRun, Mode: workflow.ModeApply, At: wfAt}); err != nil {
+		Decision: workflow.DecisionRun, Observe: false, At: wfAt}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {
@@ -438,7 +438,7 @@ func savedAt(db *DB, when time.Time) automation.Ledger {
 
 func runItem(wf string, u unit.Unit, value string, d workflow.Decision, since time.Time) workflow.Item {
 	k := workflow.Key{Workflow: wf, Unit: u, Value: value}
-	it := workflow.Item{ID: k.ID(), Key: k, Workflow: wf, Unit: u, Decision: d, Mode: workflow.ModeApply, At: since}
+	it := workflow.Item{ID: k.ID(), Key: k, Workflow: wf, Unit: u, Decision: d, Observe: false, At: since}
 	if d == workflow.DecisionPending {
 		it.Default, it.Deadline = workflow.OutcomeWait, since.Add(time.Hour)
 	}

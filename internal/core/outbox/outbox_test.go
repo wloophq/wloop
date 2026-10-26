@@ -473,7 +473,7 @@ func TestWouldHoldsOnDoubt(t *testing.T) {
 	user := reply("mine")
 	user.Origin = draft.Origin{Kind: draft.OriginUser}
 	for name, p := range map[string]Proposal{"low": low, "comment": comment, "user": user} {
-		if d := e.propose(p); d.Would.Policy != draft.WouldHold || d.Would.Reason == "" {
+		if d := e.propose(p); d.Would.Policy != draft.WouldWait || d.Would.Reason == "" {
 			t.Errorf("%s: %+v", name, d.Would)
 		}
 	}

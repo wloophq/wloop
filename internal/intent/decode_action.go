@@ -37,15 +37,15 @@ func (s *sheet) decodeAction(a *mAction) *dintent.Action {
 		return nil
 	}
 	return &dintent.Action{
-		Group:            str(a.Group, "round"),
-		Surfaces:         orEmpty(a.Surfaces, defaultActionSurfaces),
-		Visible:          s.pred("action.visible", a.Visible, "row.open"),
-		Enabled:          s.pred("action.enabled", a.Enabled, "true"),
-		ReasonOff:        s.text("action.reason_off", a.ReasonOff, ""),
-		Primary:          s.pred("action.primary", a.Primary, "false"),
-		Confirm:          s.text("action.confirm", a.Confirm, ""),
-		Hint:             s.text("action.hint", a.Hint, ""),
-		NoteWhenQuestion: a.NoteWhenQuestion,
+		Group:     str(a.Group, "round"),
+		Surfaces:  orEmpty(a.Surfaces, defaultActionSurfaces),
+		When:      s.pred("action.visible", a.Visible, "row.open"),
+		Enabled:   s.pred("action.enabled", a.Enabled, "true"),
+		ReasonOff: s.text("action.reason_off", a.ReasonOff, ""),
+		Primary:   s.pred("action.primary", a.Primary, "false"),
+		Confirm:   s.text("action.confirm", a.Confirm, ""),
+		Note:      s.text("action.hint", a.Hint, ""),
+		Warning:   a.NoteWhenQuestion,
 	}
 }
 
@@ -78,7 +78,7 @@ func compileAction(a *dintent.Action, one func(path string, p dintent.Pred) *exp
 		return ActionPrograms{}
 	}
 	return ActionPrograms{
-		Visible: one("action.visible", a.Visible),
+		Visible: one("action.visible", a.When),
 		Enabled: one("action.enabled", a.Enabled),
 		Primary: one("action.primary", a.Primary),
 	}
@@ -98,7 +98,7 @@ func (s *sheet) parseActionTexts(a *dintent.Action) map[string]*template.Templat
 	sample := SampleActionFacts()
 	out := map[string]*template.Template{}
 	for _, k := range actionTexts {
-		txt := map[string]dintent.Text{"reason_off": a.ReasonOff, "confirm": a.Confirm, "hint": a.Hint}[k]
+		txt := map[string]dintent.Text{"reason_off": a.ReasonOff, "confirm": a.Confirm, "hint": a.Note}[k]
 		if txt.Src == "" {
 			continue
 		}

@@ -41,7 +41,7 @@ var actionEffects = []actionEffect{
 
 // actionEffectsOf are the action effects d's on_sent names, in table order.
 func actionEffectsOf(d dintent.Def) []actionEffect {
-	return slices.DeleteFunc(slices.Clone(actionEffects), func(e actionEffect) bool { return !slices.Contains(d.OnSent, e.name) })
+	return slices.DeleteFunc(slices.Clone(actionEffects), func(e actionEffect) bool { return !slices.Contains(d.Effects, e.name) })
 }
 
 // Builtins are the builtin names the daemon implements, by slot.

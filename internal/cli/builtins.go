@@ -139,7 +139,7 @@ func runCell(f func(r *sentRound), r *sentRound) {
 // runPhase runs p of the on_sent effects d names, on route rt.
 func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	for _, e := range onSent {
-		if slices.Contains(d.OnSent, e.name) {
+		if slices.Contains(d.Effects, e.name) {
 			p(e.on[rt], r)
 		}
 	}
@@ -149,7 +149,7 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 // round state for r.
 func writesRounds(rt route, d dintent.Def, r *sentRound) bool {
 	for _, e := range onSent {
-		if slices.Contains(d.OnSent, e.name) && e.on[rt].writes(r) {
+		if slices.Contains(d.Effects, e.name) && e.on[rt].writes(r) {
 			return true
 		}
 	}

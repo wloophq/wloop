@@ -56,7 +56,7 @@ type Def struct {
 	Dims         []string
 	Records      Pred
 	Prepare      string
-	OnSent       []string
+	Effects      []string
 	Headline     Headline
 	Guidance     Guidance
 	Inputs       []Input // sorted by name
@@ -71,8 +71,8 @@ type Def struct {
 	Provider unit.ProviderID
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
 	DraftApproval *draft.Policy
-	// Modes are turn.Mode values; default ["session"].
-	Modes []string
+	// Runners are turn.Runner values; default ["session"].
+	Runners []string
 	// Providers are the providers of a manifest whose provider is a list,
 	// Provider the first; nil for a single provider.
 	Providers []unit.ProviderID
@@ -90,9 +90,9 @@ type Def struct {
 	// turn runs in, named outright or by an input; nil for a workspace
 	// builtin.
 	WorkspaceRepo *WorkspaceRepo
-	// DraftEffects are the effects the intent's agents may declare on the
+	// AllowedEffects are the effects the intent's agents may declare on the
 	// drafts they propose, names of builtin.Effects.
-	DraftEffects []string
+	AllowedEffects []string
 	// RoundKind is the sweep round the intent's turns are: "review" (first
 	// or follow-up, by the step's round) or "address"; "" none.
 	RoundKind string
@@ -135,12 +135,13 @@ type WorkspaceRepo struct {
 	Repo, RepoInput string
 }
 
-// Runs says whether the intent's turns may run in mode, a turn.Mode value; nil Modes run as session only.
-func (d Def) Runs(mode string) bool {
-	if d.Modes == nil {
-		return mode == "session"
+// Runs says whether the intent's turns may run under runner, a turn.Runner
+// value; nil Runners run as session only.
+func (d Def) Runs(runner string) bool {
+	if d.Runners == nil {
+		return runner == "session"
 	}
-	return slices.Contains(d.Modes, mode)
+	return slices.Contains(d.Runners, runner)
 }
 
 type Session struct {
