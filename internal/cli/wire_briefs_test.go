@@ -9,7 +9,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brief"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -55,7 +54,7 @@ func TestASlackOnlyDaemonBriefsSlackUnitsOnDemand(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)
 	off := false
-	te.cfg.Plugins = map[string]config.Plugin{string(unit.GitHub): {Enabled: &off}}
+	te.cfg.GitHub.Enabled = &off
 	te.cfg.Brief.Enabled = true
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)
 	if err != nil {

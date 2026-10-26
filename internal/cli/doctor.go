@@ -312,14 +312,14 @@ func async[T any](f func() T) func() T {
 }
 
 func (e *Env) effectiveConfig(c config.Config) string {
-	parts := []string{fmt.Sprintf("agent=%s review_prefix=%q", c.Agent, c.ReviewPrefix)}
+	parts := []string{fmt.Sprintf("agent=%s review_prefix=%q", c.Agent, c.GitHub.ReviewPrefix)}
 	if sink := e.boardSink(c); sink != "" {
 		for _, status := range []string{config.ColumnWorking, config.ColumnWorkingFallback, config.ColumnReady} {
 			parts = append(parts, fmt.Sprintf("views.%s.columns.%s=%s", sink, status, c.Column(sink, status)))
 		}
 	}
 	parts = append(parts, fmt.Sprintf("rounds.per_pr_per_day=%d automated_reviewers=%v owners=%v brief=%v",
-		c.Rounds.PerPRPerDay, c.AutomatedReviewers, c.Owners, c.Brief.Enabled))
+		c.Turns.PerUnitPerDay, c.GitHub.AutomatedReviewers, c.GitHub.Owners, c.Brief.Enabled))
 	return strings.Join(parts, " ")
 }
 
@@ -708,7 +708,7 @@ func (e *Env) sshCheck(ctx context.Context, cfg config.Config) liveGitCheck {
 	}
 	var repo wsdomain.Repo
 	for _, w := range all {
-		if strings.HasPrefix(w.DisplayName, cfg.ReviewPrefix) {
+		if strings.HasPrefix(w.DisplayName, cfg.GitHub.ReviewPrefix) {
 			for _, r := range repos {
 				if r.ID == w.RepoID {
 					repo = r

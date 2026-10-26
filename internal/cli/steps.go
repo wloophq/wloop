@@ -56,7 +56,7 @@ type stepDeps struct {
 	Pub    port.Publisher
 	Log    func(format string, args ...any)
 	// Headless starts turn.start's headless turns; Turns counts the
-	// automated turns turns.automated_per_day caps.
+	// automated turns turns.per_day caps.
 	Headless headlessStarter
 	Turns    automatedTurns
 }

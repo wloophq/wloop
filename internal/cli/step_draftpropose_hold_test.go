@@ -17,7 +17,7 @@ import (
 func TestAHoldNamesADurationOfTheConfig(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
-	cfg.Proposals.RenudgeAfter = config.Days(36 * time.Hour)
+	cfg.Drafts.RepeatAfter = config.Days(36 * time.Hour)
 	for v, want := range map[string]time.Duration{"config.drafts.repeat_after": 36 * time.Hour, "2d": 48 * time.Hour, "90m": 90 * time.Minute} {
 		if got, err := holdDuration(v, cfg); err != nil || got != want {
 			t.Errorf("%s: %v, %v; want %v", v, got, err, want)

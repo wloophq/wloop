@@ -169,7 +169,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
 		Viewer:             s.viewer.cachedLogin(),
-		StalledReviewHours: time.Duration(s.deps.Cfg.Stalled.Review).Hours(),
+		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}

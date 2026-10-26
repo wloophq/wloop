@@ -82,8 +82,8 @@ func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Ro
 }
 
 func catalogConfig(c config.Config) catalog.Config {
-	return catalog.Config{AddressReviews: c.AddressReviews, AddressChecks: c.AddressChecks,
-		FollowupsWithoutWorkspace: c.FollowupsWithoutWorkspace, AddressWithoutWorkspace: c.AddressWithoutWorkspace}
+	return catalog.Config{AddressReviews: c.GitHub.AddressReviews, AddressChecks: c.GitHub.AddressChecks,
+		FollowupsWithoutWorkspace: c.GitHub.FollowupsWithoutWorkspace, AddressWithoutWorkspace: c.GitHub.AddressWithoutWorkspace}
 }
 
 // UntrackedRow is the row of a pull request the inventory lacks, from a

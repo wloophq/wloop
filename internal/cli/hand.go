@@ -277,8 +277,8 @@ func (e *Env) prepareWorktree(ctx context.Context, cfg config.Config, ws wsdomai
 	if role == workspaceReview {
 		other, why = workspaceAuthor, "lacks"
 	}
-	if strings.HasPrefix(ws.DisplayName, cfg.ReviewPrefix) != (role == workspaceReview) {
-		fmt.Fprintf(e.Err, "this worktree is not linked to %s: its name %s the review prefix %q, so linking it would make it the %s workspace\n", ref, why, cfg.ReviewPrefix, other)
+	if strings.HasPrefix(ws.DisplayName, cfg.GitHub.ReviewPrefix) != (role == workspaceReview) {
+		fmt.Fprintf(e.Err, "this worktree is not linked to %s: its name %s the review prefix %q, so linking it would make it the %s workspace\n", ref, why, cfg.GitHub.ReviewPrefix, other)
 		return nil
 	}
 	if err := e.WS.LinkUnit(ctx, ws, ref.Unit()); err != nil {

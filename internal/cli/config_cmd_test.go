@@ -18,12 +18,12 @@ func TestConfigGet(t *testing.T) {
 		"views.orca.columns.needs-me": "waiting-me\n",
 		"views.orca.columns.reviewed": "reviewed\n",
 		"sweep.rate_limit_fraction":   "0.5\n",
-		"rounds.per_pr_per_day":       "5\n",
+		"turns.per_unit_per_day":      "5\n",
 		"brief.enabled":               "false\n",
-		"automated_reviewers":         "[]\n",
+		"github.automated_reviewers":  "[]\n",
 		"sweep.fast":                  "2m\n",
 		"sweep.slow":                  "1h\n",
-		"stalled.review":              "2d\n",
+		"github.stalled.review":       "2d\n",
 		"cleanup.idle":                "2h\n",
 	} {
 		te.out.Reset()

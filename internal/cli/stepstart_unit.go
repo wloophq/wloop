@@ -29,7 +29,7 @@ type automatedTurns interface {
 // providers: the intent is a turn that serves the unit in the step's mode,
 // its refuse_when is empty, no turn of it is open on the unit, a repository
 // it names by input is never taken from an automatic run, and the day's
-// automated turns stay under turns.automated_per_day. The workflow's own
+// automated turns stay under turns.per_day. The workflow's own
 // limits are the engine's.
 func (s *stepSet) unitGuards(ctx context.Context, c stepCall, p startPlan) (string, startPlan, error) {
 	d, mode := p.args.def, p.args.runMode()
@@ -78,7 +78,7 @@ func (s *stepSet) openTurnOf(ctx context.Context, u unit.Unit, intent dturn.Inte
 }
 
 // automatedBudget refuses once the local day's automated turns on units
-// outside the round providers reach turns.automated_per_day.
+// outside the round providers reach turns.per_day.
 func (s *stepSet) automatedBudget(ctx context.Context) (string, error) {
 	cfg, err := s.e.loadConfig()
 	if err != nil {
@@ -92,8 +92,8 @@ func (s *stepSet) automatedBudget(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if limit := cfg.Turns.AutomatedPerDay; n >= limit {
-		return fmt.Sprintf("turns.automated_per_day reached (%d)", limit), nil
+	if limit := cfg.Turns.PerDay; n >= limit {
+		return fmt.Sprintf("turns.per_day reached (%d)", limit), nil
 	}
 	return "", nil
 }

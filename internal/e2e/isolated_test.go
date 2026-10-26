@@ -150,8 +150,8 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	if c.Brief.Enabled {
 		t.Error("brief on")
 	}
-	if c.Rounds.PerPRPerDay != 1 {
-		t.Errorf("rounds.per_pr_per_day %d, want the lowest that is a limit, 1", c.Rounds.PerPRPerDay)
+	if c.Turns.PerUnitPerDay != 1 {
+		t.Errorf("turns.per_unit_per_day %d, want the lowest that is a limit, 1", c.Turns.PerUnitPerDay)
 	}
 	if c.PluginEnabled("github") || c.PluginEnabled("slack") {
 		t.Errorf("plugins github %v slack %v", c.PluginEnabled("github"), c.PluginEnabled("slack"))

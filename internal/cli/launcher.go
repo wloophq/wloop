@@ -108,7 +108,7 @@ func (e *Env) reviewFingerprint(ctx context.Context, cfg config.Config, ref gith
 		fmt.Fprintf(e.Err, "warning: %s: reading the reviews the round covers: %v\n", ref, err)
 		return ""
 	}
-	return dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.TrustedAuthors}).Fingerprint
+	return dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}).Fingerprint
 }
 
 // updateRounds applies a resume's effects to the round state.

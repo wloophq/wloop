@@ -224,7 +224,7 @@ func newCollectorAt(t *testing.T, gh *fakeGH, path string) *Collector {
 	st := inventory.New(stDB)
 	t.Cleanup(func() { stDB.Close() })
 	cfg := config.Defaults().WithColumns(map[string]map[string]string{"board": {config.ColumnNeedsMe: "needs-me"}})
-	cfg.Scope = config.Scope{People: []string{"ana"}, Teams: []string{"acme/search"}}
+	cfg.GitHub.Scope = config.Scope{People: []string{"ana"}, Teams: []string{"acme/search"}}
 	return &Collector{Store: st, GH: gh, Sink: "board", Cfg: cfg, Now: func() time.Time { return now }, MaxPages: 2, Log: t.Logf}
 }
 
@@ -386,7 +386,7 @@ func TestFastSweepContinuesAfterAQueryError(t *testing.T) {
 	s := snapshot()
 	gh := &fakeGH{remaining: 4000, failing: "team-review-requested", pages: map[string][]github.StubPage{"repo:": {{Stubs: []github.Stub{stubOf(s)}}}}, byRef: map[github.Ref]github.Snapshot{s.Ref: s}}
 	c := newCollector(t, gh)
-	c.Cfg.Scope.Repos = []string{"acme/api"}
+	c.Cfg.GitHub.Scope.Repos = []string{"acme/api"}
 	rep, err := c.Fast(context.Background())
 	if err != nil || rep.Fetched != 1 || len(rep.Warnings) != 1 {
 		t.Fatalf("%+v %v", rep, err)
@@ -600,7 +600,7 @@ func TestDismissedChangeRequestIsNotDecisive(t *testing.T) {
 	derive := func() situation.Kind {
 		pr, _, _ := c.Store.PR(ctx, s.Ref)
 		evs, _ := c.Store.Events(ctx, s.Ref)
-		return situation.Derive(situation.Input{PR: pr, Events: evs, Viewer: "me", Now: now.Add(2 * time.Hour), Stalled: c.Cfg.Stalled}).Kind
+		return situation.Derive(situation.Input{PR: pr, Events: evs, Viewer: "me", Now: now.Add(2 * time.Hour), Stalled: c.Cfg.GitHub.Stalled}).Kind
 	}
 	refresh(t, c, gh, s, now)
 	if k := derive(); k != situation.KindChanges {
@@ -750,7 +750,7 @@ func TestSyncWorkspacesPrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	a.HeadRefName = "feat/creds"
 	gh := &fakeGH{remaining: 4000, pages: map[string][]github.StubPage{"author:ana": {{Stubs: []github.Stub{stubOf(a)}}}}, byRef: map[github.Ref]github.Snapshot{a.Ref: a}}
 	c := newCollector(t, gh)
-	main := wsdomain.Workspace{ID: "main-api", RepoID: "r1", DisplayName: c.Cfg.ReviewPrefix + "api", IsMain: true, HostID: wsdomain.LocalHost, Branch: "feat/creds"}
+	main := wsdomain.Workspace{ID: "main-api", RepoID: "r1", DisplayName: c.Cfg.GitHub.ReviewPrefix + "api", IsMain: true, HostID: wsdomain.LocalHost, Branch: "feat/creds"}
 	worktree := wsdomain.Workspace{ID: "wt", RepoID: "r1", DisplayName: "creds", HostID: wsdomain.LocalHost, LinkedPR: 7}
 	for _, list := range [][]wsdomain.Workspace{{main, worktree}, {worktree, main}} {
 		c.WS = workspace.NewSet(&fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", RemoteKey: "github.com/acme/api"}}, WorkspaceList: list})

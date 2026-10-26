@@ -173,9 +173,9 @@ func mergeInitConfig(raw []byte, a initAnswers) ([]byte, error) {
 		v    any
 	}{
 		{[]string{"agent"}, a.Agent},
-		{[]string{"scope", "repos"}, nonNil(a.Repos)},
-		{[]string{"scope", "teams"}, nonNil(a.Teams)},
-		{[]string{"scope", "people"}, nonNil(a.People)},
+		{[]string{config.KeyOf("GitHub"), "scope", "repos"}, nonNil(a.Repos)},
+		{[]string{config.KeyOf("GitHub"), "scope", "teams"}, nonNil(a.Teams)},
+		{[]string{config.KeyOf("GitHub"), "scope", "people"}, nonNil(a.People)},
 		{[]string{"slack", "client_id"}, a.SlackClientID},
 	}
 	for _, s := range sets {

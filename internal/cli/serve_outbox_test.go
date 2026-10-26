@@ -168,7 +168,7 @@ func TestOutboxEffectsFollowThePlugins(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	cfg := te.cfg
 	off := false
-	cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
+	cfg.Slack.Enabled = &off
 	pub := &recordingPublisher{}
 	mods, err := buildSources([]source.Plugin{publishing(pub)}, cfg, source.Deps{DB: te.db, Clock: clockFunc(te.Now)})
 	if err != nil {

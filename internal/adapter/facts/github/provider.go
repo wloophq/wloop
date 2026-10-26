@@ -171,7 +171,7 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 		for k, t := range r.dues {
 			dues[k] = earliestOf(dues[k], t)
 		}
-		if r.runs() && v.rounds.CapReason(ref.String(), now, v.cfg.Rounds.PerPRPerDay) != "" {
+		if r.runs() && v.rounds.CapReason(ref.String(), now, v.cfg.Turns.PerUnitPerDay) != "" {
 			dues["cap"] = nextDay(now)
 		}
 	}

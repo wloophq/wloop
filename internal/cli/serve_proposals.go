@@ -42,7 +42,7 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 // service of its own, over their publishers; the sender that publishes the
 // drafts, and applies their effects, runs elsewhere.
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) *proposals.Job {
-	renudge := time.Duration(cfg.Proposals.RenudgeAfter)
+	renudge := time.Duration(cfg.Drafts.RepeatAfter)
 	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: e.itemsLedger(db, cfg, logf), Clock: clockFunc(e.Now), Log: logf,
 		RecordedFor: renudge}
 	var srcs []proposals.Source

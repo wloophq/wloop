@@ -65,7 +65,7 @@ type TurnFact struct {
 
 // IgnoreOf is who a row never waits on and a nudge never mentions.
 func IgnoreOf(cfg config.Config) []string {
-	return slices.Concat(cfg.AutomatedReviewers, cfg.AddressSkipReviewers)
+	return slices.Concat(cfg.GitHub.AutomatedReviewers, cfg.GitHub.AddressSkipReviewers)
 }
 
 // TurnFacts reads every book's driving turn, with the session of a started

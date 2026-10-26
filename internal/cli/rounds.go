@@ -339,7 +339,7 @@ func withGuidance(reason, guidance string) string {
 func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
-		if !cfg.FollowupsWithoutWorkspace {
+		if !cfg.GitHub.FollowupsWithoutWorkspace {
 			s.observe(ctx, st)
 			return false, nil
 		}
@@ -448,7 +448,7 @@ func (s *sweep) observeAddress(ctx context.Context, st step) {
 func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
-		if !cfg.AddressWithoutWorkspace {
+		if !cfg.GitHub.AddressWithoutWorkspace {
 			s.observeAddress(ctx, st)
 			return false, nil
 		}

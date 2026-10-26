@@ -99,7 +99,7 @@ func (ix *index) reviewPrefixed(w workspace.Workspace) bool {
 		return false
 	}
 	owner, name, _ := ix.ownerName(w)
-	prefix := ix.cfg.For(owner, name).ReviewPrefix
+	prefix := ix.cfg.For(owner, name).GitHub.ReviewPrefix
 	return prefix != "" && strings.HasPrefix(w.DisplayName, prefix)
 }
 
@@ -122,7 +122,7 @@ func (ix *index) reviews(w workspace.Workspace, p dinv.PR) bool {
 func (ix *index) branchOf(w workspace.Workspace) string {
 	if ix.reviewPrefixed(w) {
 		owner, name, _ := ix.ownerName(w)
-		return strings.TrimPrefix(w.DisplayName, ix.cfg.For(owner, name).ReviewPrefix)
+		return strings.TrimPrefix(w.DisplayName, ix.cfg.For(owner, name).GitHub.ReviewPrefix)
 	}
 	return w.PRBranch()
 }

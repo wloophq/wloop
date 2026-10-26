@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -286,7 +287,7 @@ func TestRoundPolicyAllowsEveryIntentsStoredTurn(t *testing.T) {
 func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.ProjectSettings = map[string]string{"review": `pr.visibility == "private"`}
+	te.cfg.Intents = map[string]config.IntentConfig{"review": {ProjectSettings: &config.ProjectSettings{When: `pr.visibility == "private"`}}}
 	pr := func(visibility string) *github.PullRequest {
 		p := &github.PullRequest{}
 		p.Ref, p.Visibility = r7, visibility

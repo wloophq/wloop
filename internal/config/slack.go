@@ -12,6 +12,8 @@ const DefaultSlackRedirectPort = 53682
 
 // Slack holds the Slack source's settings; no secret lives here.
 type Slack struct {
+	// Enabled switches the plugin; nil means enabled.
+	Enabled *bool `json:"enabled,omitempty"`
 	// ClientID is the Slack app's client id; empty leaves Slack unconfigured.
 	ClientID     string `json:"client_id"`
 	RedirectPort int    `json:"redirect_port"`
@@ -72,11 +74,11 @@ type SlackExtraction struct {
 	// Enabled nil is on.
 	Enabled *bool `json:"enabled,omitempty"`
 	// Tier is fast, balanced or frontier; empty is fast.
-	Tier     string  `json:"tier,omitempty"`
-	Language string  `json:"language,omitempty"`
-	MaxCall  float64 `json:"max_call_usd,omitempty"`
-	MaxDay   float64 `json:"max_day_usd,omitempty"`
-	MaxCalls int     `json:"max_day_calls,omitempty"`
+	Tier       string  `json:"tier,omitempty"`
+	Language   string  `json:"language,omitempty"`
+	PerCallUSD float64 `json:"per_call_usd,omitempty"`
+	PerDayUSD  float64 `json:"per_day_usd,omitempty"`
+	PerDay     int     `json:"per_day,omitempty"`
 	// Quiet is how long a unit stays unchanged before it runs; MaxWait bounds the delay of its oldest change.
 	Quiet       Days `json:"quiet,omitempty"`
 	MaxWait     Days `json:"max_wait,omitempty"`
@@ -96,11 +98,11 @@ func (e SlackExtraction) TierName() string { return cmp.Or(e.Tier, "fast") }
 
 func (e SlackExtraction) LanguageName() string { return cmp.Or(e.Language, "English") }
 
-func (e SlackExtraction) MaxCallUSD() float64 { return cmp.Or(e.MaxCall, 0.10) }
+func (e SlackExtraction) MaxCallUSD() float64 { return cmp.Or(e.PerCallUSD, 0.10) }
 
-func (e SlackExtraction) MaxDayUSD() float64 { return cmp.Or(e.MaxDay, 3.0) }
+func (e SlackExtraction) MaxDayUSD() float64 { return cmp.Or(e.PerDayUSD, 3.0) }
 
-func (e SlackExtraction) MaxDayCalls() int { return cmp.Or(e.MaxCalls, 500) }
+func (e SlackExtraction) MaxDayCalls() int { return cmp.Or(e.PerDay, 500) }
 
 func (e SlackExtraction) QuietFor() time.Duration {
 	return cmp.Or(time.Duration(e.Quiet), 90*time.Second)

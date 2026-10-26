@@ -132,7 +132,7 @@ func Derive(s Situation) api.Row {
 	if at.IsZero() {
 		at = Now
 	}
-	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().Stalled, Loaded: l, Cfg: config.Defaults(),
+	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
 		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{}}
 	if s.Pending != nil {
 		d.Pending[s.PR.Ref.Unit()] = *s.Pending

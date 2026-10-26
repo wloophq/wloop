@@ -372,7 +372,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.Scope.Teams = []string{"acme/platform", "acme/search"}
+	te.cfg.GitHub.Scope.Teams = []string{"acme/platform", "acme/search"}
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -785,7 +785,7 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 	ctx := context.Background()
 	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
 	cfg := te.cfg
-	cfg.Scope = config.Scope{People: []string{"ana"}}
+	cfg.GitHub.Scope = config.Scope{People: []string{"ana"}}
 	col := &ghsource.Collector{Store: inventory.New(db), GH: spentBudget{limit: spent}, Cfg: cfg, Now: func() time.Time { return at }, Log: t.Logf}
 	if rep, err := col.Fast(ctx); err != nil || rep.Skipped != "" {
 		t.Fatalf("fast: %+v %v", rep, err)

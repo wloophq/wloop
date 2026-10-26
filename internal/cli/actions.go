@@ -437,7 +437,7 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
-	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.TrustedAuthors}); d.Fingerprint != "" {
+	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}); d.Fingerprint != "" {
 		st.SetMark(ref.String(), round.Reviewed, d.Fingerprint)
 	}
 	st.RecordRound(ref.String(), e.Now())

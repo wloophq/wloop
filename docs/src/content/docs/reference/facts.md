@@ -251,9 +251,9 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `turn.dismiss` | session, github | Dismisses the open turn, recording the reason. |
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
-| `turn.start` | any | Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`. |
+| `turn.start` | any | Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`. |
 | `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled, or a duration of the config such as `config.drafts.repeat_after`) and `hold_after_sent` (likewise, or `forever`). Holds while a draft of the workflow, subject and person is open or failed; a run that leaves a person under a hold that ends with time stays pending until it ends. |
-| `classify` | any | A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`. |
+| `classify` | any | A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.per_day`. |
 | `notify.self` | any | A private notification. |
 
 ## Draft effects

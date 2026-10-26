@@ -105,9 +105,7 @@ func proposalKeys(v any, at string) []string {
 	}
 	var out []string
 	for _, k := range slices.Sorted(maps.Keys(obj)) {
-		if k != renudgeAfterKey {
-			out = append(out, unknownKeys(obj[k], reflect.TypeFor[ProposalRule](), join(at, k))...)
-		}
+		out = append(out, unknownKeys(obj[k], reflect.TypeFor[ProposalRule](), join(at, k))...)
 	}
 	return out
 }

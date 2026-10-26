@@ -1213,7 +1213,7 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 		Taxonomy:     func(github.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,
-		MaxDiffBytes: cfg.Brief.MaxDiffBytes,
+		MaxDiffBytes: cfg.Brief.MaxInputBytes,
 		Retry:        time.Duration(cfg.Sweep.Slow),
 		Allow:        e.GitHub.Allow,
 		Changes:      changes,

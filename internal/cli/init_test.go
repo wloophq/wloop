@@ -145,7 +145,7 @@ func TestInitDefaults(t *testing.T) {
 	t.Parallel()
 	cur := Defaults()
 	cur.ProjectsDir, cur.Profile = "/p", "/prof"
-	cur.Scope.Repos = []string{"acme/api"}
+	cur.GitHub.Scope.Repos = []string{"acme/api"}
 	for _, c := range []struct {
 		name    string
 		facts   initFacts
@@ -227,10 +227,25 @@ func TestInitFlagsExcludeEachOther(t *testing.T) {
 func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
 	t.Parallel()
 	raw := `{
-  "sweep": {"fast": "5m"},
+  "sweep": {
+    "fast": "5m"
+  },
   "agent": "claude",
-  "scope": {"watch": ["boss"], "repos": ["old/repo"]},
-  "slack": {"post_allowlist": ["C1"]}
+  "github": {
+    "scope": {
+      "watch": [
+        "boss"
+      ],
+      "repos": [
+        "old/repo"
+      ]
+    }
+  },
+  "slack": {
+    "post_allowlist": [
+      "C1"
+    ]
+  }
 }`
 	got, err := mergeInitConfig([]byte(raw), initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"})
 	if err != nil {
@@ -241,13 +256,15 @@ func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
     "fast": "5m"
   },
   "agent": "claude",
-  "scope": {
-    "watch": [
-      "boss"
-    ],
-    "repos": [
-      "acme/api"
-    ]
+  "github": {
+    "scope": {
+      "watch": [
+        "boss"
+      ],
+      "repos": [
+        "acme/api"
+      ]
+    }
   },
   "slack": {
     "post_allowlist": [
@@ -381,7 +398,7 @@ func TestInitFromFlagsWritesTheConfigAndTheProfile(t *testing.T) {
 	}
 	cfg := te.config(t)
 	if cfg.ProjectsDir != projects || cfg.Agent != "claude" || cfg.Profile != prof ||
-		!slices.Equal(cfg.Scope.Repos, []string{"acme/api"}) || !slices.Equal(cfg.Scope.Teams, []string{"acme/backend"}) {
+		!slices.Equal(cfg.GitHub.Scope.Repos, []string{"acme/api"}) || !slices.Equal(cfg.GitHub.Scope.Teams, []string{"acme/backend"}) {
 		t.Fatalf("config %+v", cfg)
 	}
 	if fi, err := os.Stat(projects); err != nil || !fi.IsDir() {
@@ -502,8 +519,8 @@ func TestInitAtATerminal(t *testing.T) {
 		t.Fatalf("exit %d: %s\n%s", code, te.err, te.out)
 	}
 	cfg := te.config(t)
-	if cfg.ProjectsDir != te.src || !slices.Equal(cfg.Scope.Repos, []string{"acme/api", "acme/web"}) ||
-		!slices.Equal(cfg.Scope.Teams, []string{"acme/backend"}) || len(cfg.Scope.People) != 0 ||
+	if cfg.ProjectsDir != te.src || !slices.Equal(cfg.GitHub.Scope.Repos, []string{"acme/api", "acme/web"}) ||
+		!slices.Equal(cfg.GitHub.Scope.Teams, []string{"acme/backend"}) || len(cfg.GitHub.Scope.People) != 0 ||
 		cfg.Profile != filepath.Join(filepath.Dir(te.ConfigPath), "profiles", "personal") || cfg.Slack.ClientID != "123.456" {
 		t.Fatalf("config %+v", cfg)
 	}

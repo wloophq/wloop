@@ -194,14 +194,14 @@ func TestTheWorkflowLimitAndTheAutomatedBudgetStopTheNextTurn(t *testing.T) {
 	refusedWith(t, eng, "limit per_day 1 reached")
 
 	r = newUnitStartRig(t, implementIntent)
-	r.te.cfg.Turns = config.Turns{AutomatedPerDay: 1}
+	r.te.cfg.Turns = config.Turns{PerDay: 1}
 	w.Limits.PerDay = 5
 	eng = r.engine(w)
 	r.sweep(t, eng)
 	if n := len(r.m.Prompts); n != 1 {
-		t.Fatalf("turns.automated_per_day 1 started %d turns", n)
+		t.Fatalf("turns.per_day 1 started %d turns", n)
 	}
-	refusedWith(t, eng, "turns.automated_per_day reached (1)")
+	refusedWith(t, eng, "turns.per_day reached (1)")
 }
 
 // refusedWith fails unless an item of the implement workflow says why.

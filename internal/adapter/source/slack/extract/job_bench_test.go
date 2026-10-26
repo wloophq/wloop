@@ -29,7 +29,7 @@ func BenchmarkExtractPass(b *testing.B) {
 	for b.Loop() {
 		b.StopTimer()
 		r := newRig(b)
-		r.cfg.Slack.Extraction.MaxDay = 1000
+		r.cfg.Slack.Extraction.PerDayUSD = 1000
 		postUnits(r, 300)
 		r.clock.set(jT0.Add(time.Hour))
 		b.StartTimer()

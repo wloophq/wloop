@@ -682,7 +682,7 @@ func TestClockFlipsStalledAndRenudge(t *testing.T) {
 		}
 	}
 	asked := f.Now
-	for workday.Between(asked, f.Now) < time.Duration(r.cfg.Stalled.Review) {
+	for workday.Between(asked, f.Now) < time.Duration(r.cfg.GitHub.Stalled.Review) {
 		asked = asked.Add(-time.Minute)
 	}
 	asked = asked.Add(30 * time.Second)

@@ -596,7 +596,7 @@ func postUnits(r *rig, n int) {
 
 func TestDailyCallCap(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCalls, r.cfg.Slack.Extraction.MaxDay = 50, 100
+	r.cfg.Slack.Extraction.PerDay, r.cfg.Slack.Extraction.PerDayUSD = 50, 100
 	postUnits(r, 200)
 	_, skipped := r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 50 {
@@ -615,7 +615,7 @@ func TestDailyCostCap(t *testing.T) {
 	r := newRig(t)
 	cost := 1.0
 	r.asker.cost = &cost
-	r.cfg.Slack.Extraction.MaxDay = 2.5
+	r.cfg.Slack.Extraction.PerDayUSD = 2.5
 	postUnits(r, 5)
 	_, skipped := r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 3 || !strings.Contains(skipped, "2.50") {
@@ -633,7 +633,7 @@ func TestDailyCostCap(t *testing.T) {
 
 func TestUnknownCostCountsAsTheCallCap(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCall, r.cfg.Slack.Extraction.MaxDay = 1, 2
+	r.cfg.Slack.Extraction.PerCallUSD, r.cfg.Slack.Extraction.PerDayUSD = 1, 2
 	postUnits(r, 4)
 	r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 2 {
@@ -694,7 +694,7 @@ func TestBreakerOpensAndTrials(t *testing.T) {
 func TestTierFromConfig(t *testing.T) {
 	r := newRig(t)
 	r.cfg.Slack.Extraction.Tier = "balanced"
-	r.cfg.Slack.Extraction.MaxCall = 0.25
+	r.cfg.Slack.Extraction.PerCallUSD = 0.25
 	postUnits(r, 1)
 	r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 1 || r.asker.asks[0].Tier != turns.TierBalanced || r.asker.asks[0].MaxCostUSD != 0.25 {
@@ -846,7 +846,7 @@ func resolveByReview(t *testing.T, r *rig, target unit.Unit) {
 
 func TestDailyCapSaysWhenItFrees(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCalls = 1
+	r.cfg.Slack.Extraction.PerDay = 1
 	postUnits(r, 3)
 	at := jT0.Add(2 * time.Minute)
 	_, skipped := r.run(at)

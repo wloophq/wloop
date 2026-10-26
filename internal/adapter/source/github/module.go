@@ -52,7 +52,7 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 		Proposals:  n.Proposals,
 		Checkouts:  checkouts{store: storeOrNil(d)},
 		Detail:     true,
-		Briefs:     brief.GitHubSource{Store: d.Inventory, Source: brief.Source{GitHub: d.GitHub}, MaxDiffBytes: cfg.Brief.MaxDiffBytes, Retry: time.Duration(cfg.Sweep.Slow)},
+		Briefs:     brief.GitHubSource{Store: d.Inventory, Source: brief.Source{GitHub: d.GitHub}, MaxDiffBytes: cfg.Brief.MaxInputBytes, Retry: time.Duration(cfg.Sweep.Slow)},
 	}, nil
 }
 

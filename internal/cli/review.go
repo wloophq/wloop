@@ -55,7 +55,7 @@ func (e *Env) openReview(ctx context.Context, cfg config.Config, ref github.Ref,
 		}
 		action = "new round in " + ws.DisplayName + ", " + verb
 	} else {
-		if cfg.FollowupsWithoutWorkspace {
+		if cfg.GitHub.FollowupsWithoutWorkspace {
 			if err := e.resetLeftoverBranch(ctx, repo.Path, ref, pr); err != nil {
 				return false, err
 			}
@@ -64,7 +64,7 @@ func (e *Env) openReview(ctx context.Context, cfg config.Config, ref github.Ref,
 			return false, cmp.Or(err, errors.New(why))
 		}
 		ws, submitted, err = e.createWithAgent(ctx, cfg, ref, repo, workspace.CreateRequest{
-			Name:    cfg.ReviewPrefix + pr.HeadRefName,
+			Name:    cfg.GitHub.ReviewPrefix + pr.HeadRefName,
 			BaseRef: "origin/pr/" + fmt.Sprint(ref.Number),
 			Unit:    ref.Unit(),
 
@@ -249,8 +249,8 @@ func findReviewWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 		if !ofRepo[w.RepoID] || w.HostID != wsdomain.LocalHost || w.IsMain {
 			continue
 		}
-		if w.DisplayName == cfg.ReviewPrefix+headRef ||
-			(w.LinkedPR == number && strings.HasPrefix(w.DisplayName, cfg.ReviewPrefix)) {
+		if w.DisplayName == cfg.GitHub.ReviewPrefix+headRef ||
+			(w.LinkedPR == number && strings.HasPrefix(w.DisplayName, cfg.GitHub.ReviewPrefix)) {
 			return w, true
 		}
 	}

@@ -327,7 +327,7 @@ func (e *Env) entryFacts(db *sqlite.DB) *factentry.Provider {
 		Enabled: enabled,
 		Settings: func() factentry.Settings {
 			cfg := e.currentConfig()
-			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Proposals.RenudgeAfter)}
+			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
 		Clock: clockFunc(func() time.Time { return e.Now() }),
 	})

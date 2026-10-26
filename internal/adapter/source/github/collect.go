@@ -332,7 +332,7 @@ func (c *Collector) slow(ctx context.Context) (Report, error) {
 	}
 	c.forgetUnreadable()
 	now := c.Now()
-	resolved, errs := scope.Resolve(ctx, c.Cfg.Scope, c.refreshViewer(ctx, &rep), c.GH)
+	resolved, errs := scope.Resolve(ctx, c.Cfg.GitHub.Scope, c.refreshViewer(ctx, &rep), c.GH)
 	for _, err := range errs {
 		c.warn(&rep, "scope: %v", err)
 	}
@@ -350,7 +350,7 @@ func (c *Collector) slow(ctx context.Context) (Report, error) {
 		if err != nil {
 			return rep, err
 		}
-		resolved = keepPrevious(resolved, prev, c.Cfg.Scope.Teams, failed > 0)
+		resolved = keepPrevious(resolved, prev, c.Cfg.GitHub.Scope.Teams, failed > 0)
 	}
 	resolved.Normalize()
 	b, err := json.Marshal(resolved)
@@ -618,7 +618,7 @@ func (c *Collector) resolved(ctx context.Context, rep *Report) (scope.Resolved, 
 	if r, ok, err := c.storedScope(ctx, rep); err != nil || ok {
 		return r, err
 	}
-	r, errs := scope.Resolve(ctx, c.Cfg.Scope, c.viewer(ctx, rep), c.GH)
+	r, errs := scope.Resolve(ctx, c.Cfg.GitHub.Scope, c.viewer(ctx, rep), c.GH)
 	for _, err := range errs {
 		c.warn(rep, "scope: %v", err)
 	}

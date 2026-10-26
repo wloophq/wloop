@@ -345,7 +345,7 @@ func TestAFollowupWithoutItsWorkspaceIsObserved(t *testing.T) {
 	if f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
 		t.Fatalf("facts = %v", f)
 	}
-	w.cfg.FollowupsWithoutWorkspace = true
+	w.cfg.GitHub.FollowupsWithoutWorkspace = true
 	if f := facts(t, w.provider(), r.Unit()); f["pr.review.observed"] != false {
 		t.Fatalf("followups_without_workspace still observes: %v", f)
 	}
@@ -479,7 +479,7 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 
 func TestAddressConflictsOffStartsNoRoundForAConflict(t *testing.T) {
 	w := newWorld()
-	w.cfg.AddressConflicts = false
+	w.cfg.GitHub.AddressConflicts = false
 	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
 		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
 		f.Reviews, f.Checks = nil, nil
@@ -815,7 +815,7 @@ func TestDueMatchesTheBasesNextDue(t *testing.T) {
 		}, t0.Add(20 * day)},
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
-			for range w.cfg.Rounds.PerPRPerDay {
+			for range w.cfg.Turns.PerUnitPerDay {
 				w.rounds.RecordFollowup(r.String(), round.Reviewed, "", t0)
 			}
 		}, nextDay(t0)},

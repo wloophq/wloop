@@ -114,9 +114,9 @@ func initDefaults(f initFacts, fl initFlags, home string) (initAnswers, map[stri
 	a := initAnswers{
 		ProjectsDir:   f.cur.ProjectsDir,
 		Profile:       f.cur.Profile,
-		Repos:         f.cur.Scope.Repos,
-		Teams:         f.cur.Scope.Teams,
-		People:        f.cur.Scope.People,
+		Repos:         f.cur.GitHub.Scope.Repos,
+		Teams:         f.cur.GitHub.Scope.Teams,
+		People:        f.cur.GitHub.Scope.People,
 		SlackClientID: f.cur.Slack.ClientID,
 	}
 	missing := map[string]string{}

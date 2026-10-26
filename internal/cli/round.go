@@ -70,7 +70,7 @@ type roundOptions struct {
 // unattended, and its preflight fails on a checkout the agent home does not
 // trust.
 func trusts(cfg config.Config, pr *github.PullRequest) bool {
-	return pr != nil && dchange.Untrusted(pr.Facts, []string{pr.Owner}, cfg.For(pr.Owner, pr.Repo).TrustedAuthors) == ""
+	return pr != nil && dchange.Untrusted(pr.Facts, []string{pr.Owner}, cfg.For(pr.Owner, pr.Repo).GitHub.TrustedAuthors) == ""
 }
 
 // keepBlocked says whether a session blocked on the question reason stays

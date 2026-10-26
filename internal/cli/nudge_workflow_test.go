@@ -173,9 +173,9 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 			r.rec.overrides = map[github.Ref]dinv.Override{sc.ref: {PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}}
 		}, func() { r.rec.overrides = nil }},
 		{"per-PR daily cap reached (1)", func() {
-			sc.te.cfg.Rounds.PerPRPerDay = 1
+			sc.te.cfg.Turns.PerUnitPerDay = 1
 			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
-		}, func() { sc.te.cfg.Rounds = Defaults().Rounds }},
+		}, func() { sc.te.cfg.Turns = Defaults().Turns }},
 	}
 	for _, g := range guards {
 		g.set()

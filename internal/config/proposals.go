@@ -12,13 +12,12 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
-// Proposals holds the settings of the drafts proposed on their own: how long a nudged, discarded, sent or
-// observed proposal keeps its rule or workflow from proposing it again, and a plugin rule's approval by rule id
-// ("github-nudge"). In JSON the rules sit beside "renudge_after". The rules the default workflows replaced
-// ("stalled-nudge", "closure", "ask-owner") still load, their approval read as their workflow's draft_approval.
+// Proposals holds a plugin rule's approval by rule id ("github-nudge"). The
+// rules the default workflows replaced ("stalled-nudge", "closure",
+// "ask-owner") still load, their approval read as their workflow's
+// draft_approval.
 type Proposals struct {
-	RenudgeAfter Days
-	Rules        map[string]ProposalRule
+	Rules map[string]ProposalRule
 }
 
 type ProposalRule struct {
@@ -87,8 +86,6 @@ func (c Config) DraftApprovalWarnings() []string {
 	return out
 }
 
-const renudgeAfterKey = "renudge_after"
-
 // Approval is rule's configured approval, wait when the config sets none.
 func (p Proposals) Approval(rule string) draft.Approval {
 	r, ok := p.Rules[rule]
@@ -109,12 +106,6 @@ func (p *Proposals) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	for _, k := range slices.Sorted(maps.Keys(raw)) {
-		if k == renudgeAfterKey {
-			if err := json.Unmarshal(raw[k], &p.RenudgeAfter); err != nil {
-				return fmt.Errorf("proposals.%s: %w", k, err)
-			}
-			continue
-		}
 		var r ProposalRule
 		if err := json.Unmarshal(raw[k], &r); err != nil {
 			return fmt.Errorf("proposals.%s: %w", k, err)
@@ -128,7 +119,7 @@ func (p *Proposals) UnmarshalJSON(b []byte) error {
 }
 
 func (p Proposals) MarshalJSON() ([]byte, error) {
-	out := map[string]any{renudgeAfterKey: p.RenudgeAfter}
+	out := map[string]any{}
 	for k, r := range p.Rules {
 		out[k] = r
 	}
@@ -136,9 +127,6 @@ func (p Proposals) MarshalJSON() ([]byte, error) {
 }
 
 func (p Proposals) validate() error {
-	if p.RenudgeAfter <= 0 {
-		return fmt.Errorf("proposals.%s must be positive, got %s", renudgeAfterKey, time.Duration(p.RenudgeAfter))
-	}
 	for _, rule := range slices.Sorted(maps.Keys(p.Rules)) {
 		if err := p.Approval(rule).Validate(); err != nil {
 			return fmt.Errorf("proposals.%s.approval: %w", rule, err)

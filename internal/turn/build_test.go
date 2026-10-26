@@ -64,7 +64,7 @@ func TestBuildUsesTheCallersReadBeforeGitHub(t *testing.T) {
 }
 
 func TestProjectSettingsFollowTheConfigsPredicate(t *testing.T) {
-	cfg := config.Config{ProjectSettings: map[string]string{"review": `pr.visibility == "private"`}}
+	cfg := config.Config{Intents: map[string]config.IntentConfig{"review": {ProjectSettings: &config.ProjectSettings{When: `pr.visibility == "private"`}}}}
 	for visibility, without := range map[string]bool{"private": false, "public": true, "": true} {
 		b := Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{}, Config: cfg}
 		c, err := b.Build(context.Background(), Request{Intent: Intent(dintent.Review), Unit: ref7.Unit(), Payload: &PR{Title: "t", Author: "ana", Head: "abc", Visibility: visibility}})

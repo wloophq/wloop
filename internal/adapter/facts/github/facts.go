@@ -163,7 +163,7 @@ func (v *view) planner(ctx context.Context, now time.Time) *planner {
 // owners are the GitHub owners automated rounds may run for: the configured
 // ones, or those of every repository the workspace manager knows.
 func (v *view) owners() []string {
-	owners := v.cfg.Owners
+	owners := v.cfg.GitHub.Owners
 	if len(owners) == 0 {
 		for _, r := range v.repos {
 			if owner, _, ok := r.OwnerName(); ok && !containsFold(owners, owner) {
@@ -257,7 +257,7 @@ func (pl *planner) review(ref pr.Ref, r *result) error {
 		WorkspaceStatus: ws.Status,
 		CompletedStatus: pl.completed,
 		TrustedOwners:   pl.owners,
-		TrustedAuthors:  pl.cfg.For(ref.Owner, ref.Repo).TrustedAuthors,
+		TrustedAuthors:  pl.cfg.For(ref.Owner, ref.Repo).GitHub.TrustedAuthors,
 		LastFingerprint: pl.v.rounds.Mark(ref.String(), round.Reviewed),
 		Recorded:        pl.recorded(ref),
 	})
@@ -269,7 +269,7 @@ func (pl *planner) review(ref pr.Ref, r *result) error {
 		r.review.action = actionComplete
 	case dchange.ReviewerFollowup:
 		r.review.action, r.review.fingerprint, r.review.lastReviewAt = actionFollowup, d.Fingerprint, d.LastReviewAt
-		r.review.observed = ws.ID == "" && !pl.cfg.For(ref.Owner, ref.Repo).FollowupsWithoutWorkspace
+		r.review.observed = ws.ID == "" && !pl.cfg.For(ref.Owner, ref.Repo).GitHub.FollowupsWithoutWorkspace
 	}
 	return nil
 }
@@ -372,7 +372,7 @@ func (pl *planner) notFollowedWithoutWorkspace(f pr.Facts) string {
 	}
 	for _, w := range pl.v.workspaces {
 		if _, ofRepo := reposOf(pl.v.repos, f.Ref)[w.RepoID]; ofRepo && pl.isReviewWorkspace(w) &&
-			(w.DisplayName == pl.cfg.ReviewPrefix+f.HeadRefName || w.LinkedPR == f.Number) {
+			(w.DisplayName == pl.cfg.GitHub.ReviewPrefix+f.HeadRefName || w.LinkedPR == f.Number) {
 			return "its review workspace is " + w.DisplayName
 		}
 	}
@@ -384,7 +384,7 @@ func (pl *planner) notFollowedWithoutWorkspace(f pr.Facts) string {
 }
 
 func (pl *planner) isReviewWorkspace(w wsdomain.Workspace) bool {
-	return !w.IsMain && strings.HasPrefix(w.DisplayName, pl.cfg.ReviewPrefix)
+	return !w.IsMain && strings.HasPrefix(w.DisplayName, pl.cfg.GitHub.ReviewPrefix)
 }
 
 // follows says whether a plan phase that runs before the first rounds lists
@@ -420,7 +420,7 @@ func (pl *planner) first(ref pr.Ref, r *result) {
 		no("you develop it in "+w.DisplayName, "you develop it in "+w.DisplayName)
 		return
 	}
-	if why := dchange.Untrusted(f.Facts, pl.owners, pl.cfg.For(ref.Owner, ref.Repo).TrustedAuthors); why != "" {
+	if why := dchange.Untrusted(f.Facts, pl.owners, pl.cfg.For(ref.Owner, ref.Repo).GitHub.TrustedAuthors); why != "" {
 		no(why, why)
 		return
 	}
@@ -465,7 +465,7 @@ func (pl *planner) address(ref pr.Ref, r *result) {
 		return
 	}
 	row, ok := pl.v.byRef[ref]
-	if !pl.cfg.AddressReviews || !ok || !strings.EqualFold(row.Author, pl.v.viewer) || row.State != dgh.StateOpen ||
+	if !pl.cfg.GitHub.AddressReviews || !ok || !strings.EqualFold(row.Author, pl.v.viewer) || row.State != dgh.StateOpen ||
 		!containsFold(pl.owners, ref.Owner) || pl.developed(row) {
 		return
 	}
@@ -488,7 +488,7 @@ func (pl *planner) address(ref pr.Ref, r *result) {
 		r.address.due, r.address.reason = false, "failing checks or a conflict alone start no round without a workspace"
 		return
 	}
-	r.address.observed = r.address.due && !pl.cfg.For(ref.Owner, ref.Repo).AddressWithoutWorkspace
+	r.address.observed = r.address.due && !pl.cfg.For(ref.Owner, ref.Repo).GitHub.AddressWithoutWorkspace
 }
 
 // developed says whether a workspace on any host is linked to p or sits on
@@ -512,15 +512,15 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 	key := f.Ref.String()
 	var who, failed []string
 	var fp string
-	if pl.cfg.AddressReviews {
+	if pl.cfg.GitHub.AddressReviews {
 		var handled time.Time
 		if prev := pl.v.rounds.Mark(key, round.AddressedReviews); prev != "" {
 			handled, _ = time.Parse(time.RFC3339Nano, prev)
 		}
-		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.AddressSkipReviewers})
+		who, fp = dchange.ReviewsToAddress(dchange.AddressInput{PR: f.Facts, Viewer: pl.v.viewer, Handled: handled, SkipReviewers: pl.cfg.GitHub.AddressSkipReviewers})
 	}
-	if pl.cfg.AddressChecks {
-		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.Mark(key, round.AddressedChecks), pl.cfg.IgnoreChecks)
+	if pl.cfg.GitHub.AddressChecks {
+		failed = dchange.FailingChecks(f.Facts, pl.v.rounds.Mark(key, round.AddressedChecks), pl.cfg.GitHub.IgnoreChecks)
 	}
 	var reasons []string
 	if len(who) > 0 {
@@ -530,7 +530,7 @@ func (pl *planner) addressStep(w wsdomain.Workspace, f sweep.Facts, r *result) {
 		reasons = append(reasons, "failing checks: "+strings.Join(failed, ", "))
 		r.address.checksHead = f.HeadRefOid
 	}
-	if pl.cfg.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.v.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
+	if pl.cfg.GitHub.AddressConflicts && pl.conflicts(f) && !mark.Handled(pl.v.rounds.Mark(key, round.AddressedConflict), f.HeadRefOid) {
 		reasons = append(reasons, "conflicts with "+f.BaseRefName)
 		r.address.conflictHead = f.HeadRefOid
 	}
@@ -678,7 +678,7 @@ func calendarDays(from, to time.Time) int {
 // situation is the row's situation without a pending round, and the text a
 // nudge would be refused with now.
 func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (situation.Result, string) {
-	in := situation.Input{PR: row, Events: evs, Override: o, Viewer: v.viewer, MyTeams: v.teams, Ignore: prrow.IgnoreOf(v.cfg), Now: now, Stalled: v.cfg.Stalled}
+	in := situation.Input{PR: row, Events: evs, Override: o, Viewer: v.viewer, MyTeams: v.teams, Ignore: prrow.IgnoreOf(v.cfg), Now: now, Stalled: v.cfg.GitHub.Stalled}
 	if b, ok := v.books[row.Ref.Unit()]; ok {
 		if tf, ok := prrow.TurnFacts(map[unit.Unit]turn.Book{row.Ref.Unit(): b}, v.registry)[row.Ref]; ok {
 			in.Turn = &tf.Facts
@@ -748,7 +748,7 @@ func findReviewWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 		if !ofRepo[w.RepoID] || w.HostID != wsdomain.LocalHost || w.IsMain {
 			continue
 		}
-		if w.DisplayName == cfg.ReviewPrefix+headRef || (w.LinkedPR == number && strings.HasPrefix(w.DisplayName, cfg.ReviewPrefix)) {
+		if w.DisplayName == cfg.GitHub.ReviewPrefix+headRef || (w.LinkedPR == number && strings.HasPrefix(w.DisplayName, cfg.GitHub.ReviewPrefix)) {
 			return w, true
 		}
 	}
@@ -764,7 +764,7 @@ func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 	var main wsdomain.Workspace
 	for _, w := range all {
 		r, ok := ofRepo[w.RepoID]
-		if !ok || w.HostID != wsdomain.LocalHost || wsdomain.MainOnDefault(w, r) || (!w.IsMain && strings.HasPrefix(w.DisplayName, cfg.ReviewPrefix)) {
+		if !ok || w.HostID != wsdomain.LocalHost || wsdomain.MainOnDefault(w, r) || (!w.IsMain && strings.HasPrefix(w.DisplayName, cfg.GitHub.ReviewPrefix)) {
 			continue
 		}
 		onHead := f.HeadRefName != "" && w.PRBranch() == f.HeadRefName

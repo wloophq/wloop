@@ -322,7 +322,7 @@ func (e *Env) doctorState(ctx context.Context, q api.DoctorQuery) (api.DoctorRep
 	}
 	if held := st.HeldToday(e.Now()); len(held) > 0 {
 		rep.Checks = append(rep.Checks, api.DoctorCheck{Mark: api.DoctorMissing, Name: "automated rounds held by a cap today", Info: strings.Join(held, ", "),
-			Fix: "raise rounds.per_pr_per_day in " + e.ConfigPath + ", or run " + e.command() + " review <url>"})
+			Fix: "raise turns.per_unit_per_day in " + e.ConfigPath + ", or run " + e.command() + " review <url>"})
 	}
 	p, err := rounds.Pause(ctx)
 	if err != nil {

@@ -437,7 +437,7 @@ type classifyRig struct {
 func newClassifyRig(t *testing.T, limit int) *classifyRig {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.Classify.DailyCap = limit
+	te.cfg.Classify.PerDay = limit
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "c.db"), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -553,7 +553,7 @@ func TestClassifyStopsAtTheDailyCap(t *testing.T) {
 		t.Fatalf("asked %d times", r.asker.n())
 	}
 	r.s.d.Classify.BreakerOpen = func() bool { return true }
-	r.te.cfg.Classify.DailyCap = 5
+	r.te.cfg.Classify.PerDay = 5
 	if refusal, _ := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Observe: false}); refusal != "the brief breaker is open" {
 		t.Fatalf("breaker: %q", refusal)
 	}

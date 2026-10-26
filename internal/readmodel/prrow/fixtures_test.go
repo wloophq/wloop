@@ -139,7 +139,7 @@ func rowCases() []rowCase {
 func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 	t.Helper()
 	l := bundled(t)
-	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().Stalled, Loaded: l, Cfg: config.Defaults(),
+	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
 		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{}}
 	for _, c := range cases {
 		if c.pending != nil {

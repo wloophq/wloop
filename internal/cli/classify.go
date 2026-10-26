@@ -87,7 +87,7 @@ func (c *classifier) refusal(ctx context.Context) (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	limit := cfg.Classify.DailyCap
+	limit := cfg.Classify.PerDay
 	spent, err := d.Store.Spent(ctx, c.s.e.Now())
 	if err != nil {
 		return "", 0, err

@@ -37,7 +37,7 @@ func (e *Env) entries(db *sqlite.DB, cfg config.Config, its coregtd.Items) *core
 // knows them.
 func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID {
 	var out []unit.ProviderID
-	for id := range cfg.Plugins {
+	for _, id := range cfg.PluginSwitches() {
 		if !cfg.PluginEnabled(id) {
 			out = append(out, unit.ProviderID(id))
 		}

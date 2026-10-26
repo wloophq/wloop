@@ -120,9 +120,9 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 	c.Unit, c.Wording = c.Payload.Unit(), c.Payload.Wording()
 	c.WithoutProjectSettings = !b.Config.ProjectSettingsFor(string(r.Intent), PayloadFacts(c.Payload))
 	c.Queued, c.Guidance, c.Local = r.Queued, r.Guidance, r.Local
-	c.AutomatedReviewers = b.Config.AutomatedReviewers
-	c.Facts = TurnFacts{AddressReviews: b.Config.AddressReviews, AddressChecks: b.Config.AddressChecks,
-		FollowupsWithoutWorkspace: b.Config.FollowupsWithoutWorkspace, AddressWithoutWorkspace: b.Config.AddressWithoutWorkspace}
+	c.AutomatedReviewers = b.Config.GitHub.AutomatedReviewers
+	c.Facts = TurnFacts{AddressReviews: b.Config.GitHub.AddressReviews, AddressChecks: b.Config.GitHub.AddressChecks,
+		FollowupsWithoutWorkspace: b.Config.GitHub.FollowupsWithoutWorkspace, AddressWithoutWorkspace: b.Config.GitHub.AddressWithoutWorkspace}
 	var st Stored
 	if pr := c.PR(); pr != nil {
 		c.Facts.CrossRepository, c.Facts.LastReviewVerdict = pr.CrossRepository, pr.LastReviewVerdict

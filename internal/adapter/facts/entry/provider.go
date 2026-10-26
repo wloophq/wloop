@@ -45,7 +45,7 @@ type Settings struct {
 	// StaleDays is gtd.stale_waiting_days: working days a waiting entry
 	// waits before its nudge; 0 waits for its resurface date only.
 	StaleDays int
-	// RenudgeAfter is proposals.renudge_after: how long a nudge keeps the
+	// RenudgeAfter is drafts.repeat_after: how long a nudge keeps the
 	// entry quiet.
 	RenudgeAfter time.Duration
 }

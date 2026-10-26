@@ -254,7 +254,7 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 		if err != nil {
 			return "", p, err
 		}
-		if why := st.CapReason(ref.String(), s.e.Now(), cfg.Rounds.PerPRPerDay); why != "" {
+		if why := st.CapReason(ref.String(), s.e.Now(), cfg.Turns.PerUnitPerDay); why != "" {
 			return why, p, nil
 		}
 	}

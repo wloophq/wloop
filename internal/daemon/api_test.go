@@ -487,7 +487,7 @@ func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
 
 func TestHealthSaysWhenAReviewStalls(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Cfg.Stalled.Review = config.Days(72 * time.Hour) })
+	s := newServerWith(t, func(d *Deps) { d.Cfg.GitHub.Stalled.Review = config.Days(72 * time.Hour) })
 	var h api.Health
 	get(t, s, "/api/health", &h)
 	if h.StalledReviewHours != 72 {

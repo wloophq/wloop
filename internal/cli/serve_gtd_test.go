@@ -288,7 +288,7 @@ func socketDo(t *testing.T, sock, method, path, body string) (int, string) {
 func TestDisabledPluginEntriesRefuseOnARealServe(t *testing.T) {
 	te := newServeEnv(t)
 	no := false
-	te.cfg.Plugins = map[string]config.Plugin{string(unit.GitHub): {Enabled: &no}}
+	te.cfg.GitHub.Enabled = &no
 	ctx, cancel := context.WithCancel(context.Background())
 	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
 	if err != nil {

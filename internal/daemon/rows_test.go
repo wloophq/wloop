@@ -59,8 +59,8 @@ func newFixture(t *testing.T) *fixture {
 	st := inventory.New(stDB)
 	t.Cleanup(func() { stDB.Close() })
 	cfg := config.Defaults()
-	cfg.AutomatedReviewers = []string{"robo"}
-	cfg.AddressSkipReviewers = []string{"skipper"}
+	cfg.GitHub.AutomatedReviewers = []string{"robo"}
+	cfg.GitHub.AddressSkipReviewers = []string{"skipper"}
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
 	f.s = New(withStore(Deps{Cfg: cfg, Version: "test", Now: f.clock,
 		Viewer: func(context.Context) (string, []string, error) { return "fer", []string{"acme/search"}, nil },
