@@ -22,7 +22,29 @@ type Exec struct{ Bin string }
 
 func New() *Exec { return &Exec{Bin: "gh"} }
 
+// DirRunner is a Runner that also runs gh in a directory, for the commands
+// that read the checkout there.
+type DirRunner interface {
+	RunIn(ctx context.Context, dir string, args ...string) ([]byte, error)
+}
+
+// RunIn runs gh in dir through r; "" is the process's directory.
+func RunIn(ctx context.Context, r Runner, dir string, args ...string) ([]byte, error) {
+	if dir == "" {
+		return r.Run(ctx, args...)
+	}
+	d, ok := r.(DirRunner)
+	if !ok {
+		return nil, fmt.Errorf("gh %s: this runner cannot run in %s", summarize(args), dir)
+	}
+	return d.RunIn(ctx, dir, args...)
+}
+
 func (e *Exec) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return e.RunIn(ctx, "", args...)
+}
+
+func (e *Exec) RunIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	bin := e.Bin
 	if bin == "" {
 		bin = "gh"
@@ -31,6 +53,7 @@ func (e *Exec) Run(ctx context.Context, args ...string) ([]byte, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -62,8 +85,12 @@ type metered struct{ r Runner }
 func Metered(r Runner) Runner { return metered{r} }
 
 func (m metered) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return m.RunIn(ctx, "", args...)
+}
+
+func (m metered) RunIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	start := time.Now()
-	out, err := m.r.Run(ctx, args...)
+	out, err := RunIn(ctx, m.r, dir, args...)
 	op, points := meterOp(args)
 	s := meter.Sample{Res: meter.GitHub, Op: op, Spawn: true, Dur: time.Since(start), Points: points, Bytes: int64(len(out)), Err: err != nil && ctx.Err() == nil}
 	if meter.Tracing(ctx) {

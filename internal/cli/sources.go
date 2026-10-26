@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/source"
 )
 
@@ -61,8 +62,8 @@ func (e *Env) locators() map[unit.ProviderID]unit.Locator {
 // ghLocator is the pull request of the checkout's branch, as gh reads it.
 type ghLocator struct{ e *Env }
 
-func (g ghLocator) UnitAt(ctx context.Context, _ string) (string, bool, error) {
-	out, err := g.e.GH.Run(ctx, "pr", "view", "--json", "url", "--jq", ".url")
+func (g ghLocator) UnitAt(ctx context.Context, dir string) (string, bool, error) {
+	out, err := ghcli.RunIn(ctx, g.e.GH, dir, "pr", "view", "--json", "url", "--jq", ".url")
 	if err != nil {
 		return "", false, err
 	}
