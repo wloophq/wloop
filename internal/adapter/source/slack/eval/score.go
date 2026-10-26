@@ -18,6 +18,49 @@ type SplitScore struct {
 	Extras          int                `json:"extras"`
 	Causes          map[string]int     `json:"causes"`
 	CostUSD         float64            `json:"cost_usd"`
+	Extractor       PassUsage          `json:"extractor"`
+}
+
+// PassUsage is what one pass spent on the conversations it answered; the
+// token means are over the calls that reported tokens.
+type PassUsage struct {
+	Conversations  int   `json:"conversations"`
+	TokensReported int   `json:"tokens_reported"`
+	Total          Usage `json:"total"`
+	Mean           Usage `json:"mean"`
+}
+
+type Usage struct {
+	CostUSD    float64 `json:"cost_usd"`
+	Input      float64 `json:"input_tokens"`
+	Output     float64 `json:"output_tokens"`
+	CacheRead  float64 `json:"cache_read_tokens"`
+	CacheWrite float64 `json:"cache_write_tokens"`
+}
+
+func (p *PassUsage) add(sc sidecar) {
+	p.Conversations++
+	p.Total.CostUSD += sc.CostUSD
+	if t := sc.Tokens; t != nil {
+		p.TokensReported++
+		p.Total.Input += float64(t.Input)
+		p.Total.Output += float64(t.Output)
+		p.Total.CacheRead += float64(t.CacheRead)
+		p.Total.CacheWrite += float64(t.CacheWrite)
+	}
+}
+
+func (p *PassUsage) settle() {
+	p.Total.CostUSD = round(p.Total.CostUSD, 4)
+	if p.Conversations > 0 {
+		p.Mean.CostUSD = round(p.Total.CostUSD/float64(p.Conversations), 4)
+	}
+	if n := float64(p.TokensReported); n > 0 {
+		p.Mean.Input = round(p.Total.Input/n, 1)
+		p.Mean.Output = round(p.Total.Output/n, 1)
+		p.Mean.CacheRead = round(p.Total.CacheRead/n, 1)
+		p.Mean.CacheWrite = round(p.Total.CacheWrite/n, 1)
+	}
 }
 
 // Score is by split, "dev" and "holdout".
@@ -82,15 +125,26 @@ func WriteScore(out, label string) (Score, error) {
 	}
 	score := Score{}
 	for _, split := range []string{SplitDev, SplitHoldout} {
-		var js []Judgment
+		var (
+			js        []Judgment
+			extractor PassUsage
+		)
 		expected, cost := 0, 0.0
 		for _, e := range m.Fixtures {
 			if e.Split != split {
 				continue
 			}
 			expected++
-			for _, p := range []string{filepath.Join(out, "oracle"), filepath.Join(out, label, "ledger"), filepath.Join(out, label, "blind"), filepath.Join(out, label, "judge")} {
-				cost += stageCost(filepath.Join(p, e.ID+".json"))
+			ledger := filepath.Join(out, label, "ledger")
+			for _, p := range []string{filepath.Join(out, "oracle"), ledger, filepath.Join(out, label, "blind"), filepath.Join(out, label, "judge")} {
+				sc, ok := stageSidecar(filepath.Join(p, e.ID+".json"))
+				if !ok {
+					continue
+				}
+				cost += sc.CostUSD
+				if p == ledger {
+					extractor.add(sc)
+				}
 			}
 			var j Judgment
 			err := readJSON(filepath.Join(out, label, "judge", e.ID+".json"), &j)
@@ -107,6 +161,8 @@ func WriteScore(out, label string) (Score, error) {
 		}
 		s := ScoreSplit(js, expected)
 		s.CostUSD = round(cost, 4)
+		extractor.settle()
+		s.Extractor = extractor
 		score[split] = s
 	}
 	return score, writeJSON(filepath.Join(out, label, "score.json"), score)
