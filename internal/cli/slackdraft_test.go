@@ -372,7 +372,7 @@ func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close","effects":["unit.closed"]}`)
-	if !isErr || !strings.Contains(got, "the reply intent lists in draft_effects") {
+	if !isErr || !strings.Contains(got, "the reply intent lists in drafts.allowed_effects") {
 		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
 	}
 	if len(w.drafts(t)) != 0 {
@@ -391,7 +391,7 @@ func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	w := newSessionWiring(t)
 	files := bundledIntentAs(t, "act", "nudging-act")
 	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], "role    = \"headless\"\n", "", 1)
-	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `draft_effects = ["entry.nudged", "unit.closed"]`, `draft_effects = ["entry.nudged", "pr.nudged"]`, 1)
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `allowed_effects = ["entry.nudged", "unit.closed"]`, `allowed_effects = ["entry.nudged", "pr.nudged"]`, 1)
 	userProfile(t, w.te, files)
 	ctx := context.Background()
 	u := dslack.ThreadUnit("T000", sessChannel, sessParent)

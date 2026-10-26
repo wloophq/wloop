@@ -82,7 +82,7 @@ func (e *Env) startOf(st workflow.Step) startArgs {
 
 func isTurnStart(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }
 
-// candidate is the sweep's round the intent's round_kind and the step's
+// candidate is the sweep's round the intent's role's round kind and the step's
 // round start, "" for an intent that sends none.
 func (a startArgs) candidate() string {
 	switch a.def.RoundKind {

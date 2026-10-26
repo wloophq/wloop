@@ -50,7 +50,7 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 			t.Errorf("unexpected draft %+v", d)
 		}
 	}
-	if want := "drafts[1] (reply): it declares the effect pr.nudged, which the act intent does not list in draft_effects"; !strings.Contains(got.Record.Next, want) {
+	if want := "drafts[1] (reply): it declares the effect pr.nudged, which the act intent does not list in drafts.allowed_effects"; !strings.Contains(got.Record.Next, want) {
 		t.Fatalf("the record does not name the intent: %q", got.Record.Next)
 	}
 }

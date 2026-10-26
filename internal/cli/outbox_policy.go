@@ -21,7 +21,7 @@ type turnBooks interface {
 type outboxManifests struct {
 	loaded func() *intentload.Loaded
 	books  turnBooks
-	// config is the config whose workflows.<name>.draft_approval replaces a
+	// config is the config whose workflows.<name>.drafts.approval overlays a
 	// workflow's block; nil reads none.
 	config func() config.Config
 }

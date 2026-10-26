@@ -448,7 +448,7 @@ func configPolicy(w workflow.Workflow, a *config.ApprovalConfig) (*draft.Policy,
 }
 
 // holdOf says why a draft of the same workflow, subject and person holds p:
-// one open or failed, one sent within hold_after_sent (or ever, with
+// one open or failed, one sent within repeat_after_sent (or ever, with
 // forever), one otherwise settled within hold; timed when only the time
 // since a settled draft holds it. A withdrawn draft holds nothing.
 func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, bool, error) {

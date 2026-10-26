@@ -1,262 +1,579 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/wloophq/wloop/workflow.schema.json",
-  "title": "Workflow manifest (workflow.toml)",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
-  "required": [
-    "summary",
-    "provider",
-    "when",
-    "step"
-  ],
   "properties": {
-    "summary": {
-      "type": "string",
-      "description": "One line on what the workflow does; its plan items' description."
-    },
-    "provider": {
-      "type": "string",
-      "description": "The provider of the units the workflow matches; their facts are in that provider's slot.",
-      "enum": [
-        "entry",
-        "github",
-        "session",
-        "slack",
-        "workspace"
-      ]
-    },
-    "trigger": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Exactly one of on or schedule. Absent: evaluated on every sweep against every unit of the provider.",
-      "properties": {
-        "on": {
-          "type": "array",
-          "description": "Source event kinds; the workflow reads each event once.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "schedule": {
-          "type": "string",
-          "description": "Five-field cron in local time, such as \"0 9 * * 1-5\"."
-        }
-      }
-    },
-    "when": {
-      "type": "string",
-      "description": "A predicate over the unit's slot, trigger.* and config.*. Write it before any table."
-    },
-    "step": {
-      "type": "array",
-      "description": "Builtins run in order on each matching unit; the other keys of a step are its arguments: strings, and effects a list of strings.",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "required": [
-          "use"
-        ],
-        "properties": {
-          "use": {
-            "type": "string",
-            "description": "A builtin step."
-          }
-        },
-        "additionalProperties": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
-        }
-      }
-    },
-    "limits": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "per_run": {
-          "type": "integer",
-          "description": "Items that run in one evaluation; 0 is no limit."
-        },
-        "per_day": {
-          "type": "integer",
-          "description": "Runs per day; 0 is no limit. Required, above 0, for a workflow that starts turns on units other than pull requests."
-        },
-        "per_unit_per_day": {
-          "type": "integer",
-          "description": "Runs per unit per day; 0 is no limit."
-        },
-        "cooldown": {
-          "type": "string",
-          "description": "The least time between runs on one unit, such as 30m or 1d."
-        }
-      }
-    },
-    "observe": {
-      "type": "boolean",
-      "description": "Plans items pending and never runs them by itself; a person applies an item by hand. Default false."
-    },
-    "order": {
-      "type": "integer",
-      "description": "Evaluation order among workflows on the same trigger, lower first. Default 100."
-    },
-    "key": {
-      "type": "array",
-      "description": "Stable facts of the unit's slot that make the idempotency key. Default is the slot's fingerprint.",
-      "items": {
-        "type": "string"
-      }
-    },
-    "marks": {
-      "type": "object",
-      "description": "Marks a done or dismissed run records on its unit: each name, stored as <workflow>/<name>, takes the value of a string, time or int fact of the unit's slot as planned. handled(\"<workflow>/<name>\", <fact>) reads it back.",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
     "approval": {
-      "type": "object",
       "additionalProperties": false,
-      "description": "The run approval: the first rule whose when holds gives the mode, else mode. Default run.",
+      "description": "The run approval: how a matched item runs.",
       "properties": {
         "mode": {
-          "type": "string",
-          "description": "run: at once; delay: when the window ends unless the user stops it; wait: the user applies it. Default run.",
+          "default": "run",
+          "description": "The mode when no rule matches.",
           "enum": [
             "run",
             "delay",
             "wait"
-          ]
-        },
-        "window": {
-          "type": "string",
-          "description": "With mode delay only: how long the user has, such as 5m."
+          ],
+          "type": "string"
         },
         "rule": {
-          "type": "array",
-          "description": "Rules tried in order before mode. A matched wait rule also makes pending an item a guard refuses. A rule that runs (run or delay) may not read an untrusted fact.",
+          "description": "A rule tried in order; the first whose when holds gives the mode.",
           "items": {
-            "type": "object",
             "additionalProperties": false,
-            "required": [
-              "when",
-              "mode"
-            ],
             "properties": {
-              "when": {
-                "type": "string",
-                "description": "A predicate over the same slots as when."
-              },
               "mode": {
-                "type": "string",
+                "description": "The mode when the rule applies.",
                 "enum": [
                   "run",
                   "delay",
                   "wait"
                 ],
-                "description": "The mode of what the rule matches."
+                "type": "string"
+              },
+              "when": {
+                "description": "When the rule applies.",
+                "type": "string"
               },
               "window": {
-                "type": "string",
-                "description": "With mode delay only: how long the user has, such as 10m."
+                "description": "The rule's window; only with mode delay, which needs it.",
+                "type": "string"
               }
-            }
-          }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "window": {
+          "description": "How long a person has before the item runs; only with mode delay, which needs it.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
     },
     "drafts": {
-      "type": "object",
       "additionalProperties": false,
-      "description": "The drafts the workflow's steps and the turns it starts propose.",
+      "description": "The drafts the workflow's steps and turns propose.",
       "properties": {
         "approval": {
-          "type": "object",
           "additionalProperties": false,
-          "description": "When those drafts are sent without the user's click. Absent: the intent's, else wait.",
-          "required": [
-            "mode"
-          ],
+          "description": "The approval of the drafts the workflow's steps and turns propose.",
           "properties": {
             "mode": {
-              "type": "string",
-              "description": "send: sent at once; delay: sent when the window ends unless the user discards or edits it first; wait: the user approves each draft; dry_run: stored as what would have been sent, never sent.",
+              "default": "wait",
+              "description": "The mode when no rule matches.",
               "enum": [
                 "send",
                 "delay",
                 "wait",
                 "dry_run"
-              ]
-            },
-            "window": {
-              "type": "string",
-              "description": "With mode delay only: how long the user has, such as 10m."
+              ],
+              "type": "string"
             },
             "rule": {
-              "type": "array",
-              "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (send or delay) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+              "description": "A rule tried in order; the first whose when holds gives the mode.",
               "items": {
-                "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "when",
-                  "mode"
-                ],
                 "properties": {
-                  "when": {
-                    "type": "string",
-                    "description": "A predicate over draft.delivery, draft.proposer, draft.purpose and draft.effects (empty for a turn's draft) and the unit's trusted facts."
-                  },
                   "mode": {
-                    "type": "string",
+                    "description": "The mode when the rule applies.",
                     "enum": [
                       "send",
                       "delay",
                       "wait",
                       "dry_run"
                     ],
-                    "description": "The mode of what the rule matches."
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the rule applies.",
+                    "type": "string"
                   },
                   "window": {
-                    "type": "string",
-                    "description": "With mode delay only: how long the user has, such as 10m."
+                    "description": "The rule's window; only with mode delay, which needs it.",
+                    "type": "string"
                   }
-                }
-              }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "How long a person has before the draft is sent; only with mode delay, which needs it.",
+              "type": "string"
             }
-          }
+          },
+          "type": "object"
         },
         "withdraw": {
-          "type": "object",
           "additionalProperties": false,
           "description": "When an open draft the workflow proposed is withdrawn.",
-          "required": [
-            "when"
-          ],
           "properties": {
-            "when": {
-              "type": "string",
-              "description": "A predicate over the unit's facts and draft.*; a match withdraws the draft."
-            },
             "reason": {
-              "type": "string",
+              "default": "moot",
+              "description": "The reason the withdrawn draft stores.",
               "enum": [
                 "assigned",
                 "moot"
               ],
-              "description": "The withdrawn draft's reason: assigned (its items got an owner) or moot, the default."
+              "type": "string"
+            },
+            "when": {
+              "description": "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "key": {
+      "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "limits": {
+      "additionalProperties": false,
+      "description": "How many runs the workflow may take.",
+      "properties": {
+        "cooldown": {
+          "description": "The least time between runs on one unit.",
+          "type": "string"
+        },
+        "per_day": {
+          "default": 0,
+          "description": "Runs per local day; 0 is no limit.",
+          "type": "integer"
+        },
+        "per_run": {
+          "default": 0,
+          "description": "Runs per evaluation; 0 is no limit.",
+          "type": "integer"
+        },
+        "per_unit_per_day": {
+          "default": 0,
+          "description": "Runs on one unit per local day; 0 is no limit.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "marks": {
+      "additionalProperties": {
+        "description": "The fact whose value the mark stores.",
+        "type": "string"
+      },
+      "description": "Mark name to fact, stored when a run is done or dismissed, which handled() reads.",
+      "type": "object"
+    },
+    "observe": {
+      "default": false,
+      "description": "Plans items pending and never runs them by itself; a person applies an item by hand.",
+      "type": "boolean"
+    },
+    "order": {
+      "default": 100,
+      "description": "Evaluation order, lowest first.",
+      "type": "integer"
+    },
+    "provider": {
+      "description": "The provider of the units it matches. Required.",
+      "enum": [
+        "entry",
+        "github",
+        "session",
+        "slack",
+        "workspace"
+      ],
+      "type": "string"
+    },
+    "step": {
+      "description": "A step the run takes, in order. Required: at least one.",
+      "items": {
+        "additionalProperties": {
+          "description": "The step's arguments.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "session.close"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "session.close"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "workspace.remove"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "workspace.remove"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "workspace.unregister"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "workspace.unregister"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "turn.dismiss"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "description": "The reason the dismissed turn records.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "turn.dismiss"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "answer.refuse"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "description": "The reason the refused answer records.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "answer.refuse"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "session.mark_dormant"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "session.mark_dormant"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "turn.start"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "intent": {
+                  "description": "The intent whose turn starts; it must serve the unit. Required.",
+                  "type": "string"
+                },
+                "runner": {
+                  "description": "How the turn runs; by default the intent's first runner.",
+                  "enum": [
+                    "session",
+                    "headless"
+                  ],
+                  "type": "string"
+                },
+                "stage": {
+                  "description": "The pass over the unit, for a review.",
+                  "enum": [
+                    "first",
+                    "follow-up"
+                  ],
+                  "type": "string"
+                },
+                "use": {
+                  "const": "turn.start"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "draft.propose"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "delivery": {
+                  "default": "message",
+                  "description": "How the draft posts.",
+                  "enum": [
+                    "message",
+                    "reaction",
+                    "comment"
+                  ],
+                  "type": "string"
+                },
+                "effects": {
+                  "description": "What sending the draft applies.",
+                  "items": {
+                    "enum": [
+                      "entry.nudged",
+                      "unit.closed",
+                      "pr.nudged"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "items": {
+                  "default": "all",
+                  "description": "Which of the unit's items the draft lists.",
+                  "enum": [
+                    "owed",
+                    "resolved",
+                    "unowned",
+                    "unowned_aged",
+                    "all"
+                  ],
+                  "type": "string"
+                },
+                "per": {
+                  "default": "unit",
+                  "description": "One draft per unit, or one per person it waits on.",
+                  "enum": [
+                    "unit",
+                    "person"
+                  ],
+                  "type": "string"
+                },
+                "purpose": {
+                  "description": "What the draft is for, such as nudge or close. Required.",
+                  "type": "string"
+                },
+                "reaction": {
+                  "description": "The emoji name, with delivery reaction.",
+                  "type": "string"
+                },
+                "repeat_after": {
+                  "description": "The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.",
+                  "type": "string"
+                },
+                "repeat_after_sent": {
+                  "description": "The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.",
+                  "type": "string"
+                },
+                "target": {
+                  "default": "unit",
+                  "description": "Where the draft posts: on the unit, or on each item.",
+                  "enum": [
+                    "unit",
+                    "item"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "text.md.tmpl",
+                  "description": "The template of the draft's text, beside the manifest.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "draft.propose"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "classify"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "prompt": {
+                  "default": "prompt.md",
+                  "description": "The classification's prompt, beside the manifest.",
+                  "type": "string"
+                },
+                "schema": {
+                  "default": "schema.json",
+                  "description": "The JSON schema of its answer, beside the manifest.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "classify"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "notify.self"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "default": "text.md.tmpl",
+                  "description": "The notification's text, beside the manifest.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "notify.self"
+                }
+              }
             }
           }
+        ],
+        "properties": {
+          "use": {
+            "description": "The step.",
+            "enum": [
+              "session.close",
+              "workspace.remove",
+              "workspace.unregister",
+              "turn.dismiss",
+              "answer.refuse",
+              "session.mark_dormant",
+              "turn.start",
+              "draft.propose",
+              "classify",
+              "notify.self"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "summary": {
+      "description": "One line, what the workflow does; its plan items' description. Required.",
+      "type": "string"
+    },
+    "trigger": {
+      "additionalProperties": false,
+      "description": "What plans the workflow: on or schedule; absent, every sweep.",
+      "properties": {
+        "on": {
+          "description": "The source event kinds the workflow reacts to.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schedule": {
+          "description": "A cron schedule, in local time.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
+    },
+    "when": {
+      "description": "The match condition, over the unit's facts, the trigger's and config.*. Required.",
+      "type": "string"
     }
-  }
+  },
+  "title": "Workflow manifest (workflow.toml)",
+  "type": "object"
 }

@@ -37,7 +37,7 @@ func slackDraftTool() tool {
 			"target":   str(0, "where it posts: empty for the unit's thread or direct message, else a message permalink, #channel, channel id or user id"),
 			"items":    {Type: "array", Items: str(0, "an item id of the unit"), Description: "the unit's items the draft answers"},
 			"reaction": str(0, "the emoji name of a react draft, without colons"),
-			"effects": {Type: "array", Items: str(0, "an effect name your intent lists in draft_effects"),
+			"effects": {Type: "array", Items: str(0, "an effect name your intent lists in drafts.allowed_effects"),
 				Description: "what sending it does besides posting, such as unit.closed for a closing post; empty for none"},
 		}),
 	}

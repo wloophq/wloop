@@ -8,7 +8,7 @@ import (
 )
 
 func TestAnMCPDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing.T) {
-	refused := errors.New("the effect unit.closed is not one the reply intent lists in draft_effects")
+	refused := errors.New("the effect unit.closed is not one the reply intent lists in drafts.allowed_effects")
 	d := &fakeDrafts{err: refused}
 	s, sid := draftSession(t, &fakeSlack{loggedIn: true}, d, "term_1")
 	res := decodeResult(t, call(t, s, sid, "term_1", draftCallBody(`{"text":"Closing.","kind":"close","effects":["unit.closed"]}`)))

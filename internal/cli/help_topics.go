@@ -302,12 +302,12 @@ func helpGroups(manager string) []helpGroup {
 			},
 			{
 				Names:    []string{"profile schema"},
-				Summary:  "The JSON Schema of the manifests",
-				Usage:    []string{"profile schema [--workflow]"},
-				About:    "Print the JSON Schema of intent.toml, or of workflow.toml with --workflow, for an editor's TOML support.",
-				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}},
-				Examples: []string{"profile schema > intent.schema.json"},
-				Docs:     "reference/intent-manifest",
+				Summary:  "The JSON Schemas of the profile files, for editors",
+				Usage:    []string{"profile schema [--workflow|--actions|--config]"},
+				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.",
+				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--config", "The schema of config.json"}},
+				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
+				Docs:     "reference/language",
 			},
 		}},
 		{"SLACK", []helpTopic{

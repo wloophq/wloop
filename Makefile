@@ -71,11 +71,12 @@ fmt: ## Format the code
 eval-instructions: ## Judge the rendered instructions of every eval scenario
 	CGO_ENABLED=0 go run ./cmd/$(BINARY) eval-instructions
 
-docs-ref: ## Regenerate the commands, facts and architecture rules reference pages of the documentation site
+docs-ref: ## Regenerate the reference pages of the documentation site and the profile's JSON schemas
 	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && go build -o "$$d/$(BINARY)" ./cmd/$(BINARY) && \
 	node docs/scripts/commands.mjs "$$d/$(BINARY)" "$$d" > docs/src/content/docs/reference/commands.md
 	@f=$$(go run ./internal/intent/builtin/cmd/factsdoc) && printf '%s\n' "$$f" | node docs/scripts/facts.mjs > docs/src/content/docs/reference/facts.md
 	@p=$$(go run ./internal/archtest/cmd/rulesdoc) && printf '%s\n' "$$p" > docs/src/content/docs/reference/architecture-rules.md
+	@go run ./internal/intent/builtin/cmd/grammardoc
 
 docs: ## Build the documentation site into docs/dist
 	cd docs && npm ci && npm run build

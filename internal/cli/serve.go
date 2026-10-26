@@ -259,7 +259,7 @@ type mcpEndpoint struct {
 	// key is read on each request, so a key install writes later applies
 	// without a restart.
 	key func() string
-	// intents is the loaded registry, whose draft_effects bound an agent's
+	// intents is the loaded registry, whose drafts.allowed_effects bound an agent's
 	// drafts; nil allows no effect.
 	intents func() *dintent.Registry
 }

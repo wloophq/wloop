@@ -37,7 +37,7 @@ type slackDrafts struct {
 	items  unitItems // nil checks no item id
 	outbox *outbox.Service
 	pub    *slacksource.Publisher
-	// intents is the loaded registry whose draft_effects bound a draft's
+	// intents is the loaded registry whose drafts.allowed_effects bound a draft's
 	// effects; nil allows none.
 	intents func() *dintent.Registry
 }
@@ -100,11 +100,11 @@ func (s *slackDrafts) intentDef(intent string) dintent.Def {
 }
 
 // checkEffects refuses an effect the session's intent does not list in its
-// draft_effects: an agent never grants itself what sending does.
+// drafts.allowed_effects: an agent never grants itself what sending does.
 func checkEffects(def dintent.Def, intent string, effects []string) error {
 	for _, e := range effects {
 		if !slices.Contains(def.AllowedEffects, e) {
-			return fmt.Errorf("the effect %s is not one the %s intent lists in draft_effects", e, intent)
+			return fmt.Errorf("the effect %s is not one the %s intent lists in drafts.allowed_effects", e, intent)
 		}
 	}
 	return nil

@@ -483,12 +483,12 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 	return out
 }
 
-// undeclared says why effects are refused: one the intent's draft_effects
+// undeclared says why effects are refused: one the intent's drafts.allowed_effects
 // does not list; "" when it lists them all.
 func undeclared(def intent.Def, effects []string) string {
 	for _, e := range effects {
 		if !slices.Contains(def.AllowedEffects, e) {
-			return fmt.Sprintf("it declares the effect %s, which the %s intent does not list in draft_effects", e, def.Name)
+			return fmt.Sprintf("it declares the effect %s, which the %s intent does not list in drafts.allowed_effects", e, def.Name)
 		}
 	}
 	return ""

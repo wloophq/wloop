@@ -6,14 +6,10 @@ description: Every field of workflow.toml, its triggers, approval and limits.
 A workflow lives in `<profile>/workflows/<name>/workflow.toml`, beside the intents, and is loaded and checked the same way. The bundled ones are listed in [The sweep and workflows](/concepts/workflows/#the-bundled-workflows). A name is a lower-case letter, then up to 39 lower-case letters, digits or `-`, and may not repeat a bundled workflow; the configuration's `workflows.<name>` overrides a bundled one instead.
 
 ```toml
-description = "Close a session whose pull request is merged or closed"
-subject = "session"
+summary = "Close a session whose pull request is merged or closed"
+provider = "session"
 when = 'session.pr_state in ["merged", "closed"]'
-mode = "apply"
 order = 11
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"
@@ -29,61 +25,107 @@ The top-level keys come before the first table, and a step's arguments are sibli
 [[step]]
 use = "turn.start"
 intent = "review"
-round = "follow-up"
+stage = "follow-up"
 ```
 
 ## Fields
 
-| Field | Required | Default | Means |
+The loader refuses any other key, naming the closest one. Without `[trigger]` a workflow is planned on every sweep; `on` plans it from a durable cursor of events, so an event seen while the daemon was down is handled once, and `schedule` on a cron in local time. The configuration's `workflows.<name>` overlays `observe`, `enabled`, `only_when`, `[approval]` and `[drafts.approval]`, field by field: `mode` and `window` replace those fields and `rule` replaces the rules (`[]` clears them).
+
+| Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `description` | yes | | one line |
-| `subject` | yes | | the unit provider: `github` (slot `pr`), `session` or `workspace` |
-| `when` | yes | | a predicate over the subject's slot, `trigger.*`, `config.*` and `now` |
-| `mode` | | `apply` | `observe` plans and runs nothing; `apply` runs the steps |
-| `order` | | `100` | evaluation order among workflows on the same trigger, lower first |
-| `allow_visible` | | `false` | lets a step whose effect others see run without approval |
-| `key` | | the subject's `fingerprint` fact | facts that identify one run: a key that ran is not run again |
-| `[marks]` | | none | `<name> = "<fact>"`: what a done or dismissed run records on its unit; see [Marks](#marks) |
-| `[trigger]` | yes | | exactly one of `every = "sweep"` (on every sweep), `on = [<event kinds>]` (from a durable cursor, so an event seen while the daemon was down is handled once) or `schedule = "<cron>"` (local time) |
-| `[[step]]` | at least one | | `use` names a builtin step; other keys are its arguments, all strings |
-| `[limits]` | | none | `per_run`, `per_day`, `per_unit_per_day`, `cooldown` |
-| `[approval]` | | none | `default`, `window`, `wait_when` |
-| `[draft_approval]` | | the intent's, else `wait` | `mode`, `window` and `[[draft_approval.rule]]` (`when`, `mode`, `window`): the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; see [Draft approval](#draft-approval). `workflows.<name>.draft_approval` in the configuration replaces it, rules included |
-| `[withdraw]` | | none | `when`, a predicate over the subject's slot and `draft.*`, withdraws an open draft the workflow's `draft.propose` proposed; `reason` is `moot` (the default) or `assigned` |
+| `summary` | string |  | One line, what the workflow does; its plan items' description. Required. |
+| `provider` | one of `entry`, `github`, `session`, `slack`, `workspace` |  | The provider of the units it matches. Required. |
+| `when` | predicate |  | The match condition, over the unit's facts, the trigger's and config.*. Required. |
+| `order` | integer | `100` | Evaluation order, lowest first. |
+| `key` | list of facts |  | The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. |
+| `marks` | table by name |  | Mark name to fact, stored when a run is done or dismissed, which handled() reads. |
+| `marks.&lt;name&gt;` | fact |  | The fact whose value the mark stores. |
+| `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
+| `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
+| `trigger.on` | list of strings |  | The source event kinds the workflow reacts to. |
+| `trigger.schedule` | string |  | A cron schedule, in local time. |
+| `step[]` | table |  | A step the run takes, in order. Required: at least one. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self` |  | The step. |
+| `step[].&lt;name&gt;` | string or table |  | The step's arguments. |
+| `limits` | table |  | How many runs the workflow may take. |
+| `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
+| `limits.per_day` | integer | `0` | Runs per local day; 0 is no limit. |
+| `limits.per_unit_per_day` | integer | `0` | Runs on one unit per local day; 0 is no limit. |
+| `limits.cooldown` | duration |  | The least time between runs on one unit. |
+| `drafts` | table |  | The drafts the workflow's steps and turns propose. |
+| `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
+| `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
+| `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
+| `approval` | table |  | The run approval: how a matched item runs. |
+| `approval.mode` | one of `run`, `delay`, `wait` | `run` | The mode when no rule matches. |
+| `approval.window` | duration |  | How long a person has before the item runs; only with mode delay, which needs it. |
+| `approval.rule[]` | table |  | A rule tried in order; the first whose when holds gives the mode. |
+| `approval.rule[].when` | predicate |  | When the rule applies. |
+| `approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The mode when the rule applies. |
+| `approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
+| `drafts.approval` | table |  | The approval of the drafts the workflow's steps and turns propose. |
+| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` | `wait` | The mode when no rule matches. |
+| `drafts.approval.window` | duration |  | How long a person has before the draft is sent; only with mode delay, which needs it. |
+| `drafts.approval.rule[]` | table |  | A rule tried in order; the first whose when holds gives the mode. |
+| `drafts.approval.rule[].when` | predicate |  | When the rule applies. |
+| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The mode when the rule applies. |
+| `drafts.approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
 
 ## Steps
 
-Steps run in order on each matching unit. The vocabulary is closed; the [facts](/reference/facts/#workflow-steps) page lists every step, and `{{command}} workflows steps` prints them with their arguments.
+Steps run in order on each matching unit. The vocabulary is closed; the [facts](/reference/facts/#workflow-steps) page lists what each step does, and `{{command}} workflows steps` prints them with their arguments. A step takes only its own arguments:
+
+| Step | Argument | Kind | Default | Meaning |
+|---|---|---|---|---|
+| `turn.dismiss` | `reason` | string |  | The reason the dismissed turn records. |
+| `answer.refuse` | `reason` | string |  | The reason the refused answer records. |
+| `turn.start` | `intent` | string |  | The intent whose turn starts; it must serve the unit. Required. |
+| `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit, for a review. |
+| `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs; by default the intent's first runner. |
+| `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
+| `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts. |
+| `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest. |
+| `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
+| `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |
+| `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
+| `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item. |
+| `draft.propose` | `effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
+| `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
+| `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
+| `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
+| `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
+| `notify.self` | `text` | file | `text.md.tmpl` | The notification's text, beside the manifest. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.
 - `workspace.remove` never forces: a manifest that sets `force` fails to load.
-- A `turn.start` naming an unknown, broken or `builds` intent breaks its workflow. On a pull request, caps, the brief, and the busy and held checks apply as for any automatic round. On any other unit, the workflow must set `limits.per_day`, and every such turn of every workflow counts toward `turns.automated_per_day` for the local day; a turn of the intent still open on the unit, or an intent whose repository comes from an input, refuses the step. The turn runs in the step's `mode`, else the intent's first mode, where the intent's [workspace](/reference/intent-manifest/#where-a-turn-runs) says.
+- A `turn.start` naming an unknown, broken or `builds` intent breaks its workflow. On a pull request, caps, the brief, and the busy and held checks apply as for any automatic round. On any other unit, the workflow must set `limits.per_day`, and every such turn of every workflow counts toward `turns.per_day` for the local day; a turn of the intent still open on the unit, or an intent whose repository comes from an input, refuses the step. The turn runs with the step's `runner`, else the intent's first runner, where the intent's [workspace](/reference/intent-manifest/#where-a-turn-runs) says.
 
 ## Approval
 
-`[approval]` makes a plan item `pending` before it runs:
+`[approval]` says how a matched item runs, and `[[approval.rule]]` overrides it for the items a rule's `when` holds for, the first match winning:
 
-- `default = "run"` runs it when `window` ends unless you act;
-- `default = "wait"` keeps it until you apply or dismiss it;
-- `wait_when` is a predicate that holds the item as `wait` with the reason shown, as the workspace workflows do for a workspace with unsaved work.
+- `mode = "run"`, the default, runs it at once;
+- `mode = "delay"` with a `window` runs it when the window ends unless you act;
+- `mode = "wait"` keeps it `pending` until you apply or dismiss it, as the workspace workflows' rule does for a workspace with unsaved work, with the reason shown.
 
-A workflow with no `window` runs a `default = "run"` item at once; the bundled `turn.start` workflows set `window = "60s"`. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
+The bundled `turn.start` workflows set `mode = "delay"` and `window = "60s"`. A rule that runs an item (`run` or `delay`) never reads an untrusted fact. `observe = true` plans items and never runs them on its own: you apply one by hand. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
 
 ## Draft approval
 
-`[draft_approval]` tries its rules in order and gives a draft the mode of the first whose `when` holds, else `mode`:
+`[drafts.approval]` tries its rules in order and gives a draft the mode of the first whose `when` holds, else `mode`:
 
 ```toml
-[draft_approval]
+[drafts.approval]
 mode = "wait"
 
-[[draft_approval.rule]]
+[[drafts.approval.rule]]
 when = 'draft.purpose == "thanks" && slack.conversation == "dm"'
 mode = "send"
 ```
 
-A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the subject's slot, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment.
+It covers the drafts of the turns the workflow starts and of its `draft.propose` steps; without it, a turn's drafts follow the intent's, and a step's wait for you. A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the unit's facts, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. `[drafts.withdraw] when` withdraws an open draft the workflow's `draft.propose` proposed, with its `reason`.
 
 ## Predicates
 
@@ -96,16 +138,13 @@ A subtraction from a zero timestamp is an evaluation error, so providers omit a 
 
 ## Marks
 
-A mark is what a unit's trigger already handled, kept on the unit after the plan and its runs are gone. `[marks]` names a string, time or int fact of the subject's slot for each mark; an item takes the facts' values when it is planned, and running it to the end or dismissing it stores them on the unit as `<workflow>/<name>`. A predicate reads a mark back with `handled("<workflow>/<name>", <fact>)`:
+A mark is what a unit's trigger already handled, kept on the unit after the plan and its runs are gone. `[marks]` names a string, time or int fact of the provider's slot for each mark; an item takes the facts' values when it is planned, and running it to the end or dismissing it stores them on the unit as `<workflow>/<name>`. A predicate reads a mark back with `handled("<workflow>/<name>", <fact>)`:
 
 ```toml
-description = "Address a lasting conflict once per head"
-subject = "github"
+summary = "Address a lasting conflict once per head"
+provider = "github"
 when = 'pr.mine && pr.conflicting_for > duration("10m") && !handled("conflict-once/head", pr.head)'
 key = ["pr.head"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"

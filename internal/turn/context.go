@@ -203,7 +203,7 @@ type Context struct {
 	Records            bool
 	AutomatedReviewers []string
 	Guide              profile.Guide
-	// Guides are the composed guides by profile: the main one and each also_profiles one that applies.
+	// Guides are the composed guides by profile: the main one and each also_profile one that applies.
 	Guides        map[string]profile.Guide
 	Brief         *Brief
 	BriefMissing  string

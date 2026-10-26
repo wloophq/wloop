@@ -36,7 +36,7 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]profile add[/]            Add a rule to the profile
   [cyan]profile check[/]          Load the profile and list its problems
   [cyan]profile try[/]            A review round that publishes nothing
-  [cyan]profile schema[/]         The JSON Schema of the manifests
+  [cyan]profile schema[/]         The JSON Schemas of the profile files, for editors
 
 [bold]SLACK[/]
   [cyan]slack login/logout[/]     Connect to Slack, or disconnect

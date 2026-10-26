@@ -50,12 +50,12 @@ func workflowTable(slot string) string {
 	return b.String()
 }
 
-// untrusted marks a fact no [draft_approval] rule may read.
+// untrusted marks a fact no [drafts.approval] rule may read.
 func untrusted(f builtin.Fact) string {
 	if !f.Untrusted {
 		return ""
 	}
-	return " **Untrusted**: no `[draft_approval]` rule reads it."
+	return " **Untrusted**: no `[drafts.approval]` rule reads it."
 }
 
 func approvalTable() string {
@@ -102,7 +102,7 @@ func effectTable() string {
 func provider(slot string) string {
 	for p, s := range builtin.Slots {
 		if s == slot {
-			return fmt.Sprintf(" (subject `%s`)", p)
+			return fmt.Sprintf(" (provider `%s`)", p)
 		}
 	}
 	return ""

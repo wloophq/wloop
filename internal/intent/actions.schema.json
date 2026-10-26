@@ -1,0 +1,52 @@
+{
+  "$id": "https://github.com/wloophq/wloop/actions.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": {
+    "additionalProperties": false,
+    "description": "A built-in action, by its id.",
+    "properties": {
+      "confirm": {
+        "description": "The dialog that confirms the action, over the action facts; empty asks nothing.",
+        "type": "string"
+      },
+      "input": {
+        "additionalProperties": false,
+        "description": "The text the action asks for.",
+        "properties": {
+          "help": {
+            "description": "What to write, shown in the empty input.",
+            "type": "string"
+          },
+          "label": {
+            "description": "The input's name.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "label": {
+        "description": "The name people read. Required.",
+        "type": "string"
+      },
+      "note": {
+        "description": "What the action would do on this row, over the action facts.",
+        "type": "string"
+      },
+      "summary": {
+        "description": "One line, what pressing it does: its tooltip and help line. Required.",
+        "type": "string"
+      },
+      "warning": {
+        "description": "Shown under the action, over the action facts; empty shows nothing.",
+        "type": "string"
+      },
+      "why": {
+        "description": "Why the action is disabled, over the action facts.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "title": "Built-in actions (actions.toml)",
+  "type": "object"
+}

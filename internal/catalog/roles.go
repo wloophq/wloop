@@ -14,7 +14,7 @@ const (
 	RoleAuthor = "author"
 )
 
-// ResolveRun is run.resolve: the drives_row intent whose workspace is the
+// ResolveRun is run.resolve: the intent that drives the row whose workspace is the
 // role of the held round's workspace; false when none or more than one is.
 func ResolveRun(reg *dintent.Registry, role string) (dintent.Def, bool) {
 	var found []dintent.Def

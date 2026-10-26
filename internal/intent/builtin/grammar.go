@@ -15,6 +15,7 @@ const (
 	SurfaceActions  Surface = "actions"  // actions.toml
 	SurfaceDefaults Surface = "defaults" // defaults.toml
 	SurfaceLabels   Surface = "labels"   // labels.toml
+	SurfaceBlock    Surface = "block"    // a judgment block's front matter
 	SurfaceConfig   Surface = "config"   // config.json
 )
 

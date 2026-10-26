@@ -36,7 +36,7 @@ PROFILE
   profile add            Add a rule to the profile
   profile check          Load the profile and list its problems
   profile try            A review round that publishes nothing
-  profile schema         The JSON Schema of the manifests
+  profile schema         The JSON Schemas of the profile files, for editors
 
 SLACK
   slack login/logout     Connect to Slack, or disconnect

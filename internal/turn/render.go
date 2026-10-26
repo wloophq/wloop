@@ -198,7 +198,7 @@ func instructionsOf(d dintent.Def, l *intentload.Loaded, devDir string) (*templa
 	return t, nil
 }
 
-// sourcesOf lists the main guide's parts, then each also_profiles guide's
+// sourcesOf lists the main guide's parts, then each also_profile guide's
 // under its prefix, then the blocks left out of the text and why.
 func sourcesOf(c Context) []string {
 	out := sources(c.Guide)
@@ -211,7 +211,7 @@ func sourcesOf(c Context) []string {
 }
 
 // Trimmed are the blocks the turn's guides left out to stay within the
-// judgment limit: the main guide's, then each also_profiles guide's under its prefix.
+// judgment limit: the main guide's, then each also_profile guide's under its prefix.
 func Trimmed(c Context) []string {
 	out := slices.Clone(c.Guide.Dropped)
 	for _, a := range alsoGuides(c) {

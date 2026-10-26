@@ -9,12 +9,12 @@ const intro = {
   '| Fact |': [
     '## Intent facts',
     '',
-    'The predicates of an intent manifest read these. The **action** slot (`[action]` predicates) reads the row the daemon serves; the **turn** slot (`records`, headline cases, `also_profiles.when`) reads the turn being built.',
+    'The predicates of an intent manifest read these. The **action** slot (`[action]` predicates) reads the row the daemon serves; the **turn** slot (`[record] when`, headline cases, `also_profile[].when`) reads the turn being built.',
   ],
   '| Approval fact |': [
     '## Draft approval facts',
     '',
-    'A `[draft_approval]` rule\'s `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow\'s: its subject\'s), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party\'s text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another subject than the draft\'s does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.',
+    'A `[drafts.approval]` rule\'s `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow\'s: its provider\'s), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party\'s text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another provider than the draft\'s unit\'s does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.',
   ],
   '| Step |': [
     '## Workflow steps',
@@ -24,7 +24,7 @@ const intro = {
   '| Effect |': [
     '## Draft effects',
     '',
-    'What a sent draft applies, once: the names a `draft.propose` step lists in `on_posted` and an intent lists in `draft_effects`.',
+    'What a sent draft applies, once: the names a `draft.propose` step lists in `effects` and an intent lists in `[drafts] allowed_effects`. A turn\'s own `effects` are on the [language](/reference/language/) page.',
   ],
 };
 
@@ -46,7 +46,7 @@ for (const table of tables) {
       '',
       '## Workflow facts',
       '',
-      'A workflow\'s `when` reads the facts of its subject\'s slot, plus `trigger.*`, `config.*` and `now`; a subject whose units have a brief also reads `brief.*`, and `[withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; in an intent it is the repository name.',
+      'A workflow\'s `when` reads the facts of its provider\'s slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; an intent reads the repository name as `pr.repo_name`.',
     );
     workflowHeading = true;
   }

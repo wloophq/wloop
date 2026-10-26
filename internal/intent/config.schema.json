@@ -1,0 +1,921 @@
+{
+  "$id": "https://github.com/wloophq/wloop/config.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "agent": {
+      "description": "The agent the sessions run.",
+      "type": "string"
+    },
+    "agent_home": {
+      "description": "The agent's own configuration directory; empty is the agent's default.",
+      "type": "string"
+    },
+    "agent_models": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "description": "The agent's model name for the tier.",
+          "type": "string"
+        },
+        "description": "One agent's models by tier.",
+        "type": "object"
+      },
+      "description": "Per agent, a model name for each model tier.",
+      "type": "object"
+    },
+    "brief": {
+      "additionalProperties": false,
+      "description": "The brief: one headless call that previews each unit.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Briefs each unit.",
+          "type": "boolean"
+        },
+        "max_input_bytes": {
+          "default": 60000,
+          "description": "The most bytes of input a brief reads, between 1000 and 200000.",
+          "type": "integer"
+        },
+        "tier": {
+          "default": "fast",
+          "description": "The brief's model tier.",
+          "enum": [
+            "fast",
+            "balanced",
+            "frontier"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "classify": {
+      "additionalProperties": false,
+      "description": "The classify step.",
+      "properties": {
+        "per_day": {
+          "default": 50,
+          "description": "Classify calls per day.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "cleanup": {
+      "additionalProperties": false,
+      "description": "The thresholds of the session and workspace cleanup workflows.",
+      "properties": {
+        "asked_idle": {
+          "default": "4h",
+          "description": "How long a session that asked you stays idle before it closes.",
+          "type": "string"
+        },
+        "disposable": {
+          "description": "Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "idle": {
+          "default": "2h",
+          "description": "How long a finished session stays idle before it closes.",
+          "type": "string"
+        },
+        "manual_idle": {
+          "default": "1d",
+          "description": "How long a session you started stays idle before it closes.",
+          "type": "string"
+        },
+        "stale_workspace": {
+          "default": "14d",
+          "description": "How long an untouched workspace stays.",
+          "type": "string"
+        },
+        "workspace_grace": {
+          "default": "1d",
+          "description": "How long, in working time, a finished pull request's workspace stays.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "dossiers": {
+      "additionalProperties": false,
+      "description": "The dossiers' lifecycle and quotas; a value of zero or less keeps its default.",
+      "properties": {
+        "archive_after": {
+          "default": "30d",
+          "description": "How long after its unit or project resolved a dossier is archived.",
+          "type": "string"
+        },
+        "compact_at_kb": {
+          "default": 256,
+          "description": "The log size that triggers compaction.",
+          "type": "integer"
+        },
+        "max_file_mb": {
+          "default": 5,
+          "description": "The largest file a dossier keeps; a larger one is linked.",
+          "type": "integer"
+        },
+        "purge_after": {
+          "default": "400d",
+          "description": "How long after the archive it is purged.",
+          "type": "string"
+        },
+        "soft_cap_mb": {
+          "default": 50,
+          "description": "The size per dossier doctor reports.",
+          "type": "integer"
+        },
+        "total_cap_mb": {
+          "default": 2048,
+          "description": "The size of dossiers and archives doctor reports.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "drafts": {
+      "additionalProperties": false,
+      "description": "The settings every proposer's drafts share.",
+      "properties": {
+        "repeat_after": {
+          "default": "1d",
+          "description": "The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github": {
+      "additionalProperties": false,
+      "description": "The GitHub plugin's settings.",
+      "properties": {
+        "address_checks": {
+          "default": true,
+          "description": "Failing checks on the head of a pull request you develop start an address round.",
+          "type": "boolean"
+        },
+        "address_conflicts": {
+          "default": true,
+          "description": "A pull request you develop that conflicts with its base past the conflict window starts an address round.",
+          "type": "boolean"
+        },
+        "address_reviews": {
+          "default": true,
+          "description": "Someone's review of a pull request you develop starts an address round.",
+          "type": "boolean"
+        },
+        "address_skip_reviewers": {
+          "description": "Logins whose reviews never start an address round.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "address_without_workspace": {
+          "default": false,
+          "description": "An address round creates its author workspace when it has none; off, the sweep only records it.",
+          "type": "boolean"
+        },
+        "automated_reviewers": {
+          "description": "Logins of review bots whose reviews count as automated.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "drafts": {
+          "additionalProperties": false,
+          "description": "The drafts the plugin's own rules propose.",
+          "properties": {
+            "approval": {
+              "additionalProperties": false,
+              "description": "Their approval; left out, each waits for you.",
+              "properties": {
+                "mode": {
+                  "description": "The approval mode.",
+                  "enum": [
+                    "send",
+                    "delay",
+                    "wait",
+                    "dry_run"
+                  ],
+                  "type": "string"
+                },
+                "window": {
+                  "description": "How long a delay waits before the draft goes; only with mode delay.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "enabled": {
+          "description": "Switches the GitHub plugin; left out, it is on.",
+          "type": "boolean"
+        },
+        "followups_without_workspace": {
+          "default": false,
+          "description": "A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it.",
+          "type": "boolean"
+        },
+        "ignore_checks": {
+          "description": "Checks whose failure never starts an address round.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "owners": {
+          "description": "The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "review_prefix": {
+          "default": "REVIEW ",
+          "description": "The prefix of a review workspace's name.",
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "description": "Whose pull requests the GitHub plugin follows.",
+          "properties": {
+            "people": {
+              "description": "Logins whose pull requests it follows.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "repos": {
+              "description": "Repositories whose pull requests it follows.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "teams": {
+              "description": "Teams whose pull requests it follows.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "watch": {
+              "description": "Repositories it watches.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "stalled": {
+          "additionalProperties": false,
+          "description": "When a pull request counts as stalled.",
+          "properties": {
+            "merge": {
+              "default": "1d",
+              "description": "Approved and unmerged for this long.",
+              "type": "string"
+            },
+            "reply": {
+              "default": "1d",
+              "description": "Waiting on a reply for this long.",
+              "type": "string"
+            },
+            "review": {
+              "default": "2d",
+              "description": "Waiting on a review for this long.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "trusted_authors": {
+          "description": "Logins whose pull requests pass the author association check of automated rounds.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "gtd": {
+      "additionalProperties": false,
+      "description": "The GTD entries' settings.",
+      "properties": {
+        "areas": {
+          "description": "The areas an entry is offered.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contexts": {
+          "description": "The contexts an entry is offered.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stale_waiting_days": {
+          "default": 2,
+          "description": "Working days after which a waiting entry goes stale.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "headless": {
+      "additionalProperties": false,
+      "description": "The headless turns' caps; a cost of zero leaves it uncapped.",
+      "properties": {
+        "per_call_usd": {
+          "default": 0.5,
+          "description": "What one call may cost, in USD.",
+          "type": "number"
+        },
+        "per_day_usd": {
+          "default": 5,
+          "description": "What they may cost in a day, in USD.",
+          "type": "number"
+        },
+        "tier": {
+          "default": "balanced",
+          "description": "The model tier of their calls.",
+          "enum": [
+            "fast",
+            "balanced",
+            "frontier"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "http": {
+      "additionalProperties": false,
+      "description": "The daemon's web cockpit.",
+      "properties": {
+        "port": {
+          "default": 0,
+          "description": "The cockpit's port; 0 is none.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "intents": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One intent's settings.",
+        "properties": {
+          "project_settings": {
+            "additionalProperties": false,
+            "description": "Where the intent's sessions load the checkout's own agent settings.",
+            "properties": {
+              "when": {
+                "description": "Where the intent's sessions load the checkout's settings; elsewhere they start without them.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "description": "Each intent's settings, by intent name.",
+      "type": "object"
+    },
+    "items": {
+      "additionalProperties": false,
+      "description": "The items.",
+      "properties": {
+        "heat": {
+          "additionalProperties": false,
+          "description": "How long a unit stays warm.",
+          "properties": {
+            "warm_for": {
+              "description": "How long a unit stays warm after its last item resolved; left out, the heat reader's default.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "mcp": {
+      "additionalProperties": false,
+      "description": "The daemon's MCP endpoint, which agent homes register.",
+      "properties": {
+        "port": {
+          "default": 47800,
+          "description": "The MCP endpoint's port.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "notifications": {
+      "additionalProperties": false,
+      "description": "The notifications.",
+      "properties": {
+        "digest_at": {
+          "default": "09:00",
+          "description": "The local HH:MM of the daily digest; empty for none.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "nudge": {
+      "additionalProperties": false,
+      "description": "The nudges.",
+      "properties": {
+        "silent_days": {
+          "default": 30,
+          "description": "Calendar days of silence after which a nudge stops.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "placement": {
+      "description": "The rules that place units; the first match wins.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "checkout": {
+            "description": "The branch their work checks out.",
+            "type": "string"
+          },
+          "match": {
+            "description": "The units the rule places.",
+            "type": "string"
+          },
+          "repo": {
+            "description": "The repository their work checks out.",
+            "type": "string"
+          },
+          "role": {
+            "description": "The role of their workspace.",
+            "enum": [
+              "review",
+              "author",
+              "work"
+            ],
+            "type": "string"
+          },
+          "shared": {
+            "description": "The units share one workspace.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "profile": {
+      "description": "The user profile layered over the bundled one: a name under the profiles directory, or a path.",
+      "type": "string"
+    },
+    "projects": {
+      "description": "Settings for the pull requests of matching repositories; the first match wins.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "description": "The agent the project's sessions run.",
+            "type": "string"
+          },
+          "agent_home": {
+            "description": "The project's agent_home.",
+            "type": "string"
+          },
+          "github": {
+            "additionalProperties": false,
+            "description": "The GitHub settings the project overrides.",
+            "properties": {
+              "address_without_workspace": {
+                "description": "The project's github.address_without_workspace.",
+                "type": "boolean"
+              },
+              "followups_without_workspace": {
+                "description": "The project's github.followups_without_workspace.",
+                "type": "boolean"
+              },
+              "trusted_authors": {
+                "description": "The project's github.trusted_authors.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "match": {
+            "description": "An owner/repo pattern, such as acme/* or acme/api.",
+            "type": "string"
+          },
+          "projects_dir": {
+            "description": "The project's projects_dir.",
+            "type": "string"
+          },
+          "workspace_managers": {
+            "description": "The managers a new worktree of the project picks from, in order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "projects_dir": {
+      "description": "Where review clones a repository the workspace manager does not know yet.",
+      "type": "string"
+    },
+    "slack": {
+      "additionalProperties": false,
+      "description": "The Slack plugin's settings; no secret lives here.",
+      "properties": {
+        "client_id": {
+          "description": "The Slack app's client id; empty leaves Slack unconfigured.",
+          "type": "string"
+        },
+        "drafts": {
+          "additionalProperties": false,
+          "description": "The drafts the plugin's own rules propose.",
+          "properties": {
+            "approval": {
+              "additionalProperties": false,
+              "description": "Their approval; left out, each waits for you.",
+              "properties": {
+                "mode": {
+                  "description": "The approval mode.",
+                  "enum": [
+                    "send",
+                    "delay",
+                    "wait",
+                    "dry_run"
+                  ],
+                  "type": "string"
+                },
+                "window": {
+                  "description": "How long a delay waits before the draft goes; only with mode delay.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "enabled": {
+          "description": "Switches the Slack plugin; left out, it is on.",
+          "type": "boolean"
+        },
+        "extraction": {
+          "additionalProperties": false,
+          "description": "The extraction job; a zero value keeps its default.",
+          "properties": {
+            "context_chars": {
+              "description": "The characters of those messages; 0 is 4000, -1 turns them off.",
+              "type": "integer"
+            },
+            "context_messages": {
+              "description": "The read-only messages shown before a DM's window; 0 is 10, -1 turns them off.",
+              "type": "integer"
+            },
+            "enabled": {
+              "description": "Switches the extraction job; left out, it is on.",
+              "type": "boolean"
+            },
+            "escalate_over_chars": {
+              "description": "A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off.",
+              "type": "integer"
+            },
+            "language": {
+              "description": "The language the extraction writes in; empty is English.",
+              "type": "string"
+            },
+            "max_failures": {
+              "description": "Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3.",
+              "type": "integer"
+            },
+            "max_wait": {
+              "description": "The longest delay of a unit's oldest change; empty is 10m.",
+              "type": "string"
+            },
+            "per_call_usd": {
+              "description": "What one extraction call may cost, in USD; 0 is 0.10.",
+              "type": "number"
+            },
+            "per_day": {
+              "description": "Extraction calls per day; 0 is 500.",
+              "type": "integer"
+            },
+            "per_day_usd": {
+              "description": "What extraction may cost in a day, in USD; 0 is 3.",
+              "type": "number"
+            },
+            "quiet": {
+              "description": "How long a unit stays unchanged before it runs; empty is 90s.",
+              "type": "string"
+            },
+            "tier": {
+              "description": "Its model tier; left out, fast.",
+              "enum": [
+                "fast",
+                "balanced",
+                "frontier"
+              ],
+              "type": "string"
+            },
+            "window_chars": {
+              "description": "The characters of conversation one call reads; 0 is 40000.",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "ingest": {
+          "additionalProperties": false,
+          "description": "What the Slack plugin admits and how it listens.",
+          "properties": {
+            "allow_apps": {
+              "description": "Bot ids (B...) or app ids (A...) whose messages are admitted.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "deny_apps": {
+              "description": "Bot ids (B...) or app ids (A...) whose messages are not.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "since": {
+              "description": "The first start's backfill date, YYYY-MM-DD; empty is 7 days back.",
+              "type": "string"
+            },
+            "socket": {
+              "description": "Listens on a socket; left out, it does.",
+              "type": "boolean"
+            },
+            "terms": {
+              "description": "A message that holds one of them as a word, in any case, is admitted.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "keychain_service": {
+          "description": "The name of the Keychain items; empty is the brand's.",
+          "type": "string"
+        },
+        "post_allowlist": {
+          "description": "When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "redirect_port": {
+          "description": "The login callback port registered in the Slack app; 0 is 53682.",
+          "type": "integer"
+        },
+        "request_log": {
+          "default": false,
+          "description": "Logs one line per Slack call: method and HTTP status.",
+          "type": "boolean"
+        },
+        "turns": {
+          "additionalProperties": false,
+          "description": "What a turn on a Slack unit reads.",
+          "properties": {
+            "max_chars": {
+              "description": "The characters of the unit's messages rendered into the instructions; 0 is 30000.",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "sweep": {
+      "additionalProperties": false,
+      "description": "How often the sweeps run.",
+      "properties": {
+        "fast": {
+          "default": "2m",
+          "description": "The fast sweep's interval.",
+          "type": "string"
+        },
+        "rate_limit_fraction": {
+          "default": 0.5,
+          "description": "The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1.",
+          "type": "number"
+        },
+        "slow": {
+          "default": "1h",
+          "description": "The slow sweep's interval.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "turns": {
+      "additionalProperties": false,
+      "description": "The automated turn budgets.",
+      "properties": {
+        "per_day": {
+          "default": 20,
+          "description": "Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).",
+          "type": "integer"
+        },
+        "per_unit_per_day": {
+          "default": 5,
+          "description": "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today).",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "views": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One sink's settings.",
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "description": "The column of the status.",
+              "type": "string"
+            },
+            "description": "The sink's column for each status: working, working-fallback, needs-me, reviewed, ready, in-progress, in-review, completed.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "description": "Each view sink's own settings, by sink.",
+      "type": "object"
+    },
+    "workflows": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "One workflow's overrides.",
+        "properties": {
+          "approval": {
+            "additionalProperties": false,
+            "description": "The approval of the workflow's runs, over the manifest's field by field.",
+            "properties": {
+              "mode": {
+                "description": "The mode when no rule matches; left out, the manifest's.",
+                "enum": [
+                  "run",
+                  "delay",
+                  "wait"
+                ],
+                "type": "string"
+              },
+              "rule": {
+                "description": "Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "description": "The rule's mode.",
+                      "enum": [
+                        "run",
+                        "delay",
+                        "wait"
+                      ],
+                      "type": "string"
+                    },
+                    "when": {
+                      "description": "When the rule applies.",
+                      "type": "string"
+                    },
+                    "window": {
+                      "description": "The rule's delay; only with mode delay.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "window": {
+                "description": "How long a delay waits before it goes; only with mode delay.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "drafts": {
+            "additionalProperties": false,
+            "description": "The drafts the workflow proposes.",
+            "properties": {
+              "approval": {
+                "additionalProperties": false,
+                "description": "The approval of the workflow's drafts, over the manifest's field by field.",
+                "properties": {
+                  "mode": {
+                    "description": "The mode when no rule matches; left out, the manifest's.",
+                    "enum": [
+                      "send",
+                      "delay",
+                      "wait",
+                      "dry_run"
+                    ],
+                    "type": "string"
+                  },
+                  "rule": {
+                    "description": "Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.",
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "mode": {
+                          "description": "The rule's mode.",
+                          "enum": [
+                            "send",
+                            "delay",
+                            "wait",
+                            "dry_run"
+                          ],
+                          "type": "string"
+                        },
+                        "when": {
+                          "description": "When the rule applies.",
+                          "type": "string"
+                        },
+                        "window": {
+                          "description": "The rule's delay; only with mode delay.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "window": {
+                    "description": "How long a delay waits before it goes; only with mode delay.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "enabled": {
+            "description": "Switches the workflow; left out, it is on.",
+            "type": "boolean"
+          },
+          "observe": {
+            "description": "Plans the workflow's items pending, for you to run; left out, the manifest's.",
+            "type": "boolean"
+          },
+          "only_when": {
+            "description": "A condition ANDed with the workflow's when.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "Overrides of each workflow's manifest, by workflow name.",
+      "type": "object"
+    },
+    "workspace_managers": {
+      "description": "The enabled workspace managers, in the order a new worktree picks them.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "title": "Configuration (config.json)",
+  "type": "object"
+}

@@ -564,25 +564,28 @@ See [Write your review profile](/guides/review-profile/).
 
 ### profile schema
 
-The JSON Schema of the manifests.
+The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow]
+{{command}} profile schema [--workflow|--actions|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml with `--workflow`, for an editor's TOML support.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
 | `--workflow` | The schema of workflow.toml |
+| `--actions` | The schema of actions.toml |
+| `--config` | The schema of config.json |
 
 Examples:
 
 ```sh
 {{command}} profile schema > intent.schema.json
+{{command}} profile schema --config > config.schema.json
 ```
 
-See [Intent manifest](/reference/intent-manifest/).
+See [Profile language](/reference/language/).
 
 ## Slack
 

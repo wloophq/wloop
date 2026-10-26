@@ -3,34 +3,186 @@ title: Configuration
 description: Every key of config.json, with its default.
 ---
 
-The configuration is `$XDG_CONFIG_HOME/{{name}}/config.json`, by default `~/.config/{{name}}/config.json`. Every key is optional; a key the loop does not read is an error that names it, and `{{command}} doctor` reports it. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key).
+The configuration is `$XDG_CONFIG_HOME/{{name}}/config.json`, by default `~/.config/{{name}}/config.json`. Every key is optional; a key the loop does not read is an error that names it and the closest key, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way; `null` leaves a key unset. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key).
 
-The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are written `"2d"`, `"36h"`, `"90m"` or `"60s"`.
+The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are written `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON schema, for editors.
 
-## Workspaces and agents
+## Settings
 
-| Key | Default | Means |
-|---|---|---|
-| `projects_dir` | none | where `review` clones a repository no workspace manager knows yet; needed only then |
-| `workspace_managers` | `["claude-desktop", "orca"]` | the enabled workspace managers, in the order a new worktree picks from; below |
-| `agent` | `"claude"` | the coding agent that runs the rounds; `claude` (Claude Code) is the one supported |
-| `agent_home` | `""` | the agent's configuration directory (`CLAUDE_CONFIG_DIR` for Claude Code), for a home other than `~/.claude`; when unset, `review` and `take-over` use the home of the session that runs them |
-| `agent_models` | `{}` | pins a model tier (`fast`, `balanced`, `frontier`) to a model name per agent: `{"claude": {"fast": "claude-haiku-5-5"}}`; without a pin, Claude Code runs `haiku`, `sonnet` and `opus` |
-| `profile` | `""` | your review profile: a name under `~/.config/{{name}}/profiles/`, or a path |
-| `review_prefix` | `"REVIEW "` | the display-name prefix that marks a review workspace |
-| `project_settings` | `{}` | per intent, a predicate over the pull request's [facts](/reference/facts/#intent-facts) where its sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone. An intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings) |
-| `projects` | `[]` | per-repository overrides, below |
+A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `approval` and `drafts.approval` take `mode`, `window` and `rule`, a list of `{"when", "mode", "window"}` that replaces the manifest's rules. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
+
+| Setting | Kind | Default | Meaning |
+|---|---|---|---|
+| `projects_dir` | string |  | Where review clones a repository the workspace manager does not know yet. |
+| `workspace_managers` | list of strings |  | The enabled workspace managers, in the order a new worktree picks them. |
+| `agent` | string |  | The agent the sessions run. |
+| `agent_home` | string |  | The agent's own configuration directory; empty is the agent's default. |
+| `agent_models` | table by name |  | Per agent, a model name for each model tier. |
+| `agent_models.&lt;name&gt;` | table by name |  | One agent's models by tier. |
+| `agent_models.&lt;name&gt;.&lt;name&gt;` | string |  | The agent's model name for the tier. |
+| `profile` | string |  | The user profile layered over the bundled one: a name under the profiles directory, or a path. |
+| `github` | table |  | The GitHub plugin's settings. |
+| `github.enabled` | bool |  | Switches the GitHub plugin; left out, it is on. |
+| `github.review_prefix` | string | `REVIEW ` | The prefix of a review workspace's name. |
+| `github.automated_reviewers` | list of strings |  | Logins of review bots whose reviews count as automated. |
+| `github.owners` | list of strings |  | The GitHub owners automated follow-ups run on; empty is every owner the workspace manager knows. |
+| `github.trusted_authors` | list of strings |  | Logins whose pull requests pass the author association check of automated rounds. |
+| `github.followups_without_workspace` | bool | `false` | A follow-up review recreates the review workspace the user deleted; off, the sweep only logs it. |
+| `github.address_without_workspace` | bool | `false` | An address round creates its author workspace when it has none; off, the sweep only records it. |
+| `github.address_reviews` | bool | `true` | Someone's review of a pull request you develop starts an address round. |
+| `github.address_skip_reviewers` | list of strings |  | Logins whose reviews never start an address round. |
+| `github.address_checks` | bool | `true` | Failing checks on the head of a pull request you develop start an address round. |
+| `github.ignore_checks` | list of strings |  | Checks whose failure never starts an address round. |
+| `github.address_conflicts` | bool | `true` | A pull request you develop that conflicts with its base past the conflict window starts an address round. |
+| `github.scope` | table |  | Whose pull requests the GitHub plugin follows. |
+| `github.scope.people` | list of strings |  | Logins whose pull requests it follows. |
+| `github.scope.teams` | list of strings |  | Teams whose pull requests it follows. |
+| `github.scope.repos` | list of strings |  | Repositories whose pull requests it follows. |
+| `github.scope.watch` | list of strings |  | Repositories it watches. |
+| `github.stalled` | table |  | When a pull request counts as stalled. |
+| `github.stalled.review` | duration | `2d` | Waiting on a review for this long. |
+| `github.stalled.reply` | duration | `1d` | Waiting on a reply for this long. |
+| `github.stalled.merge` | duration | `1d` | Approved and unmerged for this long. |
+| `projects[]` | table |  | Settings for the pull requests of matching repositories; the first match wins. |
+| `projects[].match` | string |  | An owner/repo pattern, such as acme/* or acme/api. |
+| `projects[].projects_dir` | string |  | The project's projects_dir. |
+| `projects[].agent` | string |  | The agent the project's sessions run. |
+| `projects[].agent_home` | string |  | The project's agent_home. |
+| `projects[].workspace_managers` | list of strings |  | The managers a new worktree of the project picks from, in order. |
+| `projects[].github` | table |  | The GitHub settings the project overrides. |
+| `projects[].github.trusted_authors` | list of strings |  | The project's github.trusted_authors. |
+| `projects[].github.followups_without_workspace` | bool |  | The project's github.followups_without_workspace. |
+| `projects[].github.address_without_workspace` | bool |  | The project's github.address_without_workspace. |
+| `sweep` | table |  | How often the sweeps run. |
+| `sweep.fast` | duration | `2m` | The fast sweep's interval. |
+| `sweep.slow` | duration | `1h` | The slow sweep's interval. |
+| `sweep.rate_limit_fraction` | number | `0.5` | The share of the GitHub rate limit the sweeps may spend, a number between 0 and 1. |
+| `http` | table |  | The daemon's web cockpit. |
+| `http.port` | integer | `0` | The cockpit's port; 0 is none. |
+| `mcp` | table |  | The daemon's MCP endpoint, which agent homes register. |
+| `mcp.port` | integer | `47800` | The MCP endpoint's port. |
+| `views` | table by name |  | Each view sink's own settings, by sink. |
+| `views.&lt;name&gt;` | table |  | One sink's settings. |
+| `views.&lt;name&gt;.columns` | table by name |  | The sink's column for each status: working, working-fallback, needs-me, reviewed, ready, in-progress, in-review, completed. |
+| `views.&lt;name&gt;.columns.&lt;name&gt;` | string |  | The column of the status. |
+| `brief` | table |  | The brief: one headless call that previews each unit. |
+| `brief.enabled` | bool | `false` | Briefs each unit. |
+| `brief.tier` | one of `fast`, `balanced`, `frontier` | `fast` | The brief's model tier. |
+| `brief.max_input_bytes` | integer | `60000` | The most bytes of input a brief reads, between 1000 and 200000. |
+| `cleanup` | table |  | The thresholds of the session and workspace cleanup workflows. |
+| `cleanup.idle` | duration | `2h` | How long a finished session stays idle before it closes. |
+| `cleanup.asked_idle` | duration | `4h` | How long a session that asked you stays idle before it closes. |
+| `cleanup.workspace_grace` | duration | `1d` | How long, in working time, a finished pull request's workspace stays. |
+| `cleanup.manual_idle` | duration | `1d` | How long a session you started stays idle before it closes. |
+| `cleanup.stale_workspace` | duration | `14d` | How long an untouched workspace stays. |
+| `cleanup.disposable` | list of strings |  | Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing. |
+| `nudge` | table |  | The nudges. |
+| `nudge.silent_days` | integer | `30` | Calendar days of silence after which a nudge stops. |
+| `classify` | table |  | The classify step. |
+| `classify.per_day` | integer | `50` | Classify calls per day. |
+| `workflows` | table by name |  | Overrides of each workflow's manifest, by workflow name. |
+| `workflows.&lt;name&gt;` | table |  | One workflow's overrides. |
+| `workflows.&lt;name&gt;.enabled` | bool |  | Switches the workflow; left out, it is on. |
+| `workflows.&lt;name&gt;.observe` | bool |  | Plans the workflow's items pending, for you to run; left out, the manifest's. |
+| `workflows.&lt;name&gt;.only_when` | predicate |  | A condition ANDed with the workflow's when. |
+| `workflows.&lt;name&gt;.drafts` | table |  | The drafts the workflow proposes. |
+| `workflows.&lt;name&gt;.approval` | table |  | The approval of the workflow's runs, over the manifest's field by field. |
+| `workflows.&lt;name&gt;.approval.mode` | one of `run`, `delay`, `wait` |  | The mode when no rule matches; left out, the manifest's. |
+| `workflows.&lt;name&gt;.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
+| `workflows.&lt;name&gt;.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
+| `workflows.&lt;name&gt;.approval.rule[].when` | predicate |  | When the rule applies. |
+| `workflows.&lt;name&gt;.approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The rule's mode. |
+| `workflows.&lt;name&gt;.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
+| `workflows.&lt;name&gt;.drafts.approval` | table |  | The approval of the workflow's drafts, over the manifest's field by field. |
+| `workflows.&lt;name&gt;.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The mode when no rule matches; left out, the manifest's. |
+| `workflows.&lt;name&gt;.drafts.approval.window` | duration |  | How long a delay waits before it goes; only with mode delay. |
+| `workflows.&lt;name&gt;.drafts.approval.rule[]` | table |  | Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them. |
+| `workflows.&lt;name&gt;.drafts.approval.rule[].when` | predicate |  | When the rule applies. |
+| `workflows.&lt;name&gt;.drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's mode. |
+| `workflows.&lt;name&gt;.drafts.approval.rule[].window` | duration |  | The rule's delay; only with mode delay. |
+| `intents` | table by name |  | Each intent's settings, by intent name. |
+| `intents.&lt;name&gt;` | table |  | One intent's settings. |
+| `intents.&lt;name&gt;.project_settings` | table |  | Where the intent's sessions load the checkout's own agent settings. |
+| `intents.&lt;name&gt;.project_settings.when` | predicate |  | Where the intent's sessions load the checkout's settings; elsewhere they start without them. |
+| `placement[]` | table |  | The rules that place units; the first match wins. |
+| `placement[].match` | string |  | The units the rule places. |
+| `placement[].repo` | string |  | The repository their work checks out. |
+| `placement[].checkout` | string |  | The branch their work checks out. |
+| `placement[].role` | one of `review`, `author`, `work` |  | The role of their workspace. |
+| `placement[].shared` | bool |  | The units share one workspace. |
+| `gtd` | table |  | The GTD entries' settings. |
+| `gtd.stale_waiting_days` | integer | `2` | Working days after which a waiting entry goes stale. |
+| `gtd.areas` | list of strings |  | The areas an entry is offered. |
+| `gtd.contexts` | list of strings |  | The contexts an entry is offered. |
+| `notifications` | table |  | The notifications. |
+| `notifications.digest_at` | string | `09:00` | The local HH:MM of the daily digest; empty for none. |
+| `dossiers` | table |  | The dossiers' lifecycle and quotas; a value of zero or less keeps its default. |
+| `dossiers.archive_after` | duration | `30d` | How long after its unit or project resolved a dossier is archived. |
+| `dossiers.purge_after` | duration | `400d` | How long after the archive it is purged. |
+| `dossiers.soft_cap_mb` | integer | `50` | The size per dossier doctor reports. |
+| `dossiers.total_cap_mb` | integer | `2048` | The size of dossiers and archives doctor reports. |
+| `dossiers.max_file_mb` | integer | `5` | The largest file a dossier keeps; a larger one is linked. |
+| `dossiers.compact_at_kb` | integer | `256` | The log size that triggers compaction. |
+| `drafts` | table |  | The settings every proposer's drafts share. |
+| `drafts.repeat_after` | duration | `1d` | The default repeat_after a config.drafts.repeat_after reference reads, and the plugin rules' delay before they propose a settled draft's key again. |
+| `items` | table |  | The items. |
+| `items.heat` | table |  | How long a unit stays warm. |
+| `items.heat.warm_for` | duration |  | How long a unit stays warm after its last item resolved; left out, the heat reader's default. |
+| `headless` | table |  | The headless turns' caps; a cost of zero leaves it uncapped. |
+| `headless.tier` | one of `fast`, `balanced`, `frontier` | `balanced` | The model tier of their calls. |
+| `headless.per_call_usd` | number | `0.5` | What one call may cost, in USD. |
+| `headless.per_day_usd` | number | `5` | What they may cost in a day, in USD. |
+| `turns` | table |  | The automated turn budgets. |
+| `turns.per_day` | integer | `20` | Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today). |
+| `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today). |
+| `slack` | table |  | The Slack plugin's settings; no secret lives here. |
+| `slack.enabled` | bool |  | Switches the Slack plugin; left out, it is on. |
+| `slack.client_id` | string |  | The Slack app's client id; empty leaves Slack unconfigured. |
+| `slack.redirect_port` | integer |  | The login callback port registered in the Slack app; 0 is 53682. |
+| `slack.keychain_service` | string |  | The name of the Keychain items; empty is the brand's. |
+| `slack.post_allowlist` | list of strings |  | When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to. |
+| `slack.request_log` | bool | `false` | Logs one line per Slack call: method and HTTP status. |
+| `slack.ingest` | table |  | What the Slack plugin admits and how it listens. |
+| `slack.ingest.terms` | list of strings |  | A message that holds one of them as a word, in any case, is admitted. |
+| `slack.ingest.allow_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are admitted. |
+| `slack.ingest.deny_apps` | list of strings |  | Bot ids (B...) or app ids (A...) whose messages are not. |
+| `slack.ingest.socket` | bool |  | Listens on a socket; left out, it does. |
+| `slack.ingest.since` | string |  | The first start's backfill date, YYYY-MM-DD; empty is 7 days back. |
+| `slack.extraction` | table |  | The extraction job; a zero value keeps its default. |
+| `slack.extraction.enabled` | bool |  | Switches the extraction job; left out, it is on. |
+| `slack.extraction.tier` | one of `fast`, `balanced`, `frontier` |  | Its model tier; left out, fast. |
+| `slack.extraction.language` | string |  | The language the extraction writes in; empty is English. |
+| `slack.extraction.per_call_usd` | number |  | What one extraction call may cost, in USD; 0 is 0.10. |
+| `slack.extraction.per_day_usd` | number |  | What extraction may cost in a day, in USD; 0 is 3. |
+| `slack.extraction.per_day` | integer |  | Extraction calls per day; 0 is 500. |
+| `slack.extraction.quiet` | duration |  | How long a unit stays unchanged before it runs; empty is 90s. |
+| `slack.extraction.max_wait` | duration |  | The longest delay of a unit's oldest change; empty is 10m. |
+| `slack.extraction.window_chars` | integer |  | The characters of conversation one call reads; 0 is 40000. |
+| `slack.extraction.max_failures` | integer |  | Failed calls in a row after which the job gives up on a unit until its next change; 0 is 3. |
+| `slack.extraction.context_messages` | integer |  | The read-only messages shown before a DM's window; 0 is 10, -1 turns them off. |
+| `slack.extraction.context_chars` | integer |  | The characters of those messages; 0 is 4000, -1 turns them off. |
+| `slack.extraction.escalate_over_chars` | integer |  | A unit whose rendered conversation is longer goes to the frontier tier; 0 or -1 is off. |
+| `slack.turns` | table |  | What a turn on a Slack unit reads. |
+| `slack.turns.max_chars` | integer |  | The characters of the unit's messages rendered into the instructions; 0 is 30000. |
+| `github.drafts` | table |  | The drafts the plugin's own rules propose. |
+| `github.drafts.approval` | table |  | Their approval; left out, each waits for you. |
+| `github.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
+| `github.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
+| `slack.drafts` | table |  | The drafts the plugin's own rules propose. |
+| `slack.drafts.approval` | table |  | Their approval; left out, each waits for you. |
+| `slack.drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval mode. |
+| `slack.drafts.approval.window` | duration |  | How long a delay waits before the draft goes; only with mode delay. |
 
 ### `projects`
 
 ```json
 "projects": [
   { "match": "me/*", "agent_home": "~/.claude-personal", "projects_dir": "~/projects/oss" },
-  { "match": "acme/api", "address_without_workspace": true }
+  { "match": "acme/api", "github": { "address_without_workspace": true } }
 ]
 ```
 
-`match` is `owner/repo` or a glob such as `owner/*`, case-insensitive; the first match wins. An entry may set `projects_dir`, `workspace_managers` (replaces the top-level list), `agent`, `agent_home`, `trusted_authors` (replaces the top-level list), `followups_without_workspace` and `address_without_workspace`. Empty fields keep the top-level value. What your profile says for those repositories goes in its `organization=` and `repo=` blocks.
+`match` is `owner/repo` or a glob such as `owner/*`, case-insensitive; the first match wins. An entry may set `projects_dir`, `workspace_managers` (replaces the top-level list), `agent`, `agent_home`, and under `github` the project's `trusted_authors` (replaces the top-level list), `followups_without_workspace` and `address_without_workspace`. Empty fields keep the top-level value. What your profile says for those repositories goes in its `organization=` and `repo=` blocks.
 
 ### `workspace_managers`
 
@@ -46,94 +198,15 @@ The daemon reads the file when it starts. It follows a change of `profile` live;
 - able to host the project's `agent`;
 - able to honor the session's launch policy.
 
-Orca honors every launch policy. Claude Desktop honors a session that loads the checkout's project settings, uses the default agent home, and adds allows and denies, which {{name}} writes into the worktree's `.claude/settings.local.json`. A session that needs your user settings alone (where `project_settings` is off for its intent, and always for a pull request that fails the trust check, whose checkout settings are its author's), a strict or MCP-free session, or a non-default `agent_home` falls through to the next manager. When no manager can launch it, the round fails closed and names each manager's reason. `{{command}} doctor` reports whether each manager is available and reachable (one unreachable manager is a note, all of them unreachable is a failure) and a `launch <intent>` check for each intent no enabled manager can launch.
+Orca honors every launch policy. Claude Desktop honors a session that loads the checkout's project settings, uses the default agent home, and adds allows and denies, which {{name}} writes into the worktree's `.claude/settings.local.json`. A session that needs your user settings alone (where `intents.<name>.project_settings.when` does not hold for its intent, and always for a pull request that fails the trust check, whose checkout settings are its author's), a strict or MCP-free session, or a non-default `agent_home` falls through to the next manager. When no manager can launch it, the round fails closed and names each manager's reason. `{{command}} doctor` reports whether each manager is available and reachable (one unreachable manager is a note, all of them unreachable is a failure) and a `launch <intent>` check for each intent no enabled manager can launch.
 
 An empty list is an error. The old `workspace_manager` key is refused; list the manager in `workspace_managers` instead.
-
-## Automatic rounds
-
-| Key | Default | Means |
-|---|---|---|
-| `owners` | `[]` | GitHub owners automated rounds run for; empty means the owners of every repository a workspace manager knows |
-| `trusted_authors` | `[]` | logins whose pull requests get automated rounds although they are not a member, collaborator or owner, such as `github-actions[bot]`; a fork is still refused |
-| `automated_reviewers` | `[]` | logins the review procedure treats like bots: contradicting them never stops a round |
-| `rounds.per_pr_per_day` | `5` | automatic rounds of every workflow per pull request per local day; a workflow's own caps are its manifest's [`[limits]`](/reference/workflow-manifest/) |
-| `address_reviews` | `true` | address rounds for reviews on your pull requests |
-| `address_skip_reviewers` | `[]` | logins whose reviews never start one |
-| `address_checks` | `true` | address rounds for failing checks |
-| `address_conflicts` | `true` | address rounds for a conflict with the base |
-| `ignore_checks` | `[]` | check names that never start one |
-| `followups_without_workspace` | `false` | a follow-up may recreate a review workspace you deleted |
-| `address_without_workspace` | `false` | an address round may create the author workspace of your pull request |
-| `nudge.silent_days` | `30` | calendar days of silence before `nudge-silent-30d` plans a nudge |
-| `classify.daily_cap` | `50` | headless classifier calls a workflow's `classify` step may spend per day |
-| `workflows.<name>` | `{}` | `enabled`, `mode` (`observe` or `apply`), `approval.default` (`run` or `wait`), `approval.window`, `only_when` (a predicate that must hold besides the manifest's `when`) and `draft_approval` (the approval of its drafts: `mode`, `window` and a `rule` list of `{"when", "mode", "window"}` tried first, which replaces the manifest's `[draft_approval]` whole; see [the Outbox](/concepts/approval/#the-outbox)) of a workflow, over its manifest's; see [Tune workflows](/guides/workflows/) |
-
-## Scope and the daemon
-
-| Key | Default | Means |
-|---|---|---|
-| `scope.people` | `[]` | logins whose pull requests, and whose repositories' pull requests, the daemon follows |
-| `scope.teams` | `[]` | teams, as `org/team`, whose members count as `people` |
-| `scope.repos` | `[]` | repositories, as `owner/repo`, whose pull requests the daemon follows |
-| `scope.watch` | `[]` | logins whose pull requests enter as if they requested your review |
-| `stalled.review` | `"2d"` | working days a pull request may wait on reviewers before it reads as stalled |
-| `stalled.reply` | `"1d"` | the same, waiting on an answer |
-| `stalled.merge` | `"1d"` | the same, approved and green but not merged |
-| `sweep.fast` | `"2m"` | the fast job's interval |
-| `sweep.slow` | `"1h"` | the slow job's interval |
-| `sweep.rate_limit_fraction` | `0.5` | share of the GitHub hourly budget below which the fast job waits |
-| `http.port` | `0` | the cockpit's port on `127.0.0.1`; 0 picks a free one |
-| `mcp.port` | `47800` | the MCP server's port on `127.0.0.1`; after changing it, restart the daemon and run `install` again |
-| `brief.enabled` | `false` | write the [brief](/concepts/brief/) of each pull request |
-| `brief.tier` | `"fast"` | the model tier of brief calls |
-| `brief.max_diff_bytes` | `60000` | the diff a brief reads, between 1000 and 200000 |
-
-## Cleanup
-
-| Key | Default | Means |
-|---|---|---|
-| `cleanup.idle` | `"2h"` | a loop session whose turn ended closes after this quiet time |
-| `cleanup.asked_idle` | `"4h"` | a loop session whose turn asked closes after this quiet time |
-| `cleanup.manual_idle` | `"1d"` | a session you started is offered for closing after this quiet time |
-| `cleanup.workspace_grace` | `"1d"` | working time after a pull request ended before its workspace may go |
-| `cleanup.stale_workspace` | `"14d"` | a workspace with no pull request is offered for removal after this |
-| `cleanup.disposable` | `node_modules`, `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `dist`, `build`, `target`, `bin`, `.terraform`, `.next`, `coverage`, `.gradle`, `_build`, `.docusaurus`, `.DS_Store`, `.coverage`, `.loop` | ignored names a workspace may lose; setting it replaces the whole list |
 
 ## Board
 
 Only Orca has a board. A workspace Claude Desktop owns has no card; its state shows in the cockpit, the terminal client and the menu bar.
 
-| Key | Default | Means |
-|---|---|---|
-| `views.orca.columns.working` | `"reviewing"` | while a review round runs |
-| `views.orca.columns.working-fallback` | `"in-review"` | when the board has no `working` column |
-| `views.orca.columns.needs-me` | `"needs-me"` | an agent asked or stopped |
-| `views.orca.columns.reviewed` | `"reviewed"` | a review published without approving |
-| `views.orca.columns.ready` | `"ready-to-merge"` | your approved, green pull request |
-
-The author columns `in-progress`, `in-review` and `completed` map the same way. See [board columns](/concepts/board/).
-
-## GTD, drafts and headless turns
-
-| Key | Default | Means |
-|---|---|---|
-| `plugins.<id>.enabled` | `true` | turns the `github` or `slack` plugin off; read at start |
-| `gtd.stale_waiting_days` | `2` | working days before a waiting entry with no nudge gets the focus star |
-| `gtd.areas`, `gtd.contexts` | `[]` | the areas and contexts offered |
-| `notifications.digest_at` | `"09:00"` | local time of the daily digest; `""` for none |
-| `proposals.renudge_after` | `"1d"` | a proposal rule, or a default workflow through `hold = "config.proposals.renudge_after"`, does not propose the same draft again sooner |
-| `proposals.<rule>.approval` | `{"mode": "wait"}` | the draft approval of `github-nudge`: `mode` `wait`, `delay` (with `window`), `send` or `record`; `stalled-nudge`, `closure` and `ask-owner` still load, read as the `draft_approval` of `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` with a warning |
-| `headless.tier` | `"balanced"` | the model tier of headless turns |
-| `headless.per_call_usd` | `0.5` | the cap of one headless call; 0 is uncapped |
-| `headless.per_day_usd` | `5` | the cap of a day of headless calls; 0 is uncapped |
-| `dossiers.archive_after` | `"30d"` | a resolved dossier is archived after this |
-| `dossiers.purge_after` | `"400d"` | an archive is purged after this |
-| `dossiers.soft_cap_mb` | `50` | the size per dossier `doctor` reports against |
-| `dossiers.total_cap_mb` | `2048` | the size of all dossiers `doctor` reports against |
-| `dossiers.max_file_mb` | `5` | a larger file in a dossier is refused |
-| `items.heat.warm_for` | | how long a unit stays warm after its last item resolved |
-| `placement` | `[]` | the rules that place a unit's work, below |
+`views.orca.columns` maps a status to a column: `working` (while a review round runs, `reviewing` by default), `working-fallback` (when the board has no `working` column, `in-review`), `needs-me` (an agent asked or stopped), `reviewed` (a review published without approving), `ready` (your approved, green pull request, `ready-to-merge`), and the author statuses `in-progress`, `in-review` and `completed`. See [board columns](/concepts/board/).
 
 ### `placement`
 
@@ -145,46 +218,20 @@ The author columns `in-progress`, `in-review` and `completed` map the same way. 
 
 The first rule whose `match`, a glob over `<provider>:<key>`, matches gives the repository, the checkout (`""` for a new worktree, `main`, or a path), the role and whether the workspace is `shared` by several units. A unit no rule, hint or provider default places, such as a Slack DM, runs its sessions in `<state>/neutral`, an empty repository with no project checked out.
 
-## Slack
-
-| Key | Default | Means |
-|---|---|---|
-| `slack.client_id` | `""` | your Slack app's client id; empty leaves Slack off |
-| `slack.redirect_port` | `53682` | the login callback's port on `127.0.0.1` |
-| `slack.keychain_service` | `"{{name}}-slack"` | the Keychain service of the tokens |
-| `slack.post_allowlist` | `[]` | when set, the only channel or user ids a post may reach |
-| `slack.request_log` | `false` | log each Slack call's method and status |
-| `slack.ingest.terms` | `[]` | words that admit a message |
-| `slack.ingest.allow_apps`, `slack.ingest.deny_apps` | `[]` | bot (`B000`) or app (`A000`) ids to admit or drop |
-| `slack.ingest.socket` | `true` | Socket Mode |
-| `slack.ingest.since` | 7 days back | the first start's backfill date |
-| `slack.extraction.enabled` | `true` | the extraction job |
-| `slack.extraction.tier` | `"fast"` | the model tier of extraction calls |
-| `slack.extraction.language` | `"English"` | the language items are written in |
-| `slack.extraction.max_call_usd` | `0.10` | the cap of one call |
-| `slack.extraction.max_day_usd` | `3.0` | the cap of a day |
-| `slack.extraction.max_day_calls` | `500` | calls per day |
-| `slack.extraction.quiet` | `"90s"` | how long a unit stays quiet before extraction |
-| `slack.extraction.max_wait` | `"10m"` | the longest wait after a unit's oldest change |
-| `slack.extraction.window_chars` | `40000` | the conversation text one call reads |
-| `slack.extraction.max_failures` | `3` | failures in a row before a unit waits for its next change |
-| `slack.extraction.context_messages` | `10` | earlier DM messages shown as read-only context |
-| `slack.extraction.context_chars` | `4000` | the text budget of that context |
-| `slack.extraction.escalate_over_chars` | `0` | a conversation longer than this goes to the frontier tier, and runs again on `tier`, within the daily caps, when that call hits `max_call_usd`; 0 is off |
-| `slack.turns.max_chars` | `30000` | the Slack text a turn's instructions carry |
-
 ## Example
 
 ```json
 {
   "projects_dir": "~/projects",
   "profile": "mine",
-  "scope": { "teams": ["acme/backend"], "repos": ["acme/api"] },
-  "trusted_authors": ["github-actions[bot]"],
+  "github": {
+    "scope": { "teams": ["acme/backend"], "repos": ["acme/api"] },
+    "trusted_authors": ["github-actions[bot]"]
+  },
   "brief": { "enabled": true },
   "workflows": {
-    "workspace-review-finished": { "mode": "apply" },
-    "workspace-author-finished": { "mode": "apply" }
+    "workspace-review-finished": { "observe": false },
+    "workspace-author-finished": { "observe": false }
   },
   "projects": [
     { "match": "me/*", "agent_home": "~/.claude-personal" }
