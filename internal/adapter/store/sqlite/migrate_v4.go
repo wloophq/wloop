@@ -7,10 +7,11 @@ import (
 )
 
 // v4 keys briefs and tags by unit, makes brief_runs provider-neutral, keeps
-// a sent draft's closure and when its effects were applied, and records each
-// turn's role. It declares no compatible version: a v3 release refuses the
-// store. Its data steps run between the additions and the drops, so each
-// reads the columns and tables v4 drops.
+// a sent draft's closure and when its effects were applied, records each
+// turn's role and drops items.waiting_on, which nothing reads. It declares
+// no compatible version: a v3 release refuses the store. Its data steps run
+// between the additions and the drops, so each reads the columns and tables
+// v4 drops.
 func v4(ctx context.Context, tx *sql.Tx) error {
 	if err := execAll(v4Add...)(ctx, tx); err != nil {
 		return err
@@ -73,4 +74,5 @@ var v4Drop = []string{
 	`ALTER TABLE brief_runs DROP COLUMN changed_files`,
 	`ALTER TABLE brief_runs DROP COLUMN files`,
 	`ALTER TABLE extraction_cursors DROP COLUMN brief`,
+	`ALTER TABLE items DROP COLUMN waiting_on`,
 }

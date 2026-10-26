@@ -460,7 +460,7 @@ CREATE TABLE dossiers (
 
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,
-  body TEXT NOT NULL, state TEXT NOT NULL, waiting_on TEXT NOT NULL DEFAULT '[]',
+  body TEXT NOT NULL, state TEXT NOT NULL,
   confirmed INTEGER NOT NULL DEFAULT 0, provenance TEXT NOT NULL,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   PRIMARY KEY (provider, unit_key, id)

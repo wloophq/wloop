@@ -34,7 +34,7 @@ var golden = []string{
 	"intakes: seq, provider, unit_key, intent, source, request, state, brief, note, accepted_at, briefing_at, starting_at, ended_at, turn_seq, turn_id, error, log",
 	"item_ops: seq, provider, unit_key, item, op, provenance, outcome, reason, at",
 	"item_proposals: id, provider, unit_key, item, op, provenance, reason, dedupe, state, at",
-	"items: provider, unit_key, id, body, state, waiting_on, confirmed, provenance, created_at, updated_at",
+	"items: provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at",
 	"links: provider, unit_key, to_provider, to_key, kind, item, evidence, origin, at",
 	"messages: id, entry_id, provider, unit_key, kind, text, options, recommend, confirm, origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at",
 	"meta: key, value",
