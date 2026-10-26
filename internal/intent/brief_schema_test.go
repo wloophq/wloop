@@ -51,3 +51,22 @@ func TestAWorkflowReadsTheBriefIntentsExtras(t *testing.T) {
 		t.Fatalf("an undeclared extra: %v", got)
 	}
 }
+
+func TestAClassifySchemaOutsideTheSubsetFailsTheWorkflowLoad(t *testing.T) {
+	root := t.TempDir()
+	writeWorkflow(t, root, "triage", `subject = "github"
+when = "true"
+
+[trigger]
+on = "pr.opened"
+
+[[step]]
+use = "classify"
+prompt = "what is it"
+schema = '{"type":"object","properties":{"kind":{"type":"string","oneOf":[]}}}'
+`)
+	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
+	if got := l.BrokenWorkflows["triage"]; !strings.Contains(got.Error(), "step[0].schema") || !strings.Contains(got.Error(), `keyword "oneOf"`) {
+		t.Fatalf("%v", got)
+	}
+}

@@ -18,6 +18,7 @@ import (
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -464,6 +465,11 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 					s.add(ap, "must be a string")
 					continue
 				}
+				if k == schemaArg {
+					if _, err := jsonschema.Compile([]byte(v), jsonschema.Options{}); err != nil {
+						s.add(ap, "%v", err)
+					}
+				}
 				if st.Args == nil {
 					st.Args = map[string]any{}
 				}
@@ -583,6 +589,10 @@ func (s *sheet) defineApproval(w *workflow.Workflow, a *wApproval, slot string) 
 		}
 	}
 }
+
+// schemaArg is the step argument holding the schema the step's agent
+// answers to, which Go validates the answer against.
+const schemaArg = "schema"
 
 // withExtras is env with the brief.extra.* facts of p's brief intent when
 // slot's units have a brief.

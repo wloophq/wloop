@@ -594,3 +594,24 @@ func TestAFailedClassifyIsAnAttemptNotAnotherCharge(t *testing.T) {
 		t.Fatalf("spent %d, asked %d", spent, asker.calls)
 	}
 }
+
+func TestAClassifyAnswerOutsideItsSchemaIsRefused(t *testing.T) {
+	t.Parallel()
+	r := newClassifyRig(t, 5)
+	r.st = wfStep("classify", "prompt", "what is it", "schema",
+		`{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["feature","chore"]},"urgent":{"type":"boolean"}}}`)
+	close(r.asker.release)
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	r.s.classify.wait()
+	if _, err := r.run(t); err == nil || !strings.Contains(err.Error(), "bug is not one of") {
+		t.Fatalf("an answer outside the schema: %v", err)
+	}
+	units := classifiedUnits{Units: r.units, c: r.s.classify, workflows: func() []workflow.Workflow {
+		return []workflow.Workflow{{Name: "triage-bugs", Provider: unit.GitHub, Slot: "pr", Steps: []workflow.Step{r.st}}}
+	}}
+	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage-bugs.kind"] != nil {
+		t.Fatalf("the refused answer became facts: %v", facts)
+	}
+}
