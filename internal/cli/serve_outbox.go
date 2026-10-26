@@ -17,7 +17,8 @@ import (
 )
 
 // serveOutbox serves the drafts on d: published by each built module's Publisher, pinned to their turn's unit,
-// approved by the manifests' policies, their evidence written to the items ledger. The sender runs only with
+// approved by the manifests' policies, their evidence written to the items ledger, their effects applied once
+// each is sent. The sender runs only with
 // jobs, so serve --no-jobs publishes nothing.
 func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
@@ -33,7 +34,9 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err
 		}),
-		Items: ledger, Clock: clockFunc(e.Now), Log: logf}
+		Items: ledger, Clock: clockFunc(e.Now), Log: logf,
+		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
+			Effects: effectLookup(effectDeps{Nudges: e.entries(db, cfg, ledger), Modules: mods})}}
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	return d
 }

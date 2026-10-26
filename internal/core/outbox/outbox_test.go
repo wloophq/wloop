@@ -468,13 +468,13 @@ func TestWouldHoldsOnDoubt(t *testing.T) {
 	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}, {ID: "i2", Confidence: items.Low}}}
 	low := reply("x")
 	low.Items = []string{"i1", "i2"}
-	ask := reply("who owns this?")
-	ask.Kind = draft.AskOwner
+	held := reply("who owns this?")
+	held.Kind, held.HoldAutoSend = draft.AskOwner, true
 	comment := reply("note")
 	comment.Kind = draft.Comment
 	user := reply("mine")
 	user.Origin = draft.Origin{Kind: draft.OriginUser}
-	for name, p := range map[string]Proposal{"low": low, "ask_owner": ask, "comment": comment, "user": user} {
+	for name, p := range map[string]Proposal{"low": low, "held by its proposer": held, "comment": comment, "user": user} {
 		if d := e.propose(p); d.Would.Policy != draft.WouldHold || d.Would.Reason == "" {
 			t.Errorf("%s: %+v", name, d.Would)
 		}
@@ -516,7 +516,7 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 		t.Fatalf("applied %s %+v", ap.prov, ap.ops)
 	}
 	for i, op := range ap.ops {
-		anchor := unit.Anchor{Unit: thread, Ref: "draft:1:close", Permalink: got.Evidence.Permalink, At: got.Evidence.At}
+		anchor := unit.Anchor{Unit: thread, Ref: "draft:1", Permalink: got.Evidence.Permalink, At: got.Evidence.At}
 		want := items.Op{Op: items.OpEvidence, Unit: thread, Item: p.Items[i], Anchor: anchor,
 			Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: anchor}}
 		if op.Op != want.Op || op.Unit != want.Unit || op.Item != want.Item || op.Anchor != want.Anchor || *op.Evidence != *want.Evidence {
@@ -546,7 +546,7 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 	if d.State != draft.Sent || d.Would != (draft.Would{}) || d.Evidence.Ref != "9.9" || d.Evidence.At.IsZero() {
 		t.Fatalf("%+v", d)
 	}
-	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1:reply" || ran != 1 {
+	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1" || ran != 1 {
 		t.Fatalf("published %v ops %+v onsent %d", e.fx.published, ap.ops, ran)
 	}
 	e.disabled["slack"] = true

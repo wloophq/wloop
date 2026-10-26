@@ -12,7 +12,7 @@ const maxAnchorRef = 300
 // Anchor is a plugin's opaque reference to a message or event inside a unit.
 type Anchor struct {
 	Unit      Unit      `json:"unit"`
-	Ref       string    `json:"ref"` // slack "<conversation>/<ts>"; github "review:<id>", "comment:<id>", "commit:<oid>", "situation:<kind>"; "turn:<round>"; "row:<rev>"; "draft:<id>:<kind>"
+	Ref       string    `json:"ref"` // slack "<conversation>/<ts>"; github "review:<id>", "comment:<id>", "commit:<oid>", "situation:<kind>"; "turn:<round>"; "row:<rev>"; "draft:<id>", "draft:<id>:<kind>" before v4
 	Permalink string    `json:"permalink,omitempty"`
 	At        time.Time `json:"at,omitzero"`
 }
