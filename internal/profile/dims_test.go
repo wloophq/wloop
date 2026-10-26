@@ -12,9 +12,21 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
+var todaysFacts = map[Dim]string{
+	DimOrganization: "pr.owner", DimRepo: "pr.repo", DimUser: "pr.author", DimTeam: "pr.requested_teams", DimAssociation: "pr.association",
+	DimLabel: "pr.labels", DimBase: "pr.base", DimRound: "turn.round", DimReviewer: "pr.address.reviewers",
+	DimKind: "brief.kind", DimSize: "brief.size", DimRisk: "brief.risk",
+}
+
 func TestTodaysDimsResolveThroughFacts(t *testing.T) {
+	if len(Dims) != len(todaysFacts) {
+		t.Fatalf("%d dims, %d expected", len(Dims), len(todaysFacts))
+	}
 	for i, d := range Dims {
 		a := Aliases[i]
+		if todaysFacts[d] != a.Fact {
+			t.Errorf("%s reads %s, want %s", d, a.Fact, todaysFacts[d])
+		}
 		f, ok := factOf(a.Fact)
 		if a.Dim != d || !ok || !f.Dim {
 			t.Errorf("%s: alias %+v, fact %s declared %v, flagged dim %v", d, a, a.Fact, ok, f.Dim)
