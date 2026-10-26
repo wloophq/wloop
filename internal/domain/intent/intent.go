@@ -408,3 +408,7 @@ func (r *Registry) ForProvider(p unit.ProviderID) []Def {
 	}
 	return out
 }
+
+// HoldsDrafts says whether the intent's drafts wait for a person whatever
+// their approval: its manifest sets auto_send = false.
+func (d Def) HoldsDrafts() bool { return d.AutoSend != nil && !*d.AutoSend }
