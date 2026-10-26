@@ -89,6 +89,13 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Consequence**: a new behavior is a profile change; Go grows only by a fact, a step or a gate.
 - **Enforced by**: `TestNoIntentEnumerations`, `TestProseIsEmbeddedOnlyFromProfiles`, the boundary rules, `TestBuiltinNamesLiveInTheirTables`. See [Profile first](/architecture/profile-first/).
 
+## A block's conditions are facts
+
+- **Context**: a judgment block's path could name only a closed list of pull request dimensions, matched by code that knew each one, with English headings in Go; a Slack intent or a field the user adds to the brief had no path.
+- **Decision**: a path condition reads a fact. A fact flagged `Dim` in `builtin.Facts` is a dimension under its own name, an enum field of the brief intent's `extra` under its field's name, and today's names are aliases of facts (`organization` of `pr.owner`, `reviewer` of `pr.address.reviewers`, `kind` of `brief.kind`); a dimension whose fact belongs to a provider applies only under that provider's intents, and closed values come per provider. The headings of conditions are the profile's `labels.toml`.
+- **Consequence**: a new dimension is a fact with its flag, and a turn matches its blocks against the values of the facts the dimensions read; today's paths, their order and their headings are unchanged.
+- **Enforced by**: `internal/profile`'s `TestTodaysDimsResolveThroughFacts`, `TestAFactFlaggedDimIsABlockPathCondition`, `TestSegLabelsComeFromTheProfile`, `TestAnExtraEnumIsABlockPathAndAFacet`, and the rendered-turn goldens in `internal/turn/testdata`.
+
 ## The core owns what a trigger handled
 
 - **Context**: each trigger that must fire once per signal (a review, a head's failing checks, a head's conflict) needed its own column and migration, and a source other than GitHub or a profile's own trigger had nowhere to keep it.

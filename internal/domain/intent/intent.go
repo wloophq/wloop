@@ -9,6 +9,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -82,6 +83,9 @@ type Def struct {
 	// started as a turn. Prompt and Schema are its prompt, resolved through
 	// the profile layers, and its schema, in its directory.
 	Builds, Prompt, Schema string
+	// Extra are a brief builder's extra fields, the top-level properties of
+	// its Schema as the loader compiled it; nil for any other intent.
+	Extra []jsonschema.Property
 	// WorkspaceRepo is a manifest's workspace table: the repository the
 	// turn runs in, named outright or by an input; nil for a workspace
 	// builtin.

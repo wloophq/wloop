@@ -219,6 +219,14 @@ func (f turnFacts) Get(field string) any {
 		return c.Planned.String()
 	case "turn.round":
 		return c.Round
+	case "pr.requested_teams":
+		if c.PR() == nil {
+			return nil
+		}
+		if c.Facts.RequestedTeams == nil {
+			return []string{}
+		}
+		return c.Facts.RequestedTeams
 	case "last_review.exists":
 		return c.prior() != nil
 	case "last_review.verdict":

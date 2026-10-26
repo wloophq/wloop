@@ -41,10 +41,11 @@ func Conditions(p BlockPath, paths []string) string {
 	return strings.Join(out, ", ")
 }
 
-func (f Facts) inRepo(p BlockPath) bool {
+func (f Facts) inRepo(p BlockPath, vocab []DimDef) bool {
 	for _, c := range p.Conds {
 		if c.Dim == DimOrganization || c.Dim == DimRepo {
-			if v, _ := f.value(c.Dim); v != c.Value {
+			d, _ := lookup(vocab, c.Dim)
+			if !slices.ContainsFunc(f.values(d.Fact), func(v string) bool { return d.normalize(v) == c.Value }) {
 				return false
 			}
 		}
@@ -63,7 +64,7 @@ func (t Tree) List(kind Kind, f Facts) []Listed {
 			continue
 		}
 		l := Listed{Block: b, Conditions: Conditions(b.Path, b.FM.Paths)}
-		ok, _ := f.match(b)
+		ok, _ := f.match(b, t.vocab())
 		switch {
 		case slices.ContainsFunc(g.Parts, func(p Part) bool { return p.File == b.File }):
 			l.State = Applies
@@ -73,7 +74,7 @@ func (t Tree) List(kind Kind, f Facts) []Listed {
 			l.State = Trimmed
 		case ok:
 			l.State = Overridden
-		case f.inRepo(b.Path):
+		case f.inRepo(b.Path, t.vocab()):
 			l.State = Depends
 		default:
 			l.State = Elsewhere

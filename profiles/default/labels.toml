@@ -1,0 +1,27 @@
+# The heading a turn's judgment gives a block by its conditions. {value} is
+# the condition's value, {dim} its dimension and {Dim} the same capitalized;
+# a tag's heading also reads {key}. A user profile's labels.toml replaces
+# the keys it sets.
+
+# Any dimension [dims] does not name: a fact flagged dim or a field of the
+# brief's extra.
+other = "{Dim} {value}"
+tag = "Tag {key}={value}"
+
+[dims]
+organization = "Organization {value}"
+repo = "Repository {value}"
+user = "User {value}"
+team = "Team {value}"
+association = "Author association {value}"
+label = "Label {value}"
+base = "Base branch {value}"
+reviewer = "Reviewer {value}"
+kind = "Kind {value}"
+size = "Size {value}"
+risk = "Risk {value}"
+
+# One condition's heading, by <dim>=<value>, over the dimension's.
+[values]
+"round=first" = "First rounds"
+"round=follow-up" = "Follow-up rounds"

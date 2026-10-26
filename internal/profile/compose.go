@@ -11,20 +11,33 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 )
 
-// Facts are what a block's conditions are matched against. Kind, Size,
-// Risk, Tags (key:value) and Files come from the brief and count only when
-// HasBrief is true.
+// Facts are what a block's conditions are matched against. Values are
+// the facts the dimensions read, by fact name, each a string or a
+// []string. Tags (key:value) and Files come from the brief; they, and the
+// values of brief facts, count only when HasBrief is true.
 type Facts struct {
-	Owner, Repo, Author, Association, Base string
-	// Teams are the teams a review was requested through, as <org>-<slug>.
-	Teams, Labels []string
-	// Round is first or follow-up.
-	Round string
-	// Reviewers are the reviewers an address round answers.
-	Reviewers        []string
-	Kind, Size, Risk string
-	Tags, Files      []string
-	HasBrief         bool
+	Values      map[string]any
+	Tags, Files []string
+	HasBrief    bool
+}
+
+// values are what f holds of fact.
+func (f Facts) values(fact string) []string {
+	switch v := f.Values[fact].(type) {
+	case string:
+		return []string{v}
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 type seg struct {
@@ -35,11 +48,11 @@ type seg struct {
 func segsOf(p BlockPath) []seg {
 	out := make([]seg, 0, len(p.Conds)+len(p.Tags))
 	for _, c := range p.Conds {
-		out = append(out, seg{rank: rank(c.Dim), key: string(c.Dim), value: c.Value})
+		out = append(out, seg{rank: rankOf(c.Dim), key: string(c.Dim), value: c.Value})
 	}
 	for _, t := range p.Tags {
 		k, v, _ := strings.Cut(t, ":")
-		out = append(out, seg{rank: len(Dims), key: k, value: v})
+		out = append(out, seg{rank: len(Aliases) + 1, key: k, value: v})
 	}
 	return out
 }
@@ -74,46 +87,15 @@ func holds(list []string, v string) bool {
 // bareLogin drops the "[bot]" GitHub's REST API gives a bot's login.
 func bareLogin(login string) string { return strings.TrimSuffix(login, "[bot]") }
 
-func (f Facts) value(d Dim) (string, bool) {
-	switch d {
-	case DimOrganization:
-		return fold(f.Owner), false
-	case DimRepo:
-		return fold(f.Repo), false
-	case DimUser:
-		return fold(f.Author), false
-	case DimAssociation:
-		return strings.ReplaceAll(fold(f.Association), "_", "-"), false
-	case DimBase:
-		return fold(f.Base), false
-	case DimRound:
-		return fold(f.Round), false
-	case DimKind:
-		return fold(f.Kind), true
-	case DimSize:
-		return fold(f.Size), true
-	case DimRisk:
-		return fold(f.Risk), true
-	}
-	return "", false
-}
-
-func (f Facts) match(b Block) (ok, needsBrief bool) {
+func (f Facts) match(b Block, vocab []DimDef) (ok, needsBrief bool) {
 	for _, c := range b.Path.Conds {
-		var hit, brief bool
-		switch c.Dim {
-		case DimTeam:
-			hit = holds(f.Teams, c.Value)
-		case DimLabel:
-			hit = holds(f.Labels, c.Value)
-		case DimReviewer:
-			hit = slices.ContainsFunc(f.Reviewers, func(r string) bool { return bareLogin(fold(r)) == bareLogin(c.Value) })
-		default:
-			var v string
-			v, brief = f.value(c.Dim)
-			hit = v == c.Value
+		d, known := lookup(vocab, c.Dim)
+		if !known {
+			return false, false
 		}
-		if brief && !f.HasBrief {
+		want := d.normalize(c.Value)
+		hit := slices.ContainsFunc(f.values(d.Fact), func(v string) bool { return d.normalize(v) == want })
+		if d.Brief && !f.HasBrief {
 			needsBrief = true
 		} else if !hit {
 			return false, false
@@ -175,42 +157,14 @@ func matchGlob(pattern, name []string) bool {
 	return ok && matchGlob(pattern[1:], name[1:])
 }
 
-func segLabel(s seg) string {
-	switch Dim(s.key) {
-	case DimOrganization:
-		return "Organization " + s.value
-	case DimRepo:
-		return "Repository " + s.value
-	case DimUser:
-		return "User " + s.value
-	case DimTeam:
-		return "Team " + s.value
-	case DimAssociation:
-		return "Author association " + s.value
-	case DimLabel:
-		return "Label " + s.value
-	case DimBase:
-		return "Base branch " + s.value
-	case DimRound:
-		if s.value == "first" {
-			return "First rounds"
-		}
-		return "Follow-up rounds"
-	case DimReviewer:
-		return "Reviewer " + s.value
-	case DimKind:
-		return "Kind " + s.value
-	case DimSize:
-		return "Size " + s.value
-	case DimRisk:
-		return "Risk " + s.value
-	}
-	return "Tag " + s.key + "=" + s.value
-}
-
 func lowerFirst(s string) string {
 	r, n := utf8.DecodeRuneInString(s)
 	return string(unicode.ToLower(r)) + s[n:]
+}
+
+func upperFirst(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[n:]
 }
 
 func source(b Block) string { return b.Layer.Name + ": " + b.File }
@@ -220,7 +174,7 @@ type placed struct {
 	segs []seg
 }
 
-func heading(kind Kind, before []placed, p placed) (int, string) {
+func heading(kind Kind, labels Labels, before []placed, p placed) (int, string) {
 	bundled := p.b.Layer.Dir == ""
 	var label string
 	level := 3
@@ -243,7 +197,7 @@ func heading(kind Kind, before []placed, p placed) (int, string) {
 		level = min(3+len(in), maxLevel)
 		parts := make([]string, 0, len(p.segs)-deepest)
 		for i, s := range p.segs[deepest:] {
-			l := segLabel(s)
+			l := labels.of(s)
 			if i > 0 {
 				l = lowerFirst(l)
 			}
@@ -286,7 +240,7 @@ func (t Tree) Compose(kind Kind, f Facts) Guide {
 		if b.Path.Intent != kind {
 			continue
 		}
-		ok, needs := f.match(b)
+		ok, needs := f.match(b, t.vocab())
 		if needs {
 			g.Skipped = append(g.Skipped, source(b))
 		}
@@ -307,7 +261,7 @@ func (t Tree) Compose(kind Kind, f Facts) Guide {
 	}
 	size := 0
 	for i, it := range kept {
-		level, label := heading(kind, kept[:i], it)
+		level, label := heading(kind, t.labels(), kept[:i], it)
 		p := Part{Layer: it.b.Layer, File: it.b.File, Path: it.b.Rel(), Label: label, Level: level,
 			Override: it.b.FM.Override, Text: it.b.body(level)}
 		size += len(p.Label) + len(p.Text)

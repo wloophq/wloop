@@ -34,6 +34,8 @@ type Brief struct {
 	// written; OlderFormat, that the loop's brief format changed since.
 	HeadMoved, OlderFormat bool
 	Run                    int64
+	// Extra are the brief intent's extra fields, by name.
+	Extra map[string]any
 }
 
 // Stored is what the loop keeps about a pull request beyond GitHub's read.
@@ -159,7 +161,8 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 	if c, err = Complete(c, l); err != nil {
 		return Context{}, err
 	}
-	return b.compose(c, l, st.Teams)
+	c.Facts.RequestedTeams = st.Teams
+	return b.compose(c, l)
 }
 
 // payload is the request's payload, else what the unit provider's reader
@@ -189,13 +192,14 @@ func (b Builder) payload(ctx context.Context, r Request) (Payload, error) {
 
 // compose reads the turn's guides: the intent's profile with the turn's
 // round, then each also_profiles entry whose when holds, with its round.
-func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Context, error) {
+func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 	d := c.Def
 	if d.Profile == "" {
 		return c, nil
 	}
+	dims := profile.Vocabulary(l.Registry)
 	var err error
-	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.facts(teams, c.Round))
+	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.facts(dims, c.Round))
 	if err != nil {
 		return Context{}, err
 	}
@@ -205,7 +209,7 @@ func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Conte
 		if i < len(also) && also[i] != nil && !also[i].Eval(turnFacts{&c}) {
 			continue
 		}
-		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.facts(teams, a.Round))
+		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.facts(dims, a.Round))
 		if err != nil {
 			return Context{}, err
 		}
@@ -214,18 +218,53 @@ func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Conte
 	return c, nil
 }
 
-func (c Context) facts(teams []string, round string) profile.Facts {
-	f := profile.Facts{Teams: teams, Round: round}
-	if pr := c.PR(); pr != nil {
-		f.Owner, f.Repo, f.Author, f.Association, f.Base, f.Labels = pr.Owner, pr.Repo, pr.Author, pr.Association, pr.Base, pr.Labels
-		if pr.Address != nil {
-			f.Reviewers = pr.Address.ReviewerLogins()
+// facts are the values of the dimensions a guide is matched against, the
+// turn's round being round.
+func (c Context) facts(dims []profile.DimDef, round string) profile.Facts {
+	f := profile.Facts{Values: map[string]any{}}
+	get := turnFacts{&c}
+	for _, d := range dims {
+		var v any
+		switch {
+		case d.Fact == "turn.round":
+			v = round
+		case d.Extra != "":
+			if c.Brief != nil {
+				v = c.Brief.Extra[d.Extra]
+			}
+		case d.Brief:
+			v = c.Brief.fact(d.Fact)
+		default:
+			v = get.Get(d.Fact)
+		}
+		if v != nil {
+			f.Values[d.Fact] = v
 		}
 	}
 	if br := c.Brief; br != nil {
-		f.Kind, f.Size, f.Risk, f.Tags, f.Files, f.HasBrief = br.Kind, br.Size, br.Risk, br.Tags, br.Files, true
+		f.Tags, f.Files, f.HasBrief = br.Tags, br.Files, true
 	}
 	return f
+}
+
+// fact is the brief fact name of b; nil without a brief.
+func (b *Brief) fact(name string) any {
+	if b == nil {
+		return nil
+	}
+	switch name {
+	case "brief.goal":
+		return b.Goal
+	case "brief.kind":
+		return b.Kind
+	case "brief.size":
+		return b.Size
+	case "brief.risk":
+		return b.Risk
+	case "brief.tags":
+		return b.Tags
+	}
+	return nil
 }
 
 var mineRef = regexp.MustCompile(`\bpr\.mine\b|\.Facts\.Mine\b`)

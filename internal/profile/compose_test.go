@@ -52,7 +52,7 @@ func TestTheUsersExample(t *testing.T) {
 		"organization=globex/intent=address.md":             "ADDRESS",
 		"organization=other/intent=review.md":               "OTHER",
 	})
-	g := tr.Compose(Review, Facts{Owner: "Globex", Repo: "widgets", Author: "carol", HasBrief: true, Tags: []string{"change:refac"}})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "Globex", "pr.repo": "widgets", "pr.author": "carol"}, HasBrief: true, Tags: []string{"change:refac"}})
 	want := []string{brand.Name + "'s review guide", "Your review guide", "Organization globex", "Repository widgets", "User carol", "Tag change=refac"}
 	if !slices.Equal(labels(g), want) || !slices.Equal(levels(g), []int{3, 3, 3, 4, 3, 3}) {
 		t.Fatalf("%q %v", labels(g), levels(g))
@@ -75,7 +75,7 @@ func TestBundledComesFirstAndUserExpands(t *testing.T) {
 		block(bundled(), "organization=acme/intent=review.md", "LOOP", FrontMatter{}),
 		block(bundled(), "intent=review.md", "BASE", FrontMatter{}),
 	}}
-	g := tr.Compose(Review, Facts{Owner: "acme"})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme"}})
 	if texts(g) != "BASE|LOOP|MINE" || !slices.Equal(labels(g), []string{brand.Name + "'s review guide", "Organization acme (" + brand.Name + ")", "Organization acme"}) ||
 		!slices.Equal(levels(g), []int{3, 3, 3}) {
 		t.Fatalf("%q %q %v", texts(g), labels(g), levels(g))
@@ -92,11 +92,11 @@ func TestNothingMatchesElsewhere(t *testing.T) {
 		"round=first/intent=review.md":                        "FIRST",
 		"association=first-time-contributor/intent=review.md": "WELCOME",
 	})
-	g := tr.Compose(Review, Facts{Owner: "other", Repo: "x", Author: "bob", Base: "dev", Round: "follow-up", Association: "MEMBER"})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "other", "pr.repo": "x", "pr.author": "bob", "pr.base": "dev", "turn.round": "follow-up", "pr.association": "MEMBER"}})
 	if !slices.Equal(labels(g), []string{brand.Name + "'s review guide", "Your review guide"}) {
 		t.Fatalf("%q", labels(g))
 	}
-	g = tr.Compose(Review, Facts{Owner: "x", Base: "Main", Round: "first", Association: "FIRST_TIME_CONTRIBUTOR"})
+	g = tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "x", "pr.base": "Main", "turn.round": "first", "pr.association": "FIRST_TIME_CONTRIBUTOR"}})
 	if !slices.Equal(labels(g)[2:], []string{"Author association first-time-contributor", "Base branch main", "First rounds"}) {
 		t.Fatalf("%q", labels(g))
 	}
@@ -108,11 +108,11 @@ func TestMissingAncestorJoinsTheLabel(t *testing.T) {
 		"organization=acme/intent=review.md":                                "ACME",
 		"organization=acme/repo=api/user=ana/tags/lang=go/intent=review.md": "DEEP",
 	})
-	g := tr.Compose(Review, Facts{Owner: "globex", Repo: "widgets"})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "globex", "pr.repo": "widgets"}})
 	if got := labels(g)[1:]; !slices.Equal(got, []string{"Organization globex, repository widgets"}) || g.Parts[1].Level != 3 {
 		t.Fatalf("%q %v", got, levels(g))
 	}
-	g = tr.Compose(Review, Facts{Owner: "acme", Repo: "api", Author: "ana", HasBrief: true, Tags: []string{"lang:go"}})
+	g = tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "pr.repo": "api", "pr.author": "ana"}, HasBrief: true, Tags: []string{"lang:go"}})
 	if got := labels(g)[1:]; !slices.Equal(got, []string{"Organization acme", "Repository api, user ana, tag lang=go"}) || !slices.Equal(levels(g)[1:], []int{3, 4}) {
 		t.Fatalf("%q %v", got, levels(g))
 	}
@@ -131,7 +131,7 @@ func TestOverrideDropsOnlyAncestors(t *testing.T) {
 		block(user(d), "user=ana/intent=review.md", "ANA", FrontMatter{}),
 		block(user(d), "tags/change=refac/intent=review.md", "REFAC", FrontMatter{}),
 	}}
-	g := tr.Compose(Review, Facts{Owner: "globex", Repo: "widgets", Author: "ana", Labels: []string{"hotfix"}, HasBrief: true, Tags: []string{"change:refac"}})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "globex", "pr.repo": "widgets", "pr.author": "ana", "pr.labels": []string{"hotfix"}}, HasBrief: true, Tags: []string{"change:refac"}})
 	if texts(g) != "OP|OP ANA|HOTFIX|ANA|REFAC" {
 		t.Fatalf("%q", texts(g))
 	}
@@ -139,7 +139,7 @@ func TestOverrideDropsOnlyAncestors(t *testing.T) {
 		g.Parts[1].Label != "User ana" || g.Parts[1].Level != 4 || g.Parts[2].Label != "Organization globex, label hotfix" {
 		t.Fatalf("%q %v", labels(g), levels(g))
 	}
-	if g := tr.Compose(Review, Facts{Owner: "globex", Repo: "web"}); texts(g) != "BASE|ROOT|GLOBEX" {
+	if g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "globex", "pr.repo": "web"}}); texts(g) != "BASE|ROOT|GLOBEX" {
 		t.Fatalf("the override reached another repository: %q", texts(g))
 	}
 }
@@ -152,7 +152,7 @@ func TestBriefDimsSkipWithoutABrief(t *testing.T) {
 		"tags/change=refac/intent=review.md":           "REFAC",
 		"organization=acme/intent=review.md":           "+++\npaths = [\"**/*.sql\"]\n+++\nSQL",
 	})
-	g := tr.Compose(Review, Facts{Owner: "acme"})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme"}})
 	if len(g.Parts) != 1 {
 		t.Fatalf("%q", labels(g))
 	}
@@ -163,7 +163,7 @@ func TestBriefDimsSkipWithoutABrief(t *testing.T) {
 	if !slices.Equal(g.Skipped, want) {
 		t.Fatalf("%q", g.Skipped)
 	}
-	g = tr.Compose(Review, Facts{Owner: "acme", HasBrief: true, Kind: "fix", Risk: "low", Files: []string{"db/0001.sql"}})
+	g = tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "brief.kind": "fix", "brief.risk": "low"}, HasBrief: true, Files: []string{"db/0001.sql"}})
 	if !slices.Equal(labels(g)[1:], []string{"Organization acme", "Kind fix"}) || len(g.Skipped) != 0 {
 		t.Fatalf("%q %q", labels(g), g.Skipped)
 	}
@@ -176,7 +176,7 @@ func TestTeamAndLabelMatch(t *testing.T) {
 		"label=wip/intent=review.md":          "WIP",
 		"team=acme-web/intent=review.md":      "WEB",
 	})
-	g := tr.Compose(Review, Facts{Teams: []string{"Acme-Platform"}, Labels: []string{"HotFix", "docs"}})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.requested_teams": []string{"Acme-Platform"}, "pr.labels": []string{"HotFix", "docs"}}})
 	if !slices.Equal(labels(g)[1:], []string{"Team acme-platform", "Label hotfix"}) {
 		t.Fatalf("%q", labels(g))
 	}
@@ -209,11 +209,11 @@ func TestDelegatesFromTheLastBlock(t *testing.T) {
 		"organization=acme/intent=review.md": "+++\n[delegates]\nclaude = [\"/b\"]\n+++\nACME",
 		"user=ana/intent=review.md":          "ANA",
 	})
-	g := tr.Compose(Review, Facts{Owner: "acme", Author: "ana"})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "pr.author": "ana"}})
 	if !slices.Equal(g.Delegates["claude"], []string{"/b"}) || g.DelegatesFrom != filepath.Join(d, "organization=acme", "intent=review.md") {
 		t.Fatalf("%v from %s", g.Delegates, g.DelegatesFrom)
 	}
-	g = tr.Compose(Review, Facts{Owner: "other"})
+	g = tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "other"}})
 	if !slices.Equal(g.Delegates["claude"], []string{"/a"}) {
 		t.Fatalf("%v", g.Delegates)
 	}
@@ -228,7 +228,7 @@ func TestOverTheJudgmentLimitDropsFromTheEnd(t *testing.T) {
 		"user=ana/intent=review.md":                   big,
 		"tags/lang=go/intent=review.md":               big,
 	})
-	g := tr.Compose(Review, Facts{Owner: "acme", Repo: "api", Author: "ana", HasBrief: true, Tags: []string{"lang:go"}})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "pr.repo": "api", "pr.author": "ana"}, HasBrief: true, Tags: []string{"lang:go"}})
 	want := []string{"user: " + filepath.Join(d, "tags", "lang=go", "intent=review.md"), "user: " + filepath.Join(d, "user=ana", "intent=review.md")}
 	if !slices.Equal(g.Dropped, want) || !slices.Equal(labels(g), []string{brand.Name + "'s review guide", "Your review guide", "Organization acme", "Repository api"}) {
 		t.Fatalf("%q %q", g.Dropped, labels(g))
@@ -251,7 +251,7 @@ func TestAReviewerBlockAppliesWhenTheReviewerIsAmongTheRounds(t *testing.T) {
 		"someone else":              {[]string{"ana"}, false},
 		"no reviewer":               {nil, false},
 	} {
-		if got := has(Facts{Reviewers: c.reviewers}); got != c.want {
+		if got := has(Facts{Values: map[string]any{"pr.address.reviewers": c.reviewers}}); got != c.want {
 			t.Errorf("%s: applies %v", name, got)
 		}
 	}
