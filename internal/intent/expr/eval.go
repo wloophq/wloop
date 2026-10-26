@@ -20,6 +20,9 @@ func (p *Program) Eval(f Facts) bool {
 // Reads are the fields the predicate names, sorted.
 func (p *Program) Reads() []string { return p.reads }
 
+// Source is the expression as the manifest wrote it.
+func (p *Program) Source() string { return p.src }
+
 func (p *Program) run(a activation) (bool, error) {
 	out, _, err := p.prg.Eval(a)
 	if err != nil {
@@ -124,6 +127,9 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 }
 
 func (w predicate) Reads() []string { return w.p.reads }
+
+// Source is the predicate's expression as the manifest wrote it.
+func (w predicate) Source() string { return w.p.src }
 
 func (w predicate) MarkNames() []string { return w.p.marks }
 

@@ -26,6 +26,7 @@ type Env map[string]Type // dotted field -> type, one slot
 type Facts interface{ Get(field string) any }
 
 type Program struct {
+	src   string
 	prg   cel.Program
 	env   Env
 	reads []string

@@ -88,3 +88,11 @@ type condition struct{ p workflow.Predicate }
 func (c condition) Holds(facts map[string]any, now time.Time) (bool, error) {
 	return c.p.Match(workflow.Vars{Facts: facts, Now: now})
 }
+
+// Source is the rule's when as the manifest wrote it.
+func (c condition) Source() string {
+	if s, ok := c.p.(interface{ Source() string }); ok {
+		return s.Source()
+	}
+	return ""
+}

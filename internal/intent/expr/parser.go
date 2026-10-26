@@ -44,7 +44,7 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	p := &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env), pins: pins(ast.NativeRep())}
+	p := &Program{src: src, prg: prg, env: env, reads: reads(ast.NativeRep(), env), pins: pins(ast.NativeRep())}
 	if marks {
 		if p.marks, err = handledNames(ast.NativeRep()); err != nil {
 			return nil, &Error{Col: 1, Msg: err.Error()}
