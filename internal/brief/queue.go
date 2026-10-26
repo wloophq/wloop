@@ -62,6 +62,9 @@ const (
 	TriggerRefresh = "refresh"
 	// TriggerTrial is the breaker's run that tells whether briefs work again.
 	TriggerTrial = "trial"
+	// TriggerFields is a run that fills a brief's missing extra fields,
+	// reusing its core.
+	TriggerFields = "fields"
 )
 
 type Store interface {
@@ -120,6 +123,13 @@ type Deps struct {
 	// configuration changes, or the minute turns; nil reads every call.
 	Changes port.Changes
 	Log     func(format string, args ...any)
+	// Schema is the composed schema of the brief intent; the zero Composed
+	// is the core schema alone.
+	Schema Composed
+	// Prompt is the brief intent's prompt and FieldsPrompt its
+	// missing-fields prompt, as the profile resolves them; empty is the
+	// bundled one.
+	Prompt, FieldsPrompt string
 }
 
 type Queue struct {
@@ -307,7 +317,7 @@ func (q *Queue) version(ref github.Ref) (taxonomy, version string) {
 	if q.versions == nil {
 		q.versions = map[string]string{}
 	}
-	q.versions[taxonomy] = Version(taxonomy)
+	q.versions[taxonomy] = versionOf(cmp.Or(q.d.Prompt, promptTemplate), taxonomy)
 	return taxonomy, q.versions[taxonomy]
 }
 
@@ -434,7 +444,11 @@ func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout t
 		if in.DiffBytes > 0 || in.DiffNote == "" {
 			run.DiffBytes = &in.DiffBytes
 		}
-		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Prompt: Prompt(taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in)})
+		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Schema: q.d.Schema,
+			Prompt: fill(cmp.Or(q.d.Prompt, promptTemplate), taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in, nil)})
+		if res.ExtraErr != nil {
+			q.d.Log("brief %s: the extra fields are left missing: %v", pr.Ref, res.ExtraErr)
+		}
 		run.CallMS = ms(q.d.Now().Sub(inputAt))
 		if res.Duration > 0 {
 			run.AgentMS = ms(res.Duration)

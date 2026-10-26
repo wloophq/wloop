@@ -109,6 +109,10 @@ type fakeRunner struct {
 	// res, when set, is what every call returns, with a failure too.
 	res   *Result
 	takes func()
+	// fields are what a missing-fields call answers, by name; asked are
+	// the fields each call asked for.
+	fields map[string]any
+	asked  [][]string
 }
 
 func (f *fakeRunner) Run(_ context.Context, c Call) (Result, error) {
@@ -116,6 +120,14 @@ func (f *fakeRunner) Run(_ context.Context, c Call) (Result, error) {
 	defer f.mu.Unlock()
 	f.calls++
 	f.prompts = append(f.prompts, c.Prompt)
+	f.asked = append(f.asked, c.Fields)
+	if len(c.Fields) > 0 {
+		out := map[string]any{}
+		for _, n := range c.Fields {
+			out[n] = f.fields[n]
+		}
+		return Result{Fields: out, CostUSD: ptr(0.002)}, nil
+	}
 	if f.takes != nil {
 		f.takes()
 	}
