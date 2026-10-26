@@ -447,7 +447,7 @@ func withEngine(d daemon.Deps, e *Env, ed engineDeps) daemon.Deps {
 	eng := meteredEngine{e.newEngine(ed)}
 	d.Sweep = eng
 	pd := ed
-	pd.WorkspaceFacts = siblingFacts(ed.WorkspaceFacts)
+	pd.WorkspaceFacts, pd.Withdrawals = siblingFacts(ed.WorkspaceFacts), nil
 	d.Plan = servedPlan{eng: eng, plan: e.planEngine(pd)}
 	d.Pending = enginePending{e}
 	return d

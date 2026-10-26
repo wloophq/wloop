@@ -27,6 +27,9 @@ type Engine struct {
 	Marks     Marks // nil reads every unit as having no marks
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals Withdrawals
+	// PluginEnabled says whether a provider's plugin is on; nil: every one
+	// is. No draft of a disabled plugin's unit is withdrawn.
+	PluginEnabled func(unit.ProviderID) bool
 	Reachable   func(ctx context.Context) error
 	RetryBase   time.Duration
 	Pub         port.Publisher

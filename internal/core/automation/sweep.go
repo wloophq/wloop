@@ -38,7 +38,8 @@ func (t *tally) add(r result) {
 // trigger, saves the plan, advances the event cursors and drops the run
 // items whose source moved. Under the lock it drops the run items whose unit
 // was noted after the plan's generation and no longer match, notes the
-// refusals, runs the run items and the due pending ones, and settles.
+// refusals, runs the run items and the due pending ones, withdraws the
+// drafts the workflows no longer call for, and settles.
 func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped string, err error) {
 	if e.Reachable != nil {
 		if err := e.Reachable(ctx); err != nil {
@@ -150,6 +151,9 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	}
 	t.ran, t.failed, t.refused, t.deferred, t.transient = t.ran+due.ran, t.failed+due.failed,
 		t.refused+due.refused, t.deferred+due.deferred, t.transient+due.transient
+	if err := e.withdraw(ctx); err != nil {
+		e.logf("withdrawing drafts: %v", err)
+	}
 	if s, ok := e.Units.(Settler); ok {
 		if err := s.Settle(ctx, st); err != nil {
 			return "", "", fmt.Errorf("settling: %w", err)
