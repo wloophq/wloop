@@ -47,4 +47,4 @@ The daemon starts the headless agent calls (the brief, headless turns, the Slack
 
 ## Authority
 
-Agents report facts; only your surfaces grant authority: endorsing a verdict, approving a draft, taking over a pull request, removing a workspace. Every outbound post is a draft first, and only an approved draft reaches the plugin's publisher. Agents never hold a source's token; they read and draft through the daemon's tools. [Security](/concepts/security/) states the limits of this boundary.
+Agents report facts; only your surfaces grant authority: endorsing a verdict, approving a draft, taking over a pull request, removing a workspace. Every post the loop proposes is a draft first, and only an approved draft reaches the plugin's publisher. Agents also post as you without a draft: rounds publish on GitHub through `gh`, and a tool an agent calls can post to Slack at once through the daemon, recorded afterwards as a sent draft when it lands in a unit the loop tracks. The loop never hands an agent a source's token; agents read and draft Slack through the daemon's tools. [Security](/concepts/security/) states the limits of this boundary.

@@ -61,11 +61,11 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Consequence**: any workspace or session can be recreated from stored context.
 - **Enforced by**: the views' contract suites.
 
-## Every outbound post is a draft
+## What the loop proposes to post is a draft
 
 - **Context**: a post under your name cannot be taken back, and a retry after a crash can post twice.
-- **Decision**: what {{name}} would post is a draft in the Outbox; only an approved draft reaches the plugin's publisher, once, with no automatic retry, and `Verify` settles a draft a crash left in `sending`.
-- **Consequence**: approval policies decide what goes out unattended; agents never hold a source's token.
+- **Decision**: what {{name}} proposes to post is a draft in the Outbox; only an approved draft reaches the plugin's publisher, once, with no automatic retry, and `Verify` settles a draft a crash left in `sending`.
+- **Consequence**: approval policies decide which drafts go out unattended; the loop never hands an agent a source's token.
 - **Enforced by**: `internal/core/outbox` tests.
 
 ## A worktree belongs to the manager that created it

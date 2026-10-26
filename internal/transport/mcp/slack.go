@@ -53,7 +53,7 @@ const slackSendName = "slack_send_message"
 func slackSendTool() tool {
 	return tool{
 		Name:        slackSendName,
-		Description: "Post a message to Slack as the user. Use it only when the user asked for this message to be sent.",
+		Description: "Post a message to Slack as the user, at once and without their approval. When it is unclear whether the user wants this message posted in their name, ask them first.",
 		InputSchema: object(map[string]*schema{
 			"target":    str(0, "a message permalink, #channel, channel id, @handle, email or user id"),
 			"text":      str(0, "the message, in Markdown"),

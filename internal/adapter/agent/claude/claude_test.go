@@ -229,10 +229,10 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 	doc := map[string]any{}
 	Home{}.installSettings(doc)
 	perms, _ := doc["permissions"].(map[string]any)
-	if ask, _ := perms["ask"].([]any); !slices.Contains(ask, any(SlackSendTool)) {
+	if ask, _ := perms["ask"].([]any); slices.Contains(ask, any(SlackSendTool)) {
 		t.Fatalf("installed ask %v", perms["ask"])
 	}
-	if allow, _ := perms["allow"].([]any); slices.Contains(allow, any(SlackDraftTool)) || slices.Contains(allow, any(SlackSendTool)) {
+	if allow, _ := perms["allow"].([]any); slices.Contains(allow, any(SlackDraftTool)) || !slices.Contains(allow, any(SlackSendTool)) {
 		t.Fatalf("installed allow %v", perms["allow"])
 	}
 }

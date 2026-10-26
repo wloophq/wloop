@@ -270,9 +270,7 @@ func TestInstallBytesArePinned(t *testing.T) {
   },
   "permissions": {
     "allow": [
-      "` + brand.ToolPrefix() + `turn_end"
-    ],
-    "ask": [
+      "` + brand.ToolPrefix() + `turn_end",
       "` + brand.ToolPrefix() + `slack_send_message"
     ]
   }
@@ -514,30 +512,30 @@ func settingsList(t *testing.T, home, key string) []string {
 	return s.Permissions[key]
 }
 
-func TestInstallAsksBeforeSlackSend(t *testing.T) {
+func TestInstallLetsSlackSendPostWithoutAsking(t *testing.T) {
 	h, home := testHome(t, nil)
 	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"ask":["Bash(rm *)"]}}`)
 	if _, err := h.Install(context.Background(), home, false); err != nil {
 		t.Fatal(err)
 	}
-	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)", brand.ToolPrefix() + "slack_send_message"}) {
+	if !slices.Contains(settingsList(t, home, "allow"), SlackSendTool) {
+		t.Fatalf("allow = %q", settingsList(t, home, "allow"))
+	}
+	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)"}) {
 		t.Fatalf("ask = %q", got)
 	}
-	if slices.Contains(settingsList(t, home, "allow"), SlackSendTool) {
-		t.Fatal("install allowed the Slack send tool")
-	}
-	if p := problems(t, h, home)["permission ask "+SlackSendTool]; p != "" {
+	if p := problems(t, h, home)["permission "+SlackSendTool]; p != "" {
 		t.Fatalf("check after install: %q", p)
 	}
 }
 
-func TestUninstallRemovesTheAskRule(t *testing.T) {
+func TestInstallDropsTheAskRuleAnEarlierInstallAdded(t *testing.T) {
 	h, home := testHome(t, nil)
-	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"ask":["Bash(rm *)"]}}`)
-	if _, err := h.Install(context.Background(), home, false); err != nil {
-		t.Fatal(err)
+	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"ask":["Bash(rm *)","`+SlackSendTool+`"]}}`)
+	if p := problems(t, h, home)["permission "+SlackSendTool]; p == "" {
+		t.Fatal("check passes a home that asks before every Slack post")
 	}
-	lines, err := h.Remove(context.Background(), home, false)
+	lines, err := h.Install(context.Background(), home, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -547,30 +545,29 @@ func TestUninstallRemovesTheAskRule(t *testing.T) {
 	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission ask "+SlackSendTool) }) {
 		t.Fatalf("lines %q", lines)
 	}
+	if p := problems(t, h, home)["permission "+SlackSendTool]; p != "" {
+		t.Fatalf("check after install: %q", p)
+	}
 }
 
-func TestDoctorFlagsSlackSendAllowed(t *testing.T) {
+func TestUninstallRemovesTheSlackSendPermission(t *testing.T) {
 	h, home := testHome(t, nil)
+	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"allow":["Bash(ls *)"],"ask":["Bash(rm *)"]}}`)
 	if _, err := h.Install(context.Background(), home, false); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(home, "settings.json"), `{"permissions":{"allow":["`+SlackSendTool+`"],"ask":["`+SlackSendTool+`"]}}`)
-	fs, err := h.Check(context.Background(), home)
+	lines, err := h.Remove(context.Background(), home, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(fs, func(f setup.Finding) bool { return f.Entry == "permission allow "+SlackSendTool })
-	if i < 0 || !strings.Contains(fs[i].Problem, "permissions.allow") || fs[i].Fix == "" {
-		t.Fatalf("findings %+v", fs)
+	if got := settingsList(t, home, "allow"); !slices.Equal(got, []string{"Bash(ls *)"}) {
+		t.Fatalf("allow = %q", got)
 	}
-	if _, err := h.Install(context.Background(), home, false); err != nil {
-		t.Fatal(err)
+	if got := settingsList(t, home, "ask"); !slices.Equal(got, []string{"Bash(rm *)"}) {
+		t.Fatalf("ask = %q", got)
 	}
-	if slices.Contains(settingsList(t, home, "allow"), SlackSendTool) {
-		t.Fatal("the fix left the tool allowed")
-	}
-	if p := problems(t, h, home)["permission allow "+SlackSendTool]; p != "" {
-		t.Fatalf("after the fix: %q", p)
+	if !slices.ContainsFunc(lines, func(l string) bool { return strings.Contains(l, "removed permission "+SlackSendTool) }) {
+		t.Fatalf("lines %q", lines)
 	}
 }
 
