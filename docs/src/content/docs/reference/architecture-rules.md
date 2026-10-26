@@ -151,7 +151,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/intent_cmd.go` `intentTarget` `unit.GitHub` `1` | 🧾 | the usage line names a pull request's target |
 | `internal/cli/placement.go` `Env.placements` `unit.GitHub` `1` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
 | `internal/cli/placement.go` `githubPlacement.Default` `unit.GitHub` `2` | 🧾 | GitHub's default placement reads the pull request and the viewer outside the plugin |
-| `internal/cli/serve.go` `authorFacts` `unit.GitHub` `1` | 🧾 | the views' author facts are the GitHub module's |
 | `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `4` | 🧾 | the daemon's wiring of the brief queue, the GitHub viewer and the forge |
 | `internal/cli/serve.go` `trackedBooks.Books` `unit.GitHub` `1` | 🧾 | a carded pull request without a turn still gets an empty book, so its card stays |
 | `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |

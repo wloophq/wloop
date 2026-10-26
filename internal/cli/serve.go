@@ -520,11 +520,11 @@ func (p servedPlan) Drop(ctx context.Context, u unit.Unit, why string) error {
 
 func (p servedPlan) DueRun(ctx context.Context) error { return p.eng.DueRun(ctx) }
 
-// authorFacts is the github module's facts provider as the views read it;
-// nil without one.
+// authorFacts is the facts provider of the first module that serves the
+// views' author facts; nil without one.
 func authorFacts(mods []source.Module) views.Facts {
 	for _, m := range mods {
-		if f, ok := m.Facts.(views.Facts); ok && m.ID == unit.GitHub {
+		if f, ok := m.Facts.(views.Facts); ok {
 			return f
 		}
 	}
