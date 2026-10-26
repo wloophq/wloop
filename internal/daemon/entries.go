@@ -434,9 +434,8 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		}
 		res.Output = []string{fmt.Sprintf("%s started headless as turn %d", st.ID, started.Seq)}
 	case rec.code != http.StatusOK:
-		for k, vs := range rec.header {
-			w.Header()[k] = vs
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(rec.code)
 		_, _ = w.Write(rec.body.Bytes())
 		return
