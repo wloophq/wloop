@@ -100,11 +100,11 @@ func (s *sheet) validate(d dintent.Def) {
 	if d.Provider != "" && !dunit.ValidProvider(string(d.Provider)) {
 		s.add("provider", "%q is not a provider id: lowercase letters, digits, _ and -, starting with a letter", d.Provider)
 	}
-	if d.Provider != dunit.GitHub && d.Context == "synthetic" {
-		s.add("context", "synthetic is a github pull request; a %s intent cannot use it", d.Provider)
+	if p, ok := builtin.ContextProviders[d.Context]; ok && d.Provider != p {
+		s.add("context", "%s is a %s unit; a %s intent cannot use it", d.Context, p, d.Provider)
 	}
-	if d.Provider != dunit.GitHub && d.DrivesRow {
-		s.add("drives_row", "a held round drives a github row; a %s intent cannot drive one", d.Provider)
+	if d.DrivesRow && !slices.Contains(builtin.RoundProviders, d.Provider) {
+		s.add("drives_row", "a held round drives a %s row; a %s intent cannot drive one", strings.Join(idsOf(builtin.RoundProviders), " or "), d.Provider)
 	}
 	if d.Bundled {
 		s.builtinRef("context", builtin.SlotContext, d.Context)
@@ -278,4 +278,12 @@ func (s *sheet) compile(d dintent.Def) Programs {
 		ps.Primary = one("action.primary", a.Primary, action)
 	}
 	return ps
+}
+
+func idsOf(ps []dunit.ProviderID) []string {
+	out := make([]string, len(ps))
+	for i, p := range ps {
+		out[i] = string(p)
+	}
+	return out
 }

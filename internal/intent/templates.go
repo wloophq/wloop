@@ -12,7 +12,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -101,8 +100,8 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 			switch {
 			case len(chain) >= 2 && chain[0] == "Inputs" && !declared[chain[1]]:
 				msg = "inputs." + chain[1] + " is not declared"
-			case chain[0] == "PR" && d.Provider != dunit.GitHub:
-				msg = fmt.Sprintf(".%s reads the github pull request; a %s intent cannot read it", strings.Join(chain, "."), d.Provider)
+			case builtin.PayloadProviders[chain[0]] != "" && d.Provider != builtin.PayloadProviders[chain[0]]:
+				msg = fmt.Sprintf(".%s reads the %s pull request; a %s intent cannot read it", strings.Join(chain, "."), builtin.PayloadProviders[chain[0]], d.Provider)
 			default:
 				return
 			}

@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/wloophq/wloop/internal/brief"
-	dunit "github.com/wloophq/wloop/internal/domain/unit"
+	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
@@ -34,7 +34,7 @@ func (e *Env) briefIntent(logf func(string, ...any)) func() brief.Intent {
 }
 
 func (e *Env) resolveBriefIntent(l *intentload.Loaded, logf func(string, ...any)) brief.Intent {
-	d, ok := l.Registry.Builder(builtin.BuildsBrief, dunit.GitHub)
+	d, ok := l.Registry.Builder(builtin.BuildsBrief, (dpr.Codec{}).Provider())
 	if !ok {
 		return brief.Intent{}
 	}

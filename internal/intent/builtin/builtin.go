@@ -160,6 +160,15 @@ const StepDraftPropose = "draft.propose"
 // caps; a workflow starting turns on any other must set limits.per_day.
 var RoundProviders = []unit.ProviderID{unit.GitHub}
 
+// ContextProviders are the providers whose units a context builtin makes up,
+// which only an intent of that provider may set: synthetic is a made-up pull
+// request.
+var ContextProviders = map[string]unit.ProviderID{"synthetic": unit.GitHub}
+
+// PayloadProviders are the template roots a provider's payload alone holds,
+// which only an intent of that provider may read.
+var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
+
 // The values of draft.propose's arguments.
 var (
 	DraftDeliveries = []string{"message", "reaction", "comment"}

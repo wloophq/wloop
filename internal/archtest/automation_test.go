@@ -111,8 +111,12 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 		return nil
 	}
 	imports := map[*ast.BasicLit]bool{}
+	unitName := "unit"
 	for _, imp := range f.Imports {
 		imports[imp.Path] = true
+		if p, _ := strconv.Unquote(imp.Path.Value); p == module+"internal/domain/unit" && imp.Name != nil {
+			unitName = imp.Name.Name
+		}
 	}
 	plugin := func(s string) bool { return slices.Contains(pluginIDs(), s) }
 	var out []string
@@ -141,7 +145,7 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []allowed
 				flag(n.Pos(), strconv.Quote(s))
 			}
 		case *ast.SelectorExpr:
-			if x, ok := n.X.(*ast.Ident); ok && x.Name == "unit" && providerConsts[n.Sel.Name] {
+			if x, ok := n.X.(*ast.Ident); ok && x.Name == unitName && providerConsts[n.Sel.Name] {
 				flag(n.Pos(), "unit."+n.Sel.Name)
 			}
 		}
@@ -228,4 +232,9 @@ var g = "https://github.com/a/b"
 	used := map[int]bool{}
 	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 3, "the core names no provider")
 	flagged(t, "stale", stale(allow, used), 1, "(stale)")
+	fset, f = parse(t, `package x
+import dunit "github.com/wloophq/wloop/internal/domain/unit"
+var a = dunit.GitHub
+`)
+	flagged(t, "an aliased import", coreLiterals(fset, "internal/intent/x.go", f, nil, none), 1, "a provider id lives in its plugin")
 }
