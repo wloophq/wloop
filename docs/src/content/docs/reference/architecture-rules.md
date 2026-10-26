@@ -124,33 +124,46 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `coreProviderAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/store/inventory/activity.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/briefruns.go` `"github"` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/store.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/store.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
-| `internal/adapter/store/inventory/timings.go` `unit.GitHub` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/sqlite/marks.go` `unit.GitHub` | 🧾 | a round mark notes GitHub's rounds topic |
-| `internal/adapter/store/sqlite/registry.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
-| `internal/adapter/store/sqlite/retain.go` `unit.Session` | ✅ | the store keeps the sessions the core keeps |
-| `internal/adapter/store/sqlite/retain.go` `unit.Workspace` | ✅ | the store keeps the workspaces the core keeps |
-| `internal/adapter/store/sqlite/slack.go` `"slack"` | ✅ | the store keeps the Slack plugin's tables |
-| `internal/adapter/store/sqlite/turns.go` `unit.GitHub` | 🧾 | a pull request's turns are keyed by owner, repository and number |
-| `internal/cli/actions.go` `unit.GitHub` | 🧾 | the GitHub viewer and actions read outside the plugin |
-| `internal/cli/cli.go` `"slack"` | ✅ | the slack command, the Slack plugin's own commands |
-| `internal/cli/facts.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/cli/help.go` `"slack"` | ✅ | the slack command, the Slack plugin's own commands |
-| `internal/cli/init_config.go` `"slack"` | ✅ | the slack section of the config init writes |
-| `internal/cli/intent_cmd.go` `unit.GitHub` | 🧾 | the usage line names a pull request's target |
-| `internal/cli/placement.go` `unit.GitHub` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
-| `internal/cli/serve.go` `unit.GitHub` | 🧾 | the daemon's wiring of the GitHub client, viewer and forge |
-| `internal/cli/serve_payloads.go` `unit.GitHub` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
-| `internal/cli/serve_plugins.go` `unit.GitHub` | 🧾 | the GitHub facilities the daemon holds go with the GitHub plugin |
-| `internal/cli/storedfacts.go` `unit.GitHub` | 🧾 | the stored facts of a pull request's turn |
-| `internal/cli/sweepinputs.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/cli/targets.go` `unit.GitHub` | 🧾 | GitHub's provider listed before the plugins |
-| `internal/cli/turn.go` `unit.GitHub` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/core/turns/headless.go` `"entry"` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
-| `internal/meter/meter.go` `"github"` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
-| `skills/skills.go` `unit.GitHub` | 🧾 | a turn skill takes a pull request's URL |
+| `internal/adapter/facts/session/facts.go` `Provider.build` `unit.GitHub` `1` | 🧾 | a session's facts read its linked pull request's state |
+| `internal/adapter/orca/orca.go` `Adapter.Apply` `unit.GitHub` `1` | ✅ | Orca links a worktree to a GitHub pull request only |
+| `internal/adapter/store/inventory/activity.go` `Store.eachRef` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/briefruns.go` `githubBriefs` `"github"` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.Ended` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.FirstRoundBlocks` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.Reviewed` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.StoredFacts` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.Tracked` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/store.go` `Store.UnitlessEvents` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/inventory/store.go` `refOf` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/timings.go` `Store.activeRefs` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/sqlite/marks.go` `marksTopic` `unit.GitHub` `1` | 🧾 | a round mark notes GitHub's rounds topic |
+| `internal/adapter/store/sqlite/registry.go` `sessionUnit` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/sqlite/retain.go` `retainWorkflowEventsSQL` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
+| `internal/adapter/store/sqlite/retain.go` `retainWorkflowEventsSQL` `unit.Workspace` `1` | ✅ | the store keeps the workspaces the core keeps |
+| `internal/adapter/store/sqlite/slack.go` `slackProvider` `"slack"` `1` | ✅ | the store keeps the Slack plugin's tables |
+| `internal/adapter/store/sqlite/turns.go` `compareUnits` `unit.GitHub` `2` | 🧾 | pull requests sort by owner, repository and number |
+| `internal/adapter/store/sqlite/turns.go` `prOf` `unit.GitHub` `1` | 🧾 | a pull request's turns are keyed by owner, repository and number |
+| `internal/cli/actions.go` `Env.fetchPR` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/cli/actions.go` `envActions.Intent` `unit.GitHub` `1` | 🧾 | the cockpit's intent action takes the pull request path on GitHub units |
+| `internal/cli/cli.go` `commands` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |
+| `internal/cli/facts.go` `inventoryFacts.MyReviews` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/cli/help.go` `devCommand` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |
+| `internal/cli/init_config.go` `mergeInitConfig` `"slack"` `1` | ✅ | the slack section of the config init writes |
+| `internal/cli/intent_cmd.go` `intentTarget` `unit.GitHub` `1` | 🧾 | the usage line names a pull request's target |
+| `internal/cli/placement.go` `Env.placements` `unit.GitHub` `1` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
+| `internal/cli/placement.go` `githubPlacement.Default` `unit.GitHub` `2` | 🧾 | GitHub's default placement reads the pull request and the viewer outside the plugin |
+| `internal/cli/serve.go` `authorFacts` `unit.GitHub` `1` | 🧾 | the views' author facts are the GitHub module's |
+| `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `4` | 🧾 | the daemon's wiring of the brief queue, the GitHub viewer and the forge |
+| `internal/cli/serve.go` `trackedBooks.Books` `unit.GitHub` `1` | 🧾 | a carded pull request without a turn still gets an empty book, so its card stays |
+| `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
+| `internal/cli/serve_plugins.go` `withoutGitHub` `unit.GitHub` `1` | 🧾 | the GitHub facilities the daemon holds go with the GitHub plugin |
+| `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
+| `internal/cli/sweepinputs.go` `storeInputs.Viewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/cli/targets.go` `Env.providerIDs` `unit.GitHub` `1` | 🧾 | GitHub's provider listed before the plugins |
+| `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
+| `internal/core/turns/headless.go` `entryInput` `"entry"` `1` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
+| `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
+| `internal/workspace/orca/orca.go` `Manager.LinkUnit` `unit.GitHub` `1` | ✅ | Orca's linkedPR holds a GitHub pull request only |
+| `skills/skills.go` `Bundled` `unit.GitHub` `1` | 🧾 | a turn skill takes a pull request's URL |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.

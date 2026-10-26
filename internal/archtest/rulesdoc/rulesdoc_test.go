@@ -27,6 +27,12 @@ type allowed struct{ file, literal, reason string }
 
 type edge struct{ from, to string }
 
+type site struct {
+	file   string
+	n      int
+	reason string
+}
+
 var allowlist = []allowed{
 	{"internal/b.go", "x", "debt: b | needs x"},
 	{"internal/a.go", "y", "a needs y"},
@@ -35,6 +41,8 @@ var allowlist = []allowed{
 var exempt = map[string]string{"internal/z": "z spawns", "internal/m": "fix: m spawns"}
 
 var debt = []edge{{"internal/p", "internal/q"}}
+
+var sites = []site{{"internal/c.go", 2, "c spells it twice"}}
 
 var names = []string{"not", "an", "allowlist"}
 
@@ -52,7 +60,7 @@ func TestZebra(t *testing.T) {
 
 // TestAardvark checks that aardvarks
 // dig only where allowed.
-func TestAardvark(t *testing.T) { _ = debt }
+func TestAardvark(t *testing.T) { _, _ = debt, sites }
 
 func TestUndocumented(t *testing.T) {}
 
@@ -76,6 +84,7 @@ func TestReadFindsRuleTestsAndTheirAllowlists(t *testing.T) {
 	want := []Rule{
 		{Test: "TestAardvark", File: "rules_test.go", Rule: "Aardvarks dig only where allowed.", Allowlists: []Allowlist{
 			{Name: "debt", Entries: []Entry{{Item: []string{"internal/p", "internal/q"}}}},
+			{Name: "sites", Entries: []Entry{{Item: []string{"internal/c.go", "2"}, Status: Holds, Reason: "c spells it twice"}}},
 		}},
 		{Test: "TestMisworded", File: "rules_test.go"},
 		{Test: "TestUndocumented", File: "rules_test.go"},
