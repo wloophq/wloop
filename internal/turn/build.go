@@ -38,7 +38,7 @@ type Brief struct {
 	Extra map[string]any
 }
 
-// Stored is what the loop keeps about a pull request beyond GitHub's read.
+// Stored is what the loop keeps about a unit beyond its provider's read.
 type Stored struct {
 	// Brief is nil when none is stored.
 	Brief *Brief
@@ -46,8 +46,10 @@ type Stored struct {
 	Teams []string
 }
 
+// FactsReader reads what the loop keeps about a unit; a unit with no
+// brief and no teams reads the zero Stored.
 type FactsReader interface {
-	Facts(ctx context.Context, ref github.Ref) (Stored, error)
+	Facts(ctx context.Context, u unit.Unit) (Stored, error)
 }
 
 // GuideReader composes the guide a turn of kind reads for a pull request
@@ -131,10 +133,10 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 			}
 			c.Facts.Mine = viewer != "" && strings.EqualFold(viewer, pr.Author)
 		}
-		if b.Facts != nil {
-			if st, err = b.Facts.Facts(ctx, pr.ref()); err != nil {
-				st, r.BriefMissing = Stored{}, "reading it failed ("+err.Error()+")"
-			}
+	}
+	if b.Facts != nil {
+		if st, err = b.Facts.Facts(ctx, c.Unit); err != nil {
+			st, r.BriefMissing = Stored{}, "reading it failed ("+err.Error()+")"
 		}
 	}
 	if b.Items != nil {

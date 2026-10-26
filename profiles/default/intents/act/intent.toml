@@ -6,7 +6,7 @@ workspace = "pr_else_main"
 provider  = "any"
 modes     = ["headless", "session"]
 session   = { strategy = "new", title = "act", close_when_done = true }
-brief     = { render = false, wait = false }
+brief     = { render = true, wait = false }
 draft_effects = ["entry.nudged", "unit.closed"]
 
 [guidance]

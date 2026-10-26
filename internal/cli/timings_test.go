@@ -203,7 +203,7 @@ func TestTheDaemonsFactsCarryTheBriefTextToTheCommandLine(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
-	st, _ := factsTurn{wire}.Facts(ctx, r7)
+	st, _ := factsTurn{wire}.Facts(ctx, r7.Unit())
 	if b := st.Brief; b == nil || b.Goal != "Export in batches" || b.Context != "exports time out" || b.RiskWhy != "touches the export" {
 		t.Fatalf("%+v", st.Brief)
 	}
