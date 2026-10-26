@@ -101,3 +101,10 @@ func TestActionsFileKeysFollowTheGrammar(t *testing.T) {
 		t.Errorf("%s", problems.Error())
 	}
 }
+
+func TestAnEmptyWhyFailsAtLoad(t *testing.T) {
+	got := actionsProblems(t, string(defaultProfile()), "[take_over]\nwhy = \"\"\n")
+	if !strings.Contains(got, "take_over.why: may not be empty") {
+		t.Errorf("%s", got)
+	}
+}

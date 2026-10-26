@@ -21,6 +21,8 @@ const DefaultsFile = "defaults.toml"
 type manifestDefaults struct {
 	// Provider is an intent's provider when its manifest names none.
 	Provider dunit.ProviderID `toml:"provider"`
+	// Refusal is what a [[refuse]] case whose why renders empty says.
+	Refusal string `toml:"refusal"`
 }
 
 func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Problems) {
@@ -40,6 +42,9 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 		}
 		if d.Provider != "" {
 			out.Provider = d.Provider
+		}
+		if d.Refusal != "" {
+			out.Refusal = d.Refusal
 		}
 	}
 	if bundled != nil {

@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"regexp"
@@ -312,7 +313,8 @@ func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
 }
 
 // Refusal is the why of the intent name's first refusal whose when holds
-// over facts, the unit's workflow facts; "" when none holds.
+// over facts, the unit's workflow facts, never empty when one holds; ""
+// when none holds.
 func (l *Loaded) Refusal(name dintent.Name, facts map[string]any) (string, error) {
 	d, ok := l.Registry.Get(name)
 	if !ok {
@@ -323,7 +325,11 @@ func (l *Loaded) Refusal(name dintent.Name, facts map[string]any) (string, error
 		if i >= len(p.Refuse) || p.Refuse[i] == nil || !p.Refuse[i].Eval(mapFacts(facts)) {
 			continue
 		}
-		return l.render(name, RefuseWhyName(i), unitEnv(d), facts)
+		why, err := l.render(name, RefuseWhyName(i), unitEnv(d), facts)
+		if strings.TrimSpace(why) == "" {
+			why = cmp.Or(l.EmptyRefusal, RefuseWhyName(i))
+		}
+		return why, err
 	}
 	return "", nil
 }

@@ -167,3 +167,9 @@ func TestARefusalNamesTheProfileTextItShows(t *testing.T) {
 		t.Errorf("take_over of mine: %+v", st)
 	}
 }
+
+func TestADisabledBuiltinKeepsItsRefusalCodeWithoutAWhy(t *testing.T) {
+	if st := texted(nil, "take_over", api.ActionState{ID: "take_over"}, nil); st.Refusal != api.BuiltinWhy("take_over") {
+		t.Errorf("take_over with no why: %+v", st)
+	}
+}

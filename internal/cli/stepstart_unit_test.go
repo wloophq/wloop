@@ -432,3 +432,13 @@ func TestOnlyAnIntentDeclaringPrCountedSpendsThePerUnitBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestARefuseWhoseWhyRendersEmptyStillRefuses(t *testing.T) {
+	t.Parallel()
+	r := nudgeStartRig(t)
+	m := strings.Replace(bundledIntentAs(t, "nudge", "nudge")["intents/nudge/intent.toml"], `when = 'pr.nudge.refusal != ""'`, `when = 'pr.nudge.refusal == ""'`, 1)
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": m})
+	if got := r.check(t, automation.CheckOpts{}); got != "its intent refuses it here" {
+		t.Fatalf("refusal %q", got)
+	}
+}

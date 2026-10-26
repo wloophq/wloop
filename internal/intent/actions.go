@@ -146,6 +146,8 @@ func (s *sheet) overAction(id string, a BuiltinAction, t mBuiltinAction) Builtin
 		v := texts[name]
 		switch {
 		case v == nil:
+		case *v == "" && name == "why":
+			s.add(id+".why", "may not be empty: a disabled action says why")
 		case *v == "":
 			delete(a.Texts, name)
 		default:

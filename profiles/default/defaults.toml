@@ -1,2 +1,5 @@
 # The provider whose units an intent's turns run on when its manifest names none.
 provider = "github"
+
+# What a [[refuse]] case whose when holds says when its why renders empty.
+refusal = "its intent refuses it here"

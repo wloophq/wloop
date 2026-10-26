@@ -249,6 +249,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 ## Defaults (`defaults.toml`)
 
 - `provider` (string): The provider of an intent whose manifest names none.
+- `refusal` (string): What a [[refuse]] case whose when holds says when its why renders empty.
 
 ## Block headings (`labels.toml`)
 
