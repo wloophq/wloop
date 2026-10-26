@@ -53,7 +53,7 @@ func unitIntent(d dintent.Def, u unit.Unit) error {
 		prOnly = append(prOnly, "prepare "+d.Prepare)
 	}
 	if len(d.Effects) > 0 {
-		prOnly = append(prOnly, "on_sent "+strings.Join(d.Effects, ", "))
+		prOnly = append(prOnly, "effects "+strings.Join(d.Effects, ", "))
 	}
 	if d.Intake {
 		prOnly = append(prOnly, "intake")

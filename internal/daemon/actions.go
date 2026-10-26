@@ -672,9 +672,9 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 }
 
 // actIntent runs a round of an intent as its manifest declares it: under
-// the loop, the pending round dropped first when on_sent
-// says so, its prepare run, its guidance cut at guidance.max, and the
-// events on_sent names recorded after it.
+// the loop, the pending round dropped first when its effects say so, its
+// prepare run, its guidance cut at guidance.max, and the events its effects
+// name recorded after it.
 func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, out io.Writer) error {
 	d, err := intentDef(s.loaded(), name)
 	if err != nil {

@@ -351,7 +351,7 @@ func (e *Env) recordEvent(ctx context.Context, ref github.Ref, kind, data string
 }
 
 // handRound runs a round asked for by hand on route rt, with the phases of
-// the on_sent effects d names around it: guide first, unsent when the round
+// the effects d names around it: guide first, unsent when the round
 // does not go out, state on the round state once it went out. send gets the
 // round state when the route writes it and the round with its guidance,
 // fills in what the round sent, and reports whether the round went out.

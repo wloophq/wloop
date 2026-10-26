@@ -23,10 +23,10 @@ func TestAUnitIntentRefusesWhatOnlyPullRequestsTake(t *testing.T) {
 		t.Errorf("an intent offered on no surface: %v", err)
 	}
 	for what, edit := range map[string]func(*dintent.Def){
-		"prepare": func(d *dintent.Def) { d.Prepare = "nudge.prepare" },
-		"on_sent": func(d *dintent.Def) { d.Effects = []string{"plan.drop_pending", "event.round_sent"} },
-		"intake":  func(d *dintent.Def) { d.Intake = true },
-		"launch":  func(d *dintent.Def) { d.Launch = "probe" },
+		"prepare":              func(d *dintent.Def) { d.Prepare = "nudge.prepare" },
+		"effects plan.cleared": func(d *dintent.Def) { d.Effects = []string{"plan.cleared"} },
+		"intake":               func(d *dintent.Def) { d.Intake = true },
+		"launch":               func(d *dintent.Def) { d.Launch = "probe" },
 	} {
 		d := offered
 		edit(&d)

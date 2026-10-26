@@ -341,7 +341,7 @@ func TestAThreadRefusesPullRequestOnlyIntents(t *testing.T) {
 	if _, err := c.Action(context.Background(), thread1, "quiet", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "no quiet on thread:1700000000.1") {
 		t.Errorf("an intent offered on no surface: %v", err)
 	}
-	if _, err := c.Action(context.Background(), thread1, "sent", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "on_sent plan.cleared, which act on pull requests only") {
+	if _, err := c.Action(context.Background(), thread1, "sent", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "effects plan.cleared, which act on pull requests only") {
 		t.Errorf("an intent with effects: %v", err)
 	}
 	if len(m.Prompts) != 0 || len(m.Writes) != 0 {
