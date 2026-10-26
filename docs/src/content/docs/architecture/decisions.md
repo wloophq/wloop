@@ -151,3 +151,17 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Decision**: the turn partials live in `profiles/default/partials/` and the prompts of {{name}}'s own calls in `profiles/default/prompts/`; a file of the user's profile replaces the bundled file of its path. Go keeps the markers, the schemas and the limits around them, and checks that a record partial still states the record protocol.
 - **Consequence**: a broken partial or wrapper of the user's falls back to the bundled one with a problem, so a profile edit never stops a turn from ending; the rendered turns of the bundled profile are unchanged.
 - **Enforced by**: `TestProseIsEmbeddedOnlyFromProfiles`, `TestARecordPartialMissingTheProtocolLoadsTheBundledOne`, `TestTheBundledWrapperWritesTheOldPrompt`, the scenario goldens. See [Profile first](/architecture/profile-first/).
+
+## Intents by role
+
+- **Context**: Go started the review, address, nudge and probe intents and read their history by name, so a renamed or replaced intent lost every automatic behavior.
+- **Decision**: a manifest's `role` (`round.review`, `round.address`, `nudge`, `probe`, `headless.default`) is what Go resolves an intent by; one of the user's holding a bundled role takes it over. Each turn stores its intent's role, and history readers read by it. How a round behaves comes from manifest keys (`round_kind`, `cap`, `reason_fact`, `refuse_when`, `reason`).
+- **Consequence**: an intent `my-review` holding `round.review` gets the sweep's review rounds and their history; the turns stored before roles exist were given theirs by the store's migration from the bundled names.
+- **Enforced by**: `TestNoIntentEnumerations`.
+
+## turn.start on any unit, under a budget
+
+- **Context**: a workflow could start turns only on pull requests, whose rounds have their own caps.
+- **Decision**: `turn.start` starts any intent on any unit, headless or in a session, in the repository its manifest's workspace table names; outside the round providers each workflow needs `limits.per_day`, and `turns.automated_per_day` caps all of them together per local day. A repository named by an input is never taken by a workflow.
+- **Consequence**: a request in a thread can start an implementing turn in a known repository; no thread text chooses the repository, and a runaway workflow stops at its budget.
+- **Enforced by**: the loader (`limits.per_day`) and the step's guards.
