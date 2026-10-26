@@ -560,6 +560,14 @@ func (j *Job) readDM(ctx context.Context, team string, ec config.SlackExtraction
 		from = spans[0].FromTS
 	}
 	in.Segments = spans
+	states, err := j.Store.States(ctx, units)
+	if err != nil {
+		return units, err
+	}
+	in.SegmentBriefs = make([]string, len(units))
+	for i, u := range units {
+		in.SegmentBriefs[i] = states[u].Brief
+	}
 	if in.Messages, err = j.DM(ctx, in.Conversation.ID, from); err != nil {
 		return units, err
 	}
@@ -588,6 +596,9 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	}
 	if r.Dropped > 0 {
 		j.logf("slack extraction %s: %d items or links citing a message outside the window dropped", k, r.Dropped)
+	}
+	if r.ExtrasDropped > 0 {
+		j.logf("slack extraction %s: %d briefs kept without extra fields that did not fit the brief intent's schema", k, r.ExtrasDropped)
 	}
 	states := map[unit.Unit]sqlite.ExtractionState{}
 	state := sqlite.ExtractionState{LastTS: in.Messages[len(in.Messages)-1].TS, LastSeq: p.maxSeq, Brief: r.Brief, Verdict: r.Verdict,

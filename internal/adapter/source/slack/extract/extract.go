@@ -34,7 +34,9 @@ type Input struct {
 	Extra        *Extra       // the brief intent's extra fields every brief carries; nil asks none
 	Contexts     []string     // placement contexts offered (context map keys)
 	Segments     []slack.Span // a DM's current spans, ascending, rendered s1, s2...
-	WindowChars  int          // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
+	// SegmentBriefs are the briefs in use of Segments, as stored, by index.
+	SegmentBriefs []string
+	WindowChars   int // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
 	// Context are read-only messages before Messages, rendered c1, c2...: nothing is extracted from them.
 	Context []slack.Message
 	// Segment is the one DM segment the call covers, its bounds marked; zero for a whole conversation.
@@ -53,6 +55,9 @@ type Result struct {
 	Links                           []LinkOut
 	// Dropped counts the items and links left out because they cite a message outside the window.
 	Dropped int
+	// ExtrasDropped counts the briefs kept without their extra fields
+	// because those did not fit the brief intent's schema.
+	ExtrasDropped int
 }
 
 // ItemOut is the schema's item, v2 fields plus ref, mode and place.
@@ -86,7 +91,7 @@ type ParseTarget func(target string) (unit.Unit, bool)
 // Extract asks for in's result; ask carries Tier and MaxCostUSD. An answer that does not fit
 // the schema, or names a ref, segment or link item in doesn't hold, fails with turns.ErrUnfit;
 // a new item, an item whose evidence or a link citing a message outside the window, the context's
-// included, is dropped.
+// included, is dropped, and a brief whose extra fields do not fit is kept without them.
 func Extract(ctx context.Context, a turns.Asker, ask turns.Ask, in Input) (Result, turns.Answer, error) {
 	prompt, err := Prompt(in)
 	if err != nil {
@@ -183,24 +188,24 @@ type wireLinkTo struct {
 }
 
 func decode(raw []byte, in Input) (Result, error) {
-	_, s, err := schemaFor(in.Extra)
+	bad, err := fit(raw, in.Extra)
 	if err != nil {
-		return Result{}, err
-	}
-	if err := s.ValidateJSON(raw); err != nil {
 		return Result{}, err
 	}
 	var w wireResult
 	if err := json.Unmarshal(raw, &w); err != nil {
 		return Result{}, err
 	}
-	brief, err := briefJSON(w.Brief, in.Extra)
-	if err != nil {
-		return Result{}, err
-	}
 	r := Result{
-		Brief: brief, ViewerRole: w.ViewerRole, Verdict: w.Verdict, VerdictWhy: w.VerdictWhy,
+		ViewerRole: w.ViewerRole, Verdict: w.Verdict, VerdictWhy: w.VerdictWhy,
 		StartedByViewer: w.StartedByViewer, ClosurePosted: w.ClosurePosted,
+	}
+	if bad[conversationBrief] {
+		w.Brief.Extra = nil
+		r.ExtrasDropped++
+	}
+	if r.Brief, err = briefJSON(w.Brief, in.Extra, in.Brief); err != nil {
+		return Result{}, err
 	}
 	known := map[string]bool{}
 	for _, it := range in.Ledger {
@@ -251,14 +256,22 @@ func decode(raw []byte, in Input) (Result, error) {
 		}
 		r.Items = append(r.Items, it)
 	}
-	for _, s := range w.Segments {
+	for i, s := range w.Segments {
+		prev := ""
 		if s.Ref != "new" {
 			n, _ := strconv.Atoi(strings.TrimPrefix(s.Ref, "s"))
 			if n < 1 || n > len(in.Segments) {
 				return Result{}, fmt.Errorf("segment %q is not one of the %d rendered", s.Ref, len(in.Segments))
 			}
+			if n <= len(in.SegmentBriefs) {
+				prev = in.SegmentBriefs[n-1]
+			}
 		}
-		brief, err := briefJSON(s.Brief, in.Extra)
+		if bad[i] {
+			s.Brief.Extra = nil
+			r.ExtrasDropped++
+		}
+		brief, err := briefJSON(s.Brief, in.Extra, prev)
 		if err != nil {
 			return Result{}, err
 		}

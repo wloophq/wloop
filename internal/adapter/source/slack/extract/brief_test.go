@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -128,15 +130,109 @@ func TestTheBriefIntentsExtrasJoinTheExtraction(t *testing.T) {
 	if err := json.Unmarshal([]byte(r.Brief), &got); err != nil || got.Extra["approach"] != "rewrite" || got.ExtraVersions["approach"] != "f1-abc" {
 		t.Fatalf("stored %s %v", r.Brief, err)
 	}
-	b["extra"] = obj{"approach": "magic"}
-	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": b}), in); err == nil {
-		t.Fatal("an extra outside its enum decoded")
+	for name, mod := range map[string]func(obj){
+		"an extra outside its enum": func(b obj) { b["extra"] = obj{"approach": "magic"} },
+		"a brief without its extra": func(b obj) { delete(b, "extra") },
+	} {
+		bad := briefObj("g")
+		mod(bad)
+		seg := obj{"ref": "new", "from_ts": in.Messages[0].TS, "to_ts": "", "topic": "t", "brief": bad}
+		r, err := decode(answerJSON(t, []obj{jItem("n1", in.Messages[len(in.Messages)-1].TS)}, []obj{seg}, nil, obj{"brief": bad}), in)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(r.Items) != 1 || r.ExtrasDropped != 2 {
+			t.Errorf("%s: %d items, %d extras dropped", name, len(r.Items), r.ExtrasDropped)
+		}
+		for _, stored := range []string{r.Brief, r.Segments[0].Brief} {
+			var got storedBrief
+			if err := json.Unmarshal([]byte(stored), &got); err != nil || got.Goal != "g" || got.Extra != nil || got.ExtraVersions != nil {
+				t.Errorf("%s: stored %s %v", name, stored, err)
+			}
+		}
 	}
-	delete(b, "extra")
+	b["goal"] = 3
 	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": b}), in); err == nil {
-		t.Fatal("a brief without its extra decoded")
+		t.Fatal("a brief outside the core schema decoded")
 	}
 	if _, err := decode(answerJSON(t, nil, nil, nil, obj{"brief": briefObj("g")}), loadInput(t)); err != nil {
 		t.Fatalf("without extras: %v", err)
+	}
+}
+
+var approachExtra = &Extra{Schema: []byte(`{"type":"object","additionalProperties":false,"required":["approach"],"properties":{"approach":{"type":"string","enum":["patch","rewrite"]}}}`),
+	Versions: map[string]string{"approach": "f1-abc"}}
+
+func TestUnchangedKeepsOnlyACompleteBrief(t *testing.T) {
+	answer := briefObj("Ship the export fix")
+	answer["unchanged"], answer["kind"], answer["extra"] = true, "incident", obj{"approach": "patch"}
+	for name, c := range map[string]struct {
+		prev string
+		kept bool
+	}{
+		"a migrated goal-only brief": {`{"goal":"Ship the export fix"}`, false},
+		"a brief without the extra":  {`{"goal":"g","kind":"request"}`, false},
+		"an older extra version":     {`{"goal":"g","kind":"request","extra":{"approach":"rewrite"},"extra_versions":{"approach":"f0-old"}}`, false},
+		"a complete brief":           {`{"goal":"g","kind":"request","extra":{"approach":"rewrite"},"extra_versions":{"approach":"f1-abc"}}`, true},
+	} {
+		in := loadInput(t)
+		in.Extra, in.Brief = approachExtra, c.prev
+		in.Segments, in.SegmentBriefs = []slack.Span{{ID: "1", FromTS: in.Messages[0].TS}}, []string{c.prev}
+		seg := obj{"ref": "s1", "from_ts": in.Messages[0].TS, "to_ts": "", "topic": "the export", "brief": answer}
+		r, err := decode(answerJSON(t, nil, []obj{seg}, nil, obj{"brief": answer}), in)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for which, got := range map[string]string{"conversation": r.Brief, "segment": r.Segments[0].Brief} {
+			if c.kept {
+				if got != "" {
+					t.Errorf("%s: the %s's brief was replaced by %s", name, which, got)
+				}
+				continue
+			}
+			var sb storedBrief
+			if err := json.Unmarshal([]byte(got), &sb); err != nil || sb.Kind != "incident" || sb.Extra["approach"] != "patch" || sb.ExtraVersions["approach"] != "f1-abc" {
+				t.Errorf("%s: the %s's brief %q: %v", name, which, got, err)
+			}
+		}
+	}
+}
+
+func TestAMigratedDMSegmentGetsAFullBriefFromAnUnchangedAnswer(t *testing.T) {
+	r := newRig(t)
+	r.job.Extra = func() Extra { return *approachExtra }
+	r.facts.post(jDM, ts(1), "", jOther, "can you review the deck", jT0)
+	first := briefObj("Review the deck")
+	first["extra"] = obj{"approach": "patch"}
+	kept := briefObj("Review the deck")
+	kept["unchanged"], kept["kind"], kept["extra"] = true, "question", obj{"approach": "rewrite"}
+	r.asker.reply = func(n int, _ turns.Ask) ([]byte, error) {
+		b := first
+		if n > 0 {
+			b = kept
+		}
+		return answerJSON(t, nil, []obj{{"ref": map[bool]string{true: "new", false: "s1"}[n == 0], "from_ts": ts(1), "to_ts": "", "topic": "the deck", "brief": b}},
+			nil, obj{"brief": b}), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	if _, err := r.db.Write(context.Background(), func(tx *sqlite.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `UPDATE brief_runs SET brief = '{"goal":"Review the deck"}'`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r.facts.post(jDM, ts(2), "", jOther, "any news?", jT0.Add(5*time.Minute))
+	r.run(jT0.Add(8 * time.Minute))
+	if r.asker.calls() != 2 {
+		t.Fatalf("%d calls", r.asker.calls())
+	}
+	deck := segUnit(jTeam, jDM, strings.ReplaceAll(ts(1), ".", ""))
+	st, err := r.job.Store.States(context.Background(), []unit.Unit{deck})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got storedBrief
+	if err := json.Unmarshal([]byte(st[deck].Brief), &got); err != nil || got.Kind != "question" || got.Extra["approach"] != "rewrite" {
+		t.Fatalf("the migrated segment's brief %q: %v", st[deck].Brief, err)
 	}
 }
