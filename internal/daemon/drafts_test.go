@@ -145,7 +145,7 @@ func (r *outboxRig) propose(t *testing.T, u unit.Unit, text string, mode draft.A
 		a.Window = time.Minute
 	}
 	d, err := r.o.Propose(context.Background(), outbox.Proposal{Unit: u, Kind: draft.Reply, Text: text,
-		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Approval: &a})
+		Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "test", Key: text}, Policy: draft.Fixed(a)})
 	if err != nil {
 		t.Fatal(err)
 	}

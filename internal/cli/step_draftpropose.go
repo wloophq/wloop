@@ -221,8 +221,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		return nil, err
 	}
 	now := deps.Now()
+	policy := draftApproval(deps.Config(), w)
 	var subjectFacts workflow.Facts
-	if w.Withdraw != nil {
+	if w.Withdraw != nil || len(policy.Rules) > 0 {
 		if subjectFacts, err = s.d.Units.Facts(ctx, c.u); err != nil {
 			return nil, err
 		}
@@ -241,13 +242,11 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			key = sub.subject.Key + ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
-			Effects: a.effects, ObservedFor: a.hold, HoldAutoSend: w.AutoSend != nil && !*w.AutoSend,
+			Effects: a.effects, ObservedFor: a.hold, Policy: &policy, Facts: subjectFacts,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
 		if sub.entry != nil {
 			cd.p.Entry = string(sub.entry.ID)
 		}
-		approval := draftApproval(deps.Config(), w)
-		cd.p.Approval = &approval
 		switch {
 		case len(its) == 0:
 			cd.refusal = "no " + a.items + " items"
@@ -407,17 +406,32 @@ func itemIDs(its []items.Item) []string {
 	return out
 }
 
-// draftApproval is the approval of w's drafts: the config's
+// draftApproval is the approval policy of w's drafts: the config's
 // workflows.<name>.draft_approval, then the proposals.<rule>.approval of the
 // rule w replaced, then the manifest's.
-func draftApproval(cfg config.Config, w workflow.Workflow) draft.Approval {
-	var configured *draft.Approval
-	if a := cfg.Workflows[w.Name].DraftApproval; a != nil {
-		ap := a.Approval()
-		configured = &ap
-	}
-	return outbox.ResolveApproval(configured, cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
+func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
+	return outbox.ResolveApproval(configPolicy(w, cfg.Workflows[w.Name].DraftApproval), cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
 }
+
+// configPolicy is the config's draft_approval of w, its rules compiled over
+// w's subject; nil when a is. One that does not compile holds every draft,
+// and each proposal logs why.
+func configPolicy(w workflow.Workflow, a *config.DraftApprovalConfig) *draft.Policy {
+	if a == nil {
+		return nil
+	}
+	p, err := a.Policy(builtin.ApprovalEnv(true, w.Slot))
+	if err != nil {
+		return &draft.Policy{Default: draft.Approval{Mode: draft.Always},
+			Rules: []draft.Rule{{When: refusedRule{fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)}, Approval: draft.Approval{Mode: draft.Always}}}}
+	}
+	return &p
+}
+
+// refusedRule is a rule that never holds and says why at each draft.
+type refusedRule struct{ err error }
+
+func (r refusedRule) Holds(map[string]any, time.Time) (bool, error) { return false, r.err }
 
 // holdOf says why a draft of the same workflow, subject and person holds p:
 // one open or failed, one sent within hold_after_sent (or ever, with

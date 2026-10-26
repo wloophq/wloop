@@ -24,7 +24,12 @@ type Proposal struct {
 	Kind                   draft.Kind
 	Target, Text, Reaction string
 	Origin                 draft.Origin
-	Approval               *draft.Approval // nil: resolved by Service.Policies from Origin
+	// Policy is the draft's approval policy; nil: resolved by
+	// Service.Policies from Origin.
+	Policy *draft.Policy
+	// Facts are the facts of the subject the proposer read, which the
+	// policy's rules read; nil: Service.Facts reads the unit's.
+	Facts map[string]any
 	// Purpose and Delivery are the draft's shape; "" derives them from Kind
 	// (draft.ShapeOf), and a set Purpose with no Kind derives Kind
 	// (draft.KindOf).
@@ -35,10 +40,6 @@ type Proposal struct {
 	// ObservedFor is how long a settled draft of the same origin holds this
 	// proposal from being proposed again; zero keeps Service.ObservedFor.
 	ObservedFor time.Duration
-	// HoldAutoSend keeps the draft for a person's approval whatever its
-	// approval: its proposer's manifest sets auto_send = false. A comment
-	// is held whatever it says.
-	HoldAutoSend bool
 }
 
 type Filter struct {
@@ -78,10 +79,13 @@ type Effects func(p unit.ProviderID) (port.Effects, error)
 // Evidence receives a sent draft's evidence for its items (wired to the items ledger, op "evidence").
 type Evidence func(ctx context.Context, d draft.Draft) error
 
-// Policies resolves the approval of a proposal on u whose Approval is nil.
+// Policies resolves the approval policy of a proposal on u whose Policy is nil.
 type Policies interface {
-	For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Approval, error)
+	For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Policy, error)
 }
+
+// Facts reads the facts of unit u that a policy's rules read.
+type Facts func(ctx context.Context, u unit.Unit) (map[string]any, error)
 
 // ItemReader reads a unit's items, for the confidence Would.Policy weighs.
 type ItemReader interface {
@@ -92,6 +96,7 @@ type Service struct {
 	Store    Store
 	Effects  Effects
 	Policies Policies   // nil resolves every proposal to always
+	Facts    Facts      // nil: a rule reads no fact of the unit
 	Evidence Evidence   // nil none
 	Items    ItemReader // nil: no item counts as low confidence
 	Changes  port.Changes
@@ -133,11 +138,12 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err
 	}
-	approval, err := s.approval(ctx, p)
+	dec, err := s.decide(ctx, p, d, now)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if (targetsOutside(d) || p.HoldAutoSend || d.Delivery == draft.CommentDelivery) && approval.Mode != draft.Observe {
+	approval := dec.Approval
+	if targetsOutside(d) && approval.Mode != draft.Observe {
 		approval = always
 	}
 	d.Approval = approval
@@ -150,7 +156,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err := s.implemented(d); err != nil {
 		return draft.Draft{}, err
 	}
-	d.Would = s.would(ctx, d, p.HoldAutoSend)
+	d.Would = s.would(ctx, d, dec.CommentReleased)
 	switch approval.Mode {
 	case draft.Window:
 		d.Deadline = now.Add(approval.Window)
@@ -185,16 +191,17 @@ func shaped(d draft.Draft) draft.Draft {
 	return d
 }
 
-// ResolveApproval is the approval of a workflow's draft: the config's
-// workflows.<name>.draft_approval, then the legacy proposals.<rule>.approval,
-// then the manifest's [draft_approval], else always.
-func ResolveApproval(config, legacy, manifest *draft.Approval) draft.Approval {
-	for _, a := range []*draft.Approval{config, legacy, manifest} {
-		if a != nil {
-			return *a
+// ResolveApproval is the approval policy of a workflow's draft: the
+// config's workflows.<name>.draft_approval, then the legacy
+// proposals.<rule>.approval, then the manifest's [draft_approval], else
+// always. The first one set is the whole policy, its rules with its mode.
+func ResolveApproval(config, legacy, manifest *draft.Policy) draft.Policy {
+	for _, p := range []*draft.Policy{config, legacy, manifest} {
+		if p != nil {
+			return *p
 		}
 	}
-	return always
+	return draft.Policy{Default: always}
 }
 
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
@@ -268,25 +275,49 @@ func checkKind(k draft.Kind) error {
 
 var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery}
 
-func (s *Service) approval(ctx context.Context, p Proposal) (draft.Approval, error) {
-	if p.Approval != nil {
-		if err := p.Approval.Validate(); err != nil {
-			return draft.Approval{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+// decide is the approval of d under p's policy. A policy that does not
+// validate, or a rule that cannot be read, resolves to always.
+func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now time.Time) (draft.Decision, error) {
+	held := draft.Decision{Approval: always, Rule: -1}
+	pol, err := s.policy(ctx, p)
+	if err != nil {
+		return held, err
+	}
+	facts := p.Facts
+	if facts == nil && len(pol.Rules) > 0 && s.Facts != nil {
+		if facts, err = s.Facts(ctx, d.Unit); err != nil {
+			s.logf("draft approval of a %s proposal on %s resolved to always: reading its unit's facts: %v", d.Purpose, d.Unit, err)
+			return held, nil
 		}
-		return *p.Approval, nil
 	}
+	dec, err := pol.Decide(d, facts, now)
+	if err != nil {
+		s.logf("draft approval of a %s proposal on %s resolved to always: %v", d.Purpose, d.Unit, err)
+		return held, nil
+	}
+	return dec, nil
+}
+
+func (s *Service) policy(ctx context.Context, p Proposal) (draft.Policy, error) {
+	if p.Policy != nil {
+		if err := p.Policy.Validate(); err != nil {
+			return draft.Policy{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
+		return *p.Policy, nil
+	}
+	fixed := draft.Policy{Default: always}
 	if s.Policies == nil {
-		return always, nil
+		return fixed, nil
 	}
-	a, err := s.Policies.For(ctx, p.Unit, p.Origin)
+	pol, err := s.Policies.For(ctx, p.Unit, p.Origin)
 	if err == nil {
-		err = a.Validate()
+		err = pol.Validate()
 	}
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to always: %v", cmp.Or(p.Purpose, string(p.Kind)), p.Unit, err)
-		return always, nil
+		return fixed, nil
 	}
-	return a, nil
+	return pol, nil
 }
 
 // targetsOutside reports an agent's draft aimed at another conversation or person than its unit's,
@@ -296,17 +327,17 @@ func targetsOutside(d draft.Draft) bool {
 	return (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && t != "" && !strings.EqualFold(t, d.Unit.Key)
 }
 
-func (s *Service) would(ctx context.Context, d draft.Draft, held bool) draft.Would {
+// would is what auto-send would do with d: a comment only once a rule that
+// names comment delivery released it.
+func (s *Service) would(ctx context.Context, d draft.Draft, commentReleased bool) draft.Would {
 	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldHold, Reason: reason} }
 	switch {
 	case targetsOutside(d):
 		return hold("targets outside its unit")
 	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginAuto:
 		return hold(fmt.Sprintf("proposed by %s", d.Origin.Kind))
-	case held:
-		return hold("its proposer never sends it on its own")
-	case d.Delivery == draft.CommentDelivery:
-		return hold("a comment is never sent on its own")
+	case d.Delivery == draft.CommentDelivery && !commentReleased:
+		return hold("a comment is sent on its own only by a rule that names comment delivery")
 	}
 	if len(d.Items) > 0 && s.Items != nil {
 		its, err := s.Items.Items(ctx, d.Unit)

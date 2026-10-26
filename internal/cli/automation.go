@@ -209,9 +209,8 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
-		if a := wc.DraftApproval; a != nil {
-			da := a.Approval()
-			w.DraftApproval = &da
+		if p := configPolicy(w, wc.DraftApproval); p != nil {
+			w.DraftApproval = p
 		}
 		out = append(out, w)
 	}

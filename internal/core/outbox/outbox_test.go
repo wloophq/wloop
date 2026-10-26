@@ -404,13 +404,13 @@ func TestProposeNeedsText(t *testing.T) {
 }
 
 type fixedPolicy struct {
-	a    draft.Approval
+	p    draft.Policy
 	seen []draft.Origin
 }
 
-func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Approval, error) {
+func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Policy, error) {
 	f.seen = append(f.seen, o)
-	return f.a, nil
+	return f.p, nil
 }
 
 func TestProposeDefaultsToAlways(t *testing.T) {
@@ -419,18 +419,18 @@ func TestProposeDefaultsToAlways(t *testing.T) {
 	if d.Approval != (draft.Approval{Mode: draft.Always}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
 		t.Fatalf("%+v", d)
 	}
-	pol := &fixedPolicy{a: draft.Approval{Mode: draft.Window, Window: 10 * time.Minute}}
+	pol := &fixedPolicy{p: *window(10 * time.Minute)}
 	e.svc.Policies = pol
 	w := e.propose(reply("y"))
-	if w.Approval != pol.a || !w.Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Proposed || len(pol.seen) != 1 {
+	if w.Approval != pol.p.Default || !w.Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Proposed || len(pol.seen) != 1 {
 		t.Fatalf("window %+v", w)
 	}
 	p := reply("z")
-	p.Approval = &draft.Approval{Mode: draft.Always}
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Always})
 	if got := e.propose(p); got.Approval.Mode != draft.Always || len(pol.seen) != 1 {
 		t.Fatalf("explicit approval %+v, policies asked %d times", got, len(pol.seen))
 	}
-	p.Approval = &draft.Approval{Mode: draft.Window}
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Window})
 	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("bad approval: %v", err)
 	}
@@ -468,13 +468,11 @@ func TestWouldHoldsOnDoubt(t *testing.T) {
 	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}, {ID: "i2", Confidence: items.Low}}}
 	low := reply("x")
 	low.Items = []string{"i1", "i2"}
-	held := reply("who owns this?")
-	held.Kind, held.HoldAutoSend = draft.AskOwner, true
 	comment := reply("note")
 	comment.Kind = draft.Comment
 	user := reply("mine")
 	user.Origin = draft.Origin{Kind: draft.OriginUser}
-	for name, p := range map[string]Proposal{"low": low, "held by its proposer": held, "comment": comment, "user": user} {
+	for name, p := range map[string]Proposal{"low": low, "comment": comment, "user": user} {
 		if d := e.propose(p); d.Would.Policy != draft.WouldHold || d.Would.Reason == "" {
 			t.Errorf("%s: %+v", name, d.Would)
 		}

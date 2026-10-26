@@ -70,7 +70,7 @@ type Def struct {
 	// Provider is the manifest's provider; default "github".
 	Provider unit.ProviderID
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
-	DraftApproval *draft.Approval
+	DraftApproval *draft.Policy
 	// Modes are turn.Mode values; default ["session"].
 	Modes []string
 	// Providers are the providers of a manifest whose provider is a list,
@@ -108,9 +108,6 @@ type Def struct {
 	// Reason is the why a turn's instructions carry: "address_round"; ""
 	// none.
 	Reason string
-	// AutoSend false holds the intent's drafts for a person whatever their
-	// approval; nil keeps the default of their delivery.
-	AutoSend *bool
 	// Skill says whether install writes the intent a turn skill.
 	Skill bool
 }
@@ -410,7 +407,3 @@ func (r *Registry) ForProvider(p unit.ProviderID) []Def {
 	}
 	return out
 }
-
-// HoldsDrafts says whether the intent's drafts wait for a person whatever
-// their approval: its manifest sets auto_send = false.
-func (d Def) HoldsDrafts() bool { return d.AutoSend != nil && !*d.AutoSend }

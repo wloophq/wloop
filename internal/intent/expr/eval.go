@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"cel.dev/cel-go/common/types"
@@ -125,6 +126,14 @@ func CompileWorkflow(src string, env Env) (workflow.Predicate, error) {
 func (w predicate) Reads() []string { return w.p.reads }
 
 func (w predicate) MarkNames() []string { return w.p.marks }
+
+// Requires says whether every match of p has field equal to value: a term
+// field == "value" of p's top-level conjunction, which no other term can
+// bypass.
+func Requires(p workflow.Predicate, field, value string) bool {
+	w, ok := p.(predicate)
+	return ok && slices.Contains(w.p.pins, field+"="+value)
+}
 
 func (w predicate) Match(v workflow.Vars) (bool, error) {
 	return w.p.run(activation{env: w.p.env, marks: v.Marks, get: func(name string) any {

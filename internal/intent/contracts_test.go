@@ -112,7 +112,6 @@ cap = "rounds"
 reason_fact = "pr.address.reason"
 refuse_when = "pr.nudge_refusal"
 reason = "address_round"
-auto_send = false
 brief = { need = ["solution"] }`, 1) + `
 [inputs.repo]
 type = "text"
@@ -127,7 +126,7 @@ help = "owner/name"
 	d, ok := l.Registry.Get("implement")
 	if !ok || d.WorkspaceRepo == nil || d.WorkspaceRepo.RepoInput != "repo" || d.Provider != "github" || len(d.Providers) != 2 ||
 		d.Role != "nudge" || len(d.DraftEffects) != 2 || d.RoundKind != "address" || d.Cap != "rounds" || d.ReasonFact != "pr.address.reason" ||
-		d.RefuseWhen != "pr.nudge_refusal" || d.Reason != "address_round" || d.AutoSend == nil || *d.AutoSend || d.Brief.Need[0] != "solution" {
+		d.RefuseWhen != "pr.nudge_refusal" || d.Reason != "address_round" || d.Brief.Need[0] != "solution" {
 		t.Fatalf("%+v", d)
 	}
 	if got, ok := l.Registry.ByRole("nudge", "slack"); !ok || got.Name != "implement" {

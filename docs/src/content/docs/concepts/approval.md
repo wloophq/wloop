@@ -61,7 +61,33 @@ A draft goes out only once its approval policy lets it:
 
 A draft you write yourself (Reply on an entry or a unit, see [GTD](/concepts/gtd/), `outbox new`, or `slack send` to a thread) is `always` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
-Every bundled intent, workflow and rule uses `always`. Your own intent or workflow can set another with a `[draft_approval]` table, a workflow's drafts with `workflows.<name>.draft_approval` in the configuration, and GitHub's nudge rule with `proposals.github-nudge.approval`; the older `proposals.stalled-nudge`, `closure` and `ask-owner` approvals still apply to the workflows that replaced them, with a warning naming `workflows.<name>.draft_approval`. A draft an agent aims outside its own unit is always `always`, unless the policy is `observe`, and so are a draft whose workflow or intent sets `auto_send = false` and every comment draft: a comment on a pull request goes out under your name only once you approve it.
+Every bundled intent, workflow and rule uses `always`. Your own intent or workflow can set another with a `[draft_approval]` table, a workflow's drafts with `workflows.<name>.draft_approval` in the configuration, and GitHub's nudge rule with `proposals.github-nudge.approval`; the older `proposals.stalled-nudge`, `closure` and `ask-owner` approvals still apply to the workflows that replaced them, with a warning naming `workflows.<name>.draft_approval`.
+
+A `[draft_approval]` table holds a `mode` and, before it, rules tried in order; the first whose `when` holds gives the draft's mode, and a draft no rule matches takes `mode`:
+
+```toml
+[draft_approval]
+mode = "always"
+
+[[draft_approval.rule]]
+when = 'draft.delivery == "comment" && pr.author == "dependabot[bot]"'
+mode = "none"
+
+[[draft_approval.rule]]
+when = 'draft.delivery == "message" && slack.conversation == "dm"'
+mode = "window"
+window = "10m"
+```
+
+A rule reads the facts of the draft no agent chooses (`draft.delivery`, `draft.proposer`, `draft.effects`, and `draft.purpose` when a workflow named it) and the facts of the unit the draft is on; never a brief's, which an agent writes. The [facts](/reference/facts/#draft-approval-facts) page lists them. A rule's mode is `always`, `window` (with its `window`), `none` or `observe`. The configuration's `workflows.<name>.draft_approval` takes the same `mode` and `rule` list and replaces the manifest's whole table, its rules included, for the drafts the workflow proposes and those of the turns it starts.
+
+Three floors hold whatever the policy says:
+
+- a comment draft waits for you unless a rule whose `when` has `draft.delivery == "comment"` as a term of its top-level `&&` releases it with `none` or `window`: a catch-all `mode = "none"`, or a rule that does not name comment delivery, never sends a comment on a pull request under your name;
+- a draft an agent aims outside its own unit waits for you, unless the policy is `observe`;
+- an agent never sets its own approval: the purpose an agent gives its draft reads as empty in a rule, and an intent's rules may not read `draft.purpose` at all.
+
+The older `auto_send` key still loads, with a warning naming `[draft_approval]`: `auto_send = false` reads as `mode = "always"` with no rules, and `true` as nothing.
 
 A draft has a purpose (nudge, close, ask_owner, or any label its proposer names), a delivery (a message, a reaction or a comment) and the effects sending it applies, each exactly once, after a restart too:
 

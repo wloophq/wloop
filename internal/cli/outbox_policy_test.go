@@ -61,7 +61,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 		t.Fatal(l.Problems.Error())
 	}
 	u := pr.Ref(r7).Unit()
-	if a, err := te.outboxPolicies().For(context.Background(), u, draft.Origin{Kind: draft.OriginSession}); err != nil || a.Mode != draft.Always {
+	if a, err := te.outboxPolicies().For(context.Background(), u, draft.Origin{Kind: draft.OriginSession}); err != nil || a.Default.Mode != draft.Always || len(a.Rules) != 0 {
 		t.Fatalf("a session draft without a turn: %+v, %v", a, err)
 	}
 	defs := l.Registry.All()
@@ -71,16 +71,16 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	book := dturn.Book{Unit: u}
 	var origins []draft.Origin
 	for _, d := range defs {
-		if d.DraftApproval != nil {
-			t.Errorf("intent %s declares %+v", d.Name, *d.DraftApproval)
+		if p := d.DraftApproval; p != nil && (p.Default.Mode != draft.Always || len(p.Rules) != 0) {
+			t.Errorf("intent %s declares %+v", d.Name, *p)
 		}
 		seq := int64(len(book.Turns) + 1)
 		book.Turns = append(book.Turns, dturn.Turn{Seq: seq, Intent: dturn.Intent(d.Name)})
 		origins = append(origins, draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq, Intent: string(d.Name)})
 	}
 	for _, w := range l.Workflows {
-		if w.DraftApproval != nil {
-			t.Errorf("workflow %s declares %+v", w.Name, *w.DraftApproval)
+		if p := w.DraftApproval; p != nil && (p.Default.Mode != draft.Always || len(p.Rules) != 0) {
+			t.Errorf("workflow %s declares %+v", w.Name, *p)
 		}
 		seq := int64(len(book.Turns) + 1)
 		book.Turns = append(book.Turns, dturn.Turn{Seq: seq, Intent: "review", Workflow: w.Name})
@@ -88,7 +88,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	}
 	pol := outbox.Resolver{Manifests: outboxManifests{loaded: te.loadedIntents, books: policyBooks{u: book}}}
 	for _, o := range origins {
-		if a, err := pol.For(context.Background(), u, o); err != nil || a.Mode != draft.Always {
+		if a, err := pol.For(context.Background(), u, o); err != nil || a.Default.Mode != draft.Always || len(a.Rules) != 0 {
 			t.Errorf("%+v resolves to %+v, %v", o, a, err)
 		}
 	}
@@ -126,7 +126,7 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 		{"a session draft reads its turn's intent", draft.Origin{Kind: draft.OriginSession, TurnSeq: 5}, draft.Approval{Mode: draft.None}},
 	} {
 		a, err := pol.For(context.Background(), u, c.o)
-		if err != nil || a != c.want {
+		if err != nil || a.Default != c.want || len(a.Rules) != 0 {
 			t.Errorf("%s: %+v, %v", c.name, a, err)
 		}
 	}

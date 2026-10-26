@@ -75,10 +75,17 @@ The thresholds:
 
 ## Tune the Slack proposals
 
-`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `draft_approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say; `slack-ask-owner`'s questions always wait for you whatever it says:
+`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `draft_approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say, its `rule` list tried before its `mode`:
 
 ```json
 "workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m" } } }
+```
+
+A rule picks the mode by the subject's facts; this one sends closings at once on a thread you started and keeps the window elsewhere:
+
+```json
+"workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m",
+  "rule": [{ "when": "draft.delivery == \"message\" && entry.unit_started_by_me", "mode": "none" }] } } }
 ```
 
 A workflow's `mode` and a draft's `observe` policy differ: `"mode": "observe"` plans the workflow and proposes nothing, while `"draft_approval": {"mode": "observe"}` proposes each draft and records it as what would have been sent, without sending it.

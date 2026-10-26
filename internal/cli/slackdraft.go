@@ -72,8 +72,7 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		return mcp.DraftResult{}, err
 	}
 	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Target: a.Target, Text: a.Text,
-		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow},
-		HoldAutoSend: def.HoldsDrafts()})
+		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
 	if err != nil {
 		if errors.Is(err, send.ErrNotLoggedIn) {
 			s.sender.loggedOut()

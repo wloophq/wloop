@@ -3,6 +3,7 @@ package intent
 import (
 	"cmp"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -26,6 +27,8 @@ type sheet struct {
 	file     string
 	at       map[string]frontmatter.Position
 	problems Problems
+	// warnings are what loads but is deprecated.
+	warnings Problems
 	// extras are the brief.extra.* facts of a provider's brief intent, which
 	// a workflow's predicates over a briefed subject read; nil reads none.
 	extras func(dunit.ProviderID) expr.Env
@@ -53,6 +56,10 @@ func parent(path string) string {
 
 func (s *sheet) add(path, format string, args ...any) {
 	s.problems = append(s.problems, s.problem(path, format, args...))
+}
+
+func (s *sheet) warn(path, format string, args ...any) {
+	s.warnings = append(s.warnings, s.problem(path, format, args...))
 }
 
 func (s *sheet) problem(path, format string, args ...any) Problem {
@@ -106,47 +113,46 @@ func orEmpty(v []string, def []string) []string {
 // define applies the manifest defaults and reports missing required keys.
 func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	d := dintent.Def{
-		Name:          name,
-		Label:         s.required("label", m.Label),
-		Summary:       s.required("summary", m.Summary),
-		Key:           m.Key,
-		Verb:          m.Verb,
-		UserFacing:    boolOr(m.UserFacing, true),
-		Provider:      s.defaults.Provider,
-		Context:       str(m.Context, "pr"),
-		Launch:        m.Launch,
-		Policy:        str(m.Policy, "round"),
-		Intake:        m.Intake,
-		OwnerOnly:     m.OwnerOnly,
-		Answerable:    boolOr(m.Answerable, true),
-		Board:         str(m.Board, "none"),
-		DrivesRow:     m.DrivesRow,
-		Reports:       boolOr(m.Reports, true),
-		Reconcile:     m.Reconcile,
-		Brief:         dintent.Brief{Render: true, Wait: true},
-		Dims:          orEmpty(m.Dims, nil),
-		Records:       s.pred("records", m.Records, "true"),
-		Prepare:       m.Prepare,
-		OnSent:        orEmpty(m.OnSent, nil),
-		Guidance:      dintent.Guidance{Label: "Guidance"},
-		Resume:        dintent.Resume{HeadMoved: DefaultHeadMoved},
-		DraftApproval: s.draftApproval(m.DraftApproval),
-		Modes:         s.modes(m.Modes),
-		Role:          m.Role,
-		Builds:        m.Builds,
-		Prompt:        m.Prompt,
-		Schema:        m.Schema,
-		DraftEffects:  orEmpty(m.DraftEffects, nil),
-		RoundKind:     m.RoundKind,
-		Cap:           m.Cap,
-		ReasonFact:    m.ReasonFact,
-		RefuseWhen:    m.RefuseWhen,
-		Reason:        m.Reason,
-		AutoSend:      m.AutoSend,
-		Skill:         m.Skill,
+		Name:         name,
+		Label:        s.required("label", m.Label),
+		Summary:      s.required("summary", m.Summary),
+		Key:          m.Key,
+		Verb:         m.Verb,
+		UserFacing:   boolOr(m.UserFacing, true),
+		Provider:     s.defaults.Provider,
+		Context:      str(m.Context, "pr"),
+		Launch:       m.Launch,
+		Policy:       str(m.Policy, "round"),
+		Intake:       m.Intake,
+		OwnerOnly:    m.OwnerOnly,
+		Answerable:   boolOr(m.Answerable, true),
+		Board:        str(m.Board, "none"),
+		DrivesRow:    m.DrivesRow,
+		Reports:      boolOr(m.Reports, true),
+		Reconcile:    m.Reconcile,
+		Brief:        dintent.Brief{Render: true, Wait: true},
+		Dims:         orEmpty(m.Dims, nil),
+		Records:      s.pred("records", m.Records, "true"),
+		Prepare:      m.Prepare,
+		OnSent:       orEmpty(m.OnSent, nil),
+		Guidance:     dintent.Guidance{Label: "Guidance"},
+		Resume:       dintent.Resume{HeadMoved: DefaultHeadMoved},
+		Modes:        s.modes(m.Modes),
+		Role:         m.Role,
+		Builds:       m.Builds,
+		Prompt:       m.Prompt,
+		Schema:       m.Schema,
+		DraftEffects: orEmpty(m.DraftEffects, nil),
+		RoundKind:    m.RoundKind,
+		Cap:          m.Cap,
+		ReasonFact:   m.ReasonFact,
+		RefuseWhen:   m.RefuseWhen,
+		Reason:       m.Reason,
+		Skill:        m.Skill,
 	}
 	roleRound(&d)
 	s.provider(&d, m.Provider)
+	d.DraftApproval = s.draftApproval(m.DraftApproval, m.AutoSend, builtin.ApprovalEnv(false, servedSlots(d)...))
 	s.workspace(&d, m.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
 	if p := str(m.Profile, "none"); p != "none" {
@@ -299,4 +305,18 @@ func roleRound(d *dintent.Def) {
 		r.Cap = builtin.CapRounds
 	}
 	d.Cap = cmp.Or(d.Cap, r.Cap)
+}
+
+// servedSlots are the workflow slots of the units d's turns run on.
+func servedSlots(d dintent.Def) []string {
+	if d.Serves(dintent.AnyProvider) {
+		return builtin.UnitSlots()
+	}
+	var out []string
+	for _, p := range append([]dunit.ProviderID{d.ProviderOrDefault()}, d.Providers...) {
+		if slot, ok := builtin.Slots[p]; ok && !slices.Contains(out, slot) {
+			out = append(out, slot)
+		}
+	}
+	return out
 }

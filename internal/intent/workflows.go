@@ -81,6 +81,7 @@ type wUnit struct {
 	bundled  bool
 	files    files
 	problems Problems
+	warnings Problems
 	wf       workflow.Workflow
 	// whenAt is where the manifest's when is, for a problem found after it loaded.
 	whenAt dintent.Pos
@@ -91,7 +92,7 @@ type wUnit struct {
 // bundled one whose override fails is listed in reverted and loads without
 // it. intentProblem, when set, is why a turn.start may not name an intent,
 // "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string, extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string, extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -161,6 +162,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 			continue
 		}
 		loaded = append(loaded, u.wf)
+		warnings = append(warnings, u.warnings...)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {
 		if a.Order != b.Order {
@@ -168,7 +170,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return loaded, broken, reverted, problems
+	return loaded, broken, reverted, problems, warnings
 }
 
 // markNames are the marks a workflow may read: those the loaded workflows
@@ -202,7 +204,7 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 func (u *wUnit) load(intentProblem func(string) string, extras func(dunit.ProviderID) expr.Env) {
 	file := u.files.path("workflow.toml")
 	s := &sheet{file: file, extras: extras}
-	defer func() { u.problems = s.problems }()
+	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
 	}
@@ -323,9 +325,8 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
-	w.DraftApproval = s.draftApproval(m.DraftApproval)
+	w.DraftApproval = s.draftApproval(m.DraftApproval, m.AutoSend, builtin.ApprovalEnv(true, slot))
 	s.defineWithdraw(&w, m.Withdraw, slot)
-	w.AutoSend = m.AutoSend
 	s.turnBudget(w, m.Limits)
 	return w
 }

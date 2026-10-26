@@ -31,8 +31,8 @@ func (g *githubSource) Proposals(ctx context.Context, now time.Time) ([]outbox.P
 
 func ghNudge(u unit.Unit) outbox.Proposal {
 	return outbox.Proposal{Unit: u, Kind: draft.Nudge, Text: "@{github:bob}, any news?", Entry: "e-forged",
-		Origin:   draft.Origin{Kind: draft.OriginTurn, TurnSeq: 9, Intent: "autopost", Workflow: "w", Rule: "github-nudge", Key: "forged"},
-		Approval: &draft.Approval{Mode: draft.None}}
+		Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 9, Intent: "autopost", Workflow: "w", Rule: "github-nudge", Key: "forged"},
+		Policy: draft.Fixed(draft.Approval{Mode: draft.None})}
 }
 
 func TestGitHubUnitGetsOneNudgeDraft(t *testing.T) {

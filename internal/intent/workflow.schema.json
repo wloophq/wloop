@@ -102,7 +102,7 @@
     "draft_approval": {
       "type": "object",
       "additionalProperties": false,
-      "description": "When the drafts of the turns this workflow starts are sent without the user's click. Absent: always. The approval block above governs runs, never drafts.",
+      "description": "When the drafts this workflow proposes, and those of the turns it starts, are sent without the user's click. Absent: always. The approval block above governs runs, never drafts.",
       "required": ["mode"],
       "properties": {
         "mode": {
@@ -110,7 +110,39 @@
           "description": "always: the user approves each draft; window: sent when the window ends unless the user discards or edits it first; none: sent at once; observe: recorded, never sent.",
           "enum": ["always", "window", "none", "observe"]
         },
-        "window": {"type": "string", "description": "With mode window only: how long the user has, such as 10m."}
+        "window": {"type": "string", "description": "With mode window only: how long the user has, such as 10m."},
+        "rule": {
+          "type": "array",
+          "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (none or window) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "when",
+              "mode"
+            ],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "A predicate over draft.delivery, draft.proposer, draft.effects, draft.purpose (empty for a turn's draft) and the subject's facts."
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "always",
+                  "window",
+                  "none",
+                  "observe"
+                ],
+                "description": "The mode of a draft the rule matches."
+              },
+              "window": {
+                "type": "string",
+                "description": "With mode window only: how long the user has, such as 10m."
+              }
+            }
+          }
+        }
       }
     },
     "withdraw": {
@@ -123,6 +155,6 @@
         "reason": {"type": "string", "enum": ["assigned", "moot"], "description": "The withdrawn draft's reason: assigned (its items got an owner) or moot, the default."}
       }
     },
-    "auto_send": {"type": "boolean", "description": "false keeps the workflow's drafts for the user's approval whatever their draft approval."}
+    "auto_send": {"type": "boolean", "deprecated": true, "description": "Replaced by [draft_approval]; loads with a warning: false is read as mode always with no rules, true as nothing."}
   }
 }

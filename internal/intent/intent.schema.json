@@ -94,7 +94,7 @@
     "reason_fact": {"type": "string", "description": "The workflow fact that says why the intent's round is due or not."},
     "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
     "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
-    "auto_send": {"type": "boolean", "description": "false keeps the intent's drafts for the user's approval whatever their draft approval."},
+    "auto_send": {"type": "boolean", "deprecated": true, "description": "Replaced by [draft_approval]; loads with a warning: false is read as mode always with no rules, true as nothing."},
     "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt."},
     "session": {
       "type": "object",
@@ -580,6 +580,38 @@
         "window": {
           "type": "string",
           "description": "With mode window only: how long the user has, such as 10m."
+        },
+        "rule": {
+          "type": "array",
+          "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (none or window) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "when",
+              "mode"
+            ],
+            "properties": {
+              "when": {
+                "type": "string",
+                "description": "A predicate over draft.delivery, draft.proposer, draft.effects and the facts of the unit the draft is on; never draft.purpose, which the turn's agent names."
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "always",
+                  "window",
+                  "none",
+                  "observe"
+                ],
+                "description": "The mode of a draft the rule matches."
+              },
+              "window": {
+                "type": "string",
+                "description": "With mode window only: how long the user has, such as 10m."
+              }
+            }
+          }
         }
       }
     }

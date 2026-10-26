@@ -226,6 +226,17 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `config.proposals.renudge_after` | duration | The proposals.renudge_after setting. |
 | `config.turns.automated_per_day` | int | The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together. |
 
+## Draft approval facts
+
+A `[draft_approval]` rule's `when` reads these, the facts of the draft no agent chooses, plus the facts of the unit the draft is on (a workflow's: its subject's), never `brief.*`, `trigger.*` or `config.*`. A rule that releases a draft on its own (`none` or `window`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
+
+| Approval fact | Type | Meaning |
+|---|---|---|
+| `draft.delivery` | string | How the draft is posted: message, reaction or comment. |
+| `draft.proposer` | string | What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's. |
+| `draft.effects` | list | The effects the draft applies once sent, which the proposing intent's draft_effects bound. |
+| `draft.purpose` | string | The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not. |
+
 ## Workflow steps
 
 The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints them with their arguments.

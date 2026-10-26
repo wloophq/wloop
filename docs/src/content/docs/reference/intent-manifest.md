@@ -42,8 +42,9 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `reason_fact` | | `""` | the workflow fact that says why the round is due; a review's first round says why itself |
 | `refuse_when` | | `""` | a string workflow fact whose non-empty value refuses `turn.start` with that text; on a pull request, a mute refuses too |
 | `reason` | | `""` | `address_round`: the turn carries the reviewers, failing checks and conflict its round answers |
-| `auto_send` | | unset | `false` keeps the drafts of the intent's turns for your approval whatever their policy; a comment draft waits whatever it says |
 | `draft_approval.mode`, `draft_approval.window` | | `always` | `always`, `window` (with a positive `window` such as `"10m"`), `none` or `observe` |
+| `[[draft_approval.rule]]` | | none | `when`, `mode`, `window`: tried in order before `mode`, see [`[draft_approval]`](#draft_approval) |
+| `auto_send` | | unset | replaced by `[draft_approval]`; loads with a warning, `false` as `mode = "always"` with no rules, `true` as nothing |
 | `session.strategy` | yes | | `reuse_live`, `new` |
 | `session.title` | yes | | 1 to 12 lower-case letters |
 | `session.close_when_done` | | `false` | |
@@ -116,11 +117,15 @@ Makes the intent an action on rows:
 
 ```toml
 [draft_approval]
+mode = "always"
+
+[[draft_approval.rule]]
+when = 'draft.delivery == "comment" && pr.repo == "acme/docs"'
 mode = "window"
 window = "10m"
 ```
 
-The policy of the drafts the intent's turns propose. A workflow's own `[draft_approval]` wins over the intent's for the turns it starts. See [the Outbox](/concepts/approval/#the-outbox).
+The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`. A rule's `when` reads `draft.delivery`, `draft.proposer`, `draft.effects` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose`, which the turn's agent names, nor `brief.*`. A rule that sends on its own (`none` or `window`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. A workflow's own `[draft_approval]` wins over the intent's for the turns it starts. See [the Outbox](/concepts/approval/#the-outbox).
 
 ## Providers
 

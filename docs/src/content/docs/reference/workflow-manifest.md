@@ -48,9 +48,9 @@ round = "follow-up"
 | `[[step]]` | at least one | | `use` names a builtin step; other keys are its arguments, all strings |
 | `[limits]` | | none | `per_run`, `per_day`, `per_unit_per_day`, `cooldown` |
 | `[approval]` | | none | `default`, `window`, `wait_when` |
-| `[draft_approval]` | | the intent's, else `always` | `mode`, `window`: the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; `workflows.<name>.draft_approval` in the configuration wins over it |
+| `[draft_approval]` | | the intent's, else `always` | `mode`, `window` and `[[draft_approval.rule]]` (`when`, `mode`, `window`): the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; see [Draft approval](#draft-approval). `workflows.<name>.draft_approval` in the configuration replaces it, rules included |
 | `[withdraw]` | | none | `when`, a predicate over the subject's slot and `draft.*`, withdraws an open draft the workflow's `draft.propose` proposed; `reason` is `moot` (the default) or `assigned` |
-| `auto_send` | | unset | `false` keeps the workflow's drafts for your approval whatever their policy; a comment draft waits whatever it says |
+| `auto_send` | | unset | replaced by `[draft_approval]`; loads with a warning, `false` as `mode = "always"` with no rules, `true` as nothing |
 
 ## Steps
 
@@ -70,6 +70,21 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 - `wait_when` is a predicate that holds the item as `wait` with the reason shown, as the workspace workflows do for a workspace with unsaved work.
 
 A workflow with no `window` runs a `default = "run"` item at once; the bundled `turn.start` workflows set `window = "60s"`. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
+
+## Draft approval
+
+`[draft_approval]` tries its rules in order and gives a draft the mode of the first whose `when` holds, else `mode`:
+
+```toml
+[draft_approval]
+mode = "always"
+
+[[draft_approval.rule]]
+when = 'draft.purpose == "thanks" && slack.conversation == "dm"'
+mode = "none"
+```
+
+A rule's `when` reads the [draft approval facts](/reference/facts/#draft-approval-facts) and the subject's slot, never `brief.*`, `trigger.*`, `config.*` or `handled()`. `draft.purpose` is the `draft.propose` step's `purpose`; for a draft of a turn the workflow started it reads as empty, since the turn's agent names it. A rule that sends on its own (`none` or `window`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`, and `mode` alone never releases a comment.
 
 ## Predicates
 

@@ -95,8 +95,7 @@ func (j *Job) Run(ctx context.Context) (Summary, error) {
 	}
 	props, err := j.fromSources(ctx)
 	for _, p := range props {
-		a := j.approval(p.Origin.Rule)
-		p.Approval = &a
+		p.Policy = draft.Fixed(j.approval(p.Origin.Rule))
 		switch perr := j.propose(ctx, p, now); {
 		case perr == nil:
 			sum.Proposed++

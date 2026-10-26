@@ -429,6 +429,9 @@ func runProfileCheck(e *Env, args []string) error {
 		return err
 	}
 	loaded, problems := intentload.Load(layer, turn.BundledFS(), b, turn.CheckTemplate)
+	for _, w := range loaded.Warnings.Sorted() {
+		fmt.Fprintf(e.Err, "warning: %s\n", intentload.Problems{w}.Error())
+	}
 	if out.TTY {
 		e.writeIntents(out, dir, loaded.Registry)
 		e.writeWorkflows(out, dir, loaded.Workflows)

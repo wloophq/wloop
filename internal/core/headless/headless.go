@@ -473,7 +473,7 @@ func (s *Service) propose(ctx context.Context, st started, ps []proposed) []draf
 	var out []draft.Draft
 	for _, p := range ps {
 		d, err := s.Outbox.Propose(ctx, outbox.Proposal{Unit: st.req.Unit, Items: p.Items, Entry: st.req.Entry, Kind: p.Kind,
-			Target: p.Target, Text: p.Text, Reaction: p.Reaction, Effects: p.Effects, Origin: origin, HoldAutoSend: st.def.HoldsDrafts()})
+			Target: p.Target, Text: p.Text, Reaction: p.Reaction, Effects: p.Effects, Origin: origin})
 		if err != nil {
 			s.logf("headless turn %d: a %s draft on %s was refused: %v", st.seq, p.Kind, st.req.Unit, err)
 			continue

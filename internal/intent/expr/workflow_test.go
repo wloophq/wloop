@@ -224,3 +224,28 @@ func TestAPredicateSaysWhetherItReadsMarks(t *testing.T) {
 		t.Error("All hides that a part reads marks")
 	}
 }
+
+func TestRequiresIsATermEveryMatchHolds(t *testing.T) {
+	env := Env{"draft.delivery": String, "pr.mine": Bool, "pr.author": String}
+	for src, want := range map[string]bool{
+		`draft.delivery == "comment"`:                                    true,
+		`"comment" == draft.delivery`:                                    true,
+		`pr.mine && draft.delivery == "comment"`:                         true,
+		`(pr.author == "bot" && pr.mine) && draft.delivery == "comment"`: true,
+		`pr.mine || draft.delivery == "comment"`:                         false,
+		`!(draft.delivery == "comment")`:                                 false,
+		`draft.delivery != "comment"`:                                    false,
+		`draft.delivery == "message"`:                                    false,
+		`draft.delivery in ["comment"]`:                                  false,
+		`pr.author == "comment"`:                                         false,
+		`pr.mine ? draft.delivery == "comment" : true`:                   false,
+	} {
+		p, err := CompileWorkflow(src, env)
+		if err != nil {
+			t.Fatalf("%s: %v", src, err)
+		}
+		if got := Requires(p, "draft.delivery", "comment"); got != want {
+			t.Errorf("%s: %v, want %v", src, got, want)
+		}
+	}
+}

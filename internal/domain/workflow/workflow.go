@@ -174,7 +174,7 @@ type Workflow struct {
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
 	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
-	DraftApproval *draft.Approval
+	DraftApproval *draft.Policy
 	// Withdraw is the manifest's [withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.
@@ -182,9 +182,6 @@ type Workflow struct {
 	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
 	// or moot.
 	WithdrawReason string
-	// AutoSend false holds the workflow's drafts for a person whatever their
-	// approval; nil keeps the default of their delivery.
-	AutoSend *bool
 }
 
 // Visible says whether a step of the workflow acts in the user's name where others see it.

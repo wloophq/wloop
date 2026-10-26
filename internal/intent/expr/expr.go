@@ -30,6 +30,7 @@ type Program struct {
 	env   Env
 	reads []string
 	marks []string // the marks the predicate's handled() calls name
+	pins  []string // field=literal terms every match requires
 }
 
 type Error struct {

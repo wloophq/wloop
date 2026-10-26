@@ -57,25 +57,18 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 
 type approveAll struct{}
 
-func (approveAll) For(context.Context, unit.Unit, draft.Origin) (draft.Approval, error) {
-	return draft.Approval{Mode: draft.None}, nil
+func (approveAll) For(context.Context, unit.Unit, draft.Origin) (draft.Policy, error) {
+	return draft.Policy{Default: draft.Approval{Mode: draft.None}}, nil
 }
 
-func TestAHeadlessDraftOfAnIntentThatNeverAutoSendsWaits(t *testing.T) {
+func TestAHeadlessDraftTakesItsProposersPolicy(t *testing.T) {
 	r := newRig(t, scripted{json: answerJSON(t, done, reply("On it."))})
 	r.outbox.Policies = approveAll{}
-	intents := r.svc.Intents
-	r.svc.Intents = func(n turn.Intent) (dintent.Def, bool) {
-		d, ok := intents(n)
-		never := false
-		d.AutoSend = &never
-		return d, ok
-	}
 	if _, err := r.svc.Run(context.Background(), headless.Request{Unit: thread}); err != nil {
 		t.Fatal(err)
 	}
 	drafts, _ := r.outbox.List(context.Background(), outbox.Filter{})
-	if len(drafts) != 1 || drafts[0].State != draft.Proposed || drafts[0].Approval.Mode != draft.Always {
+	if len(drafts) != 1 || drafts[0].Approval.Mode != draft.None || drafts[0].State == draft.Proposed {
 		t.Fatalf("drafts %+v", drafts)
 	}
 }

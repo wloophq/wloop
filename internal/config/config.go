@@ -291,8 +291,9 @@ type WorkflowConfig struct {
 	// besides its manifest's when; "" adds none.
 	OnlyWhen string `json:"only_when,omitempty"`
 	// DraftApproval is the approval of the drafts the workflow proposes,
-	// over its manifest's [draft_approval].
-	DraftApproval *ProposalApproval `json:"draft_approval,omitempty"`
+	// over its manifest's [draft_approval]: its mode and rules replace the
+	// manifest's.
+	DraftApproval *DraftApprovalConfig `json:"draft_approval,omitempty"`
 }
 
 type ApprovalConfig struct {
@@ -620,7 +621,7 @@ func (c Config) validateWorkflows() error {
 			}
 		}
 		if a := w.DraftApproval; a != nil {
-			if err := a.Approval().Validate(); err != nil {
+			if _, err := a.Policy(builtin.ApprovalEnv(true, builtin.UnitSlots()...)); err != nil {
 				return fmt.Errorf("workflows.%s.draft_approval: %w", name, err)
 			}
 		}

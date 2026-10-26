@@ -86,6 +86,9 @@ type Loaded struct {
 	Problems  Problems                  // user intents that did not load, and overrides read as bundled
 	Broken    map[dintent.Name]Problems // user intents that failed, keyed by directory name
 	Reverted  map[dintent.Name]Problems // bundled intents read without the user's override, which does not load
+	// Warnings are what the loaded intents and workflows declare that loads
+	// but is deprecated.
+	Warnings Problems
 
 	Workflows       []workflow.Workflow // by order, then name; a user workflow that failed is not here
 	BrokenWorkflows map[string]Problems // user workflows that failed, keyed by directory name
@@ -356,14 +359,16 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			continue
 		}
 		l.Problems = append(l.Problems, u.keyProblems...)
+		l.Warnings = append(l.Warnings, u.sheet.warnings...)
 		defs = append(defs, u.def)
 		l.Templates[u.name] = u.tmpl
 		l.Programs[u.name] = u.programs
 	}
 	l.Registry = dintent.NewRegistry(defs)
-	var wfProblems Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem, l.briefExtras)
+	var wfProblems, wfWarnings Problems
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.intentProblem, l.briefExtras)
 	l.Problems = append(l.Problems, wfProblems...)
+	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
 }
 

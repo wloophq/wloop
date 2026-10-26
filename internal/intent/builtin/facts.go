@@ -244,6 +244,10 @@ var Facts = []Fact{
 	wf("draft", "items_held", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
 	wf("draft", "items_owned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
 	wf("draft", "subject_open", expr.Bool, "The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored."),
+	approvalFact("delivery", expr.String, "How the draft is posted: message, reaction or comment."),
+	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
+	approvalFact("effects", expr.List, "The effects the draft applies once sent, which the proposing intent's draft_effects bound."),
+	approvalFact("purpose", expr.String, "The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not."),
 	wf("trigger", "kind", expr.String, "sweep, event or schedule."),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),
 	wf("trigger", "event.key", expr.String, "The event's key."),
@@ -258,6 +262,46 @@ var Facts = []Fact{
 	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
 	wf("config", "proposals.renudge_after", expr.Duration, "The proposals.renudge_after setting."),
 	wf("config", "turns.automated_per_day", expr.Int, "The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together."),
+}
+
+// approvalFact is a fact of the draft a [draft_approval] rule reads,
+// named draft.<name>.
+func approvalFact(name string, t expr.Type, doc string) Fact {
+	return Fact{Name: DraftSlot + "." + name, Type: t, Slots: []FactSlot{ApprovalSlot}, Doc: doc}
+}
+
+// DraftPurpose is the approval fact an intent's rules may not read: an agent
+// names the purpose of its turn's drafts.
+const DraftPurpose = "draft.purpose"
+
+// DraftDelivery is the approval fact a rule must pin to "comment" to release
+// a comment draft.
+const DraftDelivery = "draft.delivery"
+
+// ApprovalEnv is the env of a [draft_approval] rule's when: the approval
+// slot's facts, without draft.purpose unless purpose, and the facts of each
+// of slots, never a brief's, which an agent writes.
+func ApprovalEnv(purpose bool, slots ...string) expr.Env {
+	env := expr.Env{}
+	for _, f := range Facts {
+		switch {
+		case slices.Contains(f.Slots, ApprovalSlot) && (purpose || f.Name != DraftPurpose):
+			env[f.Name] = f.Type
+		case slices.Contains(f.Slots, WorkflowSlot) && f.Slot != "" && slices.Contains(slots, f.Slot):
+			env[f.Name] = f.Type
+		}
+	}
+	return env
+}
+
+// UnitSlots are the workflow slots of every provider's units.
+func UnitSlots() []string {
+	out := make([]string, 0, len(Slots))
+	for _, s := range Slots {
+		out = append(out, s)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // WorkflowSlots are the slots of workflow facts: each provider's, then the

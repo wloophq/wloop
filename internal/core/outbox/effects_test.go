@@ -184,42 +184,21 @@ func TestNoEffectIsDerivedFromKind(t *testing.T) {
 
 func TestTheApprovalIsConfigThenLegacyThenManifestThenAlways(t *testing.T) {
 	t.Parallel()
-	a := func(m draft.ApprovalMode) *draft.Approval { return &draft.Approval{Mode: m} }
-	window := &draft.Approval{Mode: draft.Window, Window: time.Hour}
+	a := func(m draft.ApprovalMode) *draft.Policy { return draft.Fixed(draft.Approval{Mode: m}) }
+	window := draft.Fixed(draft.Approval{Mode: draft.Window, Window: time.Hour})
 	for _, c := range []struct {
 		name                     string
-		config, legacy, manifest *draft.Approval
+		config, legacy, manifest *draft.Policy
 		want                     draft.Approval
 	}{
 		{"config wins", a(draft.None), a(draft.Observe), window, draft.Approval{Mode: draft.None}},
 		{"then legacy", nil, a(draft.Observe), window, draft.Approval{Mode: draft.Observe}},
-		{"then the manifest", nil, nil, window, *window},
+		{"then the manifest", nil, nil, window, window.Default},
 		{"else always", nil, nil, nil, always},
 	} {
-		if got := ResolveApproval(c.config, c.legacy, c.manifest); got != c.want {
+		if got := ResolveApproval(c.config, c.legacy, c.manifest); got.Default != c.want || len(got.Rules) != 0 {
 			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
 		}
-	}
-}
-
-func TestADraftWhoseProposerSetsAutoSendFalseWaits(t *testing.T) {
-	e := newEnv()
-	for _, mode := range []draft.Approval{{Mode: draft.None}, {Mode: draft.Window, Window: time.Minute}} {
-		p := Proposal{Unit: thread, Purpose: "ask_owner", Text: "who owns this?", HoldAutoSend: true, Approval: &mode,
-			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "ask", Key: string(mode.Mode)}}
-		d := e.propose(p)
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {
-			t.Fatalf("%s: %+v", mode.Mode, d)
-		}
-	}
-	e.clock.now = t0.Add(time.Hour)
-	if n, err := e.svc.Tick(ctx); n != 0 || err != nil {
-		t.Fatalf("tick approved %d %v", n, err)
-	}
-	observe := Proposal{Unit: thread, Purpose: "ask_owner", Text: "who owns this?", HoldAutoSend: true,
-		Approval: &draft.Approval{Mode: draft.Observe}, Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "ask", Key: "observe"}}
-	if d := e.propose(observe); d.State != draft.Discarded || d.Reason != string(draft.Observe) {
-		t.Fatalf("observe is kept: %+v", d)
 	}
 }
 
@@ -227,7 +206,7 @@ func TestDuplicateReadsPurposeDeliveryAndObservedFor(t *testing.T) {
 	e := newEnv()
 	auto := func(purpose string, delivery draft.Delivery, a draft.ApprovalMode) Proposal {
 		return Proposal{Unit: thread, Purpose: purpose, Delivery: delivery, Text: "done", Reaction: "white_check_mark",
-			Approval: &draft.Approval{Mode: a}, ObservedFor: time.Hour,
+			Policy: draft.Fixed(draft.Approval{Mode: a}), ObservedFor: time.Hour,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "closure", Rule: "closure", Key: thread.String()}}
 	}
 	first := e.propose(auto("close", draft.Message, draft.Always))
@@ -250,10 +229,10 @@ func TestDuplicateReadsPurposeDeliveryAndObservedFor(t *testing.T) {
 	}
 }
 
-func TestACommentDraftWaitsForAPersonWhateverItsApproval(t *testing.T) {
+func TestACommentDraftWaitsForAPersonWhateverItsMode(t *testing.T) {
 	e := newEnv()
 	for _, mode := range []draft.Approval{{Mode: draft.None}, {Mode: draft.Window, Window: time.Minute}} {
-		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Approval: &mode,
+		p := Proposal{Unit: thread, Purpose: "nudge", Delivery: draft.CommentDelivery, Text: "any news?", Policy: draft.Fixed(mode),
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-followups", Rule: "my-followups", Key: string(mode.Mode)}}
 		d := e.propose(p)
 		if d.State != draft.Proposed || d.Approval.Mode != draft.Always || !d.Deadline.IsZero() || d.Would.Policy != draft.WouldHold {

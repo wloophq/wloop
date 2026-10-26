@@ -4,7 +4,9 @@ when = 'slack.live_entry && slack.items_unowned > 0 && slack.items_unowned_age_d
 mode = "apply"
 order = 52
 key = ["slack.settled_at"]
-auto_send = false
+
+[draft_approval]
+mode = "always"
 
 [trigger]
 every = "sweep"

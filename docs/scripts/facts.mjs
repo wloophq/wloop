@@ -11,6 +11,11 @@ const intro = {
     '',
     'The predicates of an intent manifest read these. The **action** slot (`[action]` predicates) reads the row the daemon serves; the **turn** slot (`records`, headline cases, `also_profiles.when`) reads the turn being built.',
   ],
+  '| Approval fact |': [
+    '## Draft approval facts',
+    '',
+    'A `[draft_approval]` rule\'s `when` reads these, the facts of the draft no agent chooses, plus the facts of the unit the draft is on (a workflow\'s: its subject\'s), never `brief.*`, `trigger.*` or `config.*`. A rule that releases a draft on its own (`none` or `window`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.',
+  ],
   '| Step |': [
     '## Workflow steps',
     '',

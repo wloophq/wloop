@@ -44,7 +44,7 @@ func compileWith(src string, env Env, marks bool) (*Program, error) {
 	if err != nil {
 		return nil, &Error{Col: 1, Msg: err.Error()}
 	}
-	p := &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env)}
+	p := &Program{prg: prg, env: env, reads: reads(ast.NativeRep(), env), pins: pins(ast.NativeRep())}
 	if marks {
 		if p.marks, err = handledNames(ast.NativeRep()); err != nil {
 			return nil, &Error{Col: 1, Msg: err.Error()}
@@ -364,4 +364,37 @@ func depth(s string) int {
 		}
 	}
 	return d
+}
+
+// pins are the field == "literal" terms of a's top-level conjunction, as
+// field=literal: what every match of the predicate requires.
+func pins(a *celast.AST) []string {
+	var out []string
+	var walk func(e celast.Expr)
+	walk = func(e celast.Expr) {
+		if e.Kind() != celast.CallKind {
+			return
+		}
+		call := e.AsCall()
+		switch call.FunctionName() {
+		case "_&&_":
+			for _, arg := range call.Args() {
+				walk(arg)
+			}
+		case "_==_":
+			args := call.Args()
+			for i, arg := range args {
+				lit := args[1-i]
+				ref, ok := a.ReferenceMap()[arg.ID()]
+				if !ok || ref.Name == "" || lit.Kind() != celast.LiteralKind {
+					continue
+				}
+				if s, ok := lit.AsLiteral().(types.String); ok {
+					out = append(out, ref.Name+"="+string(s))
+				}
+			}
+		}
+	}
+	walk(a.Expr())
+	return out
 }

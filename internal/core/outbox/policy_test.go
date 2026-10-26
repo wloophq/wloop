@@ -15,18 +15,18 @@ import (
 )
 
 type fakeManifests struct {
-	intents   map[string]*draft.Approval
-	workflows map[string]*draft.Approval
+	intents   map[string]*draft.Policy
+	workflows map[string]*draft.Policy
 	turns     map[int64][2]string
 	turnErr   error
 }
 
-func (f fakeManifests) IntentApproval(name string) (*draft.Approval, bool) {
+func (f fakeManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	a, ok := f.intents[name]
 	return a, ok
 }
 
-func (f fakeManifests) WorkflowApproval(name string) (*draft.Approval, bool) {
+func (f fakeManifests) WorkflowApproval(name string) (*draft.Policy, bool) {
 	a, ok := f.workflows[name]
 	return a, ok
 }
@@ -39,17 +39,19 @@ func (f fakeManifests) Turn(ctx context.Context, u unit.Unit, seq int64) (string
 	return t[0], t[1], ok, nil
 }
 
-func window(d time.Duration) *draft.Approval { return &draft.Approval{Mode: draft.Window, Window: d} }
+func window(d time.Duration) *draft.Policy {
+	return draft.Fixed(draft.Approval{Mode: draft.Window, Window: d})
+}
 
 var (
-	none    = &draft.Approval{Mode: draft.None}
-	observe = &draft.Approval{Mode: draft.Observe}
+	none    = draft.Fixed(draft.Approval{Mode: draft.None})
+	observe = draft.Fixed(draft.Approval{Mode: draft.Observe})
 )
 
 func manifests() fakeManifests {
 	return fakeManifests{
-		intents:   map[string]*draft.Approval{"reply": nil, "quick": none, "watch": observe},
-		workflows: map[string]*draft.Approval{"plain": nil, "timed": window(10 * time.Minute)},
+		intents:   map[string]*draft.Policy{"reply": nil, "quick": none, "watch": observe},
+		workflows: map[string]*draft.Policy{"plain": nil, "timed": window(10 * time.Minute)},
 		turns: map[int64][2]string{4: {"reply", ""}, 7: {"quick", ""}, 8: {"reply", "timed"}, 10: {"quick", "timed"},
 			11: {"quick", "plain"}, 12: {"watch", ""}, 13: {"reply", "plain"}, 14: {"gone", ""}, 15: {"quick", "gone"}, 16: {"bad", ""}},
 	}
@@ -59,26 +61,26 @@ func TestPolicyResolutionOrder(t *testing.T) {
 	for _, c := range []struct {
 		name     string
 		origin   draft.Origin
-		explicit *draft.Approval
+		explicit *draft.Policy
 		want     draft.Approval
 	}{
-		{"explicit wins over the workflow", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 10, Intent: "quick", Workflow: "timed"}, observe, *observe},
-		{"explicit on an auto rule", draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"}, none, *none},
-		{"workflow wins over intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 10, Intent: "quick", Workflow: "timed"}, nil, *window(10 * time.Minute)},
-		{"a workflow without a block falls to the intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 11, Intent: "quick", Workflow: "plain"}, nil, *none},
-		{"intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 12, Intent: "watch"}, nil, *observe},
+		{"explicit wins over the workflow", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 10, Intent: "quick", Workflow: "timed"}, observe, observe.Default},
+		{"explicit on an auto rule", draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"}, none, none.Default},
+		{"workflow wins over intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 10, Intent: "quick", Workflow: "timed"}, nil, window(10 * time.Minute).Default},
+		{"a workflow without a block falls to the intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 11, Intent: "quick", Workflow: "plain"}, nil, none.Default},
+		{"intent", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 12, Intent: "watch"}, nil, observe.Default},
 		{"neither has a block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 13, Intent: "reply", Workflow: "plain"}, nil, always},
 		{"an auto rule without approval", draft.Origin{Kind: draft.OriginAuto, Rule: "closure"}, nil, always},
 		{"a user draft", draft.Origin{Kind: draft.OriginUser}, nil, always},
-		{"a session draft reads its turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}, nil, *none},
-		{"a session draft reads its turn's workflow", draft.Origin{Kind: draft.OriginSession, TurnSeq: 8}, nil, *window(10 * time.Minute)},
+		{"a session draft reads its turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}, nil, none.Default},
+		{"a session draft reads its turn's workflow", draft.Origin{Kind: draft.OriginSession, TurnSeq: 8}, nil, window(10 * time.Minute).Default},
 		{"a session draft without a turn", draft.Origin{Kind: draft.OriginSession}, nil, always},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e := newEnv()
 			e.svc.Policies = Resolver{Manifests: manifests()}
 			p := reply("x")
-			p.Origin, p.Approval = c.origin, c.explicit
+			p.Origin, p.Policy = c.origin, c.explicit
 			d := e.propose(p)
 			if d.Approval != c.want {
 				t.Fatalf("approval %+v, want %+v", d.Approval, c.want)
@@ -98,7 +100,7 @@ func TestPolicyLookupFailureIsAlways(t *testing.T) {
 		{"unknown workflow", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 15, Intent: "quick", Workflow: "gone"}, nil, "gone"},
 		{"unknown turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 99}, nil, "turn 99"},
 		{"the book errs", draft.Origin{Kind: draft.OriginSession, TurnSeq: 7}, func(m *fakeManifests) { m.turnErr = errBoom }, "boom"},
-		{"a malformed block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 16, Intent: "bad"}, func(m *fakeManifests) { m.intents["bad"] = &draft.Approval{Mode: draft.Window} }, "window"},
+		{"a malformed block", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 16, Intent: "bad"}, func(m *fakeManifests) { m.intents["bad"] = draft.Fixed(draft.Approval{Mode: draft.Window}) }, "window"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e := newEnv()
@@ -168,8 +170,8 @@ func TestNoneDraftWhoseApprovalFailsIsReturned(t *testing.T) {
 	}
 }
 
-func withPolicy(e *env, a *draft.Approval) {
-	e.svc.Policies = &fixedPolicy{a: *a}
+func withPolicy(e *env, p *draft.Policy) {
+	e.svc.Policies = &fixedPolicy{p: *p}
 }
 
 func TestDraftPolicyDefaultsToAlways(t *testing.T) {
@@ -304,7 +306,7 @@ func TestObservedKeyRecordsAgainAfterObservedFor(t *testing.T) {
 
 func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 	for _, kind := range []draft.OriginKind{draft.OriginTurn, draft.OriginSession} {
-		for name, a := range map[string]*draft.Approval{"none": none, "window": window(time.Minute)} {
+		for name, a := range map[string]*draft.Policy{"none": none, "window": window(time.Minute)} {
 			t.Run(string(kind)+" "+name, func(t *testing.T) {
 				e := newEnv()
 				withPolicy(e, a)
@@ -327,7 +329,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 	t.Run("explicit approval", func(t *testing.T) {
 		e := newEnv()
 		p := reply("x")
-		p.Target, p.Approval = "U0OTHER", none
+		p.Target, p.Policy = "U0OTHER", none
 		if d := e.propose(p); d.Approval != always || d.State != draft.Proposed {
 			t.Fatalf("%+v", d)
 		}
@@ -352,7 +354,7 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 	})
 	t.Run("auto drafts keep their rule's policy", func(t *testing.T) {
 		e := newEnv()
-		p := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Target: "U0OTHER", Approval: none,
+		p := Proposal{Unit: thread, Kind: draft.Nudge, Text: "ping", Target: "U0OTHER", Policy: none,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge", Key: "k1"}}
 		if d := e.propose(p); d.State != draft.Approved {
 			t.Fatalf("%+v", d)

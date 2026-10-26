@@ -67,7 +67,7 @@ An empty list is an error. The old `workspace_manager` key is refused; list the 
 | `address_without_workspace` | `false` | an address round may create the author workspace of your pull request |
 | `nudge.silent_days` | `30` | calendar days of silence before `nudge-silent-30d` plans a nudge |
 | `classify.daily_cap` | `50` | headless classifier calls a workflow's `classify` step may spend per day |
-| `workflows.<name>` | `{}` | `enabled`, `mode` (`observe` or `apply`), `approval.default` (`run` or `wait`), `approval.window`, `only_when` (a predicate that must hold besides the manifest's `when`) and `draft_approval` (the approval of its drafts, as `proposals.<rule>.approval`) of a workflow, over its manifest's; see [Tune workflows](/guides/workflows/) |
+| `workflows.<name>` | `{}` | `enabled`, `mode` (`observe` or `apply`), `approval.default` (`run` or `wait`), `approval.window`, `only_when` (a predicate that must hold besides the manifest's `when`) and `draft_approval` (the approval of its drafts: `mode`, `window` and a `rule` list of `{"when", "mode", "window"}` tried first, which replaces the manifest's `[draft_approval]` whole; see [the Outbox](/concepts/approval/#the-outbox)) of a workflow, over its manifest's; see [Tune workflows](/guides/workflows/) |
 
 ## Scope and the daemon
 

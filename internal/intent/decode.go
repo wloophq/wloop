@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -154,6 +156,13 @@ type mResume struct {
 
 // mDraftApproval is the [draft_approval] table intents and workflows share.
 type mDraftApproval struct {
+	Mode   *string         `toml:"mode"`
+	Window *string         `toml:"window"`
+	Rule   []mApprovalRule `toml:"rule"`
+}
+
+type mApprovalRule struct {
+	When   *string `toml:"when"`
 	Mode   *string `toml:"mode"`
 	Window *string `toml:"window"`
 }
@@ -184,33 +193,85 @@ func (s *sheet) modes(m []string) []string {
 
 var draftApprovalModes = []string{string(draft.Always), string(draft.Window), string(draft.None), string(draft.Observe)}
 
-func (s *sheet) draftApproval(m *mDraftApproval) *draft.Approval {
+// draftApproval is the policy of m, its rules' when compiled over env; nil
+// when m is. auto_send, which [draft_approval] replaced, loads with a
+// warning: false as mode always with no rules, true as nothing.
+func (s *sheet) draftApproval(m *mDraftApproval, autoSend *bool, env expr.Env) *draft.Policy {
+	if autoSend != nil {
+		s.warn("auto_send", "is replaced by [draft_approval]: auto_send = false is read as mode = \"always\" with no rules, and true as nothing; write [draft_approval] instead")
+		if !*autoSend {
+			return draft.Fixed(draft.Approval{Mode: draft.Always})
+		}
+	}
 	if m == nil {
 		return nil
 	}
-	if m.Mode == nil {
-		s.add("draft_approval.mode", "is required: one of %s", quoted(draftApprovalModes))
+	a, ok := s.approval("draft_approval", m.Mode, m.Window)
+	if !ok {
 		return nil
 	}
-	a := draft.Approval{Mode: draft.ApprovalMode(*m.Mode)}
-	switch {
-	case !slices.Contains(draftApprovalModes, *m.Mode):
-		s.oneOf("draft_approval.mode", *m.Mode, draftApprovalModes)
-		return nil
-	case a.Mode == draft.Window && m.Window == nil:
-		s.add("draft_approval.window", "is required with mode window: how long the user has before the draft is sent, such as 10m")
-		return nil
-	case a.Mode != draft.Window && m.Window != nil:
-		s.add("draft_approval.window", "is read only with mode window, not with %s", a.Mode)
-		return nil
-	case m.Window != nil:
-		a.Window = s.duration("draft_approval.window", *m.Window)
-		if a.Validate() != nil {
-			s.add("draft_approval.window", "must be longer than zero")
-			return nil
+	p := &draft.Policy{Default: a}
+	for i, r := range m.Rule {
+		path := fmt.Sprintf("draft_approval.rule[%d]", i)
+		ra, ok := s.approval(path, r.Mode, r.Window)
+		if r.When == nil {
+			s.add(path+".when", "is required: a predicate over the draft's facts and its unit's")
+			ok = false
+		}
+		if !ok {
+			continue
+		}
+		rule, err := builtin.ApprovalRule(*r.When, ra, env)
+		if err != nil {
+			s.ruleProblem(path+".when", *r.When, err, env)
+			continue
+		}
+		p.Rules = append(p.Rules, rule)
+	}
+	return p
+}
+
+// ruleProblem places why a rule's when does not compile; one that reads
+// draft.purpose where an agent names it says so.
+func (s *sheet) ruleProblem(path, when string, err error, env expr.Env) {
+	if _, ok := env[builtin.DraftPurpose]; !ok {
+		withPurpose := maps.Clone(env)
+		withPurpose[builtin.DraftPurpose] = expr.String
+		if _, perr := builtin.ApprovalRule(when, draft.Approval{Mode: draft.Always}, withPurpose); perr == nil {
+			s.add(path, "reads %s, which an intent's rule may not: its turns' agents name their drafts' purpose", builtin.DraftPurpose)
+			return
 		}
 	}
-	return &a
+	msg, snippet := exprMsg(err)
+	s.add(path, "%s", msg)
+	s.problems[len(s.problems)-1].Snippet = snippet
+}
+
+// approval is the mode and window at path.
+func (s *sheet) approval(path string, mode, window *string) (draft.Approval, bool) {
+	if mode == nil {
+		s.add(path+".mode", "is required: one of %s", quoted(draftApprovalModes))
+		return draft.Approval{}, false
+	}
+	a := draft.Approval{Mode: draft.ApprovalMode(*mode)}
+	switch {
+	case !slices.Contains(draftApprovalModes, *mode):
+		s.oneOf(path+".mode", *mode, draftApprovalModes)
+		return draft.Approval{}, false
+	case a.Mode == draft.Window && window == nil:
+		s.add(path+".window", "is required with mode window: how long the user has before the draft is sent, such as 10m")
+		return draft.Approval{}, false
+	case a.Mode != draft.Window && window != nil:
+		s.add(path+".window", "is read only with mode window, not with %s", a.Mode)
+		return draft.Approval{}, false
+	case window != nil:
+		a.Window = s.duration(path+".window", *window)
+		if a.Validate() != nil {
+			s.add(path+".window", "must be longer than zero")
+			return draft.Approval{}, false
+		}
+	}
+	return a, true
 }
 
 // decode reads intent.toml strictly. After a type mismatch it blanks the

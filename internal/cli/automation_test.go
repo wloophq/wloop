@@ -542,13 +542,13 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
-	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {DraftApproval: &config.ProposalApproval{Mode: "window", Window: config.Days(5 * time.Minute)}}}
-	manifest := draft.Approval{Mode: draft.Always}
-	out := applyConfig([]workflow.Workflow{{Name: "drafts", Mode: workflow.ModeApply, DraftApproval: &manifest}}, cfg)
-	if a := out[0].DraftApproval; a == nil || a.Mode != draft.Window || a.Window != 5*time.Minute {
+	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {DraftApproval: &config.DraftApprovalConfig{Mode: "window", Window: config.Days(5 * time.Minute)}}}
+	manifest := draft.Fixed(draft.Approval{Mode: draft.Always})
+	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Mode: workflow.ModeApply, DraftApproval: manifest}}, cfg)
+	if a := out[0].DraftApproval; a == nil || a.Default.Mode != draft.Window || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}
-	if manifest.Mode != draft.Always {
+	if manifest.Default.Mode != draft.Always {
 		t.Error("applyConfig changed the manifest's approval")
 	}
 }

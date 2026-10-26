@@ -1,5 +1,5 @@
 // Command factsdoc prints the generated tables of the facts reference page: the
-// intents' facts, one table per workflow slot, the workflow steps, then the draft effects.
+// intents' facts, one table per workflow slot, the draft approval facts, the workflow steps, then the draft effects.
 package main
 
 import (
@@ -20,14 +20,14 @@ func tables() []string {
 	for _, slot := range builtin.WorkflowSlots {
 		out = append(out, workflowTable(slot))
 	}
-	return append(out, stepTable(), effectTable())
+	return append(out, approvalTable(), stepTable(), effectTable())
 }
 
 func intentTable() string {
 	var b strings.Builder
 	b.WriteString("| Fact | Type | Slots | Meaning |\n|---|---|---|---|\n")
 	for _, f := range builtin.Facts {
-		if slices.Contains(f.Slots, builtin.WorkflowSlot) {
+		if slices.Contains(f.Slots, builtin.WorkflowSlot) || slices.Contains(f.Slots, builtin.ApprovalSlot) {
 			continue
 		}
 		slots := make([]string, len(f.Slots))
@@ -44,6 +44,17 @@ func workflowTable(slot string) string {
 	fmt.Fprintf(&b, "| `%s` fact%s | Type | Meaning |\n|---|---|---|\n", slot, provider(slot))
 	for _, f := range builtin.Facts {
 		if f.Slot == slot {
+			fmt.Fprintf(&b, "| `%s` | %s | %s |\n", f.Name, f.Type, cell(f.Doc))
+		}
+	}
+	return b.String()
+}
+
+func approvalTable() string {
+	var b strings.Builder
+	b.WriteString("| Approval fact | Type | Meaning |\n|---|---|---|\n")
+	for _, f := range builtin.Facts {
+		if slices.Contains(f.Slots, builtin.ApprovalSlot) {
 			fmt.Fprintf(&b, "| `%s` | %s | %s |\n", f.Name, f.Type, cell(f.Doc))
 		}
 	}

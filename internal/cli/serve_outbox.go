@@ -29,7 +29,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin}
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Policies: e.outboxPolicies(),
+	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Policies: e.outboxPolicies(), Facts: e.draftFacts,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
 			return err
@@ -39,6 +39,17 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 			Effects: effectLookup(effectDeps{Nudges: e.entries(db, cfg, ledger), Modules: mods})}}
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	return d
+}
+
+var errNoEngine = errors.New("no workflow engine reads the unit's facts")
+
+// draftFacts are u's facts as the sweep's engine reads them, for the rules
+// of a turn's draft.
+func (e *Env) draftFacts(ctx context.Context, u unit.Unit) (map[string]any, error) {
+	if e.engine == nil || e.engine.Units == nil {
+		return nil, errNoEngine
+	}
+	return e.engine.Units.Facts(ctx, u)
 }
 
 // publishers is the Effects of pubs: a provider with none is disabled, or publishes nothing.

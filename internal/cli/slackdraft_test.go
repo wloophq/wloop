@@ -386,7 +386,7 @@ func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 	}
 }
 
-func TestASlackDraftOfAnIntentThatNeverAutoSendsWaits(t *testing.T) {
+func TestASlackDraftOfAnIntentThatSetsAutoSendFalseWaits(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	files := bundledIntentAs(t, "act", "careful-act")
@@ -428,5 +428,34 @@ func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	}
 	if len(w.drafts(t)) != 0 {
 		t.Fatal("a draft whose effect never applies on Slack was stored")
+	}
+}
+
+func TestASlackDraftOfAnIntentTakesTheRuleItsUnitMatches(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	files := bundledIntentAs(t, "act", "quick-act")
+	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless.default\"\n", "", 1)
+	files["intents/quick-act/intent.toml"] = m + `
+[draft_approval]
+mode = "always"
+[[draft_approval.rule]]
+when = 'draft.delivery == "message" && slack.channel == "` + sessChannel + `"'
+mode = "window"
+window = "10m"
+`
+	userProfile(t, w.te, files)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "quick-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
+		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Window {
+		t.Fatalf("drafts %+v", ds)
 	}
 }

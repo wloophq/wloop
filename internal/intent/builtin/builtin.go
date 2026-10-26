@@ -88,6 +88,9 @@ const (
 	ActionSlot   FactSlot = "action"
 	TurnSlot     FactSlot = "turn"
 	WorkflowSlot FactSlot = "workflow"
+	// ApprovalSlot holds the draft's own facts a [draft_approval] rule reads
+	// besides its unit's.
+	ApprovalSlot FactSlot = "approval"
 )
 
 type Fact struct {

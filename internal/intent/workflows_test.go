@@ -46,9 +46,9 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, broken, _, problems := loadWorkflows(nil, sub, nil, nil)
-	if len(problems) > 0 || len(broken) > 0 {
-		t.Fatalf("%v", problems.Error())
+	loaded, broken, _, problems, warnings := loadWorkflows(nil, sub, nil, nil)
+	if len(problems) > 0 || len(broken) > 0 || len(warnings) > 0 {
+		t.Fatalf("%v\n%v", problems.Error(), warnings.Error())
 	}
 	starts := 0
 	for _, w := range loaded {

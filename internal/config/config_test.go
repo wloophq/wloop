@@ -499,7 +499,7 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	if c.Turns.AutomatedPerDay != 7 {
 		t.Errorf("turns %+v", c.Turns)
 	}
-	if a := c.Workflows["slack-closure"].DraftApproval.Approval(); a.Mode != "window" || a.Window != 10*time.Minute {
+	if a := c.Workflows["slack-closure"].DraftApproval; a.Mode != "window" || time.Duration(a.Window) != 10*time.Minute {
 		t.Errorf("draft approval %+v", a)
 	}
 	if Defaults().Turns.AutomatedPerDay != 20 {

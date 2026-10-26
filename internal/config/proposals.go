@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // Proposals holds the settings of the drafts proposed on their own: how long a nudged, discarded, sent or
@@ -26,6 +28,40 @@ type ProposalRule struct {
 type ProposalApproval struct {
 	Mode   string `json:"mode"`
 	Window Days   `json:"window,omitempty"`
+}
+
+// DraftApprovalConfig is a workflow's draft_approval: a mode, and the rules
+// tried before it, first match wins.
+type DraftApprovalConfig struct {
+	Mode   string               `json:"mode"`
+	Window Days                 `json:"window,omitempty"`
+	Rule   []ApprovalRuleConfig `json:"rule,omitempty"`
+}
+
+type ApprovalRuleConfig struct {
+	When   string `json:"when"`
+	Mode   string `json:"mode"`
+	Window Days   `json:"window,omitempty"`
+}
+
+// Policy is a as a draft approval policy, its rules' when compiled over env.
+func (a DraftApprovalConfig) Policy(env expr.Env) (draft.Policy, error) {
+	p := draft.Policy{Default: draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}}
+	if err := p.Default.Validate(); err != nil {
+		return draft.Policy{}, err
+	}
+	for i, r := range a.Rule {
+		ra := draft.Approval{Mode: draft.ApprovalMode(r.Mode), Window: time.Duration(r.Window)}
+		if err := ra.Validate(); err != nil {
+			return draft.Policy{}, fmt.Errorf("rule[%d]: %w", i, err)
+		}
+		rule, err := builtin.ApprovalRule(r.When, ra, env)
+		if err != nil {
+			return draft.Policy{}, fmt.Errorf("rule[%d].when: %w", i, err)
+		}
+		p.Rules = append(p.Rules, rule)
+	}
+	return p, nil
 }
 
 const renudgeAfterKey = "renudge_after"
@@ -98,11 +134,10 @@ var legacyDraftWorkflows = map[string]string{
 
 // LegacyDraftApproval is the proposals.<rule>.approval of the rule the
 // workflow replaced, nil when the config sets none.
-func (p Proposals) LegacyDraftApproval(workflow string) *draft.Approval {
+func (p Proposals) LegacyDraftApproval(workflow string) *draft.Policy {
 	for rule, w := range legacyDraftWorkflows {
 		if r, ok := p.Rules[rule]; ok && w == workflow && r.Approval != nil {
-			a := r.Approval.Approval()
-			return &a
+			return draft.Fixed(r.Approval.Approval())
 		}
 	}
 	return nil
