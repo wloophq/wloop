@@ -133,12 +133,13 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 		t.Fatalf("the core brief: %d calls, %v", r.run.calls, err)
 	}
 	before, _, _ := r.st.BriefRecord(ctx, ref)
-	r.q.d.Schema = composed(t)
+	c := composed(t)
+	r.q.d.Intent = func() Intent { return Intent{Schema: c} }
 	rd, err := r.q.Peek(ctx, ref, true)
 	if err != nil || rd.State != Ready {
 		t.Fatalf("%+v %v", rd, err)
 	}
-	if m := r.q.d.Schema.Missing(*rd.Brief); !slices.Equal(m, []string{"approach", "solution"}) {
+	if m := c.Missing(*rd.Brief); !slices.Equal(m, []string{"approach", "solution"}) {
 		t.Fatalf("missing %v", m)
 	}
 	r.run.fields = map[string]any{"approach": "patch", "solution": "batch the export"}
@@ -156,7 +157,7 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 	if after.Version != before.Version || after.Run == before.Run || after.HeadOid != before.HeadOid || after.ChangedFiles != before.ChangedFiles {
 		t.Fatalf("record %+v, before %+v", after, before)
 	}
-	if m := r.q.d.Schema.Missing(*b); !slices.Equal(m, []string{"solution"}) {
+	if m := c.Missing(*b); !slices.Equal(m, []string{"solution"}) {
 		t.Fatalf("still missing %v", m)
 	}
 	runs, err := r.st.BriefRuns(ctx, t0.Add(-time.Hour))

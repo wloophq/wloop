@@ -1,7 +1,6 @@
 package brief
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +18,8 @@ import (
 // any; a brief at an older core version is left for its refresh. A failed
 // call leaves the brief and its record as they were.
 func (q *Queue) Fill(ctx context.Context, ref github.Ref, need []string) (bool, error) {
-	if !q.d.Enabled || q.d.Schema.Extra == nil {
+	bi := q.intent()
+	if !q.d.Enabled || bi.Schema.Extra == nil {
 		return false, nil
 	}
 	rec, has, err := q.d.Store.BriefRecord(ctx, ref)
@@ -31,7 +31,7 @@ func (q *Queue) Fill(ctx context.Context, ref github.Ref, need []string) (bool, 
 	if b == nil || rec.Version != version {
 		return false, nil
 	}
-	missing := q.d.Schema.Missing(*b)
+	missing := bi.Schema.Missing(*b)
 	if len(need) > 0 {
 		missing = slices.DeleteFunc(missing, func(n string) bool { return !slices.Contains(need, n) })
 	}
@@ -49,13 +49,13 @@ func (q *Queue) Fill(ctx context.Context, ref github.Ref, need []string) (bool, 
 	start := q.d.Now()
 	core, _ := json.Marshal(Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk, RiskWhy: b.RiskWhy,
 		OpenQuestions: b.OpenQuestions, Tags: b.Tags})
-	res, err := q.d.Runner.Run(ctx, Call{Tier: q.d.Tier, Home: q.d.Home(ref), Schema: q.d.Schema, Fields: missing,
-		Prompt: fill(cmp.Or(q.d.FieldsPrompt, fieldsTemplate), taxonomy, "", in, []string{
-			"{{brief}}", string(core), "{{fields}}", q.d.Schema.fieldsText(missing)})})
+	res, err := q.d.Runner.Run(ctx, Call{Tier: q.d.Tier, Home: q.d.Home(ref), Schema: bi.Schema, Fields: missing,
+		Prompt: fill(bi.FieldsPrompt, taxonomy, "", in, []string{
+			"{{brief}}", string(core), "{{fields}}", bi.Schema.fieldsText(missing)})})
 	if err != nil {
 		return false, fmt.Errorf("brief %s: the missing fields %s: %w", ref, strings.Join(missing, ", "), err)
 	}
-	nb := q.d.Schema.WithFields(*b, res.Fields)
+	nb := bi.Schema.WithFields(*b, res.Fields)
 	raw, _ := json.Marshal(nb)
 	r := dinv.BriefRun{PR: ref, Trigger: TriggerFields, Version: version, AttemptOf: rec.AttemptOf, InputSHA: rec.InputSHA,
 		HeadOid: rec.HeadOid, BodyEditedAt: rec.BodyEditedAt, ChangedFiles: rec.ChangedFiles}

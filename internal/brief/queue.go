@@ -123,19 +123,32 @@ type Deps struct {
 	// configuration changes, or the minute turns; nil reads every call.
 	Changes port.Changes
 	Log     func(format string, args ...any)
-	// Schema is the composed schema of the brief intent; the zero Composed
-	// is the core schema alone.
-	Schema Composed
-	// Prompt is the brief intent's prompt and FieldsPrompt its
-	// missing-fields prompt, as the profile resolves them; empty is the
-	// bundled one.
+	// Intent is the brief intent as the profile resolves it now; nil is
+	// the bundled one.
+	Intent func() Intent
+}
+
+// Intent is what the brief intent sets of a brief: the composed schema,
+// the zero Composed being the core alone, and the prompt and the
+// missing-fields prompt, empty for the bundled ones.
+type Intent struct {
+	Schema               Composed
 	Prompt, FieldsPrompt string
+}
+
+func (q *Queue) intent() Intent {
+	var in Intent
+	if q.d.Intent != nil {
+		in = q.d.Intent()
+	}
+	in.Prompt, in.FieldsPrompt = cmp.Or(in.Prompt, promptTemplate), cmp.Or(in.FieldsPrompt, fieldsTemplate)
+	return in
 }
 
 type Queue struct {
 	d        Deps
 	mu       sync.Mutex
-	versions map[string]string // by taxonomy
+	versions map[string]string // by prompt and taxonomy
 	inflight map[github.Ref]bool
 	waiters  map[github.Ref][]chan struct{}
 	breaker  breaker
@@ -311,14 +324,16 @@ func (q *Queue) version(ref github.Ref) (taxonomy, version string) {
 	taxonomy = q.d.Taxonomy(ref)
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if v, ok := q.versions[taxonomy]; ok {
+	prompt := q.intent().Prompt
+	key := prompt + "\x00" + taxonomy
+	if v, ok := q.versions[key]; ok {
 		return taxonomy, v
 	}
 	if q.versions == nil {
 		q.versions = map[string]string{}
 	}
-	q.versions[taxonomy] = versionOf(cmp.Or(q.d.Prompt, promptTemplate), taxonomy)
-	return taxonomy, q.versions[taxonomy]
+	q.versions[key] = versionOf(prompt, taxonomy)
+	return taxonomy, q.versions[key]
 }
 
 // Run briefs up to Batch due pull requests, Concurrency at a time, leaving
@@ -444,8 +459,9 @@ func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout t
 		if in.DiffBytes > 0 || in.DiffNote == "" {
 			run.DiffBytes = &in.DiffBytes
 		}
-		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Schema: q.d.Schema,
-			Prompt: fill(cmp.Or(q.d.Prompt, promptTemplate), taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in, nil)})
+		bi := q.intent()
+		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Schema: bi.Schema,
+			Prompt: fill(bi.Prompt, taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in, nil)})
 		if res.ExtraErr != nil {
 			q.d.Log("brief %s: the extra fields are left missing: %v", pr.Ref, res.ExtraErr)
 		}
