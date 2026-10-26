@@ -91,7 +91,7 @@ Encerrando:
 - {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
 ```
 
-Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `on_posted = "unit.closed"` still ends the close entry.
+Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `on_posted = "unit.closed"` still ends the close entry. A reaction carries no text: the workflow's `text.md.tmpl` is not read, and a step that wants a text with its reaction names another file in `text`.
 
 ## Narrow one to some pull requests
 

@@ -78,6 +78,13 @@ type replay struct {
 	db  *sqlite.DB
 	svc *outbox.Service
 	now time.Time
+	// start is the first tick; script changes the store at a tick, nil
+	// for a store replayed as it is.
+	start  time.Time
+	script func(at time.Time)
+	// counts, when set, counts what the record notes by day, workflow,
+	// purpose and event, for a store whose texts stay out of any output.
+	counts map[string]int
 
 	lines   []string
 	known   map[draft.ID]draft.State
@@ -88,13 +95,21 @@ type replay struct {
 
 func newReplay(t *testing.T) *replay {
 	t.Helper()
-	te := newTestEnv(t, &fake.Manager{})
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "replay.db"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	r := &replay{t: t, te: te, db: db, now: replayStart, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
+	r := newReplayOn(t, db, replayStart)
+	r.script = r.scenario
+	return r
+}
+
+// newReplayOn is a replay over db from start, with no scenario.
+func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
+	t.Helper()
+	te := newTestEnv(t, &fake.Manager{})
+	r := &replay{t: t, te: te, db: db, now: start, start: start, known: map[draft.ID]draft.State{}, byKey: map[string]int{}}
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
 	ledger := te.itemsLedger(db, te.cfg, t.Logf)
@@ -262,6 +277,11 @@ func (r *replay) record() {
 		was, seen := r.known[d.ID]
 		r.known[d.ID] = d.State
 		switch {
+		case !seen && r.counts != nil:
+			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" proposed"]++
+			r.settle = append(r.settle, d.ID)
+		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "" && r.counts != nil:
+			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" withdrawn "+d.Reason]++
 		case !seen:
 			proposed = append(proposed, fmt.Sprintf("propose %s %s on %s entry=%q key=%s items=%s approval=%s text=%q",
 				d.Purpose, d.Delivery, d.Unit, d.Entry, d.Origin.Key, strings.Join(d.Items, ","), d.Approval.Mode, d.Text))
@@ -343,11 +363,13 @@ func (r *replay) run(p proposer) string {
 func (r *replay) runFrom(p proposer, at time.Time, then func() proposer) string {
 	r.t.Helper()
 	ctx := context.Background()
-	for r.now = replayStart; r.now.Before(replayStart.AddDate(0, 0, replayDays)); r.now = r.now.Add(replayTick) {
+	for r.now = r.start; r.now.Before(r.start.AddDate(0, 0, replayDays)); r.now = r.now.Add(replayTick) {
 		if then != nil && !r.now.Before(at) {
 			p, then = then(), nil
 		}
-		r.scenario(r.now)
+		if r.script != nil {
+			r.script(r.now)
+		}
 		r.settleQueued()
 		if err := p.pass(ctx); err != nil {
 			r.t.Fatalf("%s: %v", r.now, err)
@@ -418,4 +440,30 @@ func firstDiff(got, want string) string {
 		}
 	}
 	return ""
+}
+
+// workflowOf is the workflow a draft serves, the proposals job's rules
+// named as the workflows that replaced them.
+func workflowOf(d draft.Draft) string {
+	if d.Origin.Workflow != "" {
+		return d.Origin.Workflow
+	}
+	switch d.Origin.Rule {
+	case "stalled-nudge", "closure", "ask-owner":
+		return "slack-" + d.Origin.Rule
+	}
+	return d.Origin.Rule
+}
+
+// prime marks the drafts already stored as known, so only what the replay
+// proposes is recorded and settled.
+func (r *replay) prime() {
+	r.t.Helper()
+	ds, err := r.svc.List(context.Background(), outbox.Filter{})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	for _, d := range ds {
+		r.known[d.ID] = d.State
+	}
 }

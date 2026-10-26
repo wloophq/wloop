@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"path"
 	"slices"
 	"strings"
@@ -516,13 +515,14 @@ type draftTextItem struct {
 }
 
 // draftTemplate is the workflow's text template through the profile layers;
-// nil for an emoji delivery that names no template of its own.
+// nil for an emoji delivery that names no template of its own, so a
+// reaction carries no text even where the workflow's message text exists.
 func draftTemplate(cfg config.Config, workflowName, text string, d draft.Delivery) (*template.Template, error) {
-	rel := path.Join("workflows", workflowName, text)
-	r, err := profile.Resolve(profile.Chain(cfg), rel)
-	if errors.Is(err, fs.ErrNotExist) && slices.Contains(builtin.DraftEmojiDeliveries, string(d)) && text == defaultDraftText {
+	if slices.Contains(builtin.DraftEmojiDeliveries, string(d)) && text == defaultDraftText {
 		return nil, nil
 	}
+	rel := path.Join("workflows", workflowName, text)
+	r, err := profile.Resolve(profile.Chain(cfg), rel)
 	if err != nil {
 		return nil, fmt.Errorf("draft.propose: %w", err)
 	}

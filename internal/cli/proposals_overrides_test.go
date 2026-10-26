@@ -58,7 +58,7 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := firstDayClosure(t, r)
-	if d.Delivery != draft.Reaction || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" {
+	if d.Delivery != draft.Reaction || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" || d.Text != "" {
 		t.Fatalf("closure %+v", d)
 	}
 	if _, err := r.svc.Approve(ctx, d.ID, nil); err != nil {
