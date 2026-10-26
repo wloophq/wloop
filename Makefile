@@ -34,8 +34,9 @@ dev-install: build ## Run this checkout's build as the installed one: agent home
 test: ## Run the tests
 	go test -race -timeout 30m ./...
 
-test-brand: ## Run the tests built with the test brand
-	go test -race -timeout 30m -ldflags '$(BRAND_TEST_LDFLAGS)' ./...
+test-brand: ## Run the tests built with the test brand; SHARD=<name> runs one shard of scripts/test-shard.sh
+	pkgs=$$(if [ -n "$(SHARD)" ]; then scripts/test-shard.sh "$(SHARD)"; else echo ./...; fi) && \
+	go test -timeout 30m -ldflags '$(BRAND_TEST_LDFLAGS)' $$pkgs
 
 scan-brand: ## Check that a build with the test brand writes nothing that names the default brand
 	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && \

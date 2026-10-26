@@ -49,7 +49,7 @@ jobs:
           SHARD: ${{ matrix.shard }}
 
   test:
-    needs: [build, test-shard, brand, lint, generated, workflows]
+    needs: [build, test-shard, brand, scan-brand, lint, generated, workflows]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
@@ -77,6 +77,11 @@ jobs:
       - run: CGO_ENABLED=0 go test ./internal/client/menubar/macos/
 
   brand:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [daemon, store, cli, sources, rest]
+    name: brand (${{ matrix.shard }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,8 +91,22 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          cache: brand
-      - run: make test-brand
+          cache: brand-${{ matrix.shard }}
+      - run: make test-brand SHARD="$SHARD"
+        env:
+          SHARD: ${{ matrix.shard }}
+
+  scan-brand:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
+        with:
+          cache: brand-rest
       - run: make scan-brand
 
   lint:
