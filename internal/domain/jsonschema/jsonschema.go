@@ -353,8 +353,10 @@ func same(a, b any) bool {
 // reads it.
 type Property struct {
 	Name string
-	// Type is string, integer, number, boolean or array (of strings).
+	// Type is the property's type.
 	Type string
+	// Items is the type of an array property's items.
+	Items string
 	// Enum are the string values of the property, or of its items.
 	Enum []string
 	// Source is the property's own schema bytes, which its field version
@@ -379,6 +381,7 @@ func (s *Schema) Properties() []Property {
 		enum := p.enum
 		if p.typ == "array" {
 			enum = p.items.enum
+			prop.Items = p.items.typ
 		}
 		for _, e := range enum {
 			if s, ok := e.(string); ok {

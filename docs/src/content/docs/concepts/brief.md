@@ -49,7 +49,7 @@ schema   = "schema.json"
 }}
 ```
 
-The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword or a nested object fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one.
+The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword, a nested object, or a field of another type (a number, a null, a list of anything but strings) fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one.
 
 Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
 

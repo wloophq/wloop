@@ -29,5 +29,29 @@ func (u *unit) loadExtra(s *sheet, d *dintent.Def) {
 		s.add("schema", "%s: %v", d.Schema, err)
 		return
 	}
-	d.Extra = extra.Properties()
+	props := extra.Properties()
+	for _, p := range props {
+		if !factHolds(p) {
+			s.add("schema", "%s: $.%s: a %s, which no brief.extra fact holds; use a string, an integer, a boolean or an array of strings", d.Schema, p.Name, describe(p))
+			return
+		}
+	}
+	d.Extra = props
+}
+
+func factHolds(p jsonschema.Property) bool {
+	switch p.Type {
+	case "string", "integer", "boolean":
+		return true
+	case "array":
+		return p.Items == "string"
+	}
+	return false
+}
+
+func describe(p jsonschema.Property) string {
+	if p.Type == "array" {
+		return "array of " + p.Items
+	}
+	return p.Type
 }

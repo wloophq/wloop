@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,5 +69,30 @@ schema = '{"type":"object","properties":{"kind":{"type":"string","oneOf":[]}}}'
 	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if got := l.BrokenWorkflows["triage"]; !strings.Contains(got.Error(), "step[0].schema") || !strings.Contains(got.Error(), `keyword "oneOf"`) {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestABriefSchemaFieldNoFactCanHoldIsRefused(t *testing.T) {
+	for field, prop := range map[string]string{
+		"score": `{"type":"number"}`,
+		"none":  `{"type":"null"}`,
+		"sizes": `{"type":"array","items":{"type":"integer"}}`,
+		"flags": `{"type":"array","items":{"type":"boolean"}}`,
+	} {
+		root := t.TempDir()
+		dir := filepath.Join(root, "intents", "our-brief")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		schema := `{"type":"object","properties":{"approach":{"type":"string"},"` + field + `":` + prop + `}}`
+		for name, body := range map[string]string{"intent.toml": briefBuilder, "schema.json": schema} {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
+		if !strings.Contains(fmt.Sprint(problems), "our-brief") || !strings.Contains(fmt.Sprint(problems), "$."+field+":") {
+			t.Errorf("%s %s: %v", field, prop, problems)
+		}
 	}
 }

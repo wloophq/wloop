@@ -291,9 +291,9 @@ func WithdrawEnv(slot string) expr.Env {
 
 // ExtraFacts are the brief.extra.<name> facts the brief intent's extra
 // schema declares, typed from its properties: a string (with or without an
-// enum), an integer, a boolean or an array of strings. A number has no fact
-// type and declares none. A predicate's env is extended with them at load,
-// so naming an undeclared extra fails there.
+// enum), an integer, a boolean or an array of strings, the types the loader
+// lets a builder's schema hold. A predicate's env is extended with them at
+// load, so naming an undeclared extra fails there.
 func ExtraFacts(props []jsonschema.Property) expr.Env {
 	env := expr.Env{}
 	for _, p := range props {
