@@ -29,7 +29,7 @@ changelog:
 homebrew_casks:
   - binaries: ["{{ .ProjectName }}"]
     homepage: "https://github.com/wloophq/{{ .ProjectName }}"
-    description: Closes the loop between GitHub pull requests and AI coding agents.
+    description: Work loop for GitHub and Slack, with AI coding agents in local worktrees
     repository:
       owner: wloophq
       name: homebrew-tap
