@@ -27,7 +27,7 @@ brew install {{org}}/tap/{{command}}
 
 - the registration of {{name}}'s MCP server at user scope, with the URL from `mcp.port`, the `X-Loop-Key` header, and `{{command}} hook mcp-headers` as the `headersHelper` that names the session in `X-Loop-Session`;
 - the `Stop`, `SessionStart` and `UserPromptSubmit` hooks (`{{command}} hook stop || true`, and so on);
-- the permissions in `settings.json`: `mcp__{{name}}__turn_end` and `mcp__{{name}}__slack_send_message` allowed, so an agent posts to Slack without a prompt; `install` also removes that tool from `ask`, where earlier releases put it;
+- the permissions in `settings.json`: `mcp__{{name}}__turn_end`, `mcp__{{name}}__slack_send_message` and `mcp__{{name}}__slack_react` allowed, so an agent posts and reacts on Slack without a prompt; `install` also removes those tools from `ask`, where earlier releases put the first;
 - the bundled skills (`{{name}}`, `{{name}}-review`, `{{name}}-address`, `{{name}}-nudge` and `{{name}}-profile`), also into `~/.agents/skills` for Codex.
 
 The hooks and the `headersHelper` call the binary by its absolute path: on macOS the one you ran `install` by, a symlink such as Homebrew's `bin/{{command}}` included; on Linux the file the symlink points to. `{{command}} doctor` and the daemon accept a hook that runs the same binary by its link or its target, and `install` rewrites it to its own path.

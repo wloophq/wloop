@@ -37,8 +37,9 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 		if d.Turns != nil && d.Turns.Store != nil {
 			books = d.Turns.Store
 		}
+		sender.landing = slacksource.LandingOver(db)
 		srv.SlackDraft = &slackDrafts{sender: sender, books: books, items: d.Items, outbox: d.Outbox, pub: pub, intents: m.intents}
-		sender.record = sessionSends{token: sender.kit.Store.Load, landing: slacksource.LandingOver(db), outbox: d.Outbox, log: m.log}.record
+		sender.records = &sessionSends{token: sender.kit.Store.Load, landing: sender.landing, books: books, outbox: d.Outbox, log: m.log}
 	}
 }
 
@@ -48,9 +49,10 @@ func slackEnabled(cfg config.Config, enabled func(unit.ProviderID) bool) bool {
 
 // slackSender is the daemon's mcp.Slack over its token store and sender.
 type slackSender struct {
-	kit *slackKit
-	// record keeps a post that landed in a tracked unit as a sent draft; nil records nothing.
-	record func(ctx context.Context, r send.Request, sent send.Sent)
+	kit     *slackKit
+	landing slacksource.Landing
+	// records keeps each post as a sent draft; nil records nothing.
+	records *sessionSends
 
 	mu        sync.Mutex
 	checkedAt time.Time
@@ -70,15 +72,37 @@ func (s *slackSender) LoggedIn() bool {
 	return s.loggedIn
 }
 
-func (s *slackSender) Send(ctx context.Context, r send.Request) (send.Sent, error) {
+func (s *slackSender) Send(ctx context.Context, session string, r send.Request) (send.Sent, error) {
 	sent, err := s.kit.Send.Send(ctx, r)
 	if errors.Is(err, send.ErrNotLoggedIn) {
 		s.loggedOut()
 	}
-	if err == nil && s.record != nil {
-		s.record(ctx, r, sent)
+	if err == nil && s.records != nil {
+		s.records.post(ctx, session, r, sent)
 	}
 	return sent, err
+}
+
+func (s *slackSender) React(ctx context.Context, session string, r send.Reaction) (send.Reacted, error) {
+	got, err := s.kit.Send.React(ctx, r)
+	if errors.Is(err, send.ErrNotLoggedIn) {
+		s.loggedOut()
+	}
+	if err == nil && !got.Unchanged && s.records != nil {
+		s.records.reaction(ctx, session, r, got)
+	}
+	return got, err
+}
+
+func (s *slackSender) permalinkUnit(ctx context.Context, permalink string) (unit.Unit, error) {
+	tok, err := s.kit.Store.Load()
+	if errors.Is(err, auth.ErrNotLoggedIn) {
+		return unit.Unit{}, send.ErrNotLoggedIn
+	}
+	if err != nil {
+		return unit.Unit{}, err
+	}
+	return s.landing.PermalinkUnit(ctx, s.kit.Client, tok.Team, permalink)
 }
 
 func (s *slackSender) loggedOut() {

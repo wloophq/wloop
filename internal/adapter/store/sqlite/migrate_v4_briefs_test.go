@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,7 +138,7 @@ func TestAV3ReleaseRefusesTheV4Store(t *testing.T) {
 	var compatible string
 	err = db.QueryRow(`SELECT value FROM meta WHERE key = ?`, compatibleKey).Scan(&compatible)
 	db.Close()
-	if err != nil || compatible != fmt.Sprint(SchemaVersion) {
+	if err != nil || compatible != "4" {
 		t.Fatalf("compatible version %q, %v", compatible, err)
 	}
 	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v3.sql"))

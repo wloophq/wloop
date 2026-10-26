@@ -87,8 +87,8 @@ type turnReader interface {
 	Turn(ctx context.Context, u unit.Unit, seq int64) (intent, workflow string, ok bool, err error)
 }
 
-// pinnedEffects refuses a draft a turn proposed on a unit that is not the turn's own, before it is proposed,
-// approved or published.
+// pinnedEffects refuses a draft whose proposing turn is not in the book of the unit it names, the draft's own
+// unless its origin names another, before it is proposed, approved or published.
 type pinnedEffects struct {
 	port.Effects
 	turns turnReader
@@ -134,12 +134,16 @@ func (p pinnedEffects) pinned(ctx context.Context, d draft.Draft) error {
 	case o.Kind != draft.OriginTurn && (o.Kind != draft.OriginSession || o.TurnSeq <= 0):
 		return nil
 	}
-	_, _, ok, err := p.turns.Turn(ctx, d.Unit, o.TurnSeq)
+	u := d.Unit
+	if !o.Unit.IsZero() {
+		u = o.Unit
+	}
+	_, _, ok, err := p.turns.Turn(ctx, u, o.TurnSeq)
 	switch {
 	case err != nil:
-		return fmt.Errorf("reading turn %d of %s: %w", o.TurnSeq, d.Unit.Label(), err)
+		return fmt.Errorf("reading turn %d of %s: %w", o.TurnSeq, u.Label(), err)
 	case !ok:
-		return fmt.Errorf("turn %d is not a turn of %s: a turn's draft posts only on its own unit", o.TurnSeq, d.Unit.Label())
+		return fmt.Errorf("turn %d is not a turn of %s", o.TurnSeq, u.Label())
 	}
 	return nil
 }

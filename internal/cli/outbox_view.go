@@ -321,9 +321,17 @@ func draftOrigin(d api.Draft) string {
 	case d.Origin.Kind == "user":
 		return "written by you"
 	case d.Origin.TurnSeq > 0:
-		return fmt.Sprintf("turn %d (%s)", d.Origin.TurnSeq, d.Origin.Intent)
+		return fmt.Sprintf("turn %d (%s)", d.Origin.TurnSeq, d.Origin.Intent) + originOn(d)
 	case d.Origin.Rule != "":
 		return "rule " + d.Origin.Rule
 	}
 	return cmp.Or(d.Origin.Kind, "unknown")
+}
+
+// originOn names the unit of a draft's proposing turn when it is not the draft's.
+func originOn(d api.Draft) string {
+	if d.Origin.Unit == "" {
+		return ""
+	}
+	return " on " + d.Origin.Unit
 }

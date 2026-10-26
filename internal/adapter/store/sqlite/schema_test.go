@@ -46,7 +46,7 @@ func TestOtherVersionsAreRefused(t *testing.T) {
 func TestANewerStoreThatDeclaresThisVersionCompatibleOpens(t *testing.T) {
 	t.Parallel()
 	db, path := openTemp(t)
-	if _, err := execW(db, `PRAGMA user_version = 5`); err != nil {
+	if _, err := execW(db, fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion+1)); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

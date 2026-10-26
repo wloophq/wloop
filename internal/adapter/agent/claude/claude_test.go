@@ -212,7 +212,7 @@ func TestDraftToolAllowedSendStillAsks(t *testing.T) {
 		return got.Permissions.Allow
 	}
 	with := allowed(turns.Policy{TurnEnd: true, Drafts: true})
-	for _, name := range []string{"slack_draft", "slack_react", "slack_edit"} {
+	for _, name := range []string{"slack_draft", "slack_edit"} {
 		if !slices.Contains(with, brand.ToolPrefix()+name) {
 			t.Fatalf("allow %v lacks %s", with, name)
 		}

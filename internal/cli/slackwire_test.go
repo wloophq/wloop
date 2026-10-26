@@ -56,7 +56,7 @@ func TestServeWiresSlack(t *testing.T) {
 	if te.kc.gets != 1 {
 		t.Fatalf("keychain reads = %d for 100 checks, want 1", te.kc.gets)
 	}
-	if _, err := sender.Send(context.Background(), sendRequest("C0000000001", "hi")); !errors.Is(err, send.ErrNotLoggedIn) {
+	if _, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi")); !errors.Is(err, send.ErrNotLoggedIn) {
 		t.Fatalf("Send logged out = %v", err)
 	}
 	if n := len(te.srv.Calls("chat.postMessage")) + len(te.srv.Calls("conversations.info")); n != 0 {
@@ -68,7 +68,7 @@ func TestServeWiresSlack(t *testing.T) {
 	if !sender.LoggedIn() {
 		t.Fatal("not logged in with a stored token")
 	}
-	sent, err := sender.Send(context.Background(), sendRequest("C0000000001", "hi"))
+	sent, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi"))
 	if err != nil || !strings.Contains(sent.Permalink, "p1700000000000100") {
 		t.Fatalf("Send = %+v, %v", sent, err)
 	}

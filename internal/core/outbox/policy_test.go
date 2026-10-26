@@ -19,6 +19,8 @@ type fakeManifests struct {
 	workflows map[string]*draft.Policy
 	turns     map[int64][2]string
 	turnErr   error
+	// on, when set, is the unit whose book holds the turns.
+	on unit.Unit
 }
 
 func (f fakeManifests) IntentApproval(name string) (*draft.Policy, bool) {
@@ -37,6 +39,9 @@ func (f fakeManifests) WorkflowApproval(name string, intent *draft.Policy) (*dra
 func (f fakeManifests) Turn(ctx context.Context, u unit.Unit, seq int64) (string, string, bool, error) {
 	if f.turnErr != nil {
 		return "", "", false, f.turnErr
+	}
+	if !f.on.IsZero() && u != f.on {
+		return "", "", false, nil
 	}
 	t, ok := f.turns[seq]
 	return t[0], t[1], ok, nil
@@ -363,4 +368,19 @@ func TestDraftsTargetingOutsideTheirUnitAlwaysWait(t *testing.T) {
 			t.Fatalf("%+v", d)
 		}
 	})
+}
+
+func TestADraftOfATurnOnAnotherUnitTakesThatTurnsPolicy(t *testing.T) {
+	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}
+	thread := unit.Unit{Provider: "slack", Key: "T0/C1/1.2"}
+	m := manifests()
+	m.on = pr
+	r := Resolver{Manifests: m}
+	got, err := r.For(context.Background(), thread, draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7, Intent: "quick", Unit: pr})
+	if err != nil || got.Default != none.Default {
+		t.Fatalf("policy %+v %v", got, err)
+	}
+	if _, err := r.For(context.Background(), thread, draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7, Intent: "quick"}); !errors.Is(err, ErrUnknownOrigin) {
+		t.Fatalf("the turn read on the draft's unit: %v", err)
+	}
 }

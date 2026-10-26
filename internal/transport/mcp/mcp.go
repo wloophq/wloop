@@ -283,7 +283,7 @@ type registered struct {
 func (s *Server) tools() []registered {
 	r := []registered{{turnEndTool(), true, s.turnEnd}}
 	if s.Slack != nil {
-		r = append(r, registered{slackSendTool(), false, s.slackSend})
+		r = append(r, registered{slackSendTool(), false, s.slackSend}, registered{slackReactTool(), false, s.slackReact})
 	}
 	if s.SlackRead != nil {
 		r = append(r, registered{slackReadTool(), false, s.slackRead})
@@ -293,7 +293,7 @@ func (s *Server) tools() []registered {
 	}
 	if s.SlackDraft != nil {
 		r = append(r, registered{slackDraftTool(), true, s.slackDraft})
-		r = append(r, registered{slackReactTool(), true, s.slackReact}, registered{slackEditTool(), true, s.slackEdit})
+		r = append(r, registered{slackEditTool(), true, s.slackEdit})
 	}
 	if s.Inbox != nil {
 		r = append(r, registered{inboxPostTool(), true, s.inboxPost})

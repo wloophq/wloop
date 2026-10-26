@@ -82,6 +82,9 @@ type DraftOrigin struct {
 	Intent   string `json:"intent"`
 	Workflow string `json:"workflow"`
 	Rule     string `json:"rule"`
+	// Unit is the label of the proposing turn's unit when it is not the
+	// draft's, "" when it is.
+	Unit string `json:"unit,omitempty"`
 }
 
 type DraftApproval struct {

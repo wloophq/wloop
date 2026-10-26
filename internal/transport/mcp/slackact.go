@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -12,32 +14,52 @@ import (
 )
 
 const (
-	slackReactName = "slack_react"
-	slackEditName  = "slack_edit"
-	// The purposes the drafts of slack_react and slack_edit declare.
-	slackReactPurpose = "react"
-	slackEditPurpose  = "edit"
+	slackReactName   = "slack_react"
+	slackEditName    = "slack_edit"
+	slackEditPurpose = "edit"
 )
 
 func slackReactTool() tool {
-	return tool{Name: slackReactName, InputSchema: object(map[string]*schema{"permalink": str(0), "emoji": str(0)}, "permalink", "emoji")}
+	return tool{Name: slackReactName, InputSchema: object(map[string]*schema{"permalink": str(0), "emoji": str(0), "remove": boolean()}, "permalink", "emoji")}
 }
 
 func slackEditTool() tool {
 	return tool{Name: slackEditName, InputSchema: object(map[string]*schema{"permalink": str(0), "text": str(0)}, "permalink", "text")}
 }
 
-func (s *Server) slackReact(ctx context.Context, handle string, arguments json.RawMessage) any {
+func (s *Server) slackReact(ctx context.Context, session string, arguments json.RawMessage) any {
 	var a struct {
 		Permalink *string `json:"permalink"`
 		Emoji     *string `json:"emoji"`
+		Remove    bool    `json:"remove"`
 	}
-	link, emoji, refusal := actArgs(slackReactName, "emoji", arguments, &a, &a.Permalink, &a.Emoji)
+	link, emoji, refusal := actArgs(slackReactName, "emoji", "Nothing was changed", arguments, &a, &a.Permalink, &a.Emoji)
 	if refusal != nil {
 		return refusal
 	}
-	return s.draft(ctx, handle, DraftArgs{Purpose: slackReactPurpose, Delivery: string(draft.Reaction), Target: link,
-		Reaction: strings.Trim(strings.TrimSpace(emoji), ":")})
+	if !s.Slack.LoggedIn() {
+		return text(notLoggedIn(), true)
+	}
+	got, err := s.Slack.React(ctx, session, send.Reaction{Permalink: link, Name: strings.Trim(strings.TrimSpace(emoji), ":"), Remove: a.Remove})
+	if errors.Is(err, send.ErrNotLoggedIn) {
+		return text(notLoggedIn(), true)
+	}
+	if err != nil {
+		return text("Slack reaction failed: "+redactTokens(err.Error()), true)
+	}
+	return text(reactedText(got, a.Remove, link), false)
+}
+
+func reactedText(r send.Reacted, remove bool, link string) string {
+	switch {
+	case remove && r.Unchanged:
+		return fmt.Sprintf("The message had no :%s: of the user; nothing changed: %s", r.Name, link)
+	case remove:
+		return fmt.Sprintf("Removed :%s: from the message in %s: %s", r.Name, r.Conversation, link)
+	case r.Unchanged:
+		return fmt.Sprintf("The message already had :%s: of the user; nothing changed: %s", r.Name, link)
+	}
+	return fmt.Sprintf("Reacted :%s: to the message in %s: %s", r.Name, r.Conversation, link)
 }
 
 func (s *Server) slackEdit(ctx context.Context, handle string, arguments json.RawMessage) any {
@@ -45,7 +67,7 @@ func (s *Server) slackEdit(ctx context.Context, handle string, arguments json.Ra
 		Permalink *string `json:"permalink"`
 		Text      *string `json:"text"`
 	}
-	link, body, refusal := actArgs(slackEditName, "text", arguments, &a, &a.Permalink, &a.Text)
+	link, body, refusal := actArgs(slackEditName, "text", "Nothing was drafted", arguments, &a, &a.Permalink, &a.Text)
 	if refusal != nil {
 		return refusal
 	}
@@ -54,8 +76,8 @@ func (s *Server) slackEdit(ctx context.Context, handle string, arguments json.Ra
 
 // actArgs decodes the arguments of slack_react or slack_edit into a, whose
 // fields link and value point to: a message permalink and field. refusal is
-// the tool's answer when they are not.
-func actArgs(name, field string, arguments json.RawMessage, a any, link, value **string) (string, string, map[string]any) {
+// the tool's answer when they are not, starting with nothing.
+func actArgs(name, field, nothing string, arguments json.RawMessage, a any, link, value **string) (string, string, map[string]any) {
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
@@ -63,7 +85,7 @@ func actArgs(name, field string, arguments json.RawMessage, a any, link, value *
 		if err != nil {
 			reason += " (" + err.Error() + ")"
 		}
-		return "", "", text("Nothing was drafted: the arguments are not "+reason+".", true)
+		return "", "", text(nothing+": the arguments are not "+reason+".", true)
 	}
 	var problems []string
 	l := ""
@@ -77,7 +99,7 @@ func actArgs(name, field string, arguments json.RawMessage, a any, link, value *
 		problems = append(problems, field+": required, not empty")
 	}
 	if len(problems) > 0 {
-		return "", "", text("Nothing was drafted; fix these and call "+name+" again:\n"+strings.Join(problems, "\n"), true)
+		return "", "", text(nothing+"; fix these and call "+name+" again:\n"+strings.Join(problems, "\n"), true)
 	}
 	return l, **value, nil
 }

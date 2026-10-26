@@ -112,6 +112,9 @@ type Origin struct {
 	Workflow string // the workflow that started the proposing turn (turn.Turn.Workflow), "" none
 	Rule     string // Kind "auto": the core or plugin rule, e.g. "stalled-nudge", "closure", "ask-owner", "github-nudge"
 	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<entry>:<person key>"
+	// Unit is the unit of the proposing turn when it is not the draft's, such
+	// as a pull request whose turn drafts in a Slack thread; zero when it is.
+	Unit unit.Unit
 }
 
 type Evidence struct {

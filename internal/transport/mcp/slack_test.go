@@ -18,13 +18,21 @@ type fakeSlack struct {
 	sent     []send.Request
 	answer   send.Sent
 	err      error
+	sessions []string
+	reacted  []send.Reaction
+	reaction send.Reacted
 }
 
 func (f *fakeSlack) LoggedIn() bool { return f.loggedIn }
 
-func (f *fakeSlack) Send(_ context.Context, r send.Request) (send.Sent, error) {
-	f.sent = append(f.sent, r)
+func (f *fakeSlack) Send(_ context.Context, session string, r send.Request) (send.Sent, error) {
+	f.sent, f.sessions = append(f.sent, r), append(f.sessions, session)
 	return f.answer, f.err
+}
+
+func (f *fakeSlack) React(_ context.Context, session string, r send.Reaction) (send.Reacted, error) {
+	f.reacted, f.sessions = append(f.reacted, r), append(f.sessions, session)
+	return f.reaction, f.err
 }
 
 const unexpanded = "${ORCA_TERMINAL_HANDLE}"
@@ -75,7 +83,7 @@ func TestSlackToolListedWhenConfigured(t *testing.T) {
 	}
 	for _, in := range []bool{false, true} {
 		s, sid := slackSession(t, &fakeSlack{loggedIn: in})
-		if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message"}) {
+		if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", "slack_react"}) {
 			t.Fatalf("logged in %v: %v", in, got)
 		}
 	}

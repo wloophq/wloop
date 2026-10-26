@@ -164,7 +164,7 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	origin := d.Origin.Kind
 	switch {
 	case d.Origin.TurnSeq > 0:
-		origin += fmt.Sprintf(" %d (%s)", d.Origin.TurnSeq, d.Origin.Intent)
+		origin += fmt.Sprintf(" %d (%s)", d.Origin.TurnSeq, d.Origin.Intent) + originOn(d)
 	case d.Origin.Rule != "":
 		origin += " " + d.Origin.Rule
 	}

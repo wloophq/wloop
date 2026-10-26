@@ -54,7 +54,7 @@ func TestSlackDraftListing(t *testing.T) {
 	}
 	f, d := &fakeSlack{}, &fakeDrafts{answer: DraftResult{ID: 3}}
 	s, sid = draftSession(t, f, d, "term_1")
-	if got := listedTools(t, call(t, s, sid, "term_1", list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", slackDraftName, slackReactName, slackEditName}) {
+	if got := listedTools(t, call(t, s, sid, "term_1", list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", slackReactName, slackDraftName, slackEditName}) {
 		t.Fatalf("tools %v", got)
 	}
 	in := slackDraftTool().InputSchema

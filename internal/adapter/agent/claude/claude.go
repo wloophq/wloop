@@ -36,7 +36,7 @@ func (k Agent) defaultHome() string {
 func (k Agent) usesDefault(home string) bool { return isDefault(home, k.defaultHome()) }
 
 // SlackDraftTools only store drafts the user approves, so a session policy may allow them.
-var SlackDraftTools = []string{brand.ToolPrefix() + "slack_draft", brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit"}
+var SlackDraftTools = []string{brand.ToolPrefix() + "slack_draft", brand.ToolPrefix() + "slack_edit"}
 
 func (Agent) Name() string { return "claude" }
 

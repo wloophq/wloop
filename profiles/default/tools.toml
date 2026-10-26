@@ -83,7 +83,7 @@ description = "Search the Slack messages the user can read, newest first: one li
 "limit" = "how many messages to show, at most 100. Default 20"
 
 [slack_draft]
-description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. On a session whose turn is not on a Slack unit, target a message permalink: the draft replies in its thread. Name people as @{slack:<user id>}; an @handle or an email that names one person becomes that mention."
+description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message permalink to reply in its thread, even one your turn is not on. Name people as @{slack:<user id>}; an @handle or an email that names one person becomes that mention."
 
 [slack_draft.params]
 "text" = "the message, in Markdown; empty for a reaction"
@@ -96,11 +96,12 @@ description = "Propose a Slack message, or a reaction, to be posted as the user 
 "effects[]" = "an effect name your intent lists in drafts.allowed_effects"
 
 [slack_react]
-description = "Propose a reaction on a Slack message, added as the user once they approve it in the {{.Name}} Outbox. It reacts with nothing itself."
+description = "Add a reaction to a Slack message as the user, or remove one, at once and without their approval, such as swapping an hourglass for a check mark on a status reply. When it is unclear whether the user wants it, ask them first."
 
 [slack_react.params]
 "permalink" = "the message's permalink"
 "emoji" = "the emoji name, such as white_check_mark, with or without colons"
+"remove" = "remove the user's reaction instead of adding it"
 
 [slack_edit]
 description = "Propose new text for one of the user's own Slack messages, replaced once they approve it in the {{.Name}} Outbox. It edits nothing itself, and refuses a message someone else posted. Name people as in slack_draft."

@@ -51,7 +51,7 @@ func TestSlackReadListing(t *testing.T) {
 	r := &fakeReader{answer: "rendered"}
 	f := &fakeSlack{}
 	s, sid = readSession(t, f, r)
-	if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", "slack_read"}) {
+	if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", "slack_react", "slack_read"}) {
 		t.Fatalf("tools %v", got)
 	}
 	in := slackReadTool().InputSchema
