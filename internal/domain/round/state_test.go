@@ -40,7 +40,7 @@ func TestSettersRecordWhatTheyChanged(t *testing.T) {
 	s.FirstNote("hello", now)
 	s.FirstNote("hello", now)
 	ch := s.Changes()
-	if got, want := ch.PRs["a/b#1"], FieldSentAt|FieldRoundAt; got != want {
+	if got, want := ch.PRs["a/b#1"], FieldSentAt; got != want {
 		t.Fatalf("fields %b, want %b", got, want)
 	}
 	if got := ch.Marks["a/b#1"]; len(got) != 1 || !got[AddressedChecks] {

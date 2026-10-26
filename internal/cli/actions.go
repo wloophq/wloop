@@ -440,7 +440,6 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}); d.Fingerprint != "" {
 		st.SetMark(ref.String(), round.Reviewed, d.Fingerprint)
 	}
-	st.RecordRound(ref.String(), e.Now())
 	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
 	return rounds.Save(ctx, st)
 }

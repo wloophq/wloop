@@ -82,4 +82,5 @@ var v4Drop = []string{
 	`ALTER TABLE extraction_cursors DROP COLUMN brief`,
 	`ALTER TABLE items DROP COLUMN waiting_on`,
 	`ALTER TABLE plan_items DROP COLUMN mode`,
+	`ALTER TABLE round_state DROP COLUMN round_at`,
 }

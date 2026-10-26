@@ -76,7 +76,6 @@ CREATE TABLE instruction_parts (
 CREATE TABLE round_state (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
   sent_at TEXT NOT NULL DEFAULT '',
-  round_at TEXT NOT NULL DEFAULT '',
   agent_home TEXT NOT NULL DEFAULT '',
   first_round_skipped INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (provider, unit_key)

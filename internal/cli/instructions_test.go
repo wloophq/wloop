@@ -307,7 +307,7 @@ func TestAnAllowedRoundFormNeverRunsATurnByHand(t *testing.T) {
 		if code := te.run(append([]string{"instructions", "review"}, args...)...); code == 0 || te.out.Len() != 0 {
 			t.Errorf("%s: exit %d out %s", name, code, te.out)
 		}
-		if s, _ := te.Rounds.Load(context.Background()); !s.RoundAt(r7.String()).IsZero() {
+		if s, _ := te.Rounds.Load(context.Background()); len(s.PRs[r7.String()].Marks) != 0 {
 			t.Errorf("%s: recorded a round", name)
 		}
 	}

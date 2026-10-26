@@ -24,8 +24,6 @@ type PR struct {
 	// Marks are what the rounds covered, by mark name; see mark.Handled.
 	Marks  map[string]string
 	SentAt time.Time
-	// RoundAt is when the last round of any kind was sent.
-	RoundAt time.Time
 	// AgentHome is the agent home of the session that asked for the review,
 	// reused by the rounds the watch starts.
 	AgentHome string
@@ -48,7 +46,6 @@ type Fields uint8
 
 const (
 	FieldSentAt Fields = 1 << iota
-	FieldRoundAt
 	FieldAgentHome
 	FieldFirstRoundSkipped
 )
@@ -176,17 +173,10 @@ func (s *Store) firstNote(kind, text string, now time.Time) bool {
 // HeldToday lists the PRs a cap held back today.
 func (s *Store) HeldToday(now time.Time) []string { return s.Days[DayKey(now)].CapLogged }
 
-func (s *Store) RoundAt(key string) time.Time { return s.PRs[key].RoundAt }
-
 func (s *Store) AgentHome(key string) string { return s.PRs[key].AgentHome }
 
 func (s *Store) SetAgentHome(key, dir string) {
 	s.set(key, FieldAgentHome, func(p *PR) { p.AgentHome = dir })
-}
-
-// RecordRound notes a round the user started by hand.
-func (s *Store) RecordRound(key string, now time.Time) {
-	s.set(key, FieldRoundAt, func(p *PR) { p.RoundAt = now.UTC() })
 }
 
 // SetHeads marks the failing checks and the conflict of the heads an
@@ -207,7 +197,7 @@ func (s *Store) RecordSent(key, mark, fingerprint string, now time.Time) {
 	if fingerprint != "" {
 		s.SetMark(key, mark, fingerprint)
 	}
-	s.set(key, FieldSentAt|FieldRoundAt, func(p *PR) { p.SentAt, p.RoundAt = now.UTC(), now.UTC() })
+	s.set(key, FieldSentAt, func(p *PR) { p.SentAt = now.UTC() })
 	s.Count(key, now)
 }
 
