@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
@@ -20,39 +18,9 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
-
-// withBundled gives te's command line and daemon a registry whose bundled
-// intents are the shipped ones with edit applied.
-func withBundled(t *testing.T, te *testEnv, edit func(fstest.MapFS)) {
-	t.Helper()
-	fsys := fstest.MapFS{}
-	err := fs.WalkDir(turn.BundledFS(), ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		b, err := fs.ReadFile(turn.BundledFS(), p)
-		fsys[p] = &fstest.MapFile{Data: b}
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	edit(fsys)
-	base, err := turn.Base()
-	if err != nil {
-		t.Fatal(err)
-	}
-	st := &envIntents{}
-	st.cache = intentload.NewCache(func() []profile.Layer { return st.profileLayers(te.Env) }, fsys, base, turn.CheckTemplate, intentload.CacheOptions{})
-	te.Env.intents = st
-	if p := te.loadedIntents().Problems; len(p) > 0 {
-		t.Fatal(p)
-	}
-}
 
 // userProfile writes the ask-author fixture, and files, into a profile
 // directory te's config names.
