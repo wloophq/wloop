@@ -147,7 +147,7 @@ func NewRegistry(cs ...Codec) *Registry {
 }
 
 func (r *Registry) Parse(provider, key string) (Unit, error) {
-	c, ok := r.codecs[ProviderID(provider)]
+	c, ok := r.Codec(ProviderID(provider))
 	if !ok {
 		return Unit{}, fmt.Errorf("unknown provider %s", provider)
 	}

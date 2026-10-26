@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/web"
@@ -323,11 +322,11 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	prs := make([]unit.Unit, 0, len(req.PRs))
 	for _, key := range req.PRs {
-		ref, err := pr.ParseKey(key)
-		if err != nil || ref.Number <= 0 {
+		u, err := s.deps.Units.Parse(string(s.deps.Forge), key)
+		if err != nil || refOf(u).Number <= 0 {
 			return badRequest{key + " is not an owner/repo#n"}
 		}
-		prs = append(prs, ref.Unit())
+		prs = append(prs, u)
 	}
 	for _, repo := range req.Repos {
 		if owner, name, ok := strings.Cut(repo, "/"); !ok || owner == "" || name == "" || strings.ContainsAny(name, "/# ") {

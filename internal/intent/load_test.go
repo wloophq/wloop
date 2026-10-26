@@ -2,9 +2,9 @@ package intent
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -241,7 +241,7 @@ func TestGoodManifestLoads(t *testing.T) {
 
 func greetBundle() fstest.MapFS {
 	return fstest.MapFS{
-		DefaultsFile: {Data: []byte(testDefaults)},
+		DefaultsFile:                         {Data: []byte(testDefaults)},
 		"intents/greet/intent.toml":          {Data: []byte(minimal)},
 		"intents/greet/instructions.md.tmpl": {Data: []byte("{{.Headline}}")},
 	}

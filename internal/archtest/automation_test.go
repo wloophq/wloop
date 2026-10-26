@@ -41,8 +41,34 @@ func engineImports(self string, imports []string) []string {
 
 // coreProviderAllowlist are the core files that may still name a provider.
 var coreProviderAllowlist = []allowed{
-	{"internal/core/port/port.go", "unit.GitHub", "debt: PROf reads a pull request from a github event; a pluginDebt edge"},
 	{"internal/core/turns/headless.go", `"entry"`, "the headless turn's entry input, which shares the entry provider's spelling"},
+	{"internal/adapter/store/inventory/activity.go", "unit.GitHub", "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/store/inventory/briefruns.go", `"github"`, "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/store/inventory/store.go", "unit.GitHub", "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/store/inventory/store.go", "unit.Session", "the store keeps the sessions the core keeps"},
+	{"internal/adapter/store/inventory/timings.go", "unit.GitHub", "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/store/sqlite/marks.go", "unit.GitHub", "debt: a round mark notes GitHub's rounds topic"},
+	{"internal/adapter/store/sqlite/registry.go", "unit.Session", "the store keeps the sessions the core keeps"},
+	{"internal/adapter/store/sqlite/retain.go", "unit.Session", "the store keeps the sessions the core keeps"},
+	{"internal/adapter/store/sqlite/retain.go", "unit.Workspace", "the store keeps the workspaces the core keeps"},
+	{"internal/adapter/store/sqlite/slack.go", `"slack"`, "the store keeps the Slack plugin's tables"},
+	{"internal/adapter/store/sqlite/turns.go", "unit.GitHub", "debt: a pull request's turns are keyed by owner, repository and number"},
+	{"internal/cli/actions.go", "unit.GitHub", "debt: the GitHub viewer and actions read outside the plugin"},
+	{"internal/cli/facts.go", "unit.GitHub", "debt: the GitHub viewer read outside the plugin"},
+	{"internal/cli/sweepinputs.go", "unit.GitHub", "debt: the GitHub viewer read outside the plugin"},
+	{"internal/cli/turn.go", "unit.GitHub", "debt: the GitHub viewer read outside the plugin"},
+	{"internal/cli/cli.go", `"slack"`, "the slack command, the Slack plugin's own commands"},
+	{"internal/cli/help.go", `"slack"`, "the slack command, the Slack plugin's own commands"},
+	{"internal/cli/init_config.go", `"slack"`, "the slack section of the config init writes"},
+	{"internal/cli/intent_cmd.go", "unit.GitHub", "debt: the usage line names a pull request's target"},
+	{"internal/cli/placement.go", "unit.GitHub", "debt: GitHub's default placement, wired outside the plugin's PlacementDefaults"},
+	{"internal/cli/serve_payloads.go", "unit.GitHub", "debt: GitHub's payload reader, wired outside the plugin's Payload"},
+	{"internal/cli/serve_plugins.go", "unit.GitHub", "debt: the GitHub facilities the daemon holds go with the GitHub plugin"},
+	{"internal/cli/serve.go", "unit.GitHub", "debt: the daemon's wiring of the GitHub client, viewer and forge"},
+	{"internal/cli/storedfacts.go", "unit.GitHub", "debt: the stored facts of a pull request's turn"},
+	{"internal/cli/targets.go", "unit.GitHub", "debt: GitHub's provider listed before the plugins"},
+	{"skills/skills.go", "unit.GitHub", "debt: a turn skill takes a pull request's URL"},
+	{"internal/meter/meter.go", `"github"`, "the meter's resource of a GitHub API request, not a unit provider"},
 }
 
 // providerHomes are the packages a provider id may appear in outside the
@@ -56,12 +82,14 @@ var providerHomes = []string{
 	"internal/slack", "internal/domain/slack",
 	"internal/intent/builtin",
 	"internal/e2e",
+	// The codecs of the providers the core keeps.
+	"internal/domain/gtd/codec.go", "internal/domain/turn/session.go", "internal/domain/workspace",
 }
 
 // providerHome says whether file may spell a provider id.
 func providerHome(file string) bool {
 	dir := filepath.Dir(file)
-	if under(dir, providerHomes...) || provider(dir) != "" || compositionRoot(file) || file == sourceRoot {
+	if under(file, providerHomes...) || under(dir, providerHomes...) || provider(dir) != "" || compositionRoot(file) || file == sourceRoot {
 		return true
 	}
 	wiring, _ := filepath.Match(slackWiring, file)
@@ -183,7 +211,19 @@ var g = "entry"
 	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none), 4, "the core names no provider")
 	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none), 0, "")
 	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none), 0, "")
-	flagged(t, "outside the core", coreLiterals(fset, "internal/daemon/x.go", f, nil, none), 0, "")
+	outside := map[string]int{"internal/daemon/x.go": 3, "internal/client/tui/x.go": 3, "internal/cli/root.go": 0, "internal/cli/sources.go": 0,
+		"internal/cli/slack_wire.go": 0, "internal/domain/pr/x.go": 0, "internal/intent/builtin/x.go": 0, "internal/adapter/source/slack/x.go": 0}
+	for file, n := range outside {
+		fset, f := parse(t, `package x
+var a = "github"
+var b = unit.Session
+var c = "session"
+var d = "workspace"
+var e = "slack:U1"
+var g = "https://github.com/a/b"
+`)
+		flagged(t, file, coreLiterals(fset, file, f, nil, none), n, "a provider id lives in its plugin")
+	}
 	allow := []allowed{{"internal/core/gtd/x.go", "unit.Session", "planted"}, {"internal/core/gtd/x.go", `"slack"`, "stale"}}
 	used := map[int]bool{}
 	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 3, "the core names no provider")
