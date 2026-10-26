@@ -85,8 +85,8 @@ func (w WorkflowConfig) DraftApproval() *ApprovalConfig {
 }
 
 var (
-	runModes   = []string{string(workflow.ApprovalRun), string(workflow.ApprovalDelay), string(workflow.ApprovalWait)}
-	draftModes = []string{string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun)}
+	runModes   = builtin.ValueNames(builtin.RunModes())
+	draftModes = builtin.ValueNames(builtin.DraftModes())
 )
 
 // validateRun checks a run approval overlay at key as far as it holds
