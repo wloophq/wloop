@@ -202,7 +202,7 @@ func stageSidecar(path string) (sidecar, bool) {
 // fill replaces each placeholder of tmpl once, in one pass, so a value that
 // holds a placeholder stays as written.
 func fill(tmpl string, values map[string]string) string {
-	pairs := make([]string, 0, 2*len(values))
+	var pairs []string
 	for k, v := range values {
 		pairs = append(pairs, "{{"+k+"}}", v)
 	}

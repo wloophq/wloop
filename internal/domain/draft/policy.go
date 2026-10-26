@@ -2,6 +2,7 @@ package draft
 
 import (
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -122,13 +123,11 @@ func ofSlot(subjects []string, slot string) bool {
 }
 
 func withRuleFacts(d Draft, facts map[string]any) map[string]any {
-	out := make(map[string]any, len(facts)+4)
-	for k, v := range facts {
-		out[k] = v
+	out := maps.Clone(facts)
+	if out == nil {
+		out = map[string]any{}
 	}
-	for k, v := range d.RuleFacts() {
-		out[k] = v
-	}
+	maps.Copy(out, d.RuleFacts())
 	return out
 }
 

@@ -20,9 +20,9 @@ type lineEdit struct {
 }
 
 func lineEdits(a, b []string) []lineEdit {
-	lcs := make([][]int, len(a)+1)
+	lcs := append(make([][]int, len(a)), nil)
 	for i := range lcs {
-		lcs[i] = make([]int, len(b)+1)
+		lcs[i] = append(make([]int, len(b)), 0)
 	}
 	for i := len(a) - 1; i >= 0; i-- {
 		for j := len(b) - 1; j >= 0; j-- {
