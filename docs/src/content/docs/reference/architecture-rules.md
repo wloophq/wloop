@@ -36,6 +36,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/`, except the allowlisted ones. |
+| `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
@@ -99,6 +100,37 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/source/slack/eval` | ✅ | the extraction eval's own prompts, a dev tool |
 | `skills` | ✅ | the skills install writes into agent homes |
+
+### `TestProviderIdentityThroughAPluginPackageOnlyShrinks`
+
+| `pluginIdentityAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/facts/session/facts.go` `repoOf` `port.PROf` `1` | 🧾 | a session's facts read its linked pull request |
+| `internal/adapter/store/inventory/byunit.go` `unitRef` `port.PROf` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/brief/github_source.go` `GitHubSource.ref` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
+| `internal/brief/queue.go` `Queue.source` `pr.Codec{}.Provider` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
+| `internal/brief/units.go` `refOf` `pr.RefOf` `1` | 🧾 | the brief queue builds GitHub's brief source and its units outside the plugin |
+| `internal/catalog/catalog.go` `withSource` `pr.Codec{}.Provider` `1` | 🧾 | the catalog's built-in actions name the GitHub plugin |
+| `internal/cli/brief_intent.go` `Env.resolveBriefIntent` `pr.Codec{}.Provider` `1` | 🧾 | the brief intent falls back to the GitHub plugin's provider |
+| `internal/cli/launcher.go` `cliLauncher.Launch` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
+| `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
+| `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
+| `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
+| `internal/core/port/port.go` `PROf` `pr.RefOf` `1` | 🧾 | the core's pull request event helper, tracked in pluginDebt |
+| `internal/core/turns/service.go` `urlOf` `port.PROf` `1` | 🧾 | a turn's URL is its pull request's |
+| `internal/daemon/actions.go` `Server.readAheadQueued` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/actions.go` `Server.runAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/api.go` `Server.handleRemoveDone` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/api.go` `Server.parsePR` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/attention_entries.go` `entryViewer.rowNotice` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/briefs.go` `refsOf` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/headless.go` `Server.runHeadless` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/plan.go` `Server.actOnPlanItem` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/refs.go` `isPullRequest` `port.PROf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/refs.go` `refOf` `port.PROf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/rows.go` `Server.detail` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/unitactions.go` `sourceFollowed` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
+| `internal/daemon/unitactions.go` `unitAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 
 ### `TestProvidersStayInAdaptersAndTheRoot`
 
