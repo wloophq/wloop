@@ -7,9 +7,9 @@ description: What the loop protects against, what it does not, and the settings 
 
 ## The agent acts as you
 
-A round publishes on GitHub through `gh`, with your login. On Slack it proposes drafts that the Outbox posts with your token, or posts at once through `slack_send_message`, which Claude Code asks you to confirm on every call. {{name}} does not try to keep an agent from an identity that is already yours, on GitHub or on Slack.
+A round publishes on GitHub through `gh`, with your login. On Slack it proposes drafts that the Outbox posts with your token, or posts at once through a tool the loop serves to the session. {{name}} does not try to keep an agent from an identity that is already yours, on GitHub or on Slack.
 
-The Outbox, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, `slack_send_message`, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
+The Outbox, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, a tool that posts to Slack, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
 
 ## The same-user boundary
 

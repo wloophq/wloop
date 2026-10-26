@@ -71,7 +71,7 @@ The architecture docs describe the code as it is; each rule below is a test in `
 - Only the daemon, and the `store` commands under the store's lock, write the store; clients speak `internal/api` and decide nothing. [The daemon and its clients](docs/src/content/docs/architecture/daemon-and-clients.md)
 - The core is keyed by `unit.Unit`, names no provider and imports no plugin; a source is a plugin registered in `internal/cli/sources.go`. [Plugins](docs/src/content/docs/architecture/plugins.md)
 - Go never enumerates intents; facts, steps, roles, effects, builtins and every reserved key live in their tables in `internal/intent/builtin`. [Profile first](docs/src/content/docs/architecture/profile-first.md)
-- Every post the loop proposes is a draft that a person, or their approval policy, approves (an agent's `slack_send_message`, which Claude Code confirms, posts at once); no agent's or thread's text approves a draft, and authority never comes from an agent.
+- Every post the loop proposes is a draft that a person, or their approval policy, approves (a tool an agent calls to post to Slack at once is the exception); no agent's or thread's text approves a draft, and authority never comes from an agent.
 - Every user-visible name derives from `internal/brand`.
 
 Where a new fact, step, intent, workflow, use case, adapter, plugin, API route, command, view or table goes: [Layers](docs/src/content/docs/architecture/layers.md#where-a-change-goes).
