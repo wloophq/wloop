@@ -3,26 +3,25 @@ package intent
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
-const slackNudge = `subject = "entry"
+const slackNudge = `summary = "Case"
+provider = "entry"
 when = 'entry.state == "waiting" && now >= entry.nudge_due_at'
 key = ["entry.settled_at", "entry.waiting_on"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "draft.propose"
 purpose = "nudge"
 items = "owed"
 per = "person"
-on_posted = "entry.nudged"
-hold = "1d"
+effects = ["entry.nudged"]
+repeat_after = "1d"
 
-[withdraw]
+[drafts.withdraw]
 when = '!draft.person_waited'
 `
 
@@ -34,7 +33,7 @@ func TestAWorkflowOnEntriesProposesAndWithdrawsDrafts(t *testing.T) {
 		t.Fatalf("%s", problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Provider != "entry" || w.Slot != "entry" || w.Withdraw == nil || w.Steps[0].Args["on_posted"] != "entry.nudged" {
+	if w.Provider != "entry" || w.Slot != "entry" || w.Withdraw == nil || !slices.Equal(w.Steps[0].Args["effects"].([]string), []string{"entry.nudged"}) {
 		t.Fatalf("%+v", w)
 	}
 	if reads := strings.Join(w.Withdraw.Reads(), ","); !strings.Contains(reads, "draft.person_waited") {
@@ -48,8 +47,8 @@ func TestDraftProposeRefusesBadArguments(t *testing.T) {
 		{`purpose = "nudge"`, "purpose = \"nudge\"\ndelivery = \"fax\"", `step[0].delivery: "fax" is not one of`},
 		{`items = "owed"`, `items = "mine"`, `step[0].items: "mine" is not one of`},
 		{`per = "person"`, `per = "team"`, `step[0].per: "team" is not one of`},
-		{`on_posted = "entry.nudged"`, `on_posted = "entry.nudged, entry.closed"`, `step[0].on_posted: "entry.closed" is not an effect`},
-		{`hold = "1d"`, `hold = "soon"`, `step[0].hold: "soon" is not a duration`},
+		{`effects = ["entry.nudged"]`, `effects = ["entry.nudged", "entry.closed"]`, `step[0].effects[1]: "entry.closed" is not an effect`},
+		{`repeat_after = "1d"`, `repeat_after = "soon"`, `step[0].repeat_after: "soon" is not a duration`},
 		{"when = '!draft.person_waited'", "when = '!draft.nope'", "unknown field draft.nope"},
 	} {
 		root := t.TempDir()
@@ -70,16 +69,14 @@ func TestAReactionDraftNeedsItsEmoji(t *testing.T) {
 	}
 }
 
-const slackTurn = `subject = "slack"
+const slackTurn = `summary = "Case"
+provider = "slack"
 when = 'brief.kind == "request"'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"
 intent = "act"
-mode = "headless"
+runner = "headless"
 `
 
 func TestATurnStartOutsidePullRequestsNeedsADailyLimit(t *testing.T) {
@@ -95,8 +92,8 @@ func TestATurnStartOutsidePullRequestsNeedsADailyLimit(t *testing.T) {
 		t.Fatalf("%s", problems.Error())
 	}
 	root = t.TempDir()
-	writeWorkflow(t, root, "implement-requests", strings.Replace(slackTurn, `mode = "headless"`, `mode = "batch"`, 1)+"\n[limits]\nper_day = 3\n")
-	if _, problems := Load(userLayer(root), nil, testBase(), nil); !strings.Contains(problems.Error(), `step[0].mode: "batch" is not one of`) {
+	writeWorkflow(t, root, "implement-requests", strings.Replace(slackTurn, `runner = "headless"`, `runner = "batch"`, 1)+"\n[limits]\nper_day = 3\n")
+	if _, problems := Load(userLayer(root), nil, testBase(), nil); !strings.Contains(problems.Error(), `step[0].runner: "batch" is not one of`) {
 		t.Fatalf("%s", problems.Error())
 	}
 }

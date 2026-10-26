@@ -238,9 +238,9 @@ func (l ledger) Count(ctx context.Context, wf string, since time.Time, u *unit.U
 }
 
 type storedStep struct {
-	Use   string            `json:"use"`
-	Reach string            `json:"reach,omitempty"`
-	Args  map[string]string `json:"args,omitempty"`
+	Use   string         `json:"use"`
+	Reach string         `json:"reach,omitempty"`
+	Args  map[string]any `json:"args,omitempty"`
 }
 
 type storedEvent struct {
@@ -304,16 +304,16 @@ func itemArgs(it workflow.Item) ([]any, error) {
 		string(workflow.ModeOf(it.Observe)), eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
 }
 
-// stringArgs stores step arguments as the manifest gives them, strings; a
-// scalar of another type is formatted, a table or list refused.
-func stringArgs(in map[string]any) (map[string]string, error) {
+// stringArgs stores step arguments as the manifest gives them, strings and
+// lists of strings; a scalar of another type is formatted, a table refused.
+func stringArgs(in map[string]any) (map[string]any, error) {
 	if in == nil {
 		return nil, nil
 	}
-	out := make(map[string]string, len(in))
+	out := make(map[string]any, len(in))
 	for k, v := range in {
 		switch x := v.(type) {
-		case string:
+		case string, []string:
 			out[k] = x
 		case bool, int, int64, float64:
 			out[k] = fmt.Sprint(x)
@@ -322,6 +322,22 @@ func stringArgs(in map[string]any) (map[string]string, error) {
 		}
 	}
 	return out, nil
+}
+
+// storedArg is a stored step argument as the manifest gave it: a JSON list
+// back to a list of strings.
+func storedArg(v any) any {
+	l, ok := v.([]any)
+	if !ok {
+		return v
+	}
+	out := make([]string, 0, len(l))
+	for _, e := range l {
+		if s, ok := e.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func encodeFact(f workflow.Fact) (storedValue, error) {
@@ -422,7 +438,7 @@ func scanItem(row scanner) (workflow.Item, error) {
 		if s.Args != nil {
 			args = make(map[string]any, len(s.Args))
 			for k, v := range s.Args {
-				args[k] = v
+				args[k] = storedArg(v)
 			}
 		}
 		it.Steps = append(it.Steps, workflow.Step{Use: s.Use, Reach: workflow.Reach(s.Reach), Args: args})

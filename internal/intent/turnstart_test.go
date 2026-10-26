@@ -22,11 +22,9 @@ text = "x"
 	dir := filepath.Join(root, "intents", "unit-brief")
 	writeFile(t, filepath.Join(dir, "schema.json"), `{"type": "object", "properties": {}}`)
 	writeFile(t, filepath.Join(dir, "prompts", "brief.md"), "Brief {{marker}}")
-	writeWorkflow(t, root, "brief-everything", `subject = "github"
+	writeWorkflow(t, root, "brief-everything", `summary = "Case"
+provider = "github"
 when = 'pr.state == "open"'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"

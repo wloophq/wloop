@@ -40,7 +40,8 @@ func workflowDoctorEnv(t *testing.T) (*testEnv, *sqlite.DB) {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	user := t.TempDir()
-	writeUserWorkflow(t, user, "after-merge", `subject = "github"
+	writeUserWorkflow(t, user, "after-merge", `summary = "Case"
+provider = "github"
 when = 'trigger.event.kind == "merged"'
 
 [trigger]
@@ -50,11 +51,9 @@ on = ["merged", "closed"]
 use = "turn.dismiss"
 reason = "merged"
 `)
-	writeUserWorkflow(t, user, "broken-one", `subject = "session"
+	writeUserWorkflow(t, user, "broken-one", `summary = "Case"
+provider = "session"
 when = 'true'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.explode"

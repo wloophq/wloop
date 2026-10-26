@@ -467,7 +467,7 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		}
 		info = fmt.Sprintf("%s, %s, %s, %d refusal(s) in the last day", workflow.ModeOf(w.Observe), w.Trigger.Kind, last, a.Refusals)
 	}
-	if w.Approval.Default == workflow.OutcomeWait {
+	if w.Approval.Mode == workflow.ApprovalWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
 			workflowEntry(w.Name, `"approval": {"default": "run"}`), e.ConfigPath)
 	}

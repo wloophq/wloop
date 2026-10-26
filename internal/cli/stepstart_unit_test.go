@@ -183,7 +183,7 @@ func (r *unitStartRig) sweep(t *testing.T, eng *automation.Engine) {
 func TestTheWorkflowLimitAndTheAutomatedBudgetStopTheNextTurn(t *testing.T) {
 	w := workflow.Workflow{Name: implementWorkflow, Provider: ingesttest.Provider, Slot: string(ingesttest.Provider), Trigger: workflow.Trigger{Kind: workflow.TriggerSweep},
 		When: automationtest.MatchFunc(func(workflow.Vars) bool { return true }), Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": "implement"}}},
-		Observe: false, Approval: workflow.Approval{Default: workflow.OutcomeRun}, Limits: workflow.Limits{PerDay: 1}}
+		Observe: false, Approval: workflow.Approval{Mode: workflow.ApprovalRun}, Limits: workflow.Limits{PerDay: 1}}
 
 	r := newUnitStartRig(t, implementIntent)
 	eng := r.engine(w)
