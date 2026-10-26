@@ -3,6 +3,7 @@ package builtin
 import (
 	"slices"
 
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -15,6 +16,11 @@ const DraftActionSlot FactSlot = "draft_action"
 // posts nothing.
 var DraftRefusals = []string{"", "plugin_off", "state", "posts_nothing"}
 
+// PRRowKinds are a pull request row's situation kinds, as the cockpit
+// ranks them.
+var PRRowKinds = []string{"round_pending", "loop_waiting", "loop_stopped", "blocked", "to_address", "held", "loop_working",
+	"changes", "checks", "conflicts", "reply", "reviewer_back", "review", "no_reviewer", "merge", "draft", "muted", "done"}
+
 // ActionFacts are the facts only the action slot reads, what a row offers
 // decides on them, then the draft actions' facts.
 var ActionFacts = slices.Concat(rowActionFacts, draftActionFacts)
@@ -22,7 +28,7 @@ var ActionFacts = slices.Concat(rowActionFacts, draftActionFacts)
 var rowActionFacts = []Fact{
 	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
 	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
-	fact("row.kind", expr.String, act, "The row's situation kind."),
+	enum(fact("row.kind", expr.String, act, "The row's situation kind."), map[unit.ProviderID][]string{unit.GitHub: PRRowKinds}),
 	fact("row.open", expr.Bool, act, "The pull request is open: kind is not done, or, untracked, its GitHub state is open."),
 	fact("row.tracked", expr.Bool, act, "The pull request is in the inventory."),
 	fact("pr.adopted", expr.Bool, act, "The pull request was taken over into the loop."),

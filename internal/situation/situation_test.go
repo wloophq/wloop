@@ -11,7 +11,9 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 var (
@@ -622,5 +624,21 @@ func TestOrderHoldsEveryLabeledKindOnce(t *testing.T) {
 			t.Errorf("%s: labeled %v, twice %v", k, ok, seen[k])
 		}
 		seen[k] = true
+	}
+}
+
+func TestRowKindEnumIsEveryKind(t *testing.T) {
+	var kinds []string
+	for _, k := range Order {
+		kinds = append(kinds, string(k))
+	}
+	var row builtin.Fact
+	for _, f := range builtin.ActionFacts {
+		if f.Name == "row.kind" {
+			row = f
+		}
+	}
+	if got := row.Enum[unit.GitHub]; !slices.Equal(got, kinds) {
+		t.Errorf("row.kind's GitHub enum is %q, want %q", got, kinds)
 	}
 }
