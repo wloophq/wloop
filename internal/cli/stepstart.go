@@ -136,8 +136,8 @@ func (s *stepSet) reason(p startPlan) string {
 	return cmp.Or(why, p.args.kindName())
 }
 
-// mode is the step's mode, else the intent's first mode.
-func (a startArgs) runMode() string {
+// runnerName is the step's runner, else the intent's first runner.
+func (a startArgs) runnerName() string {
 	if a.runner != "" {
 		return a.runner
 	}
@@ -479,7 +479,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	}
 	why := c.why
 	if !p.round {
-		err := cliLauncher{s.e}.Launch(ctx, turns.Launch{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: guidance, Trigger: dturn.Automated, Why: &why})
+		started, err := s.startTurn(ctx, c.u, p.args, guidance, &why)
 		if err != nil {
 			if taken {
 				s.e.keepGuidance(ctx, p.ref, guidance)
@@ -490,7 +490,7 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 		if counted(p.args.def) {
 			st.Count(p.ref.String(), s.e.Now())
 		}
-		return "started a " + p.args.intent + " turn", nil
+		return started, nil
 	}
 	reason := s.reason(p)
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,

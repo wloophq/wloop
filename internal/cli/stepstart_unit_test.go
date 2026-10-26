@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -440,5 +441,29 @@ func TestARefuseWhoseWhyRendersEmptyStillRefuses(t *testing.T) {
 	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": m})
 	if got := r.check(t, automation.CheckOpts{}); got != "its intent refuses it here" {
 		t.Fatalf("refusal %q", got)
+	}
+}
+
+// headlessCalls records the headless turns asked for.
+type headlessCalls struct{ got []headless.Request }
+
+func (h *headlessCalls) Start(_ context.Context, r headless.Request) (int64, error) {
+	h.got = append(h.got, r)
+	return 1, nil
+}
+
+func TestATurnStartOnAPullRequestHonorsItsRunner(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	r := newStartRig(t, sc, string(dintent.Act), "")
+	r.st.Args["runner"] = string(dturn.RunnerHeadless)
+	h := &headlessCalls{}
+	r.steps.d.Headless = h
+	got, err := r.run(t, automation.RunOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.got) != 1 || h.got[0].Intent != dturn.Intent(dintent.Act) || h.got[0].Unit != sc.ref.Unit() || h.got[0].Trigger != dturn.Automated {
+		t.Fatalf("%q: headless calls %+v", got, h.got)
 	}
 }

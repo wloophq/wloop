@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -32,7 +33,7 @@ type automatedTurns interface {
 // automated turns stay under turns.per_day. The workflow's own
 // limits are the engine's.
 func (s *stepSet) unitGuards(ctx context.Context, c stepCall, p startPlan) (string, startPlan, error) {
-	d, mode := p.args.def, p.args.runMode()
+	d, mode := p.args.def, p.args.runnerName()
 	switch {
 	case d.Name == "":
 		return "", p, fmt.Errorf("the intent %q does not load", p.args.intent)
@@ -41,7 +42,7 @@ func (s *stepSet) unitGuards(ctx context.Context, c stepCall, p startPlan) (stri
 	case !d.Serves(c.u.Provider):
 		return "", p, fmt.Errorf("the intent %s does not act on %s units", d.Name, c.u.Provider)
 	case !d.Runs(mode):
-		return "", p, fmt.Errorf("the intent %s does not run as %s (its manifest's modes)", d.Name, mode)
+		return "", p, fmt.Errorf("the intent %s does not run as %s (its manifest's runners)", d.Name, mode)
 	}
 	var err error
 	if p.facts, err = s.facts(ctx, c.u); err != nil {
@@ -106,20 +107,29 @@ func (s *stepSet) unitStart(ctx context.Context, c stepCall, o automation.RunOpt
 	if refusal != "" {
 		return "", automation.Refused{Reason: refusal}
 	}
-	d, why := p.args.def, c.why
-	if p.args.runMode() == string(dturn.RunnerHeadless) {
-		if s.d.Headless == nil {
-			return "", errors.New("no headless runner is configured")
-		}
-		if _, err := s.d.Headless.Start(ctx, headless.Request{Unit: c.u, Intent: dturn.Intent(d.Name), Guidance: o.Guidance,
-			Trigger: dturn.Automated, Workflow: why.Workflow}); err != nil {
-			return "", startError(err)
-		}
-		return "started a headless " + string(d.Name) + " turn", nil
-	}
-	err = cliLauncher{s.e}.Launch(ctx, turns.Launch{Unit: c.u, Intent: dturn.Intent(d.Name), Guidance: o.Guidance, Trigger: dturn.Automated, Why: &why})
+	why := c.why
+	started, err := s.startTurn(ctx, c.u, p.args, o.Guidance, &why)
 	if err != nil {
 		return "", startError(err)
 	}
-	return "started a " + string(d.Name) + " turn", nil
+	return started, nil
+}
+
+// startTurn starts an automated turn of a's intent on u in its runner: a
+// headless call, or a session where the intent runs.
+func (s *stepSet) startTurn(ctx context.Context, u unit.Unit, a startArgs, guidance string, why *workflow.Why) (string, error) {
+	intent := dturn.Intent(a.intent)
+	if a.runnerName() == string(dturn.RunnerHeadless) {
+		if s.d.Headless == nil {
+			return "", errors.New("no headless runner is configured")
+		}
+		if _, err := s.d.Headless.Start(ctx, headless.Request{Unit: u, Intent: intent, Guidance: guidance, Trigger: dturn.Automated, Workflow: why.Workflow}); err != nil {
+			return "", err
+		}
+		return "started a headless " + a.intent + " turn", nil
+	}
+	if err := (cliLauncher{s.e}).Launch(ctx, turns.Launch{Unit: u, Intent: intent, Guidance: guidance, Trigger: dturn.Automated, Why: why}); err != nil {
+		return "", err
+	}
+	return "started a " + a.intent + " turn", nil
 }
