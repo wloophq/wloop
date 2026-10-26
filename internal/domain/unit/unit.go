@@ -2,6 +2,7 @@
 package unit
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -218,4 +219,17 @@ func (c OpaqueCodec) Valid(key string) error {
 		return fmt.Errorf("invalid %s key %q", c.ID, key)
 	}
 	return nil
+}
+
+// Resolver is a codec whose provider must look an address up to find its
+// unit, such as a Slack permalink to its thread; ok is false for an address
+// that is not one of the provider's.
+type Resolver interface {
+	Resolve(ctx context.Context, address string) (key string, ok bool, err error)
+}
+
+// Locator is a codec that knows the unit a working directory holds, such as
+// the pull request of a checkout's branch; ok is false when it holds none.
+type Locator interface {
+	UnitAt(ctx context.Context, dir string) (key string, ok bool, err error)
 }

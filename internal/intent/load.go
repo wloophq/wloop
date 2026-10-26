@@ -95,6 +95,9 @@ type Loaded struct {
 	// RevertedWorkflows are bundled workflows read without the user's override, which does not load.
 	RevertedWorkflows map[string]Problems
 
+	// Actions are the built-in actions' texts from actions.toml, by catalog id.
+	Actions map[string]BuiltinAction
+
 	skipped  []dintent.Name // kinds whose blocks need what a reverted override declared
 	layers   []profile.Layer
 	loadTree func([]profile.Layer, *dintent.Registry, []dintent.Name) (profile.Tree, error)
@@ -167,7 +170,9 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			continue
 		}
 		if len(broken) == 0 {
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems)
+			actions, actionProblems := loadActions(layers, bundled)
+			l.Actions = actions
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
