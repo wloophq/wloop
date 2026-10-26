@@ -1,0 +1,6 @@
+label = "Brief"
+summary = "One brief per unit: goal, context, kind, size, risk, open questions and tags"
+user_facing = false
+builds = "brief"
+provider = ["github", "slack"]
+prompt = "prompts/brief.md"

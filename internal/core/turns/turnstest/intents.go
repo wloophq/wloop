@@ -1,8 +1,11 @@
 package turnstest
 
-import dintent "github.com/wloophq/wloop/internal/domain/intent"
+import (
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
 
-// Intents is the registry of the five bundled intents, with the record rules
+// Intents is the registry of the bundled intents, with the record rules
 // of their manifests, for tests that build a turns.Service.
 func Intents() *dintent.Registry {
 	return dintent.NewRegistry([]dintent.Def{
@@ -25,5 +28,6 @@ func Intents() *dintent.Registry {
 		{Name: dintent.Probe, Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 		{Name: dintent.Act, UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Modes: []string{"headless", "session"}, Verb: "delegate",
 			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
+		{Name: "brief", Builds: "brief", Prompt: "prompts/brief.md", Provider: "github", Providers: []unit.ProviderID{"github", "slack"}},
 	})
 }

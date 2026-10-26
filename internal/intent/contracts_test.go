@@ -1,6 +1,8 @@
 package intent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -179,6 +181,9 @@ resumed = "x"
 [[headline.new]]
 text = "x"
 `, "{{.Headline}}")
+	if err := os.WriteFile(filepath.Join(root, "intents", "unit-brief", "schema.json"), []byte(`{"type":"object","properties":{"solution":{"type":"string"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	l, problems := Load(userLayer(root), nil, testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatalf("%s", problems.Error())

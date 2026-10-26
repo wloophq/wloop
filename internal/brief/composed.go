@@ -253,3 +253,22 @@ func (c Composed) WithFields(b Brief, values map[string]any) Brief {
 	b.Extra, b.ExtraVersions = extra, versions
 	return b
 }
+
+// ComposeExtra is Compose with the extra schema made of a brief intent's
+// properties, every one required: the brief intent's Def.Extra.
+func ComposeExtra(core string, props []jsonschema.Property) (Composed, error) {
+	if len(props) == 0 {
+		return Compose(core, nil)
+	}
+	fields := map[string]json.RawMessage{}
+	names := make([]string, 0, len(props))
+	for _, p := range props {
+		fields[p.Name] = p.Source
+		names = append(names, p.Name)
+	}
+	extra, err := json.Marshal(map[string]any{"type": "object", "additionalProperties": false, "required": names, "properties": fields})
+	if err != nil {
+		return Composed{}, err
+	}
+	return Compose(core, extra)
+}

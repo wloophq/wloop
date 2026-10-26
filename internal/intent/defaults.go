@@ -159,7 +159,12 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if g := m.Guidance; g != nil {
 		d.Guidance = dintent.Guidance{Label: str(g.Label, "Guidance"), Help: g.Help, Max: g.Max}
 	}
-	d.Headline = s.headline(m.Headline)
+	if d.Builds != "" {
+		d.Answerable, d.Reports = false, false
+	}
+	if m.Headline != nil || d.Builds == "" {
+		d.Headline = s.headline(m.Headline)
+	}
 	d.Inputs = s.inputs(m.Inputs)
 	for i, a := range m.AlsoProfiles {
 		path := fmt.Sprintf("also_profiles[%d]", i)
