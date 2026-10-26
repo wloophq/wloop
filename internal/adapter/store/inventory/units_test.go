@@ -77,10 +77,6 @@ func TestLoopTablesStoreANonGitHubUnit(t *testing.T) {
 	if err != nil || len(feed) != 1 || feed[0].PR != ref || feed[0].Title != "t" {
 		t.Errorf("activity %+v %v", feed, err)
 	}
-	acts, err := s.Activities(ctx)
-	if err != nil || len(acts) != 0 {
-		t.Errorf("activities %+v %v", acts, err)
-	}
 	if last, ok, err := s.LastEvent(ctx, ref, dinv.KindReview); err != nil || !ok || !last.At.Equal(at) {
 		t.Errorf("last %+v %v %v", last, ok, err)
 	}

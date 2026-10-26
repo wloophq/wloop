@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -28,7 +27,6 @@ import (
 type Store interface {
 	PRsWithOverrides(ctx context.Context) ([]dinv.PR, map[github.Ref]dinv.Override, error)
 	EventsByPR(ctx context.Context, refs []github.Ref) (map[github.Ref][]dinv.Event, error)
-	Activities(ctx context.Context) (map[github.Ref]inventory.Activity, error)
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 }
 
@@ -112,7 +110,7 @@ type input struct {
 	intakes    []intake.Intake
 	intake     *api.Intake
 	brief      *api.BriefSummary
-	activity   *inventory.Activity
+	activity   *turn.Activity
 	book       *turn.Book
 	set        *shared
 }
@@ -178,13 +176,13 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 	if err := p.loadIntakes(ctx, ins, recs); err != nil {
 		return nil, err
 	}
-	acts, err := p.src.Store.Activities(ctx)
+	acts, err := p.activities(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := make(map[unit.Unit]any, len(ins))
 	for u, in := range ins {
-		if a, ok := acts[in.pr.Ref]; ok {
+		if a, ok := acts[u]; ok {
 			in.activity = &a
 		}
 		out[u] = in
@@ -424,4 +422,13 @@ func LapsedMutes(k readmodel.Kept) []dinv.Override {
 		}
 	}
 	return out
+}
+
+// activities are the pull requests' activity; none without an activity
+// reader.
+func (p *Provider) activities(ctx context.Context) (map[unit.Unit]turn.Activity, error) {
+	if p.src.Activity == nil {
+		return nil, nil
+	}
+	return p.src.Activity.Activities(ctx, unit.GitHub)
 }

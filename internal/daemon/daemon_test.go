@@ -44,6 +44,7 @@ func testDeps(t *testing.T) Deps {
 	cfg.HTTP.Port = 0
 	return withStore(Deps{
 		Pauses:   sqlite.NewRounds(stDB),
+		Activity: stDB,
 		Cfg:      cfg,
 		Now:      time.Now,
 		Version:  "test",

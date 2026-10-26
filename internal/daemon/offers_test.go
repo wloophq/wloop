@@ -100,7 +100,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	repo := sqlite.New(db)
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
-	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
+	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
 		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Log:     func(string, ...any) {},
 		Actions: &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),

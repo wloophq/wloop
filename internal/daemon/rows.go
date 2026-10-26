@@ -243,7 +243,7 @@ func (s *Server) newModel() *readmodel.Model {
 	if d.Changes != nil {
 		changes = d.Changes
 	}
-	rd := readmodel.RowDeps{Intake: s.rowIntake, Settings: s.rowSettings, Logf: s.logf}
+	rd := readmodel.RowDeps{Activity: d.Activity, Intake: s.rowIntake, Settings: s.rowSettings, Logf: s.logf}
 	if d.Turns != nil {
 		rd.Books, rd.Sessions = d.Turns.Store, d.Turns.Registry
 	}

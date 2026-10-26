@@ -60,9 +60,15 @@ const FacetChannel = "channel"
 // FacetWaitsOn is the core facet of whom a row waits on.
 const FacetWaitsOn = "waits-on"
 
-func derive(in *input, base readmodel.Base) api.Row {
+func derive(in *input, base readmodel.Base, now time.Time) api.Row {
 	in = withGroupNames(in)
 	pl := payload(in)
+	if a := in.activity; a != nil {
+		pl.Turns = &api.TurnFacts{Count: a.Turns, Open: a.OpenTurns, LastIntent: a.LastIntent, Tokens: a.Tokens, CostUSD: a.CostUSD}
+		if a.BriefRetryAt.After(now) {
+			pl.Next = []api.Upcoming{{At: a.BriefRetryAt, What: api.UpcomingBriefRetry}}
+		}
+	}
 	open := openItems(in.items)
 	kind := KindNew
 	if in.hasState && in.state.Verdict != "" {

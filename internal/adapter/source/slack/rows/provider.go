@@ -15,6 +15,7 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
@@ -30,6 +31,8 @@ type Source struct {
 	Viewer func(ctx context.Context) (team, user string, err error)
 	// Now nil is time.Now.
 	Now func() time.Time
+	// Activity nil shows no activity.
+	Activity readmodel.Activities
 }
 
 // Provider is the Slack rows provider.
@@ -139,6 +142,15 @@ type input struct {
 	viewer   string
 	// host is the workspace's web host, such as "acme.slack.com"; "" when unknown.
 	host string
+	// activity is nil when the loop spent nothing on the unit.
+	activity *turn.Activity
+}
+
+func (p *Provider) activities(ctx context.Context) (map[unit.Unit]turn.Activity, error) {
+	if p.src.Activity == nil {
+		return nil, nil
+	}
+	return p.src.Activity.Activities(ctx, dslack.Provider)
 }
 
 // Load reads each unit's conversation, object, messages, extraction state,
@@ -159,6 +171,10 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 	if err != nil {
 		return nil, err
 	}
+	acts, err := p.activities(ctx)
+	if err != nil {
+		return nil, err
+	}
 	host := slackHost(sample)
 	convs := map[string]sqlite.ConversationRow{}
 	users := map[string]sqlite.UserRow{}
@@ -170,6 +186,9 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 			continue
 		}
 		in := &input{key: k, items: its[u], users: users, viewer: viewer, host: host}
+		if a, ok := acts[u]; ok {
+			in.activity = &a
+		}
 		in.state, in.hasState = states[u]
 		if in.conv, err = p.conversation(ctx, convs, k.Conversation); err != nil {
 			return nil, err
@@ -243,10 +262,10 @@ func (p *Provider) facts(ctx context.Context, k dslack.Key) (sqlite.ObjectRow, [
 	return o, msgs, err
 }
 
-func (p *Provider) Derive(base readmodel.Base, in any, _ time.Time) (api.Row, error) {
+func (p *Provider) Derive(base readmodel.Base, in any, now time.Time) (api.Row, error) {
 	x, ok := in.(*input)
 	if !ok {
 		return api.Row{}, fmt.Errorf("slackrows: input %T", in)
 	}
-	return derive(x, base), nil
+	return derive(x, base, now), nil
 }

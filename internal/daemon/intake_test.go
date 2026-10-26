@@ -86,7 +86,7 @@ func newIntakeServer(t *testing.T, briefs intake.Briefs, change func(*Deps)) (*S
 		t.Fatal(err)
 	}
 	fa := &lockedActions{a: fakeActions{out: "review sent\n"}}
-	d := withStore(Deps{Cfg: config.Defaults(), Version: "test", Actions: fa, Intakes: db.Intakes(), IntakeBriefs: briefs,
+	d := withStore(Deps{Activity: db, Cfg: config.Defaults(), Version: "test", Actions: fa, Intakes: db.Intakes(), IntakeBriefs: briefs,
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, st)
 	if change != nil {
 		change(&d)

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -318,7 +317,7 @@ func (d Deriver) upcoming(next []api.Upcoming, at time.Time, what string) []api.
 
 // AddActivity puts the pull request's turns, usage and brief retry in the
 // payload's facts.
-func (d Deriver) AddActivity(p *Payload, a inventory.Activity) {
+func (d Deriver) AddActivity(p *Payload, a turn.Activity) {
 	f := p.Facts
 	if f == nil {
 		return

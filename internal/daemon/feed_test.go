@@ -59,7 +59,7 @@ func feedServer(t *testing.T) (*Server, *change.Log, *turns.Service) {
 	}
 	repo := sqlite.New(db)
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
-	s := New(withStore(Deps{Turns: svc, Changes: log, Snapshot: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
+	s := New(withStore(Deps{Turns: svc, Activity: db, Changes: log, Snapshot: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }}, st))
 	s.token = ""
 	return s, log, svc

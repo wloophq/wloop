@@ -109,11 +109,11 @@ func (p *plugin) module() sourcereg.Module {
 	return m
 }
 
-func (p *plugin) rows(readmodel.RowDeps) readmodel.Provider {
+func (p *plugin) rows(rd readmodel.RowDeps) readmodel.Provider {
 	if p.src == nil || !p.cfg.Configured() {
 		return noRows{}
 	}
-	return slackrows.New(slackrows.Source{DB: p.deps.DB, Viewer: p.src.store.Viewer, Now: p.now})
+	return slackrows.New(slackrows.Source{DB: p.deps.DB, Viewer: p.src.store.Viewer, Now: p.now, Activity: rd.Activity})
 }
 
 func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {

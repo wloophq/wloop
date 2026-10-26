@@ -62,7 +62,7 @@ func newFixture(t *testing.T) *fixture {
 	cfg.GitHub.AutomatedReviewers = []string{"robo"}
 	cfg.GitHub.AddressSkipReviewers = []string{"skipper"}
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
-	f.s = New(withStore(Deps{Cfg: cfg, Version: "test", Now: f.clock,
+	f.s = New(withStore(Deps{Cfg: cfg, Activity: stDB, Version: "test", Now: f.clock,
 		Viewer: func(context.Context) (string, []string, error) { return "fer", []string{"acme/search"}, nil },
 		Log:    func(string, ...any) {}}, st))
 	f.s.token = ""
@@ -714,7 +714,7 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 	}
 	setTeams("acme/search")
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
-	f.s = New(withStore(Deps{Changes: log, Cfg: config.Defaults(), Version: "test", Now: f.clock,
+	f.s = New(withStore(Deps{Changes: log, Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: f.clock,
 		Viewer: func(ctx context.Context) (string, []string, error) {
 			teams, err := ghsource.MyTeams(ctx, st)
 			return "fer", teams, err

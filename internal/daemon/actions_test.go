@@ -480,7 +480,7 @@ func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 	t.Cleanup(func() { stDB.Close() })
 	var loop sync.Mutex
 	fa := &fakeActions{}
-	s := New(withStore(Deps{Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
+	s := New(withStore(Deps{Activity: stDB, Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
 	loop.Lock()
 	done := make(chan error, 1)
 	go func() { done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, io.Discard) }()

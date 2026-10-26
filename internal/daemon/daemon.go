@@ -191,6 +191,9 @@ type Deps struct {
 	// them, never a call to the manager; nil reads as unknown, so a started
 	// turn's session is never told waiting.
 	Agents readmodel.Agents
+	// Activity reads what the loop spent on each provider's units for their
+	// rows; nil shows none.
+	Activity readmodel.Activities
 	// TurnByHand runs a turn the user asked for in the handle's session, ""
 	// outside Orca; nil answers 503 to AgentAPI's by-hand turns.
 	TurnByHand func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error)

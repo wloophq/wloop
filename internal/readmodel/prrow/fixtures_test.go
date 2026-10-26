@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -32,7 +31,7 @@ type rowCase struct {
 	pending  *round.Pending
 	brief    *api.BriefSummary
 	intake   *api.Intake
-	activity *inventory.Activity
+	activity *turn.Activity
 }
 
 func ago(d time.Duration) time.Time { return fixtureNow.Add(-d) }
@@ -125,7 +124,7 @@ func rowCases() []rowCase {
 			p.ChecksState = "PENDING"
 			p.ReviewRequests = []string{"team:acme/web"}
 			p.Ref.Repo = "web"
-		}), activity: &inventory.Activity{Turns: 3, OpenTurns: 1, LastIntent: "review", Tokens: 1200, CostUSD: 0.5, BriefRetryAt: fixtureNow.Add(2 * time.Hour)}},
+		}), activity: &turn.Activity{Turns: 3, OpenTurns: 1, LastIntent: "review", Tokens: 1200, CostUSD: 0.5, BriefRetryAt: fixtureNow.Add(2 * time.Hour)}},
 		{name: "old stalled review", pr: open(31, "ana", func(p *dinv.PR) {
 			p.ReviewRequests = []string{fixtureViewer}
 			p.CreatedAt = ago(60 * day)
