@@ -64,7 +64,7 @@ An Inbox message needs you to decide: an agent's question at the end of its turn
 
 ## The Outbox
 
-Every outbound post is a draft first, in the Outbox, until its approval policy lets it out. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep:
+Every post an agent or a rule proposes is a draft first, in the Outbox, until its approval policy lets it out. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep:
 
 | Workflow or rule | Proposes |
 |---|---|
