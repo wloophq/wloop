@@ -634,6 +634,10 @@ func compareSchema(t *testing.T, path string, typ reflect.Type, node map[string]
 			return
 		}
 		compareSchema(t, path, typ.Elem(), sub)
+	case reflect.Interface:
+		if _, ok := node["oneOf"].([]any); !ok {
+			t.Errorf("%s: a key decoded as any needs oneOf in the schema", path)
+		}
 	default:
 		want := map[reflect.Kind]string{reflect.String: "string", reflect.Bool: "boolean", reflect.Int: "integer"}[typ.Kind()]
 		if node["type"] != want {

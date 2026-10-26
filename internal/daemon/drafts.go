@@ -287,8 +287,12 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 		State:    string(d.State), Error: d.Error, Reason: d.Reason, Permalink: d.Evidence.Permalink,
 		Would: api.DraftWould{Policy: string(d.Would.Policy), Reason: d.Would.Reason, Outcome: string(d.Would.Outcome)},
 		Rev:   d.Rev, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	v.Purpose, v.Delivery, v.Effects = d.Purpose, string(d.Delivery), slices.Clone(d.Effects)
 	if v.Items == nil {
 		v.Items = []string{}
+	}
+	if v.Effects == nil {
+		v.Effects = []string{}
 	}
 	if d.Approval.Window > 0 {
 		v.Approval.Window = d.Approval.Window.String()

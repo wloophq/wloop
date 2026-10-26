@@ -66,7 +66,6 @@ var Facts = []Fact{
 	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
 	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
 	prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read."),
-	prFact("pr.author_teams", expr.List, trn, "The viewer's organization teams the author belongs to, as org/team."),
 	prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn."),
 	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
 	prFact("pr.address.conflict", expr.Bool, trn, "The head conflicts with the base and the address round resolves it; false on any other turn."),

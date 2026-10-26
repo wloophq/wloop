@@ -72,6 +72,47 @@ type Def struct {
 	DraftApproval *draft.Approval
 	// Modes are turn.Mode values; default ["session"].
 	Modes []string
+	// Providers are the providers of a manifest whose provider is a list,
+	// Provider the first; nil for a single provider.
+	Providers []unit.ProviderID
+	// Role is what Go resolves the intent by (Registry.ByRole), one of
+	// builtin.Roles; "" none.
+	Role string
+	// Builds is what a builder intent builds, such as "brief": it is never
+	// started as a turn. Prompt and Schema are its prompt, resolved through
+	// the profile layers, and its schema, in its directory.
+	Builds, Prompt, Schema string
+	// WorkspaceRepo is a manifest's workspace table: the repository the
+	// turn runs in, named outright or by an input; nil for a workspace
+	// builtin.
+	WorkspaceRepo *WorkspaceRepo
+	// DraftEffects are the effects the intent's agents may declare on the
+	// drafts they propose, names of builtin.Effects.
+	DraftEffects []string
+	// RoundKind is the sweep round the intent's turns are: "review" (first
+	// or follow-up, by the step's round) or "address"; "" none.
+	RoundKind string
+	// Cap is the budget the intent's turns spend: "rounds", the per-pull
+	// request daily round cap; "" none.
+	Cap string
+	// ReasonFact is the workflow fact that says why the intent's round is
+	// due or not; "" none.
+	ReasonFact string
+	// RefuseWhen is a string workflow fact whose non-empty value refuses
+	// the turn with that text, such as pr.nudge_refusal; "" none.
+	RefuseWhen string
+	// Reason is the why a turn's instructions carry: "address_round"; ""
+	// none.
+	Reason string
+	// AutoSend false holds the intent's drafts for a person whatever their
+	// approval; nil keeps the default of their delivery.
+	AutoSend *bool
+}
+
+// WorkspaceRepo is where a turn runs when its manifest names a repository:
+// Repo (owner/name) outright, or the input RepoInput holds.
+type WorkspaceRepo struct {
+	Repo, RepoInput string
 }
 
 // Runs says whether the intent's turns may run in mode, a turn.Mode value; nil Modes run as session only.
@@ -88,7 +129,12 @@ type Session struct {
 	CloseWhenDone bool
 }
 
-type Brief struct{ Render, Wait bool }
+type Brief struct {
+	Render, Wait bool
+	// Need are the brief intent's extra fields the turn needs: a brief
+	// missing one is completed before the turn starts.
+	Need []string
+}
 
 type Pos struct {
 	File      string
@@ -295,8 +341,43 @@ const AnyProvider unit.ProviderID = "any"
 
 // Serves says whether the intent's turns run on units of p.
 func (d Def) Serves(p unit.ProviderID) bool {
+	if d.Providers != nil {
+		return slices.Contains(d.Providers, p) || slices.Contains(d.Providers, AnyProvider)
+	}
 	own := d.ProviderOrDefault()
 	return own == AnyProvider || own == p
+}
+
+// ByRole is the intent holding role for units of p: a user's intent over
+// the bundled one; the loader refuses two holders in one layer.
+func (r *Registry) ByRole(role string, p unit.ProviderID) (Def, bool) {
+	var found Def
+	ok := false
+	for _, d := range r.defs {
+		if role == "" || d.Role != role || !d.Serves(p) {
+			continue
+		}
+		if !d.Bundled {
+			return d, true
+		}
+		if !ok {
+			found, ok = d, true
+		}
+	}
+	return found, ok
+}
+
+// Builder is the intent that builds what for units of p, such as the brief.
+func (r *Registry) Builder(what string, p unit.ProviderID) (Def, bool) {
+	if what == "" {
+		return Def{}, false
+	}
+	for _, d := range r.defs {
+		if d.Builds == what && d.Serves(p) {
+			return d, true
+		}
+	}
+	return Def{}, false
 }
 
 // ProviderOrDefault is the provider whose units the intent's turns run on.

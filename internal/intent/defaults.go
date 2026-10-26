@@ -104,8 +104,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		Key:           m.Key,
 		Verb:          m.Verb,
 		UserFacing:    boolOr(m.UserFacing, true),
-		Workspace:     s.required("workspace", m.Workspace),
-		Provider:      dunit.ProviderID(str(m.Provider, string(dunit.GitHub))),
+		Provider:      dunit.GitHub,
 		Context:       str(m.Context, "pr"),
 		Launch:        m.Launch,
 		Policy:        str(m.Policy, "round"),
@@ -125,15 +124,29 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		Resume:        dintent.Resume{HeadMoved: DefaultHeadMoved},
 		DraftApproval: s.draftApproval(m.DraftApproval),
 		Modes:         s.modes(m.Modes),
+		Role:          m.Role,
+		Builds:        m.Builds,
+		Prompt:        m.Prompt,
+		Schema:        m.Schema,
+		DraftEffects:  orEmpty(m.DraftEffects, nil),
+		RoundKind:     m.RoundKind,
+		Cap:           m.Cap,
+		ReasonFact:    m.ReasonFact,
+		RefuseWhen:    m.RefuseWhen,
+		Reason:        m.Reason,
+		AutoSend:      m.AutoSend,
 	}
+	s.provider(&d, m.Provider)
+	s.workspace(&d, m.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
 	if p := str(m.Profile, "none"); p != "none" {
 		d.Profile = p
 	}
-	if m.Session == nil {
+	switch {
+	case m.Session == nil && d.Builds == "":
 		s.add("session.strategy", "is required")
 		s.add("session.title", "is required")
-	} else {
+	case m.Session != nil:
 		d.Session = dintent.Session{
 			Strategy:      s.required("session.strategy", m.Session.Strategy),
 			Title:         s.required("session.title", m.Session.Title),
@@ -141,7 +154,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		}
 	}
 	if m.Brief != nil {
-		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true)}
+		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true), Need: m.Brief.Need}
 	}
 	if g := m.Guidance; g != nil {
 		d.Guidance = dintent.Guidance{Label: str(g.Label, "Guidance"), Help: g.Help, Max: g.Max}
@@ -179,9 +192,10 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}
-	if r := m.Record; r == nil {
+	switch r := m.Record; {
+	case r == nil && d.Builds == "":
 		s.add("record.states", "is required")
-	} else {
+	case r != nil:
 		if r.States == nil {
 			s.add("record.states", "is required")
 		}

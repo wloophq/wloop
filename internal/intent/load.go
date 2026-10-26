@@ -17,6 +17,7 @@ import (
 	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -527,6 +528,15 @@ type claims struct {
 	keys    map[string]string
 	flags   map[string]meaning
 	drivers map[string]dintent.Name
+	roles   map[roleClaim]dintent.Name
+}
+
+// roleClaim is a role on one provider in one layer: a user intent takes a
+// bundled intent's role, two in one layer clash.
+type roleClaim struct {
+	bundled  bool
+	role     string
+	provider dunit.ProviderID
 }
 
 func newClaims() *claims {
@@ -540,7 +550,7 @@ func newClaims() *claims {
 	for k, id := range ids {
 		keys[k] = "the built-in action " + id
 	}
-	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}}
+	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}, roles: map[roleClaim]dintent.Name{}}
 }
 
 // key is d's key in canonical form, or why it may not take it on one of the
@@ -584,6 +594,20 @@ func (c *claims) check(u *unit, claim bool) {
 			s.add("drives_row", "%s drives the rows of %s workspaces already; at most one intent per workspace", owner, d.Workspace)
 		} else {
 			take = append(take, func() { c.drivers[d.Workspace] = d.Name })
+		}
+	}
+	if d.Role != "" {
+		providers := d.Providers
+		if providers == nil {
+			providers = []dunit.ProviderID{d.ProviderOrDefault()}
+		}
+		for _, p := range providers {
+			rc := roleClaim{u.bundled, d.Role, p}
+			if owner, taken := c.roles[rc]; taken && owner != d.Name {
+				s.add("role", "%s holds the role %s on %s units already; one intent per role and provider", owner, d.Role, p)
+				continue
+			}
+			take = append(take, func() { c.roles[rc] = d.Name })
 		}
 	}
 	own := map[string]meaning{}

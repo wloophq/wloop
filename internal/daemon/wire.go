@@ -28,7 +28,7 @@ func wireBriefView(v *brief.View) *api.BriefView {
 	out := &api.BriefView{State: v.State, Model: v.Model, At: v.At, Error: v.Error, Stale: v.Stale}
 	if b := v.Brief; b != nil {
 		out.Brief = &api.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk,
-			RiskWhy: b.RiskWhy, OpenQuestions: b.OpenQuestions, Tags: b.Tags}
+			RiskWhy: b.RiskWhy, OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra, ExtraVersions: b.ExtraVersions}
 	}
 	return out
 }

@@ -34,12 +34,17 @@ type DraftsResponse struct {
 }
 
 type Draft struct {
-	ID     int64    `json:"id"`
-	Unit   string   `json:"unit"` // "<provider>/<key>"
-	Items  []string `json:"items"`
-	Entry  string   `json:"entry,omitempty"`
-	Kind   string   `json:"kind"`
-	Target string   `json:"target"`
+	ID    int64    `json:"id"`
+	Unit  string   `json:"unit"` // "<provider>/<key>"
+	Items []string `json:"items"`
+	Entry string   `json:"entry,omitempty"`
+	Kind  string   `json:"kind"`
+	// Purpose is what the draft is for, Delivery how it is posted (message,
+	// reaction or comment) and Effects what posting it applies.
+	Purpose  string   `json:"purpose"`
+	Delivery string   `json:"delivery"`
+	Effects  []string `json:"effects"`
+	Target   string   `json:"target"`
 	// Where names the conversation or person the draft posts to; "" when its publisher could not tell.
 	Where     string        `json:"where"`
 	Text      string        `json:"text"`

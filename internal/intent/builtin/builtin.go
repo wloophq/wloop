@@ -168,6 +168,19 @@ var (
 	HoldForever = "forever"
 )
 
+// Roles are what Go resolves an intent by, a manifest's role.
+var Roles = []string{"round.review", "round.address", "nudge", "probe", "headless.default"}
+
+// Builds are what a builder intent may build.
+var Builds = []string{"brief"}
+
+// The values of a manifest's round_kind, cap and reason.
+var (
+	RoundKinds  = []string{"review", "address"}
+	Caps        = []string{"rounds"}
+	TurnReasons = []string{"address_round"}
+)
+
 // TurnModes are the values of turn.start's mode.
 var TurnModes = []string{"session", "headless"}
 

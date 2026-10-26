@@ -24,8 +24,8 @@ type manifest struct {
 	Key           string            `toml:"key"`
 	Verb          string            `toml:"verb"`
 	UserFacing    *bool             `toml:"user_facing"`
-	Workspace     *string           `toml:"workspace"`
-	Provider      *string           `toml:"provider"`
+	Workspace     any               `toml:"workspace"`
+	Provider      any               `toml:"provider"`
 	Session       *mSession         `toml:"session"`
 	Context       *string           `toml:"context"`
 	Launch        string            `toml:"launch"`
@@ -54,6 +54,17 @@ type manifest struct {
 	Resume        *mResume          `toml:"resume"`
 	DraftApproval *mDraftApproval   `toml:"draft_approval"`
 	Modes         []string          `toml:"modes"`
+	Role          string            `toml:"role"`
+	Builds        string            `toml:"builds"`
+	Prompt        string            `toml:"prompt"`
+	Schema        string            `toml:"schema"`
+	DraftEffects  []string          `toml:"draft_effects"`
+	RoundKind     string            `toml:"round_kind"`
+	Cap           string            `toml:"cap"`
+	ReasonFact    string            `toml:"reason_fact"`
+	RefuseWhen    string            `toml:"refuse_when"`
+	Reason        string            `toml:"reason"`
+	AutoSend      *bool             `toml:"auto_send"`
 }
 
 type mSession struct {
@@ -63,8 +74,9 @@ type mSession struct {
 }
 
 type mBrief struct {
-	Render *bool `toml:"render"`
-	Wait   *bool `toml:"wait"`
+	Render *bool    `toml:"render"`
+	Wait   *bool    `toml:"wait"`
+	Need   []string `toml:"need"`
 }
 
 type mGuidance struct {

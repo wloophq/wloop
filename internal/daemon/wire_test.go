@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -189,5 +190,35 @@ func TestWireKindsAreTheSituationKinds(t *testing.T) {
 		if !served[v] {
 			t.Errorf("%s %s is not a served GitHub situation", name, v)
 		}
+	}
+}
+
+// TestDraftWireShape pins the JSON of a draft the clients and the cockpit's
+// detail read: its shape, purpose, delivery and effects included.
+func TestDraftWireShape(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	d := r.stored(t, draft.Draft{Unit: r7u, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Effects: []string{"unit.closed"},
+		Text: "Closing this out", State: draft.Proposed, Approval: draft.Approval{Mode: draft.Always},
+		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-closure", Rule: "slack-closure", Key: "acme/api#7"}})
+	var got api.Draft
+	if code := get(t, r.s, api.DraftPath(int64(d.ID)), &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	b, _ := json.MarshalIndent(got, "", "  ")
+	path := filepath.Join("testdata", "wire", "draft.json")
+	if *updateWire {
+		brandtest.CanUpdate(t)
+		if err := os.WriteFile(path, append([]byte(brandtest.Collapse(string(b))), '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(append(b, '\n'), []byte(brandtest.Expand(string(want)))) {
+		t.Errorf("a draft changed shape:\n%s\nwant:\n%s", b, want)
 	}
 }

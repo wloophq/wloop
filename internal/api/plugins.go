@@ -13,6 +13,10 @@ type Plugin struct {
 	// Reacts: the plugin's publisher posts reactions (drafts of kind react); only when enabled.
 	Reacts bool      `json:"reacts,omitempty"`
 	UI     *PluginUI `json:"ui,omitempty"` // only when enabled
+	// Capabilities are what the plugin can do, so a client asks what a
+	// provider does, never which it is: checkouts, briefs, publishes, reacts,
+	// items; only when enabled.
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // Plugins is the route of every compiled-in plugin: GET -> []Plugin.

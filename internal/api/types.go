@@ -322,6 +322,10 @@ type Brief struct {
 	RiskWhy       string   `json:"risk_why"`
 	OpenQuestions []string `json:"open_questions"`
 	Tags          []string `json:"tags,omitempty"`
+	// Extra are the brief intent's extra fields, by name; ExtraVersions the
+	// version of each the brief holds.
+	Extra         map[string]any    `json:"extra,omitempty"`
+	ExtraVersions map[string]string `json:"extra_versions,omitempty"`
 }
 
 type BriefView struct {

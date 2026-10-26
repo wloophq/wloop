@@ -36,20 +36,49 @@
       "description": "Offered as a command and an action. Default true."
     },
     "provider": {
-      "type": "string",
-      "description": "The provider whose units the intent's turns run on, a registered provider id. Default \"github\".",
-      "pattern": "^[a-z][a-z0-9_-]{0,31}$"
-    },
-    "workspace": {
-      "type": "string",
-      "description": "Where the turn runs.",
-      "enum": [
-        "review",
-        "author",
-        "pr_else_main",
-        "given"
+      "description": "The provider whose units the intent's turns run on, a registered provider id, or a list of them. Default \"github\".",
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$"},
+        {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$"}}
       ]
     },
+    "workspace": {
+      "description": "Where the turn runs: a workspace builtin, or a table naming the repository outright (repo) or by an input (repo_input).",
+      "oneOf": [
+        {"type": "string", "enum": ["review", "author", "pr_else_main", "given"]},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repo": {"type": "string", "description": "owner/name.", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+            "repo_input": {"type": "string", "description": "The input that holds owner/name."}
+          }
+        }
+      ]
+    },
+    "role": {
+      "type": "string",
+      "description": "What the loop resolves the intent by; one intent per role and provider, a user's taking it from the bundled one.",
+      "enum": ["round.review", "round.address", "nudge", "probe", "headless.default"]
+    },
+    "builds": {
+      "type": "string",
+      "description": "What a builder intent builds; a builder is never started as a turn and needs no workspace, session or record.",
+      "enum": ["brief"]
+    },
+    "prompt": {"type": "string", "description": "With builds only: the prompt, a path resolved through the profile layers, such as prompts/brief.md."},
+    "schema": {"type": "string", "description": "With builds only: the JSON Schema of the extra fields, a file in the intent's directory."},
+    "draft_effects": {
+      "type": "array",
+      "description": "The effects the intent's agents may declare on their drafts. Default none.",
+      "items": {"type": "string", "enum": ["entry.nudged", "unit.closed", "pr.nudged"]}
+    },
+    "round_kind": {"type": "string", "description": "The sweep round the intent's turns are.", "enum": ["review", "address"]},
+    "cap": {"type": "string", "description": "The budget the intent's turns spend: rounds, the per pull request daily cap.", "enum": ["rounds"]},
+    "reason_fact": {"type": "string", "description": "The workflow fact that says why the intent's round is due or not."},
+    "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
+    "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
+    "auto_send": {"type": "boolean", "description": "false keeps the intent's drafts for the user's approval whatever their draft approval."},
     "session": {
       "type": "object",
       "additionalProperties": false,
@@ -122,6 +151,11 @@
         "wait": {
           "type": "boolean",
           "description": "Default true."
+        },
+        "need": {
+          "type": "array",
+          "description": "The brief intent's extra fields the turn needs; a brief missing one is completed first.",
+          "items": {"type": "string"}
         }
       }
     },
