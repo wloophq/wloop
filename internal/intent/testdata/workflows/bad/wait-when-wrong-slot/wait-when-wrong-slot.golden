@@ -1,1 +1,0 @@
-testdata/workflows/bad/wait-when-wrong-slot/workflows/case-workflow/workflow.toml:13:13: approval.wait_when: 1: unknown field session.managed

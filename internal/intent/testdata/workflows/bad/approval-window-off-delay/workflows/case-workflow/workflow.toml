@@ -1,0 +1,10 @@
+summary = "Case"
+provider = "session"
+when = 'session.managed && session.agent_state == "done"'
+
+[[step]]
+use = "session.close"
+
+[approval]
+mode = "wait"
+window = "60s"

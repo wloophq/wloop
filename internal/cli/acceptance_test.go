@@ -761,12 +761,12 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 		Subjects: map[unit.ProviderID]automation.Units{unit.Entry: noUnits{}, dslack.Provider: noUnits{}}})
 }
 
-func (f *fixtureEnv) setMode(name string, m workflow.Mode) {
+func (f *fixtureEnv) setApply(name string) {
 	if f.te.cfg.Workflows == nil {
 		f.te.cfg.Workflows = map[string]config.WorkflowConfig{}
 	}
 	wc := f.te.cfg.Workflows[name]
-	observe := m == workflow.ModeObserve
+	observe := false
 	wc.Observe = &observe
 	f.te.cfg.Workflows[name] = wc
 }
@@ -1117,7 +1117,7 @@ func TestWorkspacesHoldingWorkWaitPastEveryThreshold(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"workspace-review-finished", "workspace-author-finished", "workspace-temporary", "workspace-duplicate"} {
-		f.setMode(name, workflow.ModeApply)
+		f.setApply(name)
 	}
 	sweepOnce(t, eng)
 	sweepOnce(t, eng)
@@ -1343,13 +1343,13 @@ func TestManualSessionsWaitForTheUser(t *testing.T) {
 	}
 }
 
-// cleanupRig is one bundled workflow, with the config's mode overrides, over
+// cleanupRig is one bundled workflow, overridden to apply when apply is set, over
 // fake facts and steps.
-func cleanupRig(t *testing.T, name string, mode workflow.Mode) (*automation.Engine, *automationtest.Units, *automationtest.Steps) {
+func cleanupRig(t *testing.T, name string, apply bool) (*automation.Engine, *automationtest.Units, *automationtest.Steps) {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
-	if mode != "" {
-		observe := mode == workflow.ModeObserve
+	if apply {
+		observe := false
 		te.cfg.Workflows = map[string]config.WorkflowConfig{name: {Observe: &observe}}
 	}
 	i := slices.IndexFunc(applyConfig(te.loadedIntents().Workflows, te.cfg), func(w workflow.Workflow) bool { return w.Name == name })
@@ -1404,7 +1404,7 @@ func TestReviewFinishedMatchesOnlyReviewWorkspacesPastGrace(t *testing.T) {
 			return f
 		}(), false},
 	} {
-		eng, units, _ := cleanupRig(t, "workspace-review-finished", "")
+		eng, units, _ := cleanupRig(t, "workspace-review-finished", false)
 		units.Put(finishedWorkspace, c.facts)
 		if got := len(planOf(t, eng)) == 1; got != c.match {
 			t.Errorf("%s: matched %v", name, got)
@@ -1419,7 +1419,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 		{"workspace.untracked", "untracked or ignored files outside the disposable list: notes.txt"},
 		{"workspace.unpushed", "2 commits not pushed in /w/ws1; back them up with: git push origin HEAD:refs/heads/me/backup-b"},
 	} {
-		eng, units, steps := cleanupRig(t, "workspace-review-finished", workflow.ModeApply)
+		eng, units, steps := cleanupRig(t, "workspace-review-finished", true)
 		f := workspaceFactsOf("review", "merged", 25*time.Hour)
 		f[c.fact] = 1
 		units.Put(finishedWorkspace, f)
@@ -1437,7 +1437,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 
 func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 	t.Parallel()
-	eng, units, steps := cleanupRig(t, "workspace-idle-no-pr", "")
+	eng, units, steps := cleanupRig(t, "workspace-idle-no-pr", false)
 	f := workspaceFactsOf("none", "", 0)
 	f["workspace.pr"], f["workspace.quiet_for"] = "", 15*24*time.Hour
 	f["workspace.unpushed"], f["workspace.pendency"] = 3, []string{"commits on no remote"}
@@ -1457,7 +1457,7 @@ func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 
 func TestAuthorFinishedRemovesACleanWorkspaceWithNoPendency(t *testing.T) {
 	t.Parallel()
-	eng, units, steps := cleanupRig(t, "workspace-author-finished", workflow.ModeApply)
+	eng, units, steps := cleanupRig(t, "workspace-author-finished", true)
 	units.Put(finishedWorkspace, workspaceFactsOf("author", "merged", 25*time.Hour))
 	if items := planOf(t, eng); len(items) != 1 || items[0].Decision != workflow.DecisionRun {
 		t.Fatalf("items %+v", items)
@@ -1479,7 +1479,7 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 		{factworkspace.PendingUnrecorded, ""},
 		{factworkspace.PendingOpen, ""},
 	} {
-		eng, units, steps := cleanupRig(t, "workspace-author-finished", workflow.ModeApply)
+		eng, units, steps := cleanupRig(t, "workspace-author-finished", true)
 		f := workspaceFactsOf("author", "closed", 25*time.Hour)
 		f["workspace.pendency"] = []string{c.pendency}
 		units.Put(finishedWorkspace, f)
@@ -1507,7 +1507,7 @@ func TestAuthorFinishedSkipsReviewWorkspacesAndOpenPRs(t *testing.T) {
 		"no pull request":     workspaceFactsOf("none", "", 0),
 		"inside of the grace": workspaceFactsOf("author", "merged", time.Hour),
 	} {
-		eng, units, _ := cleanupRig(t, "workspace-author-finished", workflow.ModeApply)
+		eng, units, _ := cleanupRig(t, "workspace-author-finished", true)
 		units.Put(finishedWorkspace, f)
 		if items := planOf(t, eng); len(items) != 0 {
 			t.Errorf("%s: %+v", name, items)

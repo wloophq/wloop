@@ -1,11 +1,7 @@
-description = "Close a session whose pull request is merged or closed"
-subject = "session"
+summary = "Close a session whose pull request is merged or closed"
+provider = "session"
 when = 'session.pr_state in ["merged", "closed"]'
-mode = "apply"
 order = 11
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"

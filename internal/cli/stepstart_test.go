@@ -143,7 +143,7 @@ func newStartRig(t *testing.T, sc sweepCase, intent, round string) *startRig {
 	units.Put(u, workflow.Facts{"pr.repo": "acme/api", "pr.held": false, "pr.stale": false, "pr.state": "OPEN",
 		"pr.review.reason": "the author answered", "pr.address.reason": "reviewed by bob", "pr.first.reason": "my review was requested"})
 	r := &startRig{sc: sc, rec: rec, units: units, briefs: briefs, u: u,
-		st:  workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": intent, "round": round}},
+		st:  workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": intent, "stage": round}},
 		why: workflow.Why{Workflow: "review-follow-up", Trigger: workflow.TriggerSweep, Matched: []workflow.Fact{{Name: "pr.review.action", Value: "follow-up"}}}}
 	r.steps = newStepSet(sc.env, stepDeps{Units: units, Candidates: cands, Briefs: briefs, Rounds: sc.te.Rounds})
 	return r
@@ -503,7 +503,7 @@ func TestAStartBlockIsABlockedItemNeverTrusted(t *testing.T) {
 	eng := &automation.Engine{
 		Workflows: func() []workflow.Workflow {
 			return []workflow.Workflow{{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Observe: false,
-				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.st}, Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
+				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.st}, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}}
 		},
 		Units: r.units, Steps: r.steps, Ledger: ledger, Clock: clockFunc(sc.env.Now), State: r.steps.states(),
 	}

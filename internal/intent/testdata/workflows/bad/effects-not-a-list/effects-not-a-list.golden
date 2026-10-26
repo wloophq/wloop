@@ -1,0 +1,1 @@
+testdata/workflows/bad/effects-not-a-list/workflows/case-workflow/workflow.toml:8:11: step[0].effects: must be a list of strings

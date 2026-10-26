@@ -10,7 +10,7 @@ import (
 
 // readsMarks says whether w's predicates read the unit's marks.
 func readsMarks(w workflow.Workflow) bool {
-	return workflow.ReadsMarks(w.When) || workflow.ReadsMarks(w.Approval.WaitWhen)
+	return workflow.ReadsMarks(append(w.Approval.Predicates(), w.When)...)
 }
 
 // unitMarks are u's marks; none without a Marks port.

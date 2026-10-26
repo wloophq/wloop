@@ -72,8 +72,8 @@ type startArgs struct {
 func (e *Env) startOf(st workflow.Step) startArgs {
 	a := startArgs{}
 	a.intent, _ = st.Args["intent"].(string)
-	a.round, _ = st.Args["round"].(string)
-	a.runner, _ = st.Args["mode"].(string)
+	a.round, _ = st.Args["stage"].(string)
+	a.runner, _ = st.Args["runner"].(string)
 	if l := e.loadedIntents(); l != nil {
 		a.def, _ = l.Registry.Get(dintent.Name(a.intent))
 	}

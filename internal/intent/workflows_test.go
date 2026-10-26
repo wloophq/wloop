@@ -20,11 +20,9 @@ import (
 	"github.com/wloophq/wloop/profiles"
 )
 
-const quietSession = `subject = "session"
+const quietSession = `summary = "Close a quiet session"
+provider = "session"
 when = 'session.managed && session.idle_for > config.cleanup.idle'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"
@@ -58,7 +56,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 			}
 			if s.Use == builtin.StepTurnStart {
 				starts++
-				if w.Approval.Window != time.Minute {
+				if w.Approval.Mode != workflow.ApprovalDelay && w.Approval.Mode != workflow.ApprovalWait || w.Approval.Mode == workflow.ApprovalDelay && w.Approval.Window != time.Minute {
 					t.Errorf("%s: a turn.start workflow waits %s, want 1m", w.Name, w.Approval.Window)
 				}
 			}
@@ -100,7 +98,7 @@ func TestAWorkflowManifestBecomesTheDomainWorkflow(t *testing.T) {
 	if len(w.Steps) != 1 || w.Steps[0].Use != "session.close" || w.Steps[0].Reach != workflow.ReachLocal || w.Steps[0].Args != nil {
 		t.Errorf("%+v", w.Steps)
 	}
-	if w.Approval.Default != workflow.OutcomeRun || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
+	if w.Approval.Mode != workflow.ApprovalRun || w.Summary != "Close an agent session that finished and stayed quiet" || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
 		t.Errorf("%+v", w)
 	}
 	if want := []string{"config.cleanup.idle", "session.agent_state", "session.idle_for", "session.managed", "session.open_turn", "session.user_active"}; !slices.Equal(w.When.Reads(), want) {
@@ -114,10 +112,10 @@ func TestATurnStartWorkflowWithoutAWindowRunsAtOnce(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Approval.Window != 0 || w.Order != 10 || !slices.Equal(w.Key, []string{"pr.fingerprint"}) {
+	if w.Approval.Mode != workflow.ApprovalRun || w.Approval.Window != 0 || w.Order != 10 || !slices.Equal(w.Key, []string{"pr.fingerprint"}) {
 		t.Errorf("%+v", w)
 	}
-	if got := w.Steps[0].Args; got["intent"] != "review" || got["round"] != "follow-up" || w.Steps[0].Reach != "" {
+	if got := w.Steps[0].Args; got["intent"] != "review" || got["stage"] != "follow-up" || w.Steps[0].Reach != "" {
 		t.Errorf("%v", got)
 	}
 }
@@ -129,7 +127,8 @@ func TestAnEventAndAScheduleWorkflowLoad(t *testing.T) {
 	}
 	l, _ = Load(userLayer("testdata/workflows/good/morning-sweep"), nil, testBase(), nil)
 	w := l.Workflows[0]
-	if w.Trigger.Kind != workflow.TriggerSchedule || w.Trigger.Schedule == nil || w.Approval.Window != 24*time.Hour || w.Approval.Default != workflow.OutcomeWait || w.Approval.WaitWhen == nil {
+	if w.Trigger.Kind != workflow.TriggerSchedule || w.Trigger.Schedule == nil || w.Approval.Window != 24*time.Hour || w.Approval.Mode != workflow.ApprovalDelay ||
+		len(w.Approval.Rules) != 1 || w.Approval.Rules[0].Mode != workflow.ApprovalWait {
 		t.Errorf("%+v", w)
 	}
 }
@@ -270,11 +269,8 @@ func TestAWorkflowDirectoryWithoutItsManifestIsAProblem(t *testing.T) {
 func TestNoManifestForces(t *testing.T) {
 	root := t.TempDir()
 	writeWorkflow(t, root, "forced", strings.Replace(quietSession, `use = "session.close"`, "use = \"session.close\"\nforce = \"true\"", 1))
-	writeWorkflow(t, root, "forced-removal", `subject = "workspace"
+	writeWorkflow(t, root, "forced-removal", `provider = "workspace"
 when = "workspace.main"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "workspace.remove"
@@ -333,11 +329,9 @@ func TestATurnStartNamesAnIntentThatLoads(t *testing.T) {
 	writeIntent(t, root, "ask-author", minimal, "{{.Headline}}")
 	writeIntent(t, root, "ask-twice", strings.Replace(minimal, `workspace = "review"`, `workspace = "nowhere"`, 1), "{{.Headline}}")
 	starts := func(intent string) string {
-		return `subject = "github"
+		return `summary = "Ask"
+provider = "github"
 when = "true"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"

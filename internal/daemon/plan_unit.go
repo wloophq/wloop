@@ -76,7 +76,7 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 			continue
 		}
 		line := api.UnitWorkflow{Workflow: w.Name, Trigger: string(w.Trigger.Kind)}
-		readsMarks := workflow.ReadsMarks(w.When) || workflow.ReadsMarks(w.Approval.WaitWhen)
+		readsMarks := workflow.ReadsMarks(append(w.Approval.Predicates(), w.When)...)
 		if readsMarks && !marksRead && eng.Marks != nil {
 			marks, marksErr = eng.Marks.Marks(ctx, u)
 			marksRead = true
@@ -99,7 +99,7 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 			case err != nil:
 				line.Outcome, line.Reason = "error", err.Error()
 			case !ok:
-				line.Outcome = "not matched"
+				line.Outcome = "not_matched"
 			case w.Trigger.Kind == workflow.TriggerSchedule:
 				line.Outcome, line.Reason = "matched", "decides when its schedule fires"
 			default:

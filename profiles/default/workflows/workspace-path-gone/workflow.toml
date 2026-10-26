@@ -1,11 +1,7 @@
-description = "Unregister a workspace whose path no longer exists"
-subject = "workspace"
+summary = "Unregister a workspace whose path no longer exists"
+provider = "workspace"
 when = '!workspace.main && !workspace.path_exists'
-mode = "apply"
 order = 22
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "workspace.unregister"

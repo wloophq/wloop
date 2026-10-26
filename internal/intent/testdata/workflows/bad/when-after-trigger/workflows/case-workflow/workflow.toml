@@ -1,8 +1,8 @@
-description = "Case"
-subject = "session"
+summary = "Case"
+provider = "session"
 
 [trigger]
-every = "sweep"
+schedule = "0 9 * * *"
 
 when = "session.managed"
 

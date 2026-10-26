@@ -207,10 +207,11 @@ func TestDraftProposeRendersTheProfileTextWithItemsAsData(t *testing.T) {
 	}
 }
 
-func TestDraftProposeHoldsPerWorkflowSubjectAndPerson(t *testing.T) {
+func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	t.Parallel()
-	r := newDraftRig(t, draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "hold", "24h", "on_posted", "entry.nudged"),
-		"@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
+	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
+	wf.Steps[0].Args["effects"] = []any{"entry.nudged"}
+	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
 	r.entries.m["e1"] = gtd.Entry{ID: "e1", Kind: gtd.KindWaiting, State: gtd.Waiting, Units: []unit.Unit{draftThread},
 		Items:   []gtd.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
 		Waiting: &gtd.WaitingOn{On: []items.Person{ana, bob}}}
@@ -264,7 +265,7 @@ func TestDraftProposeHoldsPerWorkflowSubjectAndPerson(t *testing.T) {
 		t.Fatalf("past ana's hold, only ana is asked again: %+v", ds)
 	}
 
-	forever := newDraftRig(t, draftWF("closes", "purpose", "close", "items", "resolved", "hold_after_sent", "forever"), "Closing.")
+	forever := newDraftRig(t, draftWF("closes", "purpose", "close", "items", "resolved", "repeat_after_sent", "forever"), "Closing.")
 	done := openItem("i1", "Done", r.now)
 	done.State = items.Resolved
 	forever.items.set(draftThread, done)

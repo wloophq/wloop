@@ -2,9 +2,9 @@ package cli
 
 import intentload "github.com/wloophq/wloop/internal/intent"
 
-// wireWorkflows warns of each config drafts.approval rule that never
-// releases a comment draft or does not load, and of each deprecated key the
-// profile's manifests still set.
+// wireWorkflows warns of each config drafts approval rule that never
+// releases the comment it reads, of each one that does not load, and of
+// each deprecated key the profile's manifests still set.
 func (e *Env) wireWorkflows(w *serveWiring) {
 	if w.Log == nil {
 		return

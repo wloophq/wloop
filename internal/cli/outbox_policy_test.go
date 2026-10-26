@@ -13,21 +13,18 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-const followUp = `description = "Follow up a review"
-subject = "github"
+const followUp = `summary = "Follow up a review"
+provider = "github"
 when = 'pr.review.action == "follow-up"'
 key = ["pr.fingerprint"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"
 intent = "review"
-round = "follow-up"
+stage = "follow-up"
 
 [approval]
-default = "run"
+mode = "run"
 `
 
 const askQuick = `label = "Ask quick"
@@ -99,7 +96,7 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{
 		"workflows/follow-up-run/workflow.toml":   followUp,
-		"workflows/follow-up-timed/workflow.toml": followUp + "\n[draft_approval]\nmode = \"delay\"\nwindow = \"5m\"\n",
+		"workflows/follow-up-timed/workflow.toml": followUp + "\n[drafts.approval]\nmode = \"delay\"\nwindow = \"5m\"\n",
 		"intents/ask-quick/intent.toml":           askQuick,
 		"intents/ask-quick/instructions.md.tmpl":  "Ask.\n",
 	})

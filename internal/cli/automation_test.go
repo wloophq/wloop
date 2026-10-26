@@ -40,8 +40,8 @@ import (
 func turnStartWorkflow(name string) workflow.Workflow {
 	return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Observe: false,
 		Trigger:  workflow.Trigger{Kind: workflow.TriggerSweep},
-		Steps:    []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": "review", "round": "follow-up"}}},
-		Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: time.Minute}}
+		Steps:    []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": "review", "stage": "follow-up"}}},
+		Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: time.Minute}}
 }
 
 func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
@@ -51,23 +51,27 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"gone":    {Enabled: &off},
 		"watched": {Observe: &on},
-		"waits":   {Approval: &config.ApprovalConfig{Mode: "wait", Window: &window}},
+		"waits":   {Approval: &config.ApprovalConfig{Mode: "delay", Window: &window}},
+		"refused": {Approval: &config.ApprovalConfig{Mode: "run", Window: &window}},
 	}
-	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Default: workflow.OutcomeRun}}
-	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), {Name: "kept", Observe: false}}
+	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}
+	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), turnStartWorkflow("refused"), {Name: "kept", Observe: false}}
 	out := applyConfig(in, cfg)
 	var names []string
 	for _, w := range out {
 		names = append(names, w.Name)
 	}
-	if !slices.Equal(names, []string{"watched", "waits", "kept"}) {
+	if !slices.Equal(names, []string{"watched", "waits", "refused", "kept"}) {
 		t.Fatalf("workflows %v", names)
 	}
 	if !out[0].Observe {
 		t.Error("the config did not make it observe")
 	}
-	if a := out[1].Approval; a.Default != workflow.OutcomeWait || a.Window != 10*time.Minute {
+	if a := out[1].Approval; a.Mode != workflow.ApprovalDelay || a.Window != 10*time.Minute {
 		t.Errorf("approval %+v", a)
+	}
+	if ok, err := out[2].When.Match(workflow.Vars{}); ok || err == nil || !strings.Contains(err.Error(), "workflows.refused.approval") {
+		t.Errorf("a window left on run matched: %v, %v", ok, err)
 	}
 	if in[1].Observe {
 		t.Error("applyConfig changed the loaded workflow")
@@ -143,7 +147,7 @@ func TestOneStateLoadPerSweep(t *testing.T) {
 		Workflows: func() []workflow.Workflow {
 			return []workflow.Workflow{{Name: "workspace-review-finished", Provider: unit.Workspace, Slot: "workspace", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{wfStep("workspace.remove")},
-				Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
+				Approval: workflow.Approval{Mode: workflow.ApprovalRun}}}
 		},
 		Units: r.units, Steps: r.s, Ledger: automationtest.NewLedger(), Clock: clockFunc(r.te.Env.Now), State: r.s.states(),
 	}
@@ -173,7 +177,7 @@ func TestPendingRunsKeepTheGateMeterScope(t *testing.T) {
 		Workflows: func() []workflow.Workflow {
 			return []workflow.Workflow{{Name: "session-done", Provider: unit.Session, Slot: "session", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{steps.Step("session.close")},
-				Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: time.Minute}}}
+				Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: time.Minute}}}
 		},
 		Units: units, Steps: steps, Ledger: ledger, Clock: clock,
 	}}
@@ -220,7 +224,7 @@ func TestPendingRoundsServeTheReadModel(t *testing.T) {
 	deadline := testNow.Add(5 * time.Minute)
 	items := []workflow.Item{
 		{ID: "a", Workflow: "review-follow-up", Unit: pr, Decision: workflow.DecisionPending, Reason: "runs when its window ends", Default: workflow.OutcomeRun,
-			Deadline: deadline, At: testNow, Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review), "round": "follow-up"}}}},
+			Deadline: deadline, At: testNow, Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review), "stage": "follow-up"}}}},
 		{ID: "b", Workflow: "session-manual", Unit: sess, Decision: workflow.DecisionPending, Default: workflow.OutcomeWait, At: testNow,
 			Steps: []workflow.Step{wfStep("session.close")}},
 	}
@@ -336,7 +340,7 @@ func threeProviders(t *testing.T) (sweepCase, engineDeps) {
 func everyUnit(p unit.ProviderID, slot string) workflow.Workflow {
 	return workflow.Workflow{Name: "watch-" + slot, Provider: p, Slot: slot, Observe: true,
 		Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{wfStep("notify.self", "text", "seen")},
-		Approval: workflow.Approval{Default: workflow.OutcomeRun}}
+		Approval: workflow.Approval{Mode: workflow.ApprovalRun}}
 }
 
 func TestASweepThroughNewEngineListsEveryProvider(t *testing.T) {
@@ -392,7 +396,7 @@ func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
 		t.Fatalf("window %v", w.Approval.Window)
 	}
 	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; w.Approval.Window != 0 {
-		t.Fatalf("window with approval.window 0 %v", w.Approval.Window)
+		t.Fatalf("window with approval.mode run %v", w.Approval.Window)
 	}
 }
 
@@ -480,7 +484,7 @@ func appliedEngine(t *testing.T, step workflow.Step, pub port.Publisher) (*testE
 	eng := te.newEngine(engineDeps{DB: db, WorkspaceFacts: facts, Pub: pub})
 	eng.Workflows = func() []workflow.Workflow {
 		return []workflow.Workflow{{Name: "gone", Provider: unit.Workspace, Slot: "workspace", Observe: false,
-			Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{step}, Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
+			Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{step}, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}}
 	}
 	return te, db, eng, u
 }
@@ -515,7 +519,8 @@ func TestNotifySelfThroughTheEngineReachesTheNotices(t *testing.T) {
 	var got []api.Notice
 	stop := feed.Follow(func(n api.Notice) { got = append(got, n) })
 	defer stop()
-	_, db, eng, u := appliedEngine(t, wfStep("notify.self", "text", "look at it"), feed)
+	te, db, eng, u := appliedEngine(t, wfStep("notify.self"), feed)
+	besideWorkflow(t, te, "gone", map[string]string{"text.md.tmpl": "look at it"})
 	ranOnce(t, db, eng)
 	if len(got) != 1 || got[0].Text != "look at it" || got[0].Workflow != "gone" || got[0].Unit != u || got[0].ID == "" {
 		t.Fatalf("notices %+v", got)

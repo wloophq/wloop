@@ -10,8 +10,9 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-// withoutWindows is cfg with every bundled turn.start workflow sending its
-// round at once, as a user who sets their approval.window to 0.
+// withoutWindows is cfg with every bundled turn.start workflow whose
+// approval delays running at once, as a user who sets its approval.mode to
+// run.
 func withoutWindows(cfg config.Config) config.Config {
 	l, err := turn.Bundled()
 	if err != nil {
@@ -21,9 +22,8 @@ func withoutWindows(cfg config.Config) config.Config {
 	if cfg.Workflows == nil {
 		cfg.Workflows = map[string]config.WorkflowConfig{}
 	}
-	zero := config.Days(0)
 	for _, w := range l.Workflows {
-		if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
+		if w.Approval.Mode != workflow.ApprovalDelay || !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
 			continue
 		}
 		wc := cfg.Workflows[w.Name]
@@ -31,7 +31,7 @@ func withoutWindows(cfg config.Config) config.Config {
 		if wc.Approval != nil {
 			a = *wc.Approval
 		}
-		a.Window = &zero
+		a.Mode, a.Window = string(workflow.ApprovalRun), nil
 		wc.Approval = &a
 		cfg.Workflows[w.Name] = wc
 	}

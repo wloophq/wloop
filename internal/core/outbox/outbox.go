@@ -37,9 +37,9 @@ type Proposal struct {
 	Delivery draft.Delivery
 	// Effects are applied once the draft is sent, names of builtin.Effects.
 	Effects []string
-	// RecordedFor is how long a settled draft of the same origin holds this
-	// proposal from being proposed again; zero keeps Service.RecordedFor.
-	RecordedFor time.Duration
+	// RepeatAfter is how long a settled draft of the same origin holds this
+	// proposal from being proposed again; zero keeps Service.RepeatAfter.
+	RepeatAfter time.Duration
 }
 
 type Filter struct {
@@ -108,9 +108,9 @@ type Service struct {
 	Log      func(format string, args ...any) // ids, states and kinds only; never text or tokens
 	// OnSent runs after a draft is stored as sent and its Evidence call (last-nudge stamps, plugin bookkeeping).
 	OnSent []func(ctx context.Context, d draft.Draft) error
-	// RecordedFor is how long a recorded draft keeps an auto proposal of its key from being recorded again;
+	// RepeatAfter is how long a dry_run draft keeps an auto proposal of its key from being stored again;
 	// zero keeps it for good.
-	RecordedFor time.Duration
+	RepeatAfter time.Duration
 	// Applier applies a sent draft's Effects; nil applies none.
 	Applier Applier
 }
@@ -151,7 +151,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		approval = waiting
 	}
 	d.Approval = approval
-	if dup, ok, err := s.duplicate(ctx, d, p.RecordedFor, now); err != nil || ok {
+	if dup, ok, err := s.duplicate(ctx, d, p.RepeatAfter, now); err != nil || ok {
 		return dup, err
 	}
 	if err := s.publishable(ctx, d); err != nil {
@@ -209,24 +209,10 @@ func (s *Service) delivered(d draft.Draft) draft.Draft {
 	return d
 }
 
-// ResolveApproval is the approval policy of a workflow's drafts: the
-// config's workflows.<name>.draft_approval, then the legacy
-// proposals.<rule>.approval, then the manifest's [draft_approval]; nil when
-// none is set. The first one set is the whole policy, its rules with its
-// mode.
-func ResolveApproval(config, legacy, manifest *draft.Policy) *draft.Policy {
-	for _, p := range []*draft.Policy{config, legacy, manifest} {
-		if p != nil {
-			return p
-		}
-	}
-	return nil
-}
-
 // duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
-// one of the same rule, key, purpose and delivery; under record, a
-// recorded one younger than recordedFor (zero: Service.RecordedFor) counts too.
-func (s *Service) duplicate(ctx context.Context, d draft.Draft, recordedFor time.Duration, now time.Time) (draft.Draft, bool, error) {
+// one of the same rule, key, purpose and delivery; under dry_run, a
+// dry_run one younger than repeatAfter (zero: Service.RepeatAfter) counts too.
+func (s *Service) duplicate(ctx context.Context, d draft.Draft, repeatAfter time.Duration, now time.Time) (draft.Draft, bool, error) {
 	if d.Origin.Kind != draft.OriginAuto {
 		return draft.Draft{}, false, nil
 	}
@@ -238,14 +224,14 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, recordedFor time
 	if err != nil {
 		return draft.Draft{}, false, err
 	}
-	if recordedFor <= 0 {
-		recordedFor = s.RecordedFor
+	if repeatAfter <= 0 {
+		repeatAfter = s.RepeatAfter
 	}
 	for _, o := range found {
 		if o = s.delivered(o); o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
-		if o.State != draft.Discarded || o.Reason == string(draft.DryRun) && (recordedFor <= 0 || now.Sub(o.UpdatedAt) < recordedFor) {
+		if o.State != draft.Discarded || o.Reason == string(draft.DryRun) && (repeatAfter <= 0 || now.Sub(o.UpdatedAt) < repeatAfter) {
 			return o, true, ErrDuplicate
 		}
 	}

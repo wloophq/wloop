@@ -105,7 +105,7 @@ func draftedText(r DraftResult) string {
 	case draft.Approved:
 		return fmt.Sprintf("Draft %d on %s is approved by its policy and will be posted to %s; nothing was posted yet.", r.ID, r.Unit, where)
 	case draft.Discarded:
-		return fmt.Sprintf("Draft %d on %s was recorded only: its policy observes drafts, so it will not be posted to %s.", r.ID, r.Unit, where)
+		return fmt.Sprintf("Draft %d on %s is a dry run: its approval stores drafts and never sends them, so it will not be posted to %s.", r.ID, r.Unit, where)
 	}
 	return fmt.Sprintf("Proposed draft %d on %s: it will be posted to %s once the user approves it in the %s Outbox; nothing was posted.", r.ID, r.Unit, where, brand.Name)
 }

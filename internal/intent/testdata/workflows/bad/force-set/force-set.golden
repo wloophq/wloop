@@ -1,1 +1,1 @@
-testdata/workflows/bad/force-set/workflows/case-workflow/workflow.toml:10:9: step[0].force: force is never available to an automatic run
+testdata/workflows/bad/force-set/workflows/case-workflow/workflow.toml:7:9: step[0].force: force is never available to an automatic run

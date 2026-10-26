@@ -1,1 +1,0 @@
-testdata/workflows/bad/mode-later/workflows/case-workflow/workflow.toml:3:8: mode: "later" is not one of "observe", "apply"

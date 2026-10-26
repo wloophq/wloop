@@ -304,8 +304,6 @@ func itemArgs(it workflow.Item) ([]any, error) {
 		it.Observe, eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
 }
 
-// stringArgs stores step arguments as the manifest gives them, strings; a
-// scalar of another type is formatted, a table or list refused.
 // storedArgs keeps a step's string and list-of-strings arguments, and a
 // scalar as its string.
 func storedArgs(in map[string]any) (map[string]any, error) {

@@ -207,13 +207,13 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 		order         int
 		intent, round string
 		when          string
-		dflt          workflow.Outcome
+		mode          workflow.ApprovalMode
 		window        time.Duration
 	}{
-		"review-follow-up":   {10, string(dintent.Review), roundFollowup, "pr.review.action", workflow.OutcomeRun, time.Minute},
-		"review-first-round": {20, string(dintent.Review), roundFirst, "pr.first.due", workflow.OutcomeRun, time.Minute},
-		"address":            {30, string(dintent.Address), "", "pr.address.due", workflow.OutcomeRun, time.Minute},
-		nudgeSilent:          {40, string(dintent.Nudge), "", "pr.silent_days", workflow.OutcomeWait, time.Minute},
+		"review-follow-up":   {10, string(dintent.Review), roundFollowup, "pr.review.action", workflow.ApprovalDelay, time.Minute},
+		"review-first-round": {20, string(dintent.Review), roundFirst, "pr.first.due", workflow.ApprovalDelay, time.Minute},
+		"address":            {30, string(dintent.Address), "", "pr.address.due", workflow.ApprovalDelay, time.Minute},
+		nudgeSilent:          {40, string(dintent.Nudge), "", "pr.silent_days", workflow.ApprovalWait, 0},
 	}
 	if broken := te.loadedIntents().BrokenWorkflows; len(broken) > 0 {
 		t.Fatalf("broken %v", broken)
@@ -222,13 +222,13 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 		got := bundledWorkflow(t, te, name)
 		args := got.Steps[0].Args
 		if got.Provider != unit.GitHub || got.Trigger.Kind != workflow.TriggerSweep || got.Order != w.order || got.Observe ||
-			len(got.Steps) != 1 || got.Steps[0].Use != builtin.StepTurnStart || args["intent"] != w.intent || (w.round != "" && args["round"] != w.round) {
+			len(got.Steps) != 1 || got.Steps[0].Use != builtin.StepTurnStart || args["intent"] != w.intent || (w.round != "" && args["stage"] != w.round) {
 			t.Errorf("%s: %+v", name, got)
 		}
 		if !slices.Contains(got.When.Reads(), w.when) {
 			t.Errorf("%s reads %v", name, got.When.Reads())
 		}
-		if got.Approval.Default != w.dflt || got.Approval.Window != w.window {
+		if got.Approval.Mode != w.mode || got.Approval.Window != w.window {
 			t.Errorf("%s approval %+v", name, got.Approval)
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
@@ -78,7 +79,7 @@ type draftArgs struct {
 	purpose, text, reaction, items, per, target string
 	delivery                                    draft.Delivery
 	effects                                     []string
-	hold, holdAfterSent                         time.Duration
+	repeatAfter, repeatAfterSent                time.Duration
 	forever                                     bool
 }
 
@@ -94,24 +95,20 @@ func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 	if a.text != path.Base(a.text) || strings.HasPrefix(a.text, ".") {
 		return a, fmt.Errorf("draft.propose's text %q is not a file of the workflow's directory", a.text)
 	}
-	for e := range strings.SplitSeq(c.arg("on_posted"), ",") {
-		if e = strings.TrimSpace(e); e != "" {
-			a.effects = append(a.effects, e)
-		}
-	}
+	a.effects = c.list("effects")
 	var err error
-	if v := c.arg("hold"); v != "" {
-		if a.hold, err = holdDuration(v, cfg); err != nil {
-			return a, fmt.Errorf("draft.propose's hold: %w", err)
+	if v := c.arg("repeat_after"); v != "" {
+		if a.repeatAfter, err = repeatDuration(v, cfg); err != nil {
+			return a, fmt.Errorf("draft.propose's repeat_after: %w", err)
 		}
 	}
-	a.holdAfterSent = a.hold
-	switch v := c.arg("hold_after_sent"); {
-	case v == builtin.HoldForever:
+	a.repeatAfterSent = a.repeatAfter
+	switch v := c.arg("repeat_after_sent"); {
+	case v == builtin.RepeatForever:
 		a.forever = true
 	case v != "":
-		if a.holdAfterSent, err = holdDuration(v, cfg); err != nil {
-			return a, fmt.Errorf("draft.propose's hold_after_sent: %w", err)
+		if a.repeatAfterSent, err = repeatDuration(v, cfg); err != nil {
+			return a, fmt.Errorf("draft.propose's repeat_after_sent: %w", err)
 		}
 	}
 	return a, nil
@@ -240,7 +237,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			key = sub.subject.Key + ":" + person.Key
 		}
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
-			Effects: a.effects, RecordedFor: a.hold, Policy: &policy, Subject: subject,
+			Effects: a.effects, RepeatAfter: a.repeatAfter, Policy: &policy, Subject: subject,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
 		if sub.entry != nil {
 			cd.p.Entry = string(sub.entry.ID)
@@ -414,15 +411,18 @@ func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
 }
 
 // workflowApproval is the approval policy of w's drafts and of the turns it
-// starts: the config's workflows.<name>.drafts.approval, then the
-// manifest's; nil when none is set.
+// starts: the config's workflows.<name>.drafts.approval laid over the
+// manifest's [drafts.approval] field by field; nil when neither is set, so
+// the intent's applies.
 func workflowApproval(cfg config.Config, w workflow.Workflow) *draft.Policy {
-	p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval())
-	return outbox.ResolveApproval(p, nil, w.DraftApproval)
+	if p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval()); p != nil {
+		return p
+	}
+	return w.DraftApproval
 }
 
-// configApprovalProblems are the config's drafts.approval blocks that do not
-// load over their workflow's subject, each holding every draft of it.
+// configApprovalProblems are the config's drafts approval blocks that do not
+// load over their workflow's unit, each holding every draft of it.
 func configApprovalProblems(cfg config.Config, ws []workflow.Workflow) []error {
 	var out []error
 	for _, w := range ws {
@@ -433,14 +433,14 @@ func configApprovalProblems(cfg config.Config, ws []workflow.Workflow) []error {
 	return out
 }
 
-// configPolicy is the config's drafts.approval of w, its rules compiled over
-// w's subject; nil when a is. One that does not compile is refused, with
-// the error, and holds every draft of w.
+// configPolicy is the config's drafts approval of w laid over its
+// manifest's, its rules compiled over w's unit; nil when a is. One that
+// does not load is refused, with the error, and holds every draft of w.
 func configPolicy(w workflow.Workflow, a *config.ApprovalConfig) (*draft.Policy, error) {
 	if a == nil {
 		return nil, nil
 	}
-	p, err := a.Policy(builtin.ApprovalEnv(true, w.Slot))
+	p, err := intentload.OverlayDraftApproval(w.DraftApproval, overlay(*a), builtin.ApprovalEnv(true, w.Slot))
 	if err != nil {
 		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", w.Name, err)
 	}
@@ -466,7 +466,7 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs,
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
 		case d.State == draft.Discarded && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
-		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.holdAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.hold:
+		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
 				refusal, timed = held, true
 			}

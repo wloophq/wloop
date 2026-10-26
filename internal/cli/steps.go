@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +25,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/profile"
 )
 
 // kindNotifySelf is the event notify.self publishes: Key the workflow and
@@ -143,6 +146,35 @@ type stepCall struct {
 func (c stepCall) arg(name string) string {
 	v, _ := c.st.Args[name].(string)
 	return v
+}
+
+// file is the file argument name of c's step names beside its workflow's
+// manifest, its default when unset, read through the profile layers.
+func (s *stepSet) file(c stepCall, name string) (string, error) {
+	r, _ := builtin.StepArg(c.st.Use, name)
+	rel := path.Join("workflows", c.why.Workflow, cmp.Or(c.arg(name), r.Default))
+	f, err := profile.Resolve(profile.Chain(s.e.currentConfig()), rel)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", c.st.Use, err)
+	}
+	return string(f.Body), nil
+}
+
+// list is a list argument: []string as loaded, []any once stored.
+func (c stepCall) list(name string) []string {
+	switch v := c.st.Args[name].(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // stepEntry adapts one builtin; a nil note or dismiss writes nothing.
@@ -576,7 +608,7 @@ func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace,
 	for _, name := range []string{"workspace.fingerprint", "workspace.dirty", "workspace.untracked", "workspace.unpushed", "workspace.last_activity", "workspace.path_exists"} {
 		facts = append(facts, fmt.Sprint(f[name]))
 	}
-	return fmt.Sprint(workflow.ModeOf(observe), w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
+	return fmt.Sprint(observe, w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
 }
 
 // forgetLeft drops the looks of the workspaces the listing no longer has.
@@ -654,14 +686,21 @@ func (s *stepSet) unregisterRun(ctx context.Context, c stepCall, _ automation.Ru
 }
 
 func (s *stepSet) notifyCheck(_ context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
-	if c.arg("text") == "" {
+	text, err := s.file(c, "text")
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(text) == "" {
 		return "no text to notify", nil
 	}
 	return "", nil
 }
 
 func (s *stepSet) notifyRun(_ context.Context, c stepCall, _ automation.RunOpts) (string, error) {
-	text := c.arg("text")
+	text, err := s.file(c, "text")
+	if err != nil {
+		return "", err
+	}
 	if s.d.Pub == nil {
 		return "", errors.New("no notifier")
 	}

@@ -8,6 +8,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -181,7 +182,15 @@ func (c *classifier) start(ctx context.Context, sc stepCall, fp string) error {
 	if err != nil {
 		return err
 	}
-	prompt, err := classifyPrompt(sc, facts)
+	text, err := c.s.file(sc, "prompt")
+	if err != nil {
+		return err
+	}
+	schema, err := c.s.file(sc, "schema")
+	if err != nil {
+		return err
+	}
+	prompt, err := classifyPrompt(text, sc, facts)
 	if err != nil {
 		return err
 	}
@@ -196,9 +205,9 @@ func (c *classifier) start(ctx context.Context, sc stepCall, fp string) error {
 			delete(c.inflight, key)
 			c.mu.Unlock()
 		}()
-		ans, err := d.Asker.Ask(bg, turns.Ask{Tier: turns.TierFast, Prompt: prompt, Schema: sc.arg("schema")})
+		ans, err := d.Asker.Ask(bg, turns.Ask{Tier: turns.TierFast, Prompt: prompt, Schema: schema})
 		if err == nil {
-			err = validAnswer(sc.arg("schema"), ans.JSON)
+			err = validAnswer(schema, ans.JSON)
 		}
 		if err == nil {
 			err = d.Store.Save(bg, sc.u, sc.why.Workflow, fp, ans.JSON, c.s.e.Now())
@@ -229,9 +238,8 @@ func validAnswer(schema string, answer []byte) error {
 	return nil
 }
 
-func classifyPrompt(c stepCall, facts workflow.Facts) (string, error) {
-	text := c.arg("prompt")
-	if text == "" {
+func classifyPrompt(text string, c stepCall, facts workflow.Facts) (string, error) {
+	if strings.TrimSpace(text) == "" {
 		return "", errors.New("classify has no prompt")
 	}
 	raw, err := json.MarshalIndent(facts, "", "  ")

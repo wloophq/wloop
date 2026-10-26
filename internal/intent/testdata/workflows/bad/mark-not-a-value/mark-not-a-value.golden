@@ -1,1 +1,1 @@
-testdata/workflows/bad/mark-not-a-value/workflows/case-workflow/workflow.toml:13:8: marks.mine: pr.mine is a bool; a mark holds a string, a time or an int
+testdata/workflows/bad/mark-not-a-value/workflows/case-workflow/workflow.toml:10:8: marks.mine: pr.mine is a bool; a mark holds a string, a time or an int

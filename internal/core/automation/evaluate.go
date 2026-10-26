@@ -359,14 +359,12 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		decide(workflow.DecisionSkipped, reason)
 		return
 	}
-	waitWhen := false
-	if w.Approval.WaitWhen != nil {
-		var err error
-		if waitWhen, err = w.Approval.WaitWhen.Match(vars); err != nil {
-			decide(workflow.DecisionBlocked, "wait_when: "+err.Error())
-			return
-		}
+	rule, err := matchedRule(w.Approval, vars)
+	if err != nil {
+		decide(workflow.DecisionBlocked, err.Error())
+		return
 	}
+	waitRule := rule != nil && rule.Mode == workflow.ApprovalWait
 	for i, st := range w.Steps {
 		refusal, err := p.e.Steps.Check(p.ctx, st, it.Unit, it.Why, CheckOpts{Observe: w.Observe})
 		if err != nil {
@@ -378,7 +376,7 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 			break
 		}
 	}
-	if pl.refusal != "" && !waitWhen {
+	if pl.refusal != "" && !waitRule {
 		decide(workflow.DecisionBlocked, pl.refusal)
 		return
 	}
@@ -393,22 +391,26 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 			return
 		}
 	}
+	mode, window := w.Approval.Mode, w.Approval.Window
+	if rule != nil {
+		mode, window = rule.Mode, rule.Window
+	}
 	switch {
-	case waitWhen:
-		wait(waitReason(w.Approval.WaitWhen, vars, pl.refusal))
+	case waitRule:
+		wait(waitReason(rule.When, vars, pl.refusal))
 		return
 	case w.Observe:
 		wait("observe mode")
 		return
-	case w.Visible() && !w.AllowVisible:
+	case w.Visible():
 		wait("a visible step waits for you")
 		return
-	case w.Approval.Default == workflow.OutcomeWait:
+	case mode == workflow.ApprovalWait:
 		wait("waits for you")
 		return
 	}
 	carried := had && prev.Decision == workflow.DecisionPending && prev.Default == workflow.OutcomeRun
-	if !carried && w.Approval.Window <= 0 {
+	if !carried && window <= 0 {
 		decide(workflow.DecisionRun, "")
 		return
 	}
@@ -424,10 +426,24 @@ func (p *planner) rules(pl *planned, vars workflow.Vars, run workflow.Run, ran b
 		}
 	}
 	decide(workflow.DecisionPending, "runs when its window ends")
-	it.Default, it.Deadline = workflow.OutcomeRun, p.now.Add(w.Approval.Window)
+	it.Default, it.Deadline = workflow.OutcomeRun, p.now.Add(window)
 	if carried {
 		it.Reason, it.Deadline = prev.Reason, prev.Deadline
 	}
+}
+
+// matchedRule is the first rule of a whose When holds; nil when none does.
+func matchedRule(a workflow.Approval, v workflow.Vars) (*workflow.ApprovalRule, error) {
+	for i := range a.Rules {
+		ok, err := a.Rules[i].When.Match(v)
+		if err != nil {
+			return nil, fmt.Errorf("approval.rule[%d]: %w", i, err)
+		}
+		if ok {
+			return &a.Rules[i], nil
+		}
+	}
+	return nil, nil
 }
 
 func match(pred workflow.Predicate, v workflow.Vars) (bool, error) {
@@ -459,7 +475,7 @@ func matched(pred workflow.Predicate, v workflow.Vars) []workflow.Fact {
 	return out
 }
 
-// waitReason names what a matched wait_when waits on: its reads that hold a
+// waitReason names what a matched wait rule waits on: its reads that hold a
 // value, a pendency first, then the guard's refusal, whose backup command
 // stays last.
 func waitReason(pred workflow.Predicate, v workflow.Vars, refusal string) string {

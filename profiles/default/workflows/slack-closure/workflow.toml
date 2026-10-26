@@ -1,21 +1,17 @@
-description = "Close a Slack thread you started once its items resolved, listing each item's resolution"
-subject = "entry"
+summary = "Close a Slack thread you started once its items resolved, listing each item's resolution"
+provider = "entry"
 when = 'entry.unit_provider == "slack" && entry.kind == "close" && entry.state in ["inbox", "next"] && entry.items_resolved > 0'
-mode = "apply"
 order = 51
 key = ["entry.settled_at"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "draft.propose"
 purpose = "close"
 items = "resolved"
-on_posted = "unit.closed"
-hold = "config.drafts.repeat_after"
-hold_after_sent = "forever"
+effects = ["unit.closed"]
+repeat_after = "config.drafts.repeat_after"
+repeat_after_sent = "forever"
 
-[withdraw]
+[drafts.withdraw]
 when = '!draft.unit_open'
 reason = "moot"
