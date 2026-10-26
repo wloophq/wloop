@@ -189,7 +189,7 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 		return it, err
 	}
 	if w, ok := e.live()[it.Workflow]; ok && !moved {
-		facts, err := e.Units.Facts(ctx, it.Unit)
+		facts, err := e.factsFor(ctx, w.Name, it.Unit)
 		if err != nil {
 			return it, err
 		}

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	slackrows "github.com/wloophq/wloop/internal/adapter/source/slack/rows"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -96,6 +97,9 @@ func (p *plugin) module() sourcereg.Module {
 	}
 	if p.cfg.Configured() {
 		m.Identity = p.identity
+	}
+	if p.deps.DB != nil {
+		m.Facts = factslack.New(p.deps.DB, clockFunc(p.now))
 	}
 	return m
 }

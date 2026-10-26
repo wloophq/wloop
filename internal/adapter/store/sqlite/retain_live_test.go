@@ -40,7 +40,7 @@ func TestRetainBudget(t *testing.T) {
 	if got[sqlite.SessionEventsKey] < 300 || got["turn_stops"] != 300 {
 		t.Fatalf("retained %v", got)
 	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 21, {Res: meter.Tx}: 1})
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 22, {Res: meter.Tx}: 1})
 	if n := metertest.Count(sc, metertest.Limit{Res: meter.Tx, Op: "write"}); n != 1 {
 		t.Errorf("%d write transactions, want 1\n%s", n, metertest.Report(sc.Tally()))
 	}

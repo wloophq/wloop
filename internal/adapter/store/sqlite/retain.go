@@ -47,7 +47,10 @@ type Retention struct {
 	UnitlessLoopRows time.Duration
 	Classifications  time.Duration // classifications and classify_days
 	Fetches          time.Duration
-	VacuumPages      int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
+	// SubjectMarks drops the marks of entries done, in the trash or gone,
+	// and of Slack units with no extraction cursor, no item and no entry.
+	SubjectMarks bool
+	VacuumPages  int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
 }
 
 // SessionEventKinds are the bookkeeping kinds SessionEvents drops. Pause
@@ -77,6 +80,7 @@ var DefaultRetention = Retention{
 	UnitlessLoopRows: retentionWindow,
 	Classifications:  retentionWindow,
 	Fetches:          retentionWindow,
+	SubjectMarks:     true,
 	VacuumPages:      4096,
 }
 
@@ -129,11 +133,17 @@ const (
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
 	retainViewRowsSQL = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN
 		(SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?)`
-	endedPRsSQL              = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
-	retainPlanItemsSQL       = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
-	retainWorkflowRunsSQL    = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
-	retainSessionRunsSQL     = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
-	retainSessionMarksSQL    = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
+	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
+	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
+	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
+		(provider = 'entry' AND unit_key NOT IN (SELECT id FROM entries WHERE state NOT IN ('done', 'trash')))
+		OR (provider = 'slack'
+			AND NOT EXISTS (SELECT 1 FROM extraction_cursors c WHERE c.provider = 'slack' AND c.unit_key = unit_marks.unit_key)
+			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
+			AND NOT EXISTS (SELECT 1 FROM entry_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
@@ -263,6 +273,9 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 		}
 		if p.Fetches > 0 {
 			r.exec("fetches", 0, retainFetchesSQL, cutoff(now, p.Fetches))
+		}
+		if p.SubjectMarks {
+			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL)
 		}
 		return r.err
 	})

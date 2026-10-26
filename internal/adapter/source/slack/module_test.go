@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/domain/link"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -35,6 +36,9 @@ func TestModuleIsValid(t *testing.T) {
 	}
 	if err := bare.Valid(); err != nil {
 		t.Fatalf("without a store: %v", err)
+	}
+	if _, ok := f.mod.Facts.(*factslack.Provider); !ok || bare.Facts != nil {
+		t.Fatalf("the workflow facts: %T over the store, %T without one", f.mod.Facts, bare.Facts)
 	}
 	_, skip, err := bare.Ingest.Prepare(context.Background(), t0)
 	if err != nil || skip != SkipNotConfigured {
