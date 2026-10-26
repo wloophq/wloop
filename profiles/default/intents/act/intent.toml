@@ -1,11 +1,13 @@
 label   = "Act"
 summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
 verb    = "delegate"
+role    = "headless.default"
 workspace = "pr_else_main"
 provider  = "any"
 modes     = ["headless", "session"]
 session   = { strategy = "new", title = "act", close_when_done = true }
 brief     = { render = false, wait = false }
+draft_effects = ["entry.nudged", "unit.closed"]
 
 [guidance]
 help = "what to do about the items"

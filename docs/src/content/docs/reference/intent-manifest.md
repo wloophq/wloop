@@ -31,9 +31,16 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `verb` | | `""` | the GTD verb the intent's `[action]` fulfills: `approve`, `delegate` or `dismiss`; needs an `[action]` |
 | `key` | | `""` | one uppercase letter, unique among intents and built-in actions; a refused key loads the intent without it, reachable from the palette |
 | `user_facing` | | `true` | `false` keeps the intent out of the CLI and by-hand sessions, and allows no `[action]` |
-| `workspace` | yes | | `review`, `author`, `pr_else_main`, `given` |
-| `provider` | | `"github"` | the provider whose units the turns run on, such as `github` or `slack`, or `any` |
-| `modes` | | `["session"]` | `session`, `headless`, or both |
+| `workspace` | yes, unless `builds` | | `review`, `author`, `pr_else_main`, `given`, or a table: `{ repo = "<owner/name>" }` or `{ repo_input = "<input>" }`, see [Where a turn runs](#where-a-turn-runs) |
+| `provider` | | `"github"` | the provider whose units the turns run on, such as `github` or `slack`, or `any`; a list for several |
+| `modes` | | `["session"]` | `session`, `headless`, or both; the first is what `turn.start` runs without a `mode` |
+| `role` | | `""` | what {{name}} resolves the intent by, see [Roles](#roles) |
+| `builds` | | `""` | `brief`: the intent builds the brief and is never a turn |
+| `round_kind` | | `""` | `review` or `address`: the sweep's round the intent's `turn.start` sends on a pull request |
+| `cap` | | `""` | `rounds`: the intent's turns spend the per-pull request daily round cap |
+| `reason_fact` | | `""` | the workflow fact that says why the round is due; a review's first round says why itself |
+| `refuse_when` | | `""` | a string workflow fact whose non-empty value refuses `turn.start` with that text; on a pull request, a mute refuses too |
+| `reason` | | `""` | `address_round`: the turn carries the reviewers, failing checks and conflict its round answers |
 | `draft_approval.mode`, `draft_approval.window` | | `always` | `always`, `window` (with a positive `window` such as `"10m"`), `none` or `observe` |
 | `session.strategy` | yes | | `reuse_live`, `new` |
 | `session.title` | yes | | 1 to 12 lower-case letters |
@@ -117,6 +124,14 @@ The policy of the drafts the intent's turns propose. A workflow's own `[draft_ap
 
 `provider` names the units the intent works on: a turn is built only on a unit of that provider, and the catalog offers the action only on its rows; `any` serves every provider. When several intents share a `verb`, the entry's key runs the one of highest rank the row enables: an intent of the unit's own provider before one of `any`, and yours before a bundled one within each. So a `provider = "slack"` intent with `verb = "delegate"` replaces the bundled `act` on Slack entries. Only a `github` intent may set `drives_row`. An intent whose provider is not `github` cannot read the `pr.*` facts, and its templates cannot read `.PR`. Every template reads the unit's wording from the provider: `{{.Wording.Noun}}` ("pull request", "Slack thread"), `{{.Wording.This}}`, `{{.Wording.Ref}}` (`acme/api#7`) and `{{.Wording.Short}}`.
 
+## Roles
+
+{{name}} finds the intents it runs on its own through their `role`, never by name: `round.review` sends the sweep's review rounds and reads their history, `round.address` the address rounds, `nudge` the nudges, `probe` the agent-home probe and `headless.default` a headless request that names no intent. Each turn stores the role its intent held, so history reads by role too. At most one intent of a layer holds a role on a provider; one of yours holding a bundled intent's role takes it over, so an intent `my-review` with `role = "round.review"` gets every automatic review round.
+
+## Where a turn runs
+
+A `workspace` builtin places a pull request's turn. On any other unit, the turn runs where the unit's placement says, else in a neutral repository with no checkout. A workspace table names the repository instead: `repo` outright, or `repo_input` by one of the intent's inputs. The turn runs in that repository's main checkout when `session.strategy` is `reuse_live`, else in a worktree of its own, created by the workspace manager that keeps it. The repository must be one the manager knows. An input is set only by a person: a workflow's `turn.start` refuses an intent that takes its repository from an input, so no text a workflow reads chooses where a turn runs.
+
 ## Predicates
 
 `visible`, `enabled`, `primary`, `records`, `when` and `also_profiles.when` are [CEL](https://github.com/google/cel-spec) expressions, checked at load.
@@ -131,7 +146,7 @@ The policy of the drafts the intent's turns propose. A workflow's own `[draft_ap
 
 - **Action texts** (`reason_off`, `confirm`, `hint`) run over a nested map of the action facts: `{{.pr.slug}}`, `{{index .row.nudge.who 0}}`; `join` is the one extra function (`{{join .row.nudge.who ", "}}`).
 - **Headlines** run over the turn context: `{{.PR.Slug}}`, `{{.PR.Author}}`, `{{.Who}}` ("asked for by you" or the loop's name).
-- **`instructions.md.tmpl`** runs over the turn context with `missingkey=error`. `.Headline`, `.PR`, `.Wording`, `.Guidance`, `.Inputs.<name>` (its zero value when unset), `.Resume`, `.History` and `.Command` are there. The partials `history`, `resume`, `record`, `brief`, `judgment`, `review-judgment`, `items` and `unit` are {{name}}'s and cannot be replaced. Include `{{template "history" .}}` and `{{template "record" .}}` in any intent that records, and `{{if .Resume}}{{template "resume" .}}{{end}}` in any that can be answered.
+- **`instructions.md.tmpl`** runs over the turn context with `missingkey=error`. `.Headline`, `.PR`, `.Wording`, `.Guidance`, `.Inputs.<name>` (its zero value when unset), `.Resume`, `.History` and `.Command` are there. The partials `history`, `resume`, `record`, `brief`, `judgment`, `review-judgment`, `items` and `unit` are {{name}}'s; a profile replaces one with a file of the same name in its `partials/` directory, as [Change a partial](/guides/custom-intent/#change-a-partial) shows. Include `{{template "history" .}}` and `{{template "record" .}}` in any intent that records, and `{{if .Resume}}{{template "resume" .}}{{end}}` in any that can be answered.
 - Every text is parsed at load and rendered against sample facts and sample turns, so a template that would fail at run time fails `profile check`.
 
 ## Builtins

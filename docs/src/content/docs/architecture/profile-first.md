@@ -40,7 +40,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 ## The rules that keep the line
 
-- Go never enumerates intents. It binds by name only the intents it starts itself (`review`, `address`, `nudge`, `probe`), in a short list of files with their reasons (`TestNoIntentEnumerations`).
+- Go never enumerates intents and binds none by name. It finds the intents it starts itself by their manifest's `role` (`builtin.Roles`, `Registry.ByRole`), reads a turn's history by the role stored with it, and reads how a round behaves from the manifest's `round_kind`, `cap`, `reason_fact`, `refuse_when` and `reason`; the files still naming an intent are listed with their reasons (`TestNoIntentEnumerations`).
 - A builtin's name is spelled only in its tables: `internal/intent/builtin/builtin.go`, `internal/cli/builtins.go`, `internal/daemon/builtins.go`.
 - Only `internal/catalog` builds action specs and evaluates an intent's predicates.
 - The automation engine and the rest of the core name no provider.
@@ -54,8 +54,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 - the Slack extraction prompt (`internal/adapter/source/slack/extract/prompt.md`), and the brief's prompt and taxonomy (`internal/brief`);
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
-- the workflow subjects, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`), and `turn.start`, which starts turns on pull requests only;
-- where a turn on a unit other than a pull request runs: placement decides, and the intent's `workspace` is read for pull requests only;
+- the workflow subjects, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
 - notification titles, the digest and the menu bar's copy.
 
 ## Direction
@@ -63,5 +62,4 @@ These texts and decisions are still in Go, and are moving to the profile:
 A draft is what its proposer declares: a purpose, a delivery and the effects sending it applies, each once, through the effect table and a plugin's own (`TestNoDraftKindComparisons`). An agent's draft declares only the effects its intent lists in `draft_effects`, and a workflow proposes, holds and withdraws its drafts with `draft.propose`, its text from the profile. Not yet true:
 
 - the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
-- workflows start any intent on any unit, each under its own daily limit and all under one daily budget, in the repository the intent names;
 - the Slack extraction prompt and the brief's prompt and taxonomy move to `profiles/default/prompts/`.

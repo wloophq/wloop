@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -97,11 +98,18 @@ func (s step) roundKind() string {
 }
 
 // blockedIntent is the intent of the round b holds.
-func blockedIntent(b inventory.StartBlock) dintent.Name {
+func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
 	if b.Round == (step{kind: stepAddress}).roundKind() {
-		return dintent.Address
+		return e.roleIntent(builtin.RoleAddress)
 	}
-	return dintent.Review
+	return e.roleIntent(builtin.RoleReview)
+}
+
+// roleIntent is the intent holding role on pull requests; "" when none
+// loads.
+func (e *Env) roleIntent(role string) dintent.Name {
+	d, _ := e.loadedIntents().Registry.ByRole(role, unit.GitHub)
+	return d.Name
 }
 
 func (s step) describe() string {
@@ -337,12 +345,12 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		}
 		return s.openRound(ctx, st, guidance, turn.PlannedFollowUp)
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
 		BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return false, err
 	}
-	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(dintent.Review, roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
+	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
 	s.e.recordGuidance(ctx, st.pr, guidance)
 	if err != nil {
 		return false, err
@@ -393,12 +401,12 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 	if err != nil {
 		return false, err
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
 		BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return false, err
 	}
-	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(dintent.Review, roundOptions{pr: pr}))
+	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
 	s.e.recordGuidance(ctx, st.pr, guidance)
 	if err != nil {
 		return false, err
@@ -457,8 +465,8 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		}
 		st.ws = ws
 	}
-	r := turn.Request{Intent: turn.Intent(dintent.Address), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, BriefMissing: st.briefMissing, Why: st.why}
-	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(dintent.Address, roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
+	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, BriefMissing: st.briefMissing, Why: st.why}
+	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
 	if err != nil {
 		return false, err
 	}

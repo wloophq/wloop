@@ -329,7 +329,7 @@ func TestTrustBlockedExactTrustsTheWorktreeAlone(t *testing.T) {
 	_, te, _, file := blockedTriage(t)
 	home := te.cfg.AgentHome
 	b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/repo/api", Folder: "/wt/review-api-9", Home: home, Homes: []string{home}, Round: "first round"}
-	if blockedIntent(b) != dintent.Review || blockedIntent(inventory.StartBlock{Round: "triage"}) != dintent.Address {
+	if te.blockedIntent(b) != dintent.Review || te.blockedIntent(inventory.StartBlock{Round: "triage"}) != dintent.Address {
 		t.Fatal("blockedIntent")
 	}
 	if err := te.trustBlocked(context.Background(), te.cfg, b, true); err != nil {

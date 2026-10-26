@@ -80,7 +80,7 @@ func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.
 				continue
 			}
 		}
-		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), State: string(t.State), At: t.SentAt}
+		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), Role: t.Role, State: string(t.State), At: t.SentAt}
 		if !t.StartedAt.IsZero() {
 			f.At = t.StartedAt
 		}

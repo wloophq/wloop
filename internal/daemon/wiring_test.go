@@ -23,7 +23,7 @@ func TestALaterTurnNeverWaits(t *testing.T) {
 	t.Parallel()
 	books := turnstest.NewStore()
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, SentAt: at}}})
+	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "r1", State: turn.Done, SentAt: at}}})
 	briefs := intaketest.NewBriefs(intake.Readiness{Go: true, Without: true, Note: "this pull request has no brief yet"})
 	s, _ := newIntakeServer(t, briefs, func(d *Deps) { d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books} })
 	rd, err := s.BriefReady(context.Background(), pr.Ref(r7).Unit())
@@ -117,7 +117,7 @@ func TestAnIntakeTheSweepAnsweredSendsNothingMore(t *testing.T) {
 	mu.Lock()
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Starting })
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
+	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
 	mu.Unlock()
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Started })
 	got := intakeOf(t, s, in.Seq)
@@ -155,7 +155,7 @@ func raceRun(t *testing.T, body string, before []turn.Turn, during []turn.Turn) 
 func TestAByHandTurnAfterTheAcceptStillRunsTheAction(t *testing.T) {
 	t.Parallel()
 	later := time.Now().Add(time.Second)
-	_, fa, got := raceRun(t, `{}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-hand", Trigger: turn.ByHand, State: turn.Started, SentAt: later}})
+	_, fa, got := raceRun(t, `{}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "by-hand", Trigger: turn.ByHand, State: turn.Started, SentAt: later}})
 	if got.State != intake.Started || len(fa.calls()) != 1 {
 		t.Fatalf("intake %+v, calls %v", got, fa.calls())
 	}
@@ -164,7 +164,7 @@ func TestAByHandTurnAfterTheAcceptStillRunsTheAction(t *testing.T) {
 func TestAGuidedIntakeIsNotSwallowedByTheSweep(t *testing.T) {
 	t.Parallel()
 	later := time.Now().Add(time.Second)
-	_, fa, got := raceRun(t, `{"guidance":"check the migration"}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: later}})
+	_, fa, got := raceRun(t, `{"guidance":"check the migration"}`, nil, []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: later}})
 	if got.State != intake.Failed || !strings.Contains(got.Error, "your guidance was not sent, ask again once that turn ends") || len(fa.calls()) != 0 {
 		t.Fatalf("intake %+v, calls %v", got, fa.calls())
 	}
@@ -173,7 +173,7 @@ func TestAGuidedIntakeIsNotSwallowedByTheSweep(t *testing.T) {
 func TestASweepTurnBeforeTheAcceptIsIgnored(t *testing.T) {
 	t.Parallel()
 	at := time.Now().Add(-time.Minute)
-	before := []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "earlier", Trigger: turn.Automated, State: turn.Done, SentAt: at}}
+	before := []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "earlier", Trigger: turn.Automated, State: turn.Done, SentAt: at}}
 	_, fa, got := raceRun(t, `{}`, before, nil)
 	if got.State != intake.Started || len(fa.calls()) != 1 {
 		t.Fatalf("intake %+v, calls %v", got, fa.calls())

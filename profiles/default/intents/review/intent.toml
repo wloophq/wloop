@@ -2,6 +2,10 @@ label   = "Review"
 summary = "Start or continue a review round on someone else's pull request, in a dedicated workspace"
 verb    = "delegate"
 key     = "V"
+role    = "round.review"
+round_kind  = "review"
+cap         = "rounds"
+reason_fact = "pr.review.reason"
 workspace = "review"
 session   = { strategy = "reuse_live", title = "review" }
 intake    = true

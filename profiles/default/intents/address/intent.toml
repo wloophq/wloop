@@ -2,6 +2,11 @@ label   = "Address"
 summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace"
 verb    = "delegate"
 key     = "F"
+role    = "round.address"
+round_kind  = "address"
+cap         = "rounds"
+reason_fact = "pr.address.reason"
+reason      = "address_round"
 workspace = "author"
 session   = { strategy = "reuse_live", title = "triage" }
 intake    = true

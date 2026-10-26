@@ -1,0 +1,38 @@
+package intent
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestTurnStartRefusesABuilderIntent(t *testing.T) {
+	root := t.TempDir()
+	writeIntent(t, root, "unit-brief", `label = "Brief"
+summary = "One brief per unit"
+builds = "brief"
+prompt = "prompts/brief.md"
+schema = "schema.json"
+
+[headline]
+resumed = "x"
+[[headline.new]]
+text = "x"
+`, "{{.Headline}}")
+	writeWorkflow(t, root, "brief-everything", `subject = "github"
+when = 'pr.state == "open"'
+
+[trigger]
+every = "sweep"
+
+[[step]]
+use = "turn.start"
+intent = "unit-brief"
+`)
+	l, problems := Load(userLayer(root), nil, testBase(), nil)
+	if !strings.Contains(problems.Error(), `step[0].intent: the intent "unit-brief" builds a brief and is never a turn`) {
+		t.Fatalf("%s", problems.Error())
+	}
+	if _, ok := l.Registry.Builder("brief", "github"); !ok {
+		t.Fatal("the builder itself did not load")
+	}
+}

@@ -51,6 +51,7 @@ description: The words the code, the configuration, the facts and these pages us
 
 - **Turn**: one intent on one unit, from the moment {{name}} sends it until a record closes it. See [Turns and rounds](/concepts/turns/).
 - **Round**: a turn on a pull request.
+- **Role**: what {{name}} finds an intent by when it starts one on its own: `round.review`, `round.address`, `nudge`, `probe` or `headless.default`, from the manifest's `role`. A turn keeps the role its intent held. See [Roles](/reference/intent-manifest/#roles).
 - **Turn state**: `sent`, `started`, `asked`, `done`, `settled`, `failed`, `unrecorded`, `dismissed` or `replaced`. A turn is open while it is `sent` or `started`. See [States](/concepts/turns/#states).
 - **First round** and **follow-up round**: the two review rounds. The first reviews a pull request you have not reviewed; a follow-up comes after the author pushed, replied or re-requested you.
 - **Record**: how a turn ends: its state, a one-line summary, the outcome and, for a question, the question with its options, a recommendation, the draft and notes. The agent sends it with the `turn_end` tool. See [The record](/concepts/turns/#the-record).

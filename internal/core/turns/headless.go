@@ -23,8 +23,10 @@ type HeadlessStart struct {
 	Trigger  turn.Trigger
 	Guidance string
 	Workflow string
-	Items    []string
-	Entry    string
+	// Role is the role the turn's intent holds, "" none.
+	Role  string
+	Items []string
+	Entry string
 	// ResumeOf is the headless turn whose question this run answers, 0 none.
 	ResumeOf int64
 }
@@ -125,7 +127,7 @@ func (s *Service) BeginHeadless(ctx context.Context, h HeadlessStart) (int64, er
 	}
 	now := s.now()
 	b.Send(turn.Turn{Intent: h.Intent, ID: h.Turn, Trigger: h.Trigger, Guidance: h.Guidance, ResumeOf: h.ResumeOf,
-		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Entry), SentAt: now, Mode: turn.ModeHeadless, Workflow: h.Workflow})
+		Inputs: bound(map[string]any{itemsInput: append([]string{}, h.Items...)}, nil, h.Entry), SentAt: now, Mode: turn.ModeHeadless, Workflow: h.Workflow, Role: h.Role})
 	if _, err := b.Start(h.Turn, "", now); err != nil {
 		s.mu.Unlock()
 		return 0, err

@@ -53,6 +53,9 @@ type engineDeps struct {
 	Subjects map[unit.ProviderID]automation.Units
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals automation.Withdrawals
+	// TurnStart are what turn.start reads on units outside the round
+	// providers.
+	TurnStart turnStartDeps
 	// Drafts are what draft.propose reads; nil refuses it.
 	Drafts *draftDeps
 }
@@ -94,7 +97,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Candidates == nil {
 		d.Candidates = candidatesOf(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log}
+	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log, Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
 	}
@@ -307,7 +310,7 @@ func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, e
 		if i < 0 {
 			continue
 		}
-		out[it.Unit] = round.Pending{Intent: startOf(it.Steps[i]).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i]).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
 	}
 	return out, nil
 }

@@ -59,7 +59,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.
 - `workspace.remove` never forces: a manifest that sets `force` fails to load.
-- A `turn.start` naming an unknown or broken intent breaks its workflow. Caps, the brief, and the busy and held checks apply as for any automatic round.
+- A `turn.start` naming an unknown, broken or `builds` intent breaks its workflow. On a pull request, caps, the brief, and the busy and held checks apply as for any automatic round. On any other unit, the workflow must set `limits.per_day`, and every such turn of every workflow counts toward `turns.automated_per_day` for the local day; a turn of the intent still open on the unit, or an intent whose repository comes from an input, refuses the step. The turn runs in the step's `mode`, else the intent's first mode, where the intent's [workspace](/reference/intent-manifest/#where-a-turn-runs) says.
 
 ## Approval
 

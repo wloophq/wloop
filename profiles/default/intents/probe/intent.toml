@@ -1,6 +1,7 @@
 label   = "Probe"
 summary = "Check that an agent home can read its turn, record it, take an answer and be resumed"
 user_facing = false
+role    = "probe"
 workspace = "given"
 session   = { strategy = "new", title = "probe" }
 context   = "synthetic"

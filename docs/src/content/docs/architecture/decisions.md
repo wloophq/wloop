@@ -158,3 +158,17 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Decision**: a draft carries a purpose, a delivery and its effects; the Outbox applies the declared effects once each draft is sent, by name, a plugin's own first, and stores when (`drafts.effects_applied_at`), so a restart applies only what is pending. An agent declares only the effects its intent's `draft_effects` lists. A Slack unit's closure is its own column (`extraction_cursors.closure_marked`), which no extraction pass writes. Workflows hold their drafts from the drafts themselves, per workflow, subject and person, and withdraw them by their `[withdraw] when`; a draft that `[withdraw] when` would withdraw at once is not proposed, so the pair never cycles.
 - **Consequence**: the kind survives only as the input word of agents and the API, mapped once, and as what the API serves; the clients group drafts by purpose.
 - **Enforced by**: `TestNoDraftKindComparisons`, `TestASentDraftAppliesItsEffectsOnce`, `TestEffectsAreAppliedOnceAcrossARestart`, `TestASubjectMatchingWhenAndWithdrawWhenIsProposedOnce`. See [The Outbox](/concepts/approval/#the-outbox).
+
+## Intents by role
+
+- **Context**: Go started the review, address, nudge and probe intents and read their history by name, so a renamed or replaced intent lost every automatic behavior.
+- **Decision**: a manifest's `role` (`round.review`, `round.address`, `nudge`, `probe`, `headless.default`) is what Go resolves an intent by; one of the user's holding a bundled role takes it over. Each turn stores its intent's role, and history readers read by it. How a round behaves comes from manifest keys (`round_kind`, `cap`, `reason_fact`, `refuse_when`, `reason`).
+- **Consequence**: an intent `my-review` holding `round.review` gets the sweep's review rounds and their history; the turns stored before roles exist were given theirs by the store's migration from the bundled names.
+- **Enforced by**: `TestNoIntentEnumerations`.
+
+## turn.start on any unit, under a budget
+
+- **Context**: a workflow could start turns only on pull requests, whose rounds have their own caps.
+- **Decision**: `turn.start` starts any intent on any unit, headless or in a session, in the repository its manifest's workspace table names; outside the round providers each workflow needs `limits.per_day`, and `turns.automated_per_day` caps all of them together per local day. A repository named by an input is never taken by a workflow.
+- **Consequence**: a request in a thread can start an implementing turn in a known repository; no thread text chooses the repository, and a runaway workflow stops at its budget.
+- **Enforced by**: the loader (`limits.per_day`) and the step's guards.
