@@ -36,24 +36,27 @@ var (
 )
 
 // Bundled lists every skill install writes: the turn skill of each intent
-// of defs whose manifest asks for one, then the operator and profile skills.
-func Bundled(defs []dintent.Def) []Skill {
+// of defs whose manifest asks for one, its target as target names it, then
+// the operator and profile skills.
+func Bundled(defs []dintent.Def, target func(dintent.Def) string) []Skill {
 	var out []Skill
 	for _, d := range defs {
 		if d.Skill {
-			out = append(out, Turn(d))
+			out = append(out, Turn(d, target(d)))
 		}
 	}
 	return append(out, Operator, Profile)
 }
 
-// Turn is the skill that runs a turn of d by hand, filled from its manifest:
-// its name, its summary, and the flags a user passes.
-func Turn(d dintent.Def) Skill {
+// Turn is the skill that runs a turn of d by hand, filled from its manifest
+// (its name, its summary, what its target is and the flags a user passes),
+// with target the argument that names the unit, such as <url>.
+func Turn(d dintent.Def, target string) Skill {
 	intent := string(d.Name)
-	description := "Use when the prompt is `/{{name}}-" + intent + " <url>` or `${{name}}-" + intent + " <url>`, or to " +
-		lowerFirst(d.Summary) + ". Runs the " + intent + " turn {{name}} defines for that repository."
-	body := strings.NewReplacer("{{intent}}", intent, "{{description}}", quote(description), "{{flags}}", flagsLine(d)).Replace(turnTemplate)
+	description := "Use when the prompt is `/{{name}}-" + intent + " " + target + "` or `${{name}}-" + intent + " " + target + "`, or to " +
+		lowerFirst(d.Summary) + ". Runs the " + intent + " turn {{name}} defines for it."
+	body := strings.NewReplacer("{{intent}}", intent, "{{description}}", quote(description), "{{flags}}", flagsLine(d),
+		"{{target}}", target, "{{target_help}}", d.Help.Target).Replace(turnTemplate)
 	return Skill{Name: brand.SkillName(intent), Body: []byte(body)}
 }
 

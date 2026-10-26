@@ -94,7 +94,14 @@
     "reason_fact": {"type": "string", "description": "The workflow fact that says why the intent's round is due or not."},
     "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
     "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
-    "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt."},
+    "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt; it needs help.target."},
+    "help": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target": {"type": "string", "description": "What the command's target is, such as \"a pull request URL\"; the turn skill and the command's help read it."}
+      }
+    },
     "session": {
       "type": "object",
       "additionalProperties": false,

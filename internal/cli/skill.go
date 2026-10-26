@@ -23,7 +23,7 @@ func bundledSkills() []skills.Skill {
 	if err != nil {
 		panic(err)
 	}
-	return skills.Bundled(l.Registry.All())
+	return skills.Bundled(l.Registry.All(), intentTarget)
 }
 
 func (e *Env) renderSkill(sk skills.Skill) []byte { return sk.Render(e.command(), Version) }

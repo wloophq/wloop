@@ -132,6 +132,9 @@ func (s *sheet) validate(d dintent.Def) {
 	if d.Skill && !d.UserFacing {
 		s.add("skill", "applies to user-facing intents only")
 	}
+	if d.Skill && d.Help.Target == "" {
+		s.add("help.target", "is required when skill is true: the turn skill says what its target is")
+	}
 	if a := d.Action; a != nil {
 		if !d.UserFacing {
 			s.add("action", "applies to user-facing intents only")

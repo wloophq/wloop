@@ -110,6 +110,14 @@ type Def struct {
 	Reason string
 	// Skill says whether install writes the intent a turn skill.
 	Skill bool
+	Help  Help
+}
+
+// Help is how the intent's command and turn skill present it.
+type Help struct {
+	// Target says what the command's target is, such as "a pull request
+	// URL"; the turn skill and the command's help read it.
+	Target string
 }
 
 // WorkspaceRepo is where a turn runs when its manifest names a repository:

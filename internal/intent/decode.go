@@ -67,6 +67,11 @@ type manifest struct {
 	RefuseWhen    string            `toml:"refuse_when"`
 	Reason        string            `toml:"reason"`
 	Skill         bool              `toml:"skill"`
+	Help          *mHelp            `toml:"help"`
+}
+
+type mHelp struct {
+	Target string `toml:"target"`
 }
 
 type mSession struct {

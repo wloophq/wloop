@@ -418,13 +418,18 @@ func TestAVerbNeedsAnAction(t *testing.T) {
 
 func TestASkillGoesWithAUserFacingIntent(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", "skill = true\n"+minimal, "{{.Headline}}")
-	writeIntent(t, root, "ask-quietly", "skill = true\nuser_facing = false\n"+minimal, "{{.Headline}}")
+	const target = "\n[help]\ntarget = \"a pull request URL\"\n"
+	writeIntent(t, root, "ask-author", "skill = true\n"+minimal+target, "{{.Headline}}")
+	writeIntent(t, root, "ask-quietly", "skill = true\nuser_facing = false\n"+minimal+target, "{{.Headline}}")
+	writeIntent(t, root, "ask-blindly", "skill = true\n"+minimal, "{{.Headline}}")
 	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
-	if d, ok := l.Registry.Get("ask-author"); !ok || !d.Skill {
+	if d, ok := l.Registry.Get("ask-author"); !ok || !d.Skill || d.Help.Target != "a pull request URL" {
 		t.Fatalf("ask-author: %+v %v", d, l.Broken["ask-author"])
 	}
 	if p := l.Broken["ask-quietly"]; len(p) != 1 || p[0].Field != "skill" || p[0].Msg != "applies to user-facing intents only" {
+		t.Fatalf("%v", p)
+	}
+	if p := l.Broken["ask-blindly"]; len(p) != 1 || p[0].Field != "help.target" {
 		t.Fatalf("%v", p)
 	}
 }

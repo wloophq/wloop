@@ -8,8 +8,15 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/turn"
 )
+
+var codecs = unit.NewRegistry(pr.Codec{}, slack.Codec())
+
+func target(d dintent.Def) string { return codecs.Target(d.ProviderOrDefault()) }
 
 const version = "1.2.3"
 
@@ -19,7 +26,7 @@ func bundled(t *testing.T) []Skill {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Bundled(l.Registry.All())
+	return Bundled(l.Registry.All(), target)
 }
 
 func turnSkills(t *testing.T) []Skill {
@@ -42,8 +49,23 @@ func TestATurnSkillGoesToTheIntentsWhoseManifestAsksForOne(t *testing.T) {
 		{Name: "triage", Summary: "Triage a pull request", UserFacing: true, Provider: "forge", Bundled: true},
 	}
 	want := []string{brand.SkillName("sum-up"), brand.Name, brand.SkillName("profile")}
-	if got := names(Bundled(defs)); !slices.Equal(got, want) {
+	if got := names(Bundled(defs, target)); !slices.Equal(got, want) {
 		t.Fatalf("skills %v, want %v", got, want)
+	}
+}
+
+func TestATurnSkillNamesItsTargetAsTheIntentsManifestAndProviderDo(t *testing.T) {
+	d := dintent.Def{Name: "triage", Summary: "Triage a thread", UserFacing: true, Provider: slack.Provider, Skill: true,
+		Help: dintent.Help{Target: "a Slack message permalink"}}
+	body := string(Turn(d, target(d)).Render(brand.Command, version))
+	for _, want := range []string{"`" + brand.Command + " instructions triage <permalink|slack:key> -- '<guidance>'`",
+		"- `<permalink|slack:key>` is a Slack message permalink in the prompt", "`/" + brand.SkillName("triage") + " <permalink|slack:key>`"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the skill lacks %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "pull request") || strings.Contains(body, "<url>") {
+		t.Errorf("a Slack intent's skill names a pull request:\n%s", body)
 	}
 }
 
@@ -66,7 +88,7 @@ func TestThinSkillsCallInstructions(t *testing.T) {
 	for _, sk := range turnSkills(t) {
 		body := string(sk.Render(brand.Command, version))
 		kind := strings.TrimPrefix(sk.Name, brand.Name+"-")
-		if !strings.Contains(body, "`"+brand.Command+" instructions "+kind+" <url> -- '<guidance>'`") || !strings.Contains(body, "single quotes") {
+		if !strings.Contains(body, "`"+brand.Command+" instructions "+kind+" <url> -- '<guidance>'`") || !strings.Contains(body, "- `<url>` is a pull request URL in the prompt") || !strings.Contains(body, "single quotes") {
 			t.Errorf("%s does not pass the guidance after the separator:\n%s", sk.Name, body)
 		}
 		if !strings.Contains(body, "\nname: "+sk.Name+"\n") || !strings.Contains(body, "`/"+sk.Name+" <url>`") {
