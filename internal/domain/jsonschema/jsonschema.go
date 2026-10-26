@@ -112,8 +112,16 @@ func compile(src []byte, path string, depth int, o Options) (*node, error) {
 		*l.dst = &i
 	}
 	if v, ok := raw["enum"]; ok {
-		if err := json.Unmarshal(v, &n.enum); err != nil || len(n.enum) == 0 {
+		var vals []json.RawMessage
+		if err := json.Unmarshal(v, &vals); err != nil || len(vals) == 0 {
 			return nil, bad("enum", fmt.Errorf("not a list of values: %s", v))
+		}
+		for _, raw := range vals {
+			e, err := enumValue(raw, n.typ)
+			if err != nil {
+				return nil, bad("enum", err)
+			}
+			n.enum = append(n.enum, e)
 		}
 	}
 	if v, ok := raw["pattern"]; ok {
@@ -282,6 +290,40 @@ func (n *node) validate(v any, path string) error {
 		return fail("%v is not one of %v", v, n.enum)
 	}
 	return nil
+}
+
+// enumValue decodes one enum value, refusing one that is not a scalar of the
+// node's type: validate compares enum values with ==, and no answer could fit
+// a value of another type.
+func enumValue(raw json.RawMessage, typ string) (any, error) {
+	var e any
+	if err := json.Unmarshal(raw, &e); err != nil {
+		return nil, err
+	}
+	var fits bool
+	switch x := e.(type) {
+	case string:
+		fits = typ == "string"
+	case float64:
+		fits = typ == "number" || typ == "integer" && x == float64(int64(x))
+	case bool:
+		fits = typ == "boolean"
+	case nil:
+		fits = typ == "null"
+	default:
+		return nil, fmt.Errorf("%s is not a string, number, boolean or null", raw)
+	}
+	if !fits {
+		return nil, fmt.Errorf("%s is not %s %s", raw, article(typ), typ)
+	}
+	return e, nil
+}
+
+func article(typ string) string {
+	if typ == "integer" || typ == "array" || typ == "object" {
+		return "an"
+	}
+	return "a"
 }
 
 func number(v any) (float64, bool) {

@@ -136,3 +136,26 @@ func TestEveryBundledSchemaCompiles(t *testing.T) {
 		}
 	}
 }
+
+func TestCompileRefusesAnEnumNoAnswerCanBeComparedTo(t *testing.T) {
+	for _, c := range []struct{ src, want string }{
+		{`{"type":"array","items":{"type":"string"},"enum":[["x"]]}`, `$: enum: ["x"] is not a string, number, boolean or null`},
+		{`{"type":"object","properties":{"o":{"type":"object","enum":[{"k":"v"}]}}}`, `$.o: enum: {"k":"v"} is not a string`},
+		{`{"type":"object","properties":{"risk":{"type":"string","enum":["low",3]}}}`, `$.risk: enum: 3 is not a string`},
+		{`{"type":"integer","enum":[1.5]}`, `$: enum: 1.5 is not an integer`},
+		{`{"type":"boolean","enum":["true"]}`, `$: enum: "true" is not a boolean`},
+	} {
+		_, err := Compile([]byte(c.src), Options{})
+		if !errors.Is(err, ErrSchema) || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: %v, want %q", c.src, err, c.want)
+		}
+	}
+	for _, src := range []string{
+		`{"type":"integer","enum":[1,2]}`, `{"type":"number","enum":[1.5,2]}`,
+		`{"type":"null","enum":[null]}`, `{"type":"boolean","enum":[true]}`,
+	} {
+		if _, err := Compile([]byte(src), Options{}); err != nil {
+			t.Errorf("%s: %v", src, err)
+		}
+	}
+}
