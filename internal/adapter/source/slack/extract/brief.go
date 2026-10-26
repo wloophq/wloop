@@ -38,11 +38,11 @@ type Extra struct {
 // storedBrief is a brief as brief_runs keeps it, in the fields of a pull
 // request's brief: a thread has no size, and its tags are key:value.
 type storedBrief struct {
-	Goal          string   `json:"goal"`
-	Context       string   `json:"context"`
-	Kind          string   `json:"kind"`
-	Risk          string   `json:"risk"`
-	RiskWhy       string   `json:"risk_why"`
+	Goal          string            `json:"goal"`
+	Context       string            `json:"context"`
+	Kind          string            `json:"kind"`
+	Risk          string            `json:"risk"`
+	RiskWhy       string            `json:"risk_why"`
 	OpenQuestions []string          `json:"open_questions"`
 	Tags          []string          `json:"tags"`
 	Extra         map[string]any    `json:"extra,omitempty"`

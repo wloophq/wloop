@@ -19,8 +19,7 @@ var embedKept = []embedAllowed{
 }
 
 // embedMoving is prose that moves to the profile; the list only shrinks.
-var embedMoving = []embedAllowed{
-}
+var embedMoving = []embedAllowed{}
 
 var proseExts = []string{".md", ".tmpl", ".txt"}
 

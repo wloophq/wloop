@@ -164,7 +164,7 @@ type Queue struct {
 	// and filling which pull requests' fields failed at which version.
 	demand     map[unit.Unit]time.Time
 	fillFailed map[github.Ref]string
-	breaker  breaker
+	breaker    breaker
 	// recent are the last two failures, the newest last.
 	recent []failure
 	// globalTries counts a wanted pull request's global failures on one
