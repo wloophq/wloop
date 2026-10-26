@@ -1,28 +1,11 @@
 package intent
 
 import (
-	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
-
-func TestAnUnknownKeyNamesTheKeyThatReplacedIt(t *testing.T) {
-	saved := builtin.Grammar
-	t.Cleanup(func() { builtin.Grammar = saved })
-	builtin.Grammar = append(slices.Clone(saved), builtin.Key{Path: "label", In: builtin.SurfaceIntent, Kind: builtin.KindText, Was: []string{"title"}})
-	if got := unknownKey(reflect.TypeFor[manifest](), []string{"title"}); got != "title was renamed label" {
-		t.Errorf("%q", got)
-	}
-	if got := unknownKey(reflect.TypeFor[manifest](), []string{"lable"}); got != "unknown key; did you mean label?" {
-		t.Errorf("%q", got)
-	}
-	if got := unknownKey(reflect.TypeFor[wManifest](), []string{"title"}); strings.Contains(got, "renamed") {
-		t.Errorf("a workflow key was read as an intent's: %q", got)
-	}
-}
 
 func TestPredicateHintCoversEveryPredKey(t *testing.T) {
 	for _, k := range builtin.Grammar {

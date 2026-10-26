@@ -11,13 +11,11 @@ import (
 	"cel.dev/cel-go/common/types"
 )
 
-// An Env also carries what its fact table knows beyond types: the closed
-// values of a string fact and the names a fact replaced. They are keys under
+// An Env also carries the closed values of its string facts, as keys under
 // metaPrefix, so a clone or a merge of the Env keeps them.
 const (
 	metaPrefix = "\x00"
 	enumMeta   = metaPrefix + "enum\x00"
-	wasMeta    = metaPrefix + "was\x00"
 	meta       = Type(-1)
 )
 
@@ -40,21 +38,6 @@ func (e Env) Enum(name string) []string {
 	}
 	slices.Sort(out)
 	return out
-}
-
-// SetWas records that the fact name replaced old, which a predicate reading
-// old is told.
-func (e Env) SetWas(old, name string) { e[wasMeta+old+"\x00"+name] = meta }
-
-// Was is the fact that replaced old; "" when none did.
-func (e Env) Was(old string) string {
-	prefix := wasMeta + old + "\x00"
-	for k := range e {
-		if name, ok := strings.CutPrefix(k, prefix); ok {
-			return name
-		}
-	}
-	return ""
 }
 
 // Names are the env's facts, sorted.

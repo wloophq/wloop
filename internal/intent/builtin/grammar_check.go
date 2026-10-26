@@ -191,8 +191,7 @@ func integer(v any) bool {
 	return false
 }
 
-// enumProblem says why v is none of values: a removed value with its
-// replacement, or the values and the closest.
+// enumProblem says why v is none of values: the values and the closest.
 func enumProblem(v string, values []Value) string {
 	names := make([]string, len(values))
 	for i, x := range values {
@@ -200,11 +199,6 @@ func enumProblem(v string, values []Value) string {
 			return ""
 		}
 		names[i] = x.Name
-	}
-	for _, x := range values {
-		if slices.Contains(x.Was, v) {
-			return fmt.Sprintf("%q was renamed; did you mean %q?", v, x.Name)
-		}
 	}
 	msg := fmt.Sprintf("%q is not one of %s", v, orList(names))
 	if c := Closest(v, names); c != "" {
@@ -225,10 +219,6 @@ func orList(names []string) string {
 }
 
 func (w *walker) unknown(pat []string, k, path string) {
-	if msg := keyMessage(w.rows, w.rows[0].In, append(slices.Clone(pat), k)); msg != "" {
-		w.add(path, "%s", msg)
-		return
-	}
 	var siblings []string
 	for _, r := range w.rows {
 		s := segments(r.Path)
@@ -241,32 +231,6 @@ func (w *walker) unknown(pat []string, k, path string) {
 		return
 	}
 	w.add(path, "unknown key")
-}
-
-// keyMessage names the row that replaced the removed key at path, which
-// may be a pattern holding author names as they are.
-func keyMessage(all []Key, surface Surface, path []string) string {
-	for _, r := range rowsOf(all, surface) {
-		for _, old := range r.Was {
-			if matches(segments(bare(old)), path) {
-				return bare(old) + " was renamed " + bare(r.Path)
-			}
-		}
-	}
-	return ""
-}
-
-// matches says whether the pattern pat names path, "*" naming any key.
-func matches(pat, path []string) bool {
-	if len(pat) != len(path) {
-		return false
-	}
-	for i := range pat {
-		if pat[i] != "*" && pat[i] != bare(path[i]) {
-			return false
-		}
-	}
-	return true
 }
 
 // Closest is the option nearest s by edit distance, "" when none is near.
@@ -298,22 +262,6 @@ func levenshtein(a, b string) int {
 		prev = cur
 	}
 	return prev[len(b)]
-}
-
-// returnedKeys are the removed keys that return as another row's path with
-// another kind, which would read an old manifest with a new meaning.
-func returnedKeys(rows []Key) []string {
-	var out []string
-	for _, r := range rows {
-		for _, old := range r.Was {
-			for _, o := range rows {
-				if o.In == r.In && bare(o.Path) == bare(old) && o.Kind != r.Kind {
-					out = append(out, fmt.Sprintf("%s: %s was %s's, and returns as %s", r.In, bare(old), bare(r.Path), kindName(o.Kind)))
-				}
-			}
-		}
-	}
-	return out
 }
 
 var kindNames = map[Kind]string{KindPred: "a predicate", KindFact: "a fact", KindTemplate: "a template", KindFile: "a file",

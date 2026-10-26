@@ -12,7 +12,6 @@ func enumEnv() Env {
 	env := Env{"workspace.role": String, "pr.review.action": String, "pr.author": String, "turn.stage": String}
 	env.SetEnum("workspace.role", []string{"author", "review", "none"})
 	env.SetEnum("pr.review.action", []string{"", "follow-up", "complete"})
-	env.SetWas("turn.round", "turn.stage")
 	return env
 }
 
@@ -73,13 +72,6 @@ func TestAnErrorAfterADayLiteralPointsAtTheSource(t *testing.T) {
 	e, ok := err.(*Error)
 	if !ok || e.Col != 36 || !strings.Contains(e.Snippet, `duration("1d")`) {
 		t.Fatalf("%#v", err)
-	}
-}
-
-func TestFactWasNamesTheNewFact(t *testing.T) {
-	_, err := Compile(`turn.round == "first"`, enumEnv())
-	if err == nil || !strings.Contains(err.Error(), "renamed turn.stage") {
-		t.Fatalf("%v", err)
 	}
 }
 

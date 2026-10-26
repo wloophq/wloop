@@ -294,28 +294,14 @@ func blankKeyValue(src []byte, row, col int) ([]byte, bool) {
 	return out, true
 }
 
-// unknownKey says what an unknown key of the manifest type t is: a removed
-// key with the one that replaced it, else the closest key.
+// unknownKey says what an unknown key of the manifest type t is, with the
+// closest key.
 func unknownKey(t reflect.Type, key []string) string {
-	if msg := builtin.KeyMessage(surfaceOf(t), key); msg != "" {
-		return msg
-	}
 	known := keysAt(t, key[:len(key)-1])
 	if s := builtin.Closest(key[len(key)-1], known); s != "" {
 		return "unknown key; did you mean " + s + "?"
 	}
 	return "unknown key"
-}
-
-// surfaceOf is the grammar's surface of the manifest type t.
-func surfaceOf(t reflect.Type) builtin.Surface {
-	switch t {
-	case reflect.TypeFor[manifest]():
-		return builtin.SurfaceIntent
-	case reflect.TypeFor[wManifest]():
-		return builtin.SurfaceWorkflow
-	}
-	return ""
 }
 
 // keysAt lists the toml keys of the table at path, following map values and slice elements.

@@ -1,37 +1,36 @@
 package builtin
 
 import (
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
 )
 
 func roleValues() []Value {
-	return []Value{{Name: "pr.review", Was: []string{"round.review"}}, {Name: "pr.address", Was: []string{"round.address"}}, {Name: "probe"}}
+	return []Value{{Name: "pr.review"}, {Name: "pr.address"}, {Name: "probe"}}
 }
 
 func modeValues() []Value {
-	return []Value{{Name: "send"}, {Name: "wait"}, {Name: "delay"}, {Name: "dry_run", Was: []string{"record"}}}
+	return []Value{{Name: "send"}, {Name: "wait"}, {Name: "delay"}, {Name: "dry_run"}}
 }
 
 var testRows = []Key{
-	{Path: "provider", In: SurfaceWorkflow, Kind: KindText, Was: []string{"subject"}},
-	{Path: "summary", In: SurfaceWorkflow, Kind: KindText, Was: []string{"description"}},
+	{Path: "provider", In: SurfaceWorkflow, Kind: KindText},
+	{Path: "summary", In: SurfaceWorkflow, Kind: KindText},
 	{Path: "observe", In: SurfaceWorkflow, Kind: KindBool},
 	{Path: "drafts", In: SurfaceWorkflow, Kind: KindTable},
-	{Path: "drafts.approval", In: SurfaceWorkflow, Kind: KindTable, Was: []string{"draft_approval"}},
+	{Path: "drafts.approval", In: SurfaceWorkflow, Kind: KindTable},
 	{Path: "drafts.approval.mode", In: SurfaceWorkflow, Kind: KindEnum, Values: modeValues},
 	{Path: "drafts.approval.window", In: SurfaceWorkflow, Kind: KindDur},
 	{Path: "drafts.approval.rule[]", In: SurfaceWorkflow, Kind: KindTable},
 	{Path: "drafts.approval.rule[].when", In: SurfaceWorkflow, Kind: KindPred},
 	{Path: "drafts.approval.rule[].mode", In: SurfaceWorkflow, Kind: KindEnum, Values: modeValues},
-	{Path: "runners", In: SurfaceIntent, Kind: KindList, Elem: KindText, Was: []string{"modes"}},
-	{Path: "effects", In: SurfaceIntent, Kind: KindList, Elem: KindText, Was: []string{"on_sent"}},
+	{Path: "runners", In: SurfaceIntent, Kind: KindList, Elem: KindText},
+	{Path: "effects", In: SurfaceIntent, Kind: KindList, Elem: KindText},
 	{Path: "role", In: SurfaceIntent, Kind: KindEnum, Values: roleValues},
 	{Path: "inputs", In: SurfaceIntent, Kind: KindMap},
-	{Path: "inputs.*.type", In: SurfaceIntent, Kind: KindEnum, Values: func() []Value { return []Value{{Name: "bool", Was: []string{"flag"}}, {Name: "text"}} }},
-	{Path: "resume.changed", In: SurfaceIntent, Kind: KindTemplate, Was: []string{"resume.head_moved"}},
+	{Path: "inputs.*.type", In: SurfaceIntent, Kind: KindEnum, Values: func() []Value { return []Value{{Name: "bool"}, {Name: "text"}} }},
+	{Path: "resume.changed", In: SurfaceIntent, Kind: KindTemplate},
 	{Path: "resume", In: SurfaceIntent, Kind: KindTable},
 	{Path: "context", In: SurfaceIntent, Kind: KindText, Bundled: true},
 	{Path: "workflows", In: SurfaceConfig, Kind: KindMap},
@@ -61,23 +60,22 @@ func wants(t *testing.T, ps []Problem, want ...string) {
 	}
 }
 
-func TestCheckNamesTheNewKey(t *testing.T) {
-	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"subject": "github", "provder": "github", "summary": "s"}),
-		"subject: subject was renamed provider", "provder: unknown key; did you mean provider?")
-	wants(t, check(testRows, SurfaceIntent, map[string]any{"modes": []any{"session"}, "on_sent": []any{"x"}, "resume": map[string]any{"head_moved": "t"}}),
-		"modes: modes was renamed runners", "on_sent: on_sent was renamed effects", "resume.head_moved: resume.head_moved was renamed resume.changed")
-	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"draft_approval": map[string]any{"mode": "wait"}}),
-		"draft_approval: draft_approval was renamed drafts.approval")
+func TestCheckRefusesAnUnknownKey(t *testing.T) {
+	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"provder": "github", "zzz": 1, "summary": "s"}),
+		"provder: unknown key; did you mean provider?", "zzz: unknown key")
+	wants(t, check(testRows, SurfaceIntent, map[string]any{"resume": map[string]any{"head_moved": "t"}}), "resume.head_moved: unknown key")
+	wants(t, check(testRows, SurfaceIntent, map[string]any{"inputs": map[string]any{"a": map[string]any{"typ": "text"}}}),
+		"inputs.a.typ: unknown key; did you mean type?")
 }
 
-func TestCheckNamesTheNewValue(t *testing.T) {
-	wants(t, check(testRows, SurfaceIntent, map[string]any{"role": "round.review"}), `role: "round.review" was renamed; did you mean "pr.review"?`)
+func TestCheckRefusesAnUnknownValue(t *testing.T) {
 	wants(t, check(testRows, SurfaceIntent, map[string]any{"role": "pr.reviw"}), `role: "pr.reviw" is not one of "pr.review", "pr.address" or "probe"; did you mean "pr.review"?`)
 	wants(t, check(testRows, SurfaceIntent, map[string]any{"inputs": map[string]any{"self_review": map[string]any{"type": "flag"}}}),
-		`inputs.self_review.type: "flag" was renamed; did you mean "bool"?`)
-	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"drafts": map[string]any{"approval": map[string]any{"mode": "record",
-		"rule": []any{map[string]any{"when": "true", "mode": "record"}}}}}),
-		`drafts.approval.mode: "record" was renamed; did you mean "dry_run"?`, `drafts.approval.rule[0].mode: "record" was renamed; did you mean "dry_run"?`)
+		`inputs.self_review.type: "flag" is not one of "bool" or "text"`)
+	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"drafts": map[string]any{"approval": map[string]any{"mode": "dry-run",
+		"rule": []any{map[string]any{"when": "true", "mode": "wiat"}}}}}),
+		`drafts.approval.mode: "dry-run" is not one of "send", "wait", "delay" or "dry_run"; did you mean "dry_run"?`,
+		`drafts.approval.rule[0].mode: "wiat" is not one of "send", "wait", "delay" or "dry_run"; did you mean "wait"?`)
 }
 
 func TestCheckReadsKinds(t *testing.T) {
@@ -98,32 +96,6 @@ func TestCheckUserRefusesABundledKey(t *testing.T) {
 func TestASurfaceWithNoRowsIsNotChecked(t *testing.T) {
 	if ps := check(testRows, SurfaceLabels, map[string]any{"anything": 1}); ps != nil {
 		t.Fatalf("%v", ps)
-	}
-}
-
-func TestKeyMessageNamesTheReplacement(t *testing.T) {
-	for path, want := range map[string]string{
-		"subject":           "subject was renamed provider",
-		"resume.head_moved": "resume.head_moved was renamed resume.changed",
-		"provder":           "",
-	} {
-		if got := keyMessage(testRows, SurfaceWorkflow, strings.Split(path, ".")); path == "resume.head_moved" {
-			if got := keyMessage(testRows, SurfaceIntent, strings.Split(path, ".")); got != want {
-				t.Errorf("%s: %q, want %q", path, got, want)
-			}
-		} else if got != want {
-			t.Errorf("%s: %q, want %q", path, got, want)
-		}
-	}
-}
-
-func TestNoRemovedKeyReturns(t *testing.T) {
-	if r := returnedKeys(Grammar); len(r) > 0 {
-		t.Errorf("%v", r)
-	}
-	planted := append(slices.Clone(testRows), Key{Path: "subject", In: SurfaceWorkflow, Kind: KindTable})
-	if r := returnedKeys(planted); !slices.Equal(r, []string{"workflow: subject was provider's, and returns as a table"}) {
-		t.Errorf("%v", r)
 	}
 }
 

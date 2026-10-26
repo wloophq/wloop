@@ -185,10 +185,6 @@ func issueError(src string, env Env, parsed *cel.Ast, errs []*cel.Error) (int, s
 	switch {
 	case reUndeclared.MatchString(msg):
 		name := fieldAt(src, pos)
-		if renamed := env.Was(name); renamed != "" {
-			msg = "unknown field " + name + "; it was renamed " + renamed
-			break
-		}
 		msg = "unknown field " + name + suggest(name, env)
 	case reOverload.MatchString(msg):
 		m := reOverload.FindStringSubmatch(msg)

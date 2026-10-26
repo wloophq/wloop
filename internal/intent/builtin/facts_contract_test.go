@@ -22,18 +22,6 @@ func TestIsUntrusted(t *testing.T) {
 	}
 }
 
-func TestARemovedFactNameIsNoFactOfItsSlots(t *testing.T) {
-	for _, f := range Facts {
-		for _, old := range f.Was {
-			for _, g := range Facts {
-				if g.Name == old && slices.ContainsFunc(g.Slots, func(s FactSlot) bool { return slices.Contains(f.Slots, s) }) {
-					t.Errorf("%s was %s, which is still a fact of the same slot", f.Name, old)
-				}
-			}
-		}
-	}
-}
-
 func TestAnEnumHoldsItsFactsValues(t *testing.T) {
 	for _, f := range Facts {
 		for p, vs := range f.Enum {

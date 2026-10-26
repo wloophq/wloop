@@ -113,9 +113,6 @@ type Fact struct {
 	// proposing turn itself or an agent's brief sets the fact's value, so
 	// no [draft_approval] rule may read it.
 	Untrusted bool
-	// Was are the fact's removed names, which a predicate that reads one is
-	// told the fact replaced.
-	Was []string
 }
 
 var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}

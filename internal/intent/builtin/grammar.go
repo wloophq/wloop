@@ -54,16 +54,12 @@ type Key struct {
 	Doc     string
 	// Bundled says that only the embedded profile may set the key.
 	Bundled bool
-	// Was are the key's removed spellings, read only to name the key in
-	// the error.
-	Was []string
 }
 
 // Value is one value of an enum key.
 type Value struct {
 	Name string
 	Doc  string
-	Was  []string
 }
 
 // Grammar is every reserved key of the language.
@@ -77,7 +73,7 @@ type Problem struct {
 
 // Check walks doc, a document of surface decoded without a schema (a TOML
 // table or a JSON object as map[string]any), against the grammar: unknown
-// and removed keys and values, with did-you-mean, kinds and enums. A
+// keys and values, with did-you-mean, kinds and enums. A
 // surface the grammar has no row of is not checked.
 func Check(surface Surface, doc map[string]any) []Problem {
 	return check(Grammar, surface, doc)
@@ -87,12 +83,6 @@ func Check(surface Surface, doc map[string]any) []Problem {
 // only the bundled profile sets.
 func CheckUser(surface Surface, doc map[string]any) []Problem {
 	return checkUser(Grammar, surface, doc)
-}
-
-// KeyMessage says which key replaced the removed key at path of surface;
-// "" when path names no removed key.
-func KeyMessage(surface Surface, path []string) string {
-	return keyMessage(Grammar, surface, path)
 }
 
 // IsPredKey says whether a key named last holds a predicate somewhere in
