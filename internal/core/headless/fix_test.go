@@ -163,7 +163,7 @@ func TestTheDailyCapCountsStartedTurnsOfAnEarlierService(t *testing.T) {
 		t.Fatal(err)
 	}
 	rebuilt := &headless.Service{Turns: r.turns, Build: r.svc.Build, Place: r.svc.Place, Asker: r.svc.Asker, Ledger: r.svc.Ledger, Outbox: r.svc.Outbox,
-		Intents: r.svc.Intents, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper}
+		Intents: r.svc.Intents, Default: r.svc.Default, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper}
 	if _, err := rebuilt.Start(ctx, headless.Request{Unit: otherThread}); !errors.Is(err, headless.ErrOverCap) {
 		t.Fatalf("a rebuilt service ignored the call in flight: %v", err)
 	}

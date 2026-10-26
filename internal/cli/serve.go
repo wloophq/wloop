@@ -40,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -89,13 +90,24 @@ func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[github.
 	out := map[github.Ref]map[string]bool{}
 	for u, b := range books {
 		ref := prOf(u)
-		for _, i := range []dturn.Intent{dturn.Intent(dintent.Review), dturn.Intent(dintent.Address)} {
+		for _, i := range roleIntents(b, builtin.RoleReview, builtin.RoleAddress) {
 			if b.OpenQuestion(i) {
 				if out[ref] == nil {
 					out[ref] = map[string]bool{}
 				}
 				out[ref][string(i)] = true
 			}
+		}
+	}
+	return out
+}
+
+// roleIntents are the intents of b's turns whose intent held one of roles.
+func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
+	var out []dturn.Intent
+	for _, t := range b.Turns {
+		if slices.Contains(roles, t.Role) && !slices.Contains(out, t.Intent) {
+			out = append(out, t.Intent)
 		}
 	}
 	return out

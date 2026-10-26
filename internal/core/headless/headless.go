@@ -30,7 +30,7 @@ type Request struct {
 	Unit     unit.Unit
 	Items    []string // item ids acted on
 	Entry    string
-	Intent   turn.Intent // "" is "act"
+	Intent   turn.Intent // "" is the Service's Default
 	Guidance string
 	Trigger  turn.Trigger
 	Workflow string // "" by hand
@@ -73,6 +73,8 @@ type Service struct {
 	Ledger  items.Applier
 	Outbox  *outbox.Service
 	Intents func(name turn.Intent) (intent.Def, bool)
+	// Default is the intent a request that names none runs on units of p.
+	Default func(p unit.ProviderID) (intent.Def, bool)
 	Caps    Caps // from config "headless"
 	// Context is the daemon's lifetime: a stop cancels the calls Start runs; nil is context.Background.
 	Context context.Context
@@ -190,8 +192,10 @@ func (s *Service) unitOf(ctx context.Context, q turn.Turn) (unit.Unit, error) {
 }
 
 func (s *Service) begin(ctx context.Context, r Request) (started, error) {
-	if r.Intent == "" {
-		r.Intent = turn.Intent(intent.Act)
+	if r.Intent == "" && s.Default != nil {
+		if d, ok := s.Default(r.Unit.Provider); ok {
+			r.Intent = turn.Intent(d.Name)
+		}
 	}
 	if r.Trigger == "" {
 		r.Trigger = turn.ByHand
@@ -248,7 +252,7 @@ func (s *Service) begin(ctx context.Context, r Request) (started, error) {
 		return started{}, err
 	}
 	seq, err := s.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: r.Unit, Intent: r.Intent, Turn: randomHex(), Trigger: r.Trigger,
-		Guidance: r.Guidance, Workflow: r.Workflow, Items: r.Items, Entry: r.Entry, ResumeOf: r.ResumeOf})
+		Guidance: r.Guidance, Workflow: r.Workflow, Role: def.Role, Items: r.Items, Entry: r.Entry, ResumeOf: r.ResumeOf})
 	if err != nil {
 		return started{}, err
 	}

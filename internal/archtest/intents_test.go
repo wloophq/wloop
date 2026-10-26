@@ -35,8 +35,6 @@ var intentConsts = []string{"Review", "Address", "Nudge", "Probe", "Act"}
 
 // intentAllowlist are the files that may name the intents Go binds by name.
 var intentAllowlist = map[string]string{
-	"internal/cli/serve.go":                        "the sweep's open review and address questions, until they are read by role",
-	"internal/core/headless/headless.go":           "a headless request that names no intent runs act, until the headless.default role resolves it",
 	"internal/core/turns/turnstest/store.go":       "test fixtures of today's intents",
 	"internal/core/turns/turnstest/intents.go":     "the test registry of today's intents",
 	"internal/core/intake/intaketest/scenarios.go": "test fixtures of today's intents",
