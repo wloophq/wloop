@@ -3,12 +3,8 @@ package cli
 import (
 	"context"
 	"slices"
-	"time"
 
-	factentry "github.com/wloophq/wloop/internal/adapter/facts/entry"
-	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/automation"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -31,22 +27,6 @@ func (e *Env) wireSubjects(w *serveWiring) {
 			w.Engine.Subjects[p.ID] = noUnits{}
 		}
 	}
-}
-
-// entryFacts is the entry subject's facts provider, reading the config the
-// daemon holds at each read.
-func (e *Env) entryFacts(db *sqlite.DB) *factentry.Provider {
-	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
-	return factentry.New(factentry.Deps{
-		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
-		Cards:   coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
-		Enabled: enabled,
-		Settings: func() factentry.Settings {
-			cfg := e.currentConfig()
-			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Proposals.RenudgeAfter)}
-		},
-		Clock: clockFunc(func() time.Time { return e.Now() }),
-	})
 }
 
 // noUnits is the subject of a plugin that is disabled or offers no
