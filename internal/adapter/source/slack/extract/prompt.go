@@ -2,7 +2,6 @@ package extract
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"path"
@@ -25,15 +24,12 @@ var promptTemplate = func() string {
 }()
 
 //go:embed schema.json
-var schemaJSON string
+var answerSchemaJSON string
 
-var schemaDoc = func() map[string]any {
-	var doc map[string]any
-	if err := json.Unmarshal([]byte(schemaJSON), &doc); err != nil {
-		panic("extract: schema.json: " + err.Error())
-	}
-	return doc
-}()
+// schemaJSON is the schema an extraction answers to, with the brief's
+// schema under the conversation's brief and each segment's; schema is it
+// compiled, which every answer is validated against.
+var schemaJSON, schema = composeSchema(answerSchemaJSON, briefSchemaJSON)
 
 func Schema() string { return schemaJSON }
 
@@ -58,8 +54,17 @@ func Prompt(in Input) (string, error) {
 		"{{LANGUAGE}}", lang,
 		"{{LEDGER}}", renderLedger(in),
 		"{{CONTEXTS}}", renderContexts(in.Contexts),
+		"{{VOCABULARY}}", VocabularyOf(in.Vocabulary),
 		"{{CONVERSATION}}", Render(in),
 	).Replace(promptTemplate), nil
+}
+
+// VocabularyOf is the vocabulary line of the prompt.
+func VocabularyOf(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "(none yet)"
+	}
+	return strings.TrimSpace(v)
 }
 
 func renderContexts(cs []string) string {
@@ -72,7 +77,7 @@ func renderContexts(cs []string) string {
 func renderLedger(in Input) string {
 	var b strings.Builder
 	if in.Brief != "" {
-		fmt.Fprintf(&b, "Previous brief: %s\n\n", in.Brief)
+		fmt.Fprintf(&b, "Previous brief: %s\n\n", GoalOf(in.Brief))
 	}
 	if len(in.Ledger) == 0 {
 		b.WriteString("(no items yet)")

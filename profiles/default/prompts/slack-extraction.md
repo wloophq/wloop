@@ -6,6 +6,8 @@ The items already recorded for this conversation, each under its own id, with th
 
 {{LEDGER}}
 
+Tag vocabulary: {{VOCABULARY}}
+
 Return every item you still track under its id in `ref`, updated by the new messages. Give a new item the ref `n1`, `n2`, ... Never reuse an id for a different ask, and never return an existing ask as a new item. An item marked `confirmed` was corrected by the viewer: keep its fields unless a new message changes them. Leaving an item out never deletes it; resolve it when the conversation settles it.
 
 ## The conversation
@@ -85,7 +87,7 @@ The viewer may appear under other handles (GitHub, Jira, e-mail) that match thei
 
 The reader will NOT read the conversation. Everything they need to act, decide or chase must be in your output:
 
-- `brief`: two or three sentences on what the conversation is about and where it stands now, naming people and dates that matter, and whether others are blocked on the viewer or work proceeds without them.
+- `brief`: `goal`, two or three sentences on what the conversation is about and where it stands, naming who and when matters and whether others wait on the viewer; `context`, what else a reader needs, or `""`; `kind`: question, request, incident (broken now), decision or announcement; `risk` and one-line `risk_why`; up to three `open_questions`; `tags` (reuse the vocabulary's domains). `unchanged: true` keeps the previous brief.
 - `summary`: the ask itself, specific enough to act on (which PR, which option, which component), with the exact scope, including what is affected and what is kept ("turn off A and B, keeping C"), and the viewer's role (author, reviewer, decider).
 - `context`: the facts the owner needs to act or decide:
   - what was already said or done and by whom: numbers, risks, constraints, prerequisites and ordering with other items, known limits or gaps someone declared; where the ask was made (this DM/thread vs. elsewhere), so the reader knows where to answer;
@@ -155,7 +157,7 @@ Example: a message `ts=1700000000.000100` asking `<@U0001|ann>` to review pull r
 
 ## Segments
 
-Only for a direct message conversation: split it into topics. `segments` lists every topic the window covers, in order, with `from_ts` and `to_ts` (`""` while the topic is still going). Keep an existing segment's ref (`s1`, ...) when its topic continues, and use `new` for a new topic. A reply belongs to its parent's segment. `[]` for channels and threads.
+Only for a direct message conversation: split it into topics. `segments` lists every topic the window covers, in order, with `from_ts` and `to_ts` (`""` while the topic is still going). Keep an existing segment's ref (`s1`, ...) when its topic continues, and use `new` for a new topic. A reply belongs to its parent's segment. Each segment has its own `brief`, about its topic alone. `[]` for channels and threads.
 
 ## The verdict, for the viewer
 

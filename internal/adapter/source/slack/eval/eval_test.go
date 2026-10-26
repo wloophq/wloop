@@ -70,7 +70,7 @@ func extraction(f Fixture) map[string]any {
 		"waiting_on": []any{"U0000000001"}, "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
 		"confidence": "high", "ambiguity": "", "links": []any{}, "context": "", "options": []any{}, "deadline": "",
 		"mode": "none", "place": map[string]any{"context": "", "why": ""}}
-	return map[string]any{"brief": "brief of " + f.ID, "viewer_role": "assignee", "started_by_viewer": false, "items": []any{item},
+	return map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "brief of `+f.ID+`", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{item},
 		"verdict": "waits_on_viewer", "verdict_why": "", "closure_posted": false, "segments": []any{}, "links": []any{}}
 }
 

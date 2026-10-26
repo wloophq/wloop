@@ -335,9 +335,20 @@ func resolved(evidence string) func(obj) {
 	}
 }
 
+// briefObj is an answer's brief of goal, the kind a request.
+func briefObj(goal string) obj {
+	return obj{"unchanged": false, "goal": goal, "context": "", "kind": "request", "risk": "low", "risk_why": "",
+		"open_questions": []any{}, "tags": obj{"domain": []any{}, "audience": []any{}, "concern": []any{}}}
+}
+
 func answerJSON(t testing.TB, its, segs, links []obj, top obj) []byte {
 	t.Helper()
-	a := obj{"brief": "a brief", "viewer_role": "assignee", "started_by_viewer": false, "items": orEmpty(its), "verdict": "waits_on_viewer",
+	for _, sg := range segs {
+		if _, ok := sg["brief"]; !ok {
+			sg["brief"] = briefObj(fmt.Sprint(sg["topic"]))
+		}
+	}
+	a := obj{"brief": briefObj("a brief"), "viewer_role": "assignee", "started_by_viewer": false, "items": orEmpty(its), "verdict": "waits_on_viewer",
 		"verdict_why": "why", "closure_posted": false, "segments": orEmpty(segs), "links": orEmpty(links)}
 	for k, v := range top {
 		a[k] = v
@@ -440,7 +451,7 @@ func TestFailedCallKeepsTheCursor(t *testing.T) {
 	if its := r.items(u); len(its) != 1 || its[0].ID != "e"+strings.ReplaceAll(ts(1), ".", "") {
 		t.Fatalf("items after the retry %+v", its)
 	}
-	if st, _ := r.job.Store.States(context.Background(), []unit.Unit{u}); st[u].Brief != "a brief" {
+	if st, _ := r.job.Store.States(context.Background(), []unit.Unit{u}); GoalOf(st[u].Brief) != "a brief" {
 		t.Fatalf("state after the retry %+v", st)
 	}
 }
@@ -482,7 +493,7 @@ func TestDMSegmentsBeforeOps(t *testing.T) {
 		t.Fatalf("items deck %v pr %v", r.items(deck), r.items(pr))
 	}
 	st, err := r.job.Store.States(context.Background(), []unit.Unit{deck, pr})
-	if err != nil || st[deck].Topic != "the deck" || st[pr].Topic != "the PR" || st[pr].Brief != "a brief" {
+	if err != nil || st[deck].Topic != "the deck" || st[pr].Topic != "the PR" || GoalOf(st[pr].Brief) != "the PR" || GoalOf(st[deck].Brief) != "the deck" {
 		t.Fatalf("segment states %+v %v", st, err)
 	}
 	r.facts.post(jDM, ts(4), "", jOther, "any news on the PR?", jT0.Add(5*time.Minute))

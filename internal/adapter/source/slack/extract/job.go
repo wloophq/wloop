@@ -70,6 +70,9 @@ type Job struct {
 	Clock    port.Clock
 	Cfg      func() config.Config
 	Log      func(format string, args ...any)
+	// Vocabulary is the tag vocabulary the brief's domains reuse,
+	// tag.Vocabulary's lines; nil offers none.
+	Vocabulary func(ctx context.Context) (string, error)
 
 	mu      sync.Mutex
 	loaded  bool
@@ -400,6 +403,11 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 		return outcome{err: err}
 	}
 	in := Input{Unit: k, Now: now, Language: ec.LanguageName(), Conversation: conv, Brief: st.Brief, WindowChars: ec.Window()}
+	if j.Vocabulary != nil {
+		if in.Vocabulary, err = j.Vocabulary(ctx); err != nil {
+			return outcome{err: err}
+		}
+	}
 	for _, c := range cfg.Placement {
 		in.Contexts = append(in.Contexts, c.Match)
 	}
@@ -574,13 +582,13 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	units := []unit.Unit{k}
 	obj := slack.ObjectRef{Conversation: p.conv}
 	if p.dm {
-		applied, topics, err := j.segment(ctx, team, in, r)
+		applied, segs, err := j.segment(ctx, team, in, r)
 		if err != nil {
 			return 0, &answerError{err}
 		}
 		for i, u := range applied {
 			s := state
-			s.LastTS, s.LastSeq, s.Topic = "", 0, topics[i]
+			s.LastTS, s.LastSeq, s.Topic, s.Brief = "", 0, segs[i].Topic, segs[i].Brief
 			states[u] = s
 		}
 		if ops, err = j.place(ctx, in, ops, applied, itemUnit); err != nil {
@@ -630,28 +638,31 @@ func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) error {
 
 // segment writes the DM's segments the answer names before any op lands on them. Without
 // segments, a DM never segmented gets one open segment from its first message.
-func (j *Job) segment(ctx context.Context, team string, in Input, r Result) ([]unit.Unit, []string, error) {
+// segment applies the answer's segments and returns each applied unit with
+// the answer's segment it came from; a DM answered without segments is one
+// segment, briefed as the conversation.
+func (j *Job) segment(ctx context.Context, team string, in Input, r Result) ([]unit.Unit, []SegmentOut, error) {
 	var spans []slack.Span
-	var topics []string
-	for _, s := range r.Segments {
+	segs := r.Segments
+	for _, s := range segs {
 		sp := slack.Span{FromTS: s.FromTS, ToTS: s.ToTS}
 		if s.Ref != "new" {
 			n, _ := strconv.Atoi(strings.TrimPrefix(s.Ref, "s"))
 			sp.ID = in.Segments[n-1].ID
 		}
-		spans, topics = append(spans, sp), append(topics, s.Topic)
+		spans = append(spans, sp)
 	}
 	if len(spans) == 0 {
 		if len(in.Segments) > 0 {
 			return nil, nil, nil
 		}
-		spans, topics = []slack.Span{{FromTS: in.Messages[0].TS}}, []string{""}
+		spans, segs = []slack.Span{{FromTS: in.Messages[0].TS}}, []SegmentOut{{Brief: r.Brief}}
 	}
 	applied, err := j.Writer.Apply(ctx, team, in.Conversation.ID, spans)
 	if err != nil {
 		return nil, nil, fmt.Errorf("segments: %w", err)
 	}
-	return applied, topics, nil
+	return applied, segs, nil
 }
 
 // place moves every op onto the segment unit of its item: a new item's segment covers its
