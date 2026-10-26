@@ -126,7 +126,7 @@ Judgment blocks (`intent=address.md`) remain the way to add to what a turn looks
 
 ## Change a partial
 
-The partials are the text every intent's instructions share: `record` (how a turn ends), `history`, `resume`, `brief`, `judgment`, `items`, `unit`, `dossier`, `why` and `artifact` (the record's sentence per artifact kind). Each is a file of the bundled profile's `partials/`, and a file of yours of the same name replaces it for every intent:
+The partials are the text every intent's instructions share: `record` (how a turn ends), `history`, `resume`, `brief`, `judgment` (with `review-judgment` in the same file), `items`, `unit`, `dossier`, `why` and `artifact` (the record's sentence per artifact kind). Each is a file of the bundled profile's `partials/`, and a file of yours of the same name replaces it for every intent:
 
 ```sh
 {{command}} profile show acme/api --show            # the instructions, rendered
