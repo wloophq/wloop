@@ -4,7 +4,7 @@ package builtin
 var stepGrammar = []Key{
 	stepKey(StepTurnStart, "intent", KindText, "", "The intent whose turn starts; it must serve the unit. Required."),
 	stepEnum(StepTurnStart, "stage", Stages, "", "The pass over the unit, for a review."),
-	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs; by default the intent's first runner."),
+	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs, one of the intent's runners; by default its first."),
 
 	stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required."),
 	stepEnum(StepDraftPropose, "delivery", DraftDeliveries, DraftDeliveries[0], "How the draft posts."),

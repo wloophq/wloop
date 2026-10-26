@@ -355,7 +355,7 @@
                   "type": "string"
                 },
                 "runner": {
-                  "description": "How the turn runs; by default the intent's first runner.",
+                  "description": "How the turn runs, one of the intent's runners; by default its first.",
                   "enum": [
                     "session",
                     "headless"

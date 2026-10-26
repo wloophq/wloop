@@ -82,7 +82,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `answer.refuse` | `reason` | string |  | The reason the refused answer records. |
 | `turn.start` | `intent` | string |  | The intent whose turn starts; it must serve the unit. Required. |
 | `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit, for a review. |
-| `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs; by default the intent's first runner. |
+| `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs, one of the intent's runners; by default its first. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
 | `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts. |
 | `draft.propose` | `text` | file | `text.md.tmpl` | The template of the draft's text, beside the manifest. |

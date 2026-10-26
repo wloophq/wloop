@@ -374,7 +374,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.intentProblem, l.briefExtras)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.briefExtras)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
@@ -386,18 +386,24 @@ func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
 	return builtin.ExtraFacts(d.Extra)
 }
 
-func (l *Loaded) intentProblem(name string) string {
+func (l *Loaded) turnProblem(name, runner string) (arg, msg string) {
 	if _, ok := l.Broken[dintent.Name(name)]; ok {
-		return fmt.Sprintf("the intent %q does not load", name)
+		return "intent", fmt.Sprintf("the intent %q does not load", name)
 	}
 	d, ok := l.Registry.Get(dintent.Name(name))
-	if !ok {
-		return fmt.Sprintf("unknown intent %q; the intents are %s", name, l.Registry.AllNames())
+	switch {
+	case !ok:
+		return "intent", fmt.Sprintf("unknown intent %q; the intents are %s", name, l.Registry.AllNames())
+	case d.Builds != "":
+		return "intent", fmt.Sprintf("the intent %q builds a %s and is never a turn", name, d.Builds)
+	case runner != "" && !d.Runs(runner):
+		runners := d.Runners
+		if runners == nil {
+			runners = []string{"session"}
+		}
+		return "runner", fmt.Sprintf("the intent %q does not run as %s; its runners are %s", name, runner, strings.Join(runners, ", "))
 	}
-	if d.Builds != "" {
-		return fmt.Sprintf("the intent %q builds a %s and is never a turn", name, d.Builds)
-	}
-	return ""
+	return "", ""
 }
 
 // BrokenNames is the kinds whose blocks are skipped, sorted: the user

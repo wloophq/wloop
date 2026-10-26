@@ -85,9 +85,9 @@ type wUnit struct {
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
 // A user workflow that fails is listed in broken and left out of loaded; a
 // bundled one whose override fails is listed in reverted and loads without
-// it. intentProblem, when set, is why a turn.start may not name an intent,
-// "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string, extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
+// it. turnProblem, when set, is why a turn.start may not name an intent
+// or run it under a runner, with the argument at fault; "" when it may.
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -129,12 +129,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(intentProblem, extras)
+		u.load(turnProblem, extras)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(intentProblem, extras)
+			u.load(turnProblem, extras)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -200,7 +200,7 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(intentProblem func(string) string, extras func(dunit.ProviderID) expr.Env) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) {
 	file := u.files.path("workflow.toml")
 	s := &sheet{file: file, extras: extras}
 	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
@@ -229,7 +229,7 @@ func (u *wUnit) load(intentProblem func(string) string, extras func(dunit.Provid
 		s.addGrammar(ps)
 	}()
 	s.at = positions(src)
-	u.wf = s.defineWorkflow(u.name, m, intentProblem)
+	u.wf = s.defineWorkflow(u.name, m, turnProblem)
 	s.stepFiles(u.wf.Steps, u.files.read)
 	u.whenAt = s.pos("when")
 	u.wf.Source = file
@@ -269,7 +269,7 @@ func providerNames() []string {
 	return names
 }
 
-func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(string) string) workflow.Workflow {
+func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent, runner string) (arg, msg string)) workflow.Workflow {
 	w := workflow.Workflow{Name: name, Observe: m.Observe, Order: 100}
 	if m.Summary == nil || strings.TrimSpace(*m.Summary) == "" {
 		s.add("summary", "is required: one line saying what the workflow does")
@@ -295,7 +295,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	} else if m.When != nil && slot != "" {
 		w.When = s.predicate("when", *m.When, s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot))
 	}
-	s.defineSteps(&w, m.Step, intentProblem)
+	s.defineSteps(&w, m.Step, turnProblem)
 	if l := m.Limits; l != nil {
 		for k, v := range map[string]int{"per_run": l.PerRun, "per_day": l.PerDay, "per_unit_per_day": l.PerUnitPerDay} {
 			if v < 0 {
@@ -400,7 +400,7 @@ func stepDef(use string) (builtin.StepDef, bool) {
 	return builtin.Steps[i], true
 }
 
-func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intentProblem func(string) string) {
+func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnProblem func(intent, runner string) (arg, msg string)) {
 	if len(steps) == 0 {
 		s.add("step", "is required: at least one [[step]] with use = \"<builtin>\"")
 		return
@@ -469,9 +469,10 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 			if !present {
 				s.add(p+".intent", "is required: the intent the turn runs")
 			}
-			if name, ok := intent.(string); ok && intentProblem != nil {
-				if msg := intentProblem(name); msg != "" {
-					s.add(p+".intent", "%s", msg)
+			if name, ok := intent.(string); ok && turnProblem != nil {
+				runner, _ := st.Args["runner"].(string)
+				if arg, msg := turnProblem(name, runner); msg != "" {
+					s.add(p+"."+arg, "%s", msg)
 				}
 			}
 		}

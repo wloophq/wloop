@@ -228,7 +228,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
   - `stage` (one of `first`, `follow-up`): The pass over the unit, for a review.
-  - `runner` (one of `session`, `headless`): How the turn runs; by default the intent's first runner.
+  - `runner` (one of `session`, `headless`): How the turn runs, one of the intent's runners; by default its first.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
   - `delivery` (one of `message`, `reaction`, `comment`, default `message`): How the draft posts.

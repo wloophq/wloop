@@ -38,3 +38,29 @@ intent = "unit-brief"
 		t.Fatal("the builder itself did not load")
 	}
 }
+
+func TestTurnStartRefusesARunnerItsIntentDoesNotList(t *testing.T) {
+	root := t.TempDir()
+	writeWorkflow(t, root, "review-headless", `summary = "Case"
+provider = "github"
+when = 'pr.draft'
+
+[[step]]
+use = "turn.start"
+intent = "ask-author"
+runner = "headless"
+`)
+	writeIntent(t, root, "ask-author", minimal, "Ask.")
+	m := strings.ReplaceAll(strings.Replace(minimal, `workspace = "review"`, "workspace = \"given\"\nprovider = \"slack\"", 1), "{{.pr.slug}}", "{{.unit.ref}}")
+	writeIntent(t, root, "ask-owner", m, "Ask.")
+	writeWorkflow(t, root, "ask-headless", strings.Replace(slackTurn, `intent = "act"`, `intent = "ask-owner"`, 1)+"\n[limits]\nper_day = 3\n")
+	_, problems := Load(userLayer(root), nil, testBase(), nil)
+	for _, want := range []string{
+		`step[0].runner: the intent "ask-author" does not run as headless; its runners are session`,
+		`step[0].runner: the intent "ask-owner" does not run as headless; its runners are session`,
+	} {
+		if !strings.Contains(problems.Error(), want) {
+			t.Errorf("want %q in\n%s", want, problems.Error())
+		}
+	}
+}
