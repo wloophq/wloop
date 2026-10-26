@@ -242,7 +242,7 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 	if s.deps.ByHandRef != nil {
 		return s.deps.ByHandRef(ctx, req, handle)
 	}
-	return parsePRURL(req.URL)
+	return unitOfAddress(s.deps.Units, req.URL)
 }
 
 // prepareByHand runs the intent's prepare for a turn by hand, whose

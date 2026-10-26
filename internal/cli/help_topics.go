@@ -38,10 +38,6 @@ var colorFlag = helpFlag{"--color auto|always|never", "Lay the output out for a 
 func conditionFlags() []helpFlag {
 	var names []string
 	for _, d := range profile.Dims {
-		if d == profile.DimOrganization {
-			names = append(names, "--org")
-			continue
-		}
 		names = append(names, "--"+string(d))
 	}
 	return []helpFlag{
@@ -267,7 +263,7 @@ func helpGroups(manager string) []helpGroup {
 				Usage:    []string{"profile where <intent> [conditions]"},
 				About:    "Name the block of the profile a rule with these conditions goes in, and the blocks that join it in a turn.",
 				Flags:    conditionFlags(),
-				Examples: []string{"profile where review --org acme --repo api"},
+				Examples: []string{"profile where review --organization acme --repo api"},
 				Docs:     "reference/profile-blocks",
 			},
 			{
@@ -283,7 +279,7 @@ func helpGroups(manager string) []helpGroup {
 					helpFlag{"--paths <glob>", "A glob a changed file must match, for a new block; repeatable"},
 					helpFlag{"--apply", "Write the change; without it, print the diff"},
 				),
-				Examples: []string{"profile add review --org acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
+				Examples: []string{"profile add review --organization acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
 				Docs:     "guides/review-profile",
 			},
 			{

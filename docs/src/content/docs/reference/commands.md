@@ -481,13 +481,13 @@ Name the block of the profile a rule with these conditions goes in, and the bloc
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 
 Examples:
 
 ```sh
-{{command}} profile where review --org acme --repo api
+{{command}} profile where review --organization acme --repo api
 ```
 
 See [Profile format](/reference/profile-blocks/).
@@ -504,7 +504,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 | `--section <heading>` | The ## heading the rule goes under |
 | `--title <title>` | The block's heading, for a new block |
@@ -515,7 +515,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 Examples:
 
 ```sh
-{{command}} profile add review --org acme -- Every migration needs a down step.
+{{command}} profile add review --organization acme -- Every migration needs a down step.
 {{command}} profile add nudge --apply -- Keep nudges to two sentences.
 ```
 
