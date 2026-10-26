@@ -47,7 +47,7 @@ func TestDraftProposeRefusesBadArguments(t *testing.T) {
 		{`purpose = "nudge"`, "purpose = \"nudge\"\ndelivery = \"fax\"", `step[0].delivery: "fax" is not one of`},
 		{`items = "owed"`, `items = "mine"`, `step[0].items: "mine" is not one of`},
 		{`per = "person"`, `per = "team"`, `step[0].per: "team" is not one of`},
-		{`effects = ["entry.nudged"]`, `effects = ["entry.nudged", "entry.closed"]`, `step[0].effects[1]: "entry.closed" is not an effect`},
+		{`effects = ["entry.nudged"]`, `effects = ["entry.nudged", "entry.closed"]`, `step[0].effects[1]: "entry.closed" is not one of`},
 		{`repeat_after = "1d"`, `repeat_after = "soon"`, `step[0].repeat_after: "soon" is not a duration`},
 		{"when = '!draft.person_waited'", "when = '!draft.nope'", "unknown field draft.nope"},
 	} {

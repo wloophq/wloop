@@ -1,7 +1,6 @@
 package intent
 
 import (
-	"bytes"
 	"errors"
 	"io/fs"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
@@ -28,10 +28,14 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 	var problems Problems
 	merge := func(file string, src []byte) {
 		var d manifestDefaults
-		dec := toml.NewDecoder(bytes.NewReader(src))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&d); err != nil {
+		if err := toml.Unmarshal(src, &d); err != nil {
 			problems = append(problems, Problem{File: file, Msg: err.Error()})
+			return
+		}
+		s := &sheet{file: file, at: positions(src)}
+		s.addGrammar(grammar(builtin.SurfaceDefaults, src, file != DefaultsFile))
+		if len(s.problems) > 0 {
+			problems = append(problems, s.problems...)
 			return
 		}
 		if d.Provider != "" {

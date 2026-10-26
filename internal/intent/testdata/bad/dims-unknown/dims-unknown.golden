@@ -1,1 +1,1 @@
-testdata/bad/dims-unknown/intents/ask-author/intent.toml:5:18: dims[1]: "size" is not one of "stage", "reviewer"
+testdata/bad/dims-unknown/intents/ask-author/intent.toml:5:18: dims[1]: "size" is not one of "stage" or "reviewer"; did you mean "stage"?

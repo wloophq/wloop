@@ -91,8 +91,8 @@ func printWorkflowSteps(e *Env) error {
 			subjects = strings.Join(names, ", ")
 		}
 		args := "-"
-		if len(d.Args) > 0 {
-			args = strings.Join(d.Args, ", ")
+		if a := builtin.StepArgs(d.Name); len(a) > 0 {
+			args = strings.Join(a, ", ")
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", d.Name, subjects, args, d.Doc)
 	}

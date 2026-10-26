@@ -32,7 +32,7 @@ func TestCleanupDefaults(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`{"workflows":{"x":{"approval":{"mode":"never"}}}}`: `workflows.x.approval.mode: "never" is not one of run, delay, wait`,
+		`{"workflows":{"x":{"approval":{"mode":"never"}}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
 		`{"workflows":{"x":{"approval":{"window":"0s"}}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {

@@ -19,11 +19,6 @@ var (
 	inputNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	flagRe      = regexp.MustCompile(`^--[a-z][a-z0-9-]*$`)
 	titleRe     = regexp.MustCompile(`^[a-z]{1,12}$`)
-
-	strategies    = []string{"reuse_live", "new"}
-	inputTypes    = []string{"bool", "text", "list"}
-	inputFroms    = []string{"user", "prepare"}
-	inputSurfaces = []string{"cli", "instructions", "try"}
 )
 
 func quoted(vs []string) string {
@@ -89,15 +84,11 @@ func (s *sheet) validate(d dintent.Def) {
 	switch {
 	case d.Verb == "":
 	case !slices.Contains(builtin.IntentVerbs, d.Verb):
-		s.oneOf("verb", d.Verb, builtin.IntentVerbs)
 	case d.Action == nil:
 		s.add("verb", "verb needs an [action]")
 	}
 	if d.Workspace != "" {
 		s.builtinRef("workspace", builtin.SlotWorkspace, d.Workspace)
-	}
-	if d.Session.Strategy != "" {
-		s.oneOf("session.strategy", d.Session.Strategy, strategies)
 	}
 	if d.Session.Title != "" && !titleRe.MatchString(d.Session.Title) {
 		s.add("session.title", "%q must be 1 to 12 lowercase letters", d.Session.Title)
@@ -111,7 +102,6 @@ func (s *sheet) validate(d dintent.Def) {
 	}
 	s.effects("effects", d, d.Effects, builtin.AppliesTurn, builtin.TurnEffectNames())
 	s.effects("drafts.allowed_effects", d, d.AllowedEffects, builtin.AppliesDraft, builtin.EffectNames())
-	s.eachOneOf("dims", d.Dims, builtin.IntentDims)
 	if d.Guidance.Max < 0 {
 		s.add("guidance.max", "must be 0 (no limit) or more")
 	}
@@ -145,10 +135,6 @@ func (s *sheet) validateInputs(d dintent.Def) {
 		if !inputNameRe.MatchString(in.Name) {
 			s.add(path, "an input name is lowercase letters, digits and _, starting with a letter")
 		}
-		if in.Type != "" {
-			s.oneOf(path+".type", in.Type, inputTypes)
-		}
-		s.oneOf(path+".from", in.From, inputFroms)
 		if in.Type == "list" && in.From == "user" {
 			s.add(path+".type", "a list input comes from prepare, not from the user")
 		}
@@ -182,7 +168,6 @@ func (s *sheet) validateInputs(d dintent.Def) {
 		if in.Max > 0 && in.Type != "text" {
 			s.add(path+".max", "applies to text inputs only")
 		}
-		s.eachOneOf(path+".surfaces", in.Surfaces, inputSurfaces)
 		persisted[in.Name] = in.Persist
 	}
 	for i, n := range d.Join.DiffersOn {
@@ -210,12 +195,9 @@ func (s *sheet) validateRecord(d dintent.Def) {
 	if r.States != nil && len(r.States) == 0 {
 		s.add("record.states", "must list at least one state")
 	}
-	s.eachOneOf("record.states", r.States, builtin.RecordStates)
 	if slices.Contains(r.States, "asked") && !d.Answerable {
 		s.add("record.states", "asked needs answerable = true")
 	}
-	s.eachOneOf("record.artifacts", r.Artifacts, record.ArtifactKinds)
-	s.eachOneOf("record.outcome", r.Outcome, record.OutcomeFields)
 	if r.HistoryArtifact != "" && !slices.Contains(r.Artifacts, r.HistoryArtifact) {
 		s.add("record.history_artifact", "%s is not in record.artifacts", r.HistoryArtifact)
 	}

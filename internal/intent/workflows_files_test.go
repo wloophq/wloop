@@ -78,7 +78,7 @@ purpose = "close"
 		`["unit.closed", "entry.nudged"]`: "",
 		`"unit.closed"`:                   "step[0].effects: must be a list of strings",
 		`"unit.closed,entry.nudged"`:      "step[0].effects: must be a list of strings",
-		`["unit.close"]`:                  `step[0].effects[0]: "unit.close" is not an effect`,
+		`["unit.close"]`:                  `step[0].effects[0]: "unit.close" is not one of`,
 	} {
 		root := t.TempDir()
 		writeWorkflow(t, root, "close", closeEntry+"effects = "+effects+"\n")
@@ -109,7 +109,7 @@ func TestNoTriggerMeansEverySweep(t *testing.T) {
 		t.Fatalf("%+v", l.Workflows)
 	}
 	got := problems.Error()
-	for _, want := range []string{"every/workflow.toml:6:1: trigger.every: unknown key", "empty/workflow.toml:5:2: trigger: needs exactly one of on or schedule"} {
+	for _, want := range []string{"every/workflow.toml:6:9: trigger.every: unknown key", "empty/workflow.toml:5:2: trigger: needs exactly one of on or schedule"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("want %q in\n%s", want, got)
 		}

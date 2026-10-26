@@ -140,6 +140,9 @@ func (w *walker) value(pat []string, path string, v any) {
 }
 
 func (w *walker) leaf(r Key, path string, v any) {
+	if v == nil {
+		return // JSON's null, which leaves the setting unset
+	}
 	switch r.Kind {
 	case KindAny:
 	case KindTable, KindMap:
@@ -151,6 +154,10 @@ func (w *walker) leaf(r Key, path string, v any) {
 	case KindInt:
 		if !integer(v) {
 			w.add(path, "must be an integer")
+		}
+	case KindNumber:
+		if !number(v) {
+			w.add(path, "must be a number")
 		}
 	case KindList:
 		list, ok := v.([]any)
@@ -179,6 +186,14 @@ func (w *walker) leaf(r Key, path string, v any) {
 			}
 		}
 	}
+}
+
+func number(v any) bool {
+	switch v.(type) {
+	case int, int64, float64:
+		return true
+	}
+	return false
 }
 
 func integer(v any) bool {
@@ -266,6 +281,6 @@ func levenshtein(a, b string) int {
 
 var kindNames = map[Kind]string{KindPred: "a predicate", KindFact: "a fact", KindTemplate: "a template", KindFile: "a file",
 	KindEnum: "a value of a set", KindDur: "a duration", KindBool: "true or false", KindInt: "an integer", KindText: "a string",
-	KindList: "a list", KindTable: "a table", KindMap: "a table", KindAny: "any value"}
+	KindList: "a list", KindTable: "a table", KindMap: "a table", KindAny: "any value", KindNumber: "a number"}
 
 func kindName(k Kind) string { return kindNames[k] }

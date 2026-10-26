@@ -3,19 +3,21 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/duration"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // UnknownKeysError names the keys of a config file that no setting reads.
 type UnknownKeysError struct {
 	File string
 	Keys []string // paths such as "sweep.fsat" or "projects[0].agent_hom"
+	// Near are the grammar's guesses, by key: "sweep.fsat" did you mean fast.
+	Near map[string]string
 }
 
 func (e *UnknownKeysError) Error() string {
@@ -23,23 +25,42 @@ func (e *UnknownKeysError) Error() string {
 	if len(e.Keys) > 1 {
 		noun = "keys"
 	}
-	return fmt.Sprintf("%s: unknown %s %s", e.File, noun, strings.Join(e.Keys, ", "))
+	msg := fmt.Sprintf("%s: unknown %s %s", e.File, noun, strings.Join(e.Keys, ", "))
+	for _, k := range e.Keys {
+		if n := e.Near[k]; n != "" {
+			msg += fmt.Sprintf("; %s: did you mean %s?", k, n)
+		}
+	}
+	return msg
 }
 
-// decodeStrict decodes raw into c, refusing a key no field of Config reads
-// and naming the key of a duration it cannot read.
+// decodeStrict decodes raw into c after the grammar checked it: a key no
+// setting reads is an UnknownKeysError, and a value of the wrong kind or
+// outside its set names its key.
 func decodeStrict(file string, raw []byte, c *Config) error {
-	var tree any
+	var tree map[string]any
 	if err := json.Unmarshal(raw, &tree); err != nil {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
-	var w strictWalk
-	w.walk(tree, reflect.TypeFor[Config](), "")
-	if len(w.unknown) > 0 {
-		return &UnknownKeysError{File: file, Keys: w.unknown}
+	unknown := &UnknownKeysError{File: file, Near: map[string]string{}}
+	var bad []error
+	for _, p := range builtin.CheckUser(builtin.SurfaceConfig, tree) {
+		near, isUnknown := strings.CutPrefix(p.Msg, "unknown key")
+		if !isUnknown {
+			bad = append(bad, fmt.Errorf("%s: %s: %s", file, p.Path, p.Msg))
+			continue
+		}
+		unknown.Keys = append(unknown.Keys, p.Path)
+		if n, ok := strings.CutPrefix(near, "; did you mean "); ok {
+			unknown.Near[p.Path] = strings.TrimSuffix(n, "?")
+		}
 	}
-	if w.bad != nil {
-		return fmt.Errorf("%s: %w", file, w.bad)
+	if len(unknown.Keys) > 0 {
+		slices.Sort(unknown.Keys)
+		return unknown
+	}
+	if len(bad) > 0 {
+		return errors.Join(bad...)
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
@@ -47,93 +68,6 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
 	return nil
-}
-
-var (
-	unmarshalerType = reflect.TypeFor[json.Unmarshaler]()
-	daysType        = reflect.TypeFor[Days]()
-)
-
-// strictWalk collects the paths that Config has no field for, sorted, and
-// the first duration it cannot read.
-type strictWalk struct {
-	unknown []string // paths such as "sweep.fsat"
-	bad     error
-}
-
-func (w *strictWalk) walk(v any, t reflect.Type, at string) {
-	for t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	if t == daysType {
-		if s, ok := v.(string); ok && w.bad == nil {
-			if _, err := duration.Parse(s); err != nil {
-				w.bad = fmt.Errorf("%s: %w", at, err)
-			}
-		}
-		return
-	}
-	if reflect.PointerTo(t).Implements(unmarshalerType) {
-		return
-	}
-	switch t.Kind() {
-	case reflect.Struct:
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return
-		}
-		fields := jsonFields(t)
-		for _, k := range slices.Sorted(maps.Keys(obj)) {
-			f, ok := fields[k]
-			if !ok {
-				w.unknown = append(w.unknown, join(at, k))
-				continue
-			}
-			w.walk(obj[k], f, join(at, k))
-		}
-	case reflect.Map:
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return
-		}
-		for _, k := range slices.Sorted(maps.Keys(obj)) {
-			w.walk(obj[k], t.Elem(), join(at, k))
-		}
-	case reflect.Slice:
-		list, ok := v.([]any)
-		if !ok {
-			return
-		}
-		for i, e := range list {
-			w.walk(e, t.Elem(), fmt.Sprintf("%s[%d]", at, i))
-		}
-	}
-}
-
-func jsonFields(t reflect.Type) map[string]reflect.Type {
-	out := map[string]reflect.Type{}
-	for i := range t.NumField() {
-		f := t.Field(i)
-		if !f.IsExported() {
-			continue
-		}
-		name := jsonName(f)
-		switch name {
-		case "-":
-			continue
-		case "":
-			name = f.Name
-		}
-		out[name] = f.Type
-	}
-	return out
-}
-
-func join(at, k string) string {
-	if at == "" {
-		return k
-	}
-	return at + "." + k
 }
 
 // jsonName is f's key in the file, "" when its tag names none.

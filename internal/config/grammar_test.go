@@ -31,7 +31,17 @@ func configPaths(t reflect.Type, at string, out map[string]builtin.Kind) {
 	}
 }
 
-var tierType = reflect.TypeFor[turns.Tier]()
+var (
+	tierType = reflect.TypeFor[turns.Tier]()
+	daysType = reflect.TypeFor[Days]()
+)
+
+func join(at, k string) string {
+	if at == "" {
+		return k
+	}
+	return at + "." + k
+}
 
 func pathOf(ft reflect.Type, path string, out map[string]builtin.Kind) {
 	for ft.Kind() == reflect.Pointer {
@@ -58,7 +68,7 @@ func pathOf(ft reflect.Type, path string, out map[string]builtin.Kind) {
 	case ft.Kind() == reflect.Int, ft.Kind() == reflect.Int64:
 		out[path] = builtin.KindInt
 	case ft.Kind() == reflect.Float64:
-		out[path] = builtin.KindAny
+		out[path] = builtin.KindNumber
 	case ft.Kind() == reflect.String:
 		out[path] = builtin.KindText
 	default:

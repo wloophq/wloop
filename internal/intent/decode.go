@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -171,7 +170,8 @@ func (s *sheet) runners(m []string) []string {
 	return slices.Clone(m)
 }
 
-// decode reads intent.toml strictly. After a type mismatch it blanks the
+// decode reads a manifest; its unknown keys are the grammar's to name.
+// After a type mismatch it blanks the
 // offending key and decodes again, so semantic checks still run; skip is that
 // key's path, whose semantic problems would repeat the mismatch. complete is
 // false after a syntax error: there is no tree to check.
@@ -198,11 +198,6 @@ func decode[T any](file string, src []byte) (m T, problems Problems, skip string
 	case err == nil:
 		return m, problems, skip, true
 	case errors.As(err, &strict):
-		for i := range strict.Errors {
-			de := &strict.Errors[i]
-			row, col := de.Position()
-			problems = append(problems, Problem{File: file, Line: row, Col: col, Field: strings.Join(de.Key(), "."), Msg: unknownKey(reflect.TypeFor[T](), de.Key())})
-		}
 		return m, problems, skip, true
 	case errors.As(err, &de):
 		row, col := de.Position()
@@ -291,45 +286,6 @@ func blankKeyValue(src []byte, row, col int) ([]byte, bool) {
 		}
 	}
 	return out, true
-}
-
-// unknownKey says what an unknown key of the manifest type t is, with the
-// closest key.
-func unknownKey(t reflect.Type, key []string) string {
-	known := keysAt(t, key[:len(key)-1])
-	if s := builtin.Closest(key[len(key)-1], known); s != "" {
-		return "unknown key; did you mean " + s + "?"
-	}
-	return "unknown key"
-}
-
-// keysAt lists the toml keys of the table at path, following map values and slice elements.
-func keysAt(t reflect.Type, path []string) []string {
-	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
-		t = t.Elem()
-	}
-	if t.Kind() == reflect.Map {
-		if len(path) == 0 {
-			return nil
-		}
-		return keysAt(t.Elem(), path[1:])
-	}
-	if t.Kind() != reflect.Struct {
-		return nil
-	}
-	if len(path) == 0 {
-		var keys []string
-		for i := range t.NumField() {
-			keys = append(keys, t.Field(i).Tag.Get("toml"))
-		}
-		return keys
-	}
-	for i := range t.NumField() {
-		if f := t.Field(i); f.Tag.Get("toml") == path[0] {
-			return keysAt(f.Type, path[1:])
-		}
-	}
-	return nil
 }
 
 var mismatch = regexp.MustCompile(`cannot decode TOML (\S+) into .* of type (\S+)$`)

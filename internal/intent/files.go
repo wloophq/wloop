@@ -47,6 +47,11 @@ func (f files) path(name string) string {
 	return filepath.Join(f.dir, name)
 }
 
+// user says that name is read from a user layer.
+func (f files) user(name string) bool {
+	return f.bundled == nil || f.path(name) != path.Join(f.dir, name)
+}
+
 // readProblem is why file was not read: missing when it does not exist.
 func readProblem(file string, err error, missing string) Problem {
 	if errors.Is(err, fs.ErrNotExist) {

@@ -33,8 +33,9 @@ const (
 	KindText
 	KindList // a list of Elem
 	KindTable
-	KindMap // a table whose keys an author names
-	KindAny // more than one form, which its decoder reads
+	KindMap    // a table whose keys an author names
+	KindAny    // more than one form, which its decoder reads
+	KindNumber // an integer or a decimal
 )
 
 // Key is one reserved key of the language. Path is dotted, "[]" marks an
@@ -83,6 +84,30 @@ func Check(surface Surface, doc map[string]any) []Problem {
 // only the bundled profile sets.
 func CheckUser(surface Surface, doc map[string]any) []Problem {
 	return checkUser(Grammar, surface, doc)
+}
+
+// CheckStep is Check on the arguments of a workflow step, use, without use itself.
+func CheckStep(use string, args map[string]any) []Problem {
+	var rows []Key
+	for _, k := range stepGrammar {
+		if k.Step == use {
+			rows = append(rows, k)
+		}
+	}
+	w := walker{rows: rows}
+	w.table(nil, "", args)
+	return w.problems
+}
+
+// StepArgs are the arguments step use takes, in the grammar's order.
+func StepArgs(use string) []string {
+	var out []string
+	for _, k := range stepGrammar {
+		if k.Step == use {
+			out = append(out, k.Path)
+		}
+	}
+	return out
 }
 
 // IsPredKey says whether a key named last holds a predicate somewhere in

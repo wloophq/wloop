@@ -7,7 +7,6 @@ import (
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -94,11 +93,7 @@ func (s *sheet) validateKeys(d dintent.Def) {
 			s.add("workspace.repo_input", "%q is no input of the intent", w.RepoInput)
 		}
 	}
-	if d.Role != "" {
-		s.oneOf("role", d.Role, builtin.RoleNames())
-	}
 	if d.Builds != "" {
-		s.oneOf("builds", d.Builds, builtin.Builds)
 		if d.Role != "" {
 			s.add("role", "a builder intent holds no role")
 		}

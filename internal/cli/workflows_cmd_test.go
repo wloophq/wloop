@@ -67,7 +67,7 @@ func TestWorkflowsStepsListTheVocabularyWithArguments(t *testing.T) {
 		if !strings.Contains(out, d.Name+" ") {
 			t.Errorf("lacks %s", d.Name)
 		}
-		for _, a := range d.Args {
+		for _, a := range builtin.StepArgs(d.Name) {
 			if !strings.Contains(out, a) {
 				t.Errorf("lacks %s's argument %s", d.Name, a)
 			}

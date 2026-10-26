@@ -217,14 +217,16 @@ func (u *wUnit) load(intentProblem func(string) string, extras func(dunit.Provid
 		s.problems = append(s.problems, problems...)
 		return
 	}
-	for i := range problems {
-		if problems[i].Field == "trigger.when" {
-			problems[i].Msg = "when is a top-level key: write it before the [trigger] table"
-		}
-	}
 	defer func() {
 		s.problems = slices.DeleteFunc(s.problems, func(p Problem) bool { return skip != "" && unindexed(p.Field) == unindexed(skip) })
 		s.problems = append(s.problems, problems...)
+		ps := grammar(builtin.SurfaceWorkflow, src, u.files.user("workflow.toml"))
+		for i := range ps {
+			if ps[i].Path == "trigger.when" {
+				ps[i].Msg = "when is a top-level key: write it before the [trigger] table"
+			}
+		}
+		s.addGrammar(ps)
 	}()
 	s.at = positions(src)
 	u.wf = s.defineWorkflow(u.name, m, intentProblem)
@@ -335,7 +337,6 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 	}
 	w.WithdrawReason = draft.WithdrawMoot
 	if m.Reason != nil {
-		s.oneOf("drafts.withdraw.reason", *m.Reason, []string{draft.WithdrawAssigned, draft.WithdrawMoot})
 		w.WithdrawReason = *m.Reason
 	}
 }
@@ -445,11 +446,11 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 				s.add(ap, "force is never available to an automatic run")
 			case k == "reach":
 				s.add(ap, "reach comes from the step's vocabulary; a manifest cannot set it")
-			case !slices.Contains(def.Args, k):
-				if len(def.Args) == 0 {
+			case !slices.Contains(builtin.StepArgs(use), k):
+				if args := builtin.StepArgs(use); len(args) == 0 {
 					s.add(ap, "%s takes no arguments", use)
 				} else {
-					s.add(ap, "%s takes %s, not %s", use, quoted(def.Args), k)
+					s.add(ap, "%s takes %s, not %s", use, quoted(args), k)
 				}
 			default:
 				v, ok := stepArg(use, k, raw[k])
@@ -473,16 +474,17 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 					s.add(p+".intent", "%s", msg)
 				}
 			}
-			if r, ok := raw["stage"].(string); ok {
-				s.oneOf(p+".stage", r, builtin.Stages)
-			}
-			if m, ok := raw["runner"].(string); ok {
-				s.oneOf(p+".runner", m, builtin.TurnRunners)
-			}
 		}
 		if use == builtin.StepDraftPropose {
 			s.draftPropose(p, st.Args)
 		}
+		args := maps.Clone(raw)
+		delete(args, "use")
+		ps := builtin.CheckStep(use, args)
+		for i := range ps {
+			ps[i].Path = p + "." + ps[i].Path
+		}
+		s.addGrammar(ps)
 		w.Steps = append(w.Steps, st)
 	}
 }
@@ -551,24 +553,9 @@ func (s *sheet) draftPropose(p string, args map[string]any) {
 	if v, _ := arg("purpose"); strings.TrimSpace(v) == "" {
 		s.add(p+".purpose", "is required: what the draft is for, such as nudge or close")
 	}
-	delivery, ok := arg("delivery")
-	if !ok {
-		delivery = builtin.DraftDeliveries[0]
-	}
-	s.oneOf(p+".delivery", delivery, builtin.DraftDeliveries)
+	delivery, _ := arg("delivery")
 	if r, _ := arg("reaction"); slices.Contains(builtin.DraftEmojiDeliveries, delivery) && r == "" {
 		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
-	}
-	for k, allowed := range map[string][]string{"items": builtin.DraftItems, "per": builtin.DraftPer, "target": builtin.DraftTargets} {
-		if v, ok := arg(k); ok {
-			s.oneOf(p+"."+k, v, allowed)
-		}
-	}
-	effects, _ := args["effects"].([]string)
-	for i, e := range effects {
-		if !slices.Contains(builtin.EffectNames(), e) {
-			s.add(fmt.Sprintf("%s.effects[%d]", p, i), "%q is not an effect; the effects are %s", e, quoted(builtin.EffectNames()))
-		}
 	}
 	if v, ok := arg("repeat_after"); ok {
 		s.repeatAfter(p+".repeat_after", v)

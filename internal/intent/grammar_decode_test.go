@@ -3,6 +3,7 @@ package intent
 import (
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -29,5 +30,13 @@ func TestPredicateHintCoversEveryPredKey(t *testing.T) {
 		if !strings.Contains(msg, "a predicate is a string: quote it") {
 			t.Errorf("%s %s: %q\n%s", k.In, k.Path, msg, src)
 		}
+	}
+}
+
+func TestDefaultsFileKeysFollowTheGrammar(t *testing.T) {
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte("provder = \"github\"\n")}}
+	_, problems := readDefaults(nil, bundled)
+	if !strings.Contains(problems.Error(), "defaults.toml:1:11: provder: unknown key; did you mean provider?") {
+		t.Errorf("%s", problems.Error())
 	}
 }

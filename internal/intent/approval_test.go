@@ -1,18 +1,14 @@
 package intent
 
 import (
-	"io/fs"
-	"path"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
-
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/profiles"
 )
 
 const removeWorkspace = `summary = "Remove a workspace"
@@ -129,69 +125,13 @@ func TestConfigOverlaysFieldByField(t *testing.T) {
 	}
 }
 
-func TestBundledWorkflowsFollowTheGrammar(t *testing.T) {
-	sub, err := fs.Sub(profiles.Default, "default")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dirs, err := fs.ReadDir(sub, "workflows")
-	if err != nil || len(dirs) == 0 {
-		t.Fatal(err)
-	}
-	for _, d := range dirs {
-		if !d.IsDir() {
-			continue
-		}
-		b, err := fs.ReadFile(sub, path.Join("workflows", d.Name(), "workflow.toml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		var doc map[string]any
-		if err := toml.Unmarshal(b, &doc); err != nil {
-			t.Fatal(err)
-		}
-		for _, p := range builtin.Check(builtin.SurfaceWorkflow, doc) {
-			t.Errorf("%s: %s: %s", d.Name(), p.Path, p.Msg)
-		}
-		steps, _ := doc["step"].([]any)
-		for i, raw := range steps {
-			args := map[string]any{}
-			for k, v := range raw.(map[string]any) {
-				if k != "use" {
-					args[k] = v
-				}
-			}
-			for _, p := range builtin.Check(builtin.SurfaceStep, args) {
-				t.Errorf("%s: step[%d].%s: %s", d.Name(), i, p.Path, p.Msg)
-			}
-		}
-	}
-}
-
-func TestEveryStepArgumentHasAGrammarRow(t *testing.T) {
-	for _, s := range builtin.Steps {
-		for _, a := range s.Args {
-			if r, ok := builtin.StepArg(s.Name, a); !ok || r.Doc == "" {
-				t.Errorf("%s: %s has no grammar row", s.Name, a)
-			}
-		}
-	}
+func TestEveryStepArgumentNamesAStep(t *testing.T) {
 	for _, r := range builtin.Grammar {
 		if r.In != builtin.SurfaceStep {
 			continue
 		}
-		i := slicesIndex(builtin.Steps, r.Step)
-		if i < 0 || !strings.Contains(" "+strings.Join(builtin.Steps[i].Args, " ")+" ", " "+r.Path+" ") {
-			t.Errorf("row %s of %s names no argument of the step", r.Path, r.Step)
+		if !slices.ContainsFunc(builtin.Steps, func(s builtin.StepDef) bool { return s.Name == r.Step }) || r.Doc == "" {
+			t.Errorf("row %s names no step, or has no doc: %q", r.Path, r.Step)
 		}
 	}
-}
-
-func slicesIndex(steps []builtin.StepDef, name string) int {
-	for i, s := range steps {
-		if s.Name == name {
-			return i
-		}
-	}
-	return -1
 }

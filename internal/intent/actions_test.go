@@ -93,3 +93,11 @@ func TestAUserActionTableLaysItsKeysOverTheBundledOnes(t *testing.T) {
 		t.Errorf("%+v", m)
 	}
 }
+
+func TestActionsFileKeysFollowTheGrammar(t *testing.T) {
+	bundled := fstest.MapFS{ActionsFile: {Data: []byte("[skip]\nlabel = \"Skip\"\nsummari = \"Skips\"\n")}}
+	_, problems := loadActions(nil, bundled)
+	if !strings.Contains(problems.Error(), "skip.summari: unknown key; did you mean summary?") {
+		t.Errorf("%s", problems.Error())
+	}
+}

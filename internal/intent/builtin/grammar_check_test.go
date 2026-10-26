@@ -137,6 +137,12 @@ func TestGrammarDefaultsAreValid(t *testing.T) {
 				t.Errorf("%s %s: default %q is no integer", k.In, k.Path, k.Default)
 			}
 			v = n
+		case KindNumber:
+			n, err := strconv.ParseFloat(k.Default, 64)
+			if err != nil {
+				t.Errorf("%s %s: default %q is no number", k.In, k.Path, k.Default)
+			}
+			v = n
 		case KindList, KindTable, KindMap:
 			t.Errorf("%s %s: a %s has no default", k.In, k.Path, kindName(k.Kind))
 			continue
@@ -147,4 +153,24 @@ func TestGrammarDefaultsAreValid(t *testing.T) {
 			t.Errorf("%s %s: default %q: %s", k.In, k.Path, k.Default, p.Msg)
 		}
 	}
+}
+
+func TestCheckTakesNullAsUnset(t *testing.T) {
+	doc := map[string]any{"runners": nil, "inputs": nil, "resume": nil, "role": nil}
+	wants(t, check(testRows, SurfaceIntent, doc))
+	wants(t, check(testRows, SurfaceConfig, map[string]any{"turns": map[string]any{"per_day": nil}}))
+}
+
+func TestCheckReadsANumber(t *testing.T) {
+	rows := []Key{{Path: "per_call_usd", In: SurfaceConfig, Kind: KindNumber}}
+	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": 0.5}))
+	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": int64(2)}))
+	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": "0.5"}), "per_call_usd: must be a number")
+}
+
+func TestCheckStepReadsOnlyItsStepsArguments(t *testing.T) {
+	wants(t, CheckStep(StepNotifySelf, map[string]any{"text": "a.md"}))
+	wants(t, CheckStep(StepNotifySelf, map[string]any{"reason": "x"}), "reason: unknown key")
+	wants(t, CheckStep(StepTurnStart, map[string]any{"intent": "review", "stage": "frist"}), `stage: "frist" is not one of`)
+	wants(t, CheckStep("session.close", map[string]any{"reason": "x"}), "reason: unknown key")
 }

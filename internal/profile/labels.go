@@ -6,7 +6,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // LabelsFile is the profile file that names the headings of a block's
@@ -57,13 +60,31 @@ func LoadLabels(chain []Layer) (Labels, error) {
 		if err != nil {
 			return Labels{}, err
 		}
+		file := fileName(l, LabelsFile)
+		if err := checkLabels(file, r.Body); err != nil {
+			return Labels{}, err
+		}
 		var own Labels
-		if err := frontmatter.Decode(fileName(l, LabelsFile), r.Body, 1, &own); err != nil {
+		if err := frontmatter.Decode(file, r.Body, 1, &own); err != nil {
 			return Labels{}, err
 		}
 		out = out.over(own)
 	}
 	return out, nil
+}
+
+// checkLabels is the grammar's first problem with src, nil when it has none.
+func checkLabels(file string, src []byte) error {
+	var doc map[string]any
+	if toml.Unmarshal(src, &doc) != nil {
+		return nil
+	}
+	ps := builtin.Check(builtin.SurfaceLabels, doc)
+	if len(ps) == 0 {
+		return nil
+	}
+	at := frontmatter.Positions(src, 1)[ps[0].Path]
+	return &frontmatter.Error{File: file, Line: max(at.Line, 1), Col: max(at.Col, 1), Key: ps[0].Path, Msg: ps[0].Msg}
 }
 
 var bundledLabels = sync.OnceValue(func() Labels {

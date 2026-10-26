@@ -165,8 +165,8 @@ func TestSegLabelsComeFromTheProfile(t *testing.T) {
 	if want := []string{"Org acme", "Base branch main", "Primeira rodada", "Tag change=refac"}; !slices.Equal(got, want) {
 		t.Fatalf("%q, want %q", got, want)
 	}
-	if _, err := Load([]Layer{bundled(), user(dir(t, map[string]string{LabelsFile: "colour = \"x\"\n"}))}, testIntents, nil); err == nil ||
-		!strings.Contains(err.Error(), LabelsFile) || !strings.Contains(err.Error(), "unknown key") {
+	if _, err := Load([]Layer{bundled(), user(dir(t, map[string]string{LabelsFile: "tga = \"x\"\n"}))}, testIntents, nil); err == nil ||
+		!strings.Contains(err.Error(), LabelsFile) || !strings.Contains(err.Error(), "tga: unknown key; did you mean tag?") {
 		t.Fatalf("an unknown key: %v", err)
 	}
 }

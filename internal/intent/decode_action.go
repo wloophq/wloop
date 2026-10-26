@@ -70,8 +70,6 @@ func (s *sheet) validateAction(d dintent.Def) {
 	if !d.UserFacing {
 		s.add("action", "applies to user-facing intents only")
 	}
-	s.oneOf("action.group", a.Group, builtin.ActionGroups)
-	s.eachOneOf("action.surfaces", a.Surfaces, builtin.ActionSurfaces)
 	for i, r := range a.Refuse {
 		at := fmt.Sprintf("action.refuse[%d]", i)
 		if r.When.Src == "" {

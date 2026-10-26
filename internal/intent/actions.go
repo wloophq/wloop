@@ -105,7 +105,7 @@ func mergeActions(out map[string]BuiltinAction, file string, src []byte) Problem
 	if !complete {
 		return problems
 	}
-	s := &sheet{file: file, at: positions(src)}
+	s := &sheet{file: file, at: positions(src), problems: problems}
 	for _, id := range slices.Sorted(maps.Keys(m)) {
 		if !slices.Contains(builtin.BuiltinActionIDs, id) {
 			msg := "names no built-in action"
@@ -117,7 +117,8 @@ func mergeActions(out map[string]BuiltinAction, file string, src []byte) Problem
 		}
 		out[id] = s.overAction(id, out[id], m[id])
 	}
-	return append(problems, s.problems...)
+	s.addGrammar(grammar(builtin.SurfaceActions, src, file != ActionsFile))
+	return s.problems
 }
 
 func (s *sheet) overAction(id string, a BuiltinAction, t mBuiltinAction) BuiltinAction {
