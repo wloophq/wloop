@@ -90,6 +90,10 @@ jobs:
           key: ${{ steps.go.outputs.mod-key }}
 
   brand:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [daemon, store, cli, sources, rest]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,8 +104,13 @@ jobs:
       - id: go
         uses: ./.github/actions/setup-go # zizmor: ignore[self-repository] actionlint 1.7.12 rejects the $/ form
         with:
-          cache: brand
-      - run: go test -race -timeout 30m -run '^$' -ldflags "$(make -s print-brand-ldflags)" ./...
+          cache: brand-${{ matrix.shard }}
+      - run: |
+          pkgs=$(scripts/test-shard.sh "$SHARD")
+          # shellcheck disable=SC2086
+          go test -run '^$' -ldflags "$(make -s print-brand-ldflags)" $pkgs
+        env:
+          SHARD: ${{ matrix.shard }}
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go.outputs.build-path }}
