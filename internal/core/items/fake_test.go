@@ -47,9 +47,6 @@ func (m *memStore) Query(_ context.Context, q Query) ([]items.Item, error) {
 			if q.State != "" && it.State != q.State {
 				continue
 			}
-			if len(q.WaitingOn) > 0 && !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Is(items.Identity{Keys: q.WaitingOn}) }) {
-				continue
-			}
 			out = append(out, it)
 		}
 	}

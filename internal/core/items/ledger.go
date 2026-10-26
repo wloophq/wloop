@@ -184,10 +184,7 @@ func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, err
 type Query struct {
 	Units     []unit.Unit
 	State     items.State
-	WaitingOn []string // person keys
 	Providers []unit.ProviderID
-	// Codecs compare WaitingOn with an item's keys; nil compares them byte for byte.
-	Codecs unit.KeyComparer
 }
 
 type Result struct {

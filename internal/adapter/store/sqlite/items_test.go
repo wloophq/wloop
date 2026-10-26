@@ -3,14 +3,12 @@ package sqlite
 import (
 	"context"
 	"reflect"
-	"slices"
 	"testing"
 	"time"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/items"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -141,7 +139,7 @@ func TestItemsStoreRoundTrips(t *testing.T) {
 	}
 }
 
-func TestQueryByWaitingOn(t *testing.T) {
+func TestQueryByProviderAndState(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
@@ -158,18 +156,7 @@ func TestQueryByWaitingOn(t *testing.T) {
 	if err := db.Items().Commit(ctx, coreitems.Commit{Items: []items.Item{mine, alias, resolved, other, nobody}}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := db.Items().Query(ctx, coreitems.Query{WaitingOn: []string{"github:me", "slack:U000ZZZ"}, State: items.Open, Codecs: unit.NewRegistry(pr.Codec{})})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var keys []string
-	for _, it := range got {
-		keys = append(keys, it.Unit.String()+" "+it.ID)
-	}
-	if !slices.Equal(keys, []string{"github:o/r#1 i1", "slack:C000AAA/1.2 i1"}) {
-		t.Errorf("got %v", keys)
-	}
-	got, _ = db.Items().Query(ctx, coreitems.Query{Providers: []unit.ProviderID{"slack"}, State: items.Open})
+	got, _ := db.Items().Query(ctx, coreitems.Query{Providers: []unit.ProviderID{"slack"}, State: items.Open})
 	if len(got) != 2 {
 		t.Errorf("slack open: %d", len(got))
 	}
