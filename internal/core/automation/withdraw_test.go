@@ -132,3 +132,19 @@ func TestWithdrawWhenReadsTheFactsScopedToItsWorkflow(t *testing.T) {
 		t.Fatalf("withdraw when read the unscoped facts: %v %q", ok, got)
 	}
 }
+
+func TestADraftOfAWorkflowThatFailsToLoadStays(t *testing.T) {
+	r := newRig(t, withdrawWF("ask", draft.WithdrawAssigned))
+	ws := withWithdrawals(r)
+	r.e.Broken = func() []string { return []string{"my-followups"} }
+	r.put(s1, "a")
+	ws.Put("my-followups", owned(1, s1, 0))
+	ws.Put("removed", owned(2, s1, 0))
+	r.sweep()
+	if got, ok := ws.Withdrawn(1); ok {
+		t.Fatalf("the draft of a workflow that failed to load was withdrawn: %q", got)
+	}
+	if got, ok := ws.Withdrawn(2); !ok || got != draft.WithdrawMoot {
+		t.Fatalf("the draft of a removed workflow: %v %q", ok, got)
+	}
+}

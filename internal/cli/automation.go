@@ -132,6 +132,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
+		Broken:    func() []string { return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows)) },
 		Units:     units,
 		Steps:     steps,
 		Guidance:  recGuidance{e},

@@ -3,6 +3,7 @@ package automation
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -11,7 +12,8 @@ import (
 // withdraw discards every proposed draft whose applying workflow's
 // [withdraw] when matches it on fresh facts, with the workflow's reason,
 // and every draft of a workflow no longer loaded as moot; a draft of a
-// disabled plugin's unit is left as it is.
+// disabled plugin's unit, or of a workflow that failed to load, is left as
+// it is.
 func (e *Engine) withdraw(ctx context.Context) error {
 	if e.Withdrawals == nil {
 		return nil
@@ -21,13 +23,17 @@ func (e *Engine) withdraw(ctx context.Context) error {
 		return err
 	}
 	live := e.live()
+	var broken []string
+	if e.Broken != nil {
+		broken = e.Broken()
+	}
 	vars := workflow.Vars{Now: e.now()}
 	if e.Config != nil {
 		vars.Config = e.Config()
 	}
 	var errs []error
 	for _, d := range ds {
-		if d.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(d.Subject.Provider) {
+		if d.Workflow == "" || e.PluginEnabled != nil && !e.PluginEnabled(d.Subject.Provider) || slices.Contains(broken, d.Workflow) {
 			continue
 		}
 		reason, err := e.withdrawal(ctx, live, d, vars)

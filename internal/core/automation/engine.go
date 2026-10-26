@@ -13,18 +13,21 @@ import (
 
 type Engine struct {
 	Workflows func() []workflow.Workflow
-	Units     Units
-	Events    Events
-	Steps     Steps
-	Ledger    Ledger
-	Guidance  Guidance
-	Changes   port.Changes // the wake (TopicSourceEvents for event workflows) and the revalidation under the lock
-	Clock     port.Clock
-	Codecs    *unit.Registry
-	Pause     func(ctx context.Context) (Pause, error)
-	Config    func() workflow.Facts
-	State     StateLoader
-	Marks     Marks // nil reads every unit as having no marks
+	// Broken names the workflows that failed to load; their proposed drafts
+	// stay until they load again or are gone. Nil: none failed.
+	Broken   func() []string
+	Units    Units
+	Events   Events
+	Steps    Steps
+	Ledger   Ledger
+	Guidance Guidance
+	Changes  port.Changes // the wake (TopicSourceEvents for event workflows) and the revalidation under the lock
+	Clock    port.Clock
+	Codecs   *unit.Registry
+	Pause    func(ctx context.Context) (Pause, error)
+	Config   func() workflow.Facts
+	State    StateLoader
+	Marks    Marks // nil reads every unit as having no marks
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals Withdrawals
 	// PluginEnabled says whether a provider's plugin is on; nil: every one
