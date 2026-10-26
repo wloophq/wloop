@@ -129,6 +129,9 @@ func (s *sheet) validate(d dintent.Def) {
 	for i, a := range d.AlsoProfiles {
 		s.oneOf(fmt.Sprintf("also_profiles[%d].round", i), a.Round, rounds)
 	}
+	if d.Skill && !d.UserFacing {
+		s.add("skill", "applies to user-facing intents only")
+	}
 	if a := d.Action; a != nil {
 		if !d.UserFacing {
 			s.add("action", "applies to user-facing intents only")

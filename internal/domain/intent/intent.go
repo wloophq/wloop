@@ -111,6 +111,8 @@ type Def struct {
 	// AutoSend false holds the intent's drafts for a person whatever their
 	// approval; nil keeps the default of their delivery.
 	AutoSend *bool
+	// Skill says whether install writes the intent a turn skill.
+	Skill bool
 }
 
 // WorkspaceRepo is where a turn runs when its manifest names a repository:

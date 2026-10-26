@@ -161,6 +161,5 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/turns/headless.go` `entryInput` `"entry"` `1` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
 | `internal/workspace/orca/orca.go` `Manager.LinkUnit` `unit.GitHub` `1` | ✅ | Orca's linkedPR holds a GitHub pull request only |
-| `skills/skills.go` `Bundled` `unit.GitHub` `1` | 🧾 | a turn skill takes a pull request's URL |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.

@@ -64,7 +64,7 @@ See [Add your own intent](/guides/custom-intent/) and the [intent manifest](/ref
 
 In Codex the same skills run as `$<skill> <url>`. `{{command}} install --print-skill <name>` prints one.
 
-The review, address and nudge skills come from one template, filled from each intent's manifest. Every installed skill carries a marker in its front matter:
+The review, address and nudge skills come from one template, filled from each intent's manifest; an intent gets one when its manifest sets `skill = true`. Every installed skill carries a marker in its front matter:
 
 ```yaml
 metadata:

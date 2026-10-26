@@ -143,6 +143,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		RefuseWhen:    m.RefuseWhen,
 		Reason:        m.Reason,
 		AutoSend:      m.AutoSend,
+		Skill:         m.Skill,
 	}
 	roleRound(&d)
 	s.provider(&d, m.Provider)

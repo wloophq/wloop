@@ -416,6 +416,19 @@ func TestAVerbNeedsAnAction(t *testing.T) {
 	}
 }
 
+func TestASkillGoesWithAUserFacingIntent(t *testing.T) {
+	root := t.TempDir()
+	writeIntent(t, root, "ask-author", "skill = true\n"+minimal, "{{.Headline}}")
+	writeIntent(t, root, "ask-quietly", "skill = true\nuser_facing = false\n"+minimal, "{{.Headline}}")
+	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
+	if d, ok := l.Registry.Get("ask-author"); !ok || !d.Skill {
+		t.Fatalf("ask-author: %+v %v", d, l.Broken["ask-author"])
+	}
+	if p := l.Broken["ask-quietly"]; len(p) != 1 || p[0].Field != "skill" || p[0].Msg != "applies to user-facing intents only" {
+		t.Fatalf("%v", p)
+	}
+}
+
 func TestTheBundledLayerIsReadOnce(t *testing.T) {
 	bundled, err := filepath.Abs("testdata/bundled")
 	if err != nil {

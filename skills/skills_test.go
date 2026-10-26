@@ -36,7 +36,18 @@ func names(sks []Skill) []string {
 	return out
 }
 
-func TestTheTurnSkillsAreTheUserFacingGitHubIntents(t *testing.T) {
+func TestATurnSkillGoesToTheIntentsWhoseManifestAsksForOne(t *testing.T) {
+	defs := []dintent.Def{
+		{Name: "sum-up", Summary: "Sum up a thread", UserFacing: true, Provider: "chat", Skill: true},
+		{Name: "triage", Summary: "Triage a pull request", UserFacing: true, Provider: "forge", Bundled: true},
+	}
+	want := []string{brand.SkillName("sum-up"), brand.Name, brand.SkillName("profile")}
+	if got := names(Bundled(defs)); !slices.Equal(got, want) {
+		t.Fatalf("skills %v, want %v", got, want)
+	}
+}
+
+func TestTheTurnSkillsAreTheBundledIntentsThatAskForOne(t *testing.T) {
 	want := []string{brand.SkillName("address"), brand.SkillName("nudge"), brand.SkillName("review"), brand.Name, brand.SkillName("profile")}
 	if got := names(bundled(t)); !slices.Equal(got, want) {
 		t.Fatalf("skills %v, want %v", got, want)

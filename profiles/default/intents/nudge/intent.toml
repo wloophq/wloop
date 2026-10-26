@@ -3,6 +3,7 @@ summary = "Ask whoever the pull request waits on for the next step, in a comment
 key     = "N"
 role    = "nudge"
 provider = "github"
+skill = true
 cap        = "rounds"
 refuse_when = "pr.nudge_refusal"
 workspace = "pr_else_main"

@@ -95,6 +95,7 @@
     "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
     "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
     "auto_send": {"type": "boolean", "description": "false keeps the intent's drafts for the user's approval whatever their draft approval."},
+    "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt."},
     "session": {
       "type": "object",
       "additionalProperties": false,

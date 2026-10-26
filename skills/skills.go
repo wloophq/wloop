@@ -14,7 +14,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 //go:embed turn/SKILL.md.tmpl
@@ -36,12 +35,12 @@ var (
 	Profile  = Skill{Name: brand.SkillName("profile"), Body: profile}
 )
 
-// Bundled lists every skill install writes: the turn skill of each
-// user-facing github intent of defs, then the operator and profile skills.
+// Bundled lists every skill install writes: the turn skill of each intent
+// of defs whose manifest asks for one, then the operator and profile skills.
 func Bundled(defs []dintent.Def) []Skill {
 	var out []Skill
 	for _, d := range defs {
-		if d.Bundled && d.UserFacing && d.Provider == unit.GitHub {
+		if d.Skill {
 			out = append(out, Turn(d))
 		}
 	}

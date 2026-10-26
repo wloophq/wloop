@@ -4,6 +4,7 @@ verb    = "delegate"
 key     = "F"
 role    = "round.address"
 provider = "github"
+skill = true
 round_kind  = "address"
 cap         = "rounds"
 reason_fact = "pr.address.reason"

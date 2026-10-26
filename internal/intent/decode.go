@@ -65,6 +65,7 @@ type manifest struct {
 	RefuseWhen    string            `toml:"refuse_when"`
 	Reason        string            `toml:"reason"`
 	AutoSend      *bool             `toml:"auto_send"`
+	Skill         bool              `toml:"skill"`
 }
 
 type mSession struct {
