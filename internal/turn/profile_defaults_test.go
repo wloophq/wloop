@@ -1,9 +1,12 @@
 package turn
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -61,5 +64,25 @@ func TestALayersDefaultProviderFillsOnlyTheManifestsThatNameNone(t *testing.T) {
 	}
 	if d, _ := l.Registry.Get("sum-up"); d.Provider != "slack" {
 		t.Errorf("sum-up runs on %q, want the layer's default", d.Provider)
+	}
+}
+
+func TestEveryBundledIntentNamesItsProvider(t *testing.T) {
+	manifests, err := fs.Glob(BundledFS(), "intents/*/intent.toml")
+	if err != nil || len(manifests) == 0 {
+		t.Fatalf("no bundled manifests: %v", err)
+	}
+	for _, m := range manifests {
+		raw, err := fs.ReadFile(BundledFS(), m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var keys map[string]any
+		if err := toml.Unmarshal(raw, &keys); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := keys["provider"]; !ok {
+			t.Errorf("%s names no provider, so a layer's defaults.toml would move it", m)
+		}
 	}
 }
