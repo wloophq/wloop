@@ -121,7 +121,7 @@ type Deps struct {
 	// DemandTimeout bounds a first turn's wait for an OnDemand source's
 	// brief; zero is the package's.
 	DemandTimeout time.Duration
-	Now                        func() time.Time
+	Now           func() time.Time
 	// After is time.After unless set.
 	After func(time.Duration) <-chan time.Time
 	// Changes keeps Status's counts until a pull request, a brief or the
