@@ -410,8 +410,10 @@ func TestNotifySelfPublishesItsText(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": "look at it", "named.md": "named text"})
 	pub := &recordingPub{}
-	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds, Pub: pub})
+	units := automationtest.NewUnits()
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	units.Put(u, workflow.Facts{})
+	s := newStepSet(te.Env, stepDeps{Units: units, Rounds: te.Rounds, Pub: pub})
 	if _, err := s.Run(context.Background(), wfStep("notify.self", "text", "named.md"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
 		t.Fatal(err)
 	}
@@ -420,6 +422,27 @@ func TestNotifySelfPublishesItsText(t *testing.T) {
 	}
 	if len(pub.evs) != 2 || pub.evs[0].Kind != kindNotifySelf || pub.evs[0].Data != "named text" || pub.evs[1].Data != "look at it" || pub.evs[0].Unit != u {
 		t.Fatalf("published %+v", pub.evs)
+	}
+}
+
+func TestNotifySelfRendersItsTemplate(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": `{{.Workflow}}: {{index .Facts "pr.slug"}} at {{.Unit}}`, "broken.md": "{{.Workflow"})
+	pub := &recordingPub{}
+	units := automationtest.NewUnits()
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	units.Put(u, workflow.Facts{"pr.slug": "acme/api#7"})
+	s := newStepSet(te.Env, stepDeps{Units: units, Rounds: te.Rounds, Pub: pub})
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.evs) != 1 || pub.evs[0].Data != "ping: acme/api#7 at "+u.String() {
+		t.Fatalf("published %+v", pub.evs)
+	}
+	refusal, err := s.Check(context.Background(), wfStep("notify.self", "text", "broken.md"), u, workflow.Why{Workflow: "ping"}, automation.CheckOpts{})
+	if err == nil && refusal == "" {
+		t.Fatal("a template that does not parse passed the check")
 	}
 }
 
