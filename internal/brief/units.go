@@ -64,13 +64,7 @@ func (q *Queue) wakeWaiters(u unit.Unit) {
 	delete(q.waiters, u)
 }
 
-func refOf(u unit.Unit) (github.Ref, bool) {
-	if u.Provider != unit.GitHub {
-		return github.Ref{}, false
-	}
-	ref, err := pr.ParseKey(u.Key)
-	return ref, err == nil
-}
+func refOf(u unit.Unit) (github.Ref, bool) { return pr.RefOf(u) }
 
 // Ready answers for a turn of u. A pull request is briefed by the queue: a
 // first turn waits for a brief at the current version, a later one takes the

@@ -281,8 +281,8 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 // and the entry, else u's items.
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
-	if u.Provider == unit.Entry {
-		e, err := d.Entries.Entry(ctx, gtd.ID(u.Key))
+	if id, ok := gtd.IDOf(u); ok {
+		e, err := d.Entries.Entry(ctx, id)
 		if err != nil {
 			return sub, err
 		}

@@ -20,5 +20,13 @@ func (Codec) Valid(key string) error {
 	return nil
 }
 
+// IDOf is the entry u names; false for a unit of another provider.
+func IDOf(u unit.Unit) (ID, bool) {
+	if u.Provider != unit.Entry {
+		return "", false
+	}
+	return ID(u.Key), true
+}
+
 // UnitOf is the entry provider's unit of id.
 func UnitOf(id ID) unit.Unit { return unit.Unit{Provider: unit.Entry, Key: string(id)} }

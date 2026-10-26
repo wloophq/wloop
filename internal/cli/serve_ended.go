@@ -38,10 +38,7 @@ func (b openPRBooks) Books(ctx context.Context, units ...unit.Unit) (map[unit.Un
 	}
 	var refs []pr.Ref
 	for u := range books {
-		if u.Provider != unit.GitHub {
-			continue
-		}
-		if ref, err := pr.ParseKey(u.Key); err == nil {
+		if ref, ok := pr.RefOf(u); ok {
 			refs = append(refs, ref)
 		}
 	}

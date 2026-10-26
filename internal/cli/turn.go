@@ -297,7 +297,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 	}
 	ref := prOf(r.Unit)
 	repo := ""
-	if r.Unit.Provider == unit.GitHub {
+	if isPR(r.Unit) {
 		repo = ref.Owner + "/" + ref.Repo
 	}
 	stored := dinv.StoredTurn{ID: out.ID, Kind: string(r.Intent), Repo: repo,

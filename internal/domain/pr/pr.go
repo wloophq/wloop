@@ -61,6 +61,16 @@ func ParseKey(key string) (Ref, error) {
 	return ref, nil
 }
 
+// RefOf is the pull request u names; false for a unit of another provider
+// or a key that names none.
+func RefOf(u unit.Unit) (Ref, bool) {
+	if u.Provider != unit.GitHub {
+		return Ref{}, false
+	}
+	ref, err := ParseKey(u.Key)
+	return ref, err == nil
+}
+
 // Unit is the github unit of the reference; the zero reference is the zero unit.
 func (r Ref) Unit() unit.Unit {
 	if r == (Ref{}) {

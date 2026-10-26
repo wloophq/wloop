@@ -54,7 +54,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 			return err
 		case uerr != nil:
 			return uerr
-		case u.Provider == unit.GitHub:
+		case isPR(u):
 			ref = prOf(u)
 		default:
 			return runIntentOn(ctx, e, d, u, args[1:])

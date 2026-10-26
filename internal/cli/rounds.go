@@ -108,7 +108,7 @@ func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
 // roleIntent is the intent holding role on pull requests; "" when none
 // loads.
 func (e *Env) roleIntent(role string) dintent.Name {
-	d, _ := e.loadedIntents().Registry.ByRole(role, unit.GitHub)
+	d, _ := e.loadedIntents().Registry.ByRole(role, builtin.RoundProviders[0])
 	return d.Name
 }
 

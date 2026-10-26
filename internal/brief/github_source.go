@@ -40,10 +40,11 @@ type prParts struct {
 }
 
 func (g GitHubSource) ref(u unit.Unit) (github.Ref, error) {
-	if u.Provider != unit.GitHub {
+	ref, ok := pr.RefOf(u)
+	if !ok {
 		return github.Ref{}, fmt.Errorf("brief: %s is not a pull request", u)
 	}
-	return pr.ParseKey(u.Key)
+	return ref, nil
 }
 
 // AtOf is what p is at, in the format brief_runs stores.

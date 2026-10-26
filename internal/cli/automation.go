@@ -91,7 +91,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		if m.Facts != nil {
 			providers[m.ID] = m.Facts
 		}
-		if m.Codec != nil && m.ID != unit.GitHub {
+		if m.Codec != nil && !slices.ContainsFunc(codecs, func(c unit.Codec) bool { return c.Provider() == m.ID }) {
 			codecs = append(codecs, m.Codec)
 		}
 	}

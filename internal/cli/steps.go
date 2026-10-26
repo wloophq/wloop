@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -365,7 +366,7 @@ func (s *stepSet) openTurn(ctx context.Context, c stepCall) (unit.Unit, int64, w
 	if err != nil {
 		return unit.Unit{}, 0, nil, err
 	}
-	if c.u.Provider != unit.Session {
+	if !dturn.IsSession(c.u) {
 		return c.u, factInt(f, "pr.open_turn_seq"), f, nil
 	}
 	t, err := s.turns()

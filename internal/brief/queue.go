@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/tag"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -283,13 +284,13 @@ func (q *Queue) isDue(pr dinv.PR, rec dinv.BriefRecord, ok bool, version string,
 	if !backoff {
 		w.AttemptedAt = time.Time{}
 	}
-	return q.source(unit.GitHub).Stale(w, AtOf(pr), version, now)
+	return q.source(pr.Ref.Unit().Provider).Stale(w, AtOf(pr), version, now)
 }
 
 // attemptKey is what an attempt at version on pr is made from, as its
 // BriefSource names it.
 func (q *Queue) attemptKey(pr dinv.PR, version string) string {
-	return q.source(unit.GitHub).AttemptKey(version, AtOf(pr))
+	return q.source(pr.Ref.Unit().Provider).AttemptKey(version, AtOf(pr))
 }
 
 // source is the BriefSource of p's units; a pull request without one in
@@ -301,7 +302,7 @@ func (q *Queue) source(p unit.ProviderID) BriefSource {
 	if ok {
 		return s
 	}
-	if p == unit.GitHub {
+	if p == (dpr.Codec{}).Provider() {
 		return GitHubSource{Store: q.d.Store, Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
 	}
 	return nil

@@ -42,7 +42,7 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 	if d.Launch == builtin.LaunchProbe {
 		return c.probe(ctx, d, l)
 	}
-	if l.Unit.Provider != unit.GitHub {
+	if _, ok := dpr.RefOf(l.Unit); !ok {
 		return e.launchUnit(ctx, d, l)
 	}
 	run, ok := workspaceRuns()[d.Workspace]
@@ -255,10 +255,16 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 }
 
 func githubRef(u unit.Unit) (github.Ref, error) {
-	if u.Provider != unit.GitHub {
+	if u.Provider != (dpr.Codec{}).Provider() {
 		return github.Ref{}, fmt.Errorf("the %s unit %s is not a pull request", u.Provider, u.Key)
 	}
 	return dpr.ParseKey(u.Key)
+}
+
+// isPR says whether u names a pull request.
+func isPR(u unit.Unit) bool {
+	_, ok := dpr.RefOf(u)
+	return ok
 }
 
 func prOf(u unit.Unit) github.Ref {
