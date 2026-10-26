@@ -1,8 +1,6 @@
 package daemon
 
 import (
-	"strings"
-
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -17,15 +15,12 @@ func refOf(u unit.Unit) pr.Ref {
 	return ref
 }
 
-// sameUnit says whether a and b name the same unit; GitHub folds the case of
-// owners and repositories.
-func sameUnit(a, b unit.Unit) bool {
-	if a.Provider == unit.GitHub && b.Provider == unit.GitHub {
-		x, y := refOf(a), refOf(b)
-		return x.Number == y.Number && strings.EqualFold(x.Owner, y.Owner) && strings.EqualFold(x.Repo, y.Repo)
-	}
-	return a == b
-}
+// can says whether the enabled plugin of p serves capability c.
+func (s *Server) can(p unit.ProviderID, c string) bool { return api.PluginCan(s.deps.Plugins, p, c) }
+
+// sameUnit says whether a and b name the same unit, as their provider's
+// codec compares keys.
+func (s *Server) sameUnit(a, b unit.Unit) bool { return s.deps.Units.Same(a, b) }
 
 func isPullRequest(u unit.Unit) bool {
 	_, ok := port.PROf(port.Event{Unit: u})

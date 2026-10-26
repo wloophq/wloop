@@ -136,11 +136,11 @@ func (m Module) Capabilities() []string {
 
 // The capability names Module.Capabilities lists and api.Plugin serves.
 const (
-	CapabilityCheckouts = "checkouts"
-	CapabilityBriefs    = "briefs"
-	CapabilityPublishes = "publishes"
-	CapabilityReacts    = "reacts"
-	CapabilityItems     = "items"
+	CapabilityCheckouts = api.CapabilityCheckouts
+	CapabilityBriefs    = api.CapabilityBriefs
+	CapabilityPublishes = api.CapabilityPublishes
+	CapabilityReacts    = api.CapabilityReacts
+	CapabilityItems     = api.CapabilityItems
 )
 
 // Plugin is a compiled-in plugin: its codec is registered even when it is disabled.

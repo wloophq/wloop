@@ -303,7 +303,7 @@ func (s *Server) handleTurnEnd(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, err)
 		return
 	}
-	ended := api.TurnEnded{PR: unitArg(got.Unit), State: string(got.State), Added: got.Added, Note: got.Note}
+	ended := api.TurnEnded{PR: s.unitArg(got.Unit), State: string(got.State), Added: got.Added, Note: got.Note}
 	if d := got.DroppedNote(); d != "" && ended.Note != "" {
 		ended.Note += "; " + d
 	} else if d != "" {

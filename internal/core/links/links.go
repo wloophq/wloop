@@ -26,6 +26,8 @@ type Resolver struct {
 	Ledger items.Applier
 	Clock  port.Clock
 	Log    func(string, ...any)
+	// Codecs compare an actor's key with an assignee's; nil compares them byte for byte.
+	Codecs unit.KeyComparer
 
 	mu sync.Mutex
 	// silent is when each target was last logged for each reason.
@@ -130,7 +132,7 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 	resolved := 0
 	var errs []error
 	for _, p := range open {
-		ev, res, ok := settle(p, evs)
+		ev, res, ok := settle(p, evs, r.Codecs)
 		if !ok {
 			continue
 		}
@@ -157,7 +159,7 @@ func (r *Resolver) resolve(ctx context.Context, target unit.Unit, open []pending
 
 // settle is the first event of evs, oldest first, that settles p's item, and
 // the resolution it gives.
-func settle(p pending, evs []link.Event) (link.Event, ditems.Resolution, bool) {
+func settle(p pending, evs []link.Event, codecs unit.KeyComparer) (link.Event, ditems.Resolution, bool) {
 	for _, ev := range evs {
 		if !ev.At.After(p.after) {
 			continue
@@ -169,7 +171,7 @@ func settle(p pending, evs []link.Event) (link.Event, ditems.Resolution, bool) {
 			return ev, ditems.Done, true
 		case ev.Kind == link.EventMerged:
 			return ev, ditems.Moot, true
-		case ev.Kind == link.EventReview && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor):
+		case ev.Kind == link.EventReview && p.link.Kind == link.Review && byAssignee(p.item, ev.Actor, codecs):
 			return ev, ditems.Done, true
 		}
 	}
@@ -177,11 +179,11 @@ func settle(p pending, evs []link.Event) (link.Event, ditems.Resolution, bool) {
 }
 
 // byAssignee says whether actor is an assignee of it; anyone is when it has none.
-func byAssignee(it ditems.Item, actor string) bool {
+func byAssignee(it ditems.Item, actor string, codecs unit.KeyComparer) bool {
 	if len(it.Assignees) == 0 {
 		return true
 	}
-	id := ditems.Identity{Keys: []string{actor}}
+	id := ditems.Identity{Keys: []string{actor}, Codecs: codecs}
 	return slices.ContainsFunc(it.Assignees, func(p ditems.Person) bool { return p.Is(id) })
 }
 

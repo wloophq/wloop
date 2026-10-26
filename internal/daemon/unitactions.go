@@ -67,24 +67,27 @@ func unitIntent(d dintent.Def, u unit.Unit) error {
 	return nil
 }
 
-// parseUnitArg reads a unit as the agent's command line names it: a pull
-// request URL, or "<provider>:<key>" of a provider the daemon knows.
+// parseUnitArg reads a unit as the agent's command line names it: its URL,
+// or "<provider>:<key>" of a provider the daemon knows whose units have no
+// URL.
 func (s *Server) parseUnitArg(raw string) (unit.Unit, error) {
-	u, err := parsePRURL(raw)
-	if err == nil {
+	if u, ok := s.deps.Units.ParseURL(raw); ok {
 		return u, nil
 	}
 	provider, key, ok := strings.Cut(raw, ":")
-	if !ok || s.deps.Units == nil || provider == string(unit.GitHub) || strings.Contains(provider, "/") {
-		return unit.Unit{}, err
+	if !ok || s.deps.Units == nil || s.deps.Units.Linked(unit.ProviderID(provider)) || strings.Contains(provider, "/") {
+		return unit.Unit{}, fmt.Errorf("not a unit: %s; name it by its URL, or as <provider>:<key>", raw)
 	}
 	return s.deps.Units.Parse(provider, key)
 }
 
 // unitArg names u as parseUnitArg reads it.
-func unitArg(u unit.Unit) string {
-	if u.IsZero() || u.Provider == unit.GitHub {
-		return refOf(u).URL()
+func (s *Server) unitArg(u unit.Unit) string {
+	if u.IsZero() {
+		return ""
+	}
+	if url, ok := s.deps.Units.URL(u); ok {
+		return url
 	}
 	return u.String()
 }

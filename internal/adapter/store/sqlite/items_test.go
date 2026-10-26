@@ -10,6 +10,7 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -157,7 +158,7 @@ func TestQueryByWaitingOn(t *testing.T) {
 	if err := db.Items().Commit(ctx, coreitems.Commit{Items: []items.Item{mine, alias, resolved, other, nobody}}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := db.Items().Query(ctx, coreitems.Query{WaitingOn: []string{"github:me", "slack:U000ZZZ"}, State: items.Open})
+	got, err := db.Items().Query(ctx, coreitems.Query{WaitingOn: []string{"github:me", "slack:U000ZZZ"}, State: items.Open, Codecs: unit.NewRegistry(pr.Codec{})})
 	if err != nil {
 		t.Fatal(err)
 	}

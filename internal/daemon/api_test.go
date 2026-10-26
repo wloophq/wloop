@@ -67,6 +67,9 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Units == nil {
 		d.Units = unit.NewRegistry(pr.Codec{})
 	}
+	if d.Forge == "" {
+		d.Forge = unit.GitHub
+	}
 	u := inventory.ByUnit{Store: st}
 	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
 	d.RowProviders = prRows(st, nil)

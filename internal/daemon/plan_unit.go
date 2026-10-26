@@ -38,7 +38,7 @@ func Explain(ctx context.Context, eng *automation.Engine, u unit.Unit) (Explaine
 	if err != nil {
 		return Explained{}, err
 	}
-	i := slices.IndexFunc(listed, func(o unit.Unit) bool { return sameUnit(o, u) })
+	i := slices.IndexFunc(listed, func(o unit.Unit) bool { return eng.Codecs.Same(o, u) })
 	if i < 0 {
 		return Explained{Unit: u, Errors: []string{fmt.Sprintf("%s is not among the %s units the workflows read: not tracked, or gone", u.Label(), u.Provider)}}, nil
 	}

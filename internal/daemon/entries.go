@@ -394,7 +394,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if mode == string(turn.ModeSession) && u.Provider != unit.GitHub && s.deps.Placer != nil {
+	if mode == string(turn.ModeSession) && !s.can(u.Provider, api.CapabilityCheckouts) && s.deps.Placer != nil {
 		if _, err := s.deps.Placer.SessionPlace(r.Context(), u); err != nil {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -492,7 +492,7 @@ func (s *Server) delegateModes(ctx context.Context, u unit.Unit, action string) 
 			continue
 		}
 		ms := api.ModeState{Mode: string(m), Enabled: true}
-		if m == turn.ModeSession && u.Provider != unit.GitHub && s.deps.Placer != nil {
+		if m == turn.ModeSession && !s.can(u.Provider, api.CapabilityCheckouts) && s.deps.Placer != nil {
 			if _, err := s.deps.Placer.SessionPlace(ctx, u); err != nil {
 				ms.Enabled, ms.Reason = false, err.Error()
 			}

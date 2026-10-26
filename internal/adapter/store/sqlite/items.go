@@ -118,7 +118,7 @@ func (s itemStore) Query(ctx context.Context, q coreitems.Query) ([]items.Item, 
 	if err != nil || len(q.WaitingOn) == 0 {
 		return got, err
 	}
-	me := items.Identity{Keys: q.WaitingOn}
+	me := items.Identity{Keys: q.WaitingOn, Codecs: q.Codecs}
 	return slices.DeleteFunc(got, func(it items.Item) bool {
 		return !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Is(me) })
 	}), nil

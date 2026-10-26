@@ -786,12 +786,12 @@ func (s *Server) trackedAs(ctx context.Context, u unit.Unit) (unit.Unit, bool, e
 	if err != nil {
 		return u, false, err
 	}
-	known, ok := trackedIn(tracked, u)
+	known, ok := trackedIn(s.deps.Units, tracked, u)
 	return known, ok, nil
 }
 
-func trackedIn(tracked []unit.Unit, u unit.Unit) (unit.Unit, bool) {
-	if i := slices.IndexFunc(tracked, func(t unit.Unit) bool { return sameUnit(t, u) }); i >= 0 {
+func trackedIn(codecs *unit.Registry, tracked []unit.Unit, u unit.Unit) (unit.Unit, bool) {
+	if i := slices.IndexFunc(tracked, func(t unit.Unit) bool { return codecs.Same(t, u) }); i >= 0 {
 		return tracked[i], true
 	}
 	return u, false
@@ -804,7 +804,7 @@ func (s *Server) trackSlot(ctx context.Context, u unit.Unit) (unit.Unit, bool, e
 	if err != nil {
 		return u, false, err
 	}
-	if known, ok := trackedIn(tracked, u); ok {
+	if known, ok := trackedIn(s.deps.Units, tracked, u); ok {
 		return known, true, nil
 	}
 	if len(tracked) >= trackMax {

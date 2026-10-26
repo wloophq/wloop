@@ -85,7 +85,8 @@ func newFixture(t *testing.T, item items.Item, ls ...link.Link) *fixture {
 		}
 	}
 	f.r = &links.Resolver{Links: f.links, Events: map[unit.ProviderID]links.EventReader{unit.GitHub: f.events}, Ledger: f.ledger,
-		Clock: clock{t0.Add(48 * time.Hour)}, Log: func(format string, args ...any) { f.logs = append(f.logs, fmt.Sprintf(format, args...)) }}
+		Clock: clock{t0.Add(48 * time.Hour)}, Log: func(format string, args ...any) { f.logs = append(f.logs, fmt.Sprintf(format, args...)) },
+		Codecs: unit.NewRegistry(foldCodec{unit.GitHub})}
 	return f
 }
 
@@ -292,3 +293,10 @@ func TestResolverSkipsWhatCannotResolve(t *testing.T) {
 		}
 	})
 }
+
+// foldCodec compares its provider's keys without case, as GitHub's does.
+type foldCodec struct{ id unit.ProviderID }
+
+func (c foldCodec) Provider() unit.ProviderID { return c.id }
+func (foldCodec) Valid(string) error          { return nil }
+func (foldCodec) Equal(a, b string) bool      { return strings.EqualFold(a, b) }

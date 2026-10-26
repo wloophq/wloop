@@ -37,7 +37,7 @@ const (
 // handleExplore runs one search, only when the user asks, never below the
 // budget the sweeps keep and never two at once.
 func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
-	if s.refusePlugin(w, unit.Unit{Provider: unit.GitHub}) {
+	if s.refusePlugin(w, unit.Unit{Provider: s.deps.Forge}) {
 		return
 	}
 	if s.deps.Explorer == nil {

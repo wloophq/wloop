@@ -63,6 +63,14 @@ type Equaler interface {
 	Equal(a, b string) bool
 }
 
+// Linker is an optional capability of a Codec: the web address of a key, and
+// the key an address names. A unit of a provider with addresses is named by
+// its address wherever a person or an agent types it.
+type Linker interface {
+	URL(key string) string
+	KeyOf(url string) (key string, ok bool)
+}
+
 // KeysEqual says whether keys a and b of c's provider name the same thing.
 func KeysEqual(c Codec, a, b string) bool {
 	if e, ok := c.(Equaler); ok {
@@ -71,7 +79,64 @@ func KeysEqual(c Codec, a, b string) bool {
 	return a == b
 }
 
+// KeyComparer says whether two keys of provider p name the same thing.
+type KeyComparer interface {
+	KeysEqual(p ProviderID, a, b string) bool
+}
+
 type Registry struct{ codecs map[ProviderID]Codec }
+
+// KeysEqual says whether keys a and b of p name the same thing through p's
+// codec; a provider r does not know compares byte for byte.
+func (r *Registry) KeysEqual(p ProviderID, a, b string) bool {
+	if c, ok := r.Codec(p); ok {
+		return KeysEqual(c, a, b)
+	}
+	return a == b
+}
+
+// Same says whether a and b name the same unit.
+func (r *Registry) Same(a, b Unit) bool {
+	return a.Provider == b.Provider && r.KeysEqual(a.Provider, a.Key, b.Key)
+}
+
+// ParseURL is the unit a web address names, among the providers with
+// addresses.
+func (r *Registry) ParseURL(raw string) (Unit, bool) {
+	for _, p := range r.Providers() {
+		if l, ok := r.codecs[p].(Linker); ok {
+			if key, ok := l.KeyOf(raw); ok {
+				return Unit{Provider: p, Key: key}, true
+			}
+		}
+	}
+	return Unit{}, false
+}
+
+// URL is u's web address; ok is false for a provider without addresses.
+func (r *Registry) URL(u Unit) (string, bool) {
+	c, _ := r.Codec(u.Provider)
+	if l, ok := c.(Linker); ok {
+		return l.URL(u.Key), true
+	}
+	return "", false
+}
+
+// Linked says whether p's units have web addresses.
+func (r *Registry) Linked(p ProviderID) bool {
+	c, _ := r.Codec(p)
+	_, ok := c.(Linker)
+	return ok
+}
+
+// Codec is p's codec.
+func (r *Registry) Codec(p ProviderID) (Codec, bool) {
+	if r == nil {
+		return nil, false
+	}
+	c, ok := r.codecs[p]
+	return c, ok
+}
 
 func NewRegistry(cs ...Codec) *Registry {
 	r := &Registry{codecs: make(map[ProviderID]Codec, len(cs))}
@@ -93,6 +158,9 @@ func (r *Registry) Parse(provider, key string) (Unit, error) {
 }
 
 func (r *Registry) Providers() []ProviderID {
+	if r == nil {
+		return nil
+	}
 	out := make([]ProviderID, 0, len(r.codecs))
 	for p := range r.codecs {
 		out = append(out, p)

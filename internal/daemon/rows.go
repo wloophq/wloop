@@ -299,7 +299,7 @@ func (m modelSettings) Settings(ctx context.Context) (readmodel.Base, error) {
 	}
 	l := m.s.loaded()
 	off := m.s.disabledPlugins(l)
-	return readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: login}, Teams: teams, Specs: catalog.SpecsFor(l, off),
+	return readmodel.Base{Viewers: map[unit.ProviderID]string{m.s.deps.Forge: login}, Teams: teams, Specs: catalog.SpecsFor(l, off),
 		SpecsVersion: catalog.VersionFor(l, off), Intents: l}, nil
 }
 

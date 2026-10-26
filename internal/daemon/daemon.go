@@ -218,9 +218,12 @@ type Deps struct {
 	LoopMu *sync.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
-	App      *AppState
-	Cfg      config.Config
-	Viewer   func(ctx context.Context) (login string, teams []string, err error)
+	App    *AppState
+	Cfg    config.Config
+	Viewer func(ctx context.Context) (login string, teams []string, err error)
+	// Forge is the plugin of the pull requests the daemon's viewer,
+	// explorer, intakes and budget serve.
+	Forge    unit.ProviderID
 	Now      func() time.Time
 	Version  string
 	Log      func(format string, args ...any)

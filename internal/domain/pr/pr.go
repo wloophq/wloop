@@ -74,7 +74,32 @@ type Codec struct{}
 
 func (Codec) Provider() unit.ProviderID { return unit.GitHub }
 
+// Valid refuses a key that is no pull request: number 0 names none.
 func (Codec) Valid(key string) error {
-	_, err := ParseKey(key)
+	ref, err := ParseKey(key)
+	if err == nil && ref.Number <= 0 {
+		return fmt.Errorf("not a pull request key: %q", key)
+	}
 	return err
 }
+
+// URL is the pull request's address; a key that is not one names none.
+func (Codec) URL(key string) string {
+	ref, err := ParseKey(key)
+	if err != nil {
+		return ""
+	}
+	return ref.URL()
+}
+
+// KeyOf is the key of the pull request a URL names.
+func (Codec) KeyOf(raw string) (string, bool) {
+	ref, err := ParseURL(raw)
+	if err != nil {
+		return "", false
+	}
+	return ref.String(), true
+}
+
+// Equal folds case, as GitHub compares owners, repositories and logins.
+func (Codec) Equal(a, b string) bool { return strings.EqualFold(a, b) }

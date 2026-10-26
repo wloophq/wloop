@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -17,6 +18,30 @@ type Plugin struct {
 	// provider does, never which it is: checkouts, briefs, publishes, reacts,
 	// items; only when enabled.
 	Capabilities []string `json:"capabilities,omitempty"`
+}
+
+// The capabilities a plugin serves in Plugin.Capabilities.
+const (
+	// CapabilityCheckouts: a session on a unit runs in a checkout of the
+	// unit's own repository.
+	CapabilityCheckouts = "checkouts"
+	// CapabilityBriefs: the brief queue briefs the plugin's units.
+	CapabilityBriefs = "briefs"
+	// CapabilityPublishes: the plugin posts approved drafts.
+	CapabilityPublishes = "publishes"
+	// CapabilityReacts: the plugin posts reactions.
+	CapabilityReacts = "reacts"
+	// CapabilityItems: the plugin's rows derive items.
+	CapabilityItems = "items"
+)
+
+// Can says whether the plugin is enabled and serves capability c.
+func (p Plugin) Can(c string) bool { return p.Enabled && slices.Contains(p.Capabilities, c) }
+
+// PluginCan says whether the plugin of provider id is enabled and serves
+// capability c.
+func PluginCan(ps []Plugin, id unit.ProviderID, c string) bool {
+	return slices.ContainsFunc(ps, func(p Plugin) bool { return p.ID == id && p.Can(c) })
 }
 
 // Plugins is the route of every compiled-in plugin: GET -> []Plugin.

@@ -117,7 +117,7 @@ func (s *Server) draftsHeadless(ctx context.Context, g *coregtd.Service, e gtd.E
 // rowNotice is the notice of e's first unit's row; served says the unit is a pull request the read model
 // serves, ok that its row notifies.
 func (ev *entryViewer) rowNotice(ctx context.Context, e gtd.Entry) (n prrow.Notice, row api.Row, served, ok bool) {
-	if len(e.Units) == 0 || e.Units[0].Provider != unit.GitHub {
+	if len(e.Units) == 0 || !isPullRequest(e.Units[0]) {
 		return prrow.Notice{}, api.Row{}, false, false
 	}
 	rd, served, err := ev.s.readRow(ctx, e.Units[0])

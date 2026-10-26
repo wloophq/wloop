@@ -200,7 +200,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	}
 	it := items[0]
 	if action == "pause" {
-		if it.Unit.Provider != unit.GitHub {
+		if !isPullRequest(it.Unit) {
 			return it, true, badRequest{"pause applies to pull requests; " + it.Unit.Label() + " is not one"}
 		}
 		if _, err := s.applyOverride(ctx, "pause", it.Unit, api.ActionRequest{}); err != nil {
@@ -267,7 +267,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 		p.Why.Matched = append(p.Why.Matched, api.Fact{Name: f.Name, Value: turn.FactText(f.Value)})
 	}
 	var row []api.ActionState
-	if it.Decision == workflow.DecisionBlocked && it.Unit.Provider == unit.GitHub && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
+	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
 		slices.Contains(p.Steps, builtin.StepTurnStart) {
 		if rd, ok, err := s.readRow(ctx, it.Unit); err != nil {
 			s.logf("plan %s: its row: %v", it.ID, err)
@@ -355,7 +355,7 @@ func (s *Server) dropPaused(ctx context.Context, p round.Pause, why string) erro
 		}
 		seen[u] = true
 		held := p.On
-		if ref := refOf(u); u.Provider == unit.GitHub && ref.Repo != "" {
+		if ref := refOf(u); ref.Repo != "" {
 			held = p.Holds(ref.Owner, ref.Repo)
 		}
 		if held {

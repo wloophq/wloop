@@ -391,6 +391,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			teams, err := githubTeams(ctx, store)
 			return login, teams, err
 		},
+		Forge:    unit.GitHub,
 		Now:      e.Now,
 		Version:  Version,
 		Log:      logf,

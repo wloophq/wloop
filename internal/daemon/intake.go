@@ -881,7 +881,7 @@ func (s *Server) changeIntake(w http.ResponseWriter, r *http.Request, change fun
 		return
 	}
 	if s.intakes == nil {
-		if s.refusePlugin(w, unit.Unit{Provider: unit.GitHub}) {
+		if s.refusePlugin(w, unit.Unit{Provider: s.deps.Forge}) {
 			return
 		}
 		writeError(w, http.StatusServiceUnavailable, errIntakesUnavailable.Error())

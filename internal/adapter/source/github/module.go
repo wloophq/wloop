@@ -50,8 +50,17 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 		UI:         UI(),
 		Publisher:  publisherOf(d),
 		Proposals:  n.Proposals,
+		Checkouts:  checkouts{store: storeOrNil(d)},
 		Briefs:     brief.GitHubSource{Store: d.Inventory, Source: brief.Source{GitHub: d.GitHub}, MaxDiffBytes: cfg.Brief.MaxDiffBytes, Retry: time.Duration(cfg.Sweep.Slow)},
 	}, nil
+}
+
+// storeOrNil is d's inventory, nil when there is none.
+func storeOrNil(d sourcereg.Deps) prReader {
+	if d.Inventory == nil {
+		return nil
+	}
+	return d.Inventory
 }
 
 // factsOf is the source's workflow facts over the shared handles.

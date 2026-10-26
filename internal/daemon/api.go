@@ -16,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/web"
@@ -322,11 +323,11 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	prs := make([]unit.Unit, 0, len(req.PRs))
 	for _, key := range req.PRs {
-		u := unit.Unit{Provider: unit.GitHub, Key: key}
-		if refOf(u).Number == 0 {
+		ref, err := pr.ParseKey(key)
+		if err != nil || ref.Number <= 0 {
 			return badRequest{key + " is not an owner/repo#n"}
 		}
-		prs = append(prs, u)
+		prs = append(prs, ref.Unit())
 	}
 	for _, repo := range req.Repos {
 		if owner, name, ok := strings.Cut(repo, "/"); !ok || owner == "" || name == "" || strings.ContainsAny(name, "/# ") {
@@ -456,13 +457,13 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseUnit is the unit a unit route names, of any provider the daemon
-// registered: provider github takes a key such as "owner/repo#12".
+// registered, whose codec validates the key.
 func (s *Server) parseUnit(r *http.Request) (unit.Unit, bool) {
 	if s.deps.Units == nil {
 		return unit.Unit{}, false
 	}
 	u, err := s.deps.Units.Parse(r.PathValue("provider"), r.PathValue("key"))
-	if err != nil || u.Provider == unit.GitHub && refOf(u).Number <= 0 {
+	if err != nil {
 		return unit.Unit{}, false
 	}
 	return u, true
