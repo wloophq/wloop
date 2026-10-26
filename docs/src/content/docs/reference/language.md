@@ -414,7 +414,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `turns` (table): The automated turn budgets.
 - `turns.per_day` (integer, default `20`): Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).
-- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today).
+- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect.
 - `headless` (table): The headless turns' caps; a cost of zero leaves it uncapped.
 - `headless.tier` (one of `fast`, `balanced`, `frontier`, default `balanced`): The model tier of their calls.
 - `headless.per_call_usd` (number, default `0.5`): What one call may cost, in USD.

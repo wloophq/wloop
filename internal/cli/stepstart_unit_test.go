@@ -14,11 +14,12 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
-	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -409,5 +410,25 @@ func TestAWorkflowLaunchingARoleLaunchesItsHolder(t *testing.T) {
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
 	if got := r.check(t, automation.CheckOpts{}); got != "it waits on you" {
 		t.Fatalf("the holder's refusal: %q", got)
+	}
+}
+
+func TestOnlyAnIntentDeclaringPrCountedSpendsThePerUnitBudget(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		drop string
+		want int
+	}{"declared": {"", 1}, "not declared": {`"pr.counted", `, 0}} {
+		sc := followupScenario(t)
+		files := myReview(t)
+		files["intents/my-review/intent.toml"] = strings.Replace(files["intents/my-review/intent.toml"], c.drop, "", 1)
+		userProfile(t, sc.te, files)
+		r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+		if _, err := r.run(t, automation.RunOpts{}); err != nil {
+			t.Fatal(err)
+		}
+		if got := sc.te.loadRounds(t).Days[round.DayKey(testNow)].PerPR[sc.ref.String()]; got != c.want {
+			t.Errorf("%s: %d turns counted, want %d", name, got, c.want)
+		}
 	}
 }

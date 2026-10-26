@@ -134,7 +134,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `headless.per_day_usd` | number | `5` | What they may cost in a day, in USD. |
 | `turns` | table |  | The automated turn budgets. |
 | `turns.per_day` | integer | `20` | Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today). |
-| `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today). |
+| `turns.per_unit_per_day` | integer | `5` | Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect. |
 | `slack` | table |  | The Slack plugin's settings; no secret lives here. |
 | `slack.enabled` | bool |  | Switches the Slack plugin; left out, it is on. |
 | `slack.client_id` | string |  | The Slack app's client id; empty leaves Slack unconfigured. |

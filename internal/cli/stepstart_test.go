@@ -196,7 +196,7 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 	ref := sc.ref
 	st := r.load(t)
 	sc.te.cfg.Turns.PerUnitPerDay = 1
-	st.RecordFollowup(ref.String(), round.Reviewed, "", testNow)
+	st.Count(ref.String(), testNow)
 	guards := []struct {
 		want     string
 		set, off func()
@@ -209,7 +209,7 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 		{"an intake of yours asks for it", func() { r.briefs.intakes = []intake.Intake{{Unit: r.u, Intent: dturn.Intent(dintent.Review)}} }, func() { r.briefs.intakes = nil }},
 		{"round blocked: could not start", func() { r.rec.events = append(r.rec.events, trustBlockEvent(ref, testNow)) }, func() { r.rec.events = nil }},
 		{"brief not ready", func() { r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1} }, func() { r.briefs.rd = intake.Readiness{Go: true} }},
-		{"per-PR daily cap reached (1)", func() {}, func() { sc.te.cfg.Turns.PerUnitPerDay = 5 }},
+		{"turns.per_unit_per_day reached (1)", func() {}, func() { sc.te.cfg.Turns.PerUnitPerDay = 5 }},
 	}
 	for _, g := range guards {
 		g.set()
@@ -315,10 +315,10 @@ func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	st.Count(sc.ref.String(), testNow)
 	r.save(t)
 	refusal := r.check(t, automation.CheckOpts{Observe: false})
-	if refusal != "per-PR daily cap reached (1)" {
+	if refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("refusal %q", refusal)
 	}
 	for range 2 {
@@ -541,10 +541,10 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	cands[key] = c
 	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	st.Count(sc.ref.String(), testNow)
 	r.save(t)
 	refusal := r.check(t, automation.CheckOpts{Observe: false})
-	if refusal != "per-PR daily cap reached (1)" {
+	if refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("observed address: %q", refusal)
 	}
 	r.load(t)
@@ -565,7 +565,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	fc[fkey] = f
 	fsc.te.cfg.Turns.PerUnitPerDay = 1
 	fst := fr.load(t)
-	fst.RecordFollowup(fsc.ref.String(), round.Reviewed, "", testNow)
+	fst.Count(fsc.ref.String(), testNow)
 	fr.save(t)
 	if got := fr.check(t, automation.CheckOpts{Observe: false}); got != "" {
 		t.Fatalf("observed follow-up: %q", got)
@@ -683,9 +683,9 @@ func TestAnyTurnOnAPullRequestSpendsTheDailyCap(t *testing.T) {
 	r := newStartRig(t, sc, "my-review", roundFollowup)
 	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	st.Count(sc.ref.String(), testNow)
 	r.save(t)
-	if refusal := r.check(t, automation.CheckOpts{Observe: false}); refusal != "per-PR daily cap reached (1)" {
+	if refusal := r.check(t, automation.CheckOpts{Observe: false}); refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("refusal %q; broken %v", refusal, sc.env.loadedIntents().Broken)
 	}
 }

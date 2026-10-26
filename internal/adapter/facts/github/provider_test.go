@@ -816,7 +816,7 @@ func TestDueMatchesTheBasesNextDue(t *testing.T) {
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
 			for range w.cfg.Turns.PerUnitPerDay {
-				w.rounds.RecordFollowup(r.String(), round.Reviewed, "", t0)
+				w.rounds.Count(r.String(), t0)
 			}
 		}, nextDay(t0)},
 		{"conflict window", func(w *world) {

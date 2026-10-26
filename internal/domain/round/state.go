@@ -133,10 +133,14 @@ func (s *Store) SetMark(key, name, value string) {
 	s.changes.Marks[key][name] = true
 }
 
+// CapReached starts the refusal of a unit whose turns.per_unit_per_day is
+// spent.
+const CapReached = "turns.per_unit_per_day reached"
+
 // CapReason returns why an automated round for key may not run today, or "".
 func (s *Store) CapReason(key string, now time.Time, perPR int) string {
 	if s.Days[DayKey(now)].PerPR[key] >= perPR {
-		return fmt.Sprintf("per-PR daily cap reached (%d)", perPR)
+		return fmt.Sprintf("%s (%d)", CapReached, perPR)
 	}
 	return ""
 }
@@ -180,8 +184,7 @@ func (s *Store) SetAgentHome(key, dir string) {
 	s.set(key, FieldAgentHome, func(p *PR) { p.AgentHome = dir })
 }
 
-// RecordRound notes a round the user started by hand: it does not count
-// against the caps.
+// RecordRound notes a round the user started by hand.
 func (s *Store) RecordRound(key string, now time.Time) {
 	s.set(key, FieldRoundAt, func(p *PR) { p.RoundAt = now.UTC() })
 }
@@ -197,13 +200,18 @@ func (s *Store) SetHeads(key, checksHead, conflictHead string) {
 	}
 }
 
-// RecordFollowup counts a round sent and sets its mark to fingerprint; an
-// empty fingerprint keeps the mark as it was, for a round no review started.
-func (s *Store) RecordFollowup(key, mark, fingerprint string, now time.Time) {
+// RecordSent notes an automated round sent and sets its mark to
+// fingerprint; an empty fingerprint keeps the mark as it was, for a round
+// no review started. It counts nothing: Count does.
+func (s *Store) RecordSent(key, mark, fingerprint string, now time.Time) {
 	if fingerprint != "" {
 		s.SetMark(key, mark, fingerprint)
 	}
 	s.set(key, FieldSentAt|FieldRoundAt, func(p *PR) { p.SentAt, p.RoundAt = now.UTC(), now.UTC() })
+}
+
+// Count spends one of key's turns of now's day, which CapReason reads.
+func (s *Store) Count(key string, now time.Time) {
 	day := DayKey(now)
 	d := s.Days[day]
 	if d.PerPR == nil {

@@ -117,10 +117,10 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 	}{
 		{"session route, review", byHand(dintent.Review, reviewWS, nil), effects{round: true, events: []string{dinv.KindRoundSent}}},
 		{"session route, address", byHand(dintent.Address, ownWS, nil), effects{round: true, fingerprint: true, checksHead: "c2", conflictHead: "c2", events: []string{dinv.KindRoundSent}}},
-		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
+		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{round: true, events: []string{dinv.KindNudged}}},
 		{"resume, review", resume(dintent.Review, warm, review, nil), effects{round: true, fingerprint: true}},
 		{"resume, address", resume(dintent.Address, own, mine, nil), effects{round: true, fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
-		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{}},
+		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{round: true}},
 		{"held Run now, review", func(t *testing.T) (*testEnv, github.Ref) {
 			sc := followupScenario(t)
 			exhaustCap(t, sc)

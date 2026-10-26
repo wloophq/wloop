@@ -181,7 +181,8 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.SetHeads(key, "abc", "def")
-	b.RecordFollowup(key, round.Reviewed, "fp", now)
+	b.RecordSent(key, round.Reviewed, "fp", now)
+	b.Count(key, now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)
@@ -201,11 +202,11 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatalf("day %+v", d)
 	}
 
-	c.RecordFollowup(key, round.Reviewed, "", now)
+	c.Count(key, now)
 	c.SetMark(key, round.AddressedConflict, "")
 	c.FirstCapHit("acme/api#8", now)
 	other, _ := r.Load(ctx)
-	other.RecordFollowup("acme/web#1", round.Reviewed, "", now)
+	other.Count("acme/web#1", now)
 	for _, st := range []*round.Store{c, other} {
 		if err := r.Save(ctx, st); err != nil {
 			t.Fatal(err)

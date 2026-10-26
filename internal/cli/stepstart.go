@@ -382,7 +382,7 @@ func (s *stepSet) refusal(p startPlan) (string, error) {
 	return l.Refusal(p.args.def.Name, p.facts)
 }
 
-func isCapRefusal(refusal string) bool { return strings.Contains(refusal, "daily cap reached") }
+func isCapRefusal(refusal string) bool { return strings.HasPrefix(refusal, round.CapReached) }
 
 // startNote is what the sweep wrote on a round it held: a first round
 // waiting for its brief starts it and says so; a cap's first hit of the day
@@ -486,7 +486,10 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			}
 			return "", startError(err)
 		}
-		st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		if counted(p.args.def) {
+			st.Count(p.ref.String(), s.e.Now())
+		}
 		return "started a " + p.args.intent + " turn", nil
 	}
 	reason := s.reason(p)

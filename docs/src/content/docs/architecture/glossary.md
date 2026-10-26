@@ -105,7 +105,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Approval window**: the countdown during which a pending automatic round can be skipped, paused, steered or run now. See [The approval window](/concepts/approval/#the-approval-window).
 - **Ambiguity gate**: the rule inside a round's procedure that records `asked` with the full draft before publishing anything unsure, risky or contradicting another reviewer. See [The ambiguity gate](/concepts/approval/#the-ambiguity-gate).
 - **Pause**: `{{command}} pause` stops every workflow but the observe ones, and the board moves, everywhere or on one repository or pull request. A paused pull request has its rounds **held**.
-- **Cap**: a bound on automatic turns: `turns.per_unit_per_day` on a unit whose plugin keeps a per-unit count (a pull request), `turns.per_day` on the others, or a workflow's `[limits]`. A round the cap holds back shows as "held (cap)".
+- **Cap**: a bound on automatic turns: `turns.per_unit_per_day` on a unit whose plugin keeps a per-unit count (a pull request), spent by the automated turns of an intent declaring `pr.counted`, `turns.per_day` on the others, or a workflow's `[limits]`. A round the cap holds back shows as "held (cap)".
 - **Mute**: takes a pull request out of the pending views, for a while or until whom it waits on changes. Its rounds still run at their deadline.
 
 ## Pull requests in scope

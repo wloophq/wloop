@@ -757,7 +757,7 @@
         },
         "per_unit_per_day": {
           "default": 5,
-          "description": "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today).",
+          "description": "Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect.",
           "type": "integer"
         }
       },

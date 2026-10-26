@@ -46,7 +46,7 @@ const (
 var Effects = []Effect{
 	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
 	{EffectGuidanceHanded, unit.GitHub, AppliesTurn, "Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent.", false},
-	{EffectPRCounted, unit.GitHub, AppliesTurn, "Counts the turn against turns.per_unit_per_day.", false},
+	{EffectPRCounted, unit.GitHub, AppliesTurn, "Counts an automated turn against turns.per_unit_per_day: an automated turn of an intent without it spends none. A turn by hand counts nothing.", false},
 	{EffectPRRoundSent, unit.GitHub, AppliesTurn, "Records the round-sent event on the pull request.", false},
 	{EffectPRReviewed, unit.GitHub, AppliesTurn, "Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.", false},
 	{EffectPRAddressed, unit.GitHub, AppliesTurn, "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.", false},
