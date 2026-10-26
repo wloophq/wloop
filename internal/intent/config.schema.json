@@ -95,7 +95,7 @@
         },
         "workspace_grace": {
           "default": "1d",
-          "description": "How long, in working time, a finished pull request's workspace stays.",
+          "description": "How long, in working time, a workspace stays after its unit finished.",
           "type": "string"
         }
       },
@@ -493,7 +493,7 @@
       "type": "array"
     },
     "profile": {
-      "description": "The user profile layered over the bundled one: a name under the profiles directory, or a path.",
+      "description": "The user profile layered over the bundled one: a name under the profiles directory, or a path; an intent's profile names an intent.",
       "type": "string"
     },
     "projects": {

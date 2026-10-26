@@ -114,7 +114,7 @@ func TestEmptyPredicateIsAnError(t *testing.T) {
 
 func TestUnknownFieldSuggests(t *testing.T) {
 	e := compileErr(t, "pr.mien")
-	if e.Col != 1 || e.Msg != "unknown field pr.mien; did you mean pr.mine?" || e.Snippet != "pr.mien\n^" {
+	if e.Col != 1 || e.Msg != "unknown field pr.mien; did you mean \"pr.mine\"?" || e.Snippet != "pr.mien\n^" {
 		t.Errorf("%+v", e)
 	}
 	e = compileErr(t, "pr.mine && zzz.qqq")

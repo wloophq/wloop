@@ -1,6 +1,6 @@
 summary = "Remove finished workspaces every weekday morning"
 provider = "workspace"
-when = 'workspace.pr_state == "merged" && workspace.pendency == []'
+when = 'workspace.pr_state == "MERGED" && workspace.pendency == []'
 
 [trigger]
 schedule = "0 9 * * 1-5"

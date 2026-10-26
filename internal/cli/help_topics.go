@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/profile"
 )
 
 // helpFlag is one flag of a command's help: Name with its argument, Text
@@ -36,12 +35,8 @@ var colorFlag = helpFlag{"--color auto|always|never", "Lay the output out for a 
 // conditionFlags are the flags that name a block of the profile, one per
 // dimension.
 func conditionFlags() []helpFlag {
-	var names []string
-	for _, d := range profile.Dims {
-		names = append(names, "--"+string(d))
-	}
 	return []helpFlag{
-		{"--<dimension> <value>", "A condition of the block, one flag per dimension: " + strings.Join(names, ", ")},
+		{"--<dimension> <value>", "A condition of the block, one flag per dimension: " + conditionNames()},
 		{"--tag <key>=<value>", "A tag condition; repeatable"},
 	}
 }

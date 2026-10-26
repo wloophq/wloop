@@ -552,14 +552,14 @@ func (pl *planner) conflicts(f sweep.Facts) bool {
 // facts are ref's pr facts from r at now.
 func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 	v, now := pl.v, pl.now
-	f := workflow.Facts{"pr.repo": ref.Owner + "/" + ref.Repo, "pr.owner": ref.Owner, "pr.author": "", "pr.visibility": ""}
+	f := workflow.Facts{"pr.repo": ref.Owner + "/" + ref.Repo, "pr.repo_name": ref.Repo, "pr.owner": ref.Owner, "pr.author": "", "pr.visibility": ""}
 	if pf, read := v.factsOf(ref); read {
 		f["pr.visibility"] = pf.Visibility
 	}
 	row, ok := v.byRef[ref]
 	if ok {
 		o := v.overrides[ref]
-		f["pr.state"] = strings.ToLower(row.State)
+		f["pr.state"] = row.State
 		if !row.MergedAt.IsZero() {
 			f["pr.merged_at"] = row.MergedAt
 		}

@@ -142,7 +142,7 @@ func (p *Provider) build(ctx context.Context, snap *wsdomain.Snapshot) (*world, 
 			return nil, err
 		}
 		for u, pr := range got {
-			w.prs[u] = strings.ToLower(pr.State)
+			w.prs[u] = pr.State
 		}
 	}
 	return w, nil

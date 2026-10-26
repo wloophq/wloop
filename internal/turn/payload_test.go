@@ -168,7 +168,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 	d, _ := bundled(t).Registry.Get(dintent.Review)
 	c := samples(d)[0]
 	want := map[string]any{
-		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo_name": "api",
+		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo": "acme/api", "pr.repo_name": "api",
 		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"}, "pr.requested_teams": []string{}, "pr.address.reviewers": []string{}, "pr.address.checks": []string{}, "pr.address.conflict": false,
 		"turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
 		"turn.try": false, "turn.planned": "", "turn.stage": "first", "unit.ref": "acme/api#7",

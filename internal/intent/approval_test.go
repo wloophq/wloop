@@ -43,7 +43,7 @@ func TestARunRuleNeedsAWhenAndAMode(t *testing.T) {
 	for block, want := range map[string]string{
 		"[[approval.rule]]\nmode = \"wait\"\n":                                                "approval.rule[0].when: is required",
 		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\n":                                   "approval.rule[0].mode: is required",
-		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"send\"\n":                  `approval.rule[0].mode: "send" is not one of "run", "delay", "wait"`,
+		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"send\"\n":                  `approval.rule[0].mode: "send" is not one of "run", "delay" or "wait"`,
 		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"delay\"\n":                 "approval.rule[0].window: is required with mode delay",
 		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"wait\"\nwindow = \"1m\"\n": "approval.rule[0].window: is read only with mode delay",
 		"[approval]\nmode = \"delay\"\n":                                                      "approval.window: is required with mode delay",

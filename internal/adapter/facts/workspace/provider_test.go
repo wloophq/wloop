@@ -174,7 +174,7 @@ func TestFinishedForCountsWorkingTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f["workspace.pr_state"] != "merged" {
+	if f["workspace.pr_state"] != "MERGED" {
 		t.Errorf("pr_state = %v", f["workspace.pr_state"])
 	}
 	if got := f["workspace.pr_finished_for"]; got != 16*time.Hour {
@@ -308,7 +308,7 @@ func TestAReviewWorkspaceLinksByItsDisplayName(t *testing.T) {
 	w.add(workspace.Workspace{ID: "review", Path: "/w/review", DisplayName: "REVIEW feat", Branch: "review-local"})
 	w.rows = []dinv.PR{{Ref: ref(7), State: "CLOSED", HeadBranch: "feat", ClosedAt: now.Add(-time.Hour)}}
 	f := w.facts(t, "review")
-	if f["workspace.pr"] != "acme/api#7" || f["workspace.role"] != "review" || f["workspace.pr_state"] != "closed" {
+	if f["workspace.pr"] != "acme/api#7" || f["workspace.role"] != "review" || f["workspace.pr_state"] != "CLOSED" {
 		t.Errorf("facts = %v", f)
 	}
 }

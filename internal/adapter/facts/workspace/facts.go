@@ -263,7 +263,7 @@ func (p *Provider) facts(ctx context.Context, snap *workspace.Snapshot, ix *inde
 	linked, hasPR := ix.prOf(w)
 	if hasPR {
 		u := linked.Ref.Unit()
-		prKey, prState = u.Key, strings.ToLower(linked.State)
+		prKey, prState = u.Key, linked.State
 		role = RoleAuthor
 		if ix.reviews(w, linked) {
 			role = RoleReview

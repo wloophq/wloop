@@ -22,7 +22,9 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 ## Fields
 
-`intent.toml` is TOML: every string is quoted, so a predicate such as `when = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and refuses any other key, naming the closest one. A manifest without `provider` takes the one `defaults.toml` names at the profile's root; the bundled profile names `github`, and a layer's own `defaults.toml` overrides it. Every bundled intent names its own provider, so a `defaults.toml` with `provider = "slack"` changes only the manifests that name none, such as yours. The [profile language](/reference/language/) lists every file's keys on one page.
+`intent.toml` is TOML: every string is quoted, so a predicate such as `when = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and refuses any other key, naming a close one when one exists. A manifest without `provider` takes the one `defaults.toml` names at the profile's root; the bundled profile names `github`, and a layer's own `defaults.toml` overrides it. Every bundled intent names its own provider, so a `defaults.toml` with `provider = "slack"` changes only the manifests that name none, such as yours. The [profile language](/reference/language/) lists every file's keys on one page.
+
+### Identity and help
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
@@ -32,9 +34,28 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `verb` | one of `approve`, `delegate`, `dismiss` |  | The GTD verb its action fulfils. |
 | `user_facing` | bool | `true` | Offered as a command, a skill and an action. |
 | `skill` | bool | `false` | Install writes it a turn skill; needs help.target. |
+| `help` | table |  | How its command presents it. |
+| `help.target` | string |  | Free text saying what the command's argument names, such as a pull request URL. |
+| `help.summary` | string |  | The main help's line; the intent's summary when absent. |
+| `help.group` | string |  | The title of the main help's group that lists the command, free text; action.group is the action's. |
+| `help.examples` | list of strings |  | Command lines without the command's name. |
+| `help.docs` | string |  | A page path of the documentation site. |
+
+### Binding
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `role` | one of `pr.review`, `pr.address`, `pr.nudge`, `probe`, `headless` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
-| `provider` | string or table |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
-| `workspace` | string or table |  | Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository. |
+| `provider` | one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
+| `builds` | one of `brief` |  | A builder, never a turn. |
+| `prompt` | file |  | A builder's prompt file, through the profile layers. |
+| `schema` | file |  | A builder's extra fields' schema file, beside the manifest. |
+
+### Where it runs
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `workspace` | one of `review`, `author`, `linked_else_main`, `given`, or a table |  | Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository. |
 | `workspace.repo` | string |  | The repository the turn runs in, owner/name. |
 | `workspace.repo_input` | string |  | The input that holds the repository the turn runs in. |
 | `runners` | list of `session`, `headless` |  | How its turns may run; ["session"] when absent. |
@@ -42,47 +63,22 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session.strategy` | one of `reuse_live`, `new` |  | Whether a turn reuses the unit's live session or starts a new one. |
 | `session.title` | string |  | The session's title: 1 to 12 lowercase letters. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
+
+### How a turn runs
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `intake` | bool | `false` | Runs through numbered intake. |
-| `start_line` | string |  | The intake's first line. |
 | `owner_only` | bool | `false` | The unit must be yours or taken over. |
+| `join` | table |  | When a request joins an open turn. |
+| `join.differs_on` | list of strings |  | Persisted inputs whose change starts a new turn. |
 | `answerable` | bool | `true` | The turn may stop on a question. |
 | `reports` | bool | `true` | The turn reports. |
-| `brief` | table |  | How the turn reads the unit's brief. |
-| `brief.render` | bool | `true` | The instructions carry the brief. |
-| `brief.wait` | bool | `true` | The turn waits for the brief. |
-| `brief.need` | list of strings |  | The brief intent's extra fields the turn needs. |
-| `profile` | string |  | The intent whose judgment blocks the turn reads, or none. |
-| `dims` | list of `stage`, `reviewer` |  | The dimensions valid under its profile. |
-| `also_profile[]` | table |  | Other judgment the turn reads. |
-| `also_profile[].profile` | string |  | The intent with judgment blocks. |
-| `also_profile[].when` | predicate |  | When the turn reads the other judgment. |
-| `also_profile[].dims` | table by name |  | Dimensions it pins, such as { stage = "first" }. |
-| `also_profile[].dims.&lt;name&gt;` | string |  | A pinned dimension's value. |
-| `also_profile[].define` | string |  | The template define that renders it. |
-| `also_profile[].prefix` | string |  | What its sources are listed under; "&lt;profile&gt; guide: " when absent. |
-| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
-| `why` | template |  | Why the turn is due, over the unit's workflow facts. |
-| `refuse[]` | table |  | A refusal of turn.start; the first whose when holds refuses with its why. |
-| `refuse[].when` | predicate |  | When it refuses, over the unit's workflow facts. |
-| `refuse[].why` | template |  | What the refusal says, over the unit's workflow facts. |
-| `drafts` | table |  | The drafts its turns' agents propose. |
-| `drafts.allowed_effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
-| `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
-| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
-| `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |
-| `drafts.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
-| `drafts.approval.rule[].when` | predicate |  | When the approval rule applies to a draft. |
-| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's approval. |
-| `drafts.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the draft. |
-| `guidance` | table |  | The guidance a person gives the turn. |
-| `guidance.label` | string | `Guidance` | The guidance's label. |
-| `guidance.help` | string |  | What the guidance is for. |
-| `guidance.max` | integer | `0` | The guidance's length cap in runes; 0 for none. |
-| `headline` | table |  | The line that opens the turn's prompt. |
-| `headline.resumed` | template |  | What a resumed turn continues, over the turn's facts. |
-| `headline.new[]` | table |  | A headline case; the last has no when. |
-| `headline.new[].when` | predicate |  | When the headline case applies. |
-| `headline.new[].line` | template |  | The headline, over the turn's facts. |
+
+### Inputs
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `inputs` | table by name |  | The turn's inputs, by name. |
 | `inputs.&lt;name&gt;` | table |  | An input. |
 | `inputs.&lt;name&gt;.type` | one of `bool`, `text`, `list` |  | The input's type. |
@@ -95,30 +91,20 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `inputs.&lt;name&gt;.before` | one of `take_over` |  | What runs before the turn when it is set. |
 | `inputs.&lt;name&gt;.max` | integer | `0` | A text input's length cap in runes; 0 for none. |
 | `inputs.&lt;name&gt;.surfaces` | list of `cli`, `instructions`, `try` |  | Where it is offered; cli and instructions when absent. |
-| `help` | table |  | How its command presents it. |
-| `help.target` | string |  | What the command's target is. |
-| `help.summary` | string |  | The main help's line; the intent's summary when absent. |
-| `help.group` | string |  | The main help's group title. |
-| `help.examples` | list of strings |  | Command lines without the command's name. |
-| `help.docs` | string |  | A page path of the documentation site. |
-| `join` | table |  | When a request joins an open turn. |
-| `join.differs_on` | list of strings |  | Persisted inputs whose change starts a new turn. |
-| `resume` | table |  | What a resumed turn reads. |
-| `resume.changed` | string |  | The text when the unit changed since the question. |
-| `record` | table |  | The turn's record. |
-| `record.when` | predicate | `true` | When the turn records its outcome. |
-| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
-| `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
-| `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
-| `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
-| `record.history_artifact` | string |  | The artifact the unit's history shows. |
-| `record.require[]` | table |  | What a record in a state must carry. |
-| `record.require[].state` | string |  | The state. |
-| `record.require[].artifact` | string |  | The artifact it must carry. |
-| `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
-| `builds` | one of `brief` |  | A builder, never a turn. |
-| `prompt` | file |  | A builder's prompt file, through the profile layers. |
-| `schema` | file |  | A builder's extra fields' schema file, beside the manifest. |
+
+### When a turn is due or refused
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `why` | template |  | Why the turn is due, over the unit's workflow facts. |
+| `refuse[]` | table |  | A refusal of turn.start; the first whose when holds refuses with its why. |
+| `refuse[].when` | predicate |  | When it refuses, over the unit's workflow facts. |
+| `refuse[].why` | template |  | What the refusal says, over the unit's workflow facts. |
+
+### Its action on a row
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `action` | table |  | How the intent's action is offered on a row; its description is the intent's summary. |
 | `action.group` | one of `start`, `turn`, `control`, `workspace`, `brief`, `intake` | `start` | The group the action is listed under. |
 | `action.surfaces` | list of `row`, `detail`, `tui`, `menubar`, `notification`, `cli`, `explore` |  | Where the action is offered: row, detail, tui, cli and explore when absent. |
@@ -132,9 +118,81 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `action.warning` | template |  | Shown under the action, over the action facts; empty shows nothing. |
 | `action.confirm` | template |  | The dialog that confirms the action, over the action facts; empty asks nothing. |
 
+### What the prompt opens with
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `headline` | table |  | The line that opens the turn's prompt. |
+| `headline.resumed` | template |  | What a resumed turn continues, over the turn's facts. |
+| `headline.new[]` | table |  | A headline case; the last has no when. |
+| `headline.new[].when` | predicate |  | When the headline case applies. |
+| `headline.new[].line` | template |  | The headline, over the turn's facts. |
+| `start_line` | string |  | The intake's first line. |
+| `resume` | table |  | What a resumed turn reads. |
+| `resume.changed` | string |  | The text when the unit changed since the question. |
+
+### Guidance and brief
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `guidance` | table |  | The guidance a person gives the turn. |
+| `guidance.label` | string | `Guidance` | The guidance's label. |
+| `guidance.help` | string |  | What the guidance is for. |
+| `guidance.max` | integer | `0` | The guidance's length cap in runes; 0 for none. |
+| `brief` | table |  | How the turn reads the unit's brief. |
+| `brief.render` | bool | `true` | The instructions carry the brief. |
+| `brief.wait` | bool | `true` | The turn waits for the brief. |
+| `brief.need` | list of strings |  | The brief intent's extra fields the turn needs. |
+
+### Judgment
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `profile` | string |  | The intent whose judgment blocks the turn reads, or none; the configuration's profile is the profile directory. |
+| `dims` | list of `stage`, `reviewer` |  | The dimensions valid under its profile. |
+| `also_profile[]` | table |  | Other judgment the turn reads. |
+| `also_profile[].profile` | string |  | The intent with judgment blocks. |
+| `also_profile[].when` | predicate |  | When the turn reads the other judgment. |
+| `also_profile[].dims` | table |  | Dimensions it pins, such as { stage = "first" }. |
+| `also_profile[].dims.stage` | one of `first`, `follow-up` |  | The pinned stage. |
+| `also_profile[].dims.reviewer` | string |  | The pinned reviewer login. |
+| `also_profile[].define` | string |  | The template define that renders it. |
+| `also_profile[].prefix` | string |  | What its sources are listed under; "&lt;profile&gt; guide: " when absent. |
+
+### What it records
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `record` | table |  | The turn's record. |
+| `record.when` | predicate | `true` | When the turn records its outcome. |
+| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
+| `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
+| `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
+| `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
+| `record.history_artifact` | string |  | The artifact the unit's history shows. |
+| `record.require[]` | table |  | What a record in a state must carry. |
+| `record.require[].state` | string |  | The state. |
+| `record.require[].artifact` | string |  | The artifact it must carry. |
+| `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
+
+### Effects and drafts
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
+| `drafts` | table |  | The drafts its turns' agents propose. |
+| `drafts.allowed_effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
+| `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
+| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
+| `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |
+| `drafts.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
+| `drafts.approval.rule[].when` | predicate |  | When the approval rule applies to a draft. |
+| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's approval. |
+| `drafts.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the draft. |
+
 An intent with `builds` is a builder: it needs `prompt` and holds no role. Any other needs `workspace`, `[session]`, `[headline]` and `[record]`.
 
-### Inputs
+### Declaring inputs
 
 `[inputs.<name>]` declares an input. A `list` input comes only `from = "prepare"`; a user input needs `flag` (`--`, a lower-case letter, then lower-case letters, digits or `-`; two manifests may declare the same flag only with the same input name and type) and `help`. Guidance is not an input: the text after the flags, or after `--`, is the turn's guidance. `--no-wait` and `--no-brief` exist only for intents with `intake = true`; never declare them.
 
@@ -158,7 +216,7 @@ mode = "delay"
 window = "10m"
 ```
 
-The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`; `wait` when the table is absent. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. A workflow's own `[drafts.approval]` wins over the intent's for the turns it starts. See [the Outbox](/concepts/approval/#the-outbox).
+The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`; `wait` when the table is absent. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. A workflow's own `[drafts.approval]` wins over the intent's for the turns it starts; the configuration's `workflows.<name>.drafts.approval` is laid over the workflow's, or over the intent's when the workflow has none. See [the Outbox](/concepts/approval/#the-outbox).
 
 ## Providers
 
@@ -177,7 +235,7 @@ A `workspace` builtin places a pull request's turn. On any other unit, the turn 
 Every `when` key is a [CEL](https://github.com/google/cel-spec) expressions, checked at load.
 
 - Types are `bool`, `int`, `string`, `list` (of strings), `duration` and `timestamp`. A predicate is a non-empty `bool`. `in`, `size()`, `exists()` and `all()` work on lists; `duration("2h")` and `timestamp("2026-10-21T09:00:00-03:00")` are literals; a timestamp minus a timestamp is a duration.
-- Fields resolve against the facts of the predicate's slot: the **action** slot reads the row the daemon serves, the **turn** slot reads the turn being built. An unknown field fails with the closest name. The [facts](/reference/facts/) page lists them.
+- Fields resolve against the facts of the predicate's slot: the **action** slot reads the row the daemon serves, the **turn** slot reads the turn being built. An unknown field fails, naming a close one when one exists. The [facts](/reference/facts/) page lists them.
 - `inputs.<name>` reads the intent's own declared inputs, in the turn slot, with the input's type.
 - `!` applies before `==`, `!=`, `<`, `>` and `in`: write `!(turn.stage == "first")`; `!turn.stage == "first"` fails to load.
 - A missing fact reads as its type's zero value; an error at evaluation reads as false.

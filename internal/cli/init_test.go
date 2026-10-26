@@ -286,6 +286,22 @@ func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
 	}
 }
 
+func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
+	t.Parallel()
+	got, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Profile: "/profiles/mine", Agent: "claude",
+		Repos: []string{"acme/api"}, Teams: []string{"acme/core"}, People: []string{"ana"}, SlackClientID: "1.2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(got, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if ps := builtin.Check(builtin.SurfaceConfig, doc); len(ps) > 0 {
+		t.Errorf("init writes keys the grammar refuses: %v\n%s", ps, got)
+	}
+}
+
 func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
 	t.Parallel()
 	raw := `{"projects_dir": "~/src", "profile": "mine"}`
@@ -600,35 +616,4 @@ func TestProfileExamplesAreInert(t *testing.T) {
 	if err := te.checkProfile(dir); err != nil {
 		t.Fatalf("a renamed example does not load: %v", err)
 	}
-}
-
-func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
-	raw, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Agent: "claude", Profile: "/profile",
-		Repos: []string{"acme/api"}, Teams: []string{"acme/backend"}, People: []string{"ana"}, SlackClientID: "123.456"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		t.Fatal(err)
-	}
-	known := map[string]bool{}
-	for _, k := range builtin.Grammar {
-		if k.In == builtin.SurfaceConfig {
-			known[k.Path] = true
-		}
-	}
-	var walk func(prefix string, v map[string]any)
-	walk = func(prefix string, v map[string]any) {
-		for k, sub := range v {
-			path := prefix + k
-			if !known[path] {
-				t.Errorf("init writes %s, which the grammar does not know", path)
-			}
-			if m, ok := sub.(map[string]any); ok {
-				walk(path+".", m)
-			}
-		}
-	}
-	walk("", doc)
 }

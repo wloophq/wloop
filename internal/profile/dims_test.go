@@ -166,8 +166,22 @@ func TestSegLabelsComeFromTheProfile(t *testing.T) {
 		t.Fatalf("%q, want %q", got, want)
 	}
 	if _, err := Load([]Layer{bundled(), user(dir(t, map[string]string{LabelsFile: "tga = \"x\"\n"}))}, testIntents, nil); err == nil ||
-		!strings.Contains(err.Error(), LabelsFile) || !strings.Contains(err.Error(), "tga: unknown key; did you mean tag?") {
+		!strings.Contains(err.Error(), LabelsFile) || !strings.Contains(err.Error(), "tga: unknown key; did you mean \"tag\"?") {
 		t.Fatalf("an unknown key: %v", err)
+	}
+}
+
+func TestALabelOfNoDimensionFailsAtLoad(t *testing.T) {
+	for labels, want := range map[string]string{
+		"[values]\n\"round=first\" = \"First rounds\"\n": `values.round=first: unknown dimension "round"`,
+		"[dims]\nround = \"Round {value}\"\n":            `dims.round: unknown dimension "round"`,
+		"[dims]\nstag = \"Stage {value}\"\n":             `dims.stag: unknown dimension "stag"; did you mean "stage"?`,
+		"[values]\nfirst = \"First rounds\"\n":           "values.first: must be <dim>=<value>",
+	} {
+		_, err := Load([]Layer{bundled(), user(dir(t, map[string]string{LabelsFile: labels}))}, testIntents, nil)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v, want %q", labels, err, want)
+		}
 	}
 }
 

@@ -185,7 +185,7 @@ func TestTheGrammarRefusesTheOldUserConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []string
-	for _, p := range builtin.CheckUser(builtin.SurfaceConfig, tree) {
+	for _, p := range builtin.Check(builtin.SurfaceConfig, tree) {
 		got = append(got, p.Path)
 	}
 	slices.Sort(got)

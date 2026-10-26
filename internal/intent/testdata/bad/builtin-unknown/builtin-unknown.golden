@@ -1,1 +1,1 @@
-testdata/bad/builtin-unknown/intents/ask-author/intent.toml:3:13: workspace: unknown workspace builtin "pr_else_main"; the workspace builtins are "review", "author", "linked_else_main", "given"
+testdata/bad/builtin-unknown/intents/ask-author/intent.toml:3:13: workspace: "pr_else_main" is not one of "review", "author", "linked_else_main" or "given"

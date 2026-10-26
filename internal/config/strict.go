@@ -16,7 +16,7 @@ import (
 type UnknownKeysError struct {
 	File string
 	Keys []string // paths such as "sweep.fsat" or "projects[0].agent_hom"
-	// Near are the grammar's guesses, by key: "sweep.fsat" did you mean fast.
+	// Near are the grammar's guesses, by key: "sweep.fsat" did you mean "fast".
 	Near map[string]string
 }
 
@@ -28,7 +28,7 @@ func (e *UnknownKeysError) Error() string {
 	msg := fmt.Sprintf("%s: unknown %s %s", e.File, noun, strings.Join(e.Keys, ", "))
 	for _, k := range e.Keys {
 		if n := e.Near[k]; n != "" {
-			msg += fmt.Sprintf("; %s: did you mean %s?", k, n)
+			msg += fmt.Sprintf("; %s: did you mean %q?", k, n)
 		}
 	}
 	return msg
@@ -44,15 +44,14 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 	}
 	unknown := &UnknownKeysError{File: file, Near: map[string]string{}}
 	var bad []error
-	for _, p := range builtin.CheckUser(builtin.SurfaceConfig, tree) {
-		near, isUnknown := strings.CutPrefix(p.Msg, "unknown key")
-		if !isUnknown {
+	for _, p := range builtin.Check(builtin.SurfaceConfig, tree) {
+		if !p.Unknown {
 			bad = append(bad, fmt.Errorf("%s: %s: %s", file, p.Path, p.Msg))
 			continue
 		}
 		unknown.Keys = append(unknown.Keys, p.Path)
-		if n, ok := strings.CutPrefix(near, "; did you mean "); ok {
-			unknown.Near[p.Path] = strings.TrimSuffix(n, "?")
+		if p.Near != "" {
+			unknown.Near[p.Path] = p.Near
 		}
 	}
 	if len(unknown.Keys) > 0 {

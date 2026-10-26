@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
@@ -108,16 +109,12 @@ func mergeActions(out map[string]BuiltinAction, file string, src []byte) Problem
 	s := &sheet{file: file, at: positions(src), problems: problems}
 	for _, id := range slices.Sorted(maps.Keys(m)) {
 		if !slices.Contains(builtin.BuiltinActionIDs, id) {
-			msg := "names no built-in action"
-			if c := builtin.Closest(id, builtin.BuiltinActionIDs); c != "" {
-				msg += "; did you mean " + c + "?"
-			}
-			s.add(id, "%s", msg)
+			s.add(id, "names no built-in action%s", expr.DidYouMean(id, builtin.BuiltinActionIDs))
 			continue
 		}
 		out[id] = s.overAction(id, out[id], m[id])
 	}
-	s.addGrammar(grammar(builtin.SurfaceActions, src, file != ActionsFile))
+	s.addGrammar(grammar(builtin.SurfaceActions, src))
 	return s.problems
 }
 

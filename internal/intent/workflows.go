@@ -220,7 +220,7 @@ func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), 
 	defer func() {
 		s.problems = slices.DeleteFunc(s.problems, func(p Problem) bool { return skip != "" && unindexed(p.Field) == unindexed(skip) })
 		s.problems = append(s.problems, problems...)
-		ps := grammar(builtin.SurfaceWorkflow, src, u.files.user("workflow.toml"))
+		ps := grammar(builtin.SurfaceWorkflow, src)
 		for i := range ps {
 			if ps[i].Path == "trigger.when" {
 				ps[i].Msg = "when is a top-level key: write it before the [trigger] table"
@@ -286,7 +286,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 		if slot, ok = builtin.Slots[p]; ok {
 			w.Provider, w.Slot = p, slot
 		} else {
-			s.add("provider", "unknown provider %s; the providers are %s", *m.Provider, strings.Join(providerNames(), ", "))
+			s.oneOf("provider", *m.Provider, builtin.ValuesOf(builtin.SurfaceWorkflow, "provider"))
 		}
 	}
 	s.defineTrigger(&w, m.Trigger)
@@ -405,10 +405,8 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		s.add("step", "is required: at least one [[step]] with use = \"<builtin>\"")
 		return
 	}
-	names := make([]string, len(builtin.Steps))
-	for i, d := range builtin.Steps {
-		names[i] = d.Name
-	}
+	uses := builtin.ValuesOf(builtin.SurfaceWorkflow, "step[].use")
+	names := builtin.ValueNames(uses)
 	for i, raw := range steps {
 		p := fmt.Sprintf("step[%d]", i)
 		use, ok := raw["use"].(string)
@@ -418,7 +416,7 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		}
 		def, ok := stepDef(use)
 		if !ok {
-			s.add(p+".use", "unknown step %q; the steps are %s", use, quoted(names))
+			s.oneOf(p+".use", use, uses)
 			continue
 		}
 		st := workflow.Step{Use: use, Reach: def.Reach}
@@ -447,11 +445,7 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 			case k == "reach":
 				s.add(ap, "reach comes from the step's vocabulary; a manifest cannot set it")
 			case !slices.Contains(builtin.StepArgs(use), k):
-				if args := builtin.StepArgs(use); len(args) == 0 {
-					s.add(ap, "%s takes no arguments", use)
-				} else {
-					s.add(ap, "%s takes %s, not %s", use, quoted(args), k)
-				}
+				// builtin.CheckStep below says it, as the table does every unknown key.
 			default:
 				v, ok := stepArg(use, k, raw[k])
 				if !ok {
@@ -477,7 +471,7 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 			}
 		}
 		if use == builtin.StepDraftPropose {
-			s.draftPropose(p, st.Args)
+			s.draftPropose(p, st.Args, w.Provider)
 		}
 		args := maps.Clone(raw)
 		delete(args, "use")
@@ -546,7 +540,7 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 }
 
 // draftPropose checks draft.propose's arguments.
-func (s *sheet) draftPropose(p string, args map[string]any) {
+func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.ProviderID) {
 	arg := func(k string) (string, bool) {
 		v, ok := args[k].(string)
 		return v, ok
@@ -563,6 +557,12 @@ func (s *sheet) draftPropose(p string, args map[string]any) {
 	}
 	if v, ok := arg("repeat_after_sent"); ok && v != builtin.RepeatForever {
 		s.repeatAfter(p+".repeat_after_sent", v)
+	}
+	effects, _ := args["effects"].([]string)
+	for i, e := range effects {
+		if eff, ok := builtin.EffectOf(e); ok && eff.Provider != "" && provider != "" && eff.Provider != provider {
+			s.add(fmt.Sprintf("%s.effects[%d]", p, i), "%s applies to %s units only; a %s workflow cannot name it", e, eff.Provider, provider)
+		}
 	}
 }
 

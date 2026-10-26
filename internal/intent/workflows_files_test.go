@@ -21,7 +21,7 @@ provider = "github"
 when = "true"
 
 [trigger]
-on = ["pr.opened"]
+on = ["opened"]
 
 [[step]]
 use = "classify"

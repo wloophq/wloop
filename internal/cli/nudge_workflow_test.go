@@ -58,7 +58,7 @@ func newSilentRig(t *testing.T) *silentRig {
 }
 
 func silentFacts(days int, last time.Time) workflow.Facts {
-	return workflow.Facts{"pr.repo": "acme/api", "pr.state": "open", "pr.draft": false, "pr.waits_on_user": false,
+	return workflow.Facts{"pr.repo": "acme/api", "pr.state": "OPEN", "pr.draft": false, "pr.waits_on_user": false,
 		"pr.silent_days": days, "pr.last_interaction_at": last, "pr.fingerprint": "fp", "pr.mine": false, "pr.adopted": false}
 }
 
@@ -93,8 +93,8 @@ func TestNudgeSilentSkipsDraftsClosedRecentWaitingOnTheUserOrDevelopedByTheUser(
 	t.Parallel()
 	for name, set := range map[string][2]any{
 		"draft":               {"pr.draft", true},
-		"closed":              {"pr.state", "closed"},
-		"merged":              {"pr.state", "merged"},
+		"closed":              {"pr.state", "CLOSED"},
+		"merged":              {"pr.state", "MERGED"},
 		"recent":              {"pr.silent_days", 29},
 		"waiting on the user": {"pr.waits_on_user", true},
 		"mine":                {"pr.mine", true},

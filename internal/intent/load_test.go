@@ -1,7 +1,6 @@
 package intent
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -605,69 +604,6 @@ func TestTemplateCheckProblemsBreakTheIntent(t *testing.T) {
 	}
 }
 
-func TestSchemaMatchesTheDecodeStruct(t *testing.T) {
-	var schema map[string]any
-	if err := json.Unmarshal(Schema, &schema); err != nil {
-		t.Fatal(err)
-	}
-	compareSchema(t, "", reflect.TypeOf(manifest{}), schema)
-}
-
-func compareSchema(t *testing.T, path string, typ reflect.Type, node map[string]any) {
-	t.Helper()
-	for typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-	}
-	switch typ.Kind() {
-	case reflect.Struct:
-		if node["type"] != "object" || node["additionalProperties"] != false {
-			t.Errorf("%s: want a closed object, got %v", path, node["type"])
-			return
-		}
-		props, _ := node["properties"].(map[string]any)
-		seen := map[string]bool{}
-		for i := range typ.NumField() {
-			f := typ.Field(i)
-			key := f.Tag.Get("toml")
-			seen[key] = true
-			sub, ok := props[key].(map[string]any)
-			if !ok {
-				t.Errorf("%s%s: in the decode struct, not in the schema", path, key)
-				continue
-			}
-			compareSchema(t, path+key+".", f.Type, sub)
-		}
-		for key := range props {
-			if !seen[key] {
-				t.Errorf("%s%s: in the schema, not in the decode struct", path, key)
-			}
-		}
-	case reflect.Map:
-		sub, ok := node["additionalProperties"].(map[string]any)
-		if node["type"] != "object" || !ok {
-			t.Errorf("%s: want an object of values", path)
-			return
-		}
-		compareSchema(t, path+"<name>.", typ.Elem(), sub)
-	case reflect.Slice:
-		sub, ok := node["items"].(map[string]any)
-		if node["type"] != "array" || !ok {
-			t.Errorf("%s: want an array", path)
-			return
-		}
-		compareSchema(t, path, typ.Elem(), sub)
-	case reflect.Interface:
-		if _, ok := node["oneOf"].([]any); !ok {
-			t.Errorf("%s: a key decoded as any needs oneOf in the schema", path)
-		}
-	default:
-		want := map[reflect.Kind]string{reflect.String: "string", reflect.Bool: "boolean", reflect.Int: "integer"}[typ.Kind()]
-		if node["type"] != want {
-			t.Errorf("%s: schema type %v, decode type %s", path, node["type"], typ.Kind())
-		}
-	}
-}
-
 func TestATypeMismatchInsideAnInlineTableKeepsTheOtherChecks(t *testing.T) {
 	root := t.TempDir()
 	m := strings.Replace(minimal, `session = { strategy = "new", title = "ask" }`, `session = { strategy = 1, title = "ASK" }`, 1)
@@ -681,7 +617,7 @@ func TestATypeMismatchInsideAnInlineTableKeepsTheOtherChecks(t *testing.T) {
 func TestABrokenIntentsRulesCarryItsFirstProblem(t *testing.T) {
 	l, _ := Load(userLayer("testdata/bad/predicate-typo"), bundledFS(), testBase(), nil)
 	_, err := l.Rules("ask-author")
-	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean pr.mine?`
+	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean "pr.mine"?`
 	if err == nil || err.Error() != want {
 		t.Fatalf("got  %v\nwant %s", err, want)
 	}
@@ -951,25 +887,25 @@ func TestProviderDefaultsToGitHub(t *testing.T) {
 	root := t.TempDir()
 	writeIntent(t, root, "ask-author", minimal, "{{.Headline}}\n")
 	thread := strings.ReplaceAll(minimal, "{{.pr.slug}}", "{{.unit.ref}}")
-	writeIntent(t, root, "ask-thread", strings.Replace(thread, `workspace = "review"`, "workspace = \"review\"\nprovider = \"thread\"", 1), "{{.Headline}}\n")
+	writeIntent(t, root, "ask-thread", strings.Replace(thread, `workspace = "review"`, "workspace = \"review\"\nprovider = \"slack\"", 1), "{{.Headline}}\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	for name, want := range map[dintent.Name]dunit.ProviderID{"ask-author": dunit.GitHub, "ask-thread": "thread", "review": dunit.GitHub} {
+	for name, want := range map[dintent.Name]dunit.ProviderID{"ask-author": dunit.GitHub, "ask-thread": "slack", "review": dunit.GitHub} {
 		if d, _ := l.Registry.Get(name); d.Provider != want {
 			t.Errorf("%s: provider %q, want %q", name, d.Provider, want)
 		}
 	}
-	if got := l.Registry.ForProvider("thread"); len(got) != 1 || got[0].Name != "ask-thread" {
-		t.Errorf("ForProvider(thread) = %v", got)
+	if got := l.Registry.ForProvider("slack"); len(got) != 1 || got[0].Name != "ask-thread" {
+		t.Errorf("ForProvider(slack) = %v", got)
 	}
 }
 
 func TestThreadIntentCannotReadPRFacts(t *testing.T) {
 	_, problems := Load(userLayer("testdata/bad/provider-pr-fact"), bundledFS(), testBase(), nil)
 	got := problems.Error()
-	for _, want := range []string{"record.when: pr.author is a github fact; a thread intent cannot read it", ".PR.Author reads the github pull request; a thread intent cannot read it"} {
+	for _, want := range []string{"record.when: pr.author is a github fact; a slack intent cannot read it", ".PR.Author reads the github pull request; a slack intent cannot read it"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("lacks %q:\n%s", want, got)
 		}

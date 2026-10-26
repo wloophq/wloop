@@ -27,11 +27,6 @@ type mApprovalRule struct {
 	Window *string `toml:"window"`
 }
 
-var (
-	draftApprovalModes = []string{string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun)}
-	runApprovalModes   = []string{string(workflow.ApprovalRun), string(workflow.ApprovalDelay), string(workflow.ApprovalWait)}
-)
-
 // draftApprovalAt is the draft policy of m at at, its rules' when compiled
 // over env; nil when m is, wait when m sets no mode. A rule that releases while reading draft.delivery
 // in a form that never names comment delivery loads with a warning.
@@ -99,20 +94,20 @@ func (s *sheet) ruleProblem(path, when string, err error, env expr.Env) {
 
 // approval is a draft's mode and window at path.
 func (s *sheet) approval(path string, mode, window *string) (draft.Approval, bool) {
-	m, w, ok := s.modeWindow(path, mode, window, draftApprovalModes, "the draft is sent")
+	m, w, ok := s.modeWindow(path, mode, window, builtin.DraftModes(), "the draft is sent")
 	return draft.Approval{Mode: draft.ApprovalMode(m), Window: w}, ok
 }
 
 // modeWindow is the mode, one of modes, and the window at path: a window
 // only with delay, which needs one.
-func (s *sheet) modeWindow(path string, mode, window *string, modes []string, what string) (string, time.Duration, bool) {
+func (s *sheet) modeWindow(path string, mode, window *string, modes []builtin.Value, what string) (string, time.Duration, bool) {
 	if mode == nil {
-		s.add(path+".mode", "is required: one of %s", quoted(modes))
+		s.add(path+".mode", "is required: one of %s", quoted(builtin.ValueNames(modes)))
 		return "", 0, false
 	}
 	delay := *mode == string(draft.Delay)
 	switch {
-	case !slices.Contains(modes, *mode):
+	case !slices.Contains(builtin.ValueNames(modes), *mode):
 		s.oneOf(path+".mode", *mode, modes)
 		return "", 0, false
 	case delay && window == nil:
@@ -143,12 +138,12 @@ func (s *sheet) runApproval(m *mApproval, env expr.Env) workflow.Approval {
 		run := string(workflow.ApprovalRun)
 		mode = &run
 	}
-	if v, w, ok := s.modeWindow("approval", mode, m.Window, runApprovalModes, "the item runs"); ok {
+	if v, w, ok := s.modeWindow("approval", mode, m.Window, builtin.RunModes(), "the item runs"); ok {
 		a.Mode, a.Window = workflow.ApprovalMode(v), w
 	}
 	for i, r := range m.Rule {
 		path := fmt.Sprintf("approval.rule[%d]", i)
-		v, w, ok := s.modeWindow(path, r.Mode, r.Window, runApprovalModes, "the item runs")
+		v, w, ok := s.modeWindow(path, r.Mode, r.Window, builtin.RunModes(), "the item runs")
 		if r.When == nil {
 			s.add(path+".when", "is required: a predicate over the unit's facts, the trigger's and config.*")
 			continue

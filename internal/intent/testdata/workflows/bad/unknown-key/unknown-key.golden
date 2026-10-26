@@ -1,1 +1,1 @@
-testdata/workflows/bad/unknown-key/workflows/case-workflow/workflow.toml:3:10: observ: unknown key; did you mean observe?
+testdata/workflows/bad/unknown-key/workflows/case-workflow/workflow.toml:3:10: observ: unknown key; did you mean "observe"?

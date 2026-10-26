@@ -96,11 +96,22 @@
             "type": "string"
           },
           "dims": {
-            "additionalProperties": {
-              "description": "A pinned dimension's value.",
-              "type": "string"
-            },
+            "additionalProperties": false,
             "description": "Dimensions it pins, such as { stage = \"first\" }.",
+            "properties": {
+              "reviewer": {
+                "description": "The pinned reviewer login.",
+                "type": "string"
+              },
+              "stage": {
+                "description": "The pinned stage.",
+                "enum": [
+                  "first",
+                  "follow-up"
+                ],
+                "type": "string"
+              }
+            },
             "type": "object"
           },
           "prefix": {
@@ -316,7 +327,7 @@
           "type": "array"
         },
         "group": {
-          "description": "The main help's group title.",
+          "description": "The title of the main help's group that lists the command, free text; action.group is the action's.",
           "type": "string"
         },
         "summary": {
@@ -324,7 +335,7 @@
           "type": "string"
         },
         "target": {
-          "description": "What the command's target is.",
+          "description": "Free text saying what the command's argument names, such as a pull request URL.",
           "type": "string"
         }
       },
@@ -435,7 +446,7 @@
       "type": "boolean"
     },
     "profile": {
-      "description": "The intent whose judgment blocks the turn reads, or none.",
+      "description": "The intent whose judgment blocks the turn reads, or none; the configuration's profile is the profile directory.",
       "type": "string"
     },
     "prompt": {
@@ -534,6 +545,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "states"
+      ],
       "type": "object"
     },
     "refuse": {
@@ -678,6 +692,10 @@
       ]
     }
   },
+  "required": [
+    "label",
+    "summary"
+  ],
   "title": "Intent manifest (intent.toml)",
   "type": "object"
 }

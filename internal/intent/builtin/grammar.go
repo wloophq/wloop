@@ -54,14 +54,17 @@ type Key struct {
 	Values  func() []Value
 	Default string
 	Doc     string
-	// Bundled says that only the embedded profile may set the key.
-	Bundled bool
+	// Required says that the table holding the key must set it.
+	Required bool
 }
 
 // Value is one value of an enum key.
 type Value struct {
 	Name string
 	Doc  string
+	// Releases says that the value lets a send or a run go with no person
+	// approving it, which no did-you-mean suggests.
+	Releases bool
 }
 
 // Grammar is every reserved key of the language.
@@ -71,6 +74,10 @@ var Grammar = slices.Concat(intentGrammar, workflowGrammar, stepGrammar, actions
 type Problem struct {
 	Path string
 	Msg  string
+	// Near is the value or key the message suggests, "" when none.
+	Near string
+	// Unknown says that no row names the key.
+	Unknown bool
 }
 
 // Check walks doc, a document of surface decoded without a schema (a TOML
@@ -79,12 +86,6 @@ type Problem struct {
 // surface the grammar has no row of is not checked.
 func Check(surface Surface, doc map[string]any) []Problem {
 	return check(Grammar, surface, doc)
-}
-
-// CheckUser is Check on a user layer's document, which may not set a key
-// only the bundled profile sets.
-func CheckUser(surface Surface, doc map[string]any) []Problem {
-	return checkUser(Grammar, surface, doc)
 }
 
 // CheckStep is Check on the arguments of a workflow step, use, without use itself.
@@ -120,4 +121,34 @@ func IsPredKey(last string) bool {
 		}
 	}
 	return false
+}
+
+// ValuesOf are the values of the enum key at path of surface, the table's
+// set that a decoder checks a value against; nil when the key is no enum.
+func ValuesOf(surface Surface, path string) []Value {
+	for _, k := range Grammar {
+		if k.In == surface && k.Path == path && k.Values != nil {
+			return k.Values()
+		}
+	}
+	return nil
+}
+
+// StepValuesOf are the values of step use's enum argument arg.
+func StepValuesOf(use, arg string) []Value {
+	for _, k := range stepGrammar {
+		if k.Step == use && k.Path == arg && k.Values != nil {
+			return k.Values()
+		}
+	}
+	return nil
+}
+
+// ValueNames are the names of values.
+func ValueNames(values []Value) []string {
+	out := make([]string, len(values))
+	for i, v := range values {
+		out[i] = v.Name
+	}
+	return out
 }

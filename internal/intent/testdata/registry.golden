@@ -363,7 +363,7 @@ workflow/session-pr-finished.Summary = "Close a session whose pull request is me
 workflow/session-pr-finished.Provider = "session"
 workflow/session-pr-finished.Slot = "session"
 workflow/session-pr-finished.Trigger.Kind = "sweep"
-workflow/session-pr-finished.When = "session.pr_state in [\"merged\", \"closed\"]"
+workflow/session-pr-finished.When = "session.pr_state in [\"MERGED\", \"CLOSED\"]"
 workflow/session-pr-finished.Steps[0].Use = "session.close"
 workflow/session-pr-finished.Steps[0].Reach = "local"
 workflow/session-pr-finished.Limits.PerRun = 10
@@ -462,7 +462,7 @@ workflow/workspace-review-finished.Summary = "Remove a review workspace whose pu
 workflow/workspace-review-finished.Provider = "workspace"
 workflow/workspace-review-finished.Slot = "workspace"
 workflow/workspace-review-finished.Trigger.Kind = "sweep"
-workflow/workspace-review-finished.When = "!workspace.main && workspace.role == \"review\" && workspace.pr_state in [\"merged\", \"closed\"] && workspace.pr_finished_for > config.cleanup.workspace_grace && workspace.path_exists"
+workflow/workspace-review-finished.When = "!workspace.main && workspace.role == \"review\" && workspace.pr_state in [\"MERGED\", \"CLOSED\"] && workspace.pr_finished_for > config.cleanup.workspace_grace && workspace.path_exists"
 workflow/workspace-review-finished.Steps[0].Use = "workspace.remove"
 workflow/workspace-review-finished.Steps[0].Reach = "local"
 workflow/workspace-review-finished.Limits.PerRun = 5
@@ -479,7 +479,7 @@ workflow/workspace-author-finished.Summary = "Remove your workspace whose pull r
 workflow/workspace-author-finished.Provider = "workspace"
 workflow/workspace-author-finished.Slot = "workspace"
 workflow/workspace-author-finished.Trigger.Kind = "sweep"
-workflow/workspace-author-finished.When = "!workspace.main && workspace.role == \"author\" && workspace.pr_state in [\"merged\", \"closed\"] && workspace.pr_finished_for > config.cleanup.workspace_grace && workspace.path_exists"
+workflow/workspace-author-finished.When = "!workspace.main && workspace.role == \"author\" && workspace.pr_state in [\"MERGED\", \"CLOSED\"] && workspace.pr_finished_for > config.cleanup.workspace_grace && workspace.path_exists"
 workflow/workspace-author-finished.Steps[0].Use = "workspace.remove"
 workflow/workspace-author-finished.Steps[0].Reach = "local"
 workflow/workspace-author-finished.Limits.PerRun = 5
@@ -570,7 +570,7 @@ workflow/hygiene-turn-on-finished-pr.Summary = "Dismiss an open turn on a merged
 workflow/hygiene-turn-on-finished-pr.Provider = "github"
 workflow/hygiene-turn-on-finished-pr.Slot = "pr"
 workflow/hygiene-turn-on-finished-pr.Trigger.Kind = "sweep"
-workflow/hygiene-turn-on-finished-pr.When = "pr.open_turn != \"\" && pr.state in [\"merged\", \"closed\"]"
+workflow/hygiene-turn-on-finished-pr.When = "pr.open_turn != \"\" && pr.state in [\"MERGED\", \"CLOSED\"]"
 workflow/hygiene-turn-on-finished-pr.Steps[0].Use = "turn.dismiss"
 workflow/hygiene-turn-on-finished-pr.Steps[0].Reach = "local"
 workflow/hygiene-turn-on-finished-pr.Order = 30
@@ -608,7 +608,7 @@ workflow/nudge-silent-30d.Summary = "Nudge whoever someone else's open pull requ
 workflow/nudge-silent-30d.Provider = "github"
 workflow/nudge-silent-30d.Slot = "pr"
 workflow/nudge-silent-30d.Trigger.Kind = "sweep"
-workflow/nudge-silent-30d.When = "pr.state == \"open\" && !pr.draft && !pr.mine && !pr.adopted && !pr.waits_on_user && pr.silent_days >= config.github.nudge.silent_days"
+workflow/nudge-silent-30d.When = "pr.state == \"OPEN\" && !pr.draft && !pr.mine && !pr.adopted && !pr.waits_on_user && pr.silent_days >= config.github.nudge.silent_days"
 workflow/nudge-silent-30d.Steps[0].Use = "turn.start"
 workflow/nudge-silent-30d.Steps[0].Args[intent] = "nudge"
 workflow/nudge-silent-30d.Order = 40

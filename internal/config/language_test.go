@@ -73,8 +73,12 @@ func TestRecordIsNoDraftApprovalMode(t *testing.T) {
 		`{"github": {"drafts": {"approval": {"mode": "record"}}}}`:           "github.drafts.approval",
 		`{"slack": {"drafts": {"approval": {"mode": "record"}}}}`:            "slack.drafts.approval",
 	} {
-		if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), `"record"`) {
+		err := loadErr(t, raw)
+		if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), `"record"`) {
 			t.Errorf("%s: %v", raw, err)
+		}
+		if err != nil && strings.Contains(err.Error(), "did you mean") {
+			t.Errorf("%s: a guess turns a draft that never sends into one that does: %v", raw, err)
 		}
 	}
 	c := loadJSON(t, `{"workflows": {"x": {"drafts": {"approval": {"mode": "dry_run"}}}}}`)

@@ -72,6 +72,8 @@ func (p *PR) Fact(name string) (any, bool) {
 		return p.Slug(), true
 	case "pr.owner":
 		return p.Owner, true
+	case "pr.repo":
+		return p.Owner + "/" + p.Repo, true
 	case "pr.repo_name":
 		return p.Repo, true
 	case "pr.base":

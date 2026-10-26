@@ -1,1 +1,1 @@
-testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean pr.mine?
+testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean "pr.mine"?

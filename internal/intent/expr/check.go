@@ -43,36 +43,3 @@ func newError(src string, pos int, format string, args ...any) *Error {
 		Snippet: src[lineStart:lineEnd] + "\n" + string(pad) + "^",
 	}
 }
-
-func suggest(name string, env Env) string {
-	best, bestD := "", 3
-	for _, k := range env.Names() {
-		if d := levenshtein(name, k); d < bestD {
-			best, bestD = k, d
-		}
-	}
-	if best == "" {
-		return ""
-	}
-	return "; did you mean " + best + "?"
-}
-
-func levenshtein(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			c := 1
-			if a[i-1] == b[j-1] {
-				c = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+c)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
-}

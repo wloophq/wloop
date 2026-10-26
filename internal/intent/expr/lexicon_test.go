@@ -85,7 +85,7 @@ func TestEnvMetadataIsNoFact(t *testing.T) {
 	if len(env.Names()) != 4 {
 		t.Errorf("%v", env.Names())
 	}
-	if _, err := Compile(`workspace.rol == "author"`, env); err == nil || !strings.Contains(err.Error(), "did you mean workspace.role?") {
+	if _, err := Compile(`workspace.rol == "author"`, env); err == nil || !strings.Contains(err.Error(), "did you mean \"workspace.role\"?") {
 		t.Errorf("%v", err)
 	}
 }

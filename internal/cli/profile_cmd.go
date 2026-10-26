@@ -21,14 +21,23 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-const profileUsage = `usage:
+var profileUsage = `usage:
   profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
   profile schema [--workflow|--actions|--config]
   profile try <pr-url>
-conditions: --organization, --repo, --user, --team, --association, --label, --base, --stage, --kind, --size, --risk, --tag <key>=<value> (repeatable)`
+conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
+
+// conditionNames are the condition flags, one per profile dimension.
+func conditionNames() string {
+	out := make([]string, len(profile.Dims))
+	for i, d := range profile.Dims {
+		out[i] = "--" + string(d)
+	}
+	return strings.Join(out, ", ")
+}
 
 type listFlag []string
 

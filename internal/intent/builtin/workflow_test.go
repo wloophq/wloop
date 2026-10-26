@@ -15,7 +15,7 @@ var workflowTable = map[string]string{
 	"pr": "state:S merged_at:T closed_at:T finished_for:D draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B muted:B " +
 		"has_workspace:B stale:B open_turn:S open_turn_seq:I orphan_answer_id:I review.action:S review.reason:S review.observed:B " +
 		"first.due:B first.reason:S address.due:B address.reason:S address.reviewers:L address.checks:L address.conflict:B address.observed:B " +
-		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S mute.refusal:S fingerprint:S repo:S owner:S author:S visibility:S",
+		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S mute.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S",
 	"session": "state:S manager:S managed:B listed:B orphaned:B agent_state:S user_active:B user_typed_after_turn:B prompt_knowable:B " +
 		"prompted_while_idle:B open_turn:S newest_state:S newest_age:D newest_intent:S closes_when_done:B idle_since:T " +
 		"idle_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
@@ -94,14 +94,14 @@ func TestWorkflowEnvIsOneSlotWithTriggerAndConfig(t *testing.T) {
 			t.Errorf("session env lacks %s", name)
 		}
 	}
-	if _, err := expr.CompileWorkflow(`session.pr_state in ["merged", "closed"] && session.idle_for > config.cleanup.idle`, env); err != nil {
+	if _, err := expr.CompileWorkflow(`session.pr_state in ["MERGED", "CLOSED"] && session.idle_for > config.cleanup.idle`, env); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestAnUnknownSlotFactSuggests(t *testing.T) {
 	cases := map[string]string{
-		`session.idle_fr > duration("2h")`: "unknown field session.idle_fr; did you mean session.idle_for?",
+		`session.idle_fr > duration("2h")`: "unknown field session.idle_fr; did you mean \"session.idle_for\"?",
 		`pr.state == "open"`:               "unknown field pr.state",
 	}
 	for src, msg := range cases {

@@ -449,7 +449,7 @@ func TestNoRemovalMatchesAWorkspaceWhosePathIsGone(t *testing.T) {
 		removals++
 		for _, role := range []string{"review", "author"} {
 			facts := workflow.Facts{"workspace.main": false, "workspace.pr": "", "workspace.sessions": 0, "workspace.quiet_for": month,
-				"workspace.role": role, "workspace.pr_state": "merged", "workspace.pr_finished_for": month, "workspace.temporary": true,
+				"workspace.role": role, "workspace.pr_state": "MERGED", "workspace.pr_finished_for": month, "workspace.temporary": true,
 				"workspace.duplicate": true, "workspace.path_exists": true}
 			vars := workflow.Vars{Facts: facts, Trigger: workflow.Facts{"trigger.kind": "sweep"}, Config: configFacts(cfg), Now: te.Now()}
 			present, err := w.When.Match(vars)

@@ -175,6 +175,13 @@ var bookkeepingKinds = []string{KindFollowed, KindUnfollowed, KindSituation, "tu
 // reports, which no activity feed or timeline shows.
 func Bookkeeping(kind string) bool { return slices.Contains(bookkeepingKinds, kind) }
 
+// EventKinds are the kinds of a pull request's events, which a workflow's
+// trigger.on names.
+var EventKinds = []string{KindOpened, KindPush, KindReviewRequest, KindReviewRequestRemoved, KindReview, KindComment, KindCheck,
+	KindReady, KindDraft, KindMerged, KindClosed, KindRoundSent, KindRoundHeld, KindRoundPending, KindRoundSkipped, KindGuidance,
+	KindRoundBlocked, KindRoundUnblocked, KindMuted, KindUnmuted, KindHeld, KindReleased, KindAdopted, KindTracked, KindUntracked,
+	KindNudged, KindRemoved, KindStatus, KindWouldReview, KindWouldAddress, KindReviewEnded}
+
 // BookkeepingKinds are the kinds Bookkeeping accepts.
 func BookkeepingKinds() []string { return slices.Clone(bookkeepingKinds) }
 

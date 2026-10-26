@@ -32,7 +32,6 @@ var testRows = []Key{
 	{Path: "inputs.*.type", In: SurfaceIntent, Kind: KindEnum, Values: func() []Value { return []Value{{Name: "bool"}, {Name: "text"}} }},
 	{Path: "resume.changed", In: SurfaceIntent, Kind: KindTemplate},
 	{Path: "resume", In: SurfaceIntent, Kind: KindTable},
-	{Path: "context", In: SurfaceIntent, Kind: KindText, Bundled: true},
 	{Path: "workflows", In: SurfaceConfig, Kind: KindMap},
 	{Path: "workflows.*.only_when", In: SurfaceConfig, Kind: KindPred},
 	{Path: "turns.per_day", In: SurfaceConfig, Kind: KindInt},
@@ -62,10 +61,10 @@ func wants(t *testing.T, ps []Problem, want ...string) {
 
 func TestCheckRefusesAnUnknownKey(t *testing.T) {
 	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"provder": "github", "zzz": 1, "summary": "s"}),
-		"provder: unknown key; did you mean provider?", "zzz: unknown key")
+		"provder: unknown key; did you mean \"provider\"?", "zzz: unknown key")
 	wants(t, check(testRows, SurfaceIntent, map[string]any{"resume": map[string]any{"head_moved": "t"}}), "resume.head_moved: unknown key")
 	wants(t, check(testRows, SurfaceIntent, map[string]any{"inputs": map[string]any{"a": map[string]any{"typ": "text"}}}),
-		"inputs.a.typ: unknown key; did you mean type?")
+		"inputs.a.typ: unknown key; did you mean \"type\"?")
 }
 
 func TestCheckRefusesAnUnknownValue(t *testing.T) {
@@ -85,12 +84,6 @@ func TestCheckReadsKinds(t *testing.T) {
 	wants(t, check(testRows, SurfaceConfig, map[string]any{"turns": map[string]any{"per_day": 2.5}}), "turns.per_day: must be an integer")
 	wants(t, check(testRows, SurfaceConfig, map[string]any{"turns": map[string]any{"per_day": float64(20)}, "workflows": map[string]any{"x": map[string]any{"only_when": "true"}}}))
 	wants(t, check(testRows, SurfaceWorkflow, map[string]any{"drafts": map[string]any{"approval": map[string]any{"window": "1d", "mode": "delay"}}}))
-}
-
-func TestCheckUserRefusesABundledKey(t *testing.T) {
-	doc := map[string]any{"context": "synthetic"}
-	wants(t, check(testRows, SurfaceIntent, doc))
-	wants(t, checkUser(testRows, SurfaceIntent, doc), "context: only the bundled profile sets context")
 }
 
 func TestASurfaceWithNoRowsIsNotChecked(t *testing.T) {

@@ -150,7 +150,7 @@ A workflow of yours goes in `<profile>/workflows/<name>/workflow.toml`. This one
 ```toml
 summary = "Tell me about my pull requests that wait on me for two days"
 provider = "github"
-when = 'pr.state == "open" && pr.mine && pr.waits_on_user && pr.age > duration("48h")'
+when = 'pr.state == "OPEN" && pr.mine && pr.waits_on_user && pr.age > duration("48h")'
 
 [[step]]
 use = "notify.self"
