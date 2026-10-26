@@ -406,7 +406,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 			out = append(out, api.DoctorCheck{Mark: api.DoctorInfo, Name: name, Info: "disabled by workflows." + w.Name + ".enabled in " + e.ConfigPath})
 			continue
 		}
-		w = applyConfig([]workflow.Workflow{w}, cfg)[0]
+		w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(l.Registry))[0]
 		c, err := e.workflowLine(ctx, db, w, activity[w.Name], now)
 		if err != nil {
 			return out, err
