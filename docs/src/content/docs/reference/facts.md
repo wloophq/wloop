@@ -273,7 +273,6 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 |---|---|---|
 | `plan.cleared` | any | Drops the unit's pending plan items. |
 | `guidance.handed` | github | Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent. |
-| `pr.counted` | github | Counts an automated turn against turns.per_unit_per_day: an automated turn of an intent without it spends none. A turn by hand counts nothing. |
 | `pr.round_sent` | github | Records the round-sent event on the pull request. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |

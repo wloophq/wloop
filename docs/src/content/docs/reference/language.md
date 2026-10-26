@@ -137,7 +137,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 ### Effects and drafts
 
-- `effects` (list of `plan.cleared`, `guidance.handed`, `pr.counted`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged`): What sending the turn applies.
+- `effects` (list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged`): What sending the turn applies.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
 - `drafts.approval` (table): The approval of its drafts; wait when absent.
@@ -418,7 +418,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `turns` (table): The automated turn budgets.
 - `turns.per_day` (integer, default `20`): Automated turns per day, all workflows together, on units whose plugin keeps no per-unit count (every provider but GitHub today).
-- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); an automated turn counts when its intent declares the pr.counted effect.
+- `turns.per_unit_per_day` (integer, default `5`): Automated turns on one unit per local day, on units whose plugin keeps a per-unit count (GitHub today); every automated turn spends one, whatever its intent declares, and a turn by hand none.
 - `headless` (table): The headless turns' caps; a cost of zero leaves it uncapped.
 - `headless.tier` (one of `fast`, `balanced`, `frontier`, default `balanced`): The model tier of their calls.
 - `headless.per_call_usd` (number, default `0.5`): What one call may cost, in USD.

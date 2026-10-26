@@ -14,10 +14,6 @@ func TestCapAndFingerprint(t *testing.T) {
 		t.Fatal("capped on a fresh state")
 	}
 	s.RecordSent("a#1", Reviewed, "fp1", now)
-	if s.CapReason("a#1", now, 1) != "" {
-		t.Fatal("a round sent counted without Count")
-	}
-	s.Count("a#1", now)
 	if s.CapReason("a#1", now, 1) == "" {
 		t.Fatal("per-PR cap not applied")
 	}
@@ -40,7 +36,6 @@ func TestSettersRecordWhatTheyChanged(t *testing.T) {
 	s := New()
 	s.SetHeads("a/b#1", "abc", "")
 	s.RecordSent("a/b#1", AddressedReviews, "", now)
-	s.Count("a/b#1", now)
 	s.ClearFirstRoundSkipped("a/b#2")
 	s.FirstNote("hello", now)
 	s.FirstNote("hello", now)

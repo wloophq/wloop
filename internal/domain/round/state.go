@@ -200,14 +200,15 @@ func (s *Store) SetHeads(key, checksHead, conflictHead string) {
 	}
 }
 
-// RecordSent notes an automated round sent and sets its mark to
-// fingerprint; an empty fingerprint keeps the mark as it was, for a round
-// no review started. It counts nothing: Count does.
+// RecordSent notes an automated round sent, spends one of key's turns of
+// now's day, and sets its mark to fingerprint; an empty fingerprint keeps
+// the mark as it was, for a round no review started.
 func (s *Store) RecordSent(key, mark, fingerprint string, now time.Time) {
 	if fingerprint != "" {
 		s.SetMark(key, mark, fingerprint)
 	}
 	s.set(key, FieldSentAt|FieldRoundAt, func(p *PR) { p.SentAt, p.RoundAt = now.UTC(), now.UTC() })
+	s.Count(key, now)
 }
 
 // Count spends one of key's turns of now's day, which CapReason reads.

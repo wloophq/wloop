@@ -238,7 +238,7 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 	if base.For(ref.Owner, ref.Repo).AgentHome == "" {
 		remember = home
 	}
-	return e.handRound(ctx, routeAsked, ref, guidance, d, func(st *round.Store, sr *sentRound) (bool, error) {
+	return e.handRound(ctx, routeAsked, ref, guidance, d, remember != "", func(st *round.Store, sr *sentRound) (bool, error) {
 		pr, err := e.openPR(ctx, ref)
 		if err != nil {
 			return false, err

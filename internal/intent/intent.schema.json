@@ -241,7 +241,6 @@
         "enum": [
           "plan.cleared",
           "guidance.handed",
-          "pr.counted",
           "pr.round_sent",
           "pr.reviewed",
           "pr.addressed",

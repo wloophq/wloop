@@ -157,8 +157,8 @@ var Stages = []string{"first", "follow-up"}
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
 
 // RoundProviders are the providers whose plugin keeps a per-unit count of
-// turns: an automated turn.start on their units of an intent declaring
-// pr.counted spends turns.per_unit_per_day; a workflow starting turns on any other must set
+// turns: every automated turn.start on their units spends
+// turns.per_unit_per_day; a workflow starting turns on any other must set
 // limits.per_day.
 var RoundProviders = []unit.ProviderID{unit.GitHub}
 

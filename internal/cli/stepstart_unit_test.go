@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"io/fs"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -414,23 +415,23 @@ func TestAWorkflowLaunchingARoleLaunchesItsHolder(t *testing.T) {
 	}
 }
 
-func TestOnlyAnIntentDeclaringPrCountedSpendsThePerUnitBudget(t *testing.T) {
+func TestEveryAutomatedTurnSpendsThePerUnitBudget(t *testing.T) {
 	t.Parallel()
-	for name, c := range map[string]struct {
-		drop string
-		want int
-	}{"declared": {"", 1}, "not declared": {`"pr.counted", `, 0}} {
-		sc := followupScenario(t)
-		files := myReview(t)
-		files["intents/my-review/intent.toml"] = strings.Replace(files["intents/my-review/intent.toml"], c.drop, "", 1)
-		userProfile(t, sc.te, files)
-		r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
-		if _, err := r.run(t, automation.RunOpts{}); err != nil {
-			t.Fatal(err)
-		}
-		if got := sc.te.loadRounds(t).Days[round.DayKey(testNow)].PerPR[sc.ref.String()]; got != c.want {
-			t.Errorf("%s: %d turns counted, want %d", name, got, c.want)
-		}
+	sc := followupScenario(t)
+	files := myReview(t)
+	m := files["intents/my-review/intent.toml"]
+	files["intents/my-review/intent.toml"] = regexp.MustCompile(`(?m)^effects\s*=.*$`).ReplaceAllString(m, "")
+	userProfile(t, sc.te, files)
+	sc.te.cfg.Turns.PerUnitPerDay = 1
+	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
+	if _, err := r.run(t, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sc.te.loadRounds(t).Days[round.DayKey(testNow)].PerPR[sc.ref.String()]; got != 1 {
+		t.Fatalf("%d turns counted, want 1", got)
+	}
+	if got := r.check(t, automation.CheckOpts{}); !strings.HasPrefix(got, round.CapReached) {
+		t.Fatalf("at the cap: %q", got)
 	}
 }
 

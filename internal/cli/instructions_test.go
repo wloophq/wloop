@@ -158,9 +158,6 @@ func TestInstructionsByHandFindsThePullRequestOfTheWorktree(t *testing.T) {
 		!slices.Contains(kinds, dinv.KindGuidance+" look at the migration") {
 		t.Fatalf("events %q", kinds)
 	}
-	if s, _ := te.Rounds.Load(context.Background()); s.RoundAt(r7.String()).IsZero() {
-		t.Fatal("the round was not recorded; the next sweep would send it again")
-	}
 }
 
 func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {

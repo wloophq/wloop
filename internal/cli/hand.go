@@ -135,7 +135,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return err
 		}
 	}
-	return e.handRound(ctx, routeSession, ref, h.guidance, d, func(_ *round.Store, sr *sentRound) (bool, error) {
+	return e.handRound(ctx, routeSession, ref, h.guidance, d, false, func(_ *round.Store, sr *sentRound) (bool, error) {
 		r.Guidance = sr.guidance
 		sent, err := e.sendTurn(ctx, cfg, r)
 		if err != nil {
@@ -353,9 +353,10 @@ func (e *Env) recordEvent(ctx context.Context, ref github.Ref, kind, data string
 // handRound runs a round asked for by hand on route rt, with the phases of
 // the effects d names around it: guide first, unsent when the round
 // does not go out, state on the round state once it went out. send gets the
-// round state when the route writes it and the round with its guidance,
+// round state when the route writes it or keepsHome, which remembers the
+// caller's agent home in it, and the round with its guidance,
 // fills in what the round sent, and reports whether the round went out.
-func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance string, d dintent.Def, send func(st *round.Store, r *sentRound) (bool, error)) error {
+func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance string, d dintent.Def, keepsHome bool, send func(st *round.Store, r *sentRound) (bool, error)) error {
 	r := &sentRound{env: e, ctx: ctx, ref: ref, guidance: guidance}
 	runPhase(rt, d, r, guidePhase)
 	sent := false
@@ -364,7 +365,7 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 			runPhase(rt, d, r, unsentPhase)
 		}
 	}()
-	if !writesRounds(rt, d, r) {
+	if !keepsHome && !writesRounds(rt, d, r) {
 		var err error
 		sent, err = send(nil, r)
 		return err

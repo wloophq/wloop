@@ -160,10 +160,7 @@ var writes = []writeCase{
 	{
 		method: "Rounds.Save", name: "/fields and a count",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return saveRounds(ctx, e.db, func(st *round.Store) {
-				st.RecordSent(noteRef.String(), round.Reviewed, "fp", noteAt)
-				st.Count(noteRef.String(), noteAt)
-			})
+			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordSent(noteRef.String(), round.Reviewed, "fp", noteAt) })
 		},
 		topics: port.TopicRounds, units: []unit.Unit{u7},
 	},

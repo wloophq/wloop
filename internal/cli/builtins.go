@@ -82,7 +82,6 @@ var (
 		guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
 		unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
 	}
-	recordRound   = effectRun{state: func(r *sentRound, st *round.Store) { st.RecordRound(r.ref.String(), r.env.Now()) }}
 	markAddressed = effectRun{state: func(r *sentRound, st *round.Store) { r.env.recordAddressed(st, r.ref, r.pr.HeadRefOid) }}
 )
 
@@ -97,7 +96,6 @@ var onSent = []onSentEffect{
 	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindNudged, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
 	}}}},
-	{name: builtin.EffectPRCounted, on: map[route]effectRun{routeSession: recordRound, routeAsked: recordRound, routeLaunch: recordRound}},
 	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
 		sent: func(r *sentRound) {
 			if r.submitted {

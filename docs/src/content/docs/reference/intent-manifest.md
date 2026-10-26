@@ -60,7 +60,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `also_profile[].dims.&lt;name&gt;` | string |  | A pinned dimension's value. |
 | `also_profile[].define` | string |  | The template define that renders it. |
 | `also_profile[].prefix` | string |  | What its sources are listed under; "&lt;profile&gt; guide: " when absent. |
-| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.counted`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
+| `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `why` | template |  | Why the turn is due, over the unit's workflow facts. |
 | `refuse[]` | table |  | A refusal of turn.start; the first whose when holds refuses with its why. |
 | `refuse[].when` | predicate |  | When it refuses, over the unit's workflow facts. |

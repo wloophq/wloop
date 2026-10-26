@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -105,19 +104,6 @@ func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
 	}
 	return e.roleIntent(builtin.RoleReview)
 }
-
-// recordSent notes the automated round st sent, counted when the intent
-// holding role counts its turns.
-func (s *sweep) recordSent(st step, role string) {
-	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
-	if d, _ := s.e.loadedIntents().Registry.ByRole(role, builtin.RoundProviders[0]); counted(d) {
-		s.st.Count(st.key(), s.now)
-	}
-}
-
-// counted is whether an automated turn of d spends turns.per_unit_per_day:
-// its manifest's pr.counted effect.
-func counted(d dintent.Def) bool { return slices.Contains(d.Effects, builtin.EffectPRCounted) }
 
 // roleIntent is the intent holding role on pull requests; "" when none
 // loads.
@@ -379,7 +365,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.recordSent(st, builtin.RoleReview)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -429,7 +415,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.recordSent(st, builtin.RoleReview)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -488,7 +474,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.recordSent(st, builtin.RoleAddress)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
 	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)

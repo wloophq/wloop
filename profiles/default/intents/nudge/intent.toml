@@ -9,7 +9,7 @@ session   = { strategy = "new", title = "nudge", close_when_done = true }
 answerable = false
 profile   = "nudge"
 brief     = { render = false, wait = false }
-effects   = ["pr.nudged", "pr.counted"]
+effects   = ["pr.nudged"]
 
 [[refuse]]
 when = 'pr.nudge.refusal != ""'

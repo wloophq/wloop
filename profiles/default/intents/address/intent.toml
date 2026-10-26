@@ -13,7 +13,7 @@ start_line = "starting the address round"
 owner_only = true
 profile   = "address"
 dims      = ["reviewer"]
-effects   = ["pr.addressed", "pr.counted", "guidance.handed", "pr.round_sent", "plan.cleared"]
+effects   = ["pr.addressed", "guidance.handed", "pr.round_sent", "plan.cleared"]
 
 [help]
 target   = "a pull request URL"

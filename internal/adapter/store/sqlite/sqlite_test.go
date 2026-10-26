@@ -182,7 +182,6 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 	}
 	a.SetHeads(key, "abc", "def")
 	b.RecordSent(key, round.Reviewed, "fp", now)
-	b.Count(key, now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)

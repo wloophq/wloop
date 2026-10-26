@@ -2,7 +2,7 @@ label = "Ask author"
 summary = "Ask the author one question"
 workspace = "review"
 session = { strategy = "new", title = "ask" }
-effects = ["pr.counted", "nudge.prepare"]
+effects = ["pr.nudged", "nudge.prepare"]
 
 [headline]
 resumed = "ask round on {{.pr.slug}}"

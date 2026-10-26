@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -27,17 +26,17 @@ import (
 
 // effects are what a round left in the round state and the activity log.
 type effects struct {
-	round, fingerprint bool
-	checksHead         string
-	conflictHead       string
-	events             []string
+	fingerprint  bool
+	checksHead   string
+	conflictHead string
+	events       []string
 }
 
 func effectsOf(t *testing.T, te *testEnv, ref github.Ref) effects {
 	t.Helper()
 	st := te.loadRounds(t)
 	key := ref.String()
-	got := effects{round: !st.RoundAt(key).IsZero(), fingerprint: st.Mark(key, round.Reviewed)+st.Mark(key, round.AddressedReviews) != "", checksHead: st.Mark(key, round.AddressedChecks), conflictHead: st.Mark(key, round.AddressedConflict)}
+	got := effects{fingerprint: st.Mark(key, round.Reviewed)+st.Mark(key, round.AddressedReviews) != "", checksHead: st.Mark(key, round.AddressedChecks), conflictHead: st.Mark(key, round.AddressedConflict)}
 	evs, err := te.Store.Events(context.Background(), ref)
 	if err != nil {
 		t.Fatal(err)
@@ -115,12 +114,12 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 		run  func(t *testing.T) (*testEnv, github.Ref)
 		want effects
 	}{
-		{"session route, review", byHand(dintent.Review, reviewWS, nil), effects{round: true, events: []string{dinv.KindRoundSent}}},
-		{"session route, address", byHand(dintent.Address, ownWS, nil), effects{round: true, fingerprint: true, checksHead: "c2", conflictHead: "c2", events: []string{dinv.KindRoundSent}}},
-		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{round: true, events: []string{dinv.KindNudged}}},
-		{"resume, review", resume(dintent.Review, warm, review, nil), effects{round: true, fingerprint: true}},
-		{"resume, address", resume(dintent.Address, own, mine, nil), effects{round: true, fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
-		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{round: true}},
+		{"session route, review", byHand(dintent.Review, reviewWS, nil), effects{events: []string{dinv.KindRoundSent}}},
+		{"session route, address", byHand(dintent.Address, ownWS, nil), effects{fingerprint: true, checksHead: "c2", conflictHead: "c2", events: []string{dinv.KindRoundSent}}},
+		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
+		{"resume, review", resume(dintent.Review, warm, review, nil), effects{fingerprint: true}},
+		{"resume, address", resume(dintent.Address, own, mine, nil), effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
+		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{}},
 		{"held Run now, review", func(t *testing.T) (*testEnv, github.Ref) {
 			sc := followupScenario(t)
 			exhaustCap(t, sc)
@@ -129,7 +128,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 				t.Fatal(err)
 			}
 			return sc.te, sc.ref
-		}, effects{round: true, fingerprint: true}},
+		}, effects{fingerprint: true}},
 		{"held Run now, address", func(t *testing.T) (*testEnv, github.Ref) {
 			te := newTestEnv(t, myPRManager())
 			ref := mine(te)
@@ -137,7 +136,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 				t.Fatalf("%v\n%s", err, te.err)
 			}
 			return te, ref
-		}, effects{round: true, fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
+		}, effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			te, ref := c.run(t)
@@ -202,10 +201,6 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 func TestAResumeMarksAddressedWithoutRecordingTheRound(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, myPRManager())
-	withBundled(t, te, func(fsys fstest.MapFS) {
-		f := fsys["intents/address/intent.toml"]
-		f.Data = []byte(strings.Replace(string(f.Data), `"pr.counted", `, "", 1))
-	})
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "me"})
 	te.git.branch["/worktrees/feat/mine"] = "feat/mine"
 	te.git.ancestor["/worktrees/feat/mine"] = true

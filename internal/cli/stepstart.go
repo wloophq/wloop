@@ -487,9 +487,6 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			return "", startError(err)
 		}
 		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
-		if counted(p.args.def) {
-			st.Count(p.ref.String(), s.e.Now())
-		}
 		return started, nil
 	}
 	reason := s.reason(p)
