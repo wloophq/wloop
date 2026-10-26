@@ -52,6 +52,10 @@ type codec struct{}
 
 func (codec) Provider() unit.ProviderID { return Provider }
 
+// Target is how a command line names a thread: a message's permalink, or its
+// key.
+func (codec) Target() string { return "<permalink|" + string(Provider) + ":key>" }
+
 func (codec) Valid(key string) error {
 	_, err := parseKey(key)
 	return err

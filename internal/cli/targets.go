@@ -32,6 +32,15 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
+// pluginCodecs are the codecs of the compiled-in plugins.
+func pluginCodecs() *unit.Registry {
+	var codecs []unit.Codec
+	for _, p := range plugins {
+		codecs = append(codecs, p.Codec)
+	}
+	return unit.NewRegistry(codecs...)
+}
+
 // providerIDs are the providers of the compiled-in plugins.
 func (e *Env) providerIDs() []unit.ProviderID {
 	var out []unit.ProviderID

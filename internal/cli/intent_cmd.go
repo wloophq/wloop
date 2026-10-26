@@ -246,18 +246,13 @@ func intentUsage(d dintent.Def) string {
 	return "usage: " + brand.Command + " " + string(d.Name) + " " + target + intentFlags(d, surfaceCLI) + " [guidance...]"
 }
 
-// intentTarget is the target of d's command as a usage line names it: the units d serves.
+// intentTarget is the target of d's command as a usage line names it: the
+// units d serves, as their provider's codec names them.
 func intentTarget(d dintent.Def) string {
-	switch p := d.ProviderOrDefault(); p {
-	case unit.GitHub:
-		return "<url>"
-	case dintent.AnyProvider:
-		return "<url|permalink|provider:key>"
-	case slackPlugin:
-		return "<permalink|slack:key>"
-	default:
-		return "<" + string(p) + ":key>"
+	if p := d.ProviderOrDefault(); p != dintent.AnyProvider {
+		return pluginCodecs().Target(p)
 	}
+	return "<url|permalink|provider:key>"
 }
 
 // intentFlags lists the flags of d a surface takes, as a usage line shows them.

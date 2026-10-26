@@ -61,3 +61,19 @@ func TestValidProviderTakesALowercaseIDOfUpTo32Characters(t *testing.T) {
 		}
 	}
 }
+
+type namedCodec struct{ unit.OpaqueCodec }
+
+func (namedCodec) Target() string { return "<url>" }
+
+func TestATargetIsHowACommandLineNamesAProvidersUnit(t *testing.T) {
+	reg := unit.NewRegistry(namedCodec{unit.OpaqueCodec{ID: "forge"}}, unit.OpaqueCodec{ID: "thread"})
+	for p, want := range map[unit.ProviderID]string{"forge": "<url>", "thread": "<thread:key>", "chat": "<chat:key>"} {
+		if got := reg.Target(p); got != want {
+			t.Errorf("Target(%s) = %q, want %q", p, got, want)
+		}
+	}
+	if got := (*unit.Registry)(nil).Target("forge"); got != "<forge:key>" {
+		t.Errorf("a nil registry's target %q", got)
+	}
+}

@@ -113,3 +113,6 @@ func (Codec) KeyOf(raw string) (string, bool) {
 
 // Equal folds case, as GitHub compares owners, repositories and logins.
 func (Codec) Equal(a, b string) bool { return strings.EqualFold(a, b) }
+
+// Target is how a command line names a pull request: its URL.
+func (Codec) Target() string { return "<url>" }

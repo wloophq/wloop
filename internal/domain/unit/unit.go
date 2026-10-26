@@ -129,6 +129,22 @@ func (r *Registry) Linked(p ProviderID) bool {
 	return ok
 }
 
+// Targeter is an optional capability of a Codec: how a command line names
+// one of its units, such as <url>.
+type Targeter interface {
+	Target() string
+}
+
+// Target is how a command line names a unit of p: its codec's Target, else
+// <p:key>.
+func (r *Registry) Target(p ProviderID) string {
+	c, _ := r.Codec(p)
+	if t, ok := c.(Targeter); ok {
+		return t.Target()
+	}
+	return "<" + string(p) + ":key>"
+}
+
 // Codec is p's codec.
 func (r *Registry) Codec(p ProviderID) (Codec, bool) {
 	if r == nil {
