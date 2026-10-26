@@ -191,7 +191,10 @@ func TestADevDirReplacesABundledIntentsInstructions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "intents", "nudge", "instructions.md.tmpl"), []byte(`# DEV {{.Headline}} {{.Inputs.situation}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "judgment.md.tmpl"), []byte(`{{define "judgment"}}DEV JUDGMENT{{end}}`), 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "partials"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "partials", "judgment.md.tmpl"), []byte(`{{define "judgment"}}DEV JUDGMENT{{end}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	l := bundled(t)

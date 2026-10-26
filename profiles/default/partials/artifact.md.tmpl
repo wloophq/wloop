@@ -1,0 +1,3 @@
+{{define "artifact"}}{{if eq . "review-draft"}}`artifact` (asked, when the user must read something to decide): the held
+  draft, `kind: review-draft`, `body` and one `items` entry per inline comment.{{else if eq . "triage"}}`artifact` (asked, when the user must read something to decide): the
+  verdict per item, `kind: triage`.{{end}}{{end}}

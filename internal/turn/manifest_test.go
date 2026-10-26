@@ -53,9 +53,14 @@ func TestBundledManifestsLoad(t *testing.T) {
 }
 
 func TestEveryArtifactKindHasARecordSentence(t *testing.T) {
+	b, err := Base()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, k := range record.ArtifactKinds {
-		if _, err := artifactDoc(k); err != nil {
-			t.Error(err)
+		var out strings.Builder
+		if err := b.ExecuteTemplate(&out, "artifact", k); err != nil || !strings.HasPrefix(out.String(), "`artifact` (asked") || !strings.Contains(out.String(), "`kind: "+k+"`") {
+			t.Errorf("%s: %q %v", k, out.String(), err)
 		}
 	}
 }
