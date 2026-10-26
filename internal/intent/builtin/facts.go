@@ -43,6 +43,12 @@ func untrusted(f Fact) Fact {
 	return f
 }
 
+// timeVarying marks f as changing with time alone.
+func timeVarying(f Fact) Fact {
+	f.TimeVarying = true
+	return f
+}
+
 // enum declares the values f takes, by provider.
 func enum(f Fact, values map[unit.ProviderID][]string) Fact {
 	f.Enum = values
@@ -181,7 +187,7 @@ var otherFacts = []Fact{
 	untrusted(wf("pr", "address.conflict", expr.Bool, "The head has conflicted with the base past the conflict window, and the address round would resolve it.")),
 	untrusted(wf("pr", "address.observed", expr.Bool, "The address rules observe without acting.")),
 	wf("pr", "last_interaction_at", expr.Time, "The newest comment, review, push or review request, by anyone."),
-	wf("pr", "silent_days", expr.Int, "Calendar days since last_interaction_at."),
+	timeVarying(wf("pr", "silent_days", expr.Int, "Calendar days since last_interaction_at.")),
 	untrusted(wf("pr", "waits_on_user", expr.Bool, "The row waits on the user, per situation.Derive.")),
 	wf("pr", "nudge.refusal", expr.String, "The text nudge.prepare would refuse with today; empty when a nudge may go."),
 	wf("pr", "mute.refusal", expr.String, "Why the pull request is muted, such as muted until its state changes; empty when it is not."),
@@ -241,7 +247,7 @@ var otherFacts = []Fact{
 	untrusted(enum(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(EntryStates...))),
 	untrusted(wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123.")),
 	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
-	untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them.")),
+	timeVarying(untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them."))),
 	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
 	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled.")),
 	wf("entry", "muted", expr.Bool, "The entry is muted."),
@@ -261,7 +267,7 @@ var otherFacts = []Fact{
 	untrusted(providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "A live entry, neither done nor in the trash and not muted, is attached to the unit.")),
 	untrusted(providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit.")),
 	untrusted(providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis.")),
-	untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared.")),
+	timeVarying(untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."))),
 	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none."),
 	untrusted(providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items.")),
 	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
@@ -501,6 +507,17 @@ func FactType(name string) (expr.Type, bool) {
 		}
 	}
 	return 0, false
+}
+
+// TimeVarying says whether the workflow fact name changes as time passes
+// with nothing else changing; false for a name that is no workflow fact.
+func TimeVarying(name string) bool {
+	for _, f := range Facts {
+		if f.Name == name && slices.Contains(f.Slots, WorkflowSlot) {
+			return f.TimeVarying
+		}
+	}
+	return false
 }
 
 // FactProvider is the provider whose units an intent fact describes; "" for

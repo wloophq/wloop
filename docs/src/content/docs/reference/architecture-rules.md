@@ -39,6 +39,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
+| `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
@@ -134,6 +135,28 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/daemon/unitactions.go` `sourceFollowed` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/unitactions.go` `unitAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 
+### `TestProviderIdsInStringsOutsideThePluginsOnlyShrink`
+
+| `providerStringAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/store/inventory/store.go` `github` `8` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
+| `internal/adapter/store/inventory/timings.go` `github` `3` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `github` `21` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `slack` `4` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
+| `internal/adapter/store/sqlite/retain_briefs.go` `github` `3` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
+| `internal/adapter/store/sqlite/rounds.go` `github` `7` | 🧾 | the round state keeps GitHub's review rounds (issue 62) |
+| `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/config/config.go` `github` `8` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/config/config.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/builtin.go` `slack` `2` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/cmd/factsdoc/main.go` `slack` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/cmd/grammardoc/groups.go` `github` `9` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/cmd/grammardoc/groups.go` `slack` `3` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/facts.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/facts.go` `slack` `12` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/grammar_config.go` `github` `26` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/grammar_config.go` `slack` `30` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+
 ### `TestProvidersStayInAdaptersAndTheRoot`
 
 | `allowlist` entry | Status | Reason |
@@ -160,7 +183,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/facts/session/facts.go` `Provider.build` `unit.GitHub` `1` | 🧾 | a session's facts read its linked pull request's state |
 | `internal/adapter/orca/orca.go` `Adapter.Apply` `unit.GitHub` `1` | ✅ | Orca links a worktree to a GitHub pull request only |
-| `internal/adapter/store/inventory/activity.go` `Store.eachRef` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
+| `internal/adapter/store/inventory/activity.go` `Store.RecentActivity` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/briefruns.go` `githubBriefs` `"github"` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Ended` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.FirstRoundBlocks` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |

@@ -140,6 +140,9 @@ type Fact struct {
 	// proposing turn itself or an agent's brief sets the fact's value, so
 	// no [drafts.approval] rule may read it.
 	Untrusted bool
+	// TimeVarying says that the fact changes as time passes with nothing
+	// else changing, so no workflow key may hold it.
+	TimeVarying bool
 }
 
 // InputTypes are the types an input declares, with the type its fact has.

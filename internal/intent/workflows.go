@@ -26,7 +26,6 @@ import (
 
 var (
 	workflowNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,39}$`)
-	timeVarying    = []string{"pr.silent_days", "entry.waiting_days", "slack.items_unowned_age_days"}
 )
 
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.
@@ -586,7 +585,7 @@ func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 			s.add(p, "%s is not a fact of the %s slot", k, slot)
 			continue
 		}
-		if t == expr.Duration || slices.Contains(timeVarying, k) {
+		if t == expr.Duration || builtin.TimeVarying(k) {
 			s.add(p, "%s changes as time passes; a key holds stable facts such as %s.fingerprint", k, slot)
 		}
 	}
