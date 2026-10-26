@@ -85,32 +85,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#1 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#1 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#1"
+        "reason": "no open question on acme/api#1",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#1"
+        "reason": "no open question on acme/api#1",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#1"
+        "reason": "no open question on acme/api#1",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -266,32 +272,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#2 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#2 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#2"
+        "reason": "no open question on acme/api#2",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#2"
+        "reason": "no open question on acme/api#2",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#2"
+        "reason": "no open question on acme/api#2",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -438,12 +450,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -454,17 +468,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#3"
+        "reason": "no open question on acme/api#3",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#3"
+        "reason": "no open question on acme/api#3",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#3"
+        "reason": "no open question on acme/api#3",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -626,22 +643,26 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#4"
+        "reason": "no open question on acme/api#4",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#4"
+        "reason": "no open question on acme/api#4",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#4"
+        "reason": "no open question on acme/api#4",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -788,27 +809,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#5 waits on you (draft); a nudge asks someone else for the next step"
+        "reason": "acme/api#5 waits on you (draft); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#5"
+        "reason": "no open question on acme/api#5",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#5"
+        "reason": "no open question on acme/api#5",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#5"
+        "reason": "no open question on acme/api#5",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -968,27 +994,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#6 waits on you (checks failing: lint, unit); a nudge asks someone else for the next step"
+        "reason": "acme/api#6 waits on you (checks failing: lint, unit); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#6"
+        "reason": "no open question on acme/api#6",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#6"
+        "reason": "no open question on acme/api#6",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#6"
+        "reason": "no open question on acme/api#6",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -1145,27 +1176,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#7 waits on you (changes requested by carol); a nudge asks someone else for the next step"
+        "reason": "acme/api#7 waits on you (changes requested by carol); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#7"
+        "reason": "no open question on acme/api#7",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#7"
+        "reason": "no open question on acme/api#7",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#7"
+        "reason": "no open question on acme/api#7",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -1322,27 +1358,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#8 waits on you (approved and green); a nudge asks someone else for the next step"
+        "reason": "acme/api#8 waits on you (approved and green); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -1504,27 +1545,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#9 waits on you (merge conflicts with main); a nudge asks someone else for the next step"
+        "reason": "acme/api#9 waits on you (merge conflicts with main); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#9"
+        "reason": "no open question on acme/api#9",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#9"
+        "reason": "no open question on acme/api#9",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#9"
+        "reason": "no open question on acme/api#9",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -1664,12 +1710,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -1680,17 +1728,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#10"
+        "reason": "no open question on acme/api#10",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#10"
+        "reason": "no open question on acme/api#10",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#10"
+        "reason": "no open question on acme/api#10",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -1835,12 +1886,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -1851,17 +1904,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#11"
+        "reason": "no open question on acme/api#11",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#11"
+        "reason": "no open question on acme/api#11",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#11"
+        "reason": "no open question on acme/api#11",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2029,22 +2085,26 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#12"
+        "reason": "no open question on acme/api#12",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#12"
+        "reason": "no open question on acme/api#12",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#12"
+        "reason": "no open question on acme/api#12",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -2178,17 +2238,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#13"
+        "reason": "no open question on acme/api#13",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#13"
+        "reason": "no open question on acme/api#13",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#13"
+        "reason": "no open question on acme/api#13",
+        "refusal": "dismiss.why"
       },
       {
         "id": "open",
@@ -2303,17 +2366,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#14"
+        "reason": "no open question on acme/api#14",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#14"
+        "reason": "no open question on acme/api#14",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#14"
+        "reason": "no open question on acme/api#14",
+        "refusal": "dismiss.why"
       },
       {
         "id": "open",
@@ -2439,32 +2505,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#15 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#15 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#15"
+        "reason": "no open question on acme/api#15",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#15"
+        "reason": "no open question on acme/api#15",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#15"
+        "reason": "no open question on acme/api#15",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2626,32 +2698,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#16 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#16 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#16"
+        "reason": "no open question on acme/api#16",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#16"
+        "reason": "no open question on acme/api#16",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#16"
+        "reason": "no open question on acme/api#16",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2812,12 +2890,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -2828,17 +2908,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#17"
+        "reason": "no open question on acme/api#17",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#17"
+        "reason": "no open question on acme/api#17",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#17"
+        "reason": "no open question on acme/api#17",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -2992,32 +3075,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#18 waits on the review loop (automatic round held: cap reached); a nudge asks someone else for the next step"
+        "reason": "acme/api#18 waits on the review loop (automatic round held: cap reached); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#18"
+        "reason": "no open question on acme/api#18",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#18"
+        "reason": "no open question on acme/api#18",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#18"
+        "reason": "no open question on acme/api#18",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3167,32 +3256,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#19 waits on you (round blocked: no access); a nudge asks someone else for the next step"
+        "reason": "acme/api#19 waits on you (round blocked: no access); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#19"
+        "reason": "no open question on acme/api#19",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#19"
+        "reason": "no open question on acme/api#19",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#19"
+        "reason": "no open question on acme/api#19",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3348,27 +3443,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#20 waits on you (review to address, no workspace: carol asked); a nudge asks someone else for the next step"
+        "reason": "acme/api#20 waits on you (review to address, no workspace: carol asked); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#20"
+        "reason": "no open question on acme/api#20",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#20"
+        "reason": "no open question on acme/api#20",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#20"
+        "reason": "no open question on acme/api#20",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -3522,32 +3622,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#21 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#21 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#21"
+        "reason": "no open question on acme/api#21",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#21"
+        "reason": "no open question on acme/api#21",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#21"
+        "reason": "no open question on acme/api#21",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3711,32 +3817,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#22 waits on the review loop (which branch?); a nudge asks someone else for the next step"
+        "reason": "acme/api#22 waits on the review loop (which branch?); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#22"
+        "reason": "no open question on acme/api#22",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#22"
+        "reason": "no open question on acme/api#22",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#22"
+        "reason": "no open question on acme/api#22",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -3883,32 +3995,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#23 waits on the review loop (review round in progress); a nudge asks someone else for the next step"
+        "reason": "acme/api#23 waits on the review loop (review round in progress); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#23"
+        "reason": "no open question on acme/api#23",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#23"
+        "reason": "no open question on acme/api#23",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#23"
+        "reason": "no open question on acme/api#23",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4067,27 +4185,32 @@
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#24 waits on the review loop (tests broke); a nudge asks someone else for the next step"
+        "reason": "acme/api#24 waits on the review loop (tests broke); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#24"
+        "reason": "no open question on acme/api#24",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#24"
+        "reason": "no open question on acme/api#24",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#24"
+        "reason": "no open question on acme/api#24",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
         "enabled": false,
-        "reason": "It is yours already"
+        "reason": "It is yours already",
+        "refusal": "take_over.why"
       },
       {
         "id": "pause",
@@ -4234,32 +4357,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#25 waits on the review loop (the agent asked you something); a nudge asks someone else for the next step"
+        "reason": "acme/api#25 waits on the review loop (the agent asked you something); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#25"
+        "reason": "no open question on acme/api#25",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#25"
+        "reason": "no open question on acme/api#25",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#25"
+        "reason": "no open question on acme/api#25",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4424,17 +4553,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#26"
+        "reason": "no open question on acme/api#26",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#26"
+        "reason": "no open question on acme/api#26",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#26"
+        "reason": "no open question on acme/api#26",
+        "refusal": "dismiss.why"
       },
       {
         "id": "resume",
@@ -4583,12 +4715,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -4599,17 +4733,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#27"
+        "reason": "no open question on acme/api#27",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#27"
+        "reason": "no open question on acme/api#27",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#27"
+        "reason": "no open question on acme/api#27",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4766,12 +4903,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -4782,17 +4921,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#28"
+        "reason": "no open question on acme/api#28",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#28"
+        "reason": "no open question on acme/api#28",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#28"
+        "reason": "no open question on acme/api#28",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -4944,32 +5086,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#29 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#29 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#29"
+        "reason": "no open question on acme/api#29",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#29"
+        "reason": "no open question on acme/api#29",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#29"
+        "reason": "no open question on acme/api#29",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -5119,12 +5267,14 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
@@ -5135,17 +5285,20 @@
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/web#30"
+        "reason": "no open question on acme/web#30",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/web#30"
+        "reason": "no open question on acme/web#30",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/web#30"
+        "reason": "no open question on acme/web#30",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",
@@ -5301,32 +5454,38 @@
       {
         "id": "address",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "act",
         "enabled": false,
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "nudge",
         "enabled": false,
-        "reason": "acme/api#31 waits on you (review requested, no review on the head); a nudge asks someone else for the next step"
+        "reason": "acme/api#31 waits on you (review requested, no review on the head); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "id": "answer",
         "enabled": false,
-        "reason": "no open question on acme/api#31"
+        "reason": "no open question on acme/api#31",
+        "refusal": "answer.why"
       },
       {
         "id": "continue",
         "enabled": false,
-        "reason": "no open question on acme/api#31"
+        "reason": "no open question on acme/api#31",
+        "refusal": "continue.why"
       },
       {
         "id": "dismiss",
         "enabled": false,
-        "reason": "no open question on acme/api#31"
+        "reason": "no open question on acme/api#31",
+        "refusal": "dismiss.why"
       },
       {
         "id": "take_over",

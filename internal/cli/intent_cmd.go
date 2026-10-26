@@ -9,7 +9,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -67,7 +66,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	}
 	req := api.ActionRequest{Guidance: p.guidance, NoBrief: p.noBrief, Inputs: p.inputs}
 	if beforeSet(d, p.inputs, beforeTakeOver) {
-		if err := e.action(ctx, ref, beforeTakeOver, api.ActionRequest{}, "done by the daemon"); err != nil && !ownedAlready(err, ref) {
+		if err := e.action(ctx, ref, beforeTakeOver, api.ActionRequest{}, "done by the daemon"); err != nil && !ownedAlready(err) {
 			return err
 		}
 	}
@@ -111,10 +110,23 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 }
 
 // ownedAlready tells a take-over refused because the pull request is the
-// user's to develop already: taken over before, or theirs.
-func ownedAlready(err error, ref github.Ref) bool {
-	msg := err.Error()
-	return strings.HasSuffix(msg, catalog.ReasonYours) || strings.HasSuffix(msg, daemon.NotOffered(beforeTakeOver, ref.Unit()))
+// user's to develop already: taken over before, which offers no take-over,
+// or theirs, which take_over's why refuses.
+func ownedAlready(err error) bool {
+	switch refusal(err) {
+	case api.RefusalNotOffered, api.BuiltinWhy(beforeTakeOver):
+		return true
+	}
+	return false
+}
+
+// refusal is the daemon's code of the refusal err is, "" for none.
+func refusal(err error) string {
+	var r interface{ Refusal() string }
+	if errors.As(err, &r) {
+		return r.Refusal()
+	}
+	return ""
 }
 
 // parseIntentArgs reads d's flags up to the first word that is not one, or
@@ -230,18 +242,14 @@ func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]an
 	return fmt.Errorf("%s; run '"+brand.Command+" %s %s %s'", why, d.Name, strings.Join(append([]string{takeOver}, flags...), " "), ref.URL())
 }
 
-// actionRefusal is the why of d's [[action.refuse]] case, as written, that err
-// ends with; "" for none.
+// actionRefusal is the why of d's [[action.refuse]] case, as written, that
+// refused err; "" for none.
 func actionRefusal(err error, d dintent.Def) string {
-	if err == nil || d.Action == nil {
+	i, ok := api.RefuseCaseIndex(refusal(err))
+	if !ok || d.Action == nil || i >= len(d.Action.Refuse) {
 		return ""
 	}
-	for _, r := range d.Action.Refuse {
-		if r.Why.Src != "" && strings.HasSuffix(err.Error(), r.Why.Src) {
-			return r.Why.Src
-		}
-	}
-	return ""
+	return d.Action.Refuse[i].Why.Src
 }
 
 // inputFlag is the command line words that set an input to v.

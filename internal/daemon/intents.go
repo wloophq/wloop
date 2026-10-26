@@ -43,7 +43,7 @@ func intentDef(l *intentload.Loaded, name string) (dintent.Def, error) {
 		return d, nil
 	}
 	if p, ok := l.Broken[dintent.Name(name)]; ok {
-		return dintent.Def{}, conflict{fmt.Sprintf("the intent %s has problems:\n%s", name, p.Error())}
+		return dintent.Def{}, conflict{msg: fmt.Sprintf("the intent %s has problems:\n%s", name, p.Error())}
 	}
 	return dintent.Def{}, badRequest{fmt.Sprintf("unknown intent %q; use %s", name, l.Registry.Names())}
 }

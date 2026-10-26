@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"cmp"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -79,10 +78,6 @@ func on(id string) (api.ActionState, bool) { return api.ActionState{ID: id, Enab
 func off(id string) (api.ActionState, bool) { return api.ActionState{ID: id}, true }
 
 func absent() (api.ActionState, bool) { return api.ActionState{}, false }
-
-// ReasonYours is the bundled why of take_over on a pull request that is the
-// user's, which the command line recognizes.
-const ReasonYours = "It is yours already"
 
 // BasisPending and BasisHeld prefix a run_now basis.
 const (
@@ -282,7 +277,9 @@ func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[stri
 		return out
 	}
 	if !st.Enabled {
-		st.Reason = cmp.Or(render("why"), st.Reason)
+		if why := render("why"); why != "" {
+			st.Reason, st.Refusal = why, api.BuiltinWhy(key)
+		}
 		return st
 	}
 	st.Note, st.Confirm, st.Warning = render("note"), render("confirm"), render("warning")

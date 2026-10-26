@@ -11,9 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/catalog"
-	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
@@ -305,18 +304,26 @@ func TestAddressTakeOverOnAPullRequestAlreadyTakenOverAddresses(t *testing.T) {
 
 func TestATakeOverOfAPullRequestOwnedAlreadyIsNoFailure(t *testing.T) {
 	t.Parallel()
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
-	for msg, want := range map[string]bool{
-		"daemon: " + catalog.ReasonYours:                           true,
-		"daemon: " + daemon.NotOffered(beforeTakeOver, ref.Unit()): true,
-		"daemon: " + daemon.NotOffered("pause", ref.Unit()):        false,
-		"daemon: the row changed: a round is pending now":          false,
+	for refusal, want := range map[string]bool{
+		api.BuiltinWhy("take_over"): true,
+		api.RefusalNotOffered:       true,
+		api.BuiltinWhy("pause"):     false,
+		"":                          false,
 	} {
-		if got := ownedAlready(errors.New(msg), ref); got != want {
-			t.Errorf("%q: %v", msg, got)
+		if got := ownedAlready(daemonRefusal{"daemon: the profile's words", refusal}); got != want {
+			t.Errorf("%q: %v", refusal, got)
 		}
 	}
+	if ownedAlready(errors.New("daemon: It is yours already")) {
+		t.Error("the text alone reads as owned")
+	}
 }
+
+// daemonRefusal is a daemon refusal with its code.
+type daemonRefusal struct{ msg, refusal string }
+
+func (e daemonRefusal) Error() string   { return e.msg }
+func (e daemonRefusal) Refusal() string { return e.refusal }
 
 func TestAddressTakeOverThroughTheDaemonTakesOverThenAddresses(t *testing.T) {
 	t.Parallel()

@@ -245,7 +245,7 @@ var roundActions = map[string]bool{"skip": true, "guide": true}
 var intakeRouteActions = map[string]func(s *Server, ctx context.Context, i intake.Intake) (string, error){
 	"intake_without": func(s *Server, ctx context.Context, i intake.Intake) (string, error) {
 		if i.Source == sourceSession {
-			return "", conflict{catalog.SessionWithout(i.Seq)}
+			return "", conflict{msg: catalog.SessionWithout(i.Seq)}
 		}
 		return fmt.Sprintf("intake %d starts without the brief", i.Seq), s.intakes.Without(ctx, i.Seq)
 	},
@@ -432,13 +432,17 @@ func (s *Server) offered(ctx context.Context, u unit.Unit, asked catalog.Asked, 
 	st, ok := offerOf(row, name)
 	switch {
 	case basis != "" && (!ok || st.Basis != basis):
-		return row, st, conflict{"the row changed: " + changedWhy(name, basis, st, ok)}
+		c := conflict{msg: "the row changed: " + changedWhy(name, basis, st, ok)}
+		if ok && st.Reason != "" {
+			c.refusal = st.Refusal
+		}
+		return row, st, c
 	case !ok && name == "remove" && req.Force && workspaceID(row) == "":
 		return row, st, nil
 	case !ok:
-		return row, st, conflict{NotOffered(name, u)}
+		return row, st, conflict{NotOffered(name, u), api.RefusalNotOffered}
 	case !st.Enabled:
-		return row, st, conflict{st.Reason}
+		return row, st, conflict{st.Reason, st.Refusal}
 	}
 	return row, st, nil
 }
@@ -523,7 +527,7 @@ func (s *Server) runPending(ctx context.Context, u unit.Unit, req api.ActionRequ
 		}
 		return s.actOnRound(ctx, u, a, req.Guidance)
 	}
-	return "", conflict{"the row changed: the pending round already went out"}
+	return "", conflict{msg: "the row changed: the pending round already went out"}
 }
 
 // writeActionError answers an action's error with its status.
@@ -541,7 +545,7 @@ func writeActionError(w http.ResponseWriter, err error) {
 	case errors.As(err, &down):
 		writeError(w, http.StatusServiceUnavailable, down.msg)
 	case errors.As(err, &joinRefused):
-		writeError(w, http.StatusConflict, joinRefused.msg)
+		writeConflict(w, joinRefused)
 	case errors.As(err, &invalid):
 		writeError(w, http.StatusBadRequest, invalid.Reason)
 	case errors.Is(err, turn.ErrNoQuestion):

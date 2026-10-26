@@ -148,6 +148,16 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+// writeConflict answers 409 with the conflict's message and its refusal code.
+func writeConflict(w http.ResponseWriter, c conflict) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
+	_ = json.NewEncoder(w).Encode(struct {
+		Error   string `json:"error"`
+		Refusal string `json:"refusal,omitempty"`
+	}{c.msg, c.refusal})
+}
+
 // writeRefusal answers 409 with the reason, the message of the tool that
 // refused and whether force would get past it.
 func writeRefusal(w http.ResponseWriter, r Refusal) {
@@ -342,11 +352,11 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	everything := len(req.Repos) == 0 && len(prs) == 0
 	if !req.Paused && !everything {
 		if p.On {
-			return conflict{"everything is paused; resume with no argument resumes everything"}
+			return conflict{msg: "everything is paused; resume with no argument resumes everything"}
 		}
 		for _, u := range prs {
 			if ref := refOf(u); p.HoldsRepo(ref.Owner + "/" + ref.Repo) {
-				return conflict{ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
+				return conflict{msg: ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
 			}
 		}
 	}

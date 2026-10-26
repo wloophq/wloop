@@ -201,7 +201,7 @@ Every `when` key is a [CEL](https://github.com/google/cel-spec) expressions, che
 
 ## The action catalog
 
-For every row the daemon computes the actions it offers: the built-in ones, worded by the profile's `actions.toml` (`label`, `summary`, `note`, `warning`, `confirm`, `why` and `[<id>.input]`), and each intent's `[action]`. Clients render that list and decide nothing: a request for an action the row does not offer, or offers disabled, is refused with the same reason.
+For every row the daemon computes the actions it offers: the built-in ones, worded by the profile's `actions.toml` (`label`, `summary`, `note`, `warning`, `confirm`, `why` and `[<id>.input]`), and each intent's `[action]`. Clients render that list and decide nothing: a request for an action the row does not offer, or offers disabled, is refused with the same reason, and with a code that names the text it shows (`<id>.why` of a built-in action, `action.refuse[<i>]` of an intent's, `not_offered`), which a client reads instead of the words.
 
 ## Errors
 

@@ -216,9 +216,9 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	i := slices.IndexFunc(wire.Actions, func(st api.ActionState) bool { return st.ID == planOffers[action] })
 	switch {
 	case i < 0:
-		return it, true, conflict{fmt.Sprintf("%s offers no %s while %s", id, action, it.Decision)}
+		return it, true, conflict{msg: fmt.Sprintf("%s offers no %s while %s", id, action, it.Decision)}
 	case !wire.Actions[i].Enabled:
-		return it, true, conflict{wire.Actions[i].Reason}
+		return it, true, conflict{wire.Actions[i].Reason, wire.Actions[i].Refusal}
 	}
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
@@ -305,7 +305,7 @@ func (s *Server) actOnRound(ctx context.Context, u unit.Unit, a workflow.Action,
 	case !ok && a == workflow.ActionGuide && guidance != "":
 		return "no round pending; the guidance goes with the next automatic round", s.deps.Overrides.SetNextGuidance(ctx, u, guidance)
 	case !ok && a == workflow.ActionApply:
-		return "", conflict{"the row changed: the pending round already went out"}
+		return "", conflict{msg: "the row changed: the pending round already went out"}
 	case !ok:
 		return "", badRequest{"no round pending for " + u.Label() + "; add guidance to send it with the next round"}
 	}

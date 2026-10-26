@@ -4,7 +4,8 @@
       {
         "enabled": false,
         "id": "guide",
-        "reason": "the daemon plans no automatic round; see doctor"
+        "reason": "the daemon plans no automatic round; see doctor",
+        "refusal": "guide.why"
       },
       {
         "enabled": true,
@@ -14,17 +15,20 @@
       {
         "enabled": false,
         "id": "address",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "act",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "nudge",
-        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step"
+        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": true,
@@ -215,17 +219,20 @@
       {
         "enabled": false,
         "id": "answer",
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "answer.why"
       },
       {
         "enabled": false,
         "id": "continue",
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "continue.why"
       },
       {
         "enabled": false,
         "id": "dismiss",
-        "reason": "no open question on acme/api#8"
+        "reason": "no open question on acme/api#8",
+        "refusal": "dismiss.why"
       },
       {
         "enabled": true,

@@ -58,7 +58,7 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 		{"dismiss without a question", "dismiss", func(*Facts) {}, api.ActionState{Reason: "no open question on " + slug}},
 		{"dismiss on a question", "dismiss", func(f *Facts) { f.Question = true },
 			api.ActionState{Note: "Close the question; the pull request goes back to whoever it waits on"}},
-		{"take_over of mine", "take_over", func(f *Facts) { f.Mine = true }, api.ActionState{Reason: ReasonYours}},
+		{"take_over of mine", "take_over", func(f *Facts) { f.Mine = true }, api.ActionState{Reason: "It is yours already"}},
 		{"take_over", "take_over", func(*Facts) {},
 			api.ActionState{Confirm: "Take over " + slug + "? It becomes yours to develop: " + brand.Name + " creates or renames its author workspace."}},
 		{"remove on an open pull request", "remove", func(f *Facts) { f.Workspace.ID = "w" },
@@ -150,5 +150,20 @@ func TestWarningShowsOnlyOnAQuestion(t *testing.T) {
 		if want := map[bool]string{true: warning}[question]; st.Warning != want {
 			t.Errorf("question %v: review warning %q, want %q", question, st.Warning, want)
 		}
+	}
+}
+
+func TestARefusalNamesTheProfileTextItShows(t *testing.T) {
+	l := bundled(t)
+	f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Mine: false, NudgeWho: []string{}}
+	if st := stateOf(t, f, string(dintent.Address)); st.Enabled || st.Refusal != api.RefuseCase(0) {
+		t.Errorf("address on another's pull request: %+v", st)
+	}
+	f.Mine = true
+	if st := stateOf(t, f, "take_over"); st.Enabled || st.Refusal != api.BuiltinWhy("take_over") {
+		t.Errorf("take_over of mine: %+v", st)
+	}
+	if st := stateOf(t, f, "take_over"); st.Refusal == "" || st.Reason == "" {
+		t.Errorf("take_over of mine: %+v", st)
 	}
 }

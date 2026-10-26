@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -46,7 +47,7 @@ func unitIntent(d dintent.Def, u unit.Unit) error {
 		return badRequest{fmt.Sprintf("the intent %s serves %s units, not %s", d.Name, d.ProviderOrDefault(), u.Label())}
 	}
 	if d.Action == nil {
-		return conflict{NotOffered(string(d.Name), u)}
+		return conflict{NotOffered(string(d.Name), u), api.RefusalNotOffered}
 	}
 	var prOnly []string
 	if d.Prepare != "" {

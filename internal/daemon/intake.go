@@ -368,16 +368,16 @@ func (s *Server) startedBySweep(i intake.Intake, t turn.Turn, out io.Writer) err
 	var err error
 	switch how := sweepLacks(def, d.Inputs, t.Inputs); {
 	case d.Guidance != "" && d.Guidance != t.Guidance:
-		err = conflict{sent + "; your guidance was not sent, ask again once that turn ends"}
+		err = conflict{msg: sent + "; your guidance was not sent, ask again once that turn ends"}
 	case how != "":
-		err = conflict{sent + " " + how + "; ask again once that turn ends"}
+		err = conflict{msg: sent + " " + how + "; ask again once that turn ends"}
 	default:
 		fmt.Fprintln(out, sent+"; nothing more was sent")
 	}
 	if i.Source == sourceSession {
 		outcome := err
 		if outcome == nil {
-			outcome = conflict{sent + "; run this command again to follow that turn"}
+			outcome = conflict{msg: sent + "; run this command again to follow that turn"}
 		}
 		s.byHand.Store(i.Seq, byHandOutcome{err: outcome})
 	}
@@ -588,17 +588,19 @@ func (s *Server) intentOf(ctx context.Context, action string, row api.Row) (turn
 	mine := login != "" && strings.EqualFold(p.Author, login)
 	name, err := catalog.RunNowIntent(s.loaded().Registry, p.Workspace, p.Override, mine)
 	if err != nil {
-		return "", conflict{err.Error()}
+		return "", conflict{msg: err.Error()}
 	}
 	return turn.Intent(name), nil
 }
 
-type conflict struct{ msg string }
+// conflict is a request the row's state refuses; refusal is the code of
+// the profile text msg is, "" when msg is the loop's own.
+type conflict struct{ msg, refusal string }
 
 func (e conflict) Error() string { return e.msg }
 
 func joinRefused(open intake.Intake, how string) error {
-	return conflict{catalog.JoinRefusalText(open.Seq, string(open.Intent), how)}
+	return conflict{msg: catalog.JoinRefusalText(open.Seq, string(open.Intent), how)}
 }
 
 // joinsAction refuses a request from the command line, the cockpit, the
@@ -870,7 +872,7 @@ func (s *Server) handleIntake(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleIntakeWithout(w http.ResponseWriter, r *http.Request) {
 	s.changeIntake(w, r, func(ctx context.Context, i intake.Intake) error {
 		if i.Source == sourceSession {
-			return conflict{catalog.SessionWithout(i.Seq)}
+			return conflict{msg: catalog.SessionWithout(i.Seq)}
 		}
 		return s.intakes.Without(ctx, i.Seq)
 	}, "intake %d starts without the brief")

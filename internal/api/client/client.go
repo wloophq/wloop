@@ -406,12 +406,13 @@ func refused(resp *http.Response) error {
 		Source    string `json:"source"`
 		Forceable bool   `json:"forceable"`
 		Fix       string `json:"fix"`
+		Refusal   string `json:"refusal"`
 	}
 	raw, _ := io.ReadAll(resp.Body)
 	if json.Unmarshal(raw, &e) != nil || e.Error == "" {
 		e.Error = fmt.Sprintf("%s: %s", resp.Status, bytes.TrimSpace(raw))
 	}
-	return &daemonError{msg: e.Error, detail: e.Detail, source: e.Source, forceable: e.Forceable, fix: e.Fix}
+	return &daemonError{msg: e.Error, detail: e.Detail, source: e.Source, forceable: e.Forceable, fix: e.Fix, refusal: e.Refusal}
 }
 
 // daemonError is the daemon's answer to a failed request, with the message of
@@ -421,7 +422,13 @@ type daemonError struct {
 	forceable           bool
 	// fix is the command the daemon names to get past the refusal.
 	fix string
+	// refusal is the code of the profile text msg is (api.RefusalNotOffered,
+	// api.BuiltinWhy, api.RefuseCase), "" for another refusal.
+	refusal string
 }
+
+// Refusal is the refusal's code, "" when it has none.
+func (e *daemonError) Refusal() string { return e.refusal }
 
 func (e *daemonError) Error() string  { return "daemon: " + e.msg }
 func (e *daemonError) Detail() string { return e.detail }

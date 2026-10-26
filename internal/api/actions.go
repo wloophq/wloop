@@ -45,6 +45,9 @@ type ActionState struct {
 	Enabled bool   `json:"enabled"`
 	// Reason is why a disabled action is off: the profile's why.
 	Reason string `json:"reason,omitempty"`
+	// Refusal names the profile text Reason is, which a client recognizes
+	// a refusal by: BuiltinWhy or RefuseCase; "" for another reason.
+	Refusal string `json:"refusal,omitempty"`
 	// Note is what an enabled action would do on this row.
 	Note    string `json:"note,omitempty"`
 	Label   string `json:"label,omitempty"`

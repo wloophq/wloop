@@ -51,7 +51,8 @@
     {
       "id": "draft.retry",
       "enabled": false,
-      "reason": "the draft is proposed"
+      "reason": "the draft is proposed",
+      "refusal": "draft.retry.why"
     }
   ],
   "rev": 0,

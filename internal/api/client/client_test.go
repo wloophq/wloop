@@ -281,3 +281,16 @@ func TestDigestAsksTheDay(t *testing.T) {
 		t.Fatalf("%+v %v", d, err)
 	}
 }
+
+func TestClientReadsTheRefusalCode(t *testing.T) {
+	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, `{"error": "It is yours already", "refusal": %q}`, api.BuiltinWhy("take_over"))
+	})
+	_, err := New(socket).Rows(context.Background())
+	var refused interface{ Refusal() string }
+	if !errors.As(err, &refused) || refused.Refusal() != api.BuiltinWhy("take_over") {
+		t.Fatalf("err = %v", err)
+	}
+}

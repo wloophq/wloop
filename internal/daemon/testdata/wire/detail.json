@@ -57,7 +57,8 @@
       {
         "enabled": false,
         "id": "guide",
-        "reason": "the daemon plans no automatic round; see doctor"
+        "reason": "the daemon plans no automatic round; see doctor",
+        "refusal": "guide.why"
       },
       {
         "enabled": true,
@@ -67,17 +68,20 @@
       {
         "enabled": false,
         "id": "address",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "act",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "nudge",
-        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step"
+        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": true,

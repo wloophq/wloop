@@ -107,7 +107,7 @@ func (r registryActions) States(f Facts) []api.ActionState {
 		}
 		id := string(d.Name)
 		if i := slices.IndexFunc(p.Action.Refuse, func(r intentload.RefusalProgram) bool { return r.When != nil && r.When.Eval(f) }); i >= 0 {
-			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, intentload.RefusalText(i), facts)})
+			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, intentload.RefusalText(i), facts), Refusal: api.RefuseCase(i)})
 			continue
 		}
 		st := api.ActionState{ID: id, Enabled: true, Note: actionText(d.Name, p, "note", facts), Confirm: actionText(d.Name, p, "confirm", facts),
