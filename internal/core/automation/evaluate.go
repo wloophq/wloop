@@ -280,6 +280,9 @@ func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, w
 // its run could not be read.
 func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]workflow.Item) error {
 	facts, err := p.unitFacts(c.u)
+	if err == nil {
+		facts, err = p.e.scoped(p.ctx, w.Name, c.u, facts)
+	}
 	if err != nil {
 		p.errorf("%s: %s: %v", w.Name, c.u, err)
 		return err

@@ -193,14 +193,6 @@ const (
 	WithdrawMoot     = "moot"
 )
 
-// SettledAt is the newest UpdatedAt of the drafts of ds that workflow
-// proposed on subject and that settled (sent, failed for good or
-// discarded, withdrawn ones included); zero when none.
-func SettledAt(ds []Draft, workflow string, subject unit.Unit) time.Time {
-	_, _, _ = ds, workflow, subject
-	return time.Time{}
-}
-
 type ApprovalMode string // "always" (default), "window", "none", "observe"
 
 const (

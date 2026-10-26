@@ -13,7 +13,7 @@ description: The words the code, the configuration, the facts and these pages us
 ## Units and sources
 
 - **Unit**: a thing work happens on, named by its provider and the provider's key and written `<provider>:<key>`. A pull request is `github:acme/api#7` (shown as `acme/api#7`), a Slack thread is `slack:<team>/<channel>/<ts>`, a DM topic is `slack:<team>/<channel>/seg/<segment>`, an agent session is `session:<session-id>` and a workspace is `workspace:<worktree-path>`. See [Units and items](/concepts/gtd/#units-and-items).
-- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session` or `workspace`. A workflow's `subject` and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
+- **Provider**: the source that owns a kind of unit and validates its keys: `github`, `slack`, `session`, `workspace` or `entry`. A workflow's `subject` and an intent's `provider` name one. The vendor of a coding agent is never called a provider.
 - **Plugin**: a compiled-in source of units, `github` or `slack`, which brings an ingestion job, the cards of its units and, as it needs, items, actions, views, filter qualifiers and a publisher for drafts. `plugins.<id>.enabled` turns one off. `session` and `workspace` are providers the core keeps for its own units and have no plugin. See [Plugins](/architecture/plugins/).
 - **Item**: one thing someone needs from someone inside a unit: a `request`, a `question`, a `decision` or a `todo`. It is `open` or `resolved` and says who asked and who acts next. An item lives in its unit; an entry is what you do about it. See [Units and items](/concepts/gtd/#units-and-items).
 - **Confirmed item**: an item you created or corrected. Extraction never overwrites it; a later extraction that disagrees becomes a proposal in the Inbox.
@@ -79,7 +79,7 @@ description: The words the code, the configuration, the facts and these pages us
 ## Automation
 
 - **Workflow**: a manifest, `workflow.toml`, that names a subject, a condition over its facts and the steps to run. Everything {{name}} does without being asked is a workflow. See [The sweep and workflows](/concepts/workflows/).
-- **Subject**: the provider whose units a workflow looks at: `github` (pull requests), `session` or `workspace`.
+- **Subject**: the provider whose units a workflow looks at: `github` (pull requests), `session`, `workspace`, `entry` (the GTD entries neither done nor in the trash) or `slack` (the Slack units a live entry is attached to).
 - **Fact**: a named, typed value a provider computes for a unit from the store, such as `pr.first.due` or `session.idle_for`. Predicates read facts and never GitHub. See [Facts and steps](/reference/facts/).
 - **Slot**: the set of facts a predicate may read: an intent's action slot (the row) or turn slot (the turn being built), and a workflow's subject slot plus `trigger.*`, `config.*` and `now`.
 - **Predicate**: a CEL expression over the facts of a slot that yields a bool, such as a workflow's `when`. See [Predicates](/reference/intent-manifest/#predicates).

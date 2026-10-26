@@ -254,7 +254,7 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if !ch.All && !slices.Contains(ch.Units, pl.item.Unit) {
 			return ""
 		}
-		facts, err := e.Units.Facts(ctx, pl.item.Unit)
+		facts, err := e.factsFor(ctx, pl.w.Name, pl.item.Unit)
 		if err != nil {
 			return "its facts cannot be read: " + err.Error()
 		}
