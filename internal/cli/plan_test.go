@@ -267,7 +267,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 		queries = append(queries, r.URL.Query().Get("unit"))
 		json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{followup}, Errors: []string{}, Unit: "github:acme/api#7", Label: "acme/api#7", Title: "Batch export", Workflows: []api.UnitWorkflow{
 			{Workflow: "after-merge", Trigger: "event", Outcome: "waits", Reason: "decides when a merged or closed event arrives"},
-			{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not matched",
+			{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not_matched",
 				Facts: []api.Fact{{Name: "pr.first.due", Value: "false"}, {Name: "pr.first.reason", Value: "the author is a bot"}}},
 		}})
 	})
@@ -288,7 +288,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 		"            Batch export · runs in 4m0s · steps turn.start\n" +
 		"no item (2)\n" +
 		"  after-merge  event, waits: decides when a merged or closed event arrives\n" +
-		"  review-first-round  sweep, not matched\n" +
+		"  review-first-round  sweep, not_matched\n" +
 		"            pr.first.due = false · pr.first.reason = the author is a bot\n"
 	if te.out.String() != want {
 		t.Fatalf("printed\n%s\nwant\n%s", te.out, want)
