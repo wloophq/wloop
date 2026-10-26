@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"maps"
 	"path"
 	"path/filepath"
 	"slices"
@@ -168,12 +169,13 @@ func funcName(d *ast.FuncDecl) string {
 
 // coreLiterals flags a provider id spelled in a non-test file: in the core,
 // any provider id as a string literal or a unit provider constant; outside
-// it and outside the providers' homes, a unit provider constant or a
-// plugin's id as a literal or a person key's prefix, except an adapter's
-// own provider's id. Fakes, packages named <x>test, are excluded. A
+// it and outside the providers' homes, a unit provider constant, a plugin
+// package's Provider, a constant a provider's home declares to hold a
+// plugin's id, or a plugin's id as a literal or a person key's prefix,
+// except an adapter's own provider's id. Fakes, packages named <x>test, are excluded. A
 // declaration may spell an allowlisted literal as many times as its entry
 // says; used counts the spellings each entry matched.
-func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []providerSite, used map[int]int) []string {
+func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []providerSite, used map[int]int, aliases map[string]string) []string {
 	dir := filepath.Dir(file)
 	if testFile(file) || strings.HasSuffix(filepath.Base(dir), "test") {
 		return nil
@@ -185,10 +187,19 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []provide
 	own := ownProvider(dir)
 	imports := map[*ast.BasicLit]bool{}
 	unitName := "unit"
+	pluginPkgs := map[string]string{}
 	for _, imp := range f.Imports {
 		imports[imp.Path] = true
-		if p, _ := strconv.Unquote(imp.Path.Value); p == module+"internal/domain/unit" && imp.Name != nil {
+		p, _ := strconv.Unquote(imp.Path.Value)
+		if p == module+"internal/domain/unit" && imp.Name != nil {
 			unitName = imp.Name.Name
+		}
+		if dep, ok := local(p); ok && pluginOf(dep) != "" {
+			name := path.Base(dep)
+			if imp.Name != nil {
+				name = imp.Name.Name
+			}
+			pluginPkgs[name] = pluginOf(dep)
 		}
 	}
 	plugin := func(s string) bool { return slices.Contains(pluginIDs(), s) }
@@ -229,8 +240,17 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []provide
 					flag(n.Pos(), strconv.Quote(s), prefix)
 				}
 			case *ast.SelectorExpr:
-				if x, ok := n.X.(*ast.Ident); ok && x.Name == unitName && providerConsts[n.Sel.Name] {
+				x, ok := n.X.(*ast.Ident)
+				switch {
+				case ok && x.Name == unitName && providerConsts[n.Sel.Name]:
 					flag(n.Pos(), "unit."+n.Sel.Name, string(constIDs[n.Sel.Name]))
+				case ok && !core && pluginPkgs[x.Name] != "" && n.Sel.Name == "Provider":
+					flag(n.Pos(), x.Name+".Provider", pluginPkgs[x.Name])
+				}
+				return false
+			case *ast.Ident:
+				if id, ok := aliases[n.Name]; ok && !core {
+					flag(n.Pos(), n.Name, id)
 				}
 			}
 			return true
@@ -240,6 +260,36 @@ func coreLiterals(fset *token.FileSet, file string, f *ast.File, allow []provide
 		if a := allow[i]; len(ps) > a.n {
 			out = append(out, fmt.Sprintf("%s: %s in %s spelled %d times, its allowlist entry allows %d (%s); a new spelling is a new site",
 				fset.Position(ps[a.n]), a.literal, a.decl, len(ps), a.n, a.reason))
+		}
+	}
+	return out
+}
+
+// providerAliases are f's package-level constants and variables that hold a
+// plugin's id, by name, with the id they hold. Those a provider's home
+// declares are flagged where its package's other files use them; one
+// declared elsewhere is flagged as its literal.
+func providerAliases(f *ast.File) map[string]string {
+	out := map[string]string{}
+	for _, d := range f.Decls {
+		g, ok := d.(*ast.GenDecl)
+		if !ok || (g.Tok != token.CONST && g.Tok != token.VAR) {
+			continue
+		}
+		for _, sp := range g.Specs {
+			vs := sp.(*ast.ValueSpec)
+			for i, v := range vs.Values {
+				if c, ok := v.(*ast.CallExpr); ok && len(c.Args) == 1 {
+					v = c.Args[0]
+				}
+				lit, ok := v.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING || i >= len(vs.Names) {
+					continue
+				}
+				if id, err := strconv.Unquote(lit.Value); err == nil && slices.Contains(pluginIDs(), id) {
+					out[vs.Names[i].Name] = id
+				}
+			}
 		}
 	}
 	return out
@@ -263,9 +313,20 @@ func staleSites(allow []providerSite, used map[int]int) []string {
 // root.
 func TestTheCoreNamesNoProvider(t *testing.T) {
 	t.Parallel()
+	aliases := map[string]map[string]string{}
+	forEachFile(t, false, func(_ *token.FileSet, file string, f *ast.File) {
+		dir := filepath.Dir(file)
+		if !providerHome(file) {
+			return
+		}
+		if aliases[dir] == nil {
+			aliases[dir] = map[string]string{}
+		}
+		maps.Copy(aliases[dir], providerAliases(f))
+	})
 	used := map[int]int{}
 	forEachFile(t, false, func(fset *token.FileSet, file string, f *ast.File) {
-		for _, b := range coreLiterals(fset, file, f, coreProviderAllowlist, used) {
+		for _, b := range coreLiterals(fset, file, f, coreProviderAllowlist, used, aliases[filepath.Dir(file)]) {
 			t.Error(b)
 		}
 	})
@@ -314,10 +375,10 @@ var f = unit.Entry
 var g = "entry"
 `)
 	none := map[int]int{}
-	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none), 4, "the core names no provider")
-	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none), 4, "the core names no provider")
-	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none), 0, "")
-	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none), 0, "")
+	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none, nil), 4, "the core names no provider")
+	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none, nil), 4, "the core names no provider")
+	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none, nil), 0, "")
+	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none, nil), 0, "")
 	outside := map[string]int{"internal/daemon/x.go": 3, "internal/client/tui/x.go": 3, "internal/cli/root.go": 0, "internal/cli/sources.go": 0,
 		"internal/cli/slack_wire.go": 0, "internal/domain/pr/x.go": 0, "internal/intent/builtin/x.go": 0,
 		"internal/adapter/source/slack/x.go": 2, "internal/adapter/source/github/x.go": 2, "internal/adapter/facts/session/x.go": 2, "internal/workspace/orca/x.go": 3}
@@ -330,11 +391,11 @@ var d = "workspace"
 var e = "slack:U1"
 var g = "https://github.com/a/b"
 `)
-		flagged(t, file, coreLiterals(fset, file, f, nil, none), n, "a provider id lives in its plugin")
+		flagged(t, file, coreLiterals(fset, file, f, nil, none, nil), n, "a provider id lives in its plugin")
 	}
 	allow := []providerSite{{"internal/core/gtd/x.go", "b", "unit.Session", 1, "planted"}, {"internal/core/gtd/x.go", "a", `"slack"`, 1, "stale"}}
 	used := map[int]int{}
-	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used), 3, "the core names no provider")
+	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used, nil), 3, "the core names no provider")
 	flagged(t, "stale", staleSites(allow, used), 1, "matches 0")
 	fset, f = parse(t, `package x
 func (s *server) open() {
@@ -345,7 +406,7 @@ func other() { _ = unit.GitHub }
 `)
 	site := []providerSite{{"internal/cli/x.go", "server.open", "unit.GitHub", 1, "planted"}}
 	used = map[int]int{}
-	flagged(t, "another declaration of an allowlisted file", coreLiterals(fset, "internal/cli/x.go", f, site, used), 1, "unit.GitHub in other;")
+	flagged(t, "another declaration of an allowlisted file", coreLiterals(fset, "internal/cli/x.go", f, site, used, nil), 1, "unit.GitHub in other;")
 	flagged(t, "the allowlisted site", staleSites(site, used), 0, "")
 	fset, f = parse(t, `package x
 func (s *server) open() {
@@ -356,12 +417,20 @@ func (s *server) open() {
 }
 `)
 	used = map[int]int{}
-	flagged(t, "a new spelling in an allowlisted declaration", coreLiterals(fset, "internal/cli/x.go", f, site, used), 1, "spelled 2 times, its allowlist entry allows 1")
+	flagged(t, "a new spelling in an allowlisted declaration", coreLiterals(fset, "internal/cli/x.go", f, site, used, nil), 1, "spelled 2 times, its allowlist entry allows 1")
 	site[0].n = 3
 	flagged(t, "an entry allowing more than its declaration spells", staleSites(site, used), 1, "allows 3, matches 2")
 	fset, f = parse(t, `package x
 import dunit "github.com/wloophq/wloop/internal/domain/unit"
 var a = dunit.GitHub
 `)
-	flagged(t, "an aliased import", coreLiterals(fset, "internal/intent/x.go", f, nil, none), 1, "a provider id lives in its plugin")
+	flagged(t, "an aliased import", coreLiterals(fset, "internal/intent/x.go", f, nil, none, nil), 1, "a provider id lives in its plugin")
+	fset, f = parse(t, `package x
+import dslack "github.com/wloophq/wloop/internal/domain/slack"
+func open(u unit.Unit) bool { return u.Provider == dslack.Provider || u.Provider == chatPlugin }
+`)
+	_, decl := parse(t, "package x\nconst chatPlugin unit.ProviderID = \"slack\"\nvar other = \"slackish\"\n")
+	aliases := providerAliases(decl)
+	flagged(t, "a plugin package's id and a local constant", coreLiterals(fset, "internal/daemon/x.go", f, nil, none, aliases), 2, "a provider id lives in its plugin")
+	flagged(t, "a plugin's own adapter", coreLiterals(fset, "internal/adapter/facts/slack/x.go", f, nil, none, aliases), 0, "")
 }
