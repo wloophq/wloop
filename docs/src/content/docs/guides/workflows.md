@@ -25,7 +25,7 @@ The `workflows` key of `config.json` tunes a bundled workflow, or one of yours, 
 | `approval.rule` | rules tried before `mode`, the first whose `when` holds gives the item's mode; set, they replace the manifest's, and `[]` clears them |
 | `only_when` | a predicate over the workflow's [facts](/reference/facts/#workflow-facts) that must hold besides the manifest's `when`; where it does not, the workflow plans nothing |
 
-The review, address and nudge workflows wait `60s`, the `window` of their manifests. `"workflows": {"review-follow-up": {"approval": {"mode": "run"}}}` sends that workflow's rounds at once; set it per workflow. Each key of `approval` overlays the manifest's own field by field: `mode` and `window` replace those fields and keep the manifest's rules.
+The review, address and nudge workflows wait `60s`, the `window` of their manifests. `"workflows": {"review-follow-up": {"approval": {"mode": "run"}}}` sends that workflow's rounds at once; set it per workflow. Each key of `approval` overlays the manifest's own field by field: `mode` and `window` replace those fields and keep the manifest's rules, so `{"window": "5m"}` alone lengthens a `delay` workflow's window. The config refuses at load what no manifest could fix, such as a `window` beside `mode: "wait"` or a rule that runs on an untrusted fact; what only fails once merged, such as a `window` over a manifest that waits, stops that workflow, and `{{command}} doctor` and the daemon's log name it.
 
 ## Read the plan first
 
@@ -89,7 +89,7 @@ A rule picks the mode by the draft's and the unit's facts; this one sends a clos
   "rule": [{ "when": "draft.delivery == \"reaction\"", "mode": "send" }] } } } }
 ```
 
-A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text.
+A rule never reads a fact the [facts](/reference/facts/) page marks **Untrusted**, such as `entry.unit_started_by_me`, which the extraction reads from the thread's text. The config's block overlays the workflow's `[drafts.approval]` the same way, `{"rule": [...]}` alone keeping its mode; on a workflow that has none, it overlays the block of the intent whose turns the workflow starts, and `wait` for the drafts the workflow proposes itself. One that does not merge, such as a `window` over a mode other than `delay`, holds every draft of the workflow for you, and `{{command}} doctor` names it.
 
 A workflow's `observe` and a draft's `dry_run` mode differ: `"observe": true` plans the workflow and proposes nothing, while `"drafts": {"approval": {"mode": "dry_run"}}` proposes each draft and stores it as what would have been sent, without sending it.
 
@@ -145,7 +145,7 @@ Resuming less than a wider pause holds is refused: with everything paused, `resu
 
 ## Write your own
 
-A workflow of yours goes in `<profile>/workflows/<name>/workflow.toml`. This one sends you a private notification about your pull requests that wait on you for more than two days, its text in `text.md.tmpl` beside the manifest:
+A workflow of yours goes in `<profile>/workflows/<name>/workflow.toml`. This one sends you a private notification about your pull requests that wait on you for more than two days, its text in `text.md.tmpl` beside the manifest, a template over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name (`{{index .Facts "pr.slug"}} waits on you`):
 
 ```toml
 summary = "Tell me about my pull requests that wait on me for two days"
