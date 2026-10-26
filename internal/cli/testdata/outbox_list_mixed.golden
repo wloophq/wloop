@@ -1,13 +1,13 @@
 Outbox  4 drafts waiting on you
 
-NUDGES 1
-  #12  acme/api#7 · Batch export for large accoun…  @ana       26h  proposed  the unit  @ana, any news on thi…
-
-CLOSINGS 1
-  #11  DM with Ana Lima: rollout                                3h  failed    #general  closes 2 items: Rollo…
-
-REPLIES 2
+REPLY 2
   #14  #ops · When does the export ship?                        5m  proposed  the unit  Friday, after the fre…
    #9  #ops · When does the export ship?            @Bob Reis   2d  proposed  the unit  cc @Bob Reis for the …
+
+NUDGE 1
+  #12  acme/api#7 · Batch export for large accoun…  @ana       26h  proposed  the unit  @ana, any news on thi…
+
+CLOSE 1
+  #11  DM with Ana Lima: rollout                                3h  failed    #general  closes 2 items: Rollo…
 
 Next: {{command}} outbox show <id> · approve <id> · discard <id>

@@ -363,7 +363,7 @@ func TestOutboxListLaysOutForATerminal(t *testing.T) {
 	if code := te.run("outbox", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if out := te.out.String(); !strings.Contains(out, "NUDGES") || !strings.Contains(out, "\x1b[36m#1") || !strings.Contains(out, "@ana, any news?") {
+	if out := te.out.String(); !strings.Contains(out, "NUDGE") || !strings.Contains(out, "\x1b[36m#1") || !strings.Contains(out, "@ana, any news?") {
 		t.Fatalf("printed\n%s", out)
 	}
 }

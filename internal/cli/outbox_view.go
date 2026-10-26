@@ -11,47 +11,30 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// draftGroups are the Outbox's groups, in the order the list shows them, by draft purpose; a closing's
-// gist counts the items it closes.
-var draftGroups = []draftGroup{
-	{"nudge", "NUDGES", "nudge", false},
-	{"close", "CLOSINGS", "closing", true},
-	{"reply", "REPLIES", "reply", false},
-	{"react", "REACTIONS", "reaction", false},
-	{"ask_owner", "OWNER QUESTIONS", "owner question", false},
-	{"comment", "COMMENTS", "comment", false},
-}
+// closes says whether sending d closes its unit's items.
+func closes(d api.Draft) bool { return slices.Contains(d.Effects, builtin.EffectUnitClosed) }
 
-type draftGroup struct {
-	purpose, title, one string
-	closes              bool
-}
-
-// closes says whether drafts of purpose close their items.
-func closes(purpose string) bool {
-	i := slices.IndexFunc(draftGroups, func(g draftGroup) bool { return g.purpose == purpose })
-	return i >= 0 && draftGroups[i].closes
+// itemsVerb is how d's items read beside it, from what sending it does.
+func itemsVerb(d api.Draft) string {
+	switch {
+	case closes(d):
+		return "Closes"
+	case slices.Contains(d.Effects, builtin.EffectEntryNudged):
+		return "Asks about"
+	}
+	return "Answers"
 }
 
 func groupTitle(purpose string) string {
-	for _, g := range draftGroups {
-		if g.purpose == purpose {
-			return g.title
-		}
-	}
-	return strings.ToUpper(strings.ReplaceAll(purpose, "_", " "))
+	return strings.ToUpper(purposeName(purpose))
 }
 
 // purposeName is one draft's purpose as a person reads it.
 func purposeName(purpose string) string {
-	for _, g := range draftGroups {
-		if g.purpose == purpose {
-			return g.one
-		}
-	}
 	return strings.ReplaceAll(purpose, "_", " ")
 }
 
@@ -96,7 +79,7 @@ func gist(d api.Draft) string {
 	switch {
 	case d.Reaction != "":
 		return ":" + d.Reaction + ":"
-	case closes(d.Purpose):
+	case closes(d):
 		var closed []string
 		for _, l := range strings.Split(d.Text, "\n") {
 			if m := bullet.FindStringSubmatch(l); m != nil {
@@ -207,14 +190,9 @@ func writeOutbox(w io.Writer, t termfmt.Term, ds []api.Draft, now time.Time) {
 	fmt.Fprintln(w, t.Dim("Next: "+brand.Command+" outbox show <id> · approve <id> · discard <id>"))
 }
 
-// purposesOf are the purposes of ds in the groups' order, any other purpose after.
+// purposesOf are the purposes of ds in the order they first appear.
 func purposesOf(ds []api.Draft) []string {
 	var out []string
-	for _, g := range draftGroups {
-		if slices.ContainsFunc(ds, func(d api.Draft) bool { return d.Purpose == g.purpose }) {
-			out = append(out, g.purpose)
-		}
-	}
 	for _, d := range ds {
 		if !slices.Contains(out, d.Purpose) {
 			out = append(out, d.Purpose)
@@ -304,11 +282,10 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		}
 	}
 	if len(d.ItemDetails) > 0 {
-		verb := map[string]string{"close": "Closes", "nudge": "Asks about"}[d.Purpose]
 		for i, it := range d.ItemDetails {
 			label := ""
 			if i == 0 {
-				label = cmp.Or(verb, "Answers")
+				label = itemsVerb(d)
 			}
 			fmt.Fprintln(w, t.Dim(padRight(label, 10))+"  "+cmp.Or(oneLine(it.Summary), it.ID)+" "+t.Dim("("+cmp.Or(it.State, "unknown")+")"))
 		}
