@@ -27,7 +27,7 @@ func TestStoredFactsReadTheBriefTagsFilesAndTeams(t *testing.T) {
 	if err := te.Store.EndBriefRun(ctx, run, dinv.BriefRecord{}); err != nil {
 		t.Fatal(err)
 	}
-	st, err := storedFacts{store: te.Store, briefs: true}.Facts(ctx, r7)
+	st, err := storedFacts{store: te.Store, briefs: true}.Facts(ctx, r7.Unit())
 	if err != nil || st.Brief == nil {
 		t.Fatalf("%+v %v", st, err)
 	}
@@ -37,10 +37,10 @@ func TestStoredFactsReadTheBriefTagsFilesAndTeams(t *testing.T) {
 		t.Fatalf("%+v %v", b, st.Teams)
 	}
 	te.Store.UpsertPR(ctx, dinv.PR{Ref: r7, State: "OPEN", HeadOid: "h2", Reasons: []string{"author"}})
-	if st, _ := (storedFacts{store: te.Store, briefs: true}).Facts(ctx, r7); st.Brief == nil || !st.Brief.HeadMoved || st.Brief.OlderFormat {
+	if st, _ := (storedFacts{store: te.Store, briefs: true}).Facts(ctx, r7.Unit()); st.Brief == nil || !st.Brief.HeadMoved || st.Brief.OlderFormat {
 		t.Fatalf("a moved head: %+v", st.Brief)
 	}
-	if st, _ := (storedFacts{store: te.Store}).Facts(ctx, r7); st.Brief != nil {
+	if st, _ := (storedFacts{store: te.Store}).Facts(ctx, r7.Unit()); st.Brief != nil {
 		t.Fatal("briefs off still read the brief")
 	}
 }
@@ -55,7 +55,7 @@ func TestABriefOfAnOlderFormatIsNotAMovedHead(t *testing.T) {
 		StartedAt: testNow, EndedAt: testNow, Outcome: brief.OutcomeOK, Brief: `{"goal":"G","kind":"fix","size":"s","risk":"low","open_questions":[],"tags":[]}`}, dinv.BriefRecord{}); err != nil {
 		t.Fatal(err)
 	}
-	st, err := storedFacts{store: te.Store, briefs: true}.Facts(ctx, r7)
+	st, err := storedFacts{store: te.Store, briefs: true}.Facts(ctx, r7.Unit())
 	if err != nil || st.Brief == nil || st.Brief.HeadMoved || !st.Brief.OlderFormat {
 		t.Fatalf("%+v %v", st.Brief, err)
 	}
@@ -79,7 +79,7 @@ func TestAnUnreadableBriefIsAnError(t *testing.T) {
 	id, _ := te.Store.StartBriefRun(ctx, dinv.BriefRun{PR: r7, Trigger: brief.TriggerWanted, Version: "v", AttemptOf: "h1", StartedAt: testNow})
 	te.Store.EndBriefRun(ctx, dinv.BriefRun{ID: id, PR: r7, Trigger: brief.TriggerWanted, Version: "v", AttemptOf: "h1", StartedAt: testNow, EndedAt: testNow,
 		Outcome: brief.OutcomeOK, Brief: "{not json"}, dinv.BriefRecord{})
-	if _, err := (storedFacts{store: te.Store, briefs: true}).Facts(ctx, r7); err == nil {
+	if _, err := (storedFacts{store: te.Store, briefs: true}).Facts(ctx, r7.Unit()); err == nil {
 		t.Fatal("an unreadable brief read as none")
 	}
 }

@@ -103,18 +103,18 @@ type fakeBriefs struct {
 	intakes     []intake.Intake
 }
 
-func (f *fakeBriefs) Peek(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (f *fakeBriefs) Peek(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	f.peeks++
 	return f.rd, nil
 }
 
-func (f *fakeBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (f *fakeBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	f.gets++
 	return f.rd, nil
 }
 
 func (f *fakeBriefs) BriefReady(ctx context.Context, u unit.Unit) (intake.Readiness, error) {
-	return f.Ready(ctx, u, true)
+	return f.Ready(ctx, u, true, nil)
 }
 
 func (f *fakeBriefs) OpenIntakes(context.Context) ([]intake.Intake, error) { return f.intakes, nil }

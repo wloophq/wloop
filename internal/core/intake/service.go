@@ -37,6 +37,9 @@ type Service struct {
 	// Log reports what fails after an intake's change is saved; nil drops
 	// it.
 	Log func(format string, args ...any)
+	// Needs are the brief fields an intent needs, its manifest's
+	// brief.need; nil needs none.
+	Needs func(intent string) []string
 
 	// mu serializes every load, change and save of an intake; it is never
 	// held across a Ready, a wait or a Start.
@@ -176,7 +179,11 @@ func (s *Service) ready(ctx context.Context, i Intake) (Readiness, error) {
 	if err != nil {
 		return Readiness{}, err
 	}
-	return s.Briefs.Ready(ctx, i.Unit, first)
+	var need []string
+	if s.Needs != nil {
+		need = s.Needs(string(i.Intent))
+	}
+	return s.Briefs.Ready(ctx, i.Unit, first, need)
 }
 
 // decide applies rd to the intake as stored now, which a Without or a Cancel

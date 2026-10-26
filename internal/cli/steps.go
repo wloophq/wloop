@@ -63,8 +63,8 @@ type stepDeps struct {
 // briefPort is the brief queue as a round asks it: Peek plans, Ready starts
 // the brief a first round waits for.
 type briefPort interface {
-	Peek(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error)
-	Ready(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error)
+	Peek(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error)
+	Ready(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error)
 }
 
 // removalPorts are the workspace removal's ports but its Rounds, which is

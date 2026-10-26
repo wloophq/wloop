@@ -11,13 +11,13 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 )
 
-// Fill asks the agent only the extra fields ref's brief lacks at their
+// fillPR asks the agent only the extra fields ref's brief lacks at their
 // current versions, those of need when need is not empty, and stores the
 // brief with them as a fields run reusing the core: the core is never
 // briefed again for a new or changed field. It reports whether it filled
 // any; a brief at an older core version is left for its refresh. A failed
 // call leaves the brief and its record as they were.
-func (q *Queue) Fill(ctx context.Context, ref github.Ref, need []string) (bool, error) {
+func (q *Queue) fillPR(ctx context.Context, ref github.Ref, need []string) (bool, error) {
 	bi := q.intent()
 	if !q.d.Enabled || bi.Schema.Extra == nil {
 		return false, nil

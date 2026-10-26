@@ -246,7 +246,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("instruction_parts", port.TopicRounds, retainPartsSQL)
 		}
 		if p.BriefBodies > 0 {
-			r.exec("brief_runs", port.TopicBriefs, retainBriefBodiesSQL, cutoff(now, p.BriefBodies))
+			r.briefs(cutoff(now, p.BriefBodies))
 		}
 		if p.ViewRows > 0 {
 			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, cutoff(now, p.ViewRows))

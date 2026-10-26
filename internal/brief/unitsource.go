@@ -53,8 +53,8 @@ type BriefSource interface {
 	// Describe is in, one line, as the prompt's header names it.
 	Describe(in UnitInput) string
 	// Stale says whether the brief w holds of a unit now at cur is due
-	// again at now.
-	Stale(w Written, cur At, now time.Time) bool
+	// again at now, version being the brief's current version.
+	Stale(w Written, cur At, version string, now time.Time) bool
 	// AttemptKey names what an attempt at version on a unit at cur is made
 	// from, so a failure counts against that attempt only.
 	AttemptKey(version string, cur At) string

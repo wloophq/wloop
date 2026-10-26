@@ -17,9 +17,11 @@ const retainBriefBodiesSQL = `UPDATE brief_runs SET brief = '', input = json_rem
 const cursorProviders = `(SELECT DISTINCT provider FROM extraction_cursors)`
 
 const (
-	retainCursorRunsSQL = `DELETE FROM brief_runs WHERE provider IN ` + cursorProviders + ` AND started_at < ? AND id NOT IN ` + briefsInUse
-	orphanCursorRunsSQL = `DELETE FROM brief_runs WHERE provider IN ` + cursorProviders + `
-		AND (provider, unit_key) NOT IN (SELECT provider, unit_key FROM extraction_cursors) AND id NOT IN (SELECT brief_run FROM turns)`
+	// retainCursorRunsSQL deletes the daily runs no one reads past the
+	// cutoff, and every run but a turn's of a unit whose cursor is gone; it
+	// runs after the orphan unit_briefs rows are deleted.
+	retainCursorRunsSQL = `DELETE FROM brief_runs WHERE provider IN ` + cursorProviders + ` AND id NOT IN (SELECT brief_run FROM turns)
+		AND (started_at < ? AND id NOT IN ` + briefsInUse + ` OR (provider, unit_key) NOT IN (SELECT provider, unit_key FROM extraction_cursors))`
 	orphanCursorBriefsSQL = `DELETE FROM unit_briefs WHERE provider IN ` + cursorProviders + `
 		AND (provider, unit_key) NOT IN (SELECT provider, unit_key FROM extraction_cursors)`
 	orphanCursorTagsSQL = `DELETE FROM unit_tags WHERE provider IN ` + cursorProviders + `
@@ -31,10 +33,9 @@ const (
 // unit whose extraction cursor is gone.
 func (r *retainer) briefs(before string) {
 	r.exec("brief_runs", port.TopicBriefs, retainBriefBodiesSQL, before)
-	r.exec("brief_runs", port.TopicBriefs, retainCursorRunsSQL, before)
 	r.exec("unit_briefs", port.TopicBriefs, orphanCursorBriefsSQL)
 	r.exec("unit_tags", port.TopicBriefs, orphanCursorTagsSQL)
-	r.exec("brief_runs", port.TopicBriefs, orphanCursorRunsSQL)
+	r.exec("brief_runs", port.TopicBriefs, retainCursorRunsSQL, before)
 }
 
 // briefEndedTables are the brief rows of an ended pull request, in delete

@@ -348,7 +348,7 @@ func (s *stepSet) briefGate(ctx context.Context, u unit.Unit, p *startPlan, live
 	if live {
 		ask = s.d.Briefs.Ready
 	}
-	rd, err := ask(ctx, u, p.first)
+	rd, err := ask(ctx, u, p.first, p.args.def.Brief.Need)
 	switch {
 	case err != nil:
 		p.briefMissing = "reading it failed (" + err.Error() + ")"

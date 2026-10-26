@@ -44,6 +44,7 @@ func (p *plugin) extraction(cfg config.Config) []sourcereg.Job {
 	if t := p.deps.Turns; t != nil && t.Items != nil {
 		j.Ledger = t.Items
 	}
+	p.briefs.setJob(j)
 	if a, ok := p.deps.Agents[cfg.Agent].(turns.AskingAgent); ok {
 		if asker, err := a.Asker(filepath.Join(config.StateDir(), "extract"), cfg.AgentModels[cfg.Agent]); err == nil {
 			j.Asker = asker

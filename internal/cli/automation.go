@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
@@ -123,6 +124,9 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		return applyConfig(e.loadedIntents().Workflows, cfg)
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
+	if d.DB != nil {
+		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntent(func(string, ...any) {})}
+	}
 	eng := &automation.Engine{
 		Workflows: workflows,
 		Units:     units,
@@ -362,6 +366,8 @@ type unitSet struct {
 	order     []unit.ProviderID
 	// classified adds the classify outputs to the facts; nil adds none.
 	classified *classifiedUnits
+	// briefed adds the brief.* facts; nil adds none.
+	briefed *briefedFacts
 }
 
 var (
@@ -407,6 +413,9 @@ func (s *unitSet) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 		return nil, err
 	}
 	f, err := p.Facts(ctx, u)
+	if err == nil && s.briefed != nil {
+		f, err = s.briefed.add(ctx, u, f)
+	}
 	if err != nil || s.classified == nil {
 		return f, err
 	}

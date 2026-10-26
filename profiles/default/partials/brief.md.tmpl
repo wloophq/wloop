@@ -6,7 +6,7 @@ A model wrote this preview from the {{$.Wording.Noun}}; verify it before relying
 - Goal: {{line .Goal}}
 {{- with .Context}}
 - Context: {{line .}}{{end}}
-- Kind `{{.Kind}}`, size `{{.Size}}`, risk `{{.Risk}}`{{with .RiskWhy}}: {{line .}}{{end}}
+- Kind `{{.Kind}}`{{with .Size}}, size `{{.}}`{{end}}, risk `{{.Risk}}`{{with .RiskWhy}}: {{line .}}{{end}}
 {{- with .OpenQuestions}}
 - Open questions:{{range .}}
   - {{line .}}{{end}}{{end}}

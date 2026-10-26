@@ -26,6 +26,8 @@ The cockpit shows the brief in the detail panel, and size and risk as pills on e
 
 Each pass of the Slack extraction writes the brief of the thread or channel it read, in the same call: its goal and context, its **kind** (`question`, `request`, `incident`, `decision` or `announcement`), its risk, up to three open questions and tags under `domain`, `audience` and `concern`. A Slack brief has no size. Each topic of a direct message conversation gets its own brief. A pass that finds nothing new keeps the brief the conversation has; at most one brief is written per conversation a day, updated by later passes that day.
 
+The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 2 minutes for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
+
 ## Fields of your own
 
 The brief is an intent of the profile, the one whose manifest says `builds = "brief"`. Its prompt is `prompts/brief.md` and its taxonomy `prompts/brief-taxonomy.md`; a file of your profile at either path replaces the bundled one, and briefs are written again at their next refresh. To add fields, give your profile its own brief intent with a `schema.json` beside its manifest:
@@ -51,7 +53,7 @@ The schema is a flat object: strings (with or without an `enum`), integers, bool
 
 Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
 
-Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them.
+Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them. An intent that lists fields under `brief = { need = [...] }` makes its first turn wait for that call; a call that fails lets the turn start with the brief as it is. Slack briefs carry the fields from the extraction's next pass.
 
 ## Turn it on
 
