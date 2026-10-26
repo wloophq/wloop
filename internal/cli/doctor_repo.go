@@ -433,7 +433,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 			Info: "runs as bundled, the override does not load: " + oneLine(l.RevertedWorkflows[name].Error()), Fix: brand.Command + " profile check"})
 	}
 	for _, err := range configApprovalProblems(cfg, l.Workflows) {
-		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows draft_approval",
+		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows drafts.approval",
 			Info: oneLine(err.Error()), Fix: "fix it in " + e.ConfigPath})
 	}
 	for _, name := range slices.Sorted(maps.Keys(cfg.Workflows)) {
@@ -445,7 +445,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 	return out, nil
 }
 
-// workflowLine is w's mode, trigger and what it did: an observe workflow
+// workflowLine is w's trigger and what it did: an observe workflow
 // the items it plans, which it never runs, and the config entry that makes
 // it run them; a workflow whose items wait for the user the entry that
 // runs them without the user.
@@ -458,18 +458,18 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 			return api.DoctorCheck{}, err
 		}
 		mark = api.DoctorInfo
-		info = fmt.Sprintf("%s, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			workflow.ModeOf(w.Observe), w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"mode": "apply"`), e.ConfigPath)
+		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"observe": false`), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
 			last = "last ran " + shortAge(now.Sub(a.LastRun), false) + " ago"
 		}
-		info = fmt.Sprintf("%s, %s, %s, %d refusal(s) in the last day", workflow.ModeOf(w.Observe), w.Trigger.Kind, last, a.Refusals)
+		info = fmt.Sprintf("%s, %s, %d refusal(s) in the last day", w.Trigger.Kind, last, a.Refusals)
 	}
 	if w.Approval.Default == workflow.OutcomeWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, `"approval": {"default": "run"}`), e.ConfigPath)
+			workflowEntry(w.Name, `"approval": {"mode": "run"}`), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }

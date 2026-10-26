@@ -60,8 +60,8 @@ every = "sweep"
 use = "session.explode"
 `)
 	te.cfg.Profile = user
-	off := false
-	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-duplicate": {Enabled: &off}, "workspace-temporary": {Mode: "apply"}, "sesion-pr-finished": {Mode: "observe"}, "broken-one": {Mode: "observe"}}
+	off, on := false, true
+	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-duplicate": {Enabled: &off}, "workspace-temporary": {Observe: &off}, "sesion-pr-finished": {Observe: &on}, "broken-one": {Observe: &on}}
 
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -117,15 +117,15 @@ func TestDoctorReportsWorkflows(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, want := range map[string]api.DoctorCheck{
-		"workflow session-pr-finished": {Mark: api.DoctorOK, Info: "apply, sweep, last ran 2h ago, 2 refusal(s) in the last day"},
-		"workflow session-manual-quiet": {Mark: api.DoctorOK, Info: "apply, sweep, never ran, 0 refusal(s) in the last day; each item waits for you to apply it" +
-			`; set "workflows": {"session-manual-quiet": {"approval": {"default": "run"}}} in ` + te.ConfigPath + " to run them without you"},
+		"workflow session-pr-finished": {Mark: api.DoctorOK, Info: "sweep, last ran 2h ago, 2 refusal(s) in the last day"},
+		"workflow session-manual-quiet": {Mark: api.DoctorOK, Info: "sweep, never ran, 0 refusal(s) in the last day; each item waits for you to apply it" +
+			`; set "workflows": {"session-manual-quiet": {"approval": {"mode": "run"}}} in ` + te.ConfigPath + " to run them without you"},
 		"workflow workspace-review-finished": {Mark: api.DoctorInfo, Info: "observe, sweep, 1 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-review-finished" +
-			`; set "workflows": {"workspace-review-finished": {"mode": "apply"}} in ` + te.ConfigPath + " to run them"},
+			`; set "workflows": {"workspace-review-finished": {"observe": false}} in ` + te.ConfigPath + " to run them"},
 		"workflow workspace-duplicate": {Mark: api.DoctorInfo, Info: "observe, sweep, 0 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-duplicate" +
-			`; set "workflows": {"workspace-duplicate": {"mode": "apply"}} in ` + te.ConfigPath + " to run them"},
-		"workflow workspace-temporary": {Mark: api.DoctorOK, Info: "apply, sweep, never ran, 0 refusal(s) in the last day"},
-		"workflow after-merge":         {Mark: api.DoctorOK, Info: "apply, event, never ran, 0 refusal(s) in the last day"},
+			`; set "workflows": {"workspace-duplicate": {"observe": false}} in ` + te.ConfigPath + " to run them"},
+		"workflow workspace-temporary": {Mark: api.DoctorOK, Info: "sweep, never ran, 0 refusal(s) in the last day"},
+		"workflow after-merge":         {Mark: api.DoctorOK, Info: "event, never ran, 0 refusal(s) in the last day"},
 		"workflow session-duplicate":   {Mark: api.DoctorInfo, Info: "disabled by workflows.session-duplicate.enabled in " + te.ConfigPath},
 	} {
 		got, ok := checkNamed(rep.Workflows, name)

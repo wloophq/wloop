@@ -179,7 +179,7 @@ func newEnv(t *testing.T) *env {
 		Clock:       e.clock,
 		RecordedFor: 24 * time.Hour,
 	}
-	e.job = &Job{Outbox: e.svc, Clock: e.clock, RenudgeAfter: 24 * time.Hour,
+	e.job = &Job{Outbox: e.svc, Clock: e.clock, RepeatAfter: 24 * time.Hour,
 		Enabled: func(p unit.ProviderID) bool { return !e.disabled[p] },
 		Log:     func(format string, args ...any) { e.logs = append(e.logs, fmt.Sprintf(format, args...)) }}
 	e.job.Facts = factsOf(e.facts)

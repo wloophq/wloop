@@ -1,41 +1,17 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
-
-// Proposals holds a plugin rule's approval by rule id ("github-nudge"). The
-// rules the default workflows replaced ("stalled-nudge", "closure",
-// "ask-owner") still load, their approval read as their workflow's
-// draft_approval.
-type Proposals struct {
-	Rules map[string]ProposalRule
-}
-
-type ProposalRule struct {
-	Approval *ProposalApproval `json:"approval,omitempty"`
-}
-
-type ProposalApproval struct {
-	Mode   string `json:"mode"`
-	Window Days   `json:"window,omitempty"`
-}
-
-// DraftApprovalConfig is a workflow's draft_approval: a mode, and the rules
-// tried before it, first match wins.
-type DraftApprovalConfig struct {
-	Mode   string               `json:"mode"`
-	Window Days                 `json:"window,omitempty"`
-	Rule   []ApprovalRuleConfig `json:"rule,omitempty"`
-}
 
 type ApprovalRuleConfig struct {
 	When   string `json:"when"`
@@ -43,9 +19,96 @@ type ApprovalRuleConfig struct {
 	Window Days   `json:"window,omitempty"`
 }
 
+// PluginDrafts holds the approval of the drafts a plugin's own rules
+// propose.
+type PluginDrafts struct {
+	Approval *PluginApproval `json:"approval,omitempty"`
+}
+
+type PluginApproval struct {
+	Mode   string `json:"mode"`
+	Window Days   `json:"window,omitempty"`
+}
+
+// Approval is a as a draft's approval.
+func (a PluginApproval) Approval() draft.Approval {
+	return draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}
+}
+
+var pluginDraftsType = reflect.TypeFor[PluginDrafts]()
+
+// PluginDraftApproval is the approval of the drafts plugin id's own rules
+// propose: its <id>.drafts.approval, wait when the config sets none.
+func (c Config) PluginDraftApproval(id string) draft.Approval {
+	if a := c.pluginDrafts()[id].Approval; a != nil {
+		return a.Approval()
+	}
+	return draft.Approval{Mode: draft.Wait}
+}
+
+// pluginDrafts are the <id>.drafts of each top-level table that has one.
+func (c Config) pluginDrafts() map[string]PluginDrafts {
+	out := map[string]PluginDrafts{}
+	v := reflect.ValueOf(c)
+	for i := range v.NumField() {
+		f := v.Type().Field(i)
+		name := jsonName(f)
+		if f.Type.Kind() != reflect.Struct || name == "" || name == "-" {
+			continue
+		}
+		if d := v.Field(i).FieldByName("Drafts"); d.IsValid() && d.Type() == pluginDraftsType {
+			out[name] = d.Interface().(PluginDrafts)
+		}
+	}
+	return out
+}
+
+func (c Config) validatePluginDrafts() error {
+	drafts := c.pluginDrafts()
+	for _, id := range slices.Sorted(maps.Keys(drafts)) {
+		if a := drafts[id].Approval; a != nil {
+			if err := a.Approval().Validate(); err != nil {
+				return fmt.Errorf("%s.drafts.approval: %w", id, err)
+			}
+		}
+	}
+	return nil
+}
+
+// DraftApproval is the workflow's drafts.approval, nil when unset.
+func (w WorkflowConfig) DraftApproval() *ApprovalConfig {
+	if w.Drafts == nil {
+		return nil
+	}
+	return w.Drafts.Approval
+}
+
+var runModes = []string{string(workflow.OutcomeRun), "delay", string(workflow.OutcomeWait)}
+
+// validateRun checks a run approval block at key: its modes, and its rules'
+// predicates over the workflow facts.
+func (a ApprovalConfig) validateRun(key string) error {
+	if err := oneOf(key+".mode", a.Mode, runModes...); err != nil {
+		return err
+	}
+	for i, r := range a.Rule {
+		at := fmt.Sprintf("%s.rule[%d]", key, i)
+		if r.Mode == "" {
+			return fmt.Errorf("%s.mode is missing; one of %v", at, runModes)
+		}
+		if err := oneOf(at+".mode", r.Mode, runModes...); err != nil {
+			return err
+		}
+		if _, err := expr.CompileWorkflow(r.When, builtin.WorkflowEnvAll()); err != nil {
+			return fmt.Errorf("%s.when: %w", at, err)
+		}
+	}
+	return nil
+}
+
 // Policy is a as a draft approval policy, its rules' when compiled over env.
-func (a DraftApprovalConfig) Policy(env expr.Env) (draft.Policy, error) {
-	p := draft.Policy{Default: draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}}
+func (a ApprovalConfig) Policy(env expr.Env) (draft.Policy, error) {
+	p := draft.Policy{Default: draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: a.window()}}
 	if err := p.Default.Validate(); err != nil {
 		return draft.Policy{}, err
 	}
@@ -63,13 +126,20 @@ func (a DraftApprovalConfig) Policy(env expr.Env) (draft.Policy, error) {
 	return p, nil
 }
 
-// DraftApprovalWarnings name each rule of a workflows.<name>.draft_approval
+func (a ApprovalConfig) window() time.Duration {
+	if a.Window == nil {
+		return 0
+	}
+	return time.Duration(*a.Window)
+}
+
+// DraftApprovalWarnings name each rule of a workflows.<name>.drafts.approval
 // that releases, reads draft.delivery and never releases a comment draft.
 func (c Config) DraftApprovalWarnings() []string {
 	var out []string
 	env := builtin.ApprovalEnv(true, builtin.UnitSlots()...)
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
-		a := c.Workflows[name].DraftApproval
+		a := c.Workflows[name].DraftApproval()
 		if a == nil {
 			continue
 		}
@@ -79,88 +149,8 @@ func (c Config) DraftApprovalWarnings() []string {
 		}
 		for i, r := range p.Rules {
 			if builtin.NeverReleasesComment(r) {
-				out = append(out, fmt.Sprintf("workflows.%s.draft_approval.rule[%d].when reads draft.delivery but never releases a comment draft; to release one, write %s", name, i, builtin.CommentForm))
+				out = append(out, fmt.Sprintf("workflows.%s.drafts.approval.rule[%d].when reads draft.delivery but never releases a comment draft; to release one, write %s", name, i, builtin.CommentForm))
 			}
-		}
-	}
-	return out
-}
-
-// Approval is rule's configured approval, wait when the config sets none.
-func (p Proposals) Approval(rule string) draft.Approval {
-	r, ok := p.Rules[rule]
-	if !ok || r.Approval == nil {
-		return draft.Approval{Mode: draft.Wait}
-	}
-	return r.Approval.Approval()
-}
-
-// Approval is a as a draft's approval.
-func (a ProposalApproval) Approval() draft.Approval {
-	return draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}
-}
-
-func (p *Proposals) UnmarshalJSON(b []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	for _, k := range slices.Sorted(maps.Keys(raw)) {
-		var r ProposalRule
-		if err := json.Unmarshal(raw[k], &r); err != nil {
-			return fmt.Errorf("proposals.%s: %w", k, err)
-		}
-		if p.Rules == nil {
-			p.Rules = map[string]ProposalRule{}
-		}
-		p.Rules[k] = r
-	}
-	return nil
-}
-
-func (p Proposals) MarshalJSON() ([]byte, error) {
-	out := map[string]any{}
-	for k, r := range p.Rules {
-		out[k] = r
-	}
-	return json.Marshal(out)
-}
-
-func (p Proposals) validate() error {
-	for _, rule := range slices.Sorted(maps.Keys(p.Rules)) {
-		if err := p.Approval(rule).Validate(); err != nil {
-			return fmt.Errorf("proposals.%s.approval: %w", rule, err)
-		}
-	}
-	return nil
-}
-
-// legacyDraftWorkflows are the proposals job's rules a default workflow
-// replaced, by rule id, and that workflow.
-var legacyDraftWorkflows = map[string]string{
-	"stalled-nudge": "slack-stalled-nudge",
-	"closure":       "slack-closure",
-	"ask-owner":     "slack-ask-owner",
-}
-
-// LegacyDraftApproval is the proposals.<rule>.approval of the rule the
-// workflow replaced, nil when the config sets none.
-func (p Proposals) LegacyDraftApproval(workflow string) *draft.Policy {
-	for rule, w := range legacyDraftWorkflows {
-		if r, ok := p.Rules[rule]; ok && w == workflow && r.Approval != nil {
-			return draft.Fixed(r.Approval.Approval())
-		}
-	}
-	return nil
-}
-
-// LegacyWarnings name the key that replaced each proposals.<rule>.approval
-// the config still sets for a rule a workflow replaced.
-func (p Proposals) LegacyWarnings() []string {
-	var out []string
-	for _, rule := range slices.Sorted(maps.Keys(legacyDraftWorkflows)) {
-		if r, ok := p.Rules[rule]; ok && r.Approval != nil {
-			out = append(out, fmt.Sprintf("proposals.%s.approval is read as workflows.%s.draft_approval; move it there", rule, legacyDraftWorkflows[rule]))
 		}
 	}
 	return out

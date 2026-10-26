@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/proposals"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/source"
@@ -42,9 +43,9 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 // service of its own, over their publishers; the sender that publishes the
 // drafts, and applies their effects, runs elsewhere.
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) *proposals.Job {
-	renudge := time.Duration(cfg.Drafts.RepeatAfter)
+	repeatAfter := time.Duration(cfg.Drafts.RepeatAfter)
 	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: e.itemsLedger(db, cfg, logf), Clock: clockFunc(e.Now), Log: logf,
-		RecordedFor: renudge}
+		RecordedFor: repeatAfter}
 	var srcs []proposals.Source
 	for _, m := range mods {
 		if m.Proposals != nil {
@@ -54,10 +55,10 @@ func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Modul
 	enabled := func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) }
 	return &proposals.Job{
 		Outbox: svc, Sources: srcs, Enabled: enabled,
-		Facts:        coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
-		Approval:     cfg.Proposals.Approval,
-		RenudgeAfter: renudge,
-		Clock:        clockFunc(e.Now), Log: logf,
+		Facts:       coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Approval:    func(p unit.ProviderID) draft.Approval { return cfg.PluginDraftApproval(string(p)) },
+		RepeatAfter: repeatAfter,
+		Clock:       clockFunc(e.Now), Log: logf,
 	}
 }
 

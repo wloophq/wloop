@@ -283,18 +283,6 @@ func TestLoadCockpitKeys(t *testing.T) {
 	}
 }
 
-func TestParseDays(t *testing.T) {
-	for in, want := range map[string]time.Duration{"2d": 48 * time.Hour, "36h": 36 * time.Hour, "90m": 90 * time.Minute} {
-		got, err := ParseDays(in)
-		if err != nil || got != want {
-			t.Fatalf("%s: got %v, %v", in, got, err)
-		}
-	}
-	if _, err := ParseDays("soon"); err == nil {
-		t.Fatal("expected an error")
-	}
-}
-
 func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	for _, body := range []string{
 		`{"sweep": {"fast": "0s"}}`,
@@ -532,7 +520,7 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	raw := `{"agnet": "claude", "sweep": {"fast": "2m", "fsat": "1m"}, "projects": [{"match": "a/*", "agent_hom": "/h"}],
-		"workflows": {"address": {"approval": {"windw": "1m"}}}, "proposals": {"closure": {"aproval": {}}}}`
+		"workflows": {"address": {"approval": {"windw": "1m"}}}, "github": {"drafts": {"aproval": {}}}}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -541,7 +529,7 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 	if !errors.As(err, &unknown) || unknown.File != path {
 		t.Fatalf("err %v", err)
 	}
-	want := []string{"agnet", "projects[0].agent_hom", "proposals.closure.aproval", "sweep.fsat", "workflows.address.approval.windw"}
+	want := []string{"agnet", "github.drafts.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
 	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") {
 		t.Fatalf("keys %v, error %q", unknown.Keys, err)
 	}
@@ -564,7 +552,7 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	t.Parallel()
 	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"turns": {"per_day": 7}, "workflows": {"slack-closure": {"draft_approval": {"mode": "delay", "window": "10m"}}}}`), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte(`{"turns": {"per_day": 7}, "workflows": {"slack-closure": {"drafts": {"approval": {"mode": "delay", "window": "10m"}}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(file, tools())
@@ -574,17 +562,17 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	if c.Turns.PerDay != 7 {
 		t.Errorf("turns %+v", c.Turns)
 	}
-	if a := c.Workflows["slack-closure"].DraftApproval; a.Mode != "delay" || time.Duration(a.Window) != 10*time.Minute {
+	if a := c.Workflows["slack-closure"].DraftApproval(); a.Mode != "delay" || time.Duration(*a.Window) != 10*time.Minute {
 		t.Errorf("draft approval %+v", a)
 	}
 	if Defaults().Turns.PerDay != 20 {
 		t.Error("the default daily cap is not 20")
 	}
 	bad := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"draft_approval": {"mode": "delay"}}}}`), 0o600); err != nil {
+	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"drafts": {"approval": {"mode": "delay"}}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.draft_approval") {
+	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.drafts.approval") {
 		t.Fatalf("a window without one loaded: %v", err)
 	}
 }

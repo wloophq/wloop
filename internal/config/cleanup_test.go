@@ -32,8 +32,8 @@ func TestCleanupDefaults(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`{"workflows":{"x":{"mode":"later"}}}`:                 `workflows.x.mode: "later" is not one of observe, apply`,
-		`{"workflows":{"x":{"approval":{"default":"never"}}}}`: `workflows.x.approval.default: "never" is not one of run, wait`,
+		`{"workflows":{"x":{"approval":{"mode":"never"}}}}`: `workflows.x.approval.mode: "never" is not one of run, delay, wait`,
+		`{"workflows":{"x":{"approval":{"window":"0s"}}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {
 		path := filepath.Join(t.TempDir(), "config.json")
@@ -113,10 +113,10 @@ func TestLoadWorkflowConfig(t *testing.T) {
 		},
 		"workflows": {
 				"x": {
-						"mode": "observe",
+						"observe": true,
 						"enabled": false,
 						"approval": {
-								"default": "wait",
+								"mode": "wait",
 								"window": "10m"
 						}
 				}
@@ -134,7 +134,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
 		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.Nudge, c.Classify)
 	}
-	if x.Mode != "observe" || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Default != "wait" ||
+	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "wait" ||
 		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
 		t.Errorf("workflows.x = %+v", x)
 	}

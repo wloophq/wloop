@@ -46,12 +46,12 @@ func turnStartWorkflow(name string) workflow.Workflow {
 
 func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	t.Parallel()
-	off, window := false, config.Days(10*time.Minute)
+	off, on, window := false, true, config.Days(10*time.Minute)
 	cfg := Defaults()
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"gone":    {Enabled: &off},
-		"watched": {Mode: "observe"},
-		"waits":   {Approval: &config.ApprovalConfig{Default: "wait", Window: &window}},
+		"watched": {Observe: &on},
+		"waits":   {Approval: &config.ApprovalConfig{Mode: "wait", Window: &window}},
 	}
 	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Default: workflow.OutcomeRun}}
 	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), {Name: "kept", Observe: false}}
@@ -542,7 +542,7 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
-	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {DraftApproval: &config.DraftApprovalConfig{Mode: "delay", Window: config.Days(5 * time.Minute)}}}
+	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
 	manifest := draft.Fixed(draft.Approval{Mode: draft.Wait})
 	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Observe: false, DraftApproval: manifest}}, cfg)
 	if a := out[0].DraftApproval; a == nil || a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {

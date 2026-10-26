@@ -43,12 +43,12 @@ type Job struct {
 	Sources []Source
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled func(unit.ProviderID) bool
-	// Approval is a rule's configured approval; nil: always.
-	Approval func(rule string) draft.Approval
-	// RenudgeAfter is how long a sent, discarded or observed draft of a key keeps the key quiet.
-	RenudgeAfter time.Duration
-	Clock        port.Clock
-	Log          func(format string, args ...any) // ids, rules, kinds and units; never text
+	// Approval is the configured approval of a plugin's rules' drafts; nil: wait.
+	Approval func(unit.ProviderID) draft.Approval
+	// RepeatAfter is how long a sent, discarded or dry-run draft of a key keeps the key quiet.
+	RepeatAfter time.Duration
+	Clock       port.Clock
+	Log         func(format string, args ...any) // ids, rules, kinds and units; never text
 
 	// mu makes each pass, its dedupe checks and its proposals, one step.
 	mu sync.Mutex
@@ -67,11 +67,11 @@ func (s Summary) String() string {
 
 func (j *Job) enabled(p unit.ProviderID) bool { return j.Enabled == nil || j.Enabled(p) }
 
-func (j *Job) approval(rule string) draft.Approval {
+func (j *Job) approval(p unit.ProviderID) draft.Approval {
 	if j.Approval == nil {
 		return draft.Approval{Mode: draft.Wait}
 	}
-	return j.Approval(rule)
+	return j.Approval(p)
 }
 
 func (j *Job) logf(format string, args ...any) {
@@ -95,7 +95,7 @@ func (j *Job) Run(ctx context.Context) (Summary, error) {
 	}
 	props, err := j.fromSources(ctx)
 	for _, p := range props {
-		p.Policy = draft.Fixed(j.approval(p.Origin.Rule))
+		p.Policy = draft.Fixed(j.approval(p.Unit.Provider))
 		switch perr := j.propose(ctx, p, now); {
 		case perr == nil:
 			sum.Proposed++
@@ -112,7 +112,8 @@ func (j *Job) Run(ctx context.Context) (Summary, error) {
 var errHeld = errors.New("held by a draft of the same rule and key")
 
 // propose proposes p unless an auto draft of its unit, rule and key is open
-// or failed, or was sent, discarded or observed less than RenudgeAfter ago;
+// or failed, or was sent, discarded or stored as a dry run less than
+// RepeatAfter ago;
 // a draft the job withdrew holds nothing back.
 func (j *Job) propose(ctx context.Context, p outbox.Proposal, now time.Time) error {
 	prior, err := j.Outbox.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule, Key: p.Origin.Key})
@@ -127,7 +128,7 @@ func (j *Job) propose(ctx context.Context, p outbox.Proposal, now time.Time) err
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed:
 			return errHeld
 		case d.State == draft.Discarded && d.Reason == ReasonMoot:
-		case now.Sub(d.UpdatedAt) < j.RenudgeAfter:
+		case now.Sub(d.UpdatedAt) < j.RepeatAfter:
 			return errHeld
 		}
 	}
@@ -202,7 +203,7 @@ func (j *Job) closed(ctx context.Context, d draft.Draft) (string, error) {
 
 // fromSources is what each enabled plugin proposes on its own units, keeping
 // of its Origin only the rule id: the job sets the key and, in Run, the
-// rule's configured approval.
+// plugin's configured approval.
 func (j *Job) fromSources(ctx context.Context) ([]outbox.Proposal, error) {
 	now := j.Clock.Now()
 	var out []outbox.Proposal
