@@ -118,6 +118,9 @@ type Deps struct {
 	// together, of a background and of a wanted run; zero means the
 	// package's constant.
 	CallTimeout, WantedTimeout time.Duration
+	// DemandTimeout bounds a first turn's wait for an OnDemand source's
+	// brief; zero is the package's.
+	DemandTimeout time.Duration
 	Now                        func() time.Time
 	// After is time.After unless set.
 	After func(time.Duration) <-chan time.Time

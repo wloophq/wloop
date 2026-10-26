@@ -13,6 +13,10 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 )
 
+// DemandTimeout bounds a first turn's wait for an OnDemand source's brief:
+// the Slack extraction runs every 30 seconds and its call takes as long.
+const DemandTimeout = 2 * time.Minute
+
 // OnDemand is a BriefSource whose briefs another job writes, such as the
 // Slack extraction, which a first turn asks for its unit's brief.
 type OnDemand interface {
@@ -74,7 +78,7 @@ func refOf(u unit.Unit) (github.Ref, bool) {
 // turn also waits until a call fills the missing ones, once, and a later one
 // starts that call. A unit of another provider takes its brief in use; a
 // first turn without one asks its OnDemand source and waits, at most
-// WantedTimeout, while the source says a brief is coming.
+// DemandTimeout, while the source says a brief is coming.
 func (q *Queue) Ready(ctx context.Context, u unit.Unit, first bool, need []string) (Readiness, error) {
 	if ref, ok := refOf(u); ok {
 		rd, err := q.readyPR(ctx, ref, first)
@@ -166,7 +170,7 @@ func (q *Queue) onDemand(ctx context.Context, u unit.Unit, first, live bool) (Re
 		return without(fmt.Sprintf("%s units have no brief source", u.Provider)), nil
 	}
 	now := q.d.Now()
-	deadline := since.Add(cmp.Or(q.d.WantedTimeout, WantedTimeout))
+	deadline := since.Add(cmp.Or(q.d.DemandTimeout, DemandTimeout))
 	if asked && !now.Before(deadline) {
 		return without("no brief came in time"), nil
 	}
@@ -182,7 +186,7 @@ func (q *Queue) onDemand(ctx context.Context, u unit.Unit, first, live bool) (Re
 			}
 			q.demand[u], since = now, now
 			q.mu.Unlock()
-			deadline = now.Add(cmp.Or(q.d.WantedTimeout, WantedTimeout))
+			deadline = now.Add(cmp.Or(q.d.DemandTimeout, DemandTimeout))
 		}
 	}
 	if !coming {

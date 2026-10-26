@@ -43,7 +43,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	changed, release := a.Changed(thread)
 	defer release()
 	rd, err := a.Ready(ctx, thread, true, nil)
-	if err != nil || rd.Go || rd.Wait != WaitBriefing || !rd.Next.Equal(t0.Add(WantedTimeout)) || len(src.wants) != 1 {
+	if err != nil || rd.Go || rd.Wait != WaitBriefing || !rd.Next.Equal(t0.Add(DemandTimeout)) || len(src.wants) != 1 {
 		t.Fatalf("a first turn waits for the coming brief: %+v %v, wants %v", rd, err, src.wants)
 	}
 	if rd, _ := a.Peek(ctx, thread, true, nil); rd.Go {
@@ -64,7 +64,7 @@ func TestASlackUnitIsBriefedOnDemand(t *testing.T) {
 	if rd, _ := a.Ready(ctx, dm, true, nil); rd.Go {
 		t.Fatalf("a want: %+v", rd)
 	}
-	r.now = t0.Add(WantedTimeout)
+	r.now = t0.Add(DemandTimeout)
 	if rd, _ := a.Ready(ctx, dm, true, nil); !rd.Go || !rd.Without || !strings.Contains(rd.Note, "in time") {
 		t.Fatalf("past the wait: %+v", rd)
 	}

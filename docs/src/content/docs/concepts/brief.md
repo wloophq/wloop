@@ -26,7 +26,7 @@ The cockpit shows the brief in the detail panel, and size and risk as pills on e
 
 Each pass of the Slack extraction writes the brief of the thread or channel it read, in the same call: its goal and context, its **kind** (`question`, `request`, `incident`, `decision` or `announcement`), its risk, up to three open questions and tags under `domain`, `audience` and `concern`. A Slack brief has no size. Each topic of a direct message conversation gets its own brief. A pass that finds nothing new keeps the brief the conversation has; at most one brief is written per conversation a day, updated by later passes that day.
 
-The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 30 seconds for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
+The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 2 minutes for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
 
 ## Fields of your own
 
