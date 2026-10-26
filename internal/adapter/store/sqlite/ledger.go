@@ -238,8 +238,8 @@ func (l ledger) Count(ctx context.Context, wf string, since time.Time, u *unit.U
 }
 
 type storedStep struct {
-	Use   string            `json:"use"`
-	Reach string            `json:"reach,omitempty"`
+	Use   string         `json:"use"`
+	Reach string         `json:"reach,omitempty"`
 	Args  map[string]any `json:"args,omitempty"`
 }
 

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // v4Vocabulary sets plan_items.observe from the mode v4 drops and rewrites
@@ -66,8 +68,8 @@ func v4Vocabulary(ctx context.Context, tx *sql.Tx) error {
 }
 
 var v4ArgNames = map[string]map[string]string{
-	"turn.start":    {"round": "stage", "mode": "runner"},
-	"draft.propose": {"hold": "repeat_after", "hold_after_sent": "repeat_after_sent", "on_posted": "effects"},
+	builtin.StepTurnStart:    {"round": "stage", "mode": "runner"},
+	builtin.StepDraftPropose: {"hold": "repeat_after", "hold_after_sent": "repeat_after_sent", "on_posted": "effects"},
 }
 
 func v4StepArgs(use string, in map[string]any) map[string]any {
@@ -82,7 +84,7 @@ func v4StepArgs(use string, in map[string]any) map[string]any {
 		}
 		out[k] = v
 	}
-	if use != "draft.propose" {
+	if use != builtin.StepDraftPropose {
 		return out
 	}
 	if s, ok := out["effects"].(string); ok {
