@@ -227,11 +227,13 @@ func (s *Server) activity(ctx context.Context, limit int) ([]api.ActivityItem, e
 	out := []api.ActivityItem{}
 	for _, e := range evs {
 		url := e.URL
-		if url == "" {
+		if url == "" && e.PR.Number != 0 {
 			url = e.PR.URL()
 		}
-		out = append(out, api.ActivityItem{Event: wireEvent(e.Event), Title: e.Title, URL: url, Author: e.Author, State: e.State,
-			Mine: viewer != "" && strings.EqualFold(e.Author, viewer)})
+		ev := wireEvent(e.Event)
+		ev.Unit = e.Unit
+		out = append(out, api.ActivityItem{Event: ev, Title: e.Title, URL: url, Author: e.Author, State: e.State,
+			Mine: e.Mine || viewer != "" && strings.EqualFold(e.Author, viewer)})
 	}
 	return out, nil
 }

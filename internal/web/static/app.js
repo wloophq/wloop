@@ -238,6 +238,7 @@ const keyOf = (x) => unitKey(unitOf(x));
 const labelOf = (x) => x.label || refLabel(x.ref);
 const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
+const eventRef = (e) => (e.pr && e.pr.number ? refLabel(e.pr) : "");
 
 function fold(s) {
   return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -346,7 +347,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, refLabel(e.pr), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(e), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -356,7 +357,12 @@ const ACTIVITY_FIELDS = ["repo", "author"];
 
 function activityPasses(it, lens) {
   const filters = new Map([...lens.filters].filter(([id]) => ACTIVITY_FIELDS.includes(id)));
-  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: [`${it.event.pr.owner}/${it.event.pr.repo}`], author: [it.author || ""] } }, filters);
+  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: activityRepos(it), author: [it.author || ""] } }, filters);
+}
+
+function activityRepos(it) {
+  const p = it.event.pr;
+  return p && p.number ? [`${p.owner}/${p.repo}`] : [];
 }
 
 // foldMap folds s and maps each folded position back to s, so a match in
@@ -1489,7 +1495,7 @@ function renderActivity(lens) {
         h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
-        " ", h("span", { class: "ref" }, refLabel(e.pr)),
+        " ", h("span", { class: "ref" }, eventRef(e)),
         " ", h("span", { class: "title" }, it.title)),
       data ? h("span", { class: "data" }, data) : null));
   }

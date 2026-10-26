@@ -9,6 +9,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -87,10 +88,15 @@ type Event struct {
 // Reviewer is who a KindReviewRequest or KindReviewRequestRemoved event names.
 func (e Event) Reviewer() string { return e.Data }
 
-// ActivityEvent is a feed event with the pull request it belongs to.
+// ActivityEvent is a feed event with the unit it belongs to, as its pull
+// request row or, for another unit, its card shows it. PR is zero outside
+// GitHub; Mine is the card's word that the viewer started the unit, false
+// for a pull request, whose Author says it.
 type ActivityEvent struct {
 	Event
+	Unit                      unit.Unit
 	Title, URL, Author, State string
+	Mine                      bool
 }
 
 // Situation is a pull request's situation as its row derives it,

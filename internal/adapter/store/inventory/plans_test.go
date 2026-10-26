@@ -51,7 +51,7 @@ var hotPlans = []hotPlan{
 	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
 	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
-	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 3, want: []string{"SCAN e USING INDEX events_recent"}},
+	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 5, want: []string{"SCAN e USING INDEX events_recent"}},
 	{name: "active refs", query: activeRefsSQL, args: 1, want: []string{"events_recent (at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR DISTINCT"}},
 	{name: "reviewed", query: reviewedSQL, args: 2, want: []string{"turns_sent_at (sent_at>?)"}},
 	{name: "timed turns", query: timedTurnsSQL, args: 1, want: []string{"turns_sent_at (sent_at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},

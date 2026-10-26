@@ -6,10 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
+	"github.com/wloophq/wloop/internal/domain/card"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/meter"
@@ -172,4 +177,28 @@ func TestActivityBudget(t *testing.T) {
 		t.Fatalf("%d items", len(items))
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+}
+
+func TestActivityListsAnotherProvidersEventsWithItsCard(t *testing.T) {
+	t.Parallel()
+	var db *sqlite.DB
+	s := newServerWith(t, func(d *Deps) { db = d.Activity.(*sqlite.DB) })
+	ctx := context.Background()
+	chat := unit.Unit{Provider: "chat", Key: "C1/1.1"}
+	if _, err := db.Cards().Save(ctx, card.Card{Unit: chat, Title: "a thread", State: "thread", Link: "https://chat.example/C1/1.1", StartedByMe: true}, s.deps.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlite.New(db).RecordEvents(ctx, port.Event{Unit: chat, Kind: "turn_sent", Key: "k1", Actor: "loop", At: s.deps.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	var items []api.ActivityItem
+	get(t, s, "/api/activity", &items)
+	if len(items) != 3 {
+		t.Fatalf("%d items: %+v", len(items), items)
+	}
+	got := items[0]
+	if got.Event.Unit != chat || got.Event.PR != (pr.Ref{}) || got.Event.Kind != "turn_sent" || got.Title != "a thread" ||
+		got.URL != "https://chat.example/C1/1.1" || got.State != "thread" || got.Author != "" || !got.Mine {
+		t.Fatalf("%+v", got)
+	}
 }

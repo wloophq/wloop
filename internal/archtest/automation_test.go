@@ -58,6 +58,7 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},
 	{"internal/adapter/store/inventory/briefruns.go", "githubBriefs", `"github"`, 1, "debt: the inventory keeps GitHub's pull request tables"},
+	{"internal/adapter/store/inventory/activity.go", "Store.RecentActivity", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.StoredFacts", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "refOf", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},
 	{"internal/adapter/store/inventory/store.go", "Store.Reviewed", "unit.GitHub", 1, "debt: the inventory keeps GitHub's pull request tables"},

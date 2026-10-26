@@ -1747,3 +1747,20 @@ function age() { return "2h 0m"; }
 		t.Errorf("closed item %s", got)
 	}
 }
+
+func TestActivityNamesAPullRequestEventByItsRefAndAnotherByNoRef(t *testing.T) {
+	type in struct {
+		Event map[string]any `json:"event"`
+	}
+	cases := []in{
+		{map[string]any{"pr": map[string]any{"owner": "acme", "repo": "api", "number": 7}, "unit": map[string]any{"provider": "github", "key": "acme/api#7"}}},
+		{map[string]any{"pr": map[string]any{"owner": "", "repo": "", "number": 0}, "unit": map[string]any{"provider": "chat", "key": "C1/1.1"}}},
+	}
+	var got [][2]any
+	nodeRun(t, keyJS(t)+jsConst(t, appJS(t), "eventRef"), nil,
+		`process.stdout.write(JSON.stringify(input.map((it) => [eventRef(it.event), activityRepos(it)])));`+jsFunction(t, appJS(t), "activityRepos"), cases, &got)
+	want := `[["acme/api#7",["acme/api"]],["",[]]]`
+	if b, _ := json.Marshal(got); string(b) != want {
+		t.Fatalf("got %s, want %s", b, want)
+	}
+}

@@ -26,7 +26,7 @@ The page listens on `127.0.0.1` only and asks for the token that `open` hands ov
 | Backlog | charts of the open pull requests: who they wait on, age, size against risk, tags, failing checks |
 | Done | workspaces whose pull request merged or closed, ready to remove |
 | All | a dense table of everything in the inventory |
-| Recent | the newest events across the inventory |
+| Recent | the newest events of every unit the loop follows: pull requests and the units of the other sources with a card |
 | Explore | search other people's pull requests to help on |
 
 A row shows whom the pull request waits on (the colored strip on its left), why, since when, its brief's size and risk, and its failing checks. The detail panel holds the timeline, the brief, the agent's question with its answers, and the actions. The filter box (`/`) takes text and qualifiers such as `repo:`, `author:@me` or `is:stalled`; see [Cockpit filter](/reference/cockpit-filter/). Filters, grouping and order stay in the URL. **Copy list** copies what the view shows as YAML, to paste into an agent session with a prompt.
