@@ -38,13 +38,11 @@ func (q *Queue) Register(p unit.ProviderID, s BriefSource) {
 	if od, ok := s.(OnDemand); ok {
 		od.Watch(q.Noted)
 	}
-	if iu, ok := s.(IntentUser); ok {
-		iu.UseIntent(q.intent)
-	}
 }
 
 // IntentUser is a BriefSource whose job asks the brief intent's extra
-// fields itself, such as the Slack extraction.
+// fields itself, such as the Slack extraction. The composition root gives
+// it its provider's brief intent, whether or not a queue runs.
 type IntentUser interface {
 	UseIntent(intent func() Intent)
 }
@@ -75,6 +73,9 @@ func refOf(u unit.Unit) (github.Ref, bool) { return pr.RefOf(u) }
 // DemandTimeout, while the source says a brief is coming.
 func (q *Queue) Ready(ctx context.Context, u unit.Unit, first bool, need []string) (Readiness, error) {
 	if ref, ok := refOf(u); ok {
+		if rd, out := q.unavailable(); out {
+			return rd, nil
+		}
 		rd, err := q.readyPR(ctx, ref, first)
 		if err != nil || rd.State != Ready || rd.Brief == nil {
 			return rd, err
@@ -87,6 +88,9 @@ func (q *Queue) Ready(ctx context.Context, u unit.Unit, first bool, need []strin
 // Peek is Ready's answer without starting a brief, waiting or writing.
 func (q *Queue) Peek(ctx context.Context, u unit.Unit, first bool, need []string) (Readiness, error) {
 	if ref, ok := refOf(u); ok {
+		if rd, out := q.unavailable(); out {
+			return rd, nil
+		}
 		rd, err := q.peekPR(ctx, ref, first)
 		if err != nil || rd.State != Ready || rd.Brief == nil {
 			return rd, err
@@ -228,11 +232,25 @@ func (q *Queue) Unwant(ctx context.Context, u unit.Unit) error {
 
 // Fill fills the extra fields u's brief lacks, those of need when need is
 // not empty, without briefing its core again; see fillPR. Only pull
-// requests' briefs are filled this way: another provider's job writes its
-// fields at its next pass.
+// requests' briefs are filled this way, and only by a queue that can brief:
+// another provider's job writes its fields at its next pass.
 func (q *Queue) Fill(ctx context.Context, u unit.Unit, need []string) (bool, error) {
-	if ref, ok := refOf(u); ok {
+	if ref, ok := refOf(u); ok && q.d.Unavailable == "" {
 		return q.fillPR(ctx, ref, need)
 	}
 	return false, nil
+}
+
+// unavailable answers a pull request's turn without a brief when the queue
+// cannot brief one; briefs that are off answer as off.
+func (q *Queue) unavailable() (Readiness, bool) {
+	if q.d.Unavailable == "" {
+		return Readiness{}, false
+	}
+	if !q.d.Enabled {
+		rd := without(ReasonOff)
+		rd.Cause = intake.CauseOff
+		return rd, true
+	}
+	return without("briefs are unavailable: " + q.d.Unavailable), true
 }

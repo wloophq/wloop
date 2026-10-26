@@ -26,7 +26,7 @@ The cockpit shows the brief in the detail panel, and size and risk as pills on e
 
 Each pass of the Slack extraction writes the brief of the thread or channel it read, in the same call: its goal and context, its **kind** (`question`, `request`, `incident`, `decision` or `announcement`), its risk, up to three open questions and tags under `domain`, `audience` and `concern`. A Slack brief has no size. Each topic of a direct message conversation gets its own brief. A pass that finds nothing new keeps the brief the conversation has, unless that brief has no kind or lacks a field of the brief intent at its current version (a brief carried over from an older release, or one written before the field was added): then the pass's brief replaces it; at most one brief is written per conversation a day, updated by later passes that day.
 
-The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 2 minutes for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
+The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 2 minutes for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. This holds with the GitHub plugin off, and when no agent can write pull request briefs. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
 
 ## Fields of your own
 
@@ -49,7 +49,7 @@ schema   = "schema.json"
 }}
 ```
 
-The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword, a nested object, or a field of another type (a number, a null, a list of anything but strings) fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one.
+The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword, a nested object, or a field of another type (a number, a null, a list of anything but strings) fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one for the providers it lists, and each provider's units, their facts and the Slack extraction read the fields of their own provider's intent.
 
 Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
 

@@ -25,7 +25,7 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | UI | `UI` (facets, saved views, notification templates, keys, menu bar sections, terminal views), `WebAssets` served under `/plugins/<id>/`, `CLI` | renders the declarative parts on every surface; mounts the plugin's own web module and terminal views |
 | Health | `Health` | shows it with the daemon's health |
 | Its checkouts | `Checkouts` | a session on its unit runs in the unit's own checkout, with no placer asked |
-| Its briefs | `Briefs`, a `brief.BriefSource` | the brief queue reads the unit's input, revision and staleness through it |
+| Its briefs | `Briefs`, a `brief.BriefSource` | the brief queue reads the unit's input, revision and staleness through it; an `IntentUser` gets its provider's brief intent |
 | Links to other plugins' units | `Links`, a `LinkResolver` | resolves a link of its units to the unit another plugin names |
 | A detail page | `Detail` | a client opens the unit's detail in the cockpit, in place of its link |
 

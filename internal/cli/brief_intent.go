@@ -4,37 +4,42 @@ import (
 	"sync"
 
 	"github.com/wloophq/wloop/internal/brief"
-	dpr "github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 )
 
-// briefIntent is the brief intent of the profile as it loads now: its
-// composed schema and its prompts resolved through the layers. A prompt
-// or schema that does not resolve falls back to the bundled one, logged.
+// briefIntents are the brief intents of the profile as it loads now, by
+// the provider whose units they brief: each one's composed schema and its
+// prompts resolved through the layers. A prompt or schema that does not
+// resolve falls back to the bundled one, logged.
 //
-// The answer is kept while the profile's intents stay loaded as they are.
-func (e *Env) briefIntent(logf func(string, ...any)) func() brief.Intent {
+// The answers are kept while the profile's intents stay loaded as they are.
+func (e *Env) briefIntents(logf func(string, ...any)) func(unit.ProviderID) brief.Intent {
 	var (
 		mu   sync.Mutex
 		seen *intentload.Loaded
-		last brief.Intent
+		last map[unit.ProviderID]brief.Intent
 	)
-	return func() brief.Intent {
+	return func(p unit.ProviderID) brief.Intent {
 		l := e.loadedIntents()
 		mu.Lock()
 		defer mu.Unlock()
-		if l == seen {
-			return last
+		if l != seen {
+			seen, last = l, map[unit.ProviderID]brief.Intent{}
 		}
-		seen, last = l, e.resolveBriefIntent(l, logf)
-		return last
+		in, ok := last[p]
+		if !ok {
+			in = e.resolveBriefIntent(l, p, logf)
+			last[p] = in
+		}
+		return in
 	}
 }
 
-func (e *Env) resolveBriefIntent(l *intentload.Loaded, logf func(string, ...any)) brief.Intent {
-	d, ok := l.Registry.Builder(builtin.BuildsBrief, (dpr.Codec{}).Provider())
+func (e *Env) resolveBriefIntent(l *intentload.Loaded, p unit.ProviderID, logf func(string, ...any)) brief.Intent {
+	d, ok := l.Registry.Builder(builtin.BuildsBrief, p)
 	if !ok {
 		return brief.Intent{}
 	}

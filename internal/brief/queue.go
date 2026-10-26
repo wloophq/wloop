@@ -103,6 +103,11 @@ type Deps struct {
 	}
 	// Enabled is brief.enabled: false answers every Ready without a brief.
 	Enabled bool
+	// Unavailable is why the queue cannot brief pull requests, such as no
+	// agent to ask: their turns start without a brief, Runner may be nil
+	// and the queue is never started. On-demand units are briefed all the
+	// same.
+	Unavailable string
 	// Taxonomy is the bundled one until profiles exist; see the step 2 seam.
 	Taxonomy func(ref github.Ref) string
 	// Home is the agent home a pull request's brief runs with.
@@ -129,9 +134,9 @@ type Deps struct {
 	// configuration changes, or the minute turns; nil reads every call.
 	Changes port.Changes
 	Log     func(format string, args ...any)
-	// Intent is the brief intent as the profile resolves it now; nil is
-	// the bundled one.
-	Intent func() Intent
+	// Intent is the brief intent of a provider's units as the profile
+	// resolves it now; nil is the bundled one.
+	Intent func(p unit.ProviderID) Intent
 	// Sources are the providers' BriefSources by provider. Pull requests
 	// default to GitHubSource over Store and Source; a GitHub source set
 	// here keeps Retry. A source that is also an OnDemand briefs its units
@@ -150,7 +155,7 @@ type Intent struct {
 func (q *Queue) intent() Intent {
 	var in Intent
 	if q.d.Intent != nil {
-		in = q.d.Intent()
+		in = q.d.Intent((dpr.Codec{}).Provider())
 	}
 	in.Prompt, in.FieldsPrompt = cmp.Or(in.Prompt, promptTemplate), cmp.Or(in.FieldsPrompt, fieldsTemplate)
 	return in

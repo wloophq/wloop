@@ -318,23 +318,14 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	store := inventory.New(db)
 	store.UseClock(e.Now)
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
+	var queue *brief.Queue
 	var briefs *interruptFirst
 	var intakeBriefs intake.Briefs
 	var unavailable string
-	if cfg.Brief.Enabled && !e.noJobs && cfg.PluginEnabled(string(unit.GitHub)) {
-		var q *brief.Queue
-		if q, unavailable = e.briefQueue(cfg, store, logf); q != nil {
-			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: q}, brief.Intakes{Q: q}
-			if err := q.Interrupted(ctx); err != nil {
-				logf("brief: marking the runs a stop cut short: %v", err)
-			} else {
-				e.interruptedFlag().Store(true)
-			}
-			go func() {
-				lctx, scope := meter.Start(ctx, meter.Loop("brief"))
-				defer scope.End()
-				q.Start(lctx)
-			}()
+	if cfg.Brief.Enabled && !e.noJobs {
+		queue, unavailable = e.briefQueue(cfg, store, logf)
+		if unavailable == "" {
+			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
 	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
@@ -442,10 +433,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.viewFacts().set(authorFacts(mods))
 	notices := &noticeFeed{}
 	d.Notices = notices
-	ed := engineDeps{DB: db, Modules: mods, Pub: notices, Log: logf}
-	if briefs != nil {
-		ed.Briefs = briefs.Queue
-	}
+	ed := engineDeps{DB: db, Modules: mods, Pub: notices, Log: logf, Briefs: queue}
 	if !e.noJobs {
 		if a, err := e.asker(cfg, filepath.Join(e.StateDir, "classify")); err == nil {
 			ed.Asker = a
@@ -455,7 +443,34 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	for _, wire := range e.wireParts() {
 		wire(w)
 	}
+	if briefs != nil && briefsItself(mods) {
+		e.startBriefs(ctx, queue, logf)
+	}
 	return withEngine(d, e, ed)
+}
+
+// briefsItself says a module's units are briefed by the queue's own calls,
+// which the queue's loop makes; an OnDemand source's job writes its briefs.
+func briefsItself(mods []source.Module) bool {
+	return slices.ContainsFunc(mods, func(m source.Module) bool {
+		_, onDemand := m.Briefs.(brief.OnDemand)
+		return m.Briefs != nil && !onDemand
+	})
+}
+
+// startBriefs marks the runs a stopped daemon left running and starts q's
+// loop.
+func (e *Env) startBriefs(ctx context.Context, q *brief.Queue, logf func(string, ...any)) {
+	if err := q.Interrupted(ctx); err != nil {
+		logf("brief: marking the runs a stop cut short: %v", err)
+	} else {
+		e.interruptedFlag().Store(true)
+	}
+	go func() {
+		lctx, scope := meter.Start(ctx, meter.Loop("brief"))
+		defer scope.End()
+		q.Start(lctx)
+	}()
 }
 
 // withEngine is d with the workflows' engine as the sweep, its pending
@@ -1184,23 +1199,17 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	return daemon.New(deps).Run(dctx)
 }
 
-// briefQueue is nil, with the reason logged and answered, when the agent
-// cannot brief.
+// briefQueue is the brief queue and, when the agent cannot brief, why: the
+// queue then briefs only the units an OnDemand source writes the briefs of.
 func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(string, ...any)) (*brief.Queue, string) {
-	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
-	if err != nil {
-		logf("brief: %v; no briefs", err)
-		return nil, err.Error()
-	}
 	var changes port.Changes
 	if e.changes != nil {
 		changes = e.changes
 	}
-	return brief.New(brief.Deps{
+	d := brief.Deps{
 		Enabled:      cfg.Brief.Enabled,
 		Store:        store,
 		Source:       brief.Source{GitHub: e.GitHub},
-		Runner:       brief.AskRunner{Asker: asker},
 		Taxonomy:     func(github.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,
@@ -1210,8 +1219,16 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 		Changes:      changes,
 		Now:          e.Now,
 		Log:          logf,
-		Intent:       e.briefIntent(logf),
-	}), ""
+		Intent:       e.briefIntents(logf),
+	}
+	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
+	if err != nil {
+		logf("brief: %v; only on-demand briefs", err)
+		d.Unavailable = err.Error()
+	} else {
+		d.Runner = brief.AskRunner{Asker: asker}
+	}
+	return brief.New(d), d.Unavailable
 }
 
 func (e *Env) interruptedFlag() *atomic.Bool {

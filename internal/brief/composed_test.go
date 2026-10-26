@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -134,7 +135,7 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 	}
 	before, _, _ := r.st.BriefRecord(ctx, ref)
 	c := composed(t)
-	r.q.d.Intent = func() Intent { return Intent{Schema: c} }
+	r.q.d.Intent = func(unit.ProviderID) Intent { return Intent{Schema: c} }
 	rd, err := r.q.peekPR(ctx, ref, true)
 	if err != nil || rd.State != Ready {
 		t.Fatalf("%+v %v", rd, err)

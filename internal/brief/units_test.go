@@ -91,7 +91,7 @@ func TestAFirstTurnWaitsForTheFieldsItsIntentNeeds(t *testing.T) {
 		t.Fatalf("the core brief: %d, %v", r.run.calls, err)
 	}
 	c := composed(t)
-	r.q.d.Intent = func() Intent { return Intent{Schema: c} }
+	r.q.d.Intent = func(unit.ProviderID) Intent { return Intent{Schema: c} }
 	if rd, err := r.q.Ready(ctx, u, true, nil); err != nil || rd.State != Ready {
 		t.Fatalf("no need: %+v %v", rd, err)
 	}
@@ -124,5 +124,31 @@ func TestAFirstTurnWaitsForTheFieldsItsIntentNeeds(t *testing.T) {
 	}
 	if rd, _ := r2.q.Ready(ctx, u, false, []string{"solution"}); rd.State != Ready || r2.run.calls != 2 {
 		t.Fatalf("a later turn: %+v, %d calls", rd, r2.run.calls)
+	}
+}
+
+func TestAQueueThatCannotBriefStillBriefsOnDemand(t *testing.T) {
+	r := newRig(t, 1)
+	r.q.d.Runner, r.q.d.Unavailable = nil, "no agent answers"
+	ctx := context.Background()
+	src := &fakeOnDemand{coming: true}
+	r.q.Register("slack", src)
+	a := Intakes{Q: r.q}
+	pr := refN(1).Unit()
+	for name, ask := range map[string]func(context.Context, unit.Unit, bool, []string) (intake.Readiness, error){"ready": a.Ready, "peek": a.Peek} {
+		rd, err := ask(ctx, pr, true, nil)
+		if err != nil || !rd.Go || !rd.Without || !strings.Contains(rd.Note, "no agent answers") {
+			t.Fatalf("%s: a pull request's first turn: %+v %v", name, rd, err)
+		}
+	}
+	if filled, err := r.q.Fill(ctx, pr, nil); filled || err != nil {
+		t.Fatalf("a fill: %v %v", filled, err)
+	}
+	thread := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000000.000100"}
+	if rd, err := a.Ready(ctx, thread, true, nil); err != nil || rd.Go || rd.Wait != WaitBriefing || len(src.wants) != 1 {
+		t.Fatalf("a Slack first turn: %+v %v", rd, err)
+	}
+	if r.run.calls != 0 {
+		t.Fatalf("%d calls", r.run.calls)
 	}
 }

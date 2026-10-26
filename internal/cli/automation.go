@@ -128,7 +128,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
 	if d.DB != nil {
-		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntent(func(string, ...any) {})}
+		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntents(func(string, ...any) {})}
 	}
 	eng := &automation.Engine{
 		Workflows: workflows,
