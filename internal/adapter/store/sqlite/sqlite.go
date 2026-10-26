@@ -115,7 +115,7 @@ func (set schemaSet) refuse(path string, s Status) error {
 // auto_vacuum takes effect only on a file with no table yet, so it is set on
 // the connection, outside the transaction.
 func (set schemaSet) createIfEmpty(path string) error {
-	c, err := connector(path + "?_pragma=auto_vacuum(INCREMENTAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
+	c, err := connector(path + "?_pragma=busy_timeout(5000)&_pragma=auto_vacuum(INCREMENTAL)&_txlock=immediate")
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func (set schemaSet) inspect(path string) (Status, error) {
 		return s, nil
 	}
 	// The header lags a version change still in the WAL.
-	db, err := handle(path+"?_pragma=query_only(1)&_pragma=busy_timeout(5000)", 1)
+	db, err := handle(path+"?_pragma=busy_timeout(5000)&_pragma=query_only(1)", 1)
 	if err != nil {
 		return s, err
 	}
