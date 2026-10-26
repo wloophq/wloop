@@ -22,7 +22,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 ## Fields
 
-`intent.toml` is TOML: every string is quoted, so a predicate such as `enabled = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and rejects any other key, and the keys only the bundled intents set (`context`, `launch`, `policy`, `reconcile`) in any intent of yours that does not override a bundled one; an intent of yours that takes a bundled intent's role may set `reconcile`. A manifest without `provider` takes the one `defaults.toml` names at the profile's root; the bundled profile names `github`, and a layer's own `defaults.toml` overrides it.
+`intent.toml` is TOML: every string is quoted, so a predicate such as `enabled = '!pr.mine'` cannot turn into something else. The loader applies exactly these defaults and rejects any other key, and the keys only the bundled intents set (`context`, `launch`, `policy`, `reconcile`) in any intent of yours that does not override a bundled one; an intent of yours that takes a bundled intent's role may set `reconcile`. A manifest without `provider` takes the one `defaults.toml` names at the profile's root; the bundled profile names `github`, and a layer's own `defaults.toml` overrides it. Every bundled intent names its own provider, so a `defaults.toml` with `provider = "slack"` changes only the manifests that name none, such as yours.
 
 | Field | Required | Default | Values |
 |---|---|---|---|

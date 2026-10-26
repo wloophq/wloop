@@ -3,6 +3,7 @@ summary = "Start or continue a review round on someone else's pull request, in a
 verb    = "delegate"
 key     = "V"
 role    = "round.review"
+provider = "github"
 round_kind  = "review"
 cap         = "rounds"
 reason_fact = "pr.review.reason"
