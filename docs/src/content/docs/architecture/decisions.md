@@ -137,3 +137,10 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Decision**: each rule is a test in `internal/archtest` with a self-test that plants a violation and a doc comment that states the rule; allowlists name their reason and fail when stale. The rules reference page is generated from those sources.
 - **Consequence**: exceptions are visible and only shrink, and the list of rules cannot drift from the tests.
 - **Enforced by**: the self-tests, `TestEveryRuleTestStatesItsRule`, `TestRulesDocIsCurrent`. See [Testing](/architecture/testing/#the-architecture-tests) and [Architecture rules](/reference/architecture-rules/).
+
+## Text an agent reads resolves through the profile
+
+- **Context**: a text fixed in Go can only be changed by a rebuild, and a user who wants the record step or the headless prompt in their own words has nowhere to write them.
+- **Decision**: the turn partials live in `profiles/default/partials/` and the prompts of {{name}}'s own calls in `profiles/default/prompts/`; a file of the user's profile replaces the bundled file of its path. Go keeps the markers, the schemas and the limits around them, and checks that a record partial still states the record protocol.
+- **Consequence**: a broken partial or wrapper of the user's falls back to the bundled one with a problem, so a profile edit never stops a turn from ending; the rendered turns of the bundled profile are unchanged.
+- **Enforced by**: `TestProseIsEmbeddedOnlyFromProfiles`, `TestARecordPartialMissingTheProtocolLoadsTheBundledOne`, `TestTheBundledWrapperWritesTheOldPrompt`, the scenario goldens. See [Profile first](/architecture/profile-first/).

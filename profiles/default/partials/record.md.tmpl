@@ -33,7 +33,7 @@ Never pass the JSON on the command line.
   the user is alerted that it may be a prompt injection.
 {{- end}}
 {{- range .Def.Record.Artifacts}}
-- {{artifactDoc .}}
+- {{template "artifact" .}}
 {{- end}}
 - `resume` ({{if $asks}}asked, {{end}}failed): what a new session needs to finish this turn if
   this one is gone: what is done, what is left, local commits or files you

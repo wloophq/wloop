@@ -132,6 +132,8 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },
 		Caps:    headless.Caps{PerCallUSD: 0.5, PerDayUSD: 5}, Spent: r.spent, Clock: r.clock, Go: func(run func()) { run() }, Log: t.Logf}
+	w := bundledWrapper(t)
+	r.svc.Wrapper = func() (headless.Wrapper, error) { return w, nil }
 	r.turns.Headless = r.svc.Again
 	return r
 }
@@ -231,7 +233,7 @@ func TestOneHeadlessRunPerUnit(t *testing.T) {
 		t.Fatalf("second run: %v", err)
 	}
 	other := &headless.Service{Turns: r.newTurns(), Build: r.svc.Build, Place: r.svc.Place, Asker: r.svc.Asker, Ledger: r.svc.Ledger, Outbox: r.svc.Outbox,
-		Intents: r.svc.Intents, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock}
+		Intents: r.svc.Intents, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper}
 	if _, err := other.Run(ctx, headless.Request{Unit: thread}); !errors.Is(err, headless.ErrBusy) {
 		t.Fatalf("a second service: %v", err)
 	}
