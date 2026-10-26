@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,6 +158,10 @@ func (r *draftRig) check(u unit.Unit) string {
 func (r *draftRig) run(u unit.Unit) string {
 	r.t.Helper()
 	detail, err := r.s.Run(context.Background(), r.wf.Steps[0], u, workflow.Why{Workflow: r.wf.Name}, automation.RunOpts{})
+	var deferred automation.Deferred
+	if errors.As(err, &deferred) {
+		return deferred.Reason
+	}
 	if err != nil {
 		r.t.Fatal(err)
 	}

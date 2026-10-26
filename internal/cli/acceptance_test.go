@@ -34,6 +34,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -756,7 +757,8 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 	gh := factsgithub.New(factsgithub.Deps{Inputs: factsgithub.InventoryInputs(te.Store), Store: te.Store, Snapshot: f.snap, Books: te.repo,
 		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Branches: te.Env.Git, Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
 		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
-	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap})
+	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
+		Subjects: map[unit.ProviderID]automation.Units{unit.Entry: noUnits{}, dslack.Provider: noUnits{}}})
 }
 
 func (f *fixtureEnv) setMode(name string, m workflow.Mode) {

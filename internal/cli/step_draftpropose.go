@@ -83,7 +83,7 @@ type draftArgs struct {
 
 const defaultDraftText = "text.md.tmpl"
 
-func parseDraftArgs(c stepCall) (draftArgs, error) {
+func parseDraftArgs(c stepCall, cfg config.Config) (draftArgs, error) {
 	a := draftArgs{purpose: strings.TrimSpace(c.arg("purpose")), delivery: draft.Delivery(cmp.Or(c.arg("delivery"), builtin.DraftDeliveries[0])),
 		text: cmp.Or(c.arg("text"), defaultDraftText), reaction: strings.Trim(strings.TrimSpace(c.arg("reaction")), ":"),
 		items: cmp.Or(c.arg("items"), "all"), per: cmp.Or(c.arg("per"), builtin.DraftPer[0]), target: cmp.Or(c.arg("target"), builtin.DraftTargets[0])}
@@ -100,7 +100,7 @@ func parseDraftArgs(c stepCall) (draftArgs, error) {
 	}
 	var err error
 	if v := c.arg("hold"); v != "" {
-		if a.hold, err = time.ParseDuration(v); err != nil {
+		if a.hold, err = holdDuration(v, cfg); err != nil {
 			return a, fmt.Errorf("draft.propose's hold: %w", err)
 		}
 	}
@@ -109,7 +109,7 @@ func parseDraftArgs(c stepCall) (draftArgs, error) {
 	case v == builtin.HoldForever:
 		a.forever = true
 	case v != "":
-		if a.holdAfterSent, err = time.ParseDuration(v); err != nil {
+		if a.holdAfterSent, err = holdDuration(v, cfg); err != nil {
 			return a, fmt.Errorf("draft.propose's hold_after_sent: %w", err)
 		}
 	}
@@ -122,6 +122,8 @@ type draftCandidate struct {
 	p       outbox.Proposal
 	person  string
 	refusal string
+	// timed says the refusal is a hold that ends with time.
+	timed bool
 }
 
 // draftSubject is a step's subject as its drafts see it: the unit they post
@@ -160,8 +162,10 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 		return "", err
 	}
 	var ids []string
+	timed := false
 	for _, cd := range cands {
 		if cd.refusal != "" {
+			timed = timed || cd.timed
 			continue
 		}
 		d, err := ob.Propose(ctx, cd.p)
@@ -175,10 +179,14 @@ func (s *stepSet) draftProposeRun(ctx context.Context, c stepCall, _ automation.
 		}
 		ids = append(ids, fmt.Sprint(d.ID))
 	}
-	if len(ids) == 0 {
-		return "nothing new to propose", nil
+	detail := "nothing new to propose"
+	if len(ids) > 0 {
+		detail = "proposed draft " + strings.Join(ids, ", ")
 	}
-	return "proposed draft " + strings.Join(ids, ", "), nil
+	if timed {
+		return "", automation.Deferred{Reason: detail + "; a person's draft is held for a while"}
+	}
+	return detail, nil
 }
 
 // draftCandidates are the drafts the step's workflow would propose on its
@@ -189,7 +197,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	if err != nil {
 		return nil, err
 	}
-	a, err := parseDraftArgs(c)
+	a, err := parseDraftArgs(c, deps.Config())
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +256,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 			}
 		}
 		if cd.refusal == "" {
-			cd.refusal, err = holdOf(ctx, ob, cd.p, a, now)
+			cd.refusal, cd.timed, err = holdOf(ctx, ob, cd.p, a, now)
 			if err != nil {
 				return nil, err
 			}
@@ -399,41 +407,43 @@ func itemIDs(its []items.Item) []string {
 }
 
 // draftApproval is the approval of w's drafts: the config's
-// workflows.<name>.draft_approval, then the manifest's.
+// workflows.<name>.draft_approval, then the proposals.<rule>.approval of the
+// rule w replaced, then the manifest's.
 func draftApproval(cfg config.Config, w workflow.Workflow) draft.Approval {
 	var configured *draft.Approval
 	if a := cfg.Workflows[w.Name].DraftApproval; a != nil {
 		ap := a.Approval()
 		configured = &ap
 	}
-	return outbox.ResolveApproval(configured, nil, w.DraftApproval)
+	return outbox.ResolveApproval(configured, cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
 }
 
 // holdOf says why a draft of the same workflow, subject and person holds p:
 // one open or failed, one sent within hold_after_sent (or ever, with
-// forever), one otherwise settled within hold. A withdrawn draft holds
-// nothing.
-func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, error) {
+// forever), one otherwise settled within hold; timed when only the time
+// since a settled draft holds it. A withdrawn draft holds nothing.
+func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs, now time.Time) (string, bool, error) {
 	prior, err := ob.List(ctx, outbox.Filter{Unit: &p.Unit, Rule: p.Origin.Rule, Key: p.Origin.Key})
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
+	refusal, timed := "", false
 	for _, d := range prior {
 		if d.Origin.Kind != draft.OriginAuto || d.Origin.Workflow != p.Origin.Workflow {
 			continue
 		}
 		held := fmt.Sprintf("held by draft %d (%s)", d.ID, d.State)
 		switch {
-		case slices.Contains(draft.Open, d.State), d.State == draft.Failed:
-			return held, nil
+		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
+			return held, false, nil
 		case d.State == draft.Discarded && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
-		case d.State == draft.Sent && (a.forever || now.Sub(d.UpdatedAt) < a.holdAfterSent):
-			return held, nil
-		case d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.hold:
-			return held, nil
+		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.holdAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.hold:
+			if refusal == "" {
+				refusal, timed = held, true
+			}
 		}
 	}
-	return "", nil
+	return refusal, timed, nil
 }
 
 // withdrawnAtOnce refuses a draft the workflow's [withdraw] when would

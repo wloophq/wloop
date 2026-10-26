@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
@@ -23,13 +20,8 @@ var (
 	ctx    = context.Background()
 	thread = unit.Unit{Provider: "slack", Key: "C000AAA/1700000000.000100"}
 	pull   = unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}
-	// t0 is a Thursday noon; items created a week earlier are long stale.
-	t0    = time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	me    = items.Person{Key: "slack:U000ME", Name: "me"}
-	alice = items.Person{Key: "slack:U000AAA", Name: "alice"}
-	bob   = items.Person{Key: "slack:U000BBB", Name: "bob"}
-	ghMe  = items.Person{Key: "github:me", Name: "me"}
-	ghBob = items.Person{Key: "github:bob", Name: "bob"}
+	// t0 is a Thursday noon.
+	t0 = time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 )
 
 type memDrafts struct {
@@ -142,20 +134,6 @@ func (l *ledger) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
 	return slices.Clone(l.items[u]), nil
 }
 
-func (l *ledger) put(its ...items.Item) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	for _, it := range its {
-		cur := l.items[it.Unit]
-		if i := slices.IndexFunc(cur, func(o items.Item) bool { return o.ID == it.ID }); i >= 0 {
-			cur[i] = it
-		} else {
-			cur = append(cur, it)
-		}
-		l.items[it.Unit] = cur
-	}
-}
-
 func (l *ledger) apply(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -176,7 +154,6 @@ type env struct {
 	drafts   *memDrafts
 	pub      *publisher
 	svc      *outbox.Service
-	entries  *gtdtest.Store
 	ledger   *ledger
 	job      *Job
 	disabled map[unit.ProviderID]bool
@@ -185,7 +162,7 @@ type env struct {
 }
 
 func newEnv(t *testing.T) *env {
-	e := &env{t: t, clock: &clock{now: t0}, drafts: &memDrafts{}, entries: gtdtest.New(),
+	e := &env{t: t, clock: &clock{now: t0}, drafts: &memDrafts{},
 		ledger: &ledger{items: map[unit.Unit][]items.Item{}}, disabled: map[unit.ProviderID]bool{},
 		facts: map[unit.Unit]gtd.UnitFacts{}}
 	e.pub = &publisher{clock: e.clock}
@@ -202,26 +179,11 @@ func newEnv(t *testing.T) *env {
 		Clock:       e.clock,
 		ObservedFor: 24 * time.Hour,
 	}
-	e.job = &Job{Outbox: e.svc, Entries: e.entries, Items: e.ledger, Clock: e.clock, StaleDays: 2, RenudgeAfter: 24 * time.Hour,
+	e.job = &Job{Outbox: e.svc, Clock: e.clock, RenudgeAfter: 24 * time.Hour,
 		Enabled: func(p unit.ProviderID) bool { return !e.disabled[p] },
 		Log:     func(format string, args ...any) { e.logs = append(e.logs, fmt.Sprintf(format, args...)) }}
 	e.job.Facts = factsOf(e.facts)
-	e.job.Nudges = coregtd.New(coregtd.Deps{Store: e.entries, Clock: e.clock})
-	e.svc.OnSent = []func(context.Context, draft.Draft) error{e.job.Sent}
 	return e
-}
-
-// sync derives u's entries from its items as the entries service does.
-func (e *env) sync(u unit.Unit, who gtd.Me) {
-	e.t.Helper()
-	its, _ := e.ledger.Items(ctx, u)
-	have, _ := e.entries.EntriesOf(ctx, u)
-	f := e.facts[u]
-	f.Unit = u
-	cs := gtd.Reconcile(f, its, who, have, e.clock.Now())
-	if err := e.entries.Apply(ctx, cs); err != nil {
-		e.t.Fatal(err)
-	}
 }
 
 func (e *env) run() Summary {
@@ -240,35 +202,6 @@ func (e *env) list(rule string, states ...draft.State) []draft.Draft {
 		e.t.Fatal(err)
 	}
 	return got
-}
-
-func (e *env) entry(kind gtd.Kind, u unit.Unit, group string) gtd.Entry {
-	e.t.Helper()
-	got, err := e.entries.Entry(ctx, gtd.DerivedID(kind, u, group))
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	return got
-}
-
-func item(u unit.Unit, id, summary string, requester items.Person, on ...items.Person) items.Item {
-	return items.Item{ID: id, Unit: u, Kind: items.Request, Summary: summary, Requester: requester, WaitingOn: on,
-		State: items.Open, Basis: items.ExplicitMention, Confidence: items.High, Origin: unit.Anchor{Unit: u, Ref: "C000AAA/1.1"},
-		CreatedAt: t0.Add(-7 * 24 * time.Hour)}
-}
-
-func resolved(it items.Item, r items.Resolution) items.Item {
-	it.State, it.Resolution = items.Resolved, r
-	return it
-}
-
-func contains(s string, parts ...string) bool {
-	for _, p := range parts {
-		if !strings.Contains(s, p) {
-			return false
-		}
-	}
-	return true
 }
 
 type factsOf map[unit.Unit]gtd.UnitFacts

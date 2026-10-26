@@ -537,10 +537,22 @@ func (s *sheet) draftPropose(p string, args map[string]any) {
 		}
 	}
 	if v, ok := arg("hold"); ok {
-		s.duration(p+".hold", v)
+		s.hold(p+".hold", v)
 	}
 	if v, ok := arg("hold_after_sent"); ok && v != builtin.HoldForever {
-		s.duration(p+".hold_after_sent", v)
+		s.hold(p+".hold_after_sent", v)
+	}
+}
+
+// hold checks a draft.propose hold: a duration, or a duration of the config
+// slot named by its fact.
+func (s *sheet) hold(path, v string) {
+	if !strings.HasPrefix(v, "config.") {
+		s.duration(path, v)
+		return
+	}
+	if t, ok := builtin.FactType(v); !ok || t != expr.Duration {
+		s.add(path, "%q is not a duration of the config slot", v)
 	}
 }
 

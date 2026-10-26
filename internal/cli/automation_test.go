@@ -22,6 +22,7 @@ import (
 	wt "github.com/wloophq/wloop/internal/core/workspaces/workspacestest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -557,5 +558,23 @@ func TestConfigFactsCarryTheProposalSettings(t *testing.T) {
 	f := configFacts(Defaults())
 	if f["config.gtd.stale_waiting_days"] != 2 || f["config.proposals.renudge_after"] != 24*time.Hour || f["config.turns.automated_per_day"] != 20 {
 		t.Fatalf("%v", f)
+	}
+}
+
+func TestApplyConfigOnlyWhenReadsTheBriefExtras(t *testing.T) {
+	t.Parallel()
+	extras := func(p unit.ProviderID) expr.Env {
+		if p != unit.GitHub {
+			return nil
+		}
+		return builtin.ExtraFacts([]jsonschema.Property{{Name: "approach", Type: "string", Enum: []string{"small", "big"}}})
+	}
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"address": {OnlyWhen: `brief.extra.approach == "small"`}}
+	w := applyConfigWith([]workflow.Workflow{turnStartWorkflow("address")}, cfg, extras)[0]
+	for approach, want := range map[string]bool{"small": true, "big": false} {
+		if got, err := w.When.Match(workflow.Vars{Facts: workflow.Facts{"brief.extra.approach": approach}}); err != nil || got != want {
+			t.Errorf("approach %q: %v, %v; want %v", approach, got, err, want)
+		}
 	}
 }

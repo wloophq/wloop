@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,7 +83,8 @@ type subjectsRig struct {
 
 // newSubjectsRig is a plan engine wired as the daemon wires it, over a store
 // and the Slack plugin's facts, with the user's workflows on the entry,
-// slack and github subjects; github's plugin is not built.
+// slack and github subjects; github's plugin is not built. planned lists
+// the user's workflows only.
 func newSubjectsRig(t *testing.T) *subjectsRig {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
@@ -141,7 +143,9 @@ func (r *subjectsRig) planned(t *testing.T) []string {
 	}
 	var out []string
 	for _, it := range p.Items {
-		out = append(out, it.Workflow+" "+it.Unit.String())
+		if strings.HasPrefix(it.Workflow, "my-") {
+			out = append(out, it.Workflow+" "+it.Unit.String())
+		}
 	}
 	slices.Sort(out)
 	return out

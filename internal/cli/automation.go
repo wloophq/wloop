@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/gtd"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -121,7 +123,8 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	steps := newStepSet(e, sd)
 	workflows := func() []workflow.Workflow {
 		cfg, _ := e.loadConfig()
-		return applyConfig(e.loadedIntents().Workflows, cfg)
+		l := e.loadedIntents()
+		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l.Registry))
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
 	if d.DB != nil {
@@ -179,6 +182,12 @@ func (e *Env) automationPause(ctx context.Context) (automation.Pause, error) {
 // applyConfig is the loaded workflows with the config's overrides: those
 // disabled dropped, the mode and approval set.
 func applyConfig(ws []workflow.Workflow, cfg config.Config) []workflow.Workflow {
+	return applyConfigWith(ws, cfg, nil)
+}
+
+// applyConfigWith is applyConfig whose only_when also reads the brief.extra.*
+// facts extras gives for a workflow's provider; nil extras gives none.
+func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit.ProviderID) expr.Env) []workflow.Workflow {
 	out := make([]workflow.Workflow, 0, len(ws))
 	for _, w := range ws {
 		wc := cfg.Workflows[w.Name]
@@ -197,7 +206,7 @@ func applyConfig(ws []workflow.Workflow, cfg config.Config) []workflow.Workflow 
 			}
 		}
 		if wc.OnlyWhen != "" {
-			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen))
+			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
 		if a := wc.DraftApproval; a != nil {
 			da := a.Approval()
@@ -210,12 +219,25 @@ func applyConfig(ws []workflow.Workflow, cfg config.Config) []workflow.Workflow 
 
 // onlyWhen is the config's only_when of w compiled over w's facts; one that
 // does not compile refuses every unit, so the workflow runs nowhere.
-func onlyWhen(w workflow.Workflow, src string) workflow.Predicate {
-	p, err := expr.CompileWorkflow(src, builtin.WorkflowEnv(w.Slot))
+func onlyWhen(w workflow.Workflow, src string, extras func(unit.ProviderID) expr.Env) workflow.Predicate {
+	env := builtin.WorkflowEnv(w.Slot)
+	if extras != nil && slices.Contains(builtin.BriefSubjects, w.Slot) {
+		maps.Copy(env, extras(w.Provider))
+	}
+	p, err := expr.CompileWorkflow(src, env)
 	if err != nil {
 		return workflow.Refused{Err: fmt.Errorf("workflows.%s.only_when: %w", w.Name, err)}
 	}
 	return p
+}
+
+// briefExtrasOf are the brief.extra.* facts of each provider's brief intent
+// in reg.
+func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
+	return func(p unit.ProviderID) expr.Env {
+		d, _ := reg.Builder(builtin.BuildsBrief, p)
+		return builtin.ExtraFacts(d.Extra)
+	}
 }
 
 // configFacts are the config slot of a workflow's predicates.

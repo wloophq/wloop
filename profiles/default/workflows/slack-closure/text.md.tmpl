@@ -1,0 +1,4 @@
+Closing this out:
+
+{{range $i, $it := .Items}}{{if $i}}
+{{end}}- {{$it.Line}}: {{or $it.Resolution "resolved"}}{{end -}}

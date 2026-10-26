@@ -45,6 +45,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - Only `internal/catalog` builds action specs and evaluates an intent's predicates.
 - The automation engine and the rest of the core name no provider.
 - Go never names a draft's kind, compares its purpose with a value, or reads its delivery outside the publishers and the Outbox (`TestNoDraftKindComparisons`).
+- A draft's text comes from a profile template or from whoever wrote it, and only `draft.propose` and the plugin rules its allowlist names propose drafts on their own (`TestDraftTextComesFromTheProfile`, `TestOnlyTheDraftStepProposes`).
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
 
@@ -52,7 +53,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 These texts and decisions are still in Go, and are moving to the profile:
 
-- the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
+- the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
 - the workflow subjects, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
 - notification titles, the digest and the menu bar's copy.
 
@@ -60,4 +61,3 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 A draft is what its proposer declares: a purpose, a delivery and the effects sending it applies, each once, through the effect table and a plugin's own (`TestNoDraftKindComparisons`). An agent's draft declares only the effects its intent lists in `draft_effects`, and a workflow proposes, holds and withdraws its drafts with `draft.propose`, its text from the profile. Not yet true:
 
-- the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
