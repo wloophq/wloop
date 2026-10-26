@@ -216,13 +216,13 @@ func TestTemplatesAreAgentNeutral(t *testing.T) {
 			}
 		}
 	}
-	entries, err := fs.ReadDir(embedded, "templates")
-	if err != nil {
-		t.Fatal(err)
+	partials, err := fs.Glob(profiles.Default, "default/partials/*")
+	if err != nil || len(partials) < 9 {
+		t.Fatalf("%v %v", partials, err)
 	}
-	for _, e := range entries {
-		raw, _ := fs.ReadFile(embedded, "templates/"+e.Name())
-		check(e.Name(), raw)
+	for _, name := range partials {
+		raw, _ := fs.ReadFile(profiles.Default, name)
+		check(name, raw)
 	}
 	moved, err := fs.Glob(profiles.Default, "default/intents/*/instructions.md.tmpl")
 	if err != nil || len(moved) < 4 {

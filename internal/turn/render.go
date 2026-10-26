@@ -3,7 +3,6 @@ package turn
 import (
 	"bytes"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -22,9 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/profiles"
 )
-
-//go:embed templates/*.tmpl
-var embedded embed.FS
 
 // partials are the Go-owned templates every intent's instructions may call.
 var partials = []string{"history.md.tmpl", "resume.md.tmpl", "record.md.tmpl", "brief.md.tmpl", "judgment.md.tmpl", "why.md.tmpl", "items.md.tmpl", "unit.md.tmpl", "dossier.md.tmpl"}
@@ -91,7 +87,7 @@ func load(name, devDir string) (string, error) {
 			return "", err
 		}
 	}
-	raw, err := embedded.ReadFile("templates/" + name)
+	raw, err := fs.ReadFile(profiles.Default, path.Join("default", profile.PartialsDir, name))
 	return string(raw), err
 }
 
