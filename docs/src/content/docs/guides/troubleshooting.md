@@ -26,11 +26,11 @@ description: Find out why something did not happen, with doctor, the plan and th
 
 It lists the unit's plan items, then every workflow that gives it none, with the facts its condition read and the reason beside them, such as `pr.review.reason = nothing new since my last review`. Common reasons:
 
-- the pull request is from a fork, a draft, or by an author who is not a member, collaborator or owner (see `trusted_authors`);
-- its owner is not in `owners`;
+- the pull request is from a fork, a draft, or by an author who is not a member, collaborator or owner (see `github.trusted_authors`);
+- its owner is not in `github.owners`;
 - the agent of its workspace is working, or you have the workspace focused in its manager;
 - no enabled manager can launch the round's session: `doctor` names the intent in a `launch <intent>` check, and the round's failure lists each manager's reason (Claude Desktop, say, cannot start a session without the checkout's project settings, so such a session needs Orca in `workspace_managers`);
-- the per-pull-request daily cap (`rounds.per_pr_per_day`) held the round (`held (cap)` in the cockpit; `{{command}} review <url>` or `{{command}} address <url>` runs it by hand, outside the cap);
+- the per-pull-request daily cap (`turns.per_unit_per_day`) held the round (`held (cap)` in the cockpit; `{{command}} review <url>` or `{{command}} address <url>` runs it by hand, outside the cap);
 - the pull request, its repository or everything is paused, or the pull request is muted;
 - the workspace was deleted by hand (see "Without a workspace" in [The sweep and workflows](/concepts/workflows/)).
 
@@ -103,7 +103,7 @@ On Linux the daemon's output goes wherever your init system sends it (`journalct
 
 ```sh
 {{command}} turn show https://github.com/acme/api/pull/7
-{{command}} config get rounds.per_pr_per_day
+{{command}} config get turns.per_unit_per_day
 ```
 
 `turn show` prints every turn with its records and answers. `config get` prints the effective value of a key, defaults included.

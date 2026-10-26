@@ -26,7 +26,7 @@ The agent starts in a new session of the pull request's review or author workspa
 The bundled `intent=nudge.md` sets the tone (neutral and friendly), the length (one to three sentences), the language (the one the pull request's conversation uses), no sign-off, and to hold back when someone asked the same people for the same thing in the last working day. Change any of it with `intent=nudge.md` blocks:
 
 ```sh
-{{command}} profile add nudge --org acme -- 'Write nudges in Portuguese and sign them with "Abs".'
+{{command}} profile add nudge --organization acme -- 'Write nudges in Portuguese and sign them with "Abs".'
 ```
 
 ## Automatic nudges

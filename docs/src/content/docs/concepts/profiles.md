@@ -36,11 +36,11 @@ An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, the `probe
 
 - a command: `{{command}} <intent> <url> [flags] [guidance...]`, listed by `{{command}} --help`; an intent that serves another provider takes that provider's unit, such as a Slack permalink or `slack:<key>`;
 - a way to run it by hand from any agent session: `{{command}} instructions <intent>`, or the bundled skills such as `/{{name}}-review <url>`;
-- an action on the rows of the cockpit, the terminal client and the menu bar, with its own key.
+- an action on the rows of the cockpit, the terminal client and the menu bar, with its own shortcut and its `summary` as its tooltip.
 
 A turn of any intent records, asks, takes answers and resumes the same way. A user intent runs only when you ask; what starts a turn on its own is a [workflow](/concepts/workflows/) whose `turn.start` step names the intent. A directory of your profile named as a bundled intent or workflow overrides it file by file.
 
-| Bundled intent | Key | Runs in | Does |
+| Bundled intent | Shortcut | Runs in | Does |
 |---|---|---|---|
 | `review` | `V` | the review workspace, at the pull request's head | reviews someone else's pull request and publishes the review |
 | `address` | `F` | the author workspace | triages the reviews and failing checks of a pull request you develop |

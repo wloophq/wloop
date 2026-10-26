@@ -30,17 +30,19 @@ The daemon's **inventory** is the set of pull requests it follows:
 
 - your own pull requests;
 - those that request your review;
-- those of your area: the pull requests of `scope.people` and of the members of `scope.teams`, plus every pull request of a repository where one of them opened one in the last 90 days, or listed in `scope.repos`;
-- those of the logins in `scope.watch`, which enter as if they requested your review;
+- those of your area: the pull requests of `github.scope.people` and of the members of `github.scope.teams`, plus every pull request of a repository where one of them opened one in the last 90 days, or listed in `github.scope.repos`;
+- those of the logins in `github.scope.watch`, which enter as if they requested your review;
 - those that one of your workspaces stands for;
 - those you add with `{{command}} track <url>`.
 
 ```json
-"scope": {
-  "people": ["ana", "bruno"],
-  "teams": ["acme/backend"],
-  "repos": ["acme/api"],
-  "watch": ["carla"]
+"github": {
+  "scope": {
+    "people": ["ana", "bruno"],
+    "teams": ["acme/backend"],
+    "repos": ["acme/api"],
+    "watch": ["carla"]
+  }
 }
 ```
 
@@ -48,7 +50,7 @@ The loop acts only where a local workspace exists or a rule creates one; a pull 
 
 ## Who a pull request waits on
 
-From the history of each pull request the daemon derives whom it waits on (the author, the requested reviewers, you, the loop or nobody), since when and why. Past `stalled.review` (2 working days), `stalled.reply` (1) or `stalled.merge` (1) it reads as **stalled**. An approved pull request with merge conflicts waits on its author.
+From the history of each pull request the daemon derives whom it waits on (the author, the requested reviewers, you, the loop or nobody), since when and why. Past `github.stalled.review` (2 working days), `github.stalled.reply` (1) or `github.stalled.merge` (1) it reads as **stalled**. An approved pull request with merge conflicts waits on its author.
 
 ## Tracking by hand
 

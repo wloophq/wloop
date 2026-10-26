@@ -58,7 +58,7 @@ Every field has its own version, a hash of its schema. A new or changed field is
 ## Turn it on
 
 ```json
-"brief": { "enabled": true, "tier": "fast", "max_diff_bytes": 60000 }
+"brief": { "enabled": true, "tier": "fast", "max_input_bytes": 60000 }
 ```
 
 The daemon reads `brief` when it starts; restart it after turning briefs on or off (on macOS, `launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`).
@@ -67,7 +67,7 @@ Each brief is one headless call of the agent, billed to your account with it. Fo
 
 ## When briefs run
 
-A `brief` job runs after each fast sweep and briefs up to 5 pull requests per run, 2 at a time. Each reads the title, the description, the first linked issue, the file list and the diff cut to `brief.max_diff_bytes` (at most 200000). A pull request is briefed again when its description is edited, when a new head adds more than 5 files, or when a new release changes the prompt. While the GitHub budget is low, briefs wait.
+A `brief` job runs after each fast sweep and briefs up to 5 pull requests per run, 2 at a time. Each reads the title, the description, the first linked issue, the file list and the diff cut to `brief.max_input_bytes` (at most 200000). A pull request is briefed again when its description is edited, when a new head adds more than 5 files, or when a new release changes the prompt. While the GitHub budget is low, briefs wait.
 
 The **first turn** of a pull request, whatever its intent, waits for its brief. `{{command}} review` prints `briefing` while it waits. `--no-brief`, `{{command}} intake without <n>`, or "Start without brief" in the cockpit and the menu bar start without it. Later turns take the brief there is and never wait.
 

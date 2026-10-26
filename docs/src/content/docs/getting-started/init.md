@@ -14,7 +14,7 @@ description: The guided setup that checks the requirements, writes the configura
 1. **Prerequisites.** It runs the checks of `{{command}} doctor` that need no daemon (`gh` and its login, `git`, the workspace managers, the agent). When one fails it stops and prints the fix.
 2. **Projects directory.** `projects_dir` is where `{{command}} review` clones a repository that no workspace manager knows yet. It suggests the common parent of the repositories they already have.
 3. **Agent.** The coding agent that runs the rounds, detected from what is installed. Claude Code (`claude`) is the one supported today.
-4. **Scope.** What the daemon follows besides your own pull requests and your review requests: repositories (`scope.repos`), people (`scope.people`) and teams (`scope.teams`). It suggests them from what `gh` knows about you. See [the daemon](/concepts/daemon/#scope).
+4. **Scope.** What the daemon follows besides your own pull requests and your review requests: repositories (`github.scope.repos`), people (`github.scope.people`) and teams (`github.scope.teams`). It suggests them from what `gh` knows about you. See [the daemon](/concepts/daemon/#scope).
 5. **Profile.** Either the bundled default profile alone, or a personal profile directory. A new directory is created with a commented example block for each intent, ready to edit. See [Write your review profile](/guides/review-profile/).
 6. **Slack (optional).** Guided or skipped. The guided step walks you through creating the Slack app from the manifest, asks for the client id and the app-level token, and runs the OAuth login. See [Connect Slack](/guides/slack/).
 7. **Configuration file.** It shows the diff against your current `config.json` and asks before overwriting it.

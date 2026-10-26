@@ -20,13 +20,13 @@ An automatic review, address or nudge round is first a pending item. The row mov
 | Run now | Run now, `R` in the terminal client, `{{command}} plan apply <url>` | the round is sent at once |
 | Steer | the guidance box and Run now in the cockpit, or the notification's Guide field | the round is sent at once with your text as its guidance |
 
-With no answer, the round runs when the window ends. The window is the workflow's `[approval].window`, `60s` in the bundled review, address and nudge workflows; `workflows.<name>.approval.window` in the config changes it, and `"0s"` sends that workflow's rounds at once. A pending item survives a restart: one whose window ended while the daemon was down runs once when it starts.
+With no answer, the round runs when the window ends. The window is the workflow's `[approval] window` under `mode = "delay"`, `60s` in the bundled review and address workflows; `workflows.<name>.approval.window` in the config changes it, and `"approval": {"mode": "run"}` sends that workflow's rounds at once. A pending item survives a restart: one whose window ended while the daemon was down runs once when it starts.
 
 Guidance is not lost when its round does not go out (a pause, a cap, a busy workspace): it is kept for the next round of that pull request, and the cockpit's detail shows it as "Next round guidance". Rounds you ask for (`review`, `address`, `plan apply`) do not wait.
 
 A muted pull request (`{{command}} mute <url>`) stays muted: its round is not announced and goes out at the deadline unless you skip it or pause the pull request.
 
-The nudge workflow ships with `approval.default = "wait"`: each nudge stays pending until you apply it. See [Tune workflows](/guides/workflows/#let-nudges-go-out).
+The nudge workflow ships with `[approval] mode = "wait"`: each nudge stays pending until you apply it. See [Tune workflows](/guides/workflows/#let-nudges-go-out).
 
 ## The ambiguity gate
 
@@ -35,7 +35,7 @@ Inside a round, the procedure publishes on its own except when one of these hold
 - it is unsure whether a finding blocks, or the verdict depends on intent the pull request does not state;
 - it would approve a change to an irreversible or risky surface (your profile lists them: schema migrations, data deletion, auth, billing, infrastructure by default);
 - a finding alleges a security problem;
-- the review would contradict a decision another human reviewer left. Bots and the logins in `automated_reviewers` never trigger this.
+- the review would contradict a decision another human reviewer left. Bots and the logins in `github.automated_reviewers` never trigger this.
 
 An address round stops the same way before a deep change of direction, an irreversible surface, or declining a blocking request.
 
@@ -57,41 +57,41 @@ A draft goes out only once its approval policy lets it:
 | `wait` (default) | waits in the Outbox until you approve it |
 | `delay` | is sent when its `window` ends unless you discard or edit it first; an edit makes it `wait` |
 | `send` | is sent at once |
-| `record` | is recorded as what would have been sent, and never sent |
+| `dry_run` | is stored as what would have been sent, and never sent |
 
 A draft you write yourself (Reply on an entry or a unit, see [GTD](/concepts/gtd/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
-Every bundled intent, workflow and rule uses `wait`. Your own intent or workflow can set another with a `[draft_approval]` table, a workflow's drafts with `workflows.<name>.draft_approval` in the configuration, and GitHub's nudge rule with `proposals.github-nudge.approval`; the older `proposals.stalled-nudge`, `closure` and `ask-owner` approvals still apply to the workflows that replaced them, with a warning naming `workflows.<name>.draft_approval`.
+Every bundled intent, workflow and rule uses `wait`. Your own intent or workflow can set another with a `[drafts.approval]` table, a workflow's drafts with `workflows.<name>.drafts.approval` in the configuration, and the drafts of a plugin's own rules (GitHub's nudge rule) with `<id>.drafts.approval`, such as `github.drafts.approval`. A draft's approval is the first of: the configuration's `workflows.<name>.drafts.approval`, the workflow's `[drafts.approval]`, the intent's `[drafts.approval]`, then `wait`.
 
-A `[draft_approval]` table holds a `mode` and, before it, rules tried in order; the first whose `when` holds gives the draft's mode, and a draft no rule matches takes `mode`:
+A `[drafts.approval]` table holds a `mode` and, before it, rules tried in order; the first whose `when` holds gives the draft's mode, and a draft no rule matches takes `mode`:
 
 ```toml
-[draft_approval]
+[drafts.approval]
 mode = "wait"
 
-[[draft_approval.rule]]
+[[drafts.approval.rule]]
 when = 'draft.delivery == "comment" && pr.author == "dependabot[bot]"'
 mode = "send"
 
-[[draft_approval.rule]]
+[[drafts.approval.rule]]
 when = 'draft.delivery == "message" && slack.conversation == "dm"'
 mode = "delay"
 window = "10m"
 ```
 
-A rule reads the facts of the draft and of the unit the draft is on (a workflow's draft: its subject's). `draft.delivery` is how the unit's plugin posts the draft, not what its proposer asked for: GitHub posts every draft that is not a reaction as a comment on the pull request, so an agent picks between a message and a reaction and never between a comment and something else. `draft.proposer` names the workflow, intent or plugin rule that proposed it. `draft.purpose` and `draft.effects` read as empty unless a workflow or a plugin rule named them; an agent names its own, so an intent's rules may not read them at all. A rule never reads a brief, which an agent writes, nor a fact the [facts](/reference/facts/#draft-approval-facts) page marks **Untrusted**: one whose value a third party's text sets through the extraction (such as `slack.started_by_me`), or that the proposing turn itself moves before its drafts are proposed (such as `slack.items_unowned`, which a turn's ledger changes). The loader refuses a rule that reads one, naming the manifest or the configuration key, the rule and the fact.
+A rule reads the facts of the draft and of the unit the draft is on (a workflow's draft: its provider's). `draft.delivery` is how the unit's plugin posts the draft, not what its proposer asked for: GitHub posts every draft that is not a reaction as a comment on the pull request, so an agent picks between a message and a reaction and never between a comment and something else. `draft.proposer` names the workflow, intent or plugin rule that proposed it. `draft.purpose` and `draft.effects` read as empty unless a workflow or a plugin rule named them; an agent names its own, so an intent's rules may not read them at all. A rule never reads a brief, which an agent writes, nor a fact the [facts](/reference/facts/#draft-approval-facts) page marks **Untrusted**: one whose value a third party's text sets through the extraction (such as `slack.started_by_me`), or that the proposing turn itself moves before its drafts are proposed (such as `slack.items_unowned`, which a turn's ledger changes). The loader refuses a rule that reads one, naming the manifest or the configuration key, the rule and the fact.
 
-A rule applies only to a draft whose subject its facts describe: in an intent that serves Slack and GitHub, a rule over `slack.*` does not apply to a draft on a pull request, which falls through to the next rule, and a rule over the facts of two subjects never applies, so the loader refuses it. When the unit's facts cannot be read, a draft whose rules read them waits for you, and the daemon logs why. A turn a workflow started reads its unit's facts as that workflow reads them (its `settled_at` included); a turn started by hand reads them unscoped. A rule's mode is `wait`, `delay` (with its `window`), `send` or `record`. The configuration's `workflows.<name>.draft_approval` takes the same `mode` and `rule` list and replaces the manifest's whole table, its rules included, for the drafts the workflow proposes and those of the turns it starts.
+A rule applies only to a draft whose unit its facts describe: in an intent that serves Slack and GitHub, a rule over `slack.*` does not apply to a draft on a pull request, which falls through to the next rule, and a rule over the facts of two providers never applies, so the loader refuses it. When the unit's facts cannot be read, a draft whose rules read them waits for you, and the daemon logs why. A turn a workflow started reads its unit's facts as that workflow reads them (its `settled_at` included); a turn started by hand reads them unscoped. A rule's mode is `wait`, `delay` (with its `window`), `send` or `dry_run`. The configuration's `workflows.<name>.drafts.approval` takes the same `mode`, `window` and `rule` list and overlays the manifest's table field by field, for the drafts the workflow proposes and those of the turns it starts: `mode` and `window` replace those fields, `rule` replaces the rules, and `[]` clears them.
 
 Three floors hold whatever the policy says:
 
 - a comment draft waits for you unless a rule whose `when` has `draft.delivery == "comment"` as a term of its top-level `&&` releases it with `send` or `delay`: a catch-all `mode = "send"`, or a rule that does not name comment delivery, never sends a comment on a pull request under your name;
-- a draft an agent aims outside its own unit waits for you, unless the policy is `record`;
+- a draft an agent aims outside its own unit waits for you, unless the policy is `dry_run`;
 - an agent never sets its own approval: the purpose and effects an agent gives its draft read as empty in a rule, an intent's rules may not read them at all, and no rule reads an untrusted fact.
 
-A rule that releases (`send` or `delay`) and reads `draft.delivery` in a form that never names comment delivery, such as `draft.delivery in ["comment"]`, loads with a warning naming the form that does. A configuration rule over another subject's facts than its workflow's is refused: `doctor` and the daemon's log say so, and every draft of that workflow waits for you until it is fixed.
+A rule that releases (`send` or `delay`) and reads `draft.delivery` in a form that never names comment delivery, such as `draft.delivery in ["comment"]`, loads with a warning naming the form that does. A configuration rule over another provider's facts than its workflow's is refused: `doctor` and the daemon's log say so, and every draft of that workflow waits for you until it is fixed.
 
-The configuration's `workflows.slack-ask-owner.draft_approval`, and the older `proposals.ask-owner.approval` it replaced, set the approval of the questions `slack-ask-owner` proposes like those of any other workflow: `delay` sends them when the window ends, `send` at once, though they name people other than you.
+The configuration's `workflows.slack-ask-owner.drafts.approval` sets the approval of the questions `slack-ask-owner` proposes like those of any other workflow: `delay` sends them when the window ends, `send` at once, though they name people other than you.
 
 A draft has a purpose (nudge, close, ask_owner, or any label its proposer names), a delivery (a message, a reaction or a comment) and the effects sending it applies, each exactly once, after a restart too:
 
@@ -101,9 +101,9 @@ A draft has a purpose (nudge, close, ask_owner, or any label its proposer names)
 | `unit.closed` | records the unit's closure through its plugin: on Slack, it ends the close entry and lets the thread go unwatched after its warm period, whatever later extraction passes say |
 | `pr.nudged` | records the nudge on the pull request, which the next nudge's refusal reads |
 
-Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `draft_effects`; the draft is refused otherwise, with a message naming the intent. A draft declaring an effect its unit's provider does not implement, such as `pr.nudged` on a Slack thread, is refused when it is proposed. A sent draft whose effect cannot apply, such as `unit.closed` while its plugin is off, keeps it pending until it can.
+Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`; the draft is refused otherwise, with a message naming the intent. A draft declaring an effect its unit's provider does not implement, such as `pr.nudged` on a Slack thread, is refused when it is proposed. A sent draft whose effect cannot apply, such as `unit.closed` while its plugin is off, keeps it pending until it can.
 
-A workflow proposes drafts with its `draft.propose` step, its text rendered from the workflow's `text.md.tmpl` through the profile's layers, the items' text as data. It holds a draft of the same workflow, subject and person while one is open or failed, for `hold_after_sent` after one was sent (`forever` never proposes again) and for `hold` after one was otherwise settled. Its `[withdraw] when` discards an open draft it no longer calls for, with the reason `moot` or, with `reason = "assigned"`, assigned; a draft whose workflow is gone or disabled is withdrawn `moot`; no draft of a disabled plugin is, nor one of a workflow whose manifest fails to load, which waits for you to fix it: its window does not end while the manifest fails, and resumes once it loads. A draft its `[withdraw] when` would withdraw at once is not proposed.
+A workflow proposes drafts with its `draft.propose` step, its text rendered from the workflow's `text.md.tmpl` through the profile's layers, the items' text as data. It skips a draft of the same workflow, unit and person while one is open or failed, for `repeat_after_sent` after one was sent (`forever` never proposes again) and for `repeat_after` after one was otherwise settled. Its `[drafts.withdraw] when` discards an open draft it no longer calls for, with the reason `moot` or, with `reason = "assigned"`, assigned; a draft whose workflow is gone or disabled is withdrawn `moot`; no draft of a disabled plugin is, nor one of a workflow whose manifest fails to load, which waits for you to fix it: its window does not end while the manifest fails, and resumes once it loads. A draft its `[drafts.withdraw] when` would withdraw at once is not proposed.
 
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose

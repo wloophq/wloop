@@ -35,7 +35,7 @@ The UI comes in three tiers: the card, which every surface renders the same way 
 
 ## A disabled plugin
 
-`plugins.<id>.enabled = false` leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On an entry, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([GTD](/concepts/gtd/)). The core works with no plugin enabled.
+`<id>.enabled = false` (`github.enabled`, `slack.enabled`) leaves the module unbuilt: no ingestion, rows, jobs, facts, items, actions, notifications, MCP tools or publisher. Its codec stays, cards render from the stored snapshot, and every write to one of its units answers `409 {"error": "<id> is disabled"}` before the handler runs. On an entry, Dismiss still works: it detaches the disabled plugin's units and their items, and an item's link to such a unit is stored and left out while the plugin is off ([GTD](/concepts/gtd/)). The core works with no plugin enabled.
 
 ## The boundary
 

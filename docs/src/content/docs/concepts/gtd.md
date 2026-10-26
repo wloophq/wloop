@@ -10,7 +10,7 @@ description: How what people ask of you becomes GTD entries, and how the lists, 
 A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topic. Units come from plugins. Two are compiled in: `github` (pull requests) and `slack` (threads and DM topics). Each can be turned off:
 
 ```json
-"plugins": { "slack": { "enabled": false } }
+"slack": { "enabled": false }
 ```
 
 The daemon reads the switch when it starts. With a plugin off, nothing of it runs, its actions leave every surface, and its cards render from the last stored snapshot, marked stale.
@@ -68,7 +68,7 @@ Every outbound post is a draft first, in the Outbox, until its approval policy l
 
 | Workflow or rule | Proposes |
 |---|---|
-| `slack-stalled-nudge` | a nudge to each person a Slack waiting entry waits on, once it is past its resurface date or stale and not nudged within `proposals.renudge_after` (24h) |
+| `slack-stalled-nudge` | a nudge to each person a Slack waiting entry waits on, once it is past its resurface date or stale and not nudged within `drafts.repeat_after` (1d) |
 | `slack-closure` | a closing message for a Slack unit you started whose items resolved |
 | `slack-ask-owner` | a question for a Slack unit's open items with no owner after a working day; it always waits for you |
 | `github-nudge` | the GitHub plugin's nudge |
