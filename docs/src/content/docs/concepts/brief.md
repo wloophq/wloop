@@ -53,7 +53,7 @@ The schema is a flat object: strings (with or without an `enum`), integers, bool
 
 Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
 
-Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them. An intent that lists fields under `brief = { need = [...] }` makes its first turn wait for that call; a call that fails lets the turn start with the brief as it is. Slack briefs carry the fields from the extraction's next pass.
+Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them. An intent that lists fields under `brief = { need = [...] }` makes its first turn wait for that call; a call that fails lets the turn start with the brief as it is. Slack briefs carry the fields from the extraction's next pass; a pass whose fields break the schema keeps the previous brief's fields that are still at their version.
 
 ## Turn it on
 

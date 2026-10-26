@@ -53,7 +53,8 @@ type storedBrief struct {
 // briefJSON is the stored JSON of w, the answer for a unit whose brief in
 // use is prev: empty when the answer says nothing, or keeps prev and prev is
 // complete under x. A migrated goal-only brief, or one written before a
-// field of x, takes the answer's brief even when it is unchanged.
+// field of x, takes the answer's brief even when it is unchanged. An answer
+// without extras keeps prev's extras still at their version.
 func briefJSON(w wireBrief, x *Extra, prev string) (string, error) {
 	if w.Goal == "" || w.Unchanged && complete(prev, x) {
 		return "", nil
@@ -67,11 +68,37 @@ func briefJSON(w wireBrief, x *Extra, prev string) (string, error) {
 	}
 	sb := storedBrief{Goal: w.Goal, Context: w.Context, Kind: w.Kind, Risk: w.Risk, RiskWhy: w.RiskWhy,
 		OpenQuestions: w.OpenQuestions, Tags: tags}
-	if x != nil && len(w.Extra) > 0 {
+	switch {
+	case x == nil:
+	case len(w.Extra) > 0:
 		sb.Extra, sb.ExtraVersions = w.Extra, x.Versions
+	default:
+		sb.Extra, sb.ExtraVersions = currentExtras(prev, x)
 	}
 	b, err := json.Marshal(sb)
 	return string(b), err
+}
+
+// currentExtras are the extra fields of the stored brief still at their
+// version under x, nil when none is.
+func currentExtras(stored string, x *Extra) (map[string]any, map[string]string) {
+	var b storedBrief
+	if stored == "" || json.Unmarshal([]byte(stored), &b) != nil {
+		return nil, nil
+	}
+	var extra map[string]any
+	var versions map[string]string
+	for name, v := range x.Versions {
+		value, ok := b.Extra[name]
+		if !ok || b.ExtraVersions[name] != v {
+			continue
+		}
+		if extra == nil {
+			extra, versions = map[string]any{}, map[string]string{}
+		}
+		extra[name], versions[name] = value, v
+	}
+	return extra, versions
 }
 
 // complete says the stored brief has a kind and every field of x at its

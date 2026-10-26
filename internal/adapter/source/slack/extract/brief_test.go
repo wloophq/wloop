@@ -236,3 +236,40 @@ func TestAMigratedDMSegmentGetsAFullBriefFromAnUnchangedAnswer(t *testing.T) {
 		t.Fatalf("the migrated segment's brief %q: %v", st[deck].Brief, err)
 	}
 }
+
+func TestADroppedExtraKeepsThePreviousBriefsExtrasAtTheirVersion(t *testing.T) {
+	answer := briefObj("Ship the export fix")
+	answer["kind"], answer["extra"] = "incident", obj{"approach": "magic"}
+	for name, c := range map[string]struct {
+		prev            string
+		extra, versions string
+	}{
+		"an extra at its version": {`{"goal":"g","kind":"request","extra":{"approach":"rewrite","legacy":"x"},"extra_versions":{"approach":"f1-abc","legacy":"f0-old"}}`,
+			`{"approach":"rewrite"}`, `{"approach":"f1-abc"}`},
+		"an extra at an older version": {`{"goal":"g","kind":"request","extra":{"approach":"rewrite"},"extra_versions":{"approach":"f0-old"}}`, `null`, `null`},
+		"no previous brief":            {"", `null`, `null`},
+	} {
+		in := loadInput(t)
+		in.Extra, in.Brief = approachExtra, c.prev
+		in.Segments, in.SegmentBriefs = []slack.Span{{ID: "1", FromTS: in.Messages[0].TS}}, []string{c.prev}
+		seg := obj{"ref": "s1", "from_ts": in.Messages[0].TS, "to_ts": "", "topic": "the export", "brief": answer}
+		r, err := decode(answerJSON(t, nil, []obj{seg}, nil, obj{"brief": answer}), in)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if r.ExtrasDropped != 2 {
+			t.Errorf("%s: %d extras dropped", name, r.ExtrasDropped)
+		}
+		for which, got := range map[string]string{"conversation": r.Brief, "segment": r.Segments[0].Brief} {
+			var sb storedBrief
+			if err := json.Unmarshal([]byte(got), &sb); err != nil || sb.Kind != "incident" {
+				t.Fatalf("%s: the %s's brief %q: %v", name, which, got, err)
+			}
+			extra, _ := json.Marshal(sb.Extra)
+			versions, _ := json.Marshal(sb.ExtraVersions)
+			if string(extra) != c.extra || string(versions) != c.versions {
+				t.Errorf("%s: the %s's extras %s %s, want %s %s", name, which, extra, versions, c.extra, c.versions)
+			}
+		}
+	}
+}
