@@ -142,7 +142,7 @@ func TestIntentBlocksForAUserIntentLoad(t *testing.T) {
 	if err != nil || len(tr.Blocks) != 1 || tr.Blocks[0].Path.Intent != "ask-author" {
 		t.Fatalf("%+v %v", tr.Blocks, err)
 	}
-	if g := tr.Compose("ask-author", Facts{Owner: "acme"}); len(g.Parts) != 1 || !strings.Contains(g.Parts[0].Text, "Ask kindly.") {
+	if g := tr.Compose("ask-author", Facts{Values: map[string]any{"pr.owner": "acme"}}); len(g.Parts) != 1 || !strings.Contains(g.Parts[0].Text, "Ask kindly.") {
 		t.Fatalf("%+v", g)
 	}
 	if _, err := Load([]Layer{user(d)}, testIntents, nil); err == nil {

@@ -7,38 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/facet"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
-
-type Dim string
-
-const (
-	DimOrganization Dim = "organization"
-	DimRepo         Dim = "repo"
-	DimUser         Dim = "user"
-	DimTeam         Dim = "team"
-	DimAssociation  Dim = "association"
-	DimLabel        Dim = "label"
-	DimBase         Dim = "base"
-	DimRound        Dim = dintent.DimRound
-	DimReviewer     Dim = dintent.DimReviewer
-	DimKind         Dim = "kind"
-	DimSize         Dim = "size"
-	DimRisk         Dim = "risk"
-)
-
-// Dims lists the dimensions in their canonical order.
-var Dims = []Dim{DimOrganization, DimRepo, DimUser, DimTeam, DimAssociation, DimLabel, DimBase, DimRound, DimReviewer, DimKind, DimSize, DimRisk}
-
-var dimValues = map[Dim][]string{
-	DimAssociation: {"owner", "member", "collaborator", "contributor", "first-timer", "first-time-contributor", "mannequin", "none"},
-	DimRound:       {"first", "follow-up"},
-	DimKind:        facet.Kinds,
-	DimSize:        facet.Sizes,
-	DimRisk:        facet.Risks,
-}
 
 // Kinds lists the intents a block can be written for: every profile an
 // intent of the registry names, sorted.
@@ -56,13 +28,18 @@ func Kinds(intents *dintent.Registry) []Kind {
 	return out
 }
 
-// DimsOf are the dimension conditions valid under kind: those its intent's manifest lists.
+// DimsOf are the gated dimensions valid under kind: those the manifests
+// of its intents list.
 func DimsOf(intents *dintent.Registry, kind Kind) []string {
-	if intents == nil {
-		return nil
+	var out []string
+	for _, d := range defsOf(intents, kind) {
+		for _, n := range d.Dims {
+			if !slices.Contains(out, n) {
+				out = append(out, n)
+			}
+		}
 	}
-	d, _ := intents.Get(dintent.Name(kind))
-	return d.Dims
+	return out
 }
 
 func kindNames(intents *dintent.Registry) string {
@@ -106,14 +83,16 @@ func (e PathError) Error() string {
 	return s
 }
 
-func rank(d Dim) int { return slices.Index(Dims, d) }
-
-func dimNames() string {
-	names := make([]string, len(Dims))
-	for i, d := range Dims {
-		names[i] = string(d)
+func dimNames(vocab []DimDef) string {
+	names := make([]string, len(vocab))
+	for i, d := range vocab {
+		names[i] = string(d.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func isTagKey(k string) bool {
+	return slices.ContainsFunc(tag.Keys, func(t tag.Key) bool { return t.Name == k })
 }
 
 func tagKeyNames() string {
@@ -164,6 +143,7 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 	if !inGrammar(dirs, leaf) {
 		return BlockPath{}, false, nil
 	}
+	vocab := Vocabulary(intents)
 	inTags := false
 	var respelled, afterTags string
 	for _, s := range dirs {
@@ -183,9 +163,9 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 			return bad("directory "+s+" has no valid value", "write the value after =, escaping / as %2F and % as %25")
 		}
 		v = strings.ToLower(v)
-		d := Dim(k)
-		if inTags && rank(d) < 0 {
-			if !slices.ContainsFunc(tag.Keys, func(t tag.Key) bool { return t.Name == k }) {
+		def, known := lookup(vocab, Dim(k))
+		if inTags && !known {
+			if !isTagKey(k) {
 				return bad("unknown tag key "+k, "the tag keys are "+tagKeyNames())
 			}
 			n, valid := tag.Normalize(k, v)
@@ -201,13 +181,13 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 		if inTags && afterTags == "" {
 			afterTags = "condition " + k + " comes after tags/; conditions come before it"
 		}
-		if rank(d) < 0 {
-			return bad("unknown dimension "+k, "the dimensions are "+dimNames())
+		if !known {
+			return bad("unknown dimension "+k, "the dimensions are "+dimNames(vocab))
 		}
-		if vals, closed := dimValues[d]; closed && !slices.Contains(vals, v) {
+		if vals, closed := def.closedFor(nil); closed && !slices.Contains(vals, v) {
 			return bad(k+"="+v+" is not a valid value", k+" is one of "+strings.Join(vals, ", "))
 		}
-		p.Conds = append(p.Conds, Cond{Dim: d, Value: v})
+		p.Conds = append(p.Conds, Cond{Dim: def.Name, Value: v})
 	}
 	if inTags && len(p.Tags) == 0 && afterTags == "" {
 		return bad("tags/ names no tag", "add a <key>=<value> directory under tags/")
@@ -235,7 +215,7 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 		}
 		return bad(problem, "")
 	}
-	if err := checkOrder(p, intents); err != nil {
+	if err := checkOrder(p, intents, vocab); err != nil {
 		var e PathError
 		if !errors.As(err, &e) {
 			return BlockPath{}, false, err
@@ -248,7 +228,9 @@ func ParsePath(rel string, intents *dintent.Registry) (p BlockPath, ok bool, err
 
 func sorted(p BlockPath) BlockPath {
 	out := BlockPath{Conds: slices.Clone(p.Conds), Tags: slices.Clone(p.Tags), Intent: p.Intent}
-	slices.SortStableFunc(out.Conds, func(a, b Cond) int { return cmp.Compare(rank(a.Dim), rank(b.Dim)) })
+	slices.SortStableFunc(out.Conds, func(a, b Cond) int {
+		return cmp.Or(cmp.Compare(rankOf(a.Dim), rankOf(b.Dim)), cmp.Compare(a.Dim, b.Dim))
+	})
 	slices.Sort(out.Tags)
 	return out
 }
@@ -271,13 +253,13 @@ func write(p BlockPath) string {
 
 func canonical(p BlockPath, intents *dintent.Registry) (string, error) {
 	s := sorted(p)
-	if err := checkOrder(s, intents); err != nil {
+	if err := checkOrder(s, intents, Vocabulary(intents)); err != nil {
 		return "", err
 	}
 	return write(s), nil
 }
 
-func checkOrder(p BlockPath, intents *dintent.Registry) error {
+func checkOrder(p BlockPath, intents *dintent.Registry, vocab []DimDef) error {
 	s := sorted(p)
 	for i := 1; i < len(s.Conds); i++ {
 		if s.Conds[i].Dim == s.Conds[i-1].Dim {
@@ -293,16 +275,43 @@ func checkOrder(p BlockPath, intents *dintent.Registry) error {
 	if has(DimRepo) && !has(DimOrganization) {
 		return PathError{Problem: "repo is only valid right after organization", Fix: "put it under organization=<owner>/"}
 	}
-	for _, d := range []Dim{DimRound, DimReviewer} {
-		if has(d) && !slices.Contains(DimsOf(intents, p.Intent), string(d)) {
-			return PathError{Problem: string(d) + " does not apply to " + string(p.Intent) + ": its manifest's dims do not list it",
-				Fix: "drop the " + string(d) + " condition, or move the block to an intent whose dims list " + string(d)}
+	for _, c := range s.Conds {
+		if err := applies(c, p.Intent, intents, vocab); err != nil {
+			return err
 		}
 	}
 	if !slices.Equal(s.Conds, p.Conds) || !slices.Equal(s.Tags, p.Tags) {
 		return PathError{Problem: "conditions are out of order", Fix: "rename it to " + write(s)}
 	}
 	return nil
+}
+
+// applies says whether a block of kind may hold condition c.
+func applies(c Cond, kind Kind, intents *dintent.Registry, vocab []DimDef) error {
+	d, ok := lookup(vocab, c.Dim)
+	if !ok {
+		return PathError{Problem: "unknown dimension " + string(c.Dim), Fix: "the dimensions are " + dimNames(vocab)}
+	}
+	if d.Gated && !slices.Contains(DimsOf(intents, kind), string(d.Name)) {
+		return PathError{Problem: string(d.Name) + " does not apply to " + string(kind) + ": its manifest's dims do not list it",
+			Fix: "drop the " + string(d.Name) + " condition, or move the block to an intent whose dims list " + string(d.Name)}
+	}
+	if !d.appliesUnder(intents, kind) {
+		return PathError{Problem: string(d.Name) + " does not apply to " + string(kind) + ": it reads " + d.Fact + ", which only " + providerNames(d.Providers) + " units have",
+			Fix: "drop the " + string(d.Name) + " condition, or move the block to an intent of " + providerNames(d.Providers)}
+	}
+	if vals, closed := d.closedFor(providersOf(intents, kind)); closed && !slices.Contains(vals, c.Value) {
+		return PathError{Problem: string(d.Name) + "=" + c.Value + " is not a valid value", Fix: string(d.Name) + " is one of " + strings.Join(vals, ", ")}
+	}
+	return nil
+}
+
+func providerNames(ps []unit.ProviderID) string {
+	names := make([]string, len(ps))
+	for i, p := range ps {
+		names[i] = string(p)
+	}
+	return dintent.OrList(names)
 }
 
 // PathOf writes p's canonical path, the one ParsePath reads back as p.

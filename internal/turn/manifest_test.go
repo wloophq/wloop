@@ -287,6 +287,7 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.cross_repository":  func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
 		"pr.visibility":        func(_ *Builder, r *Request) { r.Payload.(*PR).Visibility = "private" },
 		"pr.labels":            func(_ *Builder, r *Request) { r.Payload.(*PR).Labels = []string{"x"} },
+		"pr.requested_teams":   func(b *Builder, _ *Request) { b.Facts = &facts{st: Stored{Teams: []string{"acme-platform"}}} },
 		"turn.trigger":         func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.automated":       func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.owned":           func(_ *Builder, r *Request) { r.Owned = true },

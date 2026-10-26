@@ -104,6 +104,9 @@ type Fact struct {
 	// Dim makes the fact a profile dimension: a block path condition under
 	// the intents of its provider.
 	Dim bool
+	// Enum are the fact's values by provider, "" standing for every
+	// provider; a provider absent takes any value.
+	Enum map[unit.ProviderID][]string
 }
 
 var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}

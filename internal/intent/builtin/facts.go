@@ -3,6 +3,7 @@ package builtin
 import (
 	"slices"
 
+	"github.com/wloophq/wloop/internal/domain/facet"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -26,6 +27,24 @@ func prFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	f.Provider = unit.GitHub
 	return f
 }
+
+// dim flags f as a profile dimension.
+func dim(f Fact) Fact {
+	f.Dim = true
+	return f
+}
+
+// enum declares the values f takes, by provider.
+func enum(f Fact, values map[unit.ProviderID][]string) Fact {
+	f.Enum = values
+	return f
+}
+
+// anyProvider keys an enum that holds for every provider.
+const anyProvider unit.ProviderID = ""
+
+// Associations are GitHub's author associations.
+var Associations = []string{"OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE"}
 
 // wf is a workflow fact of slot, named <slot>.<name>.
 func wf(slot, name string, t expr.Type, doc string) Fact {
@@ -54,19 +73,20 @@ func briefWF(name string, t expr.Type, doc string) Fact {
 // intent by Env. A workflow fact may share a name with an intent fact.
 var Facts = []Fact{
 	prFact("pr.mine", expr.Bool, both, "The pull request's author is the viewer."),
-	prFact("pr.author", expr.String, both, "The pull request's author login."),
+	dim(prFact("pr.author", expr.String, both, "The pull request's author login.")),
 	prFact("pr.state", expr.String, both, "The pull request's state on GitHub."),
 	prFact("pr.slug", expr.String, both, "owner/repo#number."),
-	prFact("pr.owner", expr.String, both, "The repository owner."),
-	prFact("pr.repo", expr.String, both, "The repository name."),
-	prFact("pr.base", expr.String, both, "The base branch."),
-	prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."),
+	dim(prFact("pr.owner", expr.String, both, "The repository owner.")),
+	dim(prFact("pr.repo", expr.String, both, "The repository name.")),
+	dim(prFact("pr.base", expr.String, both, "The base branch.")),
+	dim(enum(prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."), map[unit.ProviderID][]string{anyProvider: Associations})),
 	prFact("pr.cross_repository", expr.Bool, both, "The head branch lives in a fork."),
 	prFact("pr.visibility", expr.String, trn, "The repository's visibility: public, private or internal, from the Basics read."),
 	prFact("pr.draft", expr.Bool, act, "The pull request is a draft, from the inventory row."),
 	prFact("pr.review_requested_me", expr.Bool, act, "A review is requested from the viewer, from the inventory row."),
-	prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read."),
-	prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn."),
+	dim(prFact("pr.requested_teams", expr.List, trn, "The teams a review of the pull request was requested through, as <org>-<slug>.")),
+	dim(prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read.")),
+	dim(prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn.")),
 	prFact("pr.address.checks", expr.List, trn, "The failing checks an address round fixes; empty on any other turn."),
 	prFact("pr.address.conflict", expr.Bool, trn, "The head conflicts with the base and the address round resolves it; false on any other turn."),
 	fact("row.kind", expr.String, act, "The row's situation kind."),
@@ -91,7 +111,7 @@ var Facts = []Fact{
 	fact("turn.resume", expr.Bool, trn, "The turn resumes an earlier one."),
 	fact("turn.plain", expr.Bool, trn, "The turn is a dry run (profile try)."),
 	fact("turn.planned", expr.String, trn, "The round the request planned."),
-	fact("turn.round", expr.String, trn, "first or follow-up; only intents with dims = [\"round\"] may read it."),
+	dim(enum(fact("turn.round", expr.String, trn, "first or follow-up; only intents with dims = [\"round\"] may read it."), map[unit.ProviderID][]string{anyProvider: {"first", "follow-up"}})),
 	fact("last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	fact("last_review.verdict", expr.String, trn, "The viewer's newest review state, any state."),
 	fact("last_review.decision", expr.String, trn, "The viewer's newest non-comment verdict."),
@@ -212,9 +232,9 @@ var Facts = []Fact{
 	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none."),
 	providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items."),
 	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
-	briefWF("risk", expr.String, "The brief's risk: low, medium or high."),
-	briefWF("kind", expr.String, "The brief's kind, from the provider's taxonomy."),
-	briefWF("size", expr.String, "The brief's size; GitHub briefs only."),
+	dim(enum(briefWF("risk", expr.String, "The brief's risk: low, medium or high."), map[unit.ProviderID][]string{anyProvider: facet.Risks})),
+	dim(enum(briefWF("kind", expr.String, "The brief's kind, from the provider's taxonomy."), map[unit.ProviderID][]string{unit.GitHub: facet.Kinds})),
+	dim(enum(briefWF("size", expr.String, "The brief's size; GitHub briefs only."), map[unit.ProviderID][]string{anyProvider: facet.Sizes})),
 	briefWF("tags", expr.List, "The brief's normalized key:value tags."),
 	briefWF("missing", expr.List, "The brief intent's extra fields the unit's brief lacks: new or changed since it was written."),
 	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its entry; true for a draft of no person."),
