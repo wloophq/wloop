@@ -13,8 +13,8 @@ import (
 )
 
 var todaysFacts = map[Dim]string{
-	DimOrganization: "pr.owner", DimRepo: "pr.repo", DimUser: "pr.author", DimTeam: "pr.requested_teams", DimAssociation: "pr.association",
-	DimLabel: "pr.labels", DimBase: "pr.base", DimRound: "turn.round", DimReviewer: "pr.address.reviewers",
+	DimOrganization: "pr.owner", DimRepo: "pr.repo_name", DimUser: "pr.author", DimTeam: "pr.requested_teams", DimAssociation: "pr.association",
+	DimLabel: "pr.labels", DimBase: "pr.base", DimRound: "turn.stage", DimReviewer: "pr.address.reviewers",
 	DimKind: "brief.kind", DimSize: "brief.size", DimRisk: "brief.risk",
 }
 
@@ -160,7 +160,7 @@ func TestSegLabelsComeFromTheProfile(t *testing.T) {
 		"base=main/intent=review.md":         "BASE",
 		"tags/change=refac/intent=review.md": "TAG",
 	})
-	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "turn.round": "first", "pr.base": "main"}, HasBrief: true, Tags: []string{"change:refac"}})
+	g := tr.Compose(Review, Facts{Values: map[string]any{"pr.owner": "acme", "turn.stage": "first", "pr.base": "main"}, HasBrief: true, Tags: []string{"change:refac"}})
 	got := labels(g)[1:]
 	if want := []string{"Org acme", "Base branch main", "Primeira rodada", "Tag change=refac"}; !slices.Equal(got, want) {
 		t.Fatalf("%q, want %q", got, want)

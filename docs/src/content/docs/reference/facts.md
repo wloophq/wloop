@@ -13,10 +13,10 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 |---|---|---|---|
 | `pr.mine` | bool | action, turn | The pull request's author is the viewer. |
 | `pr.author` | string | action, turn | The pull request's author login. |
-| `pr.state` | string | action, turn | The pull request's state on GitHub. |
+| `pr.state` | string | action, turn | The pull request's state on GitHub: OPEN, CLOSED or MERGED, as the inventory stores it. |
 | `pr.slug` | string | action, turn | owner/repo#number. |
 | `pr.owner` | string | action, turn | The repository owner. |
-| `pr.repo` | string | action, turn | The repository name. |
+| `pr.repo_name` | string | action, turn | The repository name; the workflow fact pr.repo is owner/repo. |
 | `pr.base` | string | action, turn | The base branch. |
 | `pr.association` | string | turn | The author's association with the repository, from the Basics read. |
 | `pr.cross_repository` | bool | action, turn | The head branch lives in a fork. |
@@ -31,33 +31,34 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `row.kind` | string | action | The row's situation kind. |
 | `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
 | `row.tracked` | bool | action | The pull request is in the inventory. |
-| `row.adopted` | bool | action | The pull request was taken over into the loop. |
-| `row.held` | bool | action | Rounds on the pull request are held. |
-| `row.muted` | bool | action | The pull request is muted, by the server clock. |
+| `pr.adopted` | bool | action | The pull request was taken over into the loop. |
+| `pr.held` | bool | action | Rounds on the pull request are held. |
+| `pr.muted` | bool | action | The pull request is muted, by the server clock. |
 | `row.question` | bool | action | A turn waits on the user's answer. |
 | `row.pending` | bool | action | A round is pending. |
 | `row.intake` | bool | action | An intake is open on the pull request. |
 | `row.author_workspace` | bool | action | A linked workspace holds the author role. |
 | `row.yours` | bool | action | The row's unit is the viewer's to act on: any unit but a pull request, or a pull request that is the viewer's, taken over or held by an author workspace. |
 | `row.review_workspace` | bool | action | A linked workspace holds the review role. |
-| `row.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
-| `row.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
-| `row.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
+| `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
+| `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
+| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
 | `turn.trigger` | string | turn | by-hand or automated. |
 | `turn.automated` | bool | turn | The sweep started the turn. |
 | `turn.owned` | bool | turn | The viewer owns the pull request's loop. |
 | `turn.needs_take_over` | bool | turn | owner_only, not owned, and no input with before = "take_over" set. |
 | `turn.resume` | bool | turn | The turn resumes an earlier one. |
-| `turn.plain` | bool | turn | The turn is a dry run (profile try). |
-| `turn.planned` | string | turn | The round the request planned. |
-| `turn.round` | string | turn | first or follow-up; only intents with dims = ["round"] may read it. |
-| `last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
-| `last_review.verdict` | string | turn | The viewer's newest review state, any state. |
-| `last_review.decision` | string | turn | The viewer's newest non-comment verdict. |
-| `config.address_reviews` | bool | action, turn | The address_reviews setting for the pull request. |
-| `config.address_checks` | bool | action, turn | The address_checks setting for the pull request. |
-| `config.followups_without_workspace` | bool | action, turn | The followups_without_workspace setting for the pull request. |
-| `config.address_without_workspace` | bool | action, turn | The address_without_workspace setting for the pull request. |
+| `turn.try` | bool | turn | The turn is a dry run (profile try). |
+| `turn.planned` | string | turn | The round the request planned: first, follow-up, or empty for none. |
+| `turn.stage` | string | turn | first or follow-up; only intents with dims = ["round"] may read it. |
+| `unit.ref` | string | turn | The unit as the instructions name it, such as owner/repo#12. |
+| `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
+| `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
+| `pr.last_review.decision` | string | turn | The viewer's newest non-comment verdict; empty when none. |
+| `config.github.address_reviews` | bool | action, turn | The github.address_reviews setting for the pull request. |
+| `config.github.address_checks` | bool | action, turn | The github.address_checks setting for the pull request. |
+| `config.github.followups_without_workspace` | bool | action, turn | The github.followups_without_workspace setting for the pull request. |
+| `config.github.address_without_workspace` | bool | action, turn | The github.address_without_workspace setting for the pull request. |
 
 ## Workflow facts
 
@@ -73,7 +74,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.head` | string | The head commit's oid. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
 | `pr.mine` | bool | The pull request's author is the viewer. |
-| `pr.checks` | string | The checks' rollup on the head. |
+| `pr.checks` | string | The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks. |
 | `pr.stalled` | bool | The checks stalled on the head. |
 | `pr.age` | duration | Time since the pull request opened. |
 | `pr.held` | bool | Rounds on the pull request are held. |
@@ -98,7 +99,8 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. |
 | `pr.silent_days` | int | Calendar days since last_interaction_at. |
 | `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[draft_approval]` rule reads it. |
-| `pr.nudge_refusal` | string | The text nudge.prepare would refuse with today; empty when a nudge may go. |
+| `pr.nudge.refusal` | string | The text nudge.prepare would refuse with today; empty when a nudge may go. |
+| `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
 | `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `pr.repo` | string | owner/repo. |
 | `pr.owner` | string | The repository owner. |
@@ -124,7 +126,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
 | `session.idle_since` | timestamp | When the current idle period started. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[draft_approval]` rule reads it. |
-| `session.pr_state` | string | The state of the book's pull request. |
+| `session.pr_state` | string | The state of the book's pull request: open, closed or merged; empty when none. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
@@ -138,7 +140,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `workspace.role` | string | author (a taken-over workspace included), review or none. |
 | `workspace.main` | bool | The workspace is the repository's main checkout. |
 | `workspace.pr` | string | The linked pull request, owner/repo#number; empty when none. |
-| `workspace.pr_state` | string | The linked pull request's state. |
+| `workspace.pr_state` | string | The linked pull request's state: open, closed or merged; empty when none. |
 | `workspace.pr_finished_for` | duration | The linked pull request's pr.finished_for. |
 | `workspace.path_exists` | bool | The worktree path exists. |
 | `workspace.temporary` | bool | The worktree lives under a temporary path. |
@@ -165,7 +167,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `entry.resurface_at` | timestamp | When the entry resurfaces; zero when it has no date. |
 | `entry.waiting_days` | int | Working days the entry has waited, in the configured location, as the GTD rules count them. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.since_nudge` | duration | Time since the entry's last nudge; very large when it was never nudged. |
-| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.muted` | bool | The entry is muted. |
 | `entry.unit` | string | The entry's unit as provider:key; empty for an entry with none. |
 | `entry.unit_provider` | string | The provider of the entry's unit; empty for an entry with none. |
@@ -173,7 +175,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.items_open` | int | Open items of the entry's unit. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.items_resolved` | int | Resolved items of the entry's unit. **Untrusted**: no `[draft_approval]` rule reads it. |
-| `entry.items_held` | int | Open items of the entry's unit that the entry holds. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `entry.items_owed` | int | Open items of the entry's unit that the entry holds. **Untrusted**: no `[draft_approval]` rule reads it. |
 | `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
 | `entry.fingerprint` | string | The entry's id, state and update time. **Untrusted**: no `[draft_approval]` rule reads it. |
 
@@ -192,19 +194,19 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 
 | `brief` fact | Type | Meaning |
 |---|---|---|
-| `brief.goal` | string | The brief's goal; empty when the unit has no brief. |
-| `brief.risk` | string | The brief's risk: low, medium or high. |
-| `brief.kind` | string | The brief's kind, from the provider's taxonomy. |
-| `brief.size` | string | The brief's size; GitHub briefs only. |
-| `brief.tags` | list | The brief's normalized key:value tags. |
-| `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. |
+| `brief.goal` | string | The brief's goal; empty when the unit has no brief. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `brief.risk` | string | The brief's risk: low, medium or high. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `brief.kind` | string | The brief's kind, from the provider's taxonomy. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `brief.size` | string | The brief's size; GitHub briefs only. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `brief.tags` | list | The brief's normalized key:value tags. **Untrusted**: no `[draft_approval]` rule reads it. |
+| `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. **Untrusted**: no `[draft_approval]` rule reads it. |
 
 | `draft` fact | Type | Meaning |
 |---|---|---|
 | `draft.person_waited` | bool | The draft's person is still waited on by its entry; true for a draft of no person. |
-| `draft.items_held` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
-| `draft.items_owned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
-| `draft.subject_open` | bool | The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored. |
+| `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
+| `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
+| `draft.unit_open` | bool | The draft's unit still exists: its entry is neither done nor in the trash, or its unit is stored. |
 
 | `trigger` fact | Type | Meaning |
 |---|---|---|
@@ -223,8 +225,8 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `config.cleanup.stale_workspace` | duration | The cleanup.stale_workspace setting. |
 | `config.nudge.silent_days` | int | The nudge.silent_days setting, in calendar days. |
 | `config.gtd.stale_waiting_days` | int | The gtd.stale_waiting_days setting, in working days. |
-| `config.proposals.renudge_after` | duration | The proposals.renudge_after setting. |
-| `config.turns.automated_per_day` | int | The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together. |
+| `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
+| `config.turns.per_day` | int | The turns.per_day setting: automated turns on units other than pull requests, all workflows together. |
 
 ## Draft approval facts
 
@@ -250,7 +252,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
 | `turn.start` | any | Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`. |
-| `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled, or a duration of the config such as `config.proposals.renudge_after`) and `hold_after_sent` (likewise, or `forever`). Holds while a draft of the workflow, subject and person is open or failed; a run that leaves a person under a hold that ends with time stays pending until it ends. |
+| `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled, or a duration of the config such as `config.drafts.repeat_after`) and `hold_after_sent` (likewise, or `forever`). Holds while a draft of the workflow, subject and person is open or failed; a run that leaves a person under a hold that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`. |
 | `notify.self` | any | A private notification. |
 

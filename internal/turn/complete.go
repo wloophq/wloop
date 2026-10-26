@@ -207,17 +207,19 @@ func (f turnFacts) Get(field string) any {
 		return c.Trigger.String()
 	case "turn.automated":
 		return c.Automated()
+	case "unit.ref":
+		return c.Wording.Ref
 	case "turn.owned":
 		return c.Owned
 	case "turn.needs_take_over":
 		return c.NeedsTakeOver
 	case "turn.resume":
 		return c.Resume != nil
-	case "turn.plain":
+	case "turn.try":
 		return c.Plain
 	case "turn.planned":
 		return c.Planned.String()
-	case "turn.round":
+	case "turn.stage":
 		return c.Round
 	case "pr.requested_teams":
 		if c.PR() == nil {
@@ -227,22 +229,22 @@ func (f turnFacts) Get(field string) any {
 			return []string{}
 		}
 		return c.Facts.RequestedTeams
-	case "last_review.exists":
+	case "pr.last_review.exists":
 		return c.prior() != nil
-	case "last_review.verdict":
+	case "pr.last_review.verdict":
 		return c.Facts.LastReviewVerdict
-	case "last_review.decision":
+	case "pr.last_review.decision":
 		if c.prior() == nil {
 			return ""
 		}
 		return c.prior().Verdict
-	case "config.address_reviews":
+	case "config.github.address_reviews":
 		return c.Facts.AddressReviews
-	case "config.address_checks":
+	case "config.github.address_checks":
 		return c.Facts.AddressChecks
-	case "config.followups_without_workspace":
+	case "config.github.followups_without_workspace":
 		return c.Facts.FollowupsWithoutWorkspace
-	case "config.address_without_workspace":
+	case "config.github.address_without_workspace":
 		return c.Facts.AddressWithoutWorkspace
 	}
 	return nil

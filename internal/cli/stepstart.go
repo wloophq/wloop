@@ -378,13 +378,7 @@ func (s *stepSet) refusal(ctx context.Context, p startPlan) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	switch o := overrides[p.ref]; {
-	case o.MuteUntilStateChange:
-		return "muted until its state changes", nil
-	case o.MutedUntil.After(s.e.Now()):
-		return "muted until " + o.MutedUntil.Local().Format(time.DateTime), nil
-	}
-	return "", nil
+	return overrides[p.ref].MuteRefusal(s.e.Now()), nil
 }
 
 func isCapRefusal(refusal string) bool { return strings.Contains(refusal, "daily cap reached") }

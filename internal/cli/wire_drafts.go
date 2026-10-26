@@ -80,7 +80,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 		sub, err := w.d.subject(ctx, subject)
 		switch {
 		case err != nil && d.Entry != "" && errors.Is(err, coregtd.ErrNoEntry):
-			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_held": 0, "draft.items_owned": 0, "draft.subject_open": false}
+			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false}
 		case err != nil:
 			return nil, err
 		default:

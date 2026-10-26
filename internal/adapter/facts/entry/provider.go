@@ -176,7 +176,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"entry.unit_closure_posted": false,
 		"entry.items_open":          0,
 		"entry.items_resolved":      0,
-		"entry.items_held":          0,
+		"entry.items_owed":          0,
 		"entry.settled_at":          time.Time{},
 		"entry.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
 	}
@@ -223,7 +223,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 			resolved++
 		}
 	}
-	f["entry.items_open"], f["entry.items_resolved"], f["entry.items_held"] = open, resolved, len(held(e, got[eu]))
+	f["entry.items_open"], f["entry.items_resolved"], f["entry.items_owed"] = open, resolved, len(held(e, got[eu]))
 	return f, nil
 }
 

@@ -15,8 +15,8 @@ every = "sweep"
 use = "draft.propose"
 purpose = "ask_owner"
 items = "unowned_aged"
-hold = "config.proposals.renudge_after"
+hold = "config.drafts.repeat_after"
 
 [withdraw]
-when = 'draft.items_owned > 0'
+when = 'draft.items_assigned > 0'
 reason = "assigned"

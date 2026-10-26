@@ -29,7 +29,7 @@ var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
 const (
 	waitingWorkflow = `description = "Watch waiting entries"
 subject = "entry"
-when = 'entry.state == "waiting" && entry.items_held > 0 && entry.settled_at < now'
+when = 'entry.state == "waiting" && entry.items_owed > 0 && entry.settled_at < now'
 key = ["entry.settled_at", "entry.waiting_on"]
 
 [trigger]

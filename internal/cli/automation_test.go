@@ -556,7 +556,7 @@ func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
 func TestConfigFactsCarryTheProposalSettings(t *testing.T) {
 	t.Parallel()
 	f := configFacts(Defaults())
-	if f["config.gtd.stale_waiting_days"] != 2 || f["config.proposals.renudge_after"] != 24*time.Hour || f["config.turns.automated_per_day"] != 20 {
+	if f["config.gtd.stale_waiting_days"] != 2 || f["config.drafts.repeat_after"] != 24*time.Hour || f["config.turns.per_day"] != 20 {
 		t.Fatalf("%v", f)
 	}
 }

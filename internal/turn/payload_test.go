@@ -168,12 +168,12 @@ func TestTurnFactsOfASample(t *testing.T) {
 	d, _ := bundled(t).Registry.Get(dintent.Review)
 	c := samples(d)[0]
 	want := map[string]any{
-		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo": "api",
+		"pr.mine": false, "pr.author": "sample", "pr.state": "OPEN", "pr.slug": "acme/api#7", "pr.owner": "acme", "pr.repo_name": "api",
 		"pr.base": "main", "pr.association": "MEMBER", "pr.cross_repository": false, "pr.visibility": "", "pr.labels": []string{"sample"}, "pr.requested_teams": []string{}, "pr.address.reviewers": []string{}, "pr.address.checks": []string{}, "pr.address.conflict": false,
 		"turn.trigger": "by-hand", "turn.automated": false, "turn.owned": false, "turn.needs_take_over": false, "turn.resume": false,
-		"turn.plain": false, "turn.planned": "", "turn.round": "first",
-		"last_review.exists": true, "last_review.verdict": "", "last_review.decision": "APPROVED",
-		"config.address_reviews": false, "config.address_checks": false, "config.followups_without_workspace": false, "config.address_without_workspace": false,
+		"turn.try": false, "turn.planned": "", "turn.stage": "first", "unit.ref": "acme/api#7",
+		"pr.last_review.exists": true, "pr.last_review.verdict": "", "pr.last_review.decision": "APPROVED",
+		"config.github.address_reviews": false, "config.github.address_checks": false, "config.github.followups_without_workspace": false, "config.github.address_without_workspace": false,
 	}
 	var seen []string
 	for _, f := range builtin.Facts {
@@ -201,7 +201,7 @@ func TestTurnFactsOfASample(t *testing.T) {
 
 func TestThreadTurnReadsNoPRFact(t *testing.T) {
 	c := Context{Payload: threadPayload{"1"}}
-	for _, name := range []string{"pr.mine", "pr.author", "last_review.decision"} {
+	for _, name := range []string{"pr.mine", "pr.author", "pr.last_review.decision"} {
 		if got := (turnFacts{&c}).Get(name); got != nil && got != "" {
 			t.Errorf("%s = %#v on a thread", name, got)
 		}

@@ -112,14 +112,14 @@ func TestBuildComposesWithTheStoredFacts(t *testing.T) {
 	if err != nil || c.Brief != br || c.BriefMissing != "" || st.calls != 1 {
 		t.Fatalf("%+v %v", c, err)
 	}
-	want := map[string]any{"pr.owner": "acme", "pr.repo": "api", "pr.author": "ana", "pr.association": "FIRST_TIME_CONTRIBUTOR", "pr.base": "main",
-		"turn.round": "follow-up", "brief.kind": "fix", "brief.size": "s", "brief.risk": "low", "pr.requested_teams": []string{"acme-platform"},
+	want := map[string]any{"pr.owner": "acme", "pr.repo_name": "api", "pr.author": "ana", "pr.association": "FIRST_TIME_CONTRIBUTOR", "pr.base": "main",
+		"turn.stage": "follow-up", "brief.kind": "fix", "brief.size": "s", "brief.risk": "low", "pr.requested_teams": []string{"acme-platform"},
 		"pr.labels": []string{"hotfix"}, "pr.address.reviewers": []string{}}
 	if !reflect.DeepEqual(seen.Values, want) || !seen.HasBrief || strings.Join(seen.Tags, ",") != "lang:go" || strings.Join(seen.Files, ",") != "a.go" {
 		t.Fatalf("%+v", seen)
 	}
-	if _, err := (Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: st}).Build(context.Background(), Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: &PR{}}); err != nil || seen.Values["turn.round"] != "" {
-		t.Fatalf("an address round has a round fact: %q %v", seen.Values["turn.round"], err)
+	if _, err := (Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: st}).Build(context.Background(), Request{Intent: Intent(dintent.Address), Unit: ref7.Unit(), Payload: &PR{}}); err != nil || seen.Values["turn.stage"] != "" {
+		t.Fatalf("an address round has a round fact: %q %v", seen.Values["turn.stage"], err)
 	}
 }
 
@@ -135,7 +135,7 @@ func TestBuildWithoutABrief(t *testing.T) {
 		{Builder{Intents: bundledIntents, Payloads: githubReads(&fakePRs{}), Guides: guides{seen: &seen}, Facts: &facts{err: errors.New("disk")}}, "", "reading it failed (disk)"},
 	} {
 		got, err := c.b.Build(context.Background(), Request{Intent: Intent(dintent.Review), Unit: ref7.Unit(), Payload: &PR{}, BriefMissing: c.reason})
-		if err != nil || got.Brief != nil || got.BriefMissing != c.want || seen.HasBrief || seen.Values["turn.round"] != "first" {
+		if err != nil || got.Brief != nil || got.BriefMissing != c.want || seen.HasBrief || seen.Values["turn.stage"] != "first" {
 			t.Errorf("%+v %v %+v", got.BriefMissing, err, seen)
 		}
 	}
@@ -228,7 +228,7 @@ func TestASelfReviewComposesTheReviewGuideForAFirstRound(t *testing.T) {
 	if err != nil || c.Inputs["self_review"] != true || !slices.Equal(seen, []profile.Kind{addressKind, reviewKind}) {
 		t.Fatalf("%v %v %v", seen, c.Inputs, err)
 	}
-	if facts[1].Values["turn.round"] != "first" || c.Guides["review"].Kind != reviewKind {
+	if facts[1].Values["turn.stage"] != "first" || c.Guides["review"].Kind != reviewKind {
 		t.Fatalf("facts %+v guides %v", facts, c.Guides)
 	}
 }

@@ -762,10 +762,10 @@ func TestWaitsOnUserFollowsTheRow(t *testing.T) {
 			t.Errorf("%s: waits_on_user = %v, want %v", r, got, want)
 		}
 	}
-	if f := facts(t, p, waitsOnBob.Unit()); f["pr.nudge_refusal"] != "" {
-		t.Errorf("a nudge to bob is refused: %q", f["pr.nudge_refusal"])
+	if f := facts(t, p, waitsOnBob.Unit()); f["pr.nudge.refusal"] != "" {
+		t.Errorf("a nudge to bob is refused: %q", f["pr.nudge.refusal"])
 	}
-	if f := facts(t, p, asksMe.Unit()); f["pr.nudge_refusal"] == "" {
+	if f := facts(t, p, asksMe.Unit()); f["pr.nudge.refusal"] == "" {
 		t.Error("a nudge on a pull request waiting on me goes")
 	}
 }

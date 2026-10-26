@@ -2,8 +2,10 @@ package builtin
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/facet"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -49,6 +51,34 @@ func enum(f Fact, values map[unit.ProviderID][]string) Fact {
 // anyProvider keys an enum that holds for every provider.
 const anyProvider unit.ProviderID = ""
 
+// enumOf is an enum of values that holds for every provider.
+func enumOf(values ...string) map[unit.ProviderID][]string {
+	return map[unit.ProviderID][]string{anyProvider: values}
+}
+
+// was names the removed spellings of f, which a predicate is told f
+// replaced.
+func was(f Fact, old ...string) Fact {
+	f.Was = old
+	return f
+}
+
+// PRStates are a pull request's states as the inventory stores them;
+// prStatesLower are the workflow slot's spelling.
+var (
+	PRStates      = []string{"OPEN", "CLOSED", "MERGED"}
+	prStatesLower = []string{"open", "closed", "merged"}
+)
+
+// ReviewStates are GitHub's review states, and the empty value of no review.
+var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
+
+// EntryKinds and EntryStates are a GTD entry's kinds and states.
+var (
+	EntryKinds  = []string{string(gtd.KindAction), string(gtd.KindWaiting), string(gtd.KindClose), string(gtd.KindMessage), string(gtd.KindDraft), string(gtd.KindCapture), string(gtd.KindProject), string(gtd.KindReference)}
+	EntryStates = []string{string(gtd.Inbox), string(gtd.Next), string(gtd.Waiting), string(gtd.Scheduled), string(gtd.Someday), string(gtd.Reference), string(gtd.Done), string(gtd.Trash)}
+)
+
 // Associations are GitHub's author associations.
 var Associations = []string{"OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR", "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE"}
 
@@ -71,10 +101,12 @@ var BriefSubjects = []string{"pr", "slack", "entry"}
 // BriefSlot is the slot of the facts of a unit's brief.
 const BriefSlot = "brief"
 
-// briefWF is a fact of the unit's brief, read by every slot of BriefSubjects.
+// briefWF is a fact of the unit's brief, read by every slot of BriefSubjects;
+// an agent writes the brief, so it is untrusted.
 func briefWF(name string, t expr.Type, doc string) Fact {
 	f := wf(BriefSlot, name, t, doc)
 	f.Subjects = BriefSubjects
+	f.Untrusted = true
 	return f
 }
 
@@ -86,10 +118,10 @@ var Facts = slices.Concat(intentPRFacts, ActionFacts, otherFacts)
 var intentPRFacts = []Fact{
 	prFact("pr.mine", expr.Bool, both, "The pull request's author is the viewer."),
 	dim(prFact("pr.author", expr.String, both, "The pull request's author login.")),
-	prFact("pr.state", expr.String, both, "The pull request's state on GitHub."),
+	enum(prFact("pr.state", expr.String, both, "The pull request's state on GitHub: OPEN, CLOSED or MERGED, as the inventory stores it."), enumOf(PRStates...)),
 	prFact("pr.slug", expr.String, both, "owner/repo#number."),
 	dim(prFact("pr.owner", expr.String, both, "The repository owner.")),
-	dim(prFact("pr.repo", expr.String, both, "The repository name.")),
+	dim(was(prFact("pr.repo_name", expr.String, both, "The repository name; the workflow fact pr.repo is owner/repo."), "pr.repo")),
 	dim(prFact("pr.base", expr.String, both, "The base branch.")),
 	dim(enum(prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."), map[unit.ProviderID][]string{anyProvider: Associations})),
 	prFact("pr.cross_repository", expr.Bool, both, "The head branch lives in a fork."),
@@ -104,22 +136,23 @@ var intentPRFacts = []Fact{
 // otherFacts are the turn slot's own facts, the config facts of the intent
 // slots, and every workflow and approval fact.
 var otherFacts = []Fact{
-	fact("turn.trigger", expr.String, trn, "by-hand or automated."),
+	enum(fact("turn.trigger", expr.String, trn, "by-hand or automated."), enumOf("by-hand", "automated")),
 	fact("turn.automated", expr.Bool, trn, "The sweep started the turn."),
 	fact("turn.owned", expr.Bool, trn, "The viewer owns the pull request's loop."),
 	fact("turn.needs_take_over", expr.Bool, trn, "owner_only, not owned, and no input with before = \"take_over\" set."),
 	fact("turn.resume", expr.Bool, trn, "The turn resumes an earlier one."),
-	fact("turn.plain", expr.Bool, trn, "The turn is a dry run (profile try)."),
-	fact("turn.planned", expr.String, trn, "The round the request planned."),
-	dim(enum(fact("turn.round", expr.String, trn, "first or follow-up; only intents with dims = [\"round\"] may read it."), map[unit.ProviderID][]string{anyProvider: {"first", "follow-up"}})),
-	fact("last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
-	fact("last_review.verdict", expr.String, trn, "The viewer's newest review state, any state."),
-	fact("last_review.decision", expr.String, trn, "The viewer's newest non-comment verdict."),
-	fact("config.address_reviews", expr.Bool, both, "The address_reviews setting for the pull request."),
-	fact("config.address_checks", expr.Bool, both, "The address_checks setting for the pull request."),
-	fact("config.followups_without_workspace", expr.Bool, both, "The followups_without_workspace setting for the pull request."),
-	fact("config.address_without_workspace", expr.Bool, both, "The address_without_workspace setting for the pull request."),
-	wf("pr", "state", expr.String, "The pull request's state on GitHub: open, closed or merged."),
+	was(fact("turn.try", expr.Bool, trn, "The turn is a dry run (profile try)."), "turn.plain"),
+	enum(fact("turn.planned", expr.String, trn, "The round the request planned: first, follow-up, or empty for none."), enumOf("", "first", "follow-up")),
+	dim(was(enum(fact("turn.stage", expr.String, trn, "first or follow-up; only intents with dims = [\"round\"] may read it."), enumOf("first", "follow-up")), "turn.round")),
+	fact("unit.ref", expr.String, trn, "The unit as the instructions name it, such as owner/repo#12."),
+	was(fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."), "last_review.exists"),
+	was(enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)), "last_review.verdict"),
+	was(enum(fact("pr.last_review.decision", expr.String, trn, "The viewer's newest non-comment verdict; empty when none."), enumOf(ReviewStates...)), "last_review.decision"),
+	was(fact("config.github.address_reviews", expr.Bool, both, "The github.address_reviews setting for the pull request."), "config.address_reviews"),
+	was(fact("config.github.address_checks", expr.Bool, both, "The github.address_checks setting for the pull request."), "config.address_checks"),
+	was(fact("config.github.followups_without_workspace", expr.Bool, both, "The github.followups_without_workspace setting for the pull request."), "config.followups_without_workspace"),
+	was(fact("config.github.address_without_workspace", expr.Bool, both, "The github.address_without_workspace setting for the pull request."), "config.address_without_workspace"),
+	enum(wf("pr", "state", expr.String, "The pull request's state on GitHub: open, closed or merged."), enumOf(prStatesLower...)),
 	wf("pr", "merged_at", expr.Time, "When the pull request merged; zero when it did not."),
 	wf("pr", "closed_at", expr.Time, "When the pull request closed; zero when open."),
 	wf("pr", "finished_for", expr.Duration, "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."),
@@ -127,7 +160,7 @@ var otherFacts = []Fact{
 	wf("pr", "head", expr.String, "The head commit's oid."),
 	wf("pr", "conflicting_for", expr.Duration, "How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not."),
 	wf("pr", "mine", expr.Bool, "The pull request's author is the viewer."),
-	wf("pr", "checks", expr.String, "The checks' rollup on the head."),
+	enum(wf("pr", "checks", expr.String, "The checks' rollup on the head: success, failure, pending, error or expected; empty with no checks."), enumOf("", "success", "failure", "pending", "error", "expected")),
 	wf("pr", "stalled", expr.Bool, "The checks stalled on the head."),
 	wf("pr", "age", expr.Duration, "Time since the pull request opened."),
 	wf("pr", "held", expr.Bool, "Rounds on the pull request are held."),
@@ -138,7 +171,7 @@ var otherFacts = []Fact{
 	untrusted(wf("pr", "open_turn", expr.String, "The state of the book's open turn; empty when none.")),
 	untrusted(wf("pr", "open_turn_seq", expr.Int, "The sequence of the book's open turn; 0 when none.")),
 	untrusted(wf("pr", "orphan_answer_id", expr.Int, "The id of an answer whose turn ended; 0 when none.")),
-	untrusted(wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete.")),
+	untrusted(enum(wf("pr", "review.action", expr.String, "What the review rules decide: empty, follow-up or complete."), enumOf("", "follow-up", "complete"))),
 	untrusted(wf("pr", "review.reason", expr.String, "Why the review rules decide so.")),
 	untrusted(wf("pr", "review.observed", expr.Bool, "The review rules observe without acting.")),
 	untrusted(wf("pr", "first.due", expr.Bool, "A first round is due.")),
@@ -152,13 +185,14 @@ var otherFacts = []Fact{
 	wf("pr", "last_interaction_at", expr.Time, "The newest comment, review, push or review request, by anyone."),
 	wf("pr", "silent_days", expr.Int, "Calendar days since last_interaction_at."),
 	untrusted(wf("pr", "waits_on_user", expr.Bool, "The row waits on the user, per situation.Derive.")),
-	wf("pr", "nudge_refusal", expr.String, "The text nudge.prepare would refuse with today; empty when a nudge may go."),
+	was(wf("pr", "nudge.refusal", expr.String, "The text nudge.prepare would refuse with today; empty when a nudge may go."), "pr.nudge_refusal"),
+	wf("pr", "mute.refusal", expr.String, "Why the pull request is muted, such as muted until its state changes; empty when it is not."),
 	untrusted(wf("pr", "fingerprint", expr.String, "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips.")),
 	wf("pr", "repo", expr.String, "owner/repo."),
 	wf("pr", "owner", expr.String, "The repository owner."),
 	wf("pr", "author", expr.String, "The pull request's author login; empty when not stored."),
 	wf("pr", "visibility", expr.String, "The repository's visibility: public, private or internal; empty until the pull request is read in full."),
-	wf("session", "state", expr.String, "active (it has a live process), dormant (no process; its manager can wake it) or closed."),
+	enum(wf("session", "state", expr.String, "active (it has a live process), dormant (no process; its manager can wake it) or closed."), enumOf("active", "dormant", "closed")),
 	wf("session", "manager", expr.String, "The workspace manager that owns the session, such as orca or claude-desktop."),
 	wf("session", "managed", expr.Bool, "The session was started by the loop (sessions.managed)."),
 	wf("session", "listed", expr.Bool, "The session's manager lists its process as usable."),
@@ -175,7 +209,7 @@ var otherFacts = []Fact{
 	wf("session", "closes_when_done", expr.Bool, "The newest turn's intent closes its session when done."),
 	untrusted(wf("session", "idle_since", expr.Time, "When the current idle period started.")),
 	untrusted(wf("session", "idle_for", expr.Duration, "Time since idle_since.")),
-	wf("session", "pr_state", expr.String, "The state of the book's pull request."),
+	enum(wf("session", "pr_state", expr.String, "The state of the book's pull request: open, closed or merged; empty when none."), enumOf(append([]string{""}, prStatesLower...)...)),
 	wf("session", "duplicate", expr.Bool, "Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates."),
 	wf("session", "worktree_gone", expr.Bool, "The session's worktree path no longer exists."),
 	wf("session", "closed_by_manager", expr.Bool, "The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop."),
@@ -183,10 +217,10 @@ var otherFacts = []Fact{
 	wf("session", "process_gone", expr.Bool, "The active session's process was missed by two complete censuses of its manager."),
 	untrusted(wf("session", "fingerprint", expr.String, "The session id, its state, the start of the idle period and the newest turn's sequence.")),
 	wf("session", "repo", expr.String, "owner/repo of the book's pull request; empty when none."),
-	wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."),
+	enum(wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."), enumOf("author", "review", "none")),
 	wf("workspace", "main", expr.Bool, "The workspace is the repository's main checkout."),
 	wf("workspace", "pr", expr.String, "The linked pull request, owner/repo#number; empty when none."),
-	wf("workspace", "pr_state", expr.String, "The linked pull request's state."),
+	enum(wf("workspace", "pr_state", expr.String, "The linked pull request's state: open, closed or merged; empty when none."), enumOf(append([]string{""}, prStatesLower...)...)),
 	wf("workspace", "pr_finished_for", expr.Duration, "The linked pull request's pr.finished_for."),
 	wf("workspace", "path_exists", expr.Bool, "The worktree path exists."),
 	wf("workspace", "temporary", expr.Bool, "The worktree lives under a temporary path."),
@@ -204,13 +238,13 @@ var otherFacts = []Fact{
 	untrusted(wf("workspace", "fingerprint", expr.String, "The worktree path and its head.")),
 	wf("workspace", "repo", expr.String, "owner/repo; empty when unknown."),
 	wf("entry", "id", expr.String, "The entry's id."),
-	untrusted(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project.")),
-	untrusted(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash.")),
+	untrusted(enum(wf("entry", "kind", expr.String, "The entry's kind, such as action, waiting, close, message, capture or project."), enumOf(EntryKinds...))),
+	untrusted(enum(wf("entry", "state", expr.String, "The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash."), enumOf(EntryStates...))),
 	untrusted(wf("entry", "waiting_on", expr.List, "The person keys the entry waits on, such as slack:U0123.")),
 	wf("entry", "resurface_at", expr.Time, "When the entry resurfaces; zero when it has no date."),
 	untrusted(wf("entry", "waiting_days", expr.Int, "Working days the entry has waited, in the configured location, as the GTD rules count them.")),
 	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
-	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled.")),
+	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled.")),
 	wf("entry", "muted", expr.Bool, "The entry is muted."),
 	wf("entry", "unit", expr.String, "The entry's unit as provider:key; empty for an entry with none."),
 	wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."),
@@ -218,11 +252,11 @@ var otherFacts = []Fact{
 	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives.")),
 	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's unit.")),
 	untrusted(wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's unit.")),
-	untrusted(wf("entry", "items_held", expr.Int, "Open items of the entry's unit that the entry holds.")),
+	untrusted(was(wf("entry", "items_owed", expr.Int, "Open items of the entry's unit that the entry holds."), "entry.items_held")),
 	wf("entry", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none."),
 	untrusted(wf("entry", "fingerprint", expr.String, "The entry's id, state and update time.")),
 	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
-	providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."),
+	enum(providerWF(dslack.Provider, "slack", "conversation", expr.String, "The conversation's kind: channel, dm or group."), enumOf("channel", "dm", "group")),
 	untrusted(providerWF(dslack.Provider, "slack", "started_by_me", expr.Bool, "The viewer started the thread.")),
 	untrusted(providerWF(dslack.Provider, "slack", "closure_posted", expr.Bool, "A closure was posted on the unit, by the extraction or a sent draft's unit.closed.")),
 	untrusted(providerWF(dslack.Provider, "slack", "live_entry", expr.Bool, "A live entry, neither done nor in the trash and not muted, is attached to the unit.")),
@@ -238,14 +272,14 @@ var otherFacts = []Fact{
 	briefWF("tags", expr.List, "The brief's normalized key:value tags."),
 	briefWF("missing", expr.List, "The brief intent's extra fields the unit's brief lacks: new or changed since it was written."),
 	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its entry; true for a draft of no person."),
-	wf("draft", "items_held", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
-	wf("draft", "items_owned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
-	wf("draft", "subject_open", expr.Bool, "The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored."),
-	approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."),
+	was(wf("draft", "items_owed", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."), "draft.items_held"),
+	was(wf("draft", "items_assigned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."), "draft.items_owned"),
+	was(wf("draft", "unit_open", expr.Bool, "The draft's unit still exists: its entry is neither done nor in the trash, or its unit is stored."), "draft.subject_open"),
+	enum(approvalFact("delivery", expr.String, "How the unit's plugin posts the draft: message, reaction or comment. A plugin that posts every text as a comment makes each draft that is not a reaction a comment, whatever its proposer asked for."), enumOf(DraftDeliveries...)),
 	approvalFact("proposer", expr.String, "What proposed the draft: workflow:<name> for a workflow's draft.propose, intent:<name> for a turn's or a session's, rule:<name> for a plugin rule's."),
 	approvalFact("effects", expr.List, "The effects the draft applies once sent when the loop named them, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names them. A workflow's rules and the configuration's read it; an intent's do not."),
 	approvalFact("purpose", expr.String, "The draft's purpose when the loop named it, a workflow's draft.propose or a plugin rule; empty for a turn's or a session's draft, whose agent names it. A workflow's rules and the configuration's read it; an intent's do not."),
-	wf("trigger", "kind", expr.String, "sweep, event or schedule."),
+	enum(wf("trigger", "kind", expr.String, "sweep, event or schedule."), enumOf("sweep", "event", "schedule")),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),
 	wf("trigger", "event.key", expr.String, "The event's key."),
 	wf("trigger", "event.data", expr.String, "The event's data."),
@@ -257,8 +291,8 @@ var otherFacts = []Fact{
 	wf("config", "cleanup.stale_workspace", expr.Duration, "The cleanup.stale_workspace setting."),
 	wf("config", "nudge.silent_days", expr.Int, "The nudge.silent_days setting, in calendar days."),
 	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
-	wf("config", "proposals.renudge_after", expr.Duration, "The proposals.renudge_after setting."),
-	wf("config", "turns.automated_per_day", expr.Int, "The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together."),
+	was(wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."), "config.proposals.renudge_after"),
+	was(wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units other than pull requests, all workflows together."), "config.turns.automated_per_day"),
 }
 
 // approvalFact is a fact of the draft a [draft_approval] rule reads,
@@ -354,6 +388,24 @@ func ExtraFacts(props []jsonschema.Property) expr.Env {
 		}
 	}
 	return env
+}
+
+// ClassifyPrefix names a classify step's output as a fact.
+const ClassifyPrefix = "classify."
+
+// IsUntrusted says whether a rule may not trust the fact name: an agent or a
+// third party sets its value. A brief's extra fields and a classification's
+// output are untrusted whatever their name.
+func IsUntrusted(name string) bool {
+	if strings.HasPrefix(name, ExtraPrefix) || strings.HasPrefix(name, ClassifyPrefix) {
+		return true
+	}
+	for _, f := range Facts {
+		if f.Name == name && f.Untrusted {
+			return true
+		}
+	}
+	return false
 }
 
 // ExtraPrefix names a brief's extra field as a fact.

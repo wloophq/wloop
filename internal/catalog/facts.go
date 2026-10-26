@@ -121,7 +121,7 @@ func (f Facts) Get(field string) any {
 		return f.slug()
 	case "pr.owner":
 		return f.Ref.Owner
-	case "pr.repo":
+	case "pr.repo_name":
 		return f.Ref.Repo
 	case "pr.base":
 		return f.Base
@@ -137,11 +137,11 @@ func (f Facts) Get(field string) any {
 		return f.Open
 	case "row.tracked":
 		return f.Tracked
-	case "row.adopted":
+	case "pr.adopted":
 		return o.Adopted
-	case "row.held":
+	case "pr.held":
 		return o.Hold
-	case "row.muted":
+	case "pr.muted":
 		return f.Muted
 	case "row.question":
 		return f.Question
@@ -155,19 +155,19 @@ func (f Facts) Get(field string) any {
 		return f.yours()
 	case "row.review_workspace":
 		return f.Workspace.ID != "" && f.Workspace.IsReview
-	case "row.nudge.who":
+	case "pr.nudge.who":
 		return slices.Clone(f.NudgeWho)
-	case "row.nudge.why":
+	case "pr.nudge.why":
 		return f.NudgeWhy
-	case "row.nudge.refusal":
+	case "pr.nudge.refusal":
 		return f.NudgeRefusal
-	case "config.address_reviews":
+	case "config.github.address_reviews":
 		return f.Config.AddressReviews
-	case "config.address_checks":
+	case "config.github.address_checks":
 		return f.Config.AddressChecks
-	case "config.followups_without_workspace":
+	case "config.github.followups_without_workspace":
 		return f.Config.FollowupsWithoutWorkspace
-	case "config.address_without_workspace":
+	case "config.github.address_without_workspace":
 		return f.Config.AddressWithoutWorkspace
 	}
 	return nil

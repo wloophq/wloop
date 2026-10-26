@@ -7,7 +7,7 @@ drives_row = true
 session = { strategy = "reuse_live", title = "review" }
 profile = "review"
 dims = ["round"]
-records = '!turn.plain'
+records = '!turn.try'
 
 [headline]
 resumed = "review round on {{.PR.Slug}}"

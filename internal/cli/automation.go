@@ -256,8 +256,8 @@ func configFacts(cfg config.Config) workflow.Facts {
 		"config.cleanup.stale_workspace": time.Duration(c.StaleWorkspace),
 		"config.nudge.silent_days":       cfg.Nudge.SilentDays,
 		"config.gtd.stale_waiting_days":  cfg.GTD.StaleWaitingDays,
-		"config.proposals.renudge_after": time.Duration(cfg.Proposals.RenudgeAfter),
-		"config.turns.automated_per_day": cfg.Turns.AutomatedPerDay,
+		"config.drafts.repeat_after":     time.Duration(cfg.Proposals.RenudgeAfter),
+		"config.turns.per_day":           cfg.Turns.AutomatedPerDay,
 	}
 }
 

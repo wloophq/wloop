@@ -233,7 +233,7 @@ func (s *sheet) validateRecord(d dintent.Def) {
 func (s *sheet) compile(d dintent.Def) Programs {
 	turn := builtin.Env(builtin.TurnSlot, d.Inputs)
 	if !slices.Contains(d.Dims, dintent.DimRound) {
-		delete(turn, "turn.round")
+		delete(turn, "turn.stage")
 	}
 	one := func(path string, p dintent.Pred, env expr.Env) *expr.Program {
 		prog, err := expr.Compile(p.Src, env)

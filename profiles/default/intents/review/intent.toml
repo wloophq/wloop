@@ -17,7 +17,7 @@ drives_row = true
 reconcile = "my_review"
 profile   = "review"
 dims      = ["round"]
-records   = '!turn.plain'
+records   = '!turn.try'
 on_sent   = ["mark_reviewed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
 
 [help]
@@ -33,16 +33,16 @@ help = "what the round should look at"
 [headline]
 resumed = "review of {{.PR.Slug}}"
 [[headline.new]]
-when = 'turn.plain'
+when = 'turn.try'
 text = "Dry-run review of {{.PR.Slug}}: trying a profile, nothing is published."
 [[headline.new]]
-when = 'turn.round == "follow-up"'
+when = 'turn.stage == "follow-up"'
 text = "Follow-up review of {{.PR.Slug}}, {{.Who}}."
 [[headline.new]]
 text = "First review of {{.PR.Slug}}, {{.Who}}."
 
 [action]
-primary = "!row.question && !pr.mine && !row.adopted"
+primary = "!row.question && !pr.mine && !pr.adopted"
 note_when_question = "Starts a new round; the agent's open question is replaced"
 
 [record]

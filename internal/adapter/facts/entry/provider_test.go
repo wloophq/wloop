@@ -206,7 +206,7 @@ func TestEntryFactsReadTheEntryItsItemsAndItsUnitsCard(t *testing.T) {
 		"entry.waiting_days": 3, "entry.since_nudge": 80 * time.Hour,
 		"entry.unit": "chat:T1/C1/100.1", "entry.unit_provider": "chat",
 		"entry.unit_started_by_me": true, "entry.unit_closure_posted": true,
-		"entry.items_open": 2, "entry.items_resolved": 1, "entry.items_held": 1, "entry.muted": false,
+		"entry.items_open": 2, "entry.items_resolved": 1, "entry.items_owed": 1, "entry.muted": false,
 		"entry.nudge_due_at": monday.Add(-8 * time.Hour),
 	}
 	for k, v := range want {

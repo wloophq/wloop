@@ -524,10 +524,10 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		}
 	}
 	return workflow.Facts{
-		"draft.person_waited": waited,
-		"draft.items_held":    held,
-		"draft.items_owned":   owned,
-		"draft.subject_open":  sub.entry == nil || sub.entry.Open(),
+		"draft.person_waited":  waited,
+		"draft.items_owed":     held,
+		"draft.items_assigned": owned,
+		"draft.unit_open":      sub.entry == nil || sub.entry.Open(),
 	}
 }
 

@@ -37,7 +37,7 @@ round   = "first"
 define  = "review-judgment"
 
 [action]
-enabled  = "pr.mine || row.adopted || row.author_workspace"
+enabled  = "pr.mine || pr.adopted || row.author_workspace"
 reason_off = "Not yours: take it over first"
 
 [join]

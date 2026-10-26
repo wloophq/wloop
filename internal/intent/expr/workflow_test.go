@@ -22,7 +22,7 @@ var sessionEnv = Env{
 }
 
 func TestPredicateErrorGoldens(t *testing.T) {
-	turn := Env{"turn.round": String, "pr.mine": Bool, "pr.slug": String}
+	turn := Env{"turn.stage": String, "pr.mine": Bool, "pr.slug": String}
 	action := Env{"row.open": Bool, "pr.mine": Bool, "pr.slug": String}
 	cases := []struct {
 		src  string
@@ -31,10 +31,10 @@ func TestPredicateErrorGoldens(t *testing.T) {
 	}{
 		{"", action, "1: empty predicate"},
 		{"pr.slug", action, "1: predicate must be bool, got string"},
-		{"turn.round == true", turn, "12: cannot compare string == bool"},
+		{"turn.stage == true", turn, "12: cannot compare string == bool"},
 		{"row.open && pr.mien", action, "13: unknown field pr.mien; did you mean pr.mine?"},
 		{"pr.mien", turn, "1: unknown field pr.mien; did you mean pr.mine?"},
-		{`turn.round == "first"`, Env{"pr.mine": Bool}, "1: unknown field turn.round"},
+		{`turn.stage == "first"`, Env{"pr.mine": Bool}, "1: unknown field turn.stage"},
 	}
 	for _, c := range cases {
 		_, err := Compile(c.src, c.env)

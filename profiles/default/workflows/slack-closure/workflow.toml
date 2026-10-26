@@ -13,9 +13,9 @@ use = "draft.propose"
 purpose = "close"
 items = "resolved"
 on_posted = "unit.closed"
-hold = "config.proposals.renudge_after"
+hold = "config.drafts.repeat_after"
 hold_after_sent = "forever"
 
 [withdraw]
-when = '!draft.subject_open'
+when = '!draft.unit_open'
 reason = "moot"

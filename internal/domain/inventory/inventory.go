@@ -190,6 +190,18 @@ type Override struct {
 	NextGuidance         string    `json:"next_guidance"` // and guidance for the next one
 }
 
+// MuteRefusal is why the mute refuses a turn at now: muted until the state
+// changes, or until a time; "" when it does not.
+func (o Override) MuteRefusal(now time.Time) string {
+	switch {
+	case o.MuteUntilStateChange:
+		return "muted until its state changes"
+	case o.MutedUntil.After(now):
+		return "muted until " + o.MutedUntil.Local().Format(time.DateTime)
+	}
+	return ""
+}
+
 // ReasonTracked is the scope reason of a pull request the user tracks.
 const ReasonTracked = "tracked"
 

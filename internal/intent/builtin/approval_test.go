@@ -31,7 +31,7 @@ func TestAnApprovalEnvReadsItsSlotsAndNeverABrief(t *testing.T) {
 			t.Errorf("%s is missing", name)
 		}
 	}
-	for _, name := range []string{"draft.purpose", "draft.effects", "draft.items_held", "brief.risk", "slack.conversation", "trigger.kind", "config.cleanup.idle"} {
+	for _, name := range []string{"draft.purpose", "draft.effects", "draft.items_owed", "brief.risk", "slack.conversation", "trigger.kind", "config.cleanup.idle"} {
 		if _, ok := env[name]; ok {
 			t.Errorf("%s is readable", name)
 		}
@@ -94,7 +94,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 	env := ApprovalEnv(true, UnitSlots()...)
 	var n int
 	for _, f := range Facts {
-		if !f.Untrusted {
+		if !f.Untrusted || f.Slot == BriefSlot {
 			continue
 		}
 		n++
@@ -108,7 +108,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"slack.started_by_me", "slack.closure_posted", "entry.unit_started_by_me", "entry.unit_closure_posted",
-		"slack.items_open", "slack.items_unowned", "slack.items_unowned_age_days", "entry.items_open", "entry.items_resolved", "entry.items_held"} {
+		"slack.items_open", "slack.items_unowned", "slack.items_unowned_age_days", "entry.items_open", "entry.items_resolved", "entry.items_owed"} {
 		if i := slices.IndexFunc(Facts, func(f Fact) bool { return f.Name == name }); i < 0 || !Facts[i].Untrusted {
 			t.Errorf("%s is trusted", name)
 		}

@@ -1,6 +1,6 @@
 description = "Nudge each person a stalled Slack waiting entry waits on, listing the open items they owe"
 subject = "entry"
-when = 'entry.unit_provider == "slack" && entry.nudge_due_at > timestamp(0) && entry.items_held > 0'
+when = 'entry.unit_provider == "slack" && entry.nudge_due_at > timestamp(0) && entry.items_owed > 0'
 mode = "apply"
 order = 50
 key = ["entry.settled_at", "entry.waiting_on"]
@@ -14,8 +14,8 @@ purpose = "nudge"
 items = "owed"
 per = "person"
 on_posted = "entry.nudged"
-hold = "config.proposals.renudge_after"
+hold = "config.drafts.repeat_after"
 
 [withdraw]
-when = '!draft.person_waited || draft.items_held == 0'
+when = '!draft.person_waited || draft.items_owed == 0'
 reason = "moot"

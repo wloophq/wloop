@@ -14,12 +14,12 @@ import (
 var never = automationtest.MatchFunc(func(workflow.Vars) bool { return false })
 
 // withdrawWF proposes on sessions and withdraws a draft whose
-// draft.items_owned is positive or whose session is not idle.
+// draft.items_assigned is positive or whose session is not idle.
 func withdrawWF(name, reason string) workflow.Workflow {
 	w := sweepWF(name, never, "notify.self")
 	w.Withdraw = automationtest.MatchFunc(func(v workflow.Vars) bool {
-		return v.Facts["draft.items_owned"].(int) > 0 || v.Facts["session.idle"] != true
-	}, "draft.items_owned", "session.idle")
+		return v.Facts["draft.items_assigned"].(int) > 0 || v.Facts["session.idle"] != true
+	}, "draft.items_assigned", "session.idle")
 	w.WithdrawReason = reason
 	return w
 }
@@ -31,7 +31,7 @@ func withWithdrawals(r *rig) *automationtest.Withdrawals {
 }
 
 func owned(id int64, u unit.Unit, n int) automation.ProposedDraft {
-	return automation.ProposedDraft{ID: id, Subject: u, Facts: workflow.Facts{"draft.items_owned": n}}
+	return automation.ProposedDraft{ID: id, Subject: u, Facts: workflow.Facts{"draft.items_assigned": n}}
 }
 
 func TestTheSweepWithdrawsADraftByItsWorkflowsWithdrawWhen(t *testing.T) {

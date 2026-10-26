@@ -3,7 +3,7 @@ summary = "Ask the author one question"
 workspace = "review"
 session = { strategy = "new", title = "ask" }
 dims = ["round"]
-records = 'turn.round == true'
+records = 'turn.stage == true'
 
 [headline]
 resumed = "ask round on {{.PR.Slug}}"

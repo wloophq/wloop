@@ -5,7 +5,7 @@ role    = "nudge"
 provider = "github"
 skill = true
 cap        = "rounds"
-refuse_when = "pr.nudge_refusal"
+refuse_when = "pr.nudge.refusal"
 workspace = "pr_else_main"
 session   = { strategy = "new", title = "nudge", close_when_done = true }
 answerable = false
@@ -49,10 +49,10 @@ persist = true
 hidden  = true
 
 [action]
-enabled    = 'row.nudge.refusal == ""'
-reason_off = "{{.row.nudge.refusal}}"
-hint       = "Nudge {{join .row.nudge.who \", \"}}"
-confirm    = "Nudge {{join .row.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
+enabled    = 'pr.nudge.refusal == ""'
+reason_off = "{{.pr.nudge.refusal}}"
+hint       = "Nudge {{join .pr.nudge.who \", \"}}"
+confirm    = "Nudge {{join .pr.nudge.who \", \"}} on {{.pr.slug}}? An agent posts one comment under your name."
 
 [record]
 states  = ["done", "failed"]

@@ -63,9 +63,9 @@ define  = "review-judgment"
 source_prefix = "review guide: "
 
 [action]
-enabled    = "pr.mine || row.adopted || row.author_workspace"
+enabled    = "pr.mine || pr.adopted || row.author_workspace"
 reason_off = "Not yours: take it over first"
-primary    = "!row.question && (pr.mine || row.adopted)"
+primary    = "!row.question && (pr.mine || pr.adopted)"
 note_when_question = "Starts a new round; the agent's open question is replaced"
 
 [join]

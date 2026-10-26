@@ -154,7 +154,7 @@ func nudgeStartRig(t *testing.T) *startRig {
 	r := newStartRig(t, sc, string(dintent.Nudge), "")
 	r.st = workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Nudge)}}
 	r.why = workflow.Why{Workflow: nudgeSilent, Trigger: workflow.TriggerSweep}
-	r.units.Set(r.u, "pr.nudge_refusal", "")
+	r.units.Set(r.u, "pr.nudge.refusal", "")
 	return r
 }
 
@@ -194,7 +194,7 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 func TestNudgeSilentHonorsTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
-	r.units.Set(r.u, "pr.nudge_refusal", "it waits on you")
+	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
 		t.Fatalf("refusal %q", got)
 	}

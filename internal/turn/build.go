@@ -228,7 +228,7 @@ func (c Context) facts(dims []profile.DimDef, round string) profile.Facts {
 	for _, d := range dims {
 		var v any
 		switch {
-		case d.Fact == "turn.round":
+		case d.Fact == "turn.stage":
 			v = round
 		case d.Extra != "":
 			if c.Brief != nil {

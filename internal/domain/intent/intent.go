@@ -103,7 +103,7 @@ type Def struct {
 	// due or not; "" none.
 	ReasonFact string
 	// RefuseWhen is a string workflow fact whose non-empty value refuses
-	// the turn with that text, such as pr.nudge_refusal; "" none.
+	// the turn with that text, such as pr.nudge.refusal; "" none.
 	RefuseWhen string
 	// Reason is the why a turn's instructions carry: "address_round"; ""
 	// none.

@@ -37,13 +37,13 @@ type Alias struct {
 // Aliases are the dimensions of today's block paths, in their rank.
 var Aliases = []Alias{
 	{DimOrganization, "pr.owner"},
-	{DimRepo, "pr.repo"},
+	{DimRepo, "pr.repo_name"},
 	{DimUser, "pr.author"},
 	{DimTeam, "pr.requested_teams"},
 	{DimAssociation, "pr.association"},
 	{DimLabel, "pr.labels"},
 	{DimBase, "pr.base"},
-	{DimRound, "turn.round"},
+	{DimRound, "turn.stage"},
 	{DimReviewer, "pr.address.reviewers"},
 	{DimKind, "brief.kind"},
 	{DimSize, "brief.size"},

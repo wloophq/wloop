@@ -63,7 +63,7 @@ func TestManifestDraftApprovalRefusals(t *testing.T) {
 		{"a rule with no mode", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery == \"message\"'", "draft_approval.rule[0].mode", "is required"},
 		{"a rule's window without mode delay", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\nwindow = \"5m\"", "draft_approval.rule[0].window", "only with mode delay"},
 		{"a rule's bad predicate", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.delivery =='\nmode = \"send\"", "draft_approval.rule[0].when", ""},
-		{"a rule reading a withdraw fact", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.items_held > 0'\nmode = \"send\"", "draft_approval.rule[0].when", "draft.items_held"},
+		{"a rule reading a withdraw fact", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'draft.items_owed > 0'\nmode = \"send\"", "draft_approval.rule[0].when", "draft.items_owed"},
 		{"a rule reading a brief", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'brief.risk == \"low\"'\nmode = \"send\"", "draft_approval.rule[0].when", "brief.risk"},
 		{"a rule reading marks", "mode = \"wait\"\n[[draft_approval.rule]]\nwhen = 'handled(\"x\", draft.delivery)'\nmode = \"send\"", "draft_approval.rule[0].when", "marks"},
 	} {

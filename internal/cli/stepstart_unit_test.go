@@ -276,7 +276,7 @@ func TestRoundsReadTheManifestKeys(t *testing.T) {
 func TestANudgeWithoutRefuseWhenIgnoresTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
-	r.units.Set(r.u, "pr.nudge_refusal", "it waits on you")
+	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
 		t.Fatalf("the bundled nudge: %q", got)
 	}
@@ -284,7 +284,7 @@ func TestANudgeWithoutRefuseWhenIgnoresTheNudgeRefusal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": strings.Replace(string(b), "refuse_when = \"pr.nudge_refusal\"\n", "", 1)})
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": strings.Replace(string(b), "refuse_when = \"pr.nudge.refusal\"\n", "", 1)})
 	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got == "it waits on you" {
 		t.Fatal("a nudge whose manifest sets no refuse_when read the refusal")
 	}

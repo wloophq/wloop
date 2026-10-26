@@ -8,11 +8,11 @@ import (
 func TestADraftHoldIsADurationOrADurationOfTheConfig(t *testing.T) {
 	t.Parallel()
 	for hold, problem := range map[string]string{
-		"config.proposals.renudge_after": "",
-		"2d":                             "",
-		"config.gtd.stale_waiting_days":  "is not a duration of the config slot",
-		"config.nope":                    "is not a duration of the config slot",
-		"soon":                           "is not a duration",
+		"config.drafts.repeat_after":    "",
+		"2d":                            "",
+		"config.gtd.stale_waiting_days": "is not a duration of the config slot",
+		"config.nope":                   "is not a duration of the config slot",
+		"soon":                          "is not a duration",
 	} {
 		root := t.TempDir()
 		writeWorkflow(t, root, "asks", `subject = "slack"

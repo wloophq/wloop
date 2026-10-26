@@ -581,6 +581,7 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 		}
 		f["pr.held"], f["pr.adopted"] = o.Hold, o.Adopted
 		f["pr.muted"] = o.MuteUntilStateChange || o.MutedUntil.After(now)
+		f["pr.mute.refusal"] = o.MuteRefusal(now)
 		f["pr.stale"] = r.stale
 		evs := v.eventsOf(ref)
 		if at := lastInteraction(row, evs); !at.IsZero() {
@@ -590,7 +591,7 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 		sit, refusal := v.situation(row, evs, o, now)
 		f["pr.stalled"] = sit.Stalled
 		f["pr.waits_on_user"] = sit.WaitingOn == "me" || (sit.WaitingOn == "author" && strings.EqualFold(row.Author, v.viewer) && v.viewer != "")
-		f["pr.nudge_refusal"] = refusal
+		f["pr.nudge.refusal"] = refusal
 	}
 	_, hasReview := pl.targets.review[ref]
 	_, hasAuthor := pl.targets.author[ref]
