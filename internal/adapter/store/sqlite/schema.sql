@@ -127,8 +127,8 @@ CREATE TABLE turns (
   usage_source TEXT NOT NULL DEFAULT '', usage_read_at TEXT NOT NULL DEFAULT '', usage_attempts INTEGER NOT NULL DEFAULT 0,
   -- the intent's inputs as one JSON object with sorted keys
   inputs TEXT NOT NULL DEFAULT '{}',
-  mode TEXT NOT NULL DEFAULT '', workflow TEXT NOT NULL DEFAULT '',
-  -- the role of the turn's intent (round.review, round.address, nudge, probe, headless.default); '' none
+  runner TEXT NOT NULL DEFAULT '', workflow TEXT NOT NULL DEFAULT '',
+  -- the role of the turn's intent (pr.review, pr.address, pr.nudge, probe, headless); '' none
   role TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX turns_unit ON turns(provider, unit_key, seq);
@@ -296,9 +296,9 @@ CREATE TABLE plan_items (
   steps TEXT NOT NULL DEFAULT '[]', why TEXT NOT NULL DEFAULT '{}',
   default_outcome TEXT NOT NULL DEFAULT '', deadline TEXT NOT NULL DEFAULT '',
   guidance TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
-  mode TEXT NOT NULL, at TEXT NOT NULL,
+  at TEXT NOT NULL,
   gain_memory INTEGER NOT NULL DEFAULT 0, gain_disk INTEGER NOT NULL DEFAULT 0,
-  saved_at TEXT NOT NULL DEFAULT ''
+  saved_at TEXT NOT NULL DEFAULT '', observe INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
 CREATE INDEX plan_items_workflow ON plan_items(workflow);
 

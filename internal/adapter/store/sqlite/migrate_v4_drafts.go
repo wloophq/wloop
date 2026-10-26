@@ -28,16 +28,17 @@ func v4Effects(ctx context.Context, tx *sql.Tx) error {
 	)(ctx, tx)
 }
 
-// v4Approval renames the draft approval modes (always, window, none,
-// observe to wait, delay, send, record), the reason and outcome of a
-// recorded draft (observe to record, observed to recorded) and the would
-// policy send, which read as the mode, to release.
+// v4Approval writes the draft approval modes (always, window, none, observe
+// to wait, delay, send, dry_run), the reason and outcome of a draft stored
+// without sending (observe to dry_run, observed to dry_run), the outcome of
+// a released draft (auto to released) and the would policies (send to
+// release, hold to wait).
 func v4Approval(ctx context.Context, tx *sql.Tx) error {
 	return execAll(
 		`UPDATE drafts SET approval_mode = CASE approval_mode WHEN 'always' THEN 'wait' WHEN 'window' THEN 'delay'
-  WHEN 'none' THEN 'send' WHEN 'observe' THEN 'record' ELSE approval_mode END`,
-		`UPDATE drafts SET reason = 'record' WHERE state = 'discarded' AND reason = 'observe'`,
-		`UPDATE drafts SET would_outcome = 'recorded' WHERE would_outcome = 'observed'`,
-		`UPDATE drafts SET would_policy = 'release' WHERE would_policy = 'send'`,
+  WHEN 'none' THEN 'send' WHEN 'observe' THEN 'dry_run' ELSE approval_mode END`,
+		`UPDATE drafts SET reason = 'dry_run' WHERE state = 'discarded' AND reason = 'observe'`,
+		`UPDATE drafts SET would_outcome = CASE would_outcome WHEN 'observed' THEN 'dry_run' WHEN 'auto' THEN 'released' ELSE would_outcome END`,
+		`UPDATE drafts SET would_policy = CASE would_policy WHEN 'send' THEN 'release' WHEN 'hold' THEN 'wait' ELSE would_policy END`,
 	)(ctx, tx)
 }

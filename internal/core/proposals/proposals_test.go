@@ -157,12 +157,12 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 		e.run()
 		e.clock.set(t0.Add(23 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != "record" {
+		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != string(draft.DryRun) {
 			t.Fatalf("observed twice within renudge_after: %+v", all)
 		}
 		e.clock.set(t0.Add(24 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != "record" {
+		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != string(draft.DryRun) {
 			t.Fatalf("an observed key is suppressed for good: %+v", all)
 		}
 	})

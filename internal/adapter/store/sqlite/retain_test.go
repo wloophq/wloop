@@ -300,7 +300,7 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	exec(t, db, `INSERT INTO intakes (provider, unit_key, intent, source, request, state, accepted_at) VALUES ('github', ?, 'review', 'cli', '{}', 'started', ?)`, u, when)
 	exec(t, db, `INSERT INTO turn_usage (turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, first_at, last_at) VALUES (?, 'opus', 1, 1, 1, 1, 1, ?, ?)`, seq, when, when)
 	exec(t, db, `INSERT INTO workflow_runs (workflow, provider, unit_key, key_value, status, at) VALUES ('review-follow-up', 'github', ?, 'k', 'dismissed', ?)`, u, when)
-	exec(t, db, `INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, mode, at, saved_at) VALUES (?, 'address', 'github', ?, 'k', 'blocked', 'apply', ?, ?)`, "address/"+u, u, when, when)
+	exec(t, db, `INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, at, saved_at) VALUES (?, 'address', 'github', ?, 'k', 'blocked', ?, ?)`, "address/"+u, u, when, when)
 }
 
 func TestRetainEndedPR(t *testing.T) {

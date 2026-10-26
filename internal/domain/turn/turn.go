@@ -65,7 +65,7 @@ type Turn struct {
 	// Inputs are the intent's inputs the turn was sent with.
 	Inputs map[string]any
 	// Runner is empty for a session turn.
-	Runner Runner `json:"Mode,omitempty"`
+	Runner Runner `json:",omitempty"`
 	// Workflow is the workflow whose turn.start step started it, "" none.
 	Workflow string `json:",omitempty"`
 	// Role is the role its intent held when it was sent, so the history
