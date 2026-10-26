@@ -348,7 +348,7 @@ func TestSplitRule(t *testing.T) {
 }
 
 func TestExtractorPromptMatchesShipped(t *testing.T) {
-	raw, err := os.ReadFile("../extract/prompt.md")
+	raw, err := os.ReadFile("../../../../../profiles/default/prompts/slack-extraction.md")
 	if err != nil {
 		t.Fatal(err)
 	}

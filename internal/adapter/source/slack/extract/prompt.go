@@ -4,13 +4,25 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"path"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/profiles"
 )
 
-//go:embed prompt.md
-var promptTemplate string
+// PromptFile is the bundled profile's extraction prompt, relative to the
+// profile's root.
+const PromptFile = "prompts/slack-extraction.md"
+
+var promptTemplate = func() string {
+	b, err := fs.ReadFile(profiles.Default, path.Join("default", PromptFile))
+	if err != nil {
+		panic("extract: the bundled profile has no " + PromptFile + ": " + err.Error())
+	}
+	return string(b)
+}()
 
 //go:embed schema.json
 var schemaJSON string
@@ -25,7 +37,7 @@ var schemaDoc = func() map[string]any {
 
 func Schema() string { return schemaJSON }
 
-// Prompt fills prompt.md for in; each placeholder is replaced once, so text in the
+// Prompt fills the extraction prompt for in; each placeholder is replaced once, so text in the
 // conversation that looks like a placeholder stays as written.
 func Prompt(in Input) (string, error) {
 	if in.Viewer.ID == "" {

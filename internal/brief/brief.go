@@ -8,20 +8,38 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
+	"path"
 	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/facet"
+	"github.com/wloophq/wloop/profiles"
 )
 
-//go:embed prompt.md
-var promptTemplate string
+// PromptFile and TaxonomyFile are the bundled profile's brief prompt and
+// taxonomy, relative to the profile's root.
+const (
+	PromptFile       = "prompts/brief.md"
+	FieldsPromptFile = "prompts/brief-fields.md"
+	TaxonomyFile     = "prompts/brief-taxonomy.md"
+)
+
+var promptTemplate = bundled(PromptFile)
 
 //go:embed schema.json
 var Schema string
 
-//go:embed taxonomy.md
-var DefaultTaxonomy string
+// DefaultTaxonomy is the bundled profile's taxonomy.
+var DefaultTaxonomy = bundled(TaxonomyFile)
+
+func bundled(rel string) string {
+	b, err := fs.ReadFile(profiles.Default, path.Join("default", rel))
+	if err != nil {
+		panic("brief: the bundled profile has no " + rel + ": " + err.Error())
+	}
+	return string(b)
+}
 
 var ErrInvalid = errors.New("the brief does not fit the schema")
 

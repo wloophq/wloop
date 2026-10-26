@@ -73,7 +73,7 @@ type SegmentOut struct{ Ref, FromTS, ToTS, Topic string }
 
 type LinkOut struct {
 	Item, Target, EvidenceTS string    // Target: a URL or "<provider>:<key>" ("github:acme/widget#527")
-	Kind                     link.Kind // "mention" | "review" | "merge"; prompt.md defines each
+	Kind                     link.Kind // "mention" | "review" | "merge"; the extraction prompt defines each
 }
 
 // ParseTarget turns a LinkOut.Target into a unit through the registered codecs;
