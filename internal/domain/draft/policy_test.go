@@ -176,19 +176,15 @@ func TestRuleFactsJoinNoFactsAndKeepTheCallersMap(t *testing.T) {
 	}
 }
 
-func TestNoPolicyReleasesAnEdit(t *testing.T) {
+func TestAnEditTakesItsPolicyLikeAMessage(t *testing.T) {
 	edit := Draft{Delivery: EditDelivery}
-	isEdit := factIs{"draft.delivery", "edit"}
-	for _, p := range []Policy{
-		{Default: none},
-		{Default: window},
-		{Default: always, Rules: []Rule{{When: isEdit, Approval: none, NamesComment: true}}},
-	} {
-		if got, err := p.Decide(edit, Subject{}, time.Time{}); err != nil || got.Approval.Mode != Wait {
-			t.Errorf("%+v released an edit: %+v %v", p, got, err)
+	for _, def := range []Approval{none, window, always} {
+		if got, err := (Policy{Default: def}).Decide(edit, Subject{}, time.Time{}); err != nil || got.Approval != def {
+			t.Errorf("%s on an edit: %+v %v", def.Mode, got, err)
 		}
 	}
-	if got, _ := (Policy{Default: Approval{Mode: DryRun}}).Decide(edit, Subject{}, time.Time{}); got.Approval.Mode != DryRun {
-		t.Errorf("dry_run on an edit: %+v", got)
+	isEdit := factIs{"draft.delivery", "edit"}
+	if got, _ := (Policy{Default: always, Rules: []Rule{{When: isEdit, Approval: none}}}).Decide(edit, Subject{}, time.Time{}); got.Approval != none || got.Rule != 0 {
+		t.Errorf("a rule over draft.delivery: %+v", got)
 	}
 }

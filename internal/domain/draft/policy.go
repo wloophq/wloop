@@ -88,13 +88,12 @@ type Decision struct {
 // applies only when the facts it reads are of s's slot, a rule that
 // releases applies to a comment draft only when it names comment delivery,
 // and a comment draft no such rule releases waits for a person unless the
-// approval is dry_run. An edit, which rewrites what people already read
-// under the user's name, no rule releases.
+// approval is dry_run.
 func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
-	comment, edit := d.Delivery == CommentDelivery, d.Delivery == EditDelivery
+	comment := d.Delivery == CommentDelivery
 	var all map[string]any
 	for i, r := range p.Rules {
-		if r.Approval.Releases() && (comment && !r.NamesComment || edit) || !ofSlot(r.Subjects, s.Slot) {
+		if comment && r.Approval.Releases() && !r.NamesComment || !ofSlot(r.Subjects, s.Slot) {
 			continue
 		}
 		if all == nil {
@@ -108,7 +107,7 @@ func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 			return Decision{Approval: r.Approval, Rule: i, CommentReleased: comment && r.Approval.Releases()}, nil
 		}
 	}
-	if (comment || edit) && p.Default.Releases() {
+	if comment && p.Default.Releases() {
 		return Decision{Approval: Approval{Mode: Wait}, Rule: -1}, nil
 	}
 	return Decision{Approval: p.Default, Rule: -1}, nil

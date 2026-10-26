@@ -39,7 +39,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, an edit always waits for a person, and no agent or thread text sets an approval (no rule reads an untrusted fact).
+- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
 
 Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, and what an MCP tool answers.
 

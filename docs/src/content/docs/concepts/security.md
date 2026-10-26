@@ -44,9 +44,9 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 Every agent session the MCP server serves reads Slack as you, within what your user token can read:
 
 - `slack_read` reads a stored unit, or the thread of any channel message whose permalink the agent holds, private channels and Slack Connect channels included; a direct message or a group DM only when {{name}} tracks it.
-- `slack_search` runs Slack's search over every channel you can read, and returns the permalink, author, time and first line of each match. An agent no longer needs a permalink handed to it to find a channel's messages: one query reaches any channel you are in. Direct messages and group DMs are left out unless tracked, the same line `slack_read` draws, and the result says how many it left out.
+- `slack_search` runs Slack's search over every channel you can read, and returns the permalink, author, time and first line of each match. An agent needs no permalink handed to it to find a channel's messages: one query reaches any channel you are in. Direct messages and group DMs are left out unless tracked, the same line `slack_read` draws, and the result says how many it left out.
 
-What an agent reads this way is other people's text, and reaches it as data it may follow: a message found by search can ask for anything. Every post that follows still goes through the Outbox (`slack_draft`, `slack_react`, `slack_edit`) or Claude Code's permission prompt (`slack_send_message`), and `slack.post_allowlist` bounds where any of them lands. Nothing bounds what a session reads; turning the Slack plugin off (`slack.enabled = false`) removes these tools.
+Reading is as you, like posting: {{name}} keeps no channel from a session, and the line on direct messages is a workflow control, not a barrier, since the agent can reach your token by the paths above. What an agent reads this way is other people's text, and reaches it as data it may follow: a message found by search can ask for anything, and no such text approves a draft. `slack.post_allowlist` bounds where any post lands; turning the Slack plugin off (`slack.enabled = false`) removes these tools.
 
 ## The settings that limit it
 
