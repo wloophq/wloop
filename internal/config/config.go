@@ -630,13 +630,13 @@ func (c Config) validateWorkflows() error {
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
 		w := c.Workflows[name]
 		if w.OnlyWhen != "" {
-			if _, err := expr.CompileWorkflow(w.OnlyWhen, builtin.WorkflowEnvAll()); err != nil {
-				return fmt.Errorf("workflows.%s.only_when: %w", name, err)
+			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen, false); err != nil {
+				return err
 			}
 		}
 		if a := w.DraftApproval(); a != nil {
-			if _, err := a.Policy(builtin.ApprovalEnv(true, builtin.UnitSlots()...)); err != nil {
-				return fmt.Errorf("workflows.%s.drafts.approval: %w", name, err)
+			if err := a.validateDrafts("workflows." + name + ".drafts.approval"); err != nil {
+				return err
 			}
 		}
 		if w.Approval != nil {

@@ -116,7 +116,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 						"observe": true,
 						"enabled": false,
 						"approval": {
-								"mode": "wait",
+								"mode": "delay",
 								"window": "10m"
 						}
 				}
@@ -134,7 +134,7 @@ func TestLoadWorkflowConfig(t *testing.T) {
 		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
 		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.Nudge, c.Classify)
 	}
-	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "wait" ||
+	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "delay" ||
 		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
 		t.Errorf("workflows.x = %+v", x)
 	}
