@@ -3,6 +3,7 @@ package builtin
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 
@@ -33,6 +34,9 @@ func (e *SubjectsError) Error() string {
 // over env. It names comment delivery when its top-level conjunction holds
 // draft.delivery == "comment", the only way a rule releases a comment.
 func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, error) {
+	if names := DynamicFacts(when); len(names) > 0 {
+		return draft.Rule{}, &UntrustedError{Fact: names[0]}
+	}
 	p, err := expr.CompileWorkflow(when, env)
 	if err != nil {
 		return draft.Rule{}, err
@@ -42,11 +46,12 @@ func ApprovalRule(when string, a draft.Approval, env expr.Env) (draft.Rule, erro
 	}
 	var subjects []string
 	for _, name := range p.Reads() {
+		if IsUntrusted(name) {
+			return draft.Rule{}, &UntrustedError{Fact: name}
+		}
 		f, ok := workflowFact(name)
 		switch {
 		case !ok || f.Slot == "" || f.Slot == DraftSlot:
-		case f.Untrusted:
-			return draft.Rule{}, &UntrustedError{Fact: name}
 		case !slices.Contains(subjects, f.Slot):
 			subjects = append(subjects, f.Slot)
 		}
@@ -95,4 +100,22 @@ func (c condition) Source() string {
 		return s.Source()
 	}
 	return ""
+}
+
+var (
+	quotedText  = regexp.MustCompile(`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`)
+	dynamicName = regexp.MustCompile(`(?:^|[^\w.])((?:` + regexp.QuoteMeta(ExtraPrefix) + `|` + regexp.QuoteMeta(ClassifyPrefix) + `)[A-Za-z_]\w*)`)
+)
+
+// DynamicFacts are the brief.extra.* and classify.* facts src names outside
+// its string literals: facts the profile declares, untrusted whatever their
+// name, which a check without the profile cannot type.
+func DynamicFacts(src string) []string {
+	var out []string
+	for _, m := range dynamicName.FindAllStringSubmatch(quotedText.ReplaceAllString(src, `""`), -1) {
+		if !slices.Contains(out, m[1]) {
+			out = append(out, m[1])
+		}
+	}
+	return out
 }

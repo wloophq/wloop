@@ -95,7 +95,7 @@ func TestARuleReadingAnUntrustedFactIsRefused(t *testing.T) {
 	env := ApprovalEnv(true, UnitSlots()...)
 	var n int
 	for _, f := range Facts {
-		if !f.Untrusted || f.Slot == BriefSlot {
+		if !f.Untrusted || f.Slot == BriefSlot || f.Slot == "trigger" {
 			continue
 		}
 		n++
@@ -159,5 +159,31 @@ func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *
 		if NeverReleasesComment(r) {
 			t.Errorf("%s holding: flagged", when)
 		}
+	}
+}
+
+func TestARuleReadingAProfilesUntrustedFactIsRefused(t *testing.T) {
+	env := ApprovalEnv(true, "pr")
+	env[ExtraPrefix+"ship"] = expr.Bool
+	env[ClassifyPrefix+"urgent"] = expr.Bool
+	for when, fact := range map[string]string{
+		"brief.extra.ship == true":           "brief.extra.ship",
+		"pr.mine && classify.urgent":         "classify.urgent",
+		"brief.extra.unknown == true":        "brief.extra.unknown",
+		`pr.mine && (classify.other == "x")`: "classify.other",
+	} {
+		var ue *UntrustedError
+		if _, err := ApprovalRule(when, draft.Approval{Mode: draft.Wait}, env); !errors.As(err, &ue) || ue.Fact != fact {
+			t.Errorf("%s: %v, want %s refused", when, err, fact)
+		}
+	}
+	if _, err := ApprovalRule(`pr.author == "see brief.extra.ship"`, draft.Approval{Mode: draft.Wait}, ApprovalEnv(true, "pr")); err != nil {
+		t.Errorf("a string literal is no fact: %v", err)
+	}
+}
+
+func TestTriggerEventDataIsUntrusted(t *testing.T) {
+	if !IsUntrusted("trigger.event.data") {
+		t.Fatal("the event's data carries a person's or an agent's text, yet reads as trusted")
 	}
 }
