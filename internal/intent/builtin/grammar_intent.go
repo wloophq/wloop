@@ -36,20 +36,6 @@ func effectValues(a Applies) func() []Value {
 	}
 }
 
-func workspaceValues() []Value {
-	docs := map[string]string{
-		"review":                "The pull request's review workspace; the turn moves the review board.",
-		"author":                "The pull request's author workspace; the turn moves the author board.",
-		WorkspaceLinkedElseMain: "The workspace linked to the unit, else the repository's main checkout.",
-		"given":                 "The workspace the request names.",
-	}
-	out := make([]Value, 0, len(Names[SlotWorkspace]))
-	for _, n := range Names[SlotWorkspace] {
-		out = append(out, Value{Name: n, Doc: docs[n]})
-	}
-	return out
-}
-
 var draftModes = named(string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun))
 
 // intentGrammar is the intent manifest's keys.

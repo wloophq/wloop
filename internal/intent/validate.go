@@ -275,14 +275,6 @@ func (s *sheet) compile(d dintent.Def) Programs {
 	return ps
 }
 
-func idsOf(ps []dunit.ProviderID) []string {
-	out := make([]string, len(ps))
-	for i, p := range ps {
-		out[i] = string(p)
-	}
-	return out
-}
-
 // unitEnv is the env of a predicate over the workflow facts of the units
 // d's turns run on: each served slot's, with the brief's, trigger.* and
 // config.*.
