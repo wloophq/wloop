@@ -120,4 +120,4 @@ On a terminal the list groups the drafts by purpose (nudges, closings, replies, 
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment or no terminal. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 
-The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. `slack_send_message`, the tool an agent uses to post to Slack as you right away, asks Claude Code's permission prompt before every call.
+The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tool an agent uses to post to Slack as you right away posts without your approval; a post that lands in a unit the loop tracks is recorded as a sent draft.

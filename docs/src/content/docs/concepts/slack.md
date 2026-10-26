@@ -35,7 +35,7 @@ While Slack is configured and the plugin is on, the daemon's MCP server serves t
 |---|---|
 | `slack_read` | reads the messages of a unit (`slack:<key>`) or a permalink, 50 by default, up to 200 |
 | `slack_draft` | proposes a draft (`reply`, `nudge`, `close`, `ask_owner`, `react`) on the turn's Slack unit; it posts nothing, and the draft waits in the Outbox |
-| `slack_send_message` | posts as you, now; `install` puts it under Claude Code's `permissions.ask`, so you confirm every call, and it refuses `@channel`, `@here`, `@everyone` and group mentions |
+| `slack_send_message` | posts as you, now, without a prompt (`install` allows it); a post in a tracked unit is recorded as a sent draft; it refuses `@channel`, `@here`, `@everyone` and group mentions |
 
 From a terminal, `{{command}} slack send <target> <text>` shows the message and asks before it posts, unless `--yes`. A target is a permalink (a reply in its thread), `#channel`, a channel id, `@handle`, an email or a user id. A reply in a thread goes through the Outbox as a draft of yours, approved when you say yes; the other targets, `--thread=false` and `--broadcast` post directly. `{{command}} outbox new <permalink> <text>` writes the reply as a draft that waits for your approval instead. `slack.post_allowlist`, when not empty, is the only set of channels or users any post may reach.
 

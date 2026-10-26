@@ -26,7 +26,7 @@ import (
 // names it in permission rules.
 var TurnEndTool = brand.ToolPrefix() + "turn_end"
 
-// SlackSendTool posts as the user, so Claude Code asks before every call.
+// SlackSendTool posts as the user at once, without asking.
 var SlackSendTool = brand.ToolPrefix() + "slack_send_message"
 
 const (
@@ -346,14 +346,14 @@ func (h Home) Check(_ context.Context, home string) ([]setup.Finding, error) {
 		perm = "missing"
 	}
 	out = append(out, finding("permission "+TurnEndTool, perm))
-	ask := ""
-	if !slices.Contains(permissionList(settings.doc, "ask"), any(SlackSendTool)) {
-		ask = "missing"
+	send := ""
+	switch {
+	case slices.Contains(permissionList(settings.doc, "ask"), any(SlackSendTool)):
+		send = "permissions.ask holds it, so Claude Code asks before every Slack post"
+	case !slices.Contains(allowList(settings.doc), any(SlackSendTool)):
+		send = "missing"
 	}
-	out = append(out, finding("permission ask "+SlackSendTool, ask))
-	if slices.Contains(allowList(settings.doc), any(SlackSendTool)) {
-		out = append(out, finding("permission allow "+SlackSendTool, "permissions.allow holds it, so Slack posts go out as you without asking"))
-	}
+	out = append(out, finding("permission "+SlackSendTool, send))
 	if events := orcaHookEvents(settings.doc); len(events) > 0 {
 		out = append(out, setup.Finding{Home: home, Entry: "Orca status hook",
 			Problem: fmt.Sprintf("%s run Orca's status hook (%s), which moves the workspace card on every prompt and competes with "+brand.Name+"'s projection of the turn", strings.Join(events, ", "), orcaHookPort)})
@@ -430,11 +430,11 @@ func (h Home) installSettings(doc map[string]any) []string {
 	if addPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "add permission "+TurnEndTool)
 	}
-	if addPermission(doc, "ask", SlackSendTool) {
-		out = append(out, "add permission ask "+SlackSendTool)
+	if addPermission(doc, "allow", SlackSendTool) {
+		out = append(out, "add permission "+SlackSendTool)
 	}
-	if dropPermission(doc, "allow", SlackSendTool) {
-		out = append(out, "remove permission allow "+SlackSendTool)
+	if dropPermission(doc, "ask", SlackSendTool) {
+		out = append(out, "remove permission ask "+SlackSendTool)
 	}
 	return out
 }
@@ -533,6 +533,9 @@ func (h Home) removeSettings(doc map[string]any) []string {
 	}
 	if dropPermission(doc, "allow", TurnEndTool) {
 		out = append(out, "remove permission "+TurnEndTool)
+	}
+	if dropPermission(doc, "allow", SlackSendTool) {
+		out = append(out, "remove permission "+SlackSendTool)
 	}
 	if dropPermission(doc, "ask", SlackSendTool) {
 		out = append(out, "remove permission ask "+SlackSendTool)
