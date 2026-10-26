@@ -316,7 +316,7 @@ func myReview(t *testing.T) map[string]string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		files["intents/my-review/"+name] = strings.NewReplacer("key     = \"V\"\n", "", "drives_row = true\n", "", "reconcile = \"my_review\"\n", "").Replace(string(b))
+		files["intents/my-review/"+name] = string(b)
 	}
 	return files
 }

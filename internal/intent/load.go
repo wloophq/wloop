@@ -138,6 +138,13 @@ type unit struct {
 	programs Programs
 	// keyProblems are why a user intent loads without its key.
 	keyProblems Problems
+	// takenBy is the user intent that takes this bundled intent's role,
+	// with its key and its row driving.
+	takenBy *unit
+	// declaredKey and declaredDrives are what the bundled intent declared
+	// before takeRoles handed them over.
+	declaredKey    string
+	declaredDrives bool
 }
 
 func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
@@ -473,6 +480,7 @@ func crossCheck(units []*unit) {
 		}
 	}
 	refusesBrokenProfiles(ordered)
+	takeRoles(ordered)
 	c := newClaims()
 	var broken []*unit
 	for _, u := range ordered {
@@ -487,6 +495,52 @@ func crossCheck(units []*unit) {
 	for _, u := range broken {
 		c.check(u, false)
 	}
+	for _, u := range ordered {
+		if t := u.takenBy; t != nil && t.broken() {
+			u.def.Key, u.def.DrivesRow = u.declaredKey, u.declaredDrives
+		}
+	}
+}
+
+// takeRoles hands each bundled intent's role to the clean user intent that
+// holds the same role on one of its providers: the user's holder takes its
+// key and its row driving, and may set its reconcile; the bundled one keeps
+// loading without them. A user intent setting reconcile without taking a
+// bundled role is refused.
+func takeRoles(ordered []*unit) {
+	for _, u := range ordered {
+		if !u.defined || u.broken() || u.bundled || u.def.Role == "" {
+			continue
+		}
+		for _, b := range ordered {
+			if b.defined && b.bundled && b.def.Role == u.def.Role && slices.ContainsFunc(providersOf(u.def), func(p dunit.ProviderID) bool {
+				return slices.Contains(providersOf(b.def), p)
+			}) {
+				b.takenBy = u
+			}
+		}
+	}
+	taking := map[*unit]bool{}
+	for _, b := range ordered {
+		if b.takenBy != nil {
+			taking[b.takenBy] = true
+			b.declaredKey, b.declaredDrives = b.def.Key, b.def.DrivesRow
+			b.def.Key, b.def.DrivesRow = "", false
+		}
+	}
+	for _, u := range ordered {
+		if u.defined && !u.bundled && u.def.Role != "" && u.def.Reconcile != "" && !taking[u] {
+			u.sheet.add("reconcile", "is reserved for the bundled intents and the intents that take a bundled intent's role")
+		}
+	}
+}
+
+// providersOf is the providers whose units d's turns run on.
+func providersOf(d dintent.Def) []dunit.ProviderID {
+	if d.Providers != nil {
+		return d.Providers
+	}
+	return []dunit.ProviderID{d.ProviderOrDefault()}
 }
 
 func checkProfiles(u *unit, defs map[dintent.Name]dintent.Def) {
@@ -617,11 +671,7 @@ func (c *claims) check(u *unit, claim bool) {
 		}
 	}
 	if d.Role != "" || d.Builds != "" {
-		providers := d.Providers
-		if providers == nil {
-			providers = []dunit.ProviderID{d.ProviderOrDefault()}
-		}
-		for _, p := range providers {
+		for _, p := range providersOf(d) {
 			rc := roleClaim{u.bundled, d.Role, p}
 			if d.Builds != "" {
 				rc.role = "builds " + d.Builds

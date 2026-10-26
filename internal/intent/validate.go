@@ -65,11 +65,12 @@ func (s *sheet) builtinRef(path string, slot builtin.Slot, v string) {
 
 // bundledOnlyKeys are the manifest keys only a bundled intent sets: the
 // probe's synthetic pull request, launch and policy, and the review's
-// reconcile. The public schema leaves them out.
+// reconcile, which an intent taking a bundled intent's role also sets
+// (crossCheck). The public schema leaves them out.
 var bundledOnlyKeys = []string{"context", "launch", "policy", "reconcile"}
 
 func (s *sheet) refuseBundledOnly(m manifest) {
-	set := map[string]bool{"context": m.Context != nil, "launch": m.Launch != "", "policy": m.Policy != nil, "reconcile": m.Reconcile != ""}
+	set := map[string]bool{"context": m.Context != nil, "launch": m.Launch != "", "policy": m.Policy != nil, "reconcile": m.Reconcile != "" && m.Role == ""}
 	for _, k := range bundledOnlyKeys {
 		if set[k] {
 			s.add(k, "is reserved for the bundled intents")
@@ -109,6 +110,8 @@ func (s *sheet) validate(d dintent.Def) {
 		s.builtinRef("context", builtin.SlotContext, d.Context)
 		s.builtinRef("launch", builtin.SlotLaunch, d.Launch)
 		s.builtinRef("policy", builtin.SlotPolicy, d.Policy)
+		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
+	} else if d.Reconcile != "" {
 		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
 	}
 	s.builtinRef("prepare", builtin.SlotPrepare, d.Prepare)

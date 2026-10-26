@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,7 @@ resumed = "x"
 [[headline.new]]
 text = "x"
 `, "{{.Headline}}")
+	writeFile(t, filepath.Join(root, "intents", "unit-brief", "schema.json"), `{"type": "object", "properties": {}}`)
 	writeWorkflow(t, root, "brief-everything", `subject = "github"
 when = 'pr.state == "open"'
 
