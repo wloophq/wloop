@@ -202,6 +202,12 @@ const (
 	DryRun ApprovalMode = "dry_run"
 )
 
+// ApprovalModes are the draft approval's modes.
+var ApprovalModes = []ApprovalMode{Send, Delay, Wait, DryRun}
+
+// Releases says whether m sends a draft with no person approving it.
+func (m ApprovalMode) Releases() bool { return m == Send || m == Delay }
+
 type Approval struct {
 	Mode   ApprovalMode
 	Window time.Duration // Mode "delay" only, > 0
@@ -210,7 +216,7 @@ type Approval struct {
 // Validate refuses an unknown mode, a window <= 0 with delay, a window set without delay.
 func (a Approval) Validate() error {
 	switch {
-	case !slices.Contains([]ApprovalMode{Wait, Delay, Send, DryRun}, a.Mode):
+	case !slices.Contains(ApprovalModes, a.Mode):
 		return fmt.Errorf("unknown draft approval mode %q", a.Mode)
 	case a.Mode == Delay && a.Window <= 0:
 		return errors.New("draft approval delay needs a positive window")

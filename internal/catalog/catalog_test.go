@@ -128,6 +128,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"pr.state":                      func(f *Facts) { f.State = "OPEN" },
 		"pr.slug":                       func(f *Facts) { f.Ref = r7 },
 		"pr.owner":                      func(f *Facts) { f.Ref = r7 },
+		"pr.repo":                       func(f *Facts) { f.Ref = r7 },
 		"pr.repo_name":                  func(f *Facts) { f.Ref = r7 },
 		"pr.base":                       func(f *Facts) { f.Base = "main" },
 		"pr.cross_repository":           func(f *Facts) { f.CrossRepository = true },

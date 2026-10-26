@@ -2,7 +2,10 @@ package profile
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -10,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/frontmatter"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // LabelsFile is the profile file that names the headings of a block's
@@ -49,8 +53,8 @@ func (l Labels) over(o Labels) Labels {
 }
 
 // LoadLabels reads labels.toml from each layer of chain, a higher layer's
-// keys replacing a lower one's.
-func LoadLabels(chain []Layer) (Labels, error) {
+// keys replacing a lower one's; a heading names a dimension of vocab.
+func LoadLabels(chain []Layer, vocab []DimDef) (Labels, error) {
 	var out Labels
 	for _, l := range chain {
 		r, err := readLayer(l, LabelsFile)
@@ -61,7 +65,7 @@ func LoadLabels(chain []Layer) (Labels, error) {
 			return Labels{}, err
 		}
 		file := fileName(l, LabelsFile)
-		if err := checkLabels(file, r.Body); err != nil {
+		if err := checkLabels(file, r.Body, vocab); err != nil {
 			return Labels{}, err
 		}
 		var own Labels
@@ -73,22 +77,58 @@ func LoadLabels(chain []Layer) (Labels, error) {
 	return out, nil
 }
 
-// checkLabels is the grammar's first problem with src, nil when it has none.
-func checkLabels(file string, src []byte) error {
+// checkLabels is the first problem of src: the grammar's, then a heading
+// of a dimension vocab does not hold.
+func checkLabels(file string, src []byte, vocab []DimDef) error {
+	if err := checkGrammar(builtin.SurfaceLabels, file, src, 1); err != nil {
+		return err
+	}
+	var l Labels
+	if toml.Unmarshal(src, &l) != nil {
+		return nil
+	}
+	names := make([]string, len(vocab))
+	for i, d := range vocab {
+		names[i] = string(d.Name)
+	}
+	var ps []builtin.Problem
+	for _, k := range slices.Sorted(maps.Keys(l.Dims)) {
+		if !slices.Contains(names, k) {
+			ps = append(ps, builtin.Problem{Path: "dims." + k, Msg: fmt.Sprintf("unknown dimension %q%s", k, expr.DidYouMean(k, names))})
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(l.Values)) {
+		dim, _, ok := strings.Cut(k, "=")
+		switch {
+		case !ok:
+			ps = append(ps, builtin.Problem{Path: "values." + k, Msg: "must be <dim>=<value>"})
+		case !slices.Contains(names, dim):
+			ps = append(ps, builtin.Problem{Path: "values." + k, Msg: fmt.Sprintf("unknown dimension %q%s", dim, expr.DidYouMean(dim, names))})
+		}
+	}
+	return grammarError(file, src, 1, ps)
+}
+
+// checkGrammar is the grammar's first problem with src, a file of surface
+// whose first line is line; nil when it has none.
+func checkGrammar(surface builtin.Surface, file string, src []byte, line int) error {
 	var doc map[string]any
 	if toml.Unmarshal(src, &doc) != nil {
 		return nil
 	}
-	ps := builtin.Check(builtin.SurfaceLabels, doc)
+	return grammarError(file, src, line, builtin.Check(surface, doc))
+}
+
+func grammarError(file string, src []byte, line int, ps []builtin.Problem) error {
 	if len(ps) == 0 {
 		return nil
 	}
-	at := frontmatter.Positions(src, 1)[ps[0].Path]
-	return &frontmatter.Error{File: file, Line: max(at.Line, 1), Col: max(at.Col, 1), Key: ps[0].Path, Msg: ps[0].Msg}
+	at := frontmatter.Positions(src, line)[ps[0].Path]
+	return &frontmatter.Error{File: file, Line: max(at.Line, line), Col: max(at.Col, 1), Key: ps[0].Path, Msg: ps[0].Msg}
 }
 
 var bundledLabels = sync.OnceValue(func() Labels {
-	l, _ := LoadLabels([]Layer{{Name: "bundled", Source: "embedded"}})
+	l, _ := LoadLabels([]Layer{{Name: "bundled", Source: "embedded"}}, Vocabulary(nil))
 	return l
 })
 

@@ -33,7 +33,7 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 			return
 		}
 		s := &sheet{file: file, at: positions(src)}
-		s.addGrammar(grammar(builtin.SurfaceDefaults, src, file != DefaultsFile))
+		s.addGrammar(grammar(builtin.SurfaceDefaults, src))
 		if len(s.problems) > 0 {
 			problems = append(problems, s.problems...)
 			return

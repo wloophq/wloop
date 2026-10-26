@@ -9,18 +9,21 @@ Predicates are CEL expressions; their syntax is on the [intent manifest](/refere
 
 The predicates of an intent manifest read these. The **action** slot (`[action]` predicates) reads the row the daemon serves; the **turn** slot (`[record] when`, headline cases, `also_profile[].when`) reads the turn being built.
 
+### The pull request (`pr.*`)
+
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
 | `pr.mine` | bool | action, turn | The pull request's author is the viewer. |
 | `pr.author` | string | action, turn | The pull request's author login. |
-| `pr.state` | string | action, turn | The pull request's state on GitHub: OPEN, CLOSED or MERGED, as the inventory stores it. |
+| `pr.state` | string | action, turn | The pull request's state on GitHub: OPEN, CLOSED or MERGED. |
 | `pr.slug` | string | action, turn | owner/repo#number. |
 | `pr.owner` | string | action, turn | The repository owner. |
-| `pr.repo_name` | string | action, turn | The repository name; the workflow fact pr.repo is owner/repo. |
+| `pr.repo` | string | action, turn | owner/repo. |
+| `pr.repo_name` | string | action, turn | The repository name, without its owner. |
 | `pr.base` | string | action, turn | The base branch. |
 | `pr.association` | string | turn | The author's association with the repository, from the Basics read. |
 | `pr.cross_repository` | bool | action, turn | The head branch lives in a fork. |
-| `pr.visibility` | string | turn | The repository's visibility: public, private or internal, from the Basics read. |
+| `pr.visibility` | string | turn | The repository's visibility: public, private or internal, from the Basics read; empty before it. |
 | `pr.requested_teams` | list | turn | The teams a review of the pull request was requested through, as <org>-<slug>. |
 | `pr.labels` | list | turn | The pull request's labels, from the Basics read. |
 | `pr.address.reviewers` | list | turn | The reviewers an address round answers; empty on any other turn. |
@@ -28,12 +31,23 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.address.conflict` | bool | turn | The head conflicts with the base and the address round resolves it; false on any other turn. |
 | `pr.draft` | bool | action | The pull request is a draft, from the inventory row. |
 | `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
-| `row.kind` | string | action | The row's situation kind. |
-| `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
-| `row.tracked` | bool | action | The pull request is in the inventory. |
 | `pr.adopted` | bool | action | The pull request was taken over into the loop. |
 | `pr.held` | bool | action | Rounds on the pull request are held. |
 | `pr.muted` | bool | action | The pull request is muted, by the server clock. |
+| `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
+| `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
+| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
+| `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
+| `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
+| `pr.last_review.decision` | string | turn | The viewer's newest non-comment verdict; empty when none. |
+
+### The row (`row.*`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `row.kind` | string | action | The row's situation kind. |
+| `row.open` | bool | action | The pull request is open: kind is not done, or, untracked, its GitHub state is open. |
+| `row.tracked` | bool | action | The pull request is in the inventory. |
 | `row.question` | bool | action | A turn waits on the user's answer. |
 | `row.pending` | bool | action | A round is pending. |
 | `row.capped` | bool | action | The daily budget held the row's automatic round. |
@@ -46,13 +60,11 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `row.trust_homes` | list | action | The agent homes trusting row.trust_folder writes in. |
 | `row.remove_refusal` | string | action | What refused removing the row's workspace, which a force remove overrides; empty when nothing did. |
 | `row.recommended` | string | action | The runner recommended for the row's items: session or headless; empty when none is. |
-| `pr.nudge.who` | list | action | Whom a nudge would address, from nudge.targets. |
-| `pr.nudge.why` | string | action | Why the pull request waits on them, from nudge.targets. |
-| `pr.nudge.refusal` | string | action | The text nudge.prepare would refuse with now; empty when allowed. |
-| `draft.state` | string | draft_action | The draft's state. |
-| `draft.provider` | string | draft_action | The provider of the draft's unit. |
-| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
-| `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
+
+### The turn (`turn.*`, `unit.*`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
 | `turn.automated` | bool | turn | The sweep started the turn. |
 | `turn.owned` | bool | turn | The viewer owns the pull request's loop. |
 | `turn.needs_take_over` | bool | turn | owner_only, not owned, and no input with before = "take_over" set. |
@@ -61,9 +73,20 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `turn.planned` | string | turn | The round the request planned: first, follow-up, or empty for none. |
 | `turn.stage` | string | turn | first or follow-up; only intents with dims = ["stage"] may read it. |
 | `unit.ref` | string | turn | The unit as the instructions name it, such as owner/repo#12. |
-| `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
-| `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
-| `pr.last_review.decision` | string | turn | The viewer's newest non-comment verdict; empty when none. |
+
+### A draft's actions (`draft.*`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `draft.state` | string | draft_action | The draft's state. |
+| `draft.provider` | string | draft_action | The provider of the draft's unit. |
+| `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
+| `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
+
+### The configuration (`config.*`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
 | `config.github.address_reviews` | bool | action, turn | The github.address_reviews setting for the pull request. |
 | `config.github.address_checks` | bool | action, turn | The github.address_checks setting for the pull request. |
 | `config.github.followups_without_workspace` | bool | action, turn | The github.followups_without_workspace setting for the pull request. |
@@ -71,11 +94,13 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 
 ## Workflow facts
 
-A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; an intent reads the repository name as `pr.repo_name`.
+A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `config.*` and `now`; a provider whose units have a brief also reads `brief.*`, and `[drafts.withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. A pull request fact has one name and one spelling in every slot: `pr.repo` is `owner/repo` and `pr.repo_name` the bare name.
+
+### Pull requests (`pr.*`)
 
 | `pr` fact (provider `github`) | Type | Meaning |
 |---|---|---|
-| `pr.state` | string | The pull request's state on GitHub: open, closed or merged. |
+| `pr.state` | string | The pull request's state on GitHub: OPEN, CLOSED or MERGED. |
 | `pr.merged_at` | timestamp | When the pull request merged; zero when it did not. |
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
@@ -112,9 +137,12 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
 | `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `pr.repo` | string | owner/repo. |
+| `pr.repo_name` | string | The repository name, without its owner. |
 | `pr.owner` | string | The repository owner. |
 | `pr.author` | string | The pull request's author login; empty when not stored. |
 | `pr.visibility` | string | The repository's visibility: public, private or internal; empty until the pull request is read in full. |
+
+### Sessions (`session.*`)
 
 | `session` fact (provider `session`) | Type | Meaning |
 |---|---|---|
@@ -135,7 +163,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
 | `session.idle_since` | timestamp | When the current idle period started. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[drafts.approval]` rule reads it. |
-| `session.pr_state` | string | The state of the book's pull request: open, closed or merged; empty when none. |
+| `session.pr_state` | string | The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
@@ -144,12 +172,14 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
 
+### Workspaces (`workspace.*`)
+
 | `workspace` fact (provider `workspace`) | Type | Meaning |
 |---|---|---|
 | `workspace.role` | string | author (a taken-over workspace included), review or none. |
 | `workspace.main` | bool | The workspace is the repository's main checkout. |
 | `workspace.pr` | string | The linked pull request, owner/repo#number; empty when none. |
-| `workspace.pr_state` | string | The linked pull request's state: open, closed or merged; empty when none. |
+| `workspace.pr_state` | string | The linked pull request's state: OPEN, CLOSED or MERGED; empty when none. |
 | `workspace.pr_finished_for` | duration | The linked pull request's pr.finished_for. |
 | `workspace.path_exists` | bool | The worktree path exists. |
 | `workspace.temporary` | bool | The worktree lives under a temporary path. |
@@ -166,6 +196,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `workspace.quiet_for` | duration | Time since last_activity. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `workspace.fingerprint` | string | The worktree path and its head. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `workspace.repo` | string | owner/repo; empty when unknown. |
+
+### GTD entries (`entry.*`)
 
 | `entry` fact (provider `entry`) | Type | Meaning |
 |---|---|---|
@@ -188,6 +220,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
 | `entry.fingerprint` | string | The entry's id, state and update time. **Untrusted**: no `[drafts.approval]` rule reads it. |
 
+### Slack conversations (`slack.*`)
+
 | `slack` fact (provider `slack`) | Type | Meaning |
 |---|---|---|
 | `slack.channel` | string | The conversation's channel id. |
@@ -201,6 +235,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. |
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[drafts.approval]` rule reads it. |
 
+### Briefs (`brief.*`)
+
 | `brief` fact | Type | Meaning |
 |---|---|---|
 | `brief.goal` | string | The brief's goal; empty when the unit has no brief. **Untrusted**: no `[drafts.approval]` rule reads it. |
@@ -210,12 +246,16 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `brief.tags` | list | The brief's normalized key:value tags. **Untrusted**: no `[drafts.approval]` rule reads it. |
 | `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. **Untrusted**: no `[drafts.approval]` rule reads it. |
 
+### Drafts (`draft.*`)
+
 | `draft` fact | Type | Meaning |
 |---|---|---|
 | `draft.person_waited` | bool | The draft's person is still waited on by its entry; true for a draft of no person. |
 | `draft.items_owed` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
 | `draft.items_assigned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.unit_open` | bool | The draft's unit still exists: its entry is neither done nor in the trash, or its unit is stored. |
+
+### Triggers (`trigger.*`)
 
 | `trigger` fact | Type | Meaning |
 |---|---|---|
@@ -224,6 +264,8 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `trigger.event.key` | string | The event's key. |
 | `trigger.event.data` | string | The event's data. |
 | `trigger.fired_at` | timestamp | When the schedule fired; zero unless kind is schedule. |
+
+### The configuration (`config.*`)
 
 | `config` fact | Type | Meaning |
 |---|---|---|
@@ -235,7 +277,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `config.nudge.silent_days` | int | The nudge.silent_days setting, in calendar days. |
 | `config.gtd.stale_waiting_days` | int | The gtd.stale_waiting_days setting, in working days. |
 | `config.drafts.repeat_after` | duration | The drafts.repeat_after setting. |
-| `config.turns.per_day` | int | The turns.per_day setting: automated turns on units other than pull requests, all workflows together. |
+| `config.turns.per_day` | int | The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together. |
 
 ## Draft approval facts
 

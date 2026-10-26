@@ -1,1 +1,1 @@
-testdata/bad/on-sent-unknown/intents/ask-author/intent.toml:5:26: effects[1]: "event.asked" is not one of "plan.cleared", "guidance.handed", "pr.counted", "pr.round_sent", "pr.reviewed", "pr.addressed", "pr.nudged"
+testdata/bad/on-sent-unknown/intents/ask-author/intent.toml:5:26: effects[1]: "event.asked" is not one of "plan.cleared", "guidance.handed", "pr.counted", "pr.round_sent", "pr.reviewed", "pr.addressed" or "pr.nudged"

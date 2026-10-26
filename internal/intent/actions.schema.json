@@ -45,6 +45,10 @@
         "type": "string"
       }
     },
+    "required": [
+      "label",
+      "summary"
+    ],
     "type": "object"
   },
   "title": "Built-in actions (actions.toml)",

@@ -363,7 +363,7 @@
                   "type": "string"
                 },
                 "stage": {
-                  "description": "The pass over the unit, for a review.",
+                  "description": "The pass over the unit: its first, or one after.",
                   "enum": [
                     "first",
                     "follow-up"
@@ -373,7 +373,10 @@
                 "use": {
                   "const": "turn.start"
                 }
-              }
+              },
+              "required": [
+                "intent"
+              ]
             }
           },
           {
@@ -451,7 +454,7 @@
                 },
                 "target": {
                   "default": "unit",
-                  "description": "Where the draft posts: on the unit, or on each item.",
+                  "description": "Where the draft posts: on the unit, or on each item; an intent's help.target is free text.",
                   "enum": [
                     "unit",
                     "item"
@@ -466,7 +469,10 @@
                 "use": {
                   "const": "draft.propose"
                 }
-              }
+              },
+              "required": [
+                "purpose"
+              ]
             }
           },
           {
@@ -515,7 +521,7 @@
               "properties": {
                 "text": {
                   "default": "text.md.tmpl",
-                  "description": "The notification's text, beside the manifest.",
+                  "description": "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.",
                   "type": "string"
                 },
                 "use": {
@@ -543,6 +549,9 @@
             "type": "string"
           }
         },
+        "required": [
+          "use"
+        ],
         "type": "object"
       },
       "type": "array"
@@ -558,6 +567,39 @@
         "on": {
           "description": "The source event kinds the workflow reacts to.",
           "items": {
+            "enum": [
+              "opened",
+              "push",
+              "review_requested",
+              "review_request_removed",
+              "review",
+              "comment",
+              "check",
+              "ready",
+              "draft",
+              "merged",
+              "closed",
+              "round_sent",
+              "round_held",
+              "round_pending",
+              "round_skipped",
+              "guidance",
+              "round_blocked",
+              "round_unblocked",
+              "muted",
+              "unmuted",
+              "held",
+              "released",
+              "adopted",
+              "tracked",
+              "untracked",
+              "nudged",
+              "removed",
+              "status",
+              "would_review",
+              "would_address",
+              "review_ended"
+            ],
             "type": "string"
           },
           "type": "array"
@@ -574,6 +616,12 @@
       "type": "string"
     }
   },
+  "required": [
+    "provider",
+    "step",
+    "summary",
+    "when"
+  ],
   "title": "Workflow manifest (workflow.toml)",
   "type": "object"
 }

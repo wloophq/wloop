@@ -17,6 +17,7 @@ never write or rename a block path by hand.
    scope to conditions: `--organization`, `--repo` (only with
    `--organization`), `--user` (the author), `--team`, `--association`,
    `--label`, `--base`, `--stage` (`first` or `follow-up`, review only),
+   `--reviewer` (a reviewer the round answers, address only),
    `--kind`, `--size`, `--risk`,
    `--tag <key>=<value>`. No condition means every pull request. Ask only
    when the scope is ambiguous.

@@ -1,6 +1,6 @@
 [bold]Problems[/] [dim]2[/]
   [red]✗[/] [red]<dir>/intents/broken/intent.toml:1:9[/]: bogus: unknown key
-  [red]✗[/] [red]<dir>/intents/broken/intent.toml:16:8[/]: action.when: 13: unknown field pr.mien; did you mean pr.mine?
+  [red]✗[/] [red]<dir>/intents/broken/intent.toml:16:8[/]: action.when: 13: unknown field pr.mien; did you mean "pr.mine"?
       [dim]row.open && pr.mien[/]
       [dim]            ^[/]
 

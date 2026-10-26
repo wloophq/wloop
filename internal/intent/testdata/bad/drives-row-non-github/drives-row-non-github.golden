@@ -1,1 +1,1 @@
-testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:6:8: role: pr.review runs on github units; a thread intent cannot hold it
+testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:6:8: role: pr.review runs on github units; a slack intent cannot hold it

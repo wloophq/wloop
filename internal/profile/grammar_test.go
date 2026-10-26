@@ -16,7 +16,12 @@ func TestProfileFilesAreTheGrammar(t *testing.T) {
 	} {
 		var tags, rows []string
 		for i := range typ.NumField() {
-			tags = append(tags, typ.Field(i).Tag.Get("toml"))
+			f := typ.Field(i)
+			tag := f.Tag.Get("toml")
+			tags = append(tags, tag)
+			if f.Type.Kind() == reflect.Map && !slices.ContainsFunc(builtin.Grammar, func(k builtin.Key) bool { return k.In == surface && k.Path == tag+".*" }) {
+				t.Errorf("%s %s: the decoder reads a table by name, and no %s.* row", surface, tag, tag)
+			}
 		}
 		for _, k := range builtin.Grammar {
 			if k.In == surface && !strings.Contains(k.Path, ".") {

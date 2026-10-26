@@ -51,7 +51,8 @@ func TestFrontMatterErrorsCarryPositionAndHints(t *testing.T) {
 		{"paths = \"x\"", `must be a list of globs, such as ["src/**/*.go"]`},
 		{"include = \"x.md\"", `must be a list of paths, such as ["policy.md"]`},
 		{"override = \"yes\"", "must be true or false"},
-		{"title = \"ok\"\nreasn = 1", "unknown key; the keys are override, title, include, paths and delegates"},
+		{"override = true\ntitel = \"ok\"", `unknown key; did you mean "title"?`},
+		{"title = \"ok\"\nreasn = 1", "unknown key"},
 	} {
 		d := dir(t, map[string]string{"intent=review.md": "+++\n" + c.fm + "\n+++\nX"})
 		_, err := Load([]Layer{user(d)}, testIntents, nil)

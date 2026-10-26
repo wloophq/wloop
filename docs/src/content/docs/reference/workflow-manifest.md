@@ -8,7 +8,7 @@ A workflow lives in `<profile>/workflows/<name>/workflow.toml`, beside the inten
 ```toml
 summary = "Close a session whose pull request is merged or closed"
 provider = "session"
-when = 'session.pr_state in ["merged", "closed"]'
+when = 'session.pr_state in ["MERGED", "CLOSED"]'
 order = 11
 
 [[step]]
@@ -30,7 +30,9 @@ stage = "follow-up"
 
 ## Fields
 
-The loader refuses any other key, naming the closest one. Without `[trigger]` a workflow is planned on every sweep; `on` plans it from a durable cursor of events, so an event seen while the daemon was down is handled once, and `schedule` on a cron in local time. The configuration's `workflows.<name>` overlays `observe`, `enabled`, `only_when`, `[approval]` and `[drafts.approval]`, field by field: `mode` and `window` replace those fields and `rule` replaces the rules (`[]` clears them).
+The loader refuses any other key, naming a close one when one exists. Without `[trigger]` a workflow is planned on every sweep; `on` plans it from a durable cursor of events, so an event seen while the daemon was down is handled once, and `schedule` on a cron in local time. The configuration's `workflows.<name>` overlays `observe`, `enabled`, `only_when`, `[approval]` and `[drafts.approval]`, field by field: `mode` and `window` replace those fields and `rule` replaces the rules (`[]` clears them); over a workflow without `[drafts.approval]`, the config's drafts block overlays the intent's for its turns' drafts. The config loads what holds alone; a block that fails once merged is named by `doctor`.
+
+### What it matches
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
@@ -41,22 +43,33 @@ The loader refuses any other key, naming the closest one. Without `[trigger]` a 
 | `key` | list of facts |  | The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. |
 | `marks` | table by name |  | Mark name to fact, stored when a run is done or dismissed, which handled() reads. |
 | `marks.&lt;name&gt;` | fact |  | The fact whose value the mark stores. |
-| `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
+
+### When it is planned
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of strings |  | The source event kinds the workflow reacts to. |
+| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended` |  | The source event kinds the workflow reacts to. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
-| `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self` |  | The step. |
-| `step[].&lt;name&gt;` | string or table |  | The step's arguments. |
+| `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
 | `limits` | table |  | How many runs the workflow may take. |
 | `limits.per_run` | integer | `0` | Runs per evaluation; 0 is no limit. |
 | `limits.per_day` | integer | `0` | Runs per local day; 0 is no limit. |
 | `limits.per_unit_per_day` | integer | `0` | Runs on one unit per local day; 0 is no limit. |
 | `limits.cooldown` | duration |  | The least time between runs on one unit. |
-| `drafts` | table |  | The drafts the workflow's steps and turns propose. |
-| `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
-| `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
-| `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
+
+### Steps
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `step[]` | table |  | A step the run takes, in order. Required: at least one. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self` |  | The step. |
+| `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
+
+### Run approval
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
 | `approval` | table |  | The run approval: how a matched item runs. |
 | `approval.mode` | one of `run`, `delay`, `wait` | `run` | The mode when no rule matches. |
 | `approval.window` | duration |  | How long a person has before the item runs; only with mode delay, which needs it. |
@@ -64,6 +77,15 @@ The loader refuses any other key, naming the closest one. Without `[trigger]` a 
 | `approval.rule[].when` | predicate |  | When the rule applies. |
 | `approval.rule[].mode` | one of `run`, `delay`, `wait` |  | The mode when the rule applies. |
 | `approval.rule[].window` | duration |  | The rule's window; only with mode delay, which needs it. |
+
+### Drafts
+
+| Key | Kind | Default | Meaning |
+|---|---|---|---|
+| `drafts` | table |  | The drafts the workflow's steps and turns propose. |
+| `drafts.withdraw` | table |  | When an open draft the workflow proposed is withdrawn. |
+| `drafts.withdraw.when` | predicate |  | When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's. |
+| `drafts.withdraw.reason` | one of `assigned`, `moot` | `moot` | The reason the withdrawn draft stores. |
 | `drafts.approval` | table |  | The approval of the drafts the workflow's steps and turns propose. |
 | `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` | `wait` | The mode when no rule matches. |
 | `drafts.approval.window` | duration |  | How long a person has before the draft is sent; only with mode delay, which needs it. |
@@ -81,7 +103,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `turn.dismiss` | `reason` | string |  | The reason the dismissed turn records. |
 | `answer.refuse` | `reason` | string |  | The reason the refused answer records. |
 | `turn.start` | `intent` | string |  | The intent whose turn starts; it must serve the unit. Required. |
-| `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit, for a review. |
+| `turn.start` | `stage` | one of `first`, `follow-up` |  | The pass over the unit: its first, or one after. |
 | `turn.start` | `runner` | one of `session`, `headless` |  | How the turn runs; by default the intent's first runner. |
 | `draft.propose` | `purpose` | string |  | What the draft is for, such as nudge or close. Required. |
 | `draft.propose` | `delivery` | one of `message`, `reaction`, `comment` | `message` | How the draft posts. |
@@ -89,13 +111,13 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `draft.propose` | `reaction` | string |  | The emoji name, with delivery reaction. |
 | `draft.propose` | `items` | one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all` | `all` | Which of the unit's items the draft lists. |
 | `draft.propose` | `per` | one of `unit`, `person` | `unit` | One draft per unit, or one per person it waits on. |
-| `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item. |
+| `draft.propose` | `target` | one of `unit`, `item` | `unit` | Where the draft posts: on the unit, or on each item; an intent's help.target is free text. |
 | `draft.propose` | `effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | What sending the draft applies. |
 | `draft.propose` | `repeat_after` | string |  | The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after. |
 | `draft.propose` | `repeat_after_sent` | string |  | The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever. |
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
-| `notify.self` | `text` | file | `text.md.tmpl` | The notification's text, beside the manifest. |
+| `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.
@@ -110,7 +132,7 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 - `mode = "delay"` with a `window` runs it when the window ends unless you act;
 - `mode = "wait"` keeps it `pending` until you apply or dismiss it, as the workspace workflows' rule does for a workspace with unsaved work, with the reason shown.
 
-The bundled `turn.start` workflows set `mode = "delay"` and `window = "60s"`. A rule that runs an item (`run` or `delay`) never reads an untrusted fact. `observe = true` plans items and never runs them on its own: you apply one by hand. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
+The bundled `turn.start` workflows set `mode = "delay"` and `window = "60s"`. A rule that runs an item (`run` or `delay`) never reads an untrusted fact, `trigger.event.data` included; a `wait` rule may, and the workflow's `when` reads any fact. `observe = true` plans items and never runs them on its own: you apply one by hand. Dismissing or skipping an item is final for its key; holding, pausing or starting the round by hand drops the item without marking it.
 
 ## Draft approval
 
@@ -129,10 +151,7 @@ It covers the drafts of the turns the workflow starts and of its `draft.propose`
 
 ## Predicates
 
-The language is the one of the [intent manifest](/reference/intent-manifest/#predicates), with the workflow facts, and two traps:
-
-- `!x == y` and `!x in l` fail to compile with a hint: write `!(x == y)`.
-- `pr.repo` is `owner/repo` in a workflow, and the repository name in an intent.
+The language is the one of the [intent manifest](/reference/intent-manifest/#predicates), with the workflow facts. `!x == y` and `!x in l` fail to compile with a hint: write `!(x == y)`.
 
 A subtraction from a zero timestamp is an evaluation error, so providers omit a fact instead of returning zero; test for it first (`session.idle_since` is absent for a session never seen idle, and `idle_for` is 0).
 

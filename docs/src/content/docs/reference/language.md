@@ -3,7 +3,7 @@ title: Profile language
 description: Every reserved word of the profile files and the configuration, one line each.
 ---
 
-Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with the closest listed one as a suggestion. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
+Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
 
 ## Intent manifest (`intents/<name>/intent.toml`)
 
@@ -16,23 +16,38 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `user_facing` (bool, default `true`): Offered as a command, a skill and an action.
 - `skill` (bool, default `false`): Install writes it a turn skill; needs help.target.
 - `help` (table): How its command presents it.
-- `help.target` (string): What the command's target is.
+- `help.target` (string): Free text saying what the command's argument names, such as a pull request URL.
 - `help.summary` (string): The main help's line; the intent's summary when absent.
-- `help.group` (string): The main help's group title.
+- `help.group` (string): The title of the main help's group that lists the command, free text; action.group is the action's.
 - `help.examples` (list of strings): Command lines without the command's name.
 - `help.docs` (string): A page path of the documentation site.
 
 ### Binding
 
 - `role` (one of `pr.review`, `pr.address`, `pr.nudge`, `probe`, `headless`): What binds it to a plugin's mechanism. One intent per role and provider.
-- `provider` (string or table): The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.
+  - `pr.review`: The review round on someone else's pull request: first or follow-up, reconciled with the review you published; it drives its workspace's row.
+  - `pr.address`: The address round on a pull request you develop: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.
+  - `pr.nudge`: The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.
+  - `probe`: The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.
+  - `headless`: The intent a headless turn on a unit runs when its request names none.
+- `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them): The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.
+  - `entry`: Facts under entry.*.
+  - `github`: Facts under pr.*.
+  - `session`: Facts under session.*.
+  - `slack`: Facts under slack.*.
+  - `workspace`: Facts under workspace.*.
+  - `any`: Every provider's units.
 - `builds` (one of `brief`): A builder, never a turn.
 - `prompt` (file): A builder's prompt file, through the profile layers.
 - `schema` (file): A builder's extra fields' schema file, beside the manifest.
 
 ### Where it runs
 
-- `workspace` (string or table): Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository.
+- `workspace` (one of `review`, `author`, `linked_else_main`, `given`, or a table): Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository.
+  - `review`: The review workspace, created at the head.
+  - `author`: The workspace that develops the unit.
+  - `linked_else_main`: The workspace linked to the unit, else the repository's main checkout.
+  - `given`: The workspace the request names.
 - `workspace.repo` (string): The repository the turn runs in, owner/name.
 - `workspace.repo_input` (string): The input that holds the repository the turn runs in.
 - `runners` (list of `session`, `headless`): How its turns may run; ["session"] when absent.
@@ -62,6 +77,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `inputs.<name>.hidden` (bool, default `false`): Left out of help.
 - `inputs.<name>.by_hand_only` (bool, default `false`): An automated turn never sets it.
 - `inputs.<name>.before` (one of `take_over`): What runs before the turn when it is set.
+  - `take_over`: Takes the unit over into the loop before the turn.
 - `inputs.<name>.max` (integer, default `0`): A text input's length cap in runes; 0 for none.
 - `inputs.<name>.surfaces` (list of `cli`, `instructions`, `try`): Where it is offered; cli and instructions when absent.
 
@@ -111,13 +127,14 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 ### Judgment
 
-- `profile` (string): The intent whose judgment blocks the turn reads, or none.
+- `profile` (string): The intent whose judgment blocks the turn reads, or none; the configuration's profile is the profile directory.
 - `dims` (list of `stage`, `reviewer`): The dimensions valid under its profile.
 - `also_profile[]` (table): Other judgment the turn reads.
 - `also_profile[].profile` (string): The intent with judgment blocks.
 - `also_profile[].when` (predicate): When the turn reads the other judgment.
-- `also_profile[].dims` (table by name): Dimensions it pins, such as { stage = "first" }.
-- `also_profile[].dims.<name>` (string): A pinned dimension's value.
+- `also_profile[].dims` (table): Dimensions it pins, such as { stage = "first" }.
+- `also_profile[].dims.stage` (one of `first`, `follow-up`): The pinned stage.
+- `also_profile[].dims.reviewer` (string): The pinned reviewer login.
 - `also_profile[].define` (string): The template define that renders it.
 - `also_profile[].prefix` (string): What its sources are listed under; "&lt;profile&gt; guide: " when absent.
 
@@ -138,15 +155,19 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 ### Effects and drafts
 
 - `effects` (list of `plan.cleared`, `guidance.handed`, `pr.counted`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged`): What sending the turn applies.
+  - `plan.cleared`: Drops the unit's pending plan items.
+  - `guidance.handed`: Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent.
+  - `pr.counted`: Counts the turn against turns.per_unit_per_day.
+  - `pr.round_sent`: Records the round-sent event on the pull request.
+  - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
+  - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
-- `drafts.approval` (table): The approval of its drafts; wait when absent.
-- `drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`): The approval when no rule holds.
-- `drafts.approval.window` (duration): With mode delay only: how long a person has to stop the draft.
-- `drafts.approval.rule[]` (table): A rule; the first whose when holds gives the mode.
-- `drafts.approval.rule[].when` (predicate): When the approval rule applies to a draft.
-- `drafts.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`): The rule's approval.
-- `drafts.approval.rule[].window` (duration): With mode delay only: how long a person has to stop the draft.
+  - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
+  - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft.
+- `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
 
@@ -167,6 +188,11 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `summary` (string): One line, what the workflow does; its plan items' description. Required.
 - `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`): The provider of the units it matches. Required.
+  - `entry`: Facts under entry.*.
+  - `github`: Facts under pr.*.
+  - `session`: Facts under session.*.
+  - `slack`: Facts under slack.*.
+  - `workspace`: Facts under workspace.*.
 - `when` (predicate): The match condition, over the unit's facts, the trigger's and config.*. Required.
 - `order` (integer, default `100`): Evaluation order, lowest first.
 - `key` (list of facts): The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again.
@@ -176,7 +202,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 ### When it is planned
 
 - `trigger` (table): What plans the workflow: on or schedule; absent, every sweep.
-- `trigger.on` (list of strings): The source event kinds the workflow reacts to.
+- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`): The source event kinds the workflow reacts to.
 - `trigger.schedule` (string): A cron schedule, in local time.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
 - `limits` (table): How many runs the workflow may take.
@@ -189,17 +215,21 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
 - `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`): The step.
-- `step[].<name>` (string or table): The step's arguments.
+  - `session.close`: Closes the agent session.
+  - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
+  - `workspace.unregister`: Unregisters a workspace whose path is gone.
+  - `turn.dismiss`: Dismisses the open turn, recording the reason.
+  - `answer.refuse`: Refuses a queued answer whose route is gone.
+  - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
+  - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
+  - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
+  - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
+  - `notify.self`: A private notification: `text` (a file in the workflow's directory, by default `text.md.tmpl`).
+- `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
 
-- `approval` (table): The run approval: how a matched item runs.
-- `approval.mode` (one of `run`, `delay`, `wait`, default `run`): The mode when no rule matches.
-- `approval.window` (duration): How long a person has before the item runs; only with mode delay, which needs it.
-- `approval.rule[]` (table): A rule tried in order; the first whose when holds gives the mode.
-- `approval.rule[].when` (predicate): When the rule applies.
-- `approval.rule[].mode` (one of `run`, `delay`, `wait`): The mode when the rule applies.
-- `approval.rule[].window` (duration): The rule's window; only with mode delay, which needs it.
+- `approval` (an [approval table](#approval-tables) of run modes, default mode `run`): The run approval: how a matched item runs.
 
 ### Drafts
 
@@ -207,13 +237,9 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `drafts.withdraw` (table): When an open draft the workflow proposed is withdrawn.
 - `drafts.withdraw.when` (predicate): When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's.
 - `drafts.withdraw.reason` (one of `assigned`, `moot`, default `moot`): The reason the withdrawn draft stores.
-- `drafts.approval` (table): The approval of the drafts the workflow's steps and turns propose.
-- `drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`, default `wait`): The mode when no rule matches.
-- `drafts.approval.window` (duration): How long a person has before the draft is sent; only with mode delay, which needs it.
-- `drafts.approval.rule[]` (table): A rule tried in order; the first whose when holds gives the mode.
-- `drafts.approval.rule[].when` (predicate): When the rule applies.
-- `drafts.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`): The mode when the rule applies.
-- `drafts.approval.rule[].window` (duration): The rule's window; only with mode delay, which needs it.
+  - `assigned`: Its items got an owner.
+  - `moot`: It no longer applies.
+- `drafts.approval` (an [approval table](#approval-tables) of draft modes, default mode `wait`): The approval of the drafts the workflow's steps and turns propose.
 
 ## Steps and their arguments
 
@@ -227,7 +253,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `session.mark_dormant`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
-  - `stage` (one of `first`, `follow-up`): The pass over the unit, for a review.
+  - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.
   - `runner` (one of `session`, `headless`): How the turn runs; by default the intent's first runner.
 - `draft.propose`:
   - `purpose` (string): What the draft is for, such as nudge or close. Required.
@@ -236,19 +262,28 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `reaction` (string): The emoji name, with delivery reaction.
   - `items` (one of `owed`, `resolved`, `unowned`, `unowned_aged`, `all`, default `all`): Which of the unit's items the draft lists.
   - `per` (one of `unit`, `person`, default `unit`): One draft per unit, or one per person it waits on.
-  - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item.
+  - `target` (one of `unit`, `item`, default `unit`): Where the draft posts: on the unit, or on each item; an intent's help.target is free text.
   - `effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
+  - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
+  - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
 - `classify`:
   - `prompt` (file, default `prompt.md`): The classification's prompt, beside the manifest.
   - `schema` (file, default `schema.json`): The JSON schema of its answer, beside the manifest.
 - `notify.self`:
-  - `text` (file, default `text.md.tmpl`): The notification's text, beside the manifest.
+  - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
 
 ## Defaults (`defaults.toml`)
 
-- `provider` (string): The provider of an intent whose manifest names none.
+- `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`): The provider of an intent whose manifest names none.
+  - `entry`: Facts under entry.*.
+  - `github`: Facts under pr.*.
+  - `session`: Facts under session.*.
+  - `slack`: Facts under slack.*.
+  - `workspace`: Facts under workspace.*.
+  - `any`: Every provider's units.
 
 ## Block headings (`labels.toml`)
 
@@ -272,7 +307,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 
 ### Agent and workspaces
 
-- `profile` (string): The user profile layered over the bundled one: a name under the profiles directory, or a path.
+- `profile` (string): The user profile layered over the bundled one: a name under the profiles directory, or a path; an intent's profile names an intent.
 - `agent` (string): The agent the sessions run.
 - `agent_home` (string): The agent's own configuration directory; empty is the agent's default.
 - `agent_models` (table by name): Per agent, a model name for each model tier.
@@ -320,6 +355,10 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `github.drafts` (table): The drafts the plugin's own rules propose.
 - `github.drafts.approval` (table): Their approval; left out, each waits for you.
 - `github.drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`): The approval mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
 - `github.drafts.approval.window` (duration): How long a delay waits before the draft goes; only with mode delay.
 
 ### GitHub address rounds
@@ -356,6 +395,10 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `slack.drafts` (table): The drafts the plugin's own rules propose.
 - `slack.drafts.approval` (table): Their approval; left out, each waits for you.
 - `slack.drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`): The approval mode.
+  - `send`: Posts at once.
+  - `delay`: Posts when the window ends unless a person stops it.
+  - `wait`: Waits for a person.
+  - `dry_run`: Stores the draft and never sends it; nobody can release it.
 - `slack.drafts.approval.window` (duration): How long a delay waits before the draft goes; only with mode delay.
 
 ### Slack ingest
@@ -391,24 +434,12 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `workflows.<name>.enabled` (bool): Switches the workflow; left out, it is on.
 - `workflows.<name>.observe` (bool): Plans the workflow's items pending, for you to run; left out, the manifest's.
 - `workflows.<name>.only_when` (predicate): A condition ANDed with the workflow's when.
-- `workflows.<name>.approval` (table): The approval of the workflow's runs, over the manifest's field by field.
-- `workflows.<name>.approval.mode` (one of `run`, `delay`, `wait`): The mode when no rule matches; left out, the manifest's.
-- `workflows.<name>.approval.window` (duration): How long a delay waits before it goes; only with mode delay.
-- `workflows.<name>.approval.rule[]` (table): Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.
-- `workflows.<name>.approval.rule[].when` (predicate): When the rule applies.
-- `workflows.<name>.approval.rule[].mode` (one of `run`, `delay`, `wait`): The rule's mode.
-- `workflows.<name>.approval.rule[].window` (duration): The rule's delay; only with mode delay.
+- `workflows.<name>.approval` (an [approval table](#approval-tables) of run modes): The approval of the workflow's runs, over the manifest's field by field.
 
 ### Workflow draft approval
 
 - `workflows.<name>.drafts` (table): The drafts the workflow proposes.
-- `workflows.<name>.drafts.approval` (table): The approval of the workflow's drafts, over the manifest's field by field.
-- `workflows.<name>.drafts.approval.mode` (one of `send`, `delay`, `wait`, `dry_run`): The mode when no rule matches; left out, the manifest's.
-- `workflows.<name>.drafts.approval.window` (duration): How long a delay waits before it goes; only with mode delay.
-- `workflows.<name>.drafts.approval.rule[]` (table): Rules tried in order before the mode, the first match wins; set, they replace the manifest's, and [] clears them.
-- `workflows.<name>.drafts.approval.rule[].when` (predicate): When the rule applies.
-- `workflows.<name>.drafts.approval.rule[].mode` (one of `send`, `delay`, `wait`, `dry_run`): The rule's mode.
-- `workflows.<name>.drafts.approval.rule[].window` (duration): The rule's delay; only with mode delay.
+- `workflows.<name>.drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of the workflow's drafts, over the manifest's field by field.
 
 ### Turns and headless calls
 
@@ -450,7 +481,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `cleanup` (table): The thresholds of the session and workspace cleanup workflows.
 - `cleanup.idle` (duration, default `2h`): How long a finished session stays idle before it closes.
 - `cleanup.asked_idle` (duration, default `4h`): How long a session that asked you stays idle before it closes.
-- `cleanup.workspace_grace` (duration, default `1d`): How long, in working time, a finished pull request's workspace stays.
+- `cleanup.workspace_grace` (duration, default `1d`): How long, in working time, a workspace stays after its unit finished.
 - `cleanup.manual_idle` (duration, default `1d`): How long a session you started stays idle before it closes.
 - `cleanup.stale_workspace` (duration, default `14d`): How long an untouched workspace stays.
 - `cleanup.disposable` (list of strings): Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing.
@@ -479,5 +510,29 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `views.<name>` (table): One sink's settings.
 - `views.<name>.columns` (table by name): The sink's column for each status: working, working-fallback, needs-me, reviewed, ready, in-progress, in-review, completed.
 - `views.<name>.columns.<name>` (string): The column of the status.
+
+## Approval tables
+
+An approval table that links here has these keys; a run approval takes the run modes, a draft approval the draft modes.
+
+- `mode` (string): The mode when no rule matches.
+- `window` (duration): How long a person has before the item runs or the draft is sent; only with mode delay, which needs it.
+- `rule[]` (table): A rule tried in order; the first whose when holds gives the mode.
+- `rule[].when` (predicate): When the rule applies.
+- `rule[].mode` (string): The mode when the rule applies.
+- `rule[].window` (duration): The rule's window; only with mode delay, which needs it.
+
+The run modes:
+
+- `run`: Runs at once.
+- `delay`: Runs when the window ends unless a person stops it.
+- `wait`: Waits for a person; a matched wait rule also holds an item a guard refuses.
+
+The draft modes:
+
+- `send`: Posts at once.
+- `delay`: Posts when the window ends unless a person stops it.
+- `wait`: Waits for a person.
+- `dry_run`: Stores the draft and never sends it; nobody can release it.
 
 This page is generated from the grammar table by `make docs-ref`.

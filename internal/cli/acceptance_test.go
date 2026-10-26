@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -40,6 +41,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -479,6 +481,7 @@ var fxCheckouts struct {
 func TestMain(m *testing.M) {
 	os.Unsetenv("ORCA_USER_DATA_PATH")
 	storeReportWait = 0
+	builtin.Providers = append(builtin.Providers, ingesttest.Provider)
 	code := m.Run()
 	if len(fxCheckouts.paths.roots) > 0 {
 		os.RemoveAll(fxCheckouts.paths.roots[0])
@@ -855,7 +858,7 @@ func threshold(f workflow.Facts, c config.Cleanup) (string, string) {
 			stale := time.Duration(c.StaleWorkspace)
 			return "workspace-idle-no-pr", fmt.Sprintf("workspace.quiet_for %s %s cleanup.stale_workspace %s", short(dur("workspace.quiet_for")),
 				compare(dur("workspace.quiet_for"), stale), short(stale))
-		case state == "merged" || state == "closed":
+		case state == "MERGED" || state == "CLOSED":
 			grace := time.Duration(c.WorkspaceGrace)
 			return name, fmt.Sprintf("workspace.pr_finished_for %s %s cleanup.workspace_grace %s", short(dur("workspace.pr_finished_for")),
 				compare(dur("workspace.pr_finished_for"), grace), short(grace))
@@ -1393,13 +1396,13 @@ func TestReviewFinishedMatchesOnlyReviewWorkspacesPastGrace(t *testing.T) {
 		facts workflow.Facts
 		match bool
 	}{
-		"past grace":        {workspaceFactsOf("review", "merged", 25*time.Hour), true},
-		"closed past grace": {workspaceFactsOf("review", "closed", 25*time.Hour), true},
-		"inside the grace":  {workspaceFactsOf("review", "merged", 23*time.Hour), false},
-		"an author one":     {workspaceFactsOf("author", "merged", 25*time.Hour), false},
-		"an open one":       {workspaceFactsOf("review", "open", 0), false},
+		"past grace":        {workspaceFactsOf("review", "MERGED", 25*time.Hour), true},
+		"closed past grace": {workspaceFactsOf("review", "CLOSED", 25*time.Hour), true},
+		"inside the grace":  {workspaceFactsOf("review", "MERGED", 23*time.Hour), false},
+		"an author one":     {workspaceFactsOf("author", "MERGED", 25*time.Hour), false},
+		"an open one":       {workspaceFactsOf("review", "OPEN", 0), false},
 		"a main checkout": {func() workflow.Facts {
-			f := workspaceFactsOf("review", "merged", 25*time.Hour)
+			f := workspaceFactsOf("review", "MERGED", 25*time.Hour)
 			f["workspace.main"] = true
 			return f
 		}(), false},
@@ -1420,7 +1423,7 @@ func TestReviewFinishedWaitsOnDirtyUntrackedOrUnpushed(t *testing.T) {
 		{"workspace.unpushed", "2 commits not pushed in /w/ws1; back them up with: git push origin HEAD:refs/heads/me/backup-b"},
 	} {
 		eng, units, steps := cleanupRig(t, "workspace-review-finished", true)
-		f := workspaceFactsOf("review", "merged", 25*time.Hour)
+		f := workspaceFactsOf("review", "MERGED", 25*time.Hour)
 		f[c.fact] = 1
 		units.Put(finishedWorkspace, f)
 		steps.Refuse("workspace.remove", finishedWorkspace, c.refusal)
@@ -1458,7 +1461,7 @@ func TestIdleNoPRWaitsWithItsPendency(t *testing.T) {
 func TestAuthorFinishedRemovesACleanWorkspaceWithNoPendency(t *testing.T) {
 	t.Parallel()
 	eng, units, steps := cleanupRig(t, "workspace-author-finished", true)
-	units.Put(finishedWorkspace, workspaceFactsOf("author", "merged", 25*time.Hour))
+	units.Put(finishedWorkspace, workspaceFactsOf("author", "MERGED", 25*time.Hour))
 	if items := planOf(t, eng); len(items) != 1 || items[0].Decision != workflow.DecisionRun {
 		t.Fatalf("items %+v", items)
 	}
@@ -1480,7 +1483,7 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 		{factworkspace.PendingOpen, ""},
 	} {
 		eng, units, steps := cleanupRig(t, "workspace-author-finished", true)
-		f := workspaceFactsOf("author", "closed", 25*time.Hour)
+		f := workspaceFactsOf("author", "CLOSED", 25*time.Hour)
 		f["workspace.pendency"] = []string{c.pendency}
 		units.Put(finishedWorkspace, f)
 		reason := "workspace.pendency [" + c.pendency + "]"
@@ -1502,10 +1505,10 @@ func TestAuthorFinishedWaitsOnEachPendency(t *testing.T) {
 func TestAuthorFinishedSkipsReviewWorkspacesAndOpenPRs(t *testing.T) {
 	t.Parallel()
 	for name, f := range map[string]workflow.Facts{
-		"a review workspace":  workspaceFactsOf("review", "merged", 25*time.Hour),
-		"an open PR":          workspaceFactsOf("author", "open", 0),
+		"a review workspace":  workspaceFactsOf("review", "MERGED", 25*time.Hour),
+		"an open PR":          workspaceFactsOf("author", "OPEN", 0),
 		"no pull request":     workspaceFactsOf("none", "", 0),
-		"inside of the grace": workspaceFactsOf("author", "merged", time.Hour),
+		"inside of the grace": workspaceFactsOf("author", "MERGED", time.Hour),
 	} {
 		eng, units, _ := cleanupRig(t, "workspace-author-finished", true)
 		units.Put(finishedWorkspace, f)

@@ -439,7 +439,7 @@ func (u *unit) load(base *template.Template, defaults manifestDefaults) {
 	defer func() {
 		s.problems = slices.DeleteFunc(s.problems, func(p Problem) bool { return skip != "" && unindexed(p.Field) == unindexed(skip) })
 		s.problems = append(s.problems, problems...)
-		s.addGrammar(grammar(builtin.SurfaceIntent, src, u.files.user("intent.toml")))
+		s.addGrammar(grammar(builtin.SurfaceIntent, src))
 	}()
 	s.at = positions(src)
 	d := s.define(u.name, m)

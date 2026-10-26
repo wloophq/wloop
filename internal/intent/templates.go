@@ -258,6 +258,7 @@ func zero(t expr.Type) any {
 // dimension.
 func TurnEnv(d dintent.Def) expr.Env {
 	env := builtin.Env(builtin.TurnSlot, d.Inputs)
+	builtin.Narrow(env, servedProviders(d))
 	if !slices.Contains(d.Dims, dintent.DimStage) {
 		delete(env, "turn.stage")
 	}

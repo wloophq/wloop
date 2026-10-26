@@ -57,12 +57,12 @@ func enumOf(values ...string) map[unit.ProviderID][]string {
 	return map[unit.ProviderID][]string{anyProvider: values}
 }
 
-// PRStates are a pull request's states as the inventory stores them;
-// prStatesLower are the workflow slot's spelling.
-var (
-	PRStates      = []string{"OPEN", "CLOSED", "MERGED"}
-	prStatesLower = []string{"open", "closed", "merged"}
-)
+// PRStates are a pull request's states as GitHub spells them.
+var PRStates = []string{"OPEN", "CLOSED", "MERGED"}
+
+// Visibilities are a repository's visibilities, lowercased as the GitHub
+// adapter reads them.
+var Visibilities = []string{"public", "private", "internal"}
 
 // ReviewStates are GitHub's review states, and the empty value of no review.
 var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED", "PENDING"}
@@ -116,14 +116,15 @@ var Facts = slices.Concat(intentPRFacts, ActionFacts, otherFacts)
 var intentPRFacts = []Fact{
 	prFact("pr.mine", expr.Bool, both, "The pull request's author is the viewer."),
 	dim(prFact("pr.author", expr.String, both, "The pull request's author login.")),
-	enum(prFact("pr.state", expr.String, both, "The pull request's state on GitHub: OPEN, CLOSED or MERGED, as the inventory stores it."), enumOf(PRStates...)),
+	enum(prFact("pr.state", expr.String, both, "The pull request's state on GitHub: OPEN, CLOSED or MERGED."), enumOf(PRStates...)),
 	prFact("pr.slug", expr.String, both, "owner/repo#number."),
 	dim(prFact("pr.owner", expr.String, both, "The repository owner.")),
-	dim(prFact("pr.repo_name", expr.String, both, "The repository name; the workflow fact pr.repo is owner/repo.")),
+	prFact("pr.repo", expr.String, both, "owner/repo."),
+	dim(prFact("pr.repo_name", expr.String, both, "The repository name, without its owner.")),
 	dim(prFact("pr.base", expr.String, both, "The base branch.")),
 	dim(enum(prFact("pr.association", expr.String, trn, "The author's association with the repository, from the Basics read."), map[unit.ProviderID][]string{anyProvider: Associations})),
 	prFact("pr.cross_repository", expr.Bool, both, "The head branch lives in a fork."),
-	prFact("pr.visibility", expr.String, trn, "The repository's visibility: public, private or internal, from the Basics read."),
+	enum(prFact("pr.visibility", expr.String, trn, "The repository's visibility: public, private or internal, from the Basics read; empty before it."), enumOf(append([]string{""}, Visibilities...)...)),
 	dim(prFact("pr.requested_teams", expr.List, trn, "The teams a review of the pull request was requested through, as <org>-<slug>.")),
 	dim(prFact("pr.labels", expr.List, trn, "The pull request's labels, from the Basics read.")),
 	dim(prFact("pr.address.reviewers", expr.List, trn, "The reviewers an address round answers; empty on any other turn.")),
@@ -149,7 +150,7 @@ var otherFacts = []Fact{
 	fact("config.github.address_checks", expr.Bool, both, "The github.address_checks setting for the pull request."),
 	fact("config.github.followups_without_workspace", expr.Bool, both, "The github.followups_without_workspace setting for the pull request."),
 	fact("config.github.address_without_workspace", expr.Bool, both, "The github.address_without_workspace setting for the pull request."),
-	enum(wf("pr", "state", expr.String, "The pull request's state on GitHub: open, closed or merged."), enumOf(prStatesLower...)),
+	enum(wf("pr", "state", expr.String, "The pull request's state on GitHub: OPEN, CLOSED or MERGED."), enumOf(PRStates...)),
 	wf("pr", "merged_at", expr.Time, "When the pull request merged; zero when it did not."),
 	wf("pr", "closed_at", expr.Time, "When the pull request closed; zero when open."),
 	wf("pr", "finished_for", expr.Duration, "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."),
@@ -186,9 +187,10 @@ var otherFacts = []Fact{
 	wf("pr", "mute.refusal", expr.String, "Why the pull request is muted, such as muted until its state changes; empty when it is not."),
 	untrusted(wf("pr", "fingerprint", expr.String, "What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips.")),
 	wf("pr", "repo", expr.String, "owner/repo."),
+	wf("pr", "repo_name", expr.String, "The repository name, without its owner."),
 	wf("pr", "owner", expr.String, "The repository owner."),
 	wf("pr", "author", expr.String, "The pull request's author login; empty when not stored."),
-	wf("pr", "visibility", expr.String, "The repository's visibility: public, private or internal; empty until the pull request is read in full."),
+	enum(wf("pr", "visibility", expr.String, "The repository's visibility: public, private or internal; empty until the pull request is read in full."), enumOf(append([]string{""}, Visibilities...)...)),
 	enum(wf("session", "state", expr.String, "active (it has a live process), dormant (no process; its manager can wake it) or closed."), enumOf("active", "dormant", "closed")),
 	wf("session", "manager", expr.String, "The workspace manager that owns the session, such as orca or claude-desktop."),
 	wf("session", "managed", expr.Bool, "The session was started by the loop (sessions.managed)."),
@@ -206,7 +208,7 @@ var otherFacts = []Fact{
 	wf("session", "closes_when_done", expr.Bool, "The newest turn's intent closes its session when done."),
 	untrusted(wf("session", "idle_since", expr.Time, "When the current idle period started.")),
 	untrusted(wf("session", "idle_for", expr.Duration, "Time since idle_since.")),
-	enum(wf("session", "pr_state", expr.String, "The state of the book's pull request: open, closed or merged; empty when none."), enumOf(append([]string{""}, prStatesLower...)...)),
+	enum(wf("session", "pr_state", expr.String, "The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none."), enumOf(append([]string{""}, PRStates...)...)),
 	wf("session", "duplicate", expr.Bool, "Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates."),
 	wf("session", "worktree_gone", expr.Bool, "The session's worktree path no longer exists."),
 	wf("session", "closed_by_manager", expr.Bool, "The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop."),
@@ -217,7 +219,7 @@ var otherFacts = []Fact{
 	enum(wf("workspace", "role", expr.String, "author (a taken-over workspace included), review or none."), enumOf("author", "review", "none")),
 	wf("workspace", "main", expr.Bool, "The workspace is the repository's main checkout."),
 	wf("workspace", "pr", expr.String, "The linked pull request, owner/repo#number; empty when none."),
-	enum(wf("workspace", "pr_state", expr.String, "The linked pull request's state: open, closed or merged; empty when none."), enumOf(append([]string{""}, prStatesLower...)...)),
+	enum(wf("workspace", "pr_state", expr.String, "The linked pull request's state: OPEN, CLOSED or MERGED; empty when none."), enumOf(append([]string{""}, PRStates...)...)),
 	wf("workspace", "pr_finished_for", expr.Duration, "The linked pull request's pr.finished_for."),
 	wf("workspace", "path_exists", expr.Bool, "The worktree path exists."),
 	wf("workspace", "temporary", expr.Bool, "The worktree lives under a temporary path."),
@@ -289,7 +291,7 @@ var otherFacts = []Fact{
 	wf("config", "nudge.silent_days", expr.Int, "The nudge.silent_days setting, in calendar days."),
 	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
-	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units other than pull requests, all workflows together."),
+	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together."),
 }
 
 // put declares f in env with its closed values, when they hold for every
@@ -298,6 +300,31 @@ func put(env expr.Env, f Fact) {
 	env[f.Name] = f.Type
 	if vs, ok := f.Enum[anyProvider]; ok {
 		env.SetEnum(f.Name, vs)
+	}
+}
+
+// Narrow closes, in env, each fact whose values are declared per provider
+// to the values of providers: their union when each of them declares a
+// set, and any value when one does not or providers is empty.
+func Narrow(env expr.Env, providers []unit.ProviderID) {
+	for _, f := range Facts {
+		if _, in := env[f.Name]; !in || f.Enum == nil {
+			continue
+		}
+		if _, all := f.Enum[anyProvider]; all {
+			continue
+		}
+		env.ClearEnum(f.Name)
+		var union []string
+		closed := len(providers) > 0
+		for _, p := range providers {
+			vs, ok := f.Enum[p]
+			closed = closed && ok
+			union = append(union, vs...)
+		}
+		if closed {
+			env.SetEnum(f.Name, union)
+		}
 	}
 }
 
@@ -375,7 +402,19 @@ func WorkflowEnv(slot string) expr.Env {
 			put(env, f)
 		}
 	}
+	Narrow(env, providersOfSlot(slot))
 	return env
+}
+
+// providersOfSlot are the providers whose units' facts are under slot.
+func providersOfSlot(slot string) []unit.ProviderID {
+	var out []unit.ProviderID
+	for p, s := range Slots {
+		if s == slot {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // WithdrawEnv is the env of a workflow's [withdraw] when: WorkflowEnv(slot)

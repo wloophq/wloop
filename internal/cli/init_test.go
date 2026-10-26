@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -21,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/core/turns"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/slack/slacktest"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -281,6 +283,22 @@ func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
 	again, err := mergeInitConfig(got, initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"})
 	if err != nil || !bytes.Equal(again, got) {
 		t.Fatalf("a second merge changed the config (%v):\n%s", err, again)
+	}
+}
+
+func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
+	t.Parallel()
+	got, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Profile: "/profiles/mine", Agent: "claude",
+		Repos: []string{"acme/api"}, Teams: []string{"acme/core"}, People: []string{"ana"}, SlackClientID: "1.2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(got, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if ps := builtin.Check(builtin.SurfaceConfig, doc); len(ps) > 0 {
+		t.Errorf("init writes keys the grammar refuses: %v\n%s", ps, got)
 	}
 }
 

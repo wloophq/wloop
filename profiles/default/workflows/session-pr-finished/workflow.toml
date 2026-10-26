@@ -1,6 +1,6 @@
 summary = "Close a session whose pull request is merged or closed"
 provider = "session"
-when = 'session.pr_state in ["merged", "closed"]'
+when = 'session.pr_state in ["MERGED", "CLOSED"]'
 order = 11
 
 [[step]]

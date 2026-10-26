@@ -121,6 +121,8 @@ func (f Facts) Get(field string) any {
 		return f.slug()
 	case "pr.owner":
 		return f.Ref.Owner
+	case "pr.repo":
+		return f.Ref.Owner + "/" + f.Ref.Repo
 	case "pr.repo_name":
 		return f.Ref.Repo
 	case "pr.base":

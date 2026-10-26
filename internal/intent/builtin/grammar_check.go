@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/duration"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 func rowsOf(rows []Key, surface Surface) []Key {
@@ -34,25 +35,6 @@ func check(all []Key, surface Surface, doc map[string]any) []Problem {
 	w := walker{rows: rows}
 	w.table(nil, "", doc)
 	return w.problems
-}
-
-func checkUser(all []Key, surface Surface, doc map[string]any) []Problem {
-	out := check(all, surface, doc)
-	for _, k := range rowsOf(all, surface) {
-		if k.Bundled && present(doc, segments(k.Path)) {
-			out = append(out, Problem{Path: bare(k.Path), Msg: "only the bundled profile sets " + bare(k.Path)})
-		}
-	}
-	return out
-}
-
-func present(doc map[string]any, path []string) bool {
-	v, ok := doc[bare(path[0])]
-	if !ok || len(path) == 1 {
-		return ok
-	}
-	m, ok := v.(map[string]any)
-	return ok && present(m, path[1:])
 }
 
 type walker struct {
@@ -145,6 +127,7 @@ func (w *walker) leaf(r Key, path string, v any) {
 	}
 	switch r.Kind {
 	case KindAny:
+		w.anyOf(r, path, v)
 	case KindTable, KindMap:
 		w.add(path, "must be a table")
 	case KindBool:
@@ -181,8 +164,27 @@ func (w *walker) leaf(r Key, path string, v any) {
 				w.add(path, "%s", err.Error())
 			}
 		case KindEnum:
-			if msg := enumProblem(s, r.Values()); msg != "" {
-				w.add(path, "%s", msg)
+			if msg, near := EnumProblem(s, r.Values()); msg != "" {
+				w.problems = append(w.problems, Problem{Path: path, Msg: msg, Near: near})
+			}
+		}
+	}
+}
+
+// anyOf checks a value of more than one form against the row's values: a
+// string, or each string of a list.
+func (w *walker) anyOf(r Key, path string, v any) {
+	if r.Values == nil {
+		return
+	}
+	el := Key{Path: r.Path, Kind: KindEnum, Values: r.Values}
+	switch x := v.(type) {
+	case string:
+		w.leaf(el, path, x)
+	case []any:
+		for i, e := range x {
+			if s, ok := e.(string); ok {
+				w.leaf(el, fmt.Sprintf("%s[%d]", path, i), s)
 			}
 		}
 	}
@@ -206,23 +208,27 @@ func integer(v any) bool {
 	return false
 }
 
-// enumProblem says why v is none of values: the values and the closest.
-func enumProblem(v string, values []Value) string {
+// EnumProblem says why v is none of values, "" when it is one: the values
+// and the near one, never a value that releases, which a guess must not
+// turn a typo into.
+func EnumProblem(v string, values []Value) (msg, near string) {
 	names := make([]string, len(values))
 	for i, x := range values {
 		if x.Name == v {
-			return ""
+			return "", ""
 		}
 		names[i] = x.Name
 	}
-	msg := fmt.Sprintf("%q is not one of %s", v, orList(names))
-	if c := Closest(v, names); c != "" {
+	msg = fmt.Sprintf("%q is not one of %s", v, OrList(names))
+	if c := expr.Closest(v, names); c != "" && !values[slices.Index(names, c)].Releases {
+		near = c
 		msg += fmt.Sprintf("; did you mean %q?", c)
 	}
-	return msg
+	return msg, near
 }
 
-func orList(names []string) string {
+// OrList is names quoted, as "a", "b" or "c".
+func OrList(names []string) string {
 	q := make([]string, len(names))
 	for i, n := range names {
 		q[i] = strconv.Quote(n)
@@ -241,42 +247,8 @@ func (w *walker) unknown(pat []string, k, path string) {
 			siblings = append(siblings, bare(s[len(pat)]))
 		}
 	}
-	if c := Closest(k, siblings); c != "" {
-		w.add(path, "unknown key; did you mean %s?", c)
-		return
-	}
-	w.add(path, "unknown key")
-}
-
-// Closest is the option nearest s by edit distance, "" when none is near.
-func Closest(s string, options []string) string {
-	best, bestD := "", len(s)/2+2
-	for _, o := range options {
-		if d := levenshtein(s, o); d < bestD {
-			best, bestD = o, d
-		}
-	}
-	return best
-}
-
-func levenshtein(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
+	near := expr.Closest(k, siblings)
+	w.problems = append(w.problems, Problem{Path: path, Msg: "unknown key" + expr.DidYouMean(k, siblings), Near: near, Unknown: true})
 }
 
 var kindNames = map[Kind]string{KindPred: "a predicate", KindFact: "a fact", KindTemplate: "a template", KindFile: "a file",

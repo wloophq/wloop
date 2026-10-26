@@ -32,8 +32,8 @@ func TestPredicateErrorGoldens(t *testing.T) {
 		{"", action, "1: empty predicate"},
 		{"pr.slug", action, "1: predicate must be bool, got string"},
 		{"turn.stage == true", turn, "12: cannot compare string == bool"},
-		{"row.open && pr.mien", action, "13: unknown field pr.mien; did you mean pr.mine?"},
-		{"pr.mien", turn, "1: unknown field pr.mien; did you mean pr.mine?"},
+		{"row.open && pr.mien", action, "13: unknown field pr.mien; did you mean \"pr.mine\"?"},
+		{"pr.mien", turn, "1: unknown field pr.mien; did you mean \"pr.mine\"?"},
 		{`turn.stage == "first"`, Env{"pr.mine": Bool}, "1: unknown field turn.stage"},
 	}
 	for _, c := range cases {

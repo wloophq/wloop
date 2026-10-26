@@ -1,7 +1,7 @@
 package builtin
 
 import (
-	"github.com/wloophq/wloop/internal/domain/draft"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
 )
 
@@ -14,6 +14,20 @@ func named(names ...string) func() []Value {
 		}
 		return out
 	}
+}
+
+// intentProviderValues are the providers an intent's provider names, and
+// any, for every provider.
+func intentProviderValues() []Value {
+	var out []Value
+	for _, p := range Providers {
+		v := Value{Name: string(p)}
+		if slot, ok := Slots[p]; ok {
+			v.Doc = "Facts under " + slot + ".*."
+		}
+		out = append(out, v)
+	}
+	return append(out, Value{Name: string(dintent.AnyProvider), Doc: "Every provider's units."})
 }
 
 func roleNames() []Value {
@@ -36,22 +50,20 @@ func effectValues(a Applies) func() []Value {
 	}
 }
 
-var draftModes = named(string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun))
-
 // intentGrammar is the intent manifest's keys.
 var intentGrammar = []Key{
-	{Path: "label", In: SurfaceIntent, Kind: KindText, Doc: "The name people read. Required."},
-	{Path: "summary", In: SurfaceIntent, Kind: KindText, Doc: "One line on what it does: its action's tooltip, its help line, its profile listing. Required."},
+	{Path: "label", In: SurfaceIntent, Kind: KindText, Required: true, Doc: "The name people read. Required."},
+	{Path: "summary", In: SurfaceIntent, Kind: KindText, Required: true, Doc: "One line on what it does: its action's tooltip, its help line, its profile listing. Required."},
 	{Path: "shortcut", In: SurfaceIntent, Kind: KindText, Doc: "One uppercase letter for its action, not a built-in action's."},
 	{Path: "verb", In: SurfaceIntent, Kind: KindEnum, Values: named(IntentVerbs...), Doc: "The GTD verb its action fulfils."},
 	{Path: "user_facing", In: SurfaceIntent, Kind: KindBool, Default: "true", Doc: "Offered as a command, a skill and an action."},
 	{Path: "skill", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "Install writes it a turn skill; needs help.target."},
 	{Path: "role", In: SurfaceIntent, Kind: KindEnum, Values: roleNames, Doc: "What binds it to a plugin's mechanism. One intent per role and provider."},
-	{Path: "provider", In: SurfaceIntent, Kind: KindAny, Doc: "The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent."},
-	{Path: "workspace", In: SurfaceIntent, Kind: KindAny, Doc: "Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository."},
+	{Path: "provider", In: SurfaceIntent, Kind: KindAny, Values: intentProviderValues, Doc: "The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent."},
+	{Path: "workspace", In: SurfaceIntent, Kind: KindAny, Values: func() []Value { return NameValues(SlotWorkspace) }, Doc: "Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository."},
 	{Path: "workspace.repo", In: SurfaceIntent, Kind: KindText, Doc: "The repository the turn runs in, owner/name."},
 	{Path: "workspace.repo_input", In: SurfaceIntent, Kind: KindText, Doc: "The input that holds the repository the turn runs in."},
-	{Path: "runners", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named("session", "headless"), Doc: "How its turns may run; [\"session\"] when absent."},
+	{Path: "runners", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(TurnRunners...), Doc: "How its turns may run; [\"session\"] when absent."},
 	{Path: "session", In: SurfaceIntent, Kind: KindTable, Doc: "The agent session its turns run in."},
 	{Path: "session.strategy", In: SurfaceIntent, Kind: KindEnum, Values: named("reuse_live", "new"), Doc: "Whether a turn reuses the unit's live session or starts a new one."},
 	{Path: "session.title", In: SurfaceIntent, Kind: KindText, Doc: "The session's title: 1 to 12 lowercase letters."},
@@ -65,13 +77,14 @@ var intentGrammar = []Key{
 	{Path: "brief.render", In: SurfaceIntent, Kind: KindBool, Default: "true", Doc: "The instructions carry the brief."},
 	{Path: "brief.wait", In: SurfaceIntent, Kind: KindBool, Default: "true", Doc: "The turn waits for the brief."},
 	{Path: "brief.need", In: SurfaceIntent, Kind: KindList, Elem: KindText, Doc: "The brief intent's extra fields the turn needs."},
-	{Path: "profile", In: SurfaceIntent, Kind: KindText, Doc: "The intent whose judgment blocks the turn reads, or none."},
+	{Path: "profile", In: SurfaceIntent, Kind: KindText, Doc: "The intent whose judgment blocks the turn reads, or none; the configuration's profile is the profile directory."},
 	{Path: "dims", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(IntentDims...), Doc: "The dimensions valid under its profile."},
 	{Path: "also_profile[]", In: SurfaceIntent, Kind: KindTable, Doc: "Other judgment the turn reads."},
 	{Path: "also_profile[].profile", In: SurfaceIntent, Kind: KindText, Doc: "The intent with judgment blocks."},
 	{Path: "also_profile[].when", In: SurfaceIntent, Kind: KindPred, Doc: "When the turn reads the other judgment."},
-	{Path: "also_profile[].dims", In: SurfaceIntent, Kind: KindMap, Doc: "Dimensions it pins, such as { stage = \"first\" }."},
-	{Path: "also_profile[].dims.*", In: SurfaceIntent, Kind: KindText, Doc: "A pinned dimension's value."},
+	{Path: "also_profile[].dims", In: SurfaceIntent, Kind: KindTable, Doc: "Dimensions it pins, such as { stage = \"first\" }."},
+	{Path: "also_profile[].dims.stage", In: SurfaceIntent, Kind: KindEnum, Values: named(Stages...), Doc: "The pinned stage."},
+	{Path: "also_profile[].dims.reviewer", In: SurfaceIntent, Kind: KindText, Doc: "The pinned reviewer login."},
 	{Path: "also_profile[].define", In: SurfaceIntent, Kind: KindText, Doc: "The template define that renders it."},
 	{Path: "also_profile[].prefix", In: SurfaceIntent, Kind: KindText, Doc: "What its sources are listed under; \"<profile> guide: \" when absent."},
 	{Path: "effects", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: effectValues(AppliesTurn), Doc: "What sending the turn applies."},
@@ -82,11 +95,11 @@ var intentGrammar = []Key{
 	{Path: "drafts", In: SurfaceIntent, Kind: KindTable, Doc: "The drafts its turns' agents propose."},
 	{Path: "drafts.allowed_effects", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: effectValues(AppliesDraft), Doc: "The effects its agents may declare on their drafts."},
 	{Path: "drafts.approval", In: SurfaceIntent, Kind: KindTable, Doc: "The approval of its drafts; wait when absent."},
-	{Path: "drafts.approval.mode", In: SurfaceIntent, Kind: KindEnum, Values: draftModes, Doc: "The approval when no rule holds."},
+	{Path: "drafts.approval.mode", In: SurfaceIntent, Kind: KindEnum, Values: DraftModes, Doc: "The approval when no rule holds."},
 	{Path: "drafts.approval.window", In: SurfaceIntent, Kind: KindDur, Doc: "With mode delay only: how long a person has to stop the draft."},
 	{Path: "drafts.approval.rule[]", In: SurfaceIntent, Kind: KindTable, Doc: "A rule; the first whose when holds gives the mode."},
 	{Path: "drafts.approval.rule[].when", In: SurfaceIntent, Kind: KindPred, Doc: "When the approval rule applies to a draft."},
-	{Path: "drafts.approval.rule[].mode", In: SurfaceIntent, Kind: KindEnum, Values: draftModes, Doc: "The rule's approval."},
+	{Path: "drafts.approval.rule[].mode", In: SurfaceIntent, Kind: KindEnum, Values: DraftModes, Doc: "The rule's approval."},
 	{Path: "drafts.approval.rule[].window", In: SurfaceIntent, Kind: KindDur, Doc: "With mode delay only: how long a person has to stop the draft."},
 	{Path: "guidance", In: SurfaceIntent, Kind: KindTable, Doc: "The guidance a person gives the turn."},
 	{Path: "guidance.label", In: SurfaceIntent, Kind: KindText, Default: "Guidance", Doc: "The guidance's label."},
@@ -106,13 +119,13 @@ var intentGrammar = []Key{
 	{Path: "inputs.*.persist", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "Stored with the turn, restored on resume."},
 	{Path: "inputs.*.hidden", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "Left out of help."},
 	{Path: "inputs.*.by_hand_only", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "An automated turn never sets it."},
-	{Path: "inputs.*.before", In: SurfaceIntent, Kind: KindEnum, Values: named(Names[SlotBefore]...), Doc: "What runs before the turn when it is set."},
+	{Path: "inputs.*.before", In: SurfaceIntent, Kind: KindEnum, Values: func() []Value { return NameValues(SlotBefore) }, Doc: "What runs before the turn when it is set."},
 	{Path: "inputs.*.max", In: SurfaceIntent, Kind: KindInt, Default: "0", Doc: "A text input's length cap in runes; 0 for none."},
 	{Path: "inputs.*.surfaces", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named("cli", "instructions", "try"), Doc: "Where it is offered; cli and instructions when absent."},
 	{Path: "help", In: SurfaceIntent, Kind: KindTable, Doc: "How its command presents it."},
-	{Path: "help.target", In: SurfaceIntent, Kind: KindText, Doc: "What the command's target is."},
+	{Path: "help.target", In: SurfaceIntent, Kind: KindText, Doc: "Free text saying what the command's argument names, such as a pull request URL."},
 	{Path: "help.summary", In: SurfaceIntent, Kind: KindText, Doc: "The main help's line; the intent's summary when absent."},
-	{Path: "help.group", In: SurfaceIntent, Kind: KindText, Doc: "The main help's group title."},
+	{Path: "help.group", In: SurfaceIntent, Kind: KindText, Doc: "The title of the main help's group that lists the command, free text; action.group is the action's."},
 	{Path: "help.examples", In: SurfaceIntent, Kind: KindList, Elem: KindText, Doc: "Command lines without the command's name."},
 	{Path: "help.docs", In: SurfaceIntent, Kind: KindText, Doc: "A page path of the documentation site."},
 	{Path: "join", In: SurfaceIntent, Kind: KindTable, Doc: "When a request joins an open turn."},
@@ -121,7 +134,7 @@ var intentGrammar = []Key{
 	{Path: "resume.changed", In: SurfaceIntent, Kind: KindText, Doc: "The text when the unit changed since the question."},
 	{Path: "record", In: SurfaceIntent, Kind: KindTable, Doc: "The turn's record."},
 	{Path: "record.when", In: SurfaceIntent, Kind: KindPred, Default: "true", Doc: "When the turn records its outcome."},
-	{Path: "record.states", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(RecordStates...), Doc: "The states a record may take. Required."},
+	{Path: "record.states", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(RecordStates...), Required: true, Doc: "The states a record may take. Required."},
 	{Path: "record.artifacts", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(record.ArtifactKinds...), Doc: "The artifacts a record may carry."},
 	{Path: "record.outcome", In: SurfaceIntent, Kind: KindList, Elem: KindEnum, Values: named(record.OutcomeFields...), Doc: "The outcome fields a record may carry."},
 	{Path: "record.outcome_doc", In: SurfaceIntent, Kind: KindText, Doc: "What the outcome holds, for the instructions."},

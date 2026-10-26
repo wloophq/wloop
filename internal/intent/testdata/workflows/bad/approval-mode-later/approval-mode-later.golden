@@ -1,1 +1,1 @@
-testdata/workflows/bad/approval-mode-later/workflows/case-workflow/workflow.toml:10:8: approval.mode: "later" is not one of "run", "delay", "wait"
+testdata/workflows/bad/approval-mode-later/workflows/case-workflow/workflow.toml:10:8: approval.mode: "later" is not one of "run", "delay" or "wait"

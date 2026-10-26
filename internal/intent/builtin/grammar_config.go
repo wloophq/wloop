@@ -3,9 +3,7 @@ package builtin
 import (
 	"slices"
 
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/placement"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 func cfgValues(ns ...string) func() []Value {
@@ -23,8 +21,6 @@ func cfgValues(ns ...string) func() []Value {
 var ConfigTiers = cfgValues("fast", "balanced", "frontier")
 
 var (
-	cfgRunModes       = cfgValues(string(workflow.OutcomeRun), "delay", string(workflow.OutcomeWait))
-	cfgDraftModes     = cfgValues(string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun))
 	cfgPlacementRoles = cfgValues(placement.RoleReview, placement.RoleAuthor, placement.RoleWork)
 )
 
@@ -58,7 +54,7 @@ func cfgPluginDrafts(id string) []Key {
 	return []Key{
 		cfgKey(id+".drafts", KindTable, "", "The drafts the plugin's own rules propose."),
 		cfgKey(id+".drafts.approval", KindTable, "", "Their approval; left out, each waits for you."),
-		cfgEnum(id+".drafts.approval.mode", cfgDraftModes, "", "The approval mode."),
+		cfgEnum(id+".drafts.approval.mode", DraftModes, "", "The approval mode."),
 		cfgKey(id+".drafts.approval.window", KindDur, "", "How long a delay waits before the draft goes; only with mode delay."),
 	}
 }
@@ -73,7 +69,7 @@ var configGrammar = slices.Concat(
 		cfgKey("agent_models", KindMap, "", "Per agent, a model name for each model tier."),
 		cfgKey("agent_models.*", KindMap, "", "One agent's models by tier."),
 		cfgKey("agent_models.*.*", KindText, "", "The agent's model name for the tier."),
-		cfgKey("profile", KindText, "", "The user profile layered over the bundled one: a name under the profiles directory, or a path."),
+		cfgKey("profile", KindText, "", "The user profile layered over the bundled one: a name under the profiles directory, or a path; an intent's profile names an intent."),
 
 		cfgKey("github", KindTable, "", "The GitHub plugin's settings."),
 		cfgKey("github.enabled", KindBool, "", "Switches the GitHub plugin; left out, it is on."),
@@ -129,7 +125,7 @@ var configGrammar = slices.Concat(
 		cfgKey("cleanup", KindTable, "", "The thresholds of the session and workspace cleanup workflows."),
 		cfgKey("cleanup.idle", KindDur, "2h", "How long a finished session stays idle before it closes."),
 		cfgKey("cleanup.asked_idle", KindDur, "4h", "How long a session that asked you stays idle before it closes."),
-		cfgKey("cleanup.workspace_grace", KindDur, "1d", "How long, in working time, a finished pull request's workspace stays."),
+		cfgKey("cleanup.workspace_grace", KindDur, "1d", "How long, in working time, a workspace stays after its unit finished."),
 		cfgKey("cleanup.manual_idle", KindDur, "1d", "How long a session you started stays idle before it closes."),
 		cfgKey("cleanup.stale_workspace", KindDur, "14d", "How long an untouched workspace stays."),
 		cfgList("cleanup.disposable", "Ignored files and directories a tool recreates, so removing a workspace that holds them loses nothing."),
@@ -145,8 +141,8 @@ var configGrammar = slices.Concat(
 		cfgKey("workflows.*.only_when", KindPred, "", "A condition ANDed with the workflow's when."),
 		cfgKey("workflows.*.drafts", KindTable, "", "The drafts the workflow proposes."),
 	},
-	cfgApproval("workflows.*.approval", cfgRunModes, "the workflow's runs"),
-	cfgApproval("workflows.*.drafts.approval", cfgDraftModes, "the workflow's drafts"),
+	cfgApproval("workflows.*.approval", RunModes, "the workflow's runs"),
+	cfgApproval("workflows.*.drafts.approval", DraftModes, "the workflow's drafts"),
 	[]Key{
 		cfgKey("intents", KindMap, "", "Each intent's settings, by intent name."),
 		cfgKey("intents.*", KindTable, "", "One intent's settings."),

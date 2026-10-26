@@ -5,10 +5,8 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/record"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -21,23 +19,19 @@ var (
 	titleRe     = regexp.MustCompile(`^[a-z]{1,12}$`)
 )
 
-func quoted(vs []string) string {
-	out := make([]string, len(vs))
-	for i, v := range vs {
-		out[i] = fmt.Sprintf("%q", v)
-	}
-	return strings.Join(out, ", ")
-}
+func quoted(vs []string) string { return builtin.OrList(vs) }
 
-func (s *sheet) oneOf(path, v string, allowed []string) {
-	if !slices.Contains(allowed, v) {
-		s.add(path, "%q is not one of %s", v, quoted(allowed))
+// oneOf refuses v at path when it is none of values, in the grammar
+// table's words.
+func (s *sheet) oneOf(path, v string, values []builtin.Value) {
+	if msg, _ := builtin.EnumProblem(v, values); msg != "" {
+		s.add(path, "%s", msg)
 	}
 }
 
-func (s *sheet) eachOneOf(path string, vs, allowed []string) {
+func (s *sheet) eachOneOf(path string, vs []string, values []builtin.Value) {
 	for i, v := range vs {
-		s.oneOf(fmt.Sprintf("%s[%d]", path, i), v, allowed)
+		s.oneOf(fmt.Sprintf("%s[%d]", path, i), v, values)
 	}
 }
 
@@ -52,7 +46,7 @@ func (s *sheet) builtinRef(path string, slot builtin.Slot, v string) {
 			return
 		}
 	}
-	s.add(path, "unknown %s builtin %q; the %s builtins are %s", slot, v, slot, quoted(builtin.Names[slot]))
+	s.oneOf(path, v, builtin.NameValues(slot))
 }
 
 // effects checks the effects at path against the names applies allows,
@@ -63,11 +57,7 @@ func (s *sheet) effects(path string, d dintent.Def, names []string, applies buil
 		eff, ok := builtin.EffectOf(e)
 		switch {
 		case !ok || eff.Applies&applies == 0:
-			msg := fmt.Sprintf("%q is not one of %s", e, quoted(allowed))
-			if c := builtin.Closest(e, allowed); c != "" {
-				msg += fmt.Sprintf("; did you mean %q?", c)
-			}
-			s.add(at, "%s", msg)
+			s.add(at, "%q is not one of %s%s", e, quoted(allowed), expr.DidYouMean(e, allowed))
 		case eff.Provider != "" && !onlyServes(d, eff.Provider):
 			s.add(at, "%s applies to %s units only; a %s intent cannot name it", e, eff.Provider, d.Provider)
 		}
@@ -94,9 +84,6 @@ func (s *sheet) validate(d dintent.Def) {
 		s.add("session.title", "%q must be 1 to 12 lowercase letters", d.Session.Title)
 	}
 	s.validateKeys(d)
-	if d.Provider != "" && !dunit.ValidProvider(string(d.Provider)) {
-		s.add("provider", "%q is not a provider id: lowercase letters, digits, _ and -, starting with a letter", d.Provider)
-	}
 	if r, ok := builtin.RoleOf(d.Role); ok && r.Provider != "" && !onlyServes(d, r.Provider) {
 		s.add("role", "%s runs on %s units; a %s intent cannot hold it", d.Role, r.Provider, d.Provider)
 	}
@@ -111,11 +98,8 @@ func (s *sheet) validate(d dintent.Def) {
 	for i, a := range d.AlsoProfiles {
 		for _, k := range slices.Sorted(maps.Keys(a.Dims)) {
 			path := fmt.Sprintf("also_profile[%d].dims.%s", i, k)
-			switch {
-			case !slices.Contains(builtin.IntentDims, k):
-				s.oneOf(path, k, builtin.IntentDims)
-			case k == dintent.DimStage:
-				s.oneOf(path, a.Dims[k], builtin.Stages)
+			if k == dintent.DimStage {
+				s.oneOf(path, a.Dims[k], builtin.ValuesOf(builtin.SurfaceIntent, "also_profile[].dims.stage"))
 			}
 		}
 	}
@@ -209,7 +193,7 @@ func (s *sheet) validateRecord(d dintent.Def) {
 		if q.Artifact != "" && !slices.Contains(r.Artifacts, q.Artifact) {
 			s.add(path+".artifact", "%s is not in record.artifacts", q.Artifact)
 		}
-		s.eachOneOf(path+".fields", q.Fields, record.OutcomeFields)
+		s.eachOneOf(path+".fields", q.Fields, builtin.ValuesOf(builtin.SurfaceIntent, "record.outcome"))
 	}
 }
 
@@ -250,8 +234,10 @@ func (s *sheet) compile(d dintent.Def) Programs {
 		}
 		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profile[%d].when", i), a.When, turn))
 	}
+	action := builtin.Env(builtin.ActionSlot, nil)
+	builtin.Narrow(action, servedProviders(d))
 	ps.Action = compileAction(d.Action, func(path string, p dintent.Pred) *expr.Program {
-		return one(path, p, builtin.Env(builtin.ActionSlot, nil))
+		return one(path, p, action)
 	})
 	return ps
 }
@@ -264,5 +250,16 @@ func unitEnv(d dintent.Def) expr.Env {
 	for _, slot := range servedSlots(d) {
 		maps.Copy(env, builtin.WorkflowEnv(slot))
 	}
+	builtin.Narrow(env, servedProviders(d))
 	return env
+}
+
+// servedProviders are the providers d's turns run on, none when it serves
+// any.
+func servedProviders(d dintent.Def) []dunit.ProviderID {
+	ps := providersOf(d)
+	if slices.Contains(ps, dintent.AnyProvider) {
+		return nil
+	}
+	return ps
 }

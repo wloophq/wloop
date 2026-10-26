@@ -16,7 +16,7 @@ func TestExtendIsAnUnknownKey(t *testing.T) {
 	d := dir(t, map[string]string{"intent=review.md": "+++\nextend = true\n+++\nX"})
 	_, err := Load([]Layer{bundled(), user(d)}, testIntents, nil)
 	var f FrontMatterError
-	if !errors.As(err, &f) || f.Key != "extend" || !strings.Contains(f.Problem, "override, title, include, paths and delegates") {
+	if !errors.As(err, &f) || f.Key != "extend" || f.Problem != "unknown key" {
 		t.Fatalf("%v", err)
 	}
 }

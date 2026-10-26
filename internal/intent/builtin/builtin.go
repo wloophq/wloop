@@ -4,6 +4,7 @@
 package builtin
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/gtd"
@@ -29,6 +30,24 @@ const WorkspaceLinkedElseMain = "linked_else_main"
 var Names = map[Slot][]string{
 	SlotWorkspace: {"review", "author", WorkspaceLinkedElseMain, "given"},
 	SlotBefore:    {"take_over"},
+}
+
+// nameDocs say what each builtin of Names is.
+var nameDocs = map[string]string{
+	"review":                "The review workspace, created at the head.",
+	"author":                "The workspace that develops the unit.",
+	WorkspaceLinkedElseMain: "The workspace linked to the unit, else the repository's main checkout.",
+	"given":                 "The workspace the request names.",
+	"take_over":             "Takes the unit over into the loop before the turn.",
+}
+
+// NameValues are the builtins of slot, with what each is.
+func NameValues(slot Slot) []Value {
+	out := make([]Value, len(Names[slot]))
+	for i, n := range Names[slot] {
+		out[i] = Value{Name: n, Doc: nameDocs[n]}
+	}
+	return out
 }
 
 // Boards are the workspaces whose board an intent's turns move: a turn in
@@ -162,3 +181,7 @@ var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 // Slots name each provider's fact slot.
 var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
 	unit.Entry: "entry", dslack.Provider: "slack"}
+
+// Providers are the providers an intent may serve: those of Slots, and a
+// plugin whose units have no workflow facts adds its own.
+var Providers = slices.Sorted(maps.Keys(Slots))

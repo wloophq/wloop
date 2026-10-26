@@ -146,20 +146,18 @@ type mResume struct {
 	Changed *string `toml:"changed"`
 }
 
-// runners are the turn.Runner values a manifest's runners take.
-var runners = []string{"session", "headless"}
-
 func (s *sheet) runners(m []string) []string {
 	if m == nil {
 		return nil
 	}
+	runners := builtin.ValuesOf(builtin.SurfaceIntent, "runners")
 	if len(m) == 0 {
-		s.add("runners", "lists at least one of %s", quoted(runners))
+		s.add("runners", "lists at least one of %s", quoted(builtin.ValueNames(runners)))
 		return nil
 	}
 	for i, v := range m {
 		switch {
-		case !slices.Contains(runners, v):
+		case !slices.ContainsFunc(runners, func(r builtin.Value) bool { return r.Name == v }):
 			s.oneOf(fmt.Sprintf("runners[%d]", i), v, runners)
 			return nil
 		case slices.Contains(m[:i], v):

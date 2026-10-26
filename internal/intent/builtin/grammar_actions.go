@@ -49,8 +49,8 @@ var actionsGrammar = []Key{
 	{Path: "action.confirm", In: SurfaceIntent, Kind: KindTemplate, Doc: "The dialog that confirms the action, over the action facts; empty asks nothing."},
 
 	{Path: "*", In: SurfaceActions, Kind: KindTable, Doc: "A built-in action, by its id."},
-	{Path: "*.label", In: SurfaceActions, Kind: KindText, Doc: "The name people read. Required."},
-	{Path: "*.summary", In: SurfaceActions, Kind: KindText, Doc: "One line, what pressing it does: its tooltip and help line. Required."},
+	{Path: "*.label", In: SurfaceActions, Kind: KindText, Required: true, Doc: "The name people read. Required."},
+	{Path: "*.summary", In: SurfaceActions, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip and help line. Required."},
 	{Path: "*.note", In: SurfaceActions, Kind: KindTemplate, Doc: "What the action would do on this row, over the action facts."},
 	{Path: "*.warning", In: SurfaceActions, Kind: KindTemplate, Doc: "Shown under the action, over the action facts; empty shows nothing."},
 	{Path: "*.confirm", In: SurfaceActions, Kind: KindTemplate, Doc: "The dialog that confirms the action, over the action facts; empty asks nothing."},

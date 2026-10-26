@@ -96,11 +96,12 @@ func fileName(l Layer, rel string) string {
 // first; intents are the registry blocks are written for, loaded first.
 // Blocks of a broken intent are skipped, so its manifest's problems stay its own.
 func Load(chain []Layer, intents *dintent.Registry, broken []dintent.Name) (Tree, error) {
-	labels, err := LoadLabels(chain)
+	vocab := Vocabulary(intents)
+	labels, err := LoadLabels(chain, vocab)
 	if err != nil {
 		return Tree{}, err
 	}
-	t := Tree{Chain: chain, Labels: &labels, Dims: Vocabulary(intents)}
+	t := Tree{Chain: chain, Labels: &labels, Dims: vocab}
 	for _, l := range chain {
 		fsys, done, err := layerFS(l)
 		if err != nil {

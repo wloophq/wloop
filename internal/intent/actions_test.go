@@ -49,7 +49,7 @@ func actionsProblems(t *testing.T, bundled, user string) string {
 func TestABuiltinActionWithoutATableFailsAtLoad(t *testing.T) {
 	src := strings.Replace(string(defaultProfile()), "[plan_dismiss]", "[plan_dismis]", 1)
 	got := actionsProblems(t, src, "")
-	for _, want := range []string{"plan_dismis: names no built-in action; did you mean plan_dismiss?", "plan_dismiss: is missing"} {
+	for _, want := range []string{"plan_dismis: names no built-in action; did you mean \"plan_dismiss\"?", "plan_dismiss: is missing"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("no %q in:\n%s", want, got)
 		}
@@ -58,7 +58,7 @@ func TestABuiltinActionWithoutATableFailsAtLoad(t *testing.T) {
 
 func TestAUserTableNamingNoActionFails(t *testing.T) {
 	got := actionsProblems(t, string(defaultProfile()), "[pasue]\nsummary = \"x\"\n")
-	if !strings.Contains(got, "pasue: names no built-in action; did you mean pause?") {
+	if !strings.Contains(got, "pasue: names no built-in action; did you mean \"pause\"?") {
 		t.Errorf("%s", got)
 	}
 }
@@ -97,7 +97,7 @@ func TestAUserActionTableLaysItsKeysOverTheBundledOnes(t *testing.T) {
 func TestActionsFileKeysFollowTheGrammar(t *testing.T) {
 	bundled := fstest.MapFS{ActionsFile: {Data: []byte("[skip]\nlabel = \"Skip\"\nsummari = \"Skips\"\n")}}
 	_, problems := loadActions(nil, bundled)
-	if !strings.Contains(problems.Error(), "skip.summari: unknown key; did you mean summary?") {
+	if !strings.Contains(problems.Error(), "skip.summari: unknown key; did you mean \"summary\"?") {
 		t.Errorf("%s", problems.Error())
 	}
 }

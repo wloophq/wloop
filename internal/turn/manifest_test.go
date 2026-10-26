@@ -281,6 +281,7 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.state":                func(_ *Builder, r *Request) { r.Payload.(*PR).State = "OPEN" },
 		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
 		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "other", Repo: "api", Number: 7}.Unit() },
+		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
 		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
 		"pr.base":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Base = "main" },
 		"pr.association":          func(_ *Builder, r *Request) { r.Payload.(*PR).Association = "MEMBER" },

@@ -71,7 +71,7 @@ func (p Policy) ReadsSubject() bool {
 }
 
 // Releases says whether a sends a draft with no person approving it.
-func (a Approval) Releases() bool { return a.Mode == Send || a.Mode == Delay }
+func (a Approval) Releases() bool { return a.Mode.Releases() }
 
 // Decision is the approval Decide picked and why.
 type Decision struct {

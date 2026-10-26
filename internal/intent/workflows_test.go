@@ -1,12 +1,10 @@
 package intent
 
 import (
-	"encoding/json"
 	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -185,7 +183,7 @@ func TestAnInvalidUserWorkflowDisablesOnlyItself(t *testing.T) {
 	if got := slices.Sorted(mapKeys(l.BrokenWorkflows)); !slices.Equal(got, []string{"mine-step", "mine-typo"}) {
 		t.Errorf("broken %v", got)
 	}
-	if !strings.Contains(problems.Error(), "unknown field session.manged; did you mean session.managed?") {
+	if !strings.Contains(problems.Error(), "unknown field session.manged; did you mean \"session.managed\"?") {
 		t.Error(problems.Error())
 	}
 }
@@ -293,34 +291,6 @@ func TestACachedLoadReloadsWhenAWorkflowChanges(t *testing.T) {
 	writeWorkflow(t, root, "mine-two", quietSession)
 	if n := len(c.Get().Workflows); n != 2 {
 		t.Fatalf("not reloaded: %d", n)
-	}
-}
-
-func TestWorkflowSchemaMatchesTheDecodeStruct(t *testing.T) {
-	var schema map[string]any
-	if err := json.Unmarshal(WorkflowSchema, &schema); err != nil {
-		t.Fatal(err)
-	}
-	props := schema["properties"].(map[string]any)
-	typ := reflect.TypeFor[wManifest]()
-	seen := map[string]bool{}
-	for i := range typ.NumField() {
-		f := typ.Field(i)
-		key := f.Tag.Get("toml")
-		seen[key] = true
-		sub, ok := props[key].(map[string]any)
-		if !ok {
-			t.Errorf("%s: in the decode struct, not in the schema", key)
-			continue
-		}
-		if f.Type.Kind() == reflect.Pointer && f.Type.Elem().Kind() == reflect.Struct {
-			compareSchema(t, key+".", f.Type.Elem(), sub)
-		}
-	}
-	for key := range props {
-		if !seen[key] {
-			t.Errorf("%s: in the schema, not in the decode struct", key)
-		}
 	}
 }
 

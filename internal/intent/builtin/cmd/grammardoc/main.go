@@ -49,18 +49,29 @@ func outputs(root string) ([]output, error) {
 		}
 		out = append(out, output{filepath.Join(root, "internal/intent", s.file), b})
 	}
-	for page, tables := range map[string][]string{
-		"intent-manifest.md":   {keyTable(builtin.SurfaceIntent, "Key")},
-		"workflow-manifest.md": {keyTable(builtin.SurfaceWorkflow, "Key"), stepTable()},
-		"configuration.md":     {keyTable(builtin.SurfaceConfig, "Setting")},
+	for page, keys := range map[string]struct {
+		surface builtin.Surface
+		title   string
+	}{
+		"intent-manifest.md":   {builtin.SurfaceIntent, "Key"},
+		"workflow-manifest.md": {builtin.SurfaceWorkflow, "Key"},
+		"configuration.md":     {builtin.SurfaceConfig, "Setting"},
 	} {
 		path := filepath.Join(root, referenceDir, page)
 		doc, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}
-		for _, t := range tables {
-			if doc, err = replaceTable(doc, t); err != nil {
+		gs := groups[keys.surface]
+		tables, err := groupedTables(keys.surface, keys.title, gs)
+		if err != nil {
+			return nil, err
+		}
+		if doc, err = replaceGroups(doc, tables, tableHeader(keys.title), gs[0].title, gs[len(gs)-1].title); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		if keys.surface == builtin.SurfaceWorkflow {
+			if doc, err = replaceTable(doc, stepTable()); err != nil {
 				return nil, fmt.Errorf("%s: %w", path, err)
 			}
 		}
@@ -85,6 +96,34 @@ func replaceTable(doc []byte, t string) ([]byte, error) {
 	}
 	_, after, _ := strings.Cut(rest, "\n\n")
 	return []byte(before + t + "\n" + after), nil
+}
+
+// replaceGroups swaps the grouped tables of doc, from the heading of the
+// group first to the end of the table under the heading of last, for
+// tables; a page whose keys are still one table under header has that
+// table swapped.
+func replaceGroups(doc []byte, tables, header, first, last string) ([]byte, error) {
+	s := string(doc)
+	start := strings.Index(s, "### "+first+"\n\n"+header+"\n")
+	end := -1
+	if start >= 0 {
+		if l := strings.Index(s[start:], "### "+last+"\n\n"+header+"\n"); l >= 0 {
+			end = start + l
+		}
+	} else if start = strings.Index(s, header+"\n"); start >= 0 {
+		end = start
+	}
+	if start < 0 || end < 0 {
+		return nil, fmt.Errorf("no tables start with %q under %q", header, first)
+	}
+	tail := strings.Index(s[end:], "\n\n"+header+"\n")
+	if tail < 0 {
+		tail = 0
+	} else {
+		tail += 2
+	}
+	_, after, _ := strings.Cut(s[end+tail:], "\n\n")
+	return []byte(s[:start] + tables + "\n" + after), nil
 }
 
 func rows(surface builtin.Surface) []builtin.Key {
@@ -118,7 +157,18 @@ var kindWords = map[builtin.Kind]string{
 	builtin.KindPred: "predicate", builtin.KindFact: "fact", builtin.KindTemplate: "template", builtin.KindFile: "file",
 	builtin.KindEnum: "one of", builtin.KindDur: "duration", builtin.KindBool: "bool", builtin.KindInt: "integer",
 	builtin.KindText: "string", builtin.KindList: "list", builtin.KindTable: "table", builtin.KindMap: "table by name",
-	builtin.KindAny: "string or table", builtin.KindNumber: "number",
+	builtin.KindNumber: "number",
+}
+
+// hasKeys says whether a row of more than one form takes a table: the
+// grammar has rows under it.
+func hasKeys(k builtin.Key) bool {
+	for _, r := range rows(k.In) {
+		if r.Step == k.Step && strings.HasPrefix(r.Path, k.Path+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // kind is what a row's value is, with its values.
@@ -135,6 +185,14 @@ func kind(k builtin.Key) string {
 		return "list of " + strings.Join(quoted, ", ")
 	case k.Kind == builtin.KindList:
 		return "list of " + kindWords[k.Elem] + "s"
+	case k.Kind == builtin.KindAny && hasKeys(k) && len(vs) > 0:
+		return "one of " + strings.Join(quoted, ", ") + ", or a table"
+	case k.Kind == builtin.KindAny && hasKeys(k):
+		return "string or table"
+	case k.Kind == builtin.KindAny && len(vs) > 0:
+		return "one of " + strings.Join(quoted, ", ") + ", or a list of them"
+	case k.Kind == builtin.KindAny:
+		return "string or list"
 	}
 	return kindWords[k.Kind]
 }
@@ -150,13 +208,29 @@ func defaultOf(k builtin.Key) string {
 	return "`" + k.Default + "`"
 }
 
-func keyTable(surface builtin.Surface, title string) string {
+func tableHeader(title string) string { return "| " + title + " | Kind | Default | Meaning |" }
+
+func keyTable(title string, keys []builtin.Key) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "| %s | Kind | Default | Meaning |\n|---|---|---|---|\n", title)
-	for _, k := range rows(surface) {
+	fmt.Fprintf(&b, "%s\n|---|---|---|---|\n", tableHeader(title))
+	for _, k := range keys {
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", cell(shown(k.Path)), kind(k), defaultOf(k), cell(k.Doc))
 	}
 	return b.String()
+}
+
+// groupedTables are the key tables of surface, one per group of gs under
+// its heading, the language page's groups.
+func groupedTables(surface builtin.Surface, title string, gs []group) (string, error) {
+	parts, err := grouped(rows(surface), gs)
+	if err != nil {
+		return "", err
+	}
+	out := make([]string, len(gs))
+	for i, g := range gs {
+		out[i] = "### " + g.title + "\n\n" + keyTable(title, parts[i])
+	}
+	return strings.Join(out, "\n"), nil
 }
 
 func stepTable() string {
@@ -188,12 +262,110 @@ var sections = []struct {
 	{builtin.SurfaceConfig, "Configuration (`config.json`)"},
 }
 
+// line is a row of the language page, then what each of its values means
+// when the table says.
 func line(k builtin.Key) string {
 	s := fmt.Sprintf("- `%s` (%s", shown(k.Path), kind(k))
 	if k.Default != "" {
 		s += ", default `" + k.Default + "`"
 	}
-	return s + "): " + cell(k.Doc)
+	return s + "): " + cell(k.Doc) + valueDocs(k, "  ")
+}
+
+func valueDocs(k builtin.Key, indent string) string {
+	if k.Values == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, v := range k.Values() {
+		if v.Doc != "" {
+			fmt.Fprintf(&b, "\n%s- `%s`: %s", indent, v.Name, cell(v.Doc))
+		}
+	}
+	return b.String()
+}
+
+// approvalKeys are the keys under an approval table, the shape the page
+// states once.
+var approvalKeys = []string{"mode", "window", "rule[]", "rule[].when", "rule[].mode", "rule[].window"}
+
+// approvalModes says which mode set the approval table at k uses, when
+// every key of the shape is under it.
+func approvalModes(k builtin.Key, all []builtin.Key) (string, bool) {
+	if k.Kind != builtin.KindTable || !strings.HasSuffix(k.Path, "approval") {
+		return "", false
+	}
+	var mode builtin.Key
+	for _, sub := range approvalKeys {
+		i := slices.IndexFunc(all, func(r builtin.Key) bool { return r.Path == k.Path+"."+sub })
+		if i < 0 {
+			return "", false
+		}
+		if sub == "mode" {
+			mode = all[i]
+		}
+	}
+	switch names := values(mode); {
+	case slices.Equal(names, builtin.ValueNames(builtin.RunModes())):
+		return "run", true
+	case slices.Equal(names, builtin.ValueNames(builtin.DraftModes())):
+		return "draft", true
+	}
+	return "", false
+}
+
+// lines are the language page's lines of keys, an approval table in one
+// line that points at the shape.
+func lines(keys []builtin.Key) []string {
+	var out []string
+	var under string
+	for _, k := range keys {
+		if under != "" && strings.HasPrefix(k.Path, under+".") {
+			continue
+		}
+		under = ""
+		modes, ok := approvalModes(k, keys)
+		if !ok {
+			out = append(out, line(k))
+			continue
+		}
+		under = k.Path
+		s := fmt.Sprintf("- `%s` (an [approval table](#approval-tables) of %s modes", shown(k.Path), modes)
+		for _, r := range keys {
+			if r.Path == k.Path+".mode" && r.Default != "" {
+				s += ", default mode `" + r.Default + "`"
+			}
+		}
+		out = append(out, s+"): "+cell(k.Doc))
+	}
+	return out
+}
+
+// approvalSection states the approval table's shape once, with its two
+// mode sets.
+func approvalSection() []string {
+	out := []string{"", "## Approval tables", "",
+		"An approval table that links here has these keys; a run approval takes the run modes, a draft approval the draft modes.", ""}
+	for _, r := range rows(builtin.SurfaceWorkflow) {
+		if sub, ok := strings.CutPrefix(r.Path, "approval."); ok && slices.Contains(approvalKeys, sub) {
+			k := r
+			k.Path, k.Values, k.Default = sub, nil, ""
+			k.Doc = strings.Replace(k.Doc, "the item runs", "the item runs or the draft is sent", 1)
+			if sub == "mode" || sub == "rule[].mode" {
+				k.Kind = builtin.KindText
+			}
+			out = append(out, line(k))
+		}
+	}
+	out = append(out, "", "The run modes:", "")
+	for _, v := range builtin.RunModes() {
+		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
+	}
+	out = append(out, "", "The draft modes:", "")
+	for _, v := range builtin.DraftModes() {
+		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
+	}
+	return out
 }
 
 func languagePage() (string, error) {
@@ -203,7 +375,7 @@ func languagePage() (string, error) {
 		"description: Every reserved word of the profile files and the configuration, one line each.",
 		"---",
 		"",
-		"Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with the closest listed one as a suggestion. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.",
+		"Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.",
 	}
 	for _, s := range sections {
 		out = append(out, "", "## "+s.title, "")
@@ -214,18 +386,14 @@ func languagePage() (string, error) {
 			}
 			for i, g := range gs {
 				out = append(out, "### "+g.title, "")
-				for _, k := range parts[i] {
-					out = append(out, line(k))
-				}
+				out = append(out, lines(parts[i])...)
 				out = append(out, "")
 			}
 			out = out[:len(out)-1]
 			continue
 		}
 		if s.surface != builtin.SurfaceStep {
-			for _, k := range rows(s.surface) {
-				out = append(out, line(k))
-			}
+			out = append(out, lines(rows(s.surface))...)
 			continue
 		}
 		for _, st := range builtin.Steps {
@@ -242,6 +410,7 @@ func languagePage() (string, error) {
 			}
 		}
 	}
+	out = append(out, approvalSection()...)
 	out = append(out, "", "This page is generated from the grammar table by `make docs-ref`.")
 	return strings.Join(out, "\n") + "\n", nil
 }
@@ -317,12 +486,20 @@ func schemaOf(s struct {
 func object(n *node) map[string]any {
 	out := map[string]any{"type": "object"}
 	props := map[string]any{}
+	var required []string
 	for name, c := range n.keys {
 		if name == "*" {
 			out["additionalProperties"] = schemaOfNode(c)
 			continue
 		}
 		props[name] = schemaOfNode(c)
+		if c.row != nil && c.row.Required {
+			required = append(required, name)
+		}
+	}
+	if len(required) > 0 {
+		slices.Sort(required)
+		out["required"] = required
 	}
 	if len(props) > 0 {
 		out["properties"] = props
@@ -402,7 +579,11 @@ func stepArgs() []any {
 	var out []any
 	for _, st := range builtin.Steps {
 		props := map[string]any{"use": map[string]any{"const": st.Name}}
+		var required []string
 		for _, k := range rows(builtin.SurfaceStep) {
+			if k.Step == st.Name && k.Required {
+				required = append(required, k.Path)
+			}
 			if k.Step == st.Name {
 				s := leaf(k)
 				s["description"] = k.Doc
@@ -412,9 +593,13 @@ func stepArgs() []any {
 				props[k.Path] = s
 			}
 		}
+		then := map[string]any{"properties": props, "additionalProperties": false}
+		if len(required) > 0 {
+			then["required"] = required
+		}
 		out = append(out, map[string]any{
 			"if":   map[string]any{"properties": map[string]any{"use": map[string]any{"const": st.Name}}, "required": []string{"use"}},
-			"then": map[string]any{"properties": props, "additionalProperties": false},
+			"then": then,
 		})
 	}
 	return out

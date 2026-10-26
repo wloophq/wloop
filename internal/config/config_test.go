@@ -530,7 +530,7 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 	want := []string{"agnet", "github.drafts.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
-	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") || !strings.Contains(err.Error(), "; sweep.fsat: did you mean fast?") {
+	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") || !strings.Contains(err.Error(), "; sweep.fsat: did you mean \"fast\"?") {
 		t.Fatalf("keys %v, error %q", unknown.Keys, err)
 	}
 }

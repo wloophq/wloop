@@ -79,6 +79,8 @@ func refines(row, field builtin.Kind) bool {
 		return true
 	case builtin.KindTable:
 		return row == builtin.KindAny
+	case builtin.KindMap:
+		return row == builtin.KindTable
 	}
 	return false
 }
@@ -100,7 +102,9 @@ func TestManifestStructsAreTheGrammar(t *testing.T) {
 		}
 		for _, p := range slices.Sorted(maps.Keys(decoded)) {
 			r, ok := rows[p]
+			parent, named := strings.CutSuffix(p, ".*")
 			switch {
+			case !ok && named && rows[parent].Kind == builtin.KindTable:
 			case !ok:
 				t.Errorf("%s %s: decoded, and no grammar row", surface, p)
 			case !refines(r.Kind, decoded[p]):

@@ -16,13 +16,13 @@ The leaf is always `intent=<intent>.md`, for `review`, `address`, `nudge` or any
 | Rank | Dimension | Fact | Matches |
 |---|---|---|---|
 | 1 | `organization` | `pr.owner` | the repository's owner |
-| 2 | `repo` | `pr.repo` | the repository name, only right after `organization` |
+| 2 | `repo` | `pr.repo_name` | the repository name without its owner, only right after `organization` |
 | 3 | `user` | `pr.author` | the pull request's author |
 | 4 | `team` | `pr.requested_teams` | a team the review was requested through, as `<org>-<slug>` |
 | 5 | `association` | `pr.association` | GitHub's author association, lower-case with `-`, such as `first-time-contributor` |
 | 6 | `label` | `pr.labels` | a label on the pull request |
 | 7 | `base` | `pr.base` | the base branch |
-| 8 | `round` | `turn.round` | `first` or `follow-up`, for intents whose manifest lists it in `dims` (review) |
+| 8 | `stage` | `turn.stage` | `first` or `follow-up`, for intents whose manifest lists it in `dims` (review) |
 | 9 | `reviewer` | `pr.address.reviewers` | a reviewer the round answers, for intents whose manifest lists it in `dims` (address); a bot matches with or without `[bot]` |
 | 10 to 12 | `kind`, `size`, `risk` | `brief.kind`, `brief.size`, `brief.risk` | the brief's values; `kind` takes GitHub's taxonomy under GitHub intents and any value under others |
 | 13 | any other fact flagged as a dimension, by its name, then each enum field of the brief intent's `extra`, by its name, such as `approach=rewrite` | the fact, or `brief.extra.<name>` | the fact's value, or one of a list fact's values; sorted by name |
@@ -63,7 +63,7 @@ codex = []
 | `paths` | the block applies only when a changed file matches one of these globs |
 | `delegates` | per agent, skills the finding step runs besides the procedure's own work; they come from the last block that names them |
 
-A file that opens with `---` fails with `front matter is TOML between +++ lines`. Any other key, a bad value or a path off the grammar stops every round, as a profile directory that does not exist does, with the file and the fix.
+A file that opens with `---` fails with `front matter is TOML between +++ lines`. Any other key, a bad value or a path off the grammar stops every round, as a profile directory that does not exist does, with the file, the key and a close key when one exists. The [profile language](/reference/language/) lists the keys.
 
 ## Headings
 
@@ -79,10 +79,10 @@ organization = "Organisation {value}"
 
 # One condition's heading, over its dimension's.
 [values]
-"round=first" = "First rounds"
+"stage=first" = "First rounds"
 ```
 
-`{value}` is the condition's value, `{dim}` its dimension, `{Dim}` the same capitalized, and `{key}` a tag's key. An unknown key fails the profile's load, naming the file.
+`{value}` is the condition's value, `{dim}` its dimension, `{Dim}` the same capitalized, and `{key}` a tag's key. A key of `[dims]` and the `<dim>` of a key of `[values]` name a dimension of the table above; an unknown key, or a heading of no dimension (`"round=first"`), fails the profile's load, naming the file and the key.
 
 ## Limits
 
@@ -94,7 +94,7 @@ A block is at most 16 KiB with its includes. A turn's judgment over 48 KiB drops
 {{command}} profile where <intent> [conditions]
 {{command}} profile add <intent>[,<intent>...] [conditions] [--section <h>] [--title <t>] [--override] [--paths <glob>]... [--apply] [-- <text>]
 {{command}} profile check [<dir>]
-{{command}} profile show <owner/repo|url> [--kind <intent>] [--show]
+{{command}} profile show <owner/repo|url> [--intent <intent>] [--show]
 ```
 
-The conditions are `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` and `--tag <key>=<value>` (repeatable). `profile add` writes a tag in its one spelling (`lang=Golang` as `lang=go`).
+The conditions are one flag per dimension of the first twelve, `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size` and `--risk`, and `--tag <key>=<value>` (repeatable). `profile add` writes a tag in its one spelling (`lang=Golang` as `lang=go`).

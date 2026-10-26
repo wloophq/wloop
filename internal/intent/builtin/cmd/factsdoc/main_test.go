@@ -3,8 +3,10 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 const factsPage = "docs/src/content/docs/reference/facts.md"
@@ -14,16 +16,28 @@ func TestFactsDocIsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range tables() {
-		header, _, _ := strings.Cut(want, "\n")
-		_, rest, ok := strings.Cut(string(doc), header+"\n")
-		if !ok {
-			t.Errorf("%s lacks the generated table %q; regenerate it with make docs-ref", factsPage, header)
-			continue
-		}
-		got, _, _ := strings.Cut(header+"\n"+rest, "\n\n")
-		if got+"\n" != want {
-			t.Errorf("%s's generated table %q drifted; regenerate it with make docs-ref\ngot:\n%s\nwant:\n%s", factsPage, header, got, want)
-		}
+	want, err := page()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(doc) != want {
+		t.Errorf("%s is not what the fact registry generates; regenerate it with make docs-ref", factsPage)
+	}
+}
+
+func TestAnIntentFactOutsideEveryGroupFails(t *testing.T) {
+	facts := []builtin.Fact{{Name: "pr.mine"}, {Name: "zzz.new"}}
+	if _, err := groupedFacts(facts, []group{{"PR", []string{"pr"}}}); err == nil {
+		t.Fatal("zzz.new is in no group, and groupedFacts took it")
+	}
+	if _, err := groupedFacts(facts[:1], []group{{"PR", []string{"pr"}}, {"Gone", []string{"gone"}}}); err == nil {
+		t.Fatal("Gone holds no fact, and groupedFacts took it")
+	}
+}
+
+func TestAWorkflowFactOfAnUntitledSlotFails(t *testing.T) {
+	facts := []builtin.Fact{{Name: "zzz.new", Type: expr.String, Slots: []builtin.FactSlot{builtin.WorkflowSlot}, Slot: "zzz"}}
+	if _, err := workflowSections(facts, workflowGroups); err == nil {
+		t.Fatal("the slot zzz has no title, and workflowSections took it")
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // FrontMatterError carries Line and Col (1-based) when the problem has a position in the file.
@@ -79,6 +80,9 @@ func splitFrontMatter(file, raw string) (FrontMatter, string, error) {
 	if head == "" {
 		return fm, text, nil
 	}
+	if err := checkGrammar(builtin.SurfaceBlock, file, []byte(head), 2); err != nil {
+		return fm, "", asFrontMatterError(file, err)
+	}
 	var r rawFrontMatter
 	if err := frontmatter.Decode(file, []byte(head), 2, &r); err != nil {
 		return fm, "", asFrontMatterError(file, err)
@@ -115,8 +119,7 @@ func asFrontMatterError(file string, err error) error {
 	out := FrontMatterError{File: file, Key: fe.Key, Problem: fe.Msg, Line: fe.Line, Col: fe.Col}
 	top, _, _ := strings.Cut(fe.Key, ".")
 	switch hint, known := keyHints[top]; {
-	case fe.Msg == "unknown key":
-		out.Problem = "unknown key; the keys are override, title, include, paths and delegates"
+	case strings.HasPrefix(fe.Msg, "unknown key"):
 	case known:
 		out.Key, out.Problem = top, hint
 	}

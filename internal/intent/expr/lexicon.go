@@ -27,6 +27,16 @@ func (e Env) SetEnum(name string, values []string) {
 	}
 }
 
+// ClearEnum lets the string fact name take any value again.
+func (e Env) ClearEnum(name string) {
+	prefix := enumMeta + name + "\x00"
+	for k := range e {
+		if strings.HasPrefix(k, prefix) {
+			delete(e, k)
+		}
+	}
+}
+
 // Enum is the closed values of name, sorted; nil when it takes any value.
 func (e Env) Enum(name string) []string {
 	var out []string
@@ -117,25 +127,7 @@ func enumMessage(name, v string, values []string) string {
 		list = strings.Join(quoted[:n-1], ", ") + " or " + quoted[n-1]
 	}
 	msg := fmt.Sprintf("%s is %s, never %q", name, list, v)
-	if s := closestValue(v, values); s != "" {
-		msg += fmt.Sprintf("; did you mean %q?", s)
-	}
-	return msg
-}
-
-func closestValue(v string, values []string) string {
-	for _, s := range values {
-		if strings.EqualFold(s, v) {
-			return s
-		}
-	}
-	best, bestD := "", 3
-	for _, s := range values {
-		if d := levenshtein(v, s); s != "" && d < bestD {
-			best, bestD = s, d
-		}
-	}
-	return best
+	return msg + DidYouMean(v, values)
 }
 
 // dayLiteral is a duration literal written in days, which CEL does not read.

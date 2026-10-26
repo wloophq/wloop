@@ -3,7 +3,7 @@ package builtin
 // profileGrammar is the keys of defaults.toml, labels.toml and a judgment
 // block's front matter.
 var profileGrammar = []Key{
-	{Path: "provider", In: SurfaceDefaults, Kind: KindText, Doc: "The provider of an intent whose manifest names none."},
+	{Path: "provider", In: SurfaceDefaults, Kind: KindEnum, Values: intentProviderValues, Doc: "The provider of an intent whose manifest names none."},
 
 	{Path: "other", In: SurfaceLabels, Kind: KindText, Doc: "The heading of a dimension dims does not name: {Dim} and {value}."},
 	{Path: "tag", In: SurfaceLabels, Kind: KindText, Doc: "The heading of a tag condition: {key} and {value}."},
