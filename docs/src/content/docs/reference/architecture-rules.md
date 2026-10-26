@@ -144,7 +144,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/store/sqlite/turns.go` `compareUnits` `unit.GitHub` `2` | 🧾 | pull requests sort by owner, repository and number |
 | `internal/adapter/store/sqlite/turns.go` `prOf` `unit.GitHub` `1` | 🧾 | a pull request's turns are keyed by owner, repository and number |
 | `internal/cli/actions.go` `Env.fetchPR` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/cli/actions.go` `envActions.Intent` `unit.GitHub` `1` | 🧾 | the cockpit's intent action takes the pull request path on GitHub units |
 | `internal/cli/cli.go` `commands` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |
 | `internal/cli/facts.go` `inventoryFacts.MyReviews` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/cli/help.go` `devCommand` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |

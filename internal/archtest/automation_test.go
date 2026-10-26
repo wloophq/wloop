@@ -73,7 +73,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/adapter/store/sqlite/slack.go", "slackProvider", `"slack"`, 1, "the store keeps the Slack plugin's tables"},
 	{"internal/adapter/store/sqlite/turns.go", "prOf", "unit.GitHub", 1, "debt: a pull request's turns are keyed by owner, repository and number"},
 	{"internal/adapter/store/sqlite/turns.go", "compareUnits", "unit.GitHub", 2, "debt: pull requests sort by owner, repository and number"},
-	{"internal/cli/actions.go", "envActions.Intent", "unit.GitHub", 1, "debt: the cockpit's intent action takes the pull request path on GitHub units"},
 	{"internal/cli/actions.go", "Env.fetchPR", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/facts.go", "inventoryFacts.MyReviews", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},
 	{"internal/cli/sweepinputs.go", "storeInputs.Viewer", "unit.GitHub", 1, "debt: the GitHub viewer read outside the plugin"},

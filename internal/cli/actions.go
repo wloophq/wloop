@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -318,7 +319,7 @@ func (a envActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error
 }
 
 func (a envActions) Intent(ctx context.Context, name string, u unit.Unit, c daemon.Call) error {
-	if u.Provider != unit.GitHub {
+	if !slices.Contains(builtin.RoundProviders, u.Provider) {
 		e := a.call(c)
 		d, err := e.intentDef(name)
 		if err != nil {
