@@ -1,5 +1,5 @@
 label   = "Act"
-summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
+summary = "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop"
 verb    = "delegate"
 role    = "headless"
 workspace = "linked_else_main"

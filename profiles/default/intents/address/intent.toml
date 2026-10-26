@@ -1,5 +1,5 @@
 label   = "Address"
-summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace"
+summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies"
 verb    = "delegate"
 shortcut = "F"
 role    = "pr.address"

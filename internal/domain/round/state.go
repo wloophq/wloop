@@ -235,7 +235,7 @@ func (s *Store) ClearFirstRoundSkipped(key string) {
 	}
 }
 
-// Pause holds every workflow in apply mode and board moves everywhere when
+// Pause holds every workflow that does not observe and board moves everywhere when
 // On, else on the repositories in Repos. A pull request's own pause is its
 // override's Hold.
 type Pause struct {

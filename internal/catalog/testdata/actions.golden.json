@@ -105,7 +105,7 @@
   {
     "id": "address",
     "label": "Address",
-    "summary": "Triage the reviews and failing checks of a pull request you develop, in its workspace",
+    "summary": "Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies",
     "group": "start",
     "key": "F",
     "surfaces": [
@@ -126,7 +126,7 @@
   {
     "id": "act",
     "label": "Act",
-    "summary": "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve",
+    "summary": "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop",
     "group": "start",
     "surfaces": [
       "row",
@@ -257,7 +257,7 @@
   {
     "id": "mute",
     "label": "Mute",
-    "summary": "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; rounds still run, unannounced. Pause stops the rounds instead.",
+    "summary": "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead.",
     "group": "control",
     "key": "M",
     "surfaces": [

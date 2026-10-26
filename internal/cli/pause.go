@@ -48,7 +48,7 @@ func runPause(ctx context.Context, e *Env, paused bool, args []string) error {
 	if err := c.SetPause(ctx, req); err != nil {
 		return err
 	}
-	what := "every workflow in apply mode and board moves"
+	what := "every workflow that does not observe and board moves"
 	if named := append(slices.Clone(req.Repos), req.PRs...); len(named) > 0 {
 		what += " on " + strings.Join(named, ", ")
 	}

@@ -2334,7 +2334,7 @@ function planItem(it) {
       h("span", { class: "plan-wf" }, it.workflow),
       h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
       it.title ? h("span", { class: "plan-title" }, it.title) : null,
-      it.observe ? h("span", { class: "plan-mode", title: "This workflow only plans; nothing runs until it is switched to apply" }, "observe") : null),
+      it.observe ? h("span", { class: "plan-mode", title: "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off" }, "observe") : null),
     it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
     it.error ? h("p", { class: "plan-error" }, `attempt ${it.attempts}: ${it.error}`) : null,
     h("div", { class: "d-actions" }, ...planButtons(it)));

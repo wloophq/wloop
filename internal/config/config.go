@@ -56,8 +56,10 @@ type Config struct {
 	Workflows map[string]WorkflowConfig `json:"workflows"`
 	// Intents set each intent's settings by intent name.
 	Intents map[string]IntentConfig `json:"intents"`
-	// Plugins switch the plugins that have no settings of their own in the
-	// file, by provider id; the file switches a plugin with <id>.enabled.
+	// Plugins switch, by provider id, a plugin registered without a settings
+	// namespace, which has no <id>.enabled for the file to set: the
+	// composition root that registers it switches it here, as a test's
+	// plugin is. Every plugin the file knows switches with <id>.enabled.
 	Plugins map[string]Plugin `json:"-"`
 	// Placement is the rules that place units; the first match wins.
 	Placement []PlacementRule `json:"placement,omitempty"`

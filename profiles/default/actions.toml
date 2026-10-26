@@ -67,7 +67,7 @@ summary = "Let automatic rounds run on this pull request again."
 
 [mute]
 label   = "Mute"
-summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; rounds still run, unannounced. Pause stops the rounds instead."
+summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
 
 [mute.input]
 label = "Mute for"

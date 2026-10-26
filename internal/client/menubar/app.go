@@ -446,9 +446,10 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 		if st.ID == "open" {
 			title = open
 		}
+		tip := actionTooltip(spec, st)
 		if !st.Enabled {
 			title += " (" + st.Reason + ")"
-			items = append(items, MenuItem{Title: title, Tooltip: st.Reason})
+			items = append(items, MenuItem{Title: title, Tooltip: tip})
 			continue
 		}
 		do := c.later(func(ctx context.Context) error {
@@ -456,12 +457,22 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 			return err
 		})
 		if st.Confirm == "" {
-			items = append(items, MenuItem{Title: title, Tooltip: spec.Summary, Enabled: true, Action: do})
+			items = append(items, MenuItem{Title: title, Tooltip: tip, Enabled: true, Action: do})
 			continue
 		}
-		items = append(items, MenuItem{Title: title + "…", Tooltip: spec.Summary, Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
+		items = append(items, MenuItem{Title: title + "…", Tooltip: tip, Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
 	}
 	return items
+}
+
+// actionTooltip is what the action does, then what it would do on this row
+// when enabled or why it is off, as the web shows it.
+func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
+	extra := st.Reason
+	if st.Enabled {
+		extra = st.Note
+	}
+	return strings.Join(slices.DeleteFunc([]string{spec.Summary, extra}, func(s string) bool { return s == "" }), "\n")
 }
 
 func label(r api.Row) string { return r.Summary.Line }

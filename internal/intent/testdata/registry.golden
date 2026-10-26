@@ -1,6 +1,6 @@
 intent/act.Name = "act"
 intent/act.Label = "Act"
-intent/act.Summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
+intent/act.Summary = "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop"
 intent/act.Verb = "delegate"
 intent/act.UserFacing = true
 intent/act.Workspace = "linked_else_main"
@@ -50,7 +50,7 @@ intent/act.Help.Examples[1] = "https://acme.slack.com/archives/C0123/p1700000000
 intent/act.Help.Docs = "concepts/gtd"
 intent/address.Name = "address"
 intent/address.Label = "Address"
-intent/address.Summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace"
+intent/address.Summary = "Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies"
 intent/address.Key = "F"
 intent/address.Verb = "delegate"
 intent/address.UserFacing = true

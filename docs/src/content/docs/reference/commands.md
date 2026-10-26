@@ -78,7 +78,7 @@ Resolve a unit's open items, replies as drafts.
 {{command}} act <url|permalink|slack:key> [guidance...]
 ```
 
-Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
+Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
@@ -97,7 +97,7 @@ Triage the reviews and failing checks of yours.
 {{command}} address <url> [--self-review] [--take-over] [--no-wait] [--no-brief] [guidance...]
 ```
 
-Triage the reviews and failing checks of a pull request you develop, in its workspace. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
+Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
 
 | Flag | Description |
 | --- | --- |
@@ -366,7 +366,7 @@ Stop or restart automatic rounds.
 {{command}} resume [<url>|<owner/repo>]...
 ```
 
-Stop or restart the workflows in apply mode and the board moves on those pull requests and repositories; with none, everywhere. Workflows in observe mode keep planning.
+Stop or restart the workflows that do not observe and the board moves on those pull requests and repositories; with none, everywhere. Workflows that observe keep planning.
 
 Examples:
 

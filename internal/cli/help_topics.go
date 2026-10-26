@@ -207,8 +207,8 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"pause", "resume"},
 				Summary: "Stop or restart automatic rounds",
 				Usage:   []string{"pause [<url>|<owner/repo>]...", "resume [<url>|<owner/repo>]..."},
-				About: "Stop or restart the workflows in apply mode and the board moves on those pull requests and repositories; with none, everywhere. " +
-					"Workflows in observe mode keep planning.",
+				About: "Stop or restart the workflows that do not observe and the board moves on those pull requests and repositories; with none, everywhere. " +
+					"Workflows that observe keep planning.",
 				Examples: []string{"pause", "pause acme/api", "resume " + pr},
 				Docs:     "concepts/workflows",
 			},

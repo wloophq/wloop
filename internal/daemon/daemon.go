@@ -114,7 +114,7 @@ func appWarning(a api.AppStatus) string {
 	return ""
 }
 
-// Pauses keeps the pause of every workflow in apply mode and board moves.
+// Pauses keeps the pause of every workflow that does not observe and of board moves.
 type Pauses interface {
 	Pause(ctx context.Context) (round.Pause, error)
 	SetPause(ctx context.Context, p round.Pause) error
