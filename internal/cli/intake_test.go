@@ -171,17 +171,19 @@ func TestInterruptDetaches(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = d.socket
 	te.LoadConfig = nil
+	out := &syncBuffer{}
+	te.Env.Out = out
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan int)
 	go func() { done <- Run(ctx, te.Env, []string{"review", r7.URL()}) }()
 	eventually(t, "the intake", func() bool { return d.state(t, 1) == intake.Briefing })
-	time.Sleep(50 * time.Millisecond)
+	eventually(t, "the CLI follows", func() bool { return strings.Contains(out.String(), "accepted as intake 1\n") })
 	cancel()
 	if code := <-done; code != 130 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if !strings.HasSuffix(te.out.String(), "intake 1 goes on in the daemon; follow it with "+brand.Command+" intake 1, stop it with "+brand.Command+" intake cancel 1\n") {
-		t.Fatalf("stdout %q", te.out)
+	if !strings.HasSuffix(out.String(), "intake 1 goes on in the daemon; follow it with "+brand.Command+" intake 1, stop it with "+brand.Command+" intake cancel 1\n") {
+		t.Fatalf("stdout %q", out)
 	}
 	if got := d.state(t, 1); got != intake.Briefing {
 		t.Fatalf("the interrupt changed the intake: %s", got)

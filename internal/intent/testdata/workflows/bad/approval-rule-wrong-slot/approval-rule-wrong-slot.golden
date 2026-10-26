@@ -1,0 +1,1 @@
+testdata/workflows/bad/approval-rule-wrong-slot/workflows/case-workflow/workflow.toml:10:8: approval.rule[0].when: 1: unknown field session.managed

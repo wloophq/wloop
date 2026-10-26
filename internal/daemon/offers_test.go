@@ -100,7 +100,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	repo := sqlite.New(db)
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
-	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
+	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
 		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Log:     func(string, ...any) {},
 		Actions: &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
@@ -140,7 +140,7 @@ func (c catalogRig) override(t *testing.T, o dinv.Override) {
 func (c catalogRig) asks(t *testing.T, state turn.State, rec record.Record) {
 	t.Helper()
 	at := catalogNow.Add(-30 * time.Minute)
-	b := turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term",
+	b := turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term",
 		State: state, SentAt: at, StartedAt: at}},
 		Records: []turn.Record{{Session: "term", Hash: "x", At: at, Record: rec}}}
 	if _, err := c.repo.Save(context.Background(), b, port.Event{Unit: pr.Ref(r7).Unit(), Kind: turns.KindTurnSent, Key: "r", At: at}); err != nil {
@@ -272,7 +272,7 @@ func goldenJSON(t *testing.T, name string, v any) {
 func TestActionsGolden(t *testing.T) {
 	t.Parallel()
 	specs := catalogOf(bundledActions())
-	goldenJSON(t, "specs.json", api.ActionsResponse{Version: catalog.Version(specs), Specs: specs, Plan: catalog.PlanSpecs()})
+	goldenJSON(t, "specs.json", api.ActionsResponse{Version: catalog.Version(specs), Specs: specs, Plan: catalog.PlanSpecs(bundledActions())})
 	rows := map[string]api.Row{}
 	for _, f := range catalogFixtures {
 		_, rows[f.name] = seededRow(t, f)

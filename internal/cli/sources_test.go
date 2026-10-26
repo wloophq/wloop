@@ -43,6 +43,9 @@ func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
 	}
 	d = withSources(withStore(d, st), plugins, mods)
 	d.Ingest, d.Collector, d.Track = nil, nil, nil
+	if d.Forge == "" {
+		d.Forge = unit.GitHub
+	}
 	return d
 }
 

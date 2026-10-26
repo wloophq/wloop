@@ -93,7 +93,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatalf("%d", code)
 	}
 	spec, ok := specOf(got.Specs, "ask-author")
-	want := api.ActionSpec{ID: "ask-author", Label: "Ask author", Group: "round", Key: "Q", Surfaces: []string{"row", "detail", "tui", "cli"},
+	want := api.ActionSpec{ID: "ask-author", Label: "Ask author", Summary: "Ask the author one question", Group: "start", Key: "Q", Surfaces: []string{"row", "detail", "tui", "cli"},
 		Input: &api.InputSpec{Kind: "text", Label: "Guidance"}, Source: filepath.Join(dir, "intents", "ask-author", "intent.toml"), Scope: "unit", Plugin: "github"}
 	if !ok || !reflect.DeepEqual(spec, want) {
 		t.Fatalf("spec %+v, want %+v", spec, want)
@@ -102,7 +102,7 @@ func TestIntentActionsComeFromManifests(t *testing.T) {
 		t.Fatal("the specs version ignores the user intent")
 	}
 	st, ok := offerOf(rowOf(t, s, r7), "ask-author")
-	if !ok || !st.Enabled || st.Hint != "Ask ana one question" {
+	if !ok || !st.Enabled || st.Note != "Ask ana one question" {
 		t.Fatalf("on someone else's pull request: %+v %v", st, ok)
 	}
 	ctx := context.Background()
@@ -325,7 +325,7 @@ func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
 	mu.Lock()
 	in := ask(t, s, "address", `{"source":"cli","inputs":{"self_review":true}}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Starting })
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
+	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), Role: "pr.address", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: time.Now().Add(time.Second)}}})
 	mu.Unlock()
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Failed })
 	got := intakeOf(t, s, in.Seq)
@@ -559,7 +559,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 	r := newTurnRig(t)
 	at := r.s.deps.Now().Add(-time.Hour)
 	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{
-		{Intent: turn.Intent(dintent.Review), ID: "a", Trigger: turn.Automated, State: turn.Done, SentAt: at},
+		{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "a", Trigger: turn.Automated, State: turn.Done, SentAt: at},
 		{Intent: turn.Intent(dintent.Nudge), ID: "b", Trigger: turn.ByHand, State: turn.Sent, SentAt: at.Add(time.Minute)},
 	}})
 	bundled := r.s.loaded().Registry

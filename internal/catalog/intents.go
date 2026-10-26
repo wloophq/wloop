@@ -11,7 +11,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -75,12 +74,12 @@ func (r registryActions) Specs() []api.ActionSpec {
 	var out []api.ActionSpec
 	for _, d := range r.offering() {
 		a := d.Action
-		out = append(out, api.ActionSpec{ID: string(d.Name), Label: d.Label, Group: a.Group, Key: d.Key, Verb: d.Verb, Surfaces: slices.Clone(a.Surfaces),
+		out = append(out, api.ActionSpec{ID: string(d.Name), Label: d.Label, Summary: d.Summary, Group: a.Group, Key: d.Key, Verb: d.Verb, Surfaces: slices.Clone(a.Surfaces),
 			Input:  &api.InputSpec{Kind: "text", Label: d.Guidance.Label, Placeholder: d.Guidance.Help, Max: d.Guidance.Max},
 			Intake: d.Intake, Source: manifestPath(d), Scope: intentScope(d), Plugin: pluginOf(d)})
 	}
 	for _, n := range r.broken() {
-		out = append(out, api.ActionSpec{ID: string(n), Label: string(n), Group: "round", Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore},
+		out = append(out, api.ActionSpec{ID: string(n), Label: string(n), Group: builtin.GroupStart, Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI, SurfaceExplore},
 			Source: brokenManifest(r.l.Broken[n]), Scope: ScopeUnit})
 	}
 	return out
@@ -97,29 +96,24 @@ func pluginOf(d dintent.Def) string {
 func (r registryActions) States(f Facts) []api.ActionState {
 	var out []api.ActionState
 	facts := intentload.ActionFactMap(f.Get)
-	provider := f.Row.Unit.Provider
-	if provider == "" {
-		provider = unit.GitHub
-	}
+	provider := cmp.Or(f.Row.Unit, f.Ref.Unit()).Provider
 	for _, d := range r.offering() {
 		if !d.Serves(provider) {
 			continue
 		}
 		p := r.l.Programs[d.Name]
-		if p.Visible != nil && !p.Visible.Eval(f) {
+		if p.Action.When != nil && !p.Action.When.Eval(f) {
 			continue
 		}
 		id := string(d.Name)
-		if p.Enabled != nil && !p.Enabled.Eval(f) {
-			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, "reason_off", facts)})
+		if i := slices.IndexFunc(p.Action.Refuse, func(r intentload.RefusalProgram) bool { return r.When != nil && r.When.Eval(f) }); i >= 0 {
+			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, intentload.RefusalText(i), facts), Refusal: api.RefuseCase(i)})
 			continue
 		}
-		st := api.ActionState{ID: id, Enabled: true, Hint: actionText(d.Name, p, "hint", facts), Confirm: actionText(d.Name, p, "confirm", facts)}
-		st.Primary = p.Primary != nil && p.Primary.Eval(f)
+		st := api.ActionState{ID: id, Enabled: true, Note: actionText(d.Name, p, "note", facts), Confirm: actionText(d.Name, p, "confirm", facts),
+			Warning: actionText(d.Name, p, "warning", facts)}
+		st.Primary = p.Action.Primary != nil && p.Action.Primary.Eval(f)
 		recommend(&st, d, f.Recommended)
-		if f.Question {
-			st.Note = d.Action.NoteWhenQuestion
-		}
 		out = append(out, st)
 	}
 	if !f.Open {
@@ -134,7 +128,7 @@ func (r registryActions) States(f Facts) []api.ActionState {
 // actionText renders an action text; one that fails to render says so, so
 // a refusal never reads empty.
 func actionText(intent dintent.Name, p intentload.Programs, name string, facts map[string]any) string {
-	t := p.ActionTexts[name]
+	t := p.Action.ActionTexts[name]
 	if t == nil {
 		return ""
 	}

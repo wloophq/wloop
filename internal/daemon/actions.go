@@ -16,10 +16,10 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -207,12 +207,9 @@ var overrideActions = map[string]func(o *dinv.Override, req api.ActionRequest, n
 			}
 			o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = true, string(kind), waitingOn
 		} else {
-			d, err := config.ParseDays(req.Until)
+			d, err := duration.Parse(req.Until)
 			if err != nil {
-				return "", "", badRequest{err.Error()}
-			}
-			if d <= 0 {
-				return "", "", badRequest{"mute duration must be positive"}
+				return "", "", badRequest{"mute " + err.Error()}
 			}
 			o.MutedUntil = now.Add(d)
 			data = "for " + req.Until
@@ -248,7 +245,7 @@ var roundActions = map[string]bool{"skip": true, "guide": true}
 var intakeRouteActions = map[string]func(s *Server, ctx context.Context, i intake.Intake) (string, error){
 	"intake_without": func(s *Server, ctx context.Context, i intake.Intake) (string, error) {
 		if i.Source == sourceSession {
-			return "", conflict{catalog.SessionWithout(i.Seq)}
+			return "", conflict{msg: catalog.SessionWithout(i.Seq)}
 		}
 		return fmt.Sprintf("intake %d starts without the brief", i.Seq), s.intakes.Without(ctx, i.Seq)
 	},
@@ -331,7 +328,7 @@ func isBuiltin(name string) bool {
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
-	if d, ok := s.loaded().Registry.Get(dintent.Name(r.PathValue("action"))); ok && d.Runs(string(turn.ModeHeadless)) {
+	if d, ok := s.loaded().Registry.Get(dintent.Name(r.PathValue("action"))); ok && d.Runs(string(turn.RunnerHeadless)) {
 		s.runModes(w, r, d)
 		return
 	}
@@ -435,13 +432,17 @@ func (s *Server) offered(ctx context.Context, u unit.Unit, asked catalog.Asked, 
 	st, ok := offerOf(row, name)
 	switch {
 	case basis != "" && (!ok || st.Basis != basis):
-		return row, st, conflict{"the row changed: " + changedWhy(name, basis, st, ok)}
+		c := conflict{msg: "the row changed: " + changedWhy(name, basis, st, ok)}
+		if ok && st.Reason != "" {
+			c.refusal = st.Refusal
+		}
+		return row, st, c
 	case !ok && name == "remove" && req.Force && workspaceID(row) == "":
 		return row, st, nil
 	case !ok:
-		return row, st, conflict{NotOffered(name, u)}
+		return row, st, conflict{NotOffered(name, u), api.RefusalNotOffered}
 	case !st.Enabled:
-		return row, st, conflict{st.Reason}
+		return row, st, conflict{st.Reason, st.Refusal}
 	}
 	return row, st, nil
 }
@@ -526,7 +527,7 @@ func (s *Server) runPending(ctx context.Context, u unit.Unit, req api.ActionRequ
 		}
 		return s.actOnRound(ctx, u, a, req.Guidance)
 	}
-	return "", conflict{"the row changed: the pending round already went out"}
+	return "", conflict{msg: "the row changed: the pending round already went out"}
 }
 
 // writeActionError answers an action's error with its status.
@@ -544,7 +545,7 @@ func writeActionError(w http.ResponseWriter, err error) {
 	case errors.As(err, &down):
 		writeError(w, http.StatusServiceUnavailable, down.msg)
 	case errors.As(err, &joinRefused):
-		writeError(w, http.StatusConflict, joinRefused.msg)
+		writeConflict(w, joinRefused)
 	case errors.As(err, &invalid):
 		writeError(w, http.StatusBadRequest, invalid.Reason)
 	case errors.Is(err, turn.ErrNoQuestion):
@@ -675,9 +676,9 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 }
 
 // actIntent runs a round of an intent as its manifest declares it: under
-// the loop, the pending round dropped first when on_sent
-// says so, its prepare run, its guidance cut at guidance.max, and the
-// events on_sent names recorded after it.
+// the loop, the pending round dropped first when its effects say so, its
+// prepare run, its guidance cut at guidance.max, and the events its effects
+// name recorded after it.
 func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, out io.Writer) error {
 	d, err := intentDef(s.loaded(), name)
 	if err != nil {
@@ -786,12 +787,12 @@ func (s *Server) trackedAs(ctx context.Context, u unit.Unit) (unit.Unit, bool, e
 	if err != nil {
 		return u, false, err
 	}
-	known, ok := trackedIn(tracked, u)
+	known, ok := trackedIn(s.deps.Units, tracked, u)
 	return known, ok, nil
 }
 
-func trackedIn(tracked []unit.Unit, u unit.Unit) (unit.Unit, bool) {
-	if i := slices.IndexFunc(tracked, func(t unit.Unit) bool { return sameUnit(t, u) }); i >= 0 {
+func trackedIn(codecs *unit.Registry, tracked []unit.Unit, u unit.Unit) (unit.Unit, bool) {
+	if i := slices.IndexFunc(tracked, func(t unit.Unit) bool { return codecs.Same(t, u) }); i >= 0 {
 		return tracked[i], true
 	}
 	return u, false
@@ -804,7 +805,7 @@ func (s *Server) trackSlot(ctx context.Context, u unit.Unit) (unit.Unit, bool, e
 	if err != nil {
 		return u, false, err
 	}
-	if known, ok := trackedIn(tracked, u); ok {
+	if known, ok := trackedIn(s.deps.Units, tracked, u); ok {
 		return known, true, nil
 	}
 	if len(tracked) >= trackMax {

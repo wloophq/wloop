@@ -103,16 +103,21 @@ type Person struct {
 }
 
 // Identity is the user's keys over the enabled plugins: each Identity's Key and Aliases, so an email:<addr> alias matches across plugins.
-type Identity struct{ Keys []string }
+// Codecs compare two keys of one provider; nil compares them byte for byte.
+type Identity struct {
+	Keys   []string
+	Codecs unit.KeyComparer `json:"-"`
+}
 
-// Is says whether p's Key or an alias is in id.Keys; github keys compare case-insensitively.
+// Is says whether p's Key or an alias is in id.Keys, keys of one provider
+// compared through that provider's codec.
 func (p Person) Is(id Identity) bool {
 	for _, k := range append([]string{p.Key}, p.Aliases...) {
 		if k == "" {
 			continue
 		}
 		for _, mine := range id.Keys {
-			if k == mine || (isGitHubKey(k) && isGitHubKey(mine) && strings.EqualFold(k, mine)) {
+			if k == mine || id.same(k, mine) {
 				return true
 			}
 		}
@@ -120,11 +125,14 @@ func (p Person) Is(id Identity) bool {
 	return false
 }
 
-func isGitHubKey(k string) bool {
-	return len(k) > len(githubPrefix) && strings.EqualFold(k[:len(githubPrefix)], githubPrefix)
+func (id Identity) same(a, b string) bool {
+	pa, ka, okA := strings.Cut(a, ":")
+	pb, kb, okB := strings.Cut(b, ":")
+	if id.Codecs == nil || !okA || !okB || !strings.EqualFold(pa, pb) {
+		return false
+	}
+	return id.Codecs.KeysEqual(unit.ProviderID(strings.ToLower(pa)), ka, kb)
 }
-
-const githubPrefix = "github:"
 
 type Option struct {
 	Label    string   `json:"label"`

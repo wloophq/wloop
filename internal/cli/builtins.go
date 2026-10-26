@@ -17,13 +17,13 @@ import (
 )
 
 // nudgedWho is the input nudge.prepare fills with whom the round asks,
-// which event.nudged records.
+// which pr.nudged records.
 const nudgedWho = "who"
 
 // The workspace builtins whose role links a worktree to the pull request.
 const (
-	workspaceReview = "review"
-	workspaceAuthor = "author"
+	workspaceReview = builtin.WorkspaceReview
+	workspaceAuthor = builtin.WorkspaceAuthor
 )
 
 // beforeTakeOver is the before builtin that takes the pull request over.
@@ -31,7 +31,7 @@ const beforeTakeOver = "take_over"
 
 // contextPR is the context of an intent whose turns are about a real pull
 // request.
-const contextPR = "pr"
+const contextPR = builtin.ContextPR
 
 // route is a way a round of an intent goes out from the command line.
 type route int
@@ -45,7 +45,7 @@ const (
 	routeLaunch
 )
 
-// sentRound is what an on_sent effect reads of a round on its way out; the
+// sentRound is what a turn effect reads of a round on its way out; the
 // route fills it as the round goes.
 type sentRound struct {
 	env       *Env
@@ -71,7 +71,7 @@ type effectRun struct {
 	writesIf func(r *sentRound) bool
 }
 
-// onSentEffect is an on_sent effect and what it does on each route.
+// onSentEffect is a turn effect and what it does on each route.
 type onSentEffect struct {
 	name string
 	on   map[route]effectRun
@@ -82,23 +82,21 @@ var (
 		guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
 		unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
 	}
-	recordRound   = effectRun{state: func(r *sentRound, st *round.Store) { st.RecordRound(r.ref.String(), r.env.Now()) }}
 	markAddressed = effectRun{state: func(r *sentRound, st *round.Store) { r.env.recordAddressed(st, r.ref, r.pr.HeadRefOid) }}
 )
 
-// onSent is the on_sent effects the command line runs, in the order each
+// onSent is the turn effects the command line runs, in the order each
 // phase runs them. The daemon records the events of a round asked through
 // its action.
 var onSent = []onSentEffect{
-	{name: "keeps_guidance", on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
-	{name: "event.round_sent", on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
+	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
+	{name: builtin.EffectPRRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
 	}}}},
-	{name: "event.nudged", on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
+	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindNudged, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
 	}}}},
-	{name: "record_round", on: map[route]effectRun{routeSession: recordRound, routeAsked: recordRound, routeLaunch: recordRound}},
-	{name: "mark_reviewed", on: map[route]effectRun{routeLaunch: {
+	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
 		sent: func(r *sentRound) {
 			if r.submitted {
 				r.fingerprint = r.env.reviewFingerprint(r.ctx, r.cfg, r.ref)
@@ -107,7 +105,7 @@ var onSent = []onSentEffect{
 		state:    func(r *sentRound, st *round.Store) { st.SetMark(r.ref.String(), round.Reviewed, r.fingerprint) },
 		writesIf: func(r *sentRound) bool { return r.fingerprint != "" },
 	}}},
-	{name: "mark_addressed", on: map[route]effectRun{routeSession: markAddressed, routeAsked: markAddressed, routeLaunch: markAddressed}},
+	{name: builtin.EffectPRAddressed, on: map[route]effectRun{routeSession: markAddressed, routeAsked: markAddressed, routeLaunch: markAddressed}},
 }
 
 type phase func(c effectRun, r *sentRound)
@@ -136,10 +134,10 @@ func runCell(f func(r *sentRound), r *sentRound) {
 	}
 }
 
-// runPhase runs p of the on_sent effects d names, on route rt.
+// runPhase runs p of the turn effects d names, on route rt.
 func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	for _, e := range onSent {
-		if slices.Contains(d.OnSent, e.name) {
+		if slices.Contains(d.Effects, e.name) {
 			p(e.on[rt], r)
 		}
 	}
@@ -149,7 +147,7 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 // round state for r.
 func writesRounds(rt route, d dintent.Def, r *sentRound) bool {
 	for _, e := range onSent {
-		if slices.Contains(d.OnSent, e.name) && e.on[rt].writes(r) {
+		if slices.Contains(d.Effects, e.name) && e.on[rt].writes(r) {
 			return true
 		}
 	}
@@ -180,15 +178,15 @@ type workspaceRun func(e *Env, ctx context.Context, run roundRun) (submitted boo
 // given workspace is the one a launch names, and only the probe launch does.
 func workspaceRuns() map[string]workspaceRun {
 	return map[string]workspaceRun{
-		workspaceReview: (*Env).runInReview,
-		workspaceAuthor: (*Env).runInAuthor,
-		"pr_else_main":  (*Env).runInPRElseMain,
+		workspaceReview:                 (*Env).runInReview,
+		workspaceAuthor:                 (*Env).runInAuthor,
+		builtin.WorkspaceLinkedElseMain: (*Env).runInPRElseMain,
 	}
 }
 
 // policyRound is the policy of a round whose manifest is not at hand: the
 // sweep's.
-const policyRound = "round"
+const policyRound = builtin.PolicyRound
 
 // policies are the agent policies a manifest's policy names, for a session
 // of intent; none may run or read the managers' control surface.
@@ -196,22 +194,23 @@ var policies = map[string]func(e *Env, intent dintent.Name, control turns.Contro
 	policyRound: func(e *Env, _ dintent.Name, control turns.Control) turns.Policy {
 		return roundPolicy(e.loopCommand(), prIntents(e.loadedIntents().Registry)).Denied(control)
 	},
-	"probe": func(e *Env, intent dintent.Name, control turns.Control) turns.Policy {
+	builtin.PolicyProbe: func(e *Env, intent dintent.Name, control turns.Control) turns.Policy {
 		return probePolicy(e.loopCommand(), []string{string(intent)}).Denied(control)
 	},
 }
 
-// cliBuiltins are the builtin names the command line implements, by slot.
-func cliBuiltins() map[builtin.Slot][]string {
-	return map[builtin.Slot][]string{
-		builtin.SlotWorkspace: append(slices.Sorted(maps.Keys(workspaceRuns())), "given"),
-		builtin.SlotLaunch:    {"", builtin.LaunchProbe},
-		builtin.SlotBefore:    {beforeTakeOver},
-		builtin.SlotOnSent:    onSentNames(),
-		builtin.SlotPolicy:    slices.Sorted(maps.Keys(policies)),
-		builtin.SlotContext:   {contextPR, "synthetic"},
-		builtin.SlotPrepare:   {""},
-		builtin.SlotReconcile: {"", turns.ReconcileMyReview},
+// cliBuiltins are the builtin names the command line implements: the
+// workspaces and befores a manifest names, the turn effects, and what a
+// role binds.
+func cliBuiltins() map[string][]string {
+	return map[string][]string{
+		string(builtin.SlotWorkspace): append(slices.Sorted(maps.Keys(workspaceRuns())), "given"),
+		string(builtin.SlotBefore):    {beforeTakeOver},
+		"effects":                     onSentNames(),
+		"policy":                      slices.Sorted(maps.Keys(policies)),
+		"context":                     {contextPR, builtin.ContextSynthetic},
+		"launch":                      {"", builtin.LaunchProbe},
+		"reconcile":                   {"", turns.ReconcileMyReview},
 	}
 }
 

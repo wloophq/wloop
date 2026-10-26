@@ -1,1 +1,1 @@
-testdata/workflows/bad/step-wrong-provider/workflows/case-workflow/workflow.toml:9:7: step[0].use: workspace.remove acts on workspace, not on session
+testdata/workflows/bad/step-wrong-provider/workflows/case-workflow/workflow.toml:6:7: step[0].use: workspace.remove acts on workspace, not on session

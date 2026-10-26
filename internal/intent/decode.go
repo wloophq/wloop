@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -12,48 +11,66 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/unstable"
 
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // manifest is intent.toml as written; a pointer marks a key whose absence matters.
 type manifest struct {
-	Label         *string           `toml:"label"`
-	Summary       *string           `toml:"summary"`
-	Key           string            `toml:"key"`
-	Verb          string            `toml:"verb"`
-	UserFacing    *bool             `toml:"user_facing"`
-	Workspace     *string           `toml:"workspace"`
-	Provider      *string           `toml:"provider"`
-	Session       *mSession         `toml:"session"`
-	Context       *string           `toml:"context"`
-	Launch        string            `toml:"launch"`
-	Policy        *string           `toml:"policy"`
-	Intake        bool              `toml:"intake"`
-	StartLine     *string           `toml:"start_line"`
-	OwnerOnly     bool              `toml:"owner_only"`
-	Answerable    *bool             `toml:"answerable"`
-	Board         *string           `toml:"board"`
-	DrivesRow     bool              `toml:"drives_row"`
-	Reports       *bool             `toml:"reports"`
-	Reconcile     string            `toml:"reconcile"`
-	Brief         *mBrief           `toml:"brief"`
-	Profile       *string           `toml:"profile"`
-	Dims          []string          `toml:"dims"`
-	Records       *string           `toml:"records"`
-	Prepare       string            `toml:"prepare"`
-	OnSent        []string          `toml:"on_sent"`
-	Guidance      *mGuidance        `toml:"guidance"`
-	Headline      *mHeadline        `toml:"headline"`
-	Inputs        map[string]mInput `toml:"inputs"`
-	AlsoProfiles  []mAlsoProfile    `toml:"also_profiles"`
-	Action        *mAction          `toml:"action"`
-	Join          *mJoin            `toml:"join"`
-	Record        *mRecord          `toml:"record"`
-	Resume        *mResume          `toml:"resume"`
-	DraftApproval *mDraftApproval   `toml:"draft_approval"`
-	Modes         []string          `toml:"modes"`
+	Label       *string           `toml:"label"`
+	Summary     *string           `toml:"summary"`
+	Shortcut    string            `toml:"shortcut"`
+	Verb        string            `toml:"verb"`
+	UserFacing  *bool             `toml:"user_facing"`
+	Workspace   any               `toml:"workspace"`
+	Provider    any               `toml:"provider"`
+	Session     *mSession         `toml:"session"`
+	Intake      bool              `toml:"intake"`
+	StartLine   *string           `toml:"start_line"`
+	OwnerOnly   bool              `toml:"owner_only"`
+	Answerable  *bool             `toml:"answerable"`
+	Reports     *bool             `toml:"reports"`
+	Brief       *mBrief           `toml:"brief"`
+	Profile     *string           `toml:"profile"`
+	Dims        []string          `toml:"dims"`
+	Effects     []string          `toml:"effects"`
+	Why         *string           `toml:"why"`
+	Refuse      []mRefuse         `toml:"refuse"`
+	Drafts      *mDrafts          `toml:"drafts"`
+	Guidance    *mGuidance        `toml:"guidance"`
+	Headline    *mHeadline        `toml:"headline"`
+	Inputs      map[string]mInput `toml:"inputs"`
+	AlsoProfile []mAlsoProfile    `toml:"also_profile"`
+	Action      *mAction          `toml:"action"`
+	Join        *mJoin            `toml:"join"`
+	Record      *mRecord          `toml:"record"`
+	Resume      *mResume          `toml:"resume"`
+	Runners     []string          `toml:"runners"`
+	Role        string            `toml:"role"`
+	Builds      string            `toml:"builds"`
+	Prompt      string            `toml:"prompt"`
+	Schema      string            `toml:"schema"`
+	Skill       bool              `toml:"skill"`
+	Help        *mHelp            `toml:"help"`
+}
+
+type mRefuse struct {
+	When *string `toml:"when"`
+	Why  *string `toml:"why"`
+}
+
+type mDrafts struct {
+	AllowedEffects []string   `toml:"allowed_effects"`
+	Approval       *mApproval `toml:"approval"`
+}
+
+type mHelp struct {
+	Target   string   `toml:"target"`
+	Summary  string   `toml:"summary"`
+	Group    string   `toml:"group"`
+	Examples []string `toml:"examples"`
+	Docs     string   `toml:"docs"`
 }
 
 type mSession struct {
@@ -63,8 +80,9 @@ type mSession struct {
 }
 
 type mBrief struct {
-	Render *bool `toml:"render"`
-	Wait   *bool `toml:"wait"`
+	Render *bool    `toml:"render"`
+	Wait   *bool    `toml:"wait"`
+	Need   []string `toml:"need"`
 }
 
 type mGuidance struct {
@@ -80,7 +98,7 @@ type mHeadline struct {
 
 type mCase struct {
 	When *string `toml:"when"`
-	Text *string `toml:"text"`
+	Line *string `toml:"line"`
 }
 
 type mInput struct {
@@ -97,23 +115,11 @@ type mInput struct {
 }
 
 type mAlsoProfile struct {
-	Profile      *string `toml:"profile"`
-	When         *string `toml:"when"`
-	Round        string  `toml:"round"`
-	Define       *string `toml:"define"`
-	SourcePrefix *string `toml:"source_prefix"`
-}
-
-type mAction struct {
-	Group            *string  `toml:"group"`
-	Surfaces         []string `toml:"surfaces"`
-	Visible          *string  `toml:"visible"`
-	Enabled          *string  `toml:"enabled"`
-	ReasonOff        *string  `toml:"reason_off"`
-	Primary          *string  `toml:"primary"`
-	Confirm          *string  `toml:"confirm"`
-	Hint             *string  `toml:"hint"`
-	NoteWhenQuestion string   `toml:"note_when_question"`
+	Profile *string           `toml:"profile"`
+	When    *string           `toml:"when"`
+	Dims    map[string]string `toml:"dims"`
+	Define  *string           `toml:"define"`
+	Prefix  *string           `toml:"prefix"`
 }
 
 type mJoin struct {
@@ -121,6 +127,7 @@ type mJoin struct {
 }
 
 type mRecord struct {
+	When            *string    `toml:"when"`
 	States          []string   `toml:"states"`
 	Artifacts       []string   `toml:"artifacts"`
 	Outcome         []string   `toml:"outcome"`
@@ -136,71 +143,33 @@ type mRequire struct {
 }
 
 type mResume struct {
-	HeadMoved *string `toml:"head_moved"`
+	Changed *string `toml:"changed"`
 }
 
-// mDraftApproval is the [draft_approval] table intents and workflows share.
-type mDraftApproval struct {
-	Mode   *string `toml:"mode"`
-	Window *string `toml:"window"`
-}
-
-// turnModes are the turn.Mode values a manifest's modes take.
-var turnModes = []string{"session", "headless"}
-
-func (s *sheet) modes(m []string) []string {
+func (s *sheet) runners(m []string) []string {
 	if m == nil {
 		return nil
 	}
+	runners := builtin.ValuesOf(builtin.SurfaceIntent, "runners")
 	if len(m) == 0 {
-		s.add("modes", "lists at least one of %s", quoted(turnModes))
+		s.add("runners", "lists at least one of %s", quoted(builtin.ValueNames(runners)))
 		return nil
 	}
 	for i, v := range m {
 		switch {
-		case !slices.Contains(turnModes, v):
-			s.oneOf(fmt.Sprintf("modes[%d]", i), v, turnModes)
+		case !slices.ContainsFunc(runners, func(r builtin.Value) bool { return r.Name == v }):
+			s.oneOf(fmt.Sprintf("runners[%d]", i), v, runners)
 			return nil
 		case slices.Contains(m[:i], v):
-			s.add(fmt.Sprintf("modes[%d]", i), "repeats %q", v)
+			s.add(fmt.Sprintf("runners[%d]", i), "repeats %q", v)
 			return nil
 		}
 	}
 	return slices.Clone(m)
 }
 
-var draftApprovalModes = []string{string(draft.Always), string(draft.Window), string(draft.None), string(draft.Observe)}
-
-func (s *sheet) draftApproval(m *mDraftApproval) *draft.Approval {
-	if m == nil {
-		return nil
-	}
-	if m.Mode == nil {
-		s.add("draft_approval.mode", "is required: one of %s", quoted(draftApprovalModes))
-		return nil
-	}
-	a := draft.Approval{Mode: draft.ApprovalMode(*m.Mode)}
-	switch {
-	case !slices.Contains(draftApprovalModes, *m.Mode):
-		s.oneOf("draft_approval.mode", *m.Mode, draftApprovalModes)
-		return nil
-	case a.Mode == draft.Window && m.Window == nil:
-		s.add("draft_approval.window", "is required with mode window: how long the user has before the draft is sent, such as 10m")
-		return nil
-	case a.Mode != draft.Window && m.Window != nil:
-		s.add("draft_approval.window", "is read only with mode window, not with %s", a.Mode)
-		return nil
-	case m.Window != nil:
-		a.Window = s.duration("draft_approval.window", *m.Window)
-		if a.Validate() != nil {
-			s.add("draft_approval.window", "must be longer than zero")
-			return nil
-		}
-	}
-	return &a
-}
-
-// decode reads intent.toml strictly. After a type mismatch it blanks the
+// decode reads a manifest; its unknown keys are the grammar's to name.
+// After a type mismatch it blanks the
 // offending key and decodes again, so semantic checks still run; skip is that
 // key's path, whose semantic problems would repeat the mismatch. complete is
 // false after a syntax error: there is no tree to check.
@@ -227,11 +196,6 @@ func decode[T any](file string, src []byte) (m T, problems Problems, skip string
 	case err == nil:
 		return m, problems, skip, true
 	case errors.As(err, &strict):
-		for i := range strict.Errors {
-			de := &strict.Errors[i]
-			row, col := de.Position()
-			problems = append(problems, Problem{File: file, Line: row, Col: col, Field: strings.Join(de.Key(), "."), Msg: unknownKey(reflect.TypeFor[T](), de.Key())})
-		}
 		return m, problems, skip, true
 	case errors.As(err, &de):
 		row, col := de.Position()
@@ -322,73 +286,6 @@ func blankKeyValue(src []byte, row, col int) ([]byte, bool) {
 	return out, true
 }
 
-func unknownKey(t reflect.Type, key []string) string {
-	known := keysAt(t, key[:len(key)-1])
-	if s := closest(key[len(key)-1], known); s != "" {
-		return "unknown key; did you mean " + s + "?"
-	}
-	return "unknown key"
-}
-
-// keysAt lists the toml keys of the table at path, following map values and slice elements.
-func keysAt(t reflect.Type, path []string) []string {
-	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
-		t = t.Elem()
-	}
-	if t.Kind() == reflect.Map {
-		if len(path) == 0 {
-			return nil
-		}
-		return keysAt(t.Elem(), path[1:])
-	}
-	if t.Kind() != reflect.Struct {
-		return nil
-	}
-	if len(path) == 0 {
-		var keys []string
-		for i := range t.NumField() {
-			keys = append(keys, t.Field(i).Tag.Get("toml"))
-		}
-		return keys
-	}
-	for i := range t.NumField() {
-		if f := t.Field(i); f.Tag.Get("toml") == path[0] {
-			return keysAt(f.Type, path[1:])
-		}
-	}
-	return nil
-}
-
-func closest(s string, options []string) string {
-	best, bestD := "", len(s)/2+2
-	for _, o := range options {
-		if d := distance(s, o); d < bestD {
-			best, bestD = o, d
-		}
-	}
-	return best
-}
-
-func distance(a, b string) int {
-	prev := make([]int, len(b)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(a); i++ {
-		cur := make([]int, len(b)+1)
-		cur[0] = i
-		for j := 1; j <= len(b); j++ {
-			cost := 1
-			if a[i-1] == b[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(b)]
-}
-
 var mismatch = regexp.MustCompile(`cannot decode TOML (\S+) into .* of type (\S+)$`)
 
 func typeMismatch(msg string) string {
@@ -416,8 +313,6 @@ var (
 	assignment = regexp.MustCompile(`^\s*([A-Za-z0-9_.-]+)\s*=`)
 	header     = regexp.MustCompile(`^\s*\[\[?\s*([A-Za-z0-9_.-]+)\s*\]\]?`)
 )
-
-var predicateKeys = map[string]bool{"records": true, "when": true, "visible": true, "enabled": true, "primary": true, "wait_when": true}
 
 // syntaxError names the key on the error's line and, for a predicate written
 // without quotes, says to quote it.
@@ -451,7 +346,7 @@ func syntaxError(src []byte, row int, msg string) (string, string) {
 		break
 	}
 	last := key[strings.LastIndex(key, ".")+1:]
-	if predicateKeys[last] {
+	if builtin.IsPredKey(last) {
 		msg += "; a predicate is a string: quote it, as in " + last + " = '!pr.mine'"
 	}
 	return field, msg

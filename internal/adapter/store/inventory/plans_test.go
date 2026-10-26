@@ -51,7 +51,7 @@ var hotPlans = []hotPlan{
 	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
 	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
-	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 3, want: []string{"SCAN e USING INDEX events_recent"}},
+	{name: "recent activity", query: recentActivitySQL(marks(2)), args: 5, want: []string{"SCAN e USING INDEX events_recent"}},
 	{name: "active refs", query: activeRefsSQL, args: 1, want: []string{"events_recent (at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR DISTINCT"}},
 	{name: "reviewed", query: reviewedSQL, args: 2, want: []string{"turns_sent_at (sent_at>?)"}},
 	{name: "timed turns", query: timedTurnsSQL, args: 1, want: []string{"turns_sent_at (sent_at>?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
@@ -64,7 +64,7 @@ var hotPlans = []hotPlan{
 	{name: "outages", query: outagesSQL, args: 1, want: []string{"events_kind (kind=? AND at>?)"}},
 	{name: "latest bundle", query: latestBundleSQL, args: 2, want: []string{"turn_instructions_kind (kind=? AND repo=?)"}},
 	{name: "open pull requests", query: listPRsSQL(true), want: []string{"pr_state (state=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR LAST 3 TERMS OF ORDER BY"}},
-	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"pr_tags_kv (key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
+	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"unit_tags_kv (key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
 }
 
 var (
@@ -133,7 +133,7 @@ var indexesPlannedElsewhere = []string{
 	"entries_state", "entries_rev", "entry_items_unit", "entry_units_unit",
 	"projects_slug", "review_runs_open",
 	"links_to",
-	"drafts_state", "drafts_unit", "drafts_entry", "drafts_rule",
+	"drafts_state", "drafts_unit", "drafts_entry", "drafts_rule", "drafts_workflow",
 }
 
 func TestNoUnusedIndex(t *testing.T) {

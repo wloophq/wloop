@@ -1,1 +1,2 @@
-testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:5:14: drives_row: a held round drives a github row; a thread intent cannot drive one
+testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:3:13: workspace: review drives the rows of review workspaces already: at most one intent per workspace, and ask-author drives them by its role pr.review
+testdata/bad/drives-row-non-github/intents/ask-author/intent.toml:6:8: role: pr.review runs on github units; a slack intent cannot hold it

@@ -1,0 +1,10 @@
+summary = "Case"
+provider = "session"
+when = 'session.managed'
+
+[trigger]
+on = ["merged"]
+
+[[step]]
+use = "classify"
+prompt = "ask.md"

@@ -399,9 +399,6 @@ func TestRunSendsTheHeldFollowupNow(t *testing.T) {
 	if why := st.CapReason(sc.ref.String(), testNow, 2); why != "" {
 		t.Fatalf("run counted against the cap: %s", why)
 	}
-	if st.RoundAt(sc.ref.String()).IsZero() {
-		t.Fatal("the round was not recorded")
-	}
 }
 
 func TestDaemonRoutedCommandsForwardTheCallersProfile(t *testing.T) {

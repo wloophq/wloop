@@ -175,7 +175,7 @@ func NewBriefs(answers ...intake.Readiness) *Briefs {
 	return &Briefs{answers: answers, changed: map[unit.Unit]chan struct{}{}}
 }
 
-func (b *Briefs) Ready(ctx context.Context, _ unit.Unit, first bool) (intake.Readiness, error) {
+func (b *Briefs) Ready(ctx context.Context, _ unit.Unit, first bool, _ []string) (intake.Readiness, error) {
 	if b.OnReady != nil {
 		b.OnReady(ctx)
 	}

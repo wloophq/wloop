@@ -217,7 +217,7 @@ func (q *Queue) scan(ctx context.Context) (next time.Time, ok bool, err error) {
 	} else {
 		for _, st := range wanted {
 			if q.claimIf(ctx, st.PR.Ref, func(rec dinv.BriefRecord, has bool, version string) bool {
-				return wantedNow(st.PR, rec, has, version, q.d.Now())
+				return q.wantedNow(st.PR, rec, has, version, q.d.Now())
 			}) {
 				q.spawn(ctx, st.PR, TriggerWanted, q.timeout(true), true)
 			}
@@ -232,9 +232,9 @@ func (q *Queue) scan(ctx context.Context) (next time.Time, ok bool, err error) {
 
 // wantedNow is a pull request a first turn wants a brief of, with no brief
 // at the current version, not given up and not waiting for a retry.
-func wantedNow(p dinv.PR, rec dinv.BriefRecord, has bool, version string, now time.Time) bool {
+func (q *Queue) wantedNow(p dinv.PR, rec dinv.BriefRecord, has bool, version string, now time.Time) bool {
 	return has && !rec.WantedAt.IsZero() && (rec.Run == 0 || rec.Version != version) &&
-		(rec.AttemptOf != attemptOf(p, version) || rec.GaveUpAt.IsZero() && !now.Before(rec.RetryAt))
+		(rec.AttemptOf != q.attemptKey(p, version) || rec.GaveUpAt.IsZero() && !now.Before(rec.RetryAt))
 }
 
 // wanted lists the wanted pull requests not in flight, the oldest want
@@ -242,7 +242,7 @@ func wantedNow(p dinv.PR, rec dinv.BriefRecord, has bool, version string, now ti
 func (q *Queue) wanted(states []inventory.BriefState, now time.Time) []inventory.BriefState {
 	var out []inventory.BriefState
 	for _, st := range states {
-		if _, v := q.version(st.PR.Ref); q.inFlight(st.PR.Ref) || !wantedNow(st.PR, st.Rec, st.Has, v, now) {
+		if _, v := q.version(st.PR.Ref); q.inFlight(st.PR.Ref) || !q.wantedNow(st.PR, st.Rec, st.Has, v, now) {
 			continue
 		}
 		out = append(out, st)
@@ -263,7 +263,7 @@ func (q *Queue) runTrial(ctx context.Context, states, wanted []inventory.BriefSt
 	}
 	var rest []dinv.PR
 	for _, st := range states {
-		if _, v := q.version(st.PR.Ref); st.PR.Followed() && st.Rec.WantedAt.IsZero() && Due(st.PR, st.Rec, st.Has, v, now, 0) {
+		if _, v := q.version(st.PR.Ref); st.PR.Followed() && st.Rec.WantedAt.IsZero() && q.isDue(st.PR, st.Rec, st.Has, v, now, false) {
 			rest = append(rest, st.PR)
 		}
 	}

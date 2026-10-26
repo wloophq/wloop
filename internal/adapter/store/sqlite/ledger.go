@@ -30,7 +30,7 @@ var _ automation.Ledger = ledger{}
 func (db *DB) Ledger() automation.Ledger { return ledger{db, time.Now} }
 
 const itemColumns = `id, workflow, provider, unit_key, key_value, decision, reason, steps, why,
-	default_outcome, deadline, guidance, attempts, error, mode, at, gain_memory, gain_disk`
+	default_outcome, deadline, guidance, attempts, error, observe, at, gain_memory, gain_disk`
 
 // insertItemSQL takes itemArgs and the write time, which retention ages
 // the row by.
@@ -238,9 +238,9 @@ func (l ledger) Count(ctx context.Context, wf string, since time.Time, u *unit.U
 }
 
 type storedStep struct {
-	Use   string            `json:"use"`
-	Reach string            `json:"reach,omitempty"`
-	Args  map[string]string `json:"args,omitempty"`
+	Use   string         `json:"use"`
+	Reach string         `json:"reach,omitempty"`
+	Args  map[string]any `json:"args,omitempty"`
 }
 
 type storedEvent struct {
@@ -274,7 +274,7 @@ type storedValue struct {
 func itemArgs(it workflow.Item) ([]any, error) {
 	steps := make([]storedStep, 0, len(it.Steps))
 	for _, st := range it.Steps {
-		args, err := stringArgs(st.Args)
+		args, err := storedArgs(st.Args)
 		if err != nil {
 			return nil, fmt.Errorf("step %s of %s: %w", st.Use, it.ID, err)
 		}
@@ -301,22 +301,35 @@ func itemArgs(it workflow.Item) ([]any, error) {
 	}
 	return []any{it.ID, it.Workflow, string(it.Unit.Provider), it.Unit.Key, it.Key.Value, string(it.Decision), it.Reason,
 		string(stepsJSON), string(whyJSON), string(it.Default), eventTime(it.Deadline), it.Guidance, it.Attempts, it.Error,
-		string(it.Mode), eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
+		it.Observe, eventTime(it.At), it.Gain.MemoryBytes, it.Gain.DiskBytes}, nil
 }
 
-// stringArgs stores step arguments as the manifest gives them, strings; a
-// scalar of another type is formatted, a table or list refused.
-func stringArgs(in map[string]any) (map[string]string, error) {
+// storedArgs keeps a step's string and list-of-strings arguments, and a
+// scalar as its string.
+func storedArgs(in map[string]any) (map[string]any, error) {
 	if in == nil {
 		return nil, nil
 	}
-	out := make(map[string]string, len(in))
+	out := make(map[string]any, len(in))
 	for k, v := range in {
 		switch x := v.(type) {
 		case string:
 			out[k] = x
 		case bool, int, int64, float64:
 			out[k] = fmt.Sprint(x)
+		case []string:
+			list := make([]any, len(x))
+			for i, e := range x {
+				list[i] = e
+			}
+			out[k] = list
+		case []any:
+			for _, e := range x {
+				if _, ok := e.(string); !ok {
+					return nil, fmt.Errorf("argument %s has an element of type %T", k, e)
+				}
+			}
+			out[k] = x
 		default:
 			return nil, fmt.Errorf("argument %s has a value of type %T", k, v)
 		}
@@ -396,13 +409,13 @@ func decodeFact(s storedValue) (workflow.Fact, error) {
 
 func scanItem(row scanner) (workflow.Item, error) {
 	var it workflow.Item
-	var decision, steps, why, def, deadline, mode, at string
+	var decision, steps, why, def, deadline, at string
 	if err := row.Scan(&it.ID, &it.Workflow, &it.Unit.Provider, &it.Unit.Key, &it.Key.Value, &decision, &it.Reason, &steps, &why,
-		&def, &deadline, &it.Guidance, &it.Attempts, &it.Error, &mode, &at, &it.Gain.MemoryBytes, &it.Gain.DiskBytes); err != nil {
+		&def, &deadline, &it.Guidance, &it.Attempts, &it.Error, &it.Observe, &at, &it.Gain.MemoryBytes, &it.Gain.DiskBytes); err != nil {
 		return workflow.Item{}, err
 	}
 	it.Key.Workflow, it.Key.Unit = it.Workflow, it.Unit
-	it.Decision, it.Default, it.Mode = workflow.Decision(decision), workflow.Outcome(def), workflow.Mode(mode)
+	it.Decision, it.Default = workflow.Decision(decision), workflow.Outcome(def)
 	fail := func(what string, err error) (workflow.Item, error) {
 		return workflow.Item{}, fmt.Errorf("the %s of plan item %s: %w", what, it.ID, err)
 	}

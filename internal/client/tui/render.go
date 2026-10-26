@@ -11,7 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -92,6 +91,10 @@ func pad(lines []string, n int) []string {
 	return lines[:n]
 }
 
+// pluginViewsGroup groups the plugins' own views; no provider id has its
+// shape.
+const pluginViewsGroup = " plugins"
+
 // tabs names the views with their counts, the current one bold, and the
 // daemon's flags at the right edge when they fit: the group on screen
 // whole, then each other group that fits whole, GTD views first.
@@ -112,12 +115,17 @@ func (m *Model) tabs(width int) string {
 		}
 		groups[i] = append(groups[i], x)
 	}
-	for i, v := range m.views {
-		add(cmp.Or(v.Provider, string(unit.GitHub)), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
+	// The core views and the plan join the first plugin's row views.
+	first := ""
+	if i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider != "" }); i >= 0 {
+		first = m.views[i].Provider
 	}
-	add(string(unit.GitHub), tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
+	for i, v := range m.views {
+		add(cmp.Or(v.Provider, first), tab{fmt.Sprintf("%s %d", v.Label, len(m.in(v.ID))), i})
+	}
+	add(first, tab{fmt.Sprintf("%s %d", planLabel, len(m.plan)), m.planView()})
 	for i, v := range m.plugins {
-		add("", tab{v.Label(), m.pluginBase() + i})
+		add(pluginViewsGroup, tab{v.Label(), m.pluginBase() + i})
 	}
 	mine := 0
 	for i, g := range groups {

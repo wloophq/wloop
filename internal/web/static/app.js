@@ -238,6 +238,7 @@ const keyOf = (x) => unitKey(unitOf(x));
 const labelOf = (x) => x.label || refLabel(x.ref);
 const labelTail = (r) => (pl(r).repo && labelOf(r).startsWith(pl(r).repo) ? labelOf(r).slice(pl(r).repo.length) : labelOf(r));
 const refLabel = (ref) => `${ref.owner}/${ref.repo}#${ref.number}`;
+const eventRef = (e) => (e.pr && e.pr.number ? refLabel(e.pr) : "");
 
 function fold(s) {
   return String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -346,7 +347,7 @@ function matches(r, ts) {
 
 function matchesActivity(it, ts) {
   const e = it.event;
-  const fields = [it.title, refLabel(e.pr), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
+  const fields = [it.title, eventRef(e), it.author, e.actor, EVENT_LABEL[e.kind] || e.kind, e.data].map(fold);
   return ts.every((t) => fields.some((f) => f.includes(t)));
 }
 
@@ -356,7 +357,12 @@ const ACTIVITY_FIELDS = ["repo", "author"];
 
 function activityPasses(it, lens) {
   const filters = new Map([...lens.filters].filter(([id]) => ACTIVITY_FIELDS.includes(id)));
-  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: [`${it.event.pr.owner}/${it.event.pr.repo}`], author: [it.author || ""] } }, filters);
+  return matchesActivity(it, lens.ts) && passesFilters({ facets: { repo: activityRepos(it), author: [it.author || ""] } }, filters);
+}
+
+function activityRepos(it) {
+  const p = it.event.pr;
+  return p && p.number ? [`${p.owner}/${p.repo}`] : [];
 }
 
 // foldMap folds s and maps each folded position back to s, so a match in
@@ -1073,8 +1079,10 @@ function actionStates(subject, surface, groups) {
     .filter(([, sp]) => sp && sp.surfaces.includes(surface) && (groups ? groups.includes(sp.group) : surface !== "detail" || !CARD_GROUPS.has(sp.group)));
 }
 
-function actionTitle(st) {
-  return (st.enabled ? st.hint : st.reason) || undefined;
+// actionTitle is an action's tooltip: what it does, then what it would do on
+// this row, or why it is off.
+function actionTitle(st, sp) {
+  return [sp && sp.summary, st.enabled ? st.note : st.reason].filter(Boolean).join("\n") || undefined;
 }
 
 function actionButton(subject, st, sp, opts) {
@@ -1083,7 +1091,7 @@ function actionButton(subject, st, sp, opts) {
   return h("button", {
     type: "button",
     class: ["act", st.enabled && st.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
-    title: actionTitle(st),
+    title: actionTitle(st, sp),
     "data-focus": `${opts.scope || "row:" + key}:${focusSlot(st.id)}`,
     disabled: state.busy.has(key) || !st.enabled,
     onclick: (e) => { e.stopPropagation(); return run(st.id); },
@@ -1096,7 +1104,7 @@ function actionButtons(subject, surface, opts = {}) {
 }
 
 function actionNotes(subject, surface) {
-  return actionStates(subject, surface).filter(([st]) => st.enabled && st.note).map(([st]) => h("p", { class: "act-note" }, st.note));
+  return actionStates(subject, surface).filter(([st]) => st.enabled && st.warning).map(([st]) => h("p", { class: "act-note" }, st.warning));
 }
 
 // facet is a value on screen that filters by itself: a click filters by it,
@@ -1487,7 +1495,7 @@ function renderActivity(lens) {
         h("span", { class: "kind" }, EVENT_LABEL[e.kind] || e.kind.replaceAll("_", " ")),
         requested ? h("span", { class: "who" }, " from " + requestedFrom(e.data)) : null,
         e.actor ? h("span", { class: "who" }, (requested ? " by " : " ") + actorLabel(e.actor)) : null,
-        " ", h("span", { class: "ref" }, refLabel(e.pr)),
+        " ", h("span", { class: "ref" }, eventRef(e)),
         " ", h("span", { class: "title" }, it.title)),
       data ? h("span", { class: "data" }, data) : null));
   }
@@ -1718,7 +1726,7 @@ function turnButton(r, slot, label, name, extra, attrs = {}) {
   return h("button", {
     type: "button",
     class: ["act", st.enabled && attrs.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
-    title: st.enabled ? st.hint || attrs.title : st.reason || undefined,
+    title: st.enabled && !st.note && attrs.title ? attrs.title : actionTitle(st, state.specs.byId[name]),
     disabled: state.busy.has(keyOf(r)) || !st.enabled || !!attrs.disabled,
     "data-focus": `detail:${slot}`,
     onclick: () => act(r, name, name === "answer" && answerNote(r) ? { ...extra, guidance: answerNote(r) } : extra),
@@ -2317,7 +2325,7 @@ function planButtons(it) {
     .map(([st, sp]) => h("button", {
       type: "button",
       class: ["act", st.enabled && st.primary ? "primary" : "", st.enabled ? "" : "off"].filter(Boolean).join(" "),
-      title: actionTitle(st),
+      title: actionTitle(st, sp),
       "data-focus": `plan:${it.id}:${st.id}`,
       disabled: state.busy.has(it.id) || !st.enabled,
       onclick: () => actOnPlan(it, st.id),
@@ -2332,7 +2340,7 @@ function planItem(it) {
       h("span", { class: "plan-wf" }, it.workflow),
       h("span", { class: "plan-unit" }, safeURL(it.link) ? h("a", { href: safeURL(it.link), target: "_blank", rel: "noopener noreferrer" }, itemLabel(it)) : itemLabel(it)),
       it.title ? h("span", { class: "plan-title" }, it.title) : null,
-      it.mode === "observe" ? h("span", { class: "plan-mode", title: "This workflow only plans; nothing runs until it is switched to apply" }, "observe") : null),
+      it.observe ? h("span", { class: "plan-mode", title: "This workflow observes: it only plans, and nothing runs until you apply an item or turn observe off" }, "observe") : null),
     it.reason ? h("p", { class: "plan-reason" }, it.reason) : null,
     it.error ? h("p", { class: "plan-error" }, `attempt ${it.attempts}: ${it.error}`) : null,
     h("div", { class: "d-actions" }, ...planButtons(it)));

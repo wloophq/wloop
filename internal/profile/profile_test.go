@@ -107,7 +107,7 @@ func TestSourcesKeepThePathsForStorage(t *testing.T) {
 func TestGuidesComposeTheConfiguredChain(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Profile = dir(t, map[string]string{"intent=review.md": "USER", "organization=acme/intent=review.md": "ACME"})
-	g, err := guidesOf(cfg).Guide(Review, Facts{Owner: "acme", Repo: "api"})
+	g, err := guidesOf(cfg).Guide(Review, Facts{Values: map[string]any{"pr.owner": "acme", "pr.repo_name": "api"}})
 	if err != nil || len(g.Parts) != 3 || g.Parts[1].Text != "USER" || g.Parts[2].Text != "ACME" {
 		t.Fatalf("%+v %v", g.Parts, err)
 	}

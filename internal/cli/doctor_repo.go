@@ -66,7 +66,7 @@ func (e *Env) profileChecks(cfg config.Config) []check {
 func runProfileShow(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("profile show", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	kind := fs.String("kind", "", "an intent with judgment blocks (default: all)")
+	kind := fs.String("intent", "", "an intent with judgment blocks (default: all)")
 	show := fs.Bool("show", false, "print the instructions a round there would read")
 	var color termfmt.Mode
 	fs.Var(&color, "color", "lay the report out for a terminal: auto, always or never")
@@ -102,7 +102,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	var st api.DoctorReport
-	base := profile.Facts{Owner: ref.Owner, Repo: ref.Repo}
+	base := profile.Facts{Values: map[string]any{"pr.owner": ref.Owner, "pr.repo_name": ref.Repo}}
 	var read *api.Facts
 	if c != nil {
 		q := api.DoctorQuery{Repo: ref.Owner + "/" + ref.Repo}
@@ -241,8 +241,9 @@ func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref github.Ref) 
 }
 
 func profileFacts(f api.Facts) profile.Facts {
-	return profile.Facts{Owner: f.Owner, Repo: f.Repo, Author: f.Author, Association: f.Association, Base: f.Base, Teams: f.Teams, Labels: f.Labels,
-		Kind: f.Kind, Size: f.Size, Risk: f.Risk, Tags: f.Tags, Files: f.Files, HasBrief: f.HasBrief}
+	return profile.Facts{Values: map[string]any{"pr.owner": f.Owner, "pr.repo_name": f.Repo, "pr.author": f.Author, "pr.association": f.Association, "pr.base": f.Base,
+		"pr.requested_teams": f.Teams, "pr.labels": f.Labels, "brief.kind": f.Kind, "brief.size": f.Size, "brief.risk": f.Risk},
+		Tags: f.Tags, Files: f.Files, HasBrief: f.HasBrief}
 }
 
 func describeFacts(f api.Facts) string {
@@ -266,7 +267,7 @@ func describeFacts(f api.Facts) string {
 	return strings.Join(parts, "; ")
 }
 
-var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--kind <intent>] [--show] [--color auto|always|never]"
+var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]"
 
 func parseRepoArg(v string) (github.Ref, error) {
 	if strings.HasPrefix(v, "https://") {
@@ -321,14 +322,14 @@ func (e *Env) doctorState(ctx context.Context, q api.DoctorQuery) (api.DoctorRep
 	}
 	if held := st.HeldToday(e.Now()); len(held) > 0 {
 		rep.Checks = append(rep.Checks, api.DoctorCheck{Mark: api.DoctorMissing, Name: "automated rounds held by a cap today", Info: strings.Join(held, ", "),
-			Fix: "raise rounds.per_pr_per_day in " + e.ConfigPath + ", or run " + e.command() + " review <url>"})
+			Fix: "raise turns.per_unit_per_day in " + e.ConfigPath + ", or run " + e.command() + " <intent> <url> by hand"})
 	}
 	p, err := rounds.Pause(ctx)
 	if err != nil {
 		return rep, err
 	}
 	if p.Any() {
-		info := "every workflow in apply mode and board moves paused"
+		info := "every workflow that does not observe and board moves paused"
 		if !p.On {
 			info += " on " + strings.Join(p.Repos, ", ")
 		}
@@ -405,7 +406,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 			out = append(out, api.DoctorCheck{Mark: api.DoctorInfo, Name: name, Info: "disabled by workflows." + w.Name + ".enabled in " + e.ConfigPath})
 			continue
 		}
-		w = applyConfig([]workflow.Workflow{w}, cfg)[0]
+		w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(l.Registry))[0]
 		c, err := e.workflowLine(ctx, db, w, activity[w.Name], now)
 		if err != nil {
 			return out, err
@@ -431,6 +432,10 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflow " + name + " override",
 			Info: "runs as bundled, the override does not load: " + oneLine(l.RevertedWorkflows[name].Error()), Fix: brand.Command + " profile check"})
 	}
+	for _, err := range configWorkflowProblems(cfg, l) {
+		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows",
+			Info: oneLine(err.Error()), Fix: "fix it in " + e.ConfigPath})
+	}
 	for _, name := range slices.Sorted(maps.Keys(cfg.Workflows)) {
 		if !known[name] {
 			out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "config workflows." + name,
@@ -440,31 +445,31 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 	return out, nil
 }
 
-// workflowLine is w's mode, trigger and what it did: an observe workflow
+// workflowLine is w's trigger and what it did: an observe workflow
 // the items it plans, which it never runs, and the config entry that makes
 // it run them; a workflow whose items wait for the user the entry that
 // runs them without the user.
 func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Workflow, a sqlite.WorkflowActivity, now time.Time) (api.DoctorCheck, error) {
 	var info string
 	mark := api.DoctorOK
-	if w.Mode == workflow.ModeObserve {
+	if w.Observe {
 		items, err := db.Ledger().Items(ctx, automation.Filter{Workflow: w.Name})
 		if err != nil {
 			return api.DoctorCheck{}, err
 		}
 		mark = api.DoctorInfo
-		info = fmt.Sprintf("%s, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Mode, w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"mode": "apply"`), e.ConfigPath)
+		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"observe": false`), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
 			last = "last ran " + shortAge(now.Sub(a.LastRun), false) + " ago"
 		}
-		info = fmt.Sprintf("%s, %s, %s, %d refusal(s) in the last day", w.Mode, w.Trigger.Kind, last, a.Refusals)
+		info = fmt.Sprintf("%s, %s, %d refusal(s) in the last day", w.Trigger.Kind, last, a.Refusals)
 	}
-	if w.Approval.Default == workflow.OutcomeWait {
+	if w.Approval.Mode == workflow.ApprovalWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, `"approval": {"default": "run"}`), e.ConfigPath)
+			workflowEntry(w.Name, `"approval": {"mode": "run"}`), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }

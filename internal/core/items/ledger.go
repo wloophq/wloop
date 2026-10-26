@@ -184,7 +184,6 @@ func (l *Ledger) Decide(ctx context.Context, id int64, accept bool) (Result, err
 type Query struct {
 	Units     []unit.Unit
 	State     items.State
-	WaitingOn []string // person keys
 	Providers []unit.ProviderID
 }
 

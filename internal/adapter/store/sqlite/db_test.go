@@ -512,3 +512,35 @@ func onStore(x ast.Expr, stores map[string]bool) bool {
 	id, ok := x.(*ast.Ident)
 	return ok && stores[id.Name]
 }
+
+// A connection runs its DSN's pragmas in order as it opens, and only those
+// after busy_timeout wait out a lock another connection holds: a pool
+// connection opened under load would fail its journal_mode with SQLITE_BUSY.
+func TestEveryDSNSetsTheBusyTimeoutFirst(t *testing.T) {
+	fset := token.NewFileSet()
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			lit, ok := n.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			before, rest, ok := strings.Cut(lit.Value, "_pragma=")
+			first := before == `"` || strings.HasSuffix(before, "?")
+			if ok && first && !strings.HasPrefix(rest, "busy_timeout(") {
+				t.Errorf("%s: the first pragma of %s is not busy_timeout", fset.Position(lit.Pos()), lit.Value)
+			}
+			return true
+		})
+	}
+}

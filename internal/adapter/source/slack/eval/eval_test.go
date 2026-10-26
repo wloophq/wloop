@@ -14,6 +14,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/source/slack/extract"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/usage"
 )
 
 const fixturesDir = "testdata/fixtures"
@@ -24,6 +25,8 @@ type scripted struct {
 	set   Set
 	cost  float64
 	calls []turns.Ask
+	// tokens, when set, is what each answer reports by its schema.
+	tokens map[string]usage.Tokens
 }
 
 func (s *scripted) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
@@ -48,7 +51,11 @@ func (s *scripted) Ask(_ context.Context, q turns.Ask) (turns.Answer, error) {
 		return turns.Answer{}, fmt.Errorf("unexpected schema")
 	}
 	raw, _ := json.Marshal(out)
-	return turns.Answer{JSON: raw, CostUSD: &c, Model: "scripted"}, nil
+	ans := turns.Answer{JSON: raw, CostUSD: &c, Model: "scripted"}
+	if t, ok := s.tokens[q.Schema]; ok {
+		ans.Tokens = &t
+	}
+	return ans, nil
 }
 
 func (s *scripted) fixtureOf(prompt string) Fixture {
@@ -70,7 +77,7 @@ func extraction(f Fixture) map[string]any {
 		"waiting_on": []any{"U0000000001"}, "state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none",
 		"confidence": "high", "ambiguity": "", "links": []any{}, "context": "", "options": []any{}, "deadline": "",
 		"mode": "none", "place": map[string]any{"context": "", "why": ""}}
-	return map[string]any{"brief": "brief of " + f.ID, "viewer_role": "assignee", "started_by_viewer": false, "items": []any{item},
+	return map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "brief of ` + f.ID + `", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{item},
 		"verdict": "waits_on_viewer", "verdict_why": "", "closure_posted": false, "segments": []any{}, "links": []any{}}
 }
 
@@ -185,6 +192,38 @@ func TestRunWritesEveryStage(t *testing.T) {
 	}
 	if s[SplitDev].N != 4 || s[SplitHoldout].N != 2 || s[SplitHoldout].SameActions != 1 {
 		t.Errorf("score %+v", s)
+	}
+}
+
+func TestRunRecordsEachPassUsage(t *testing.T) {
+	set := loadSet(t, fixturesDir)
+	extractor := usage.Tokens{Input: 1200, Output: 300, CacheRead: 5000, CacheWrite: 700}
+	judge := usage.Tokens{Input: 9000, Output: 800, CacheRead: 0, CacheWrite: 4000}
+	a := &scripted{set: set, cost: 0.02, tokens: map[string]usage.Tokens{extract.Schema(): extractor, judgeSchema: judge}}
+	o := options(t, a, set)
+	if _, err := Run(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	f := set.Fixtures[0]
+	for pass, want := range map[string]*Tokens{"ledger": {Input: 1200, Output: 300, CacheRead: 5000, CacheWrite: 700}, "judge": {Input: 9000, Output: 800, CacheWrite: 4000}, "blind": nil} {
+		var sc sidecar
+		if err := readJSON(keyPath(filepath.Join(o.Out, "shipped", pass, f.ID+".json")), &sc); err != nil {
+			t.Fatal(err)
+		}
+		if sc.CostUSD != 0.02 || (sc.Tokens == nil) != (want == nil) || want != nil && *sc.Tokens != *want {
+			t.Errorf("%s: cost %v tokens %+v, want 0.02 and %+v", pass, sc.CostUSD, sc.Tokens, want)
+		}
+	}
+	var s Score
+	if err := readJSON(filepath.Join(o.Out, "shipped", "score.json"), &s); err != nil {
+		t.Fatal(err)
+	}
+	dev := s[SplitDev].Extractor
+	want := PassUsage{Conversations: 4, TokensReported: 4,
+		Total: Usage{CostUSD: 0.08, Input: 4800, Output: 1200, CacheRead: 20000, CacheWrite: 2800},
+		Mean:  Usage{CostUSD: 0.02, Input: 1200, Output: 300, CacheRead: 5000, CacheWrite: 700}}
+	if dev != want {
+		t.Errorf("dev extractor usage %+v, want %+v", dev, want)
 	}
 }
 
@@ -348,7 +387,7 @@ func TestSplitRule(t *testing.T) {
 }
 
 func TestExtractorPromptMatchesShipped(t *testing.T) {
-	raw, err := os.ReadFile("../extract/prompt.md")
+	raw, err := os.ReadFile("../../../../../profiles/default/prompts/slack-extraction.md")
 	if err != nil {
 		t.Fatal(err)
 	}

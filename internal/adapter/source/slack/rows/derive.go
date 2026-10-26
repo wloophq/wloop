@@ -60,12 +60,15 @@ const FacetChannel = "channel"
 // FacetWaitsOn is the core facet of whom a row waits on.
 const FacetWaitsOn = "waits-on"
 
-// closeRef ends the anchor ref of a sent closing draft.
-const closeRef = ":close"
-
-func derive(in *input, base readmodel.Base) api.Row {
+func derive(in *input, base readmodel.Base, now time.Time) api.Row {
 	in = withGroupNames(in)
 	pl := payload(in)
+	if a := in.activity; a != nil {
+		pl.Turns = &api.TurnFacts{Count: a.Turns, Open: a.OpenTurns, LastIntent: a.LastIntent, Tokens: a.Tokens, CostUSD: a.CostUSD}
+		if a.BriefRetryAt.After(now) {
+			pl.Next = []api.Upcoming{{At: a.BriefRetryAt, What: api.UpcomingBriefRetry}}
+		}
+	}
 	open := openItems(in.items)
 	kind := KindNew
 	if in.hasState && in.state.Verdict != "" {
@@ -116,7 +119,7 @@ func waitingWho(summary string) []string {
 
 func payload(in *input) Payload {
 	pl := Payload{Conversation: in.key.Conversation, Viewer: in.viewer, Topic: in.state.Topic, Verdict: in.state.Verdict,
-		StartedByViewer: in.state.StartedByViewer, ClosurePosted: in.state.ClosurePosted || closureSent(in.items),
+		StartedByViewer: in.state.StartedByViewer, ClosurePosted: in.state.ClosurePosted || in.state.ClosureMarked,
 		Followed: slices.Contains(in.object.Reasons, string(dslack.ReasonUserFollow))}
 	if !in.hasState {
 		pl.StartedByViewer = in.key.Segment == "" && len(in.msgs) > 0 && in.msgs[0].TS == in.key.TS &&
@@ -151,19 +154,6 @@ func payload(in *input) Payload {
 		}
 	}
 	return pl
-}
-
-// closureSent says whether a closing draft was sent on the unit: an item's
-// sent_draft evidence whose ref ends in ":close".
-func closureSent(its []items.Item) bool {
-	for _, it := range its {
-		for _, e := range append([]items.Evidence{it.Evidence}, it.Trail...) {
-			if e.Kind == items.EvidenceSentDraft && strings.HasSuffix(e.Anchor.Ref, closeRef) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // with are the people of a DM besides the viewer: an im's other party, else

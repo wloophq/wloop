@@ -116,7 +116,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err != nil {
 		pr = nil
 	}
-	if err := e.trustBlocked(ctx, pcfg, b, !pcfg.ProjectSettingsFor(string(blockedIntent(b)), prFacts(pr))); err != nil {
+	if err := e.trustBlocked(ctx, pcfg, b, !pcfg.ProjectSettingsFor(string(e.blockedIntent(b)), prFacts(pr))); err != nil {
 		return err
 	}
 	ev := dinv.Event{PR: ref, Kind: dinv.KindRoundUnblocked, At: e.Now(), Data: "you trusted its folder"}

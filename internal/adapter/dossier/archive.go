@@ -152,10 +152,10 @@ func extract(ctx context.Context, tarball, into string) error {
 			return err
 		}
 		name := filepath.FromSlash(strings.TrimSuffix(h.Name, "/"))
-		target := filepath.Join(into, name)
-		if filepath.IsAbs(name) || !under(into, target) {
+		if !filepath.IsLocal(name) {
 			return fmt.Errorf("the entry %q leaves the dossier", h.Name)
 		}
+		target := filepath.Join(into, name)
 		switch h.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, dirMode); err != nil {

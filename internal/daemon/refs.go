@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -17,15 +18,12 @@ func refOf(u unit.Unit) pr.Ref {
 	return ref
 }
 
-// sameUnit says whether a and b name the same unit; GitHub folds the case of
-// owners and repositories.
-func sameUnit(a, b unit.Unit) bool {
-	if a.Provider == unit.GitHub && b.Provider == unit.GitHub {
-		x, y := refOf(a), refOf(b)
-		return x.Number == y.Number && strings.EqualFold(x.Owner, y.Owner) && strings.EqualFold(x.Repo, y.Repo)
-	}
-	return a == b
-}
+// can says whether the enabled plugin of p serves capability c.
+func (s *Server) can(p unit.ProviderID, c string) bool { return api.PluginCan(s.deps.Plugins, p, c) }
+
+// sameUnit says whether a and b name the same unit, as their provider's
+// codec compares keys.
+func (s *Server) sameUnit(a, b unit.Unit) bool { return s.deps.Units.Same(a, b) }
 
 func isPullRequest(u unit.Unit) bool {
 	_, ok := port.PROf(port.Event{Unit: u})
@@ -41,6 +39,23 @@ func refIntakes(ref pr.Ref, is []intake.Intake) map[pr.Ref][]intake.Intake {
 }
 
 type turnFactMap = map[pr.Ref]prrow.TurnFact
+
+// unitOfAddress is the unit raw names through the codecs: <provider>:<key>
+// of a provider units knows, or a web address a codec reads.
+func unitOfAddress(units *unit.Registry, raw string) (unit.Unit, error) {
+	if p, key, ok := strings.Cut(raw, ":"); ok && !strings.HasPrefix(key, "//") {
+		if c, known := units.Codec(unit.ProviderID(p)); known {
+			if err := c.Valid(key); err != nil {
+				return unit.Unit{}, err
+			}
+			return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
+		}
+	}
+	if u, ok := units.ParseURL(raw); ok {
+		return u, nil
+	}
+	return unit.Unit{}, badRequest{fmt.Sprintf("%q names no unit: give a unit's web address or <provider>:<key>", raw)}
+}
 
 // parsePRURL is the unit of the pull request a URL names.
 func parsePRURL(raw string) (unit.Unit, error) {

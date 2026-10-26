@@ -1,0 +1,17 @@
+summary = "Nudge each person a stalled Slack waiting entry waits on, listing the open items they owe"
+provider = "entry"
+when = 'entry.unit_provider == "slack" && entry.nudge_due_at > timestamp(0) && entry.items_owed > 0'
+order = 50
+key = ["entry.settled_at", "entry.waiting_on"]
+
+[[step]]
+use = "draft.propose"
+purpose = "nudge"
+items = "owed"
+per = "person"
+effects = ["entry.nudged"]
+repeat_after = "config.drafts.repeat_after"
+
+[drafts.withdraw]
+when = '!draft.person_waited || draft.items_owed == 0'
+reason = "moot"

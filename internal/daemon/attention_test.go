@@ -35,7 +35,7 @@ func askTurn(t *testing.T, repo *sqlite.Store, n int, recs ...record.Record) {
 	t.Helper()
 	at := fixtureNow.Add(-30 * time.Minute)
 	ref := pr.Ref(ref(n))
-	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h",
+	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h",
 		Session: "term", State: turn.Asked, SentAt: at, StartedAt: at}}}
 	for i, r := range recs {
 		b.Records = append(b.Records, turn.Record{Session: "term", Hash: "x" + strconv.Itoa(i), At: at.Add(time.Duration(i) * time.Minute), Record: r})
@@ -212,15 +212,15 @@ func TestNudgeComputedOnce(t *testing.T) {
 		got[rowNumber(r)], _ = offerOf(r, "nudge")
 	}
 	want := map[int]api.ActionState{
-		50: {ID: "nudge", Enabled: true, Hint: "Nudge @ana"},
-		51: {ID: "nudge", Enabled: true, Hint: "Nudge " + prrow.NudgeMaintainers},
+		50: {ID: "nudge", Enabled: true, Note: "Nudge @ana"},
+		51: {ID: "nudge", Enabled: true, Note: "Nudge " + prrow.NudgeMaintainers},
 		52: {ID: "nudge", Reason: "acme/api#52 waits on you (review requested"},
 		53: {},
-		54: {ID: "nudge", Enabled: true, Hint: "Nudge @bob"},
+		54: {ID: "nudge", Enabled: true, Note: "Nudge @bob"},
 	}
 	for n, w := range want {
 		g := got[n]
-		if g.ID != w.ID || g.Enabled != w.Enabled || g.Hint != w.Hint || !strings.HasPrefix(g.Reason, w.Reason) {
+		if g.ID != w.ID || g.Enabled != w.Enabled || g.Note != w.Note || !strings.HasPrefix(g.Reason, w.Reason) {
 			t.Errorf("#%d nudge %+v, want %+v", n, g, w)
 		}
 	}
@@ -234,7 +234,7 @@ func TestTheRowShowsTheQuestionAnAnswerReaches(t *testing.T) {
 	at := fixtureNow.Add(-30 * time.Minute)
 	ref33 := pr.Ref(ref(33))
 	b := turn.Book{Unit: ref33.Unit(), Turns: []turn.Turn{
-		{Intent: turn.Intent(dintent.Review), ID: "r1", Trigger: turn.Automated, Session: "term", State: turn.Asked, SentAt: at, StartedAt: at},
+		{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r1", Trigger: turn.Automated, Session: "term", State: turn.Asked, SentAt: at, StartedAt: at},
 		{Intent: turn.Intent(dintent.Probe), ID: "p1", Trigger: turn.ByHand, Session: "probe", State: turn.Asked, SentAt: at.Add(time.Minute), StartedAt: at.Add(time.Minute)},
 	}}
 	if _, err := repo.Save(context.Background(), b, port.Event{Unit: ref33.Unit(), Kind: turns.KindTurnSent, Key: "r", At: at}); err != nil {

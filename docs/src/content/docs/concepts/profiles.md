@@ -5,7 +5,7 @@ description: How your judgment reaches every round, and how a profile adds kinds
 
 A turn's instructions have two parts:
 
-- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It comes from the intent's instructions, rendered for each turn with only the steps that turn runs. The bundled intents are defaults: your profile overrides any of their files, as [Change a bundled intent](/guides/custom-intent/#change-a-bundled-intent) shows. The shared partials, such as the record protocol, are still fixed.
+- The **procedure** is the mechanics of the turn: reading the pull request, delegating, the ambiguity gate, the rule that an automatic round never approves on its own, publishing, the record that ends it. It comes from the intent's instructions, rendered for each turn with only the steps that turn runs. The bundled intents are defaults: your profile overrides any of their files, as [Change a bundled intent](/guides/custom-intent/#change-a-bundled-intent) shows. The shared partials, such as the record protocol, are files of the profile too: a `partials/<name>.md.tmpl` of yours replaces the bundled one for every intent, as [Change a partial](/guides/custom-intent/#change-a-partial) shows.
 - The **judgment** is yours: what a review looks for, the labels and what blocks, the risky surfaces, the shape of the body, the voice; how you answer reviews of your pull requests, commit and test the fixes, and whom you ask for another look; what a nudge says and its tone.
 
 ## The review profile
@@ -36,11 +36,11 @@ An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, the `probe
 
 - a command: `{{command}} <intent> <url> [flags] [guidance...]`, listed by `{{command}} --help`; an intent that serves another provider takes that provider's unit, such as a Slack permalink or `slack:<key>`;
 - a way to run it by hand from any agent session: `{{command}} instructions <intent>`, or the bundled skills such as `/{{name}}-review <url>`;
-- an action on the rows of the cockpit, the terminal client and the menu bar, with its own key.
+- an action on the rows of the cockpit, the terminal client and the menu bar, with its own shortcut and its `summary` as its tooltip.
 
 A turn of any intent records, asks, takes answers and resumes the same way. A user intent runs only when you ask; what starts a turn on its own is a [workflow](/concepts/workflows/) whose `turn.start` step names the intent. A directory of your profile named as a bundled intent or workflow overrides it file by file.
 
-| Bundled intent | Key | Runs in | Does |
+| Bundled intent | Shortcut | Runs in | Does |
 |---|---|---|---|
 | `review` | `V` | the review workspace, at the pull request's head | reviews someone else's pull request and publishes the review |
 | `address` | `F` | the author workspace | triages the reviews and failing checks of a pull request you develop |
@@ -64,7 +64,7 @@ See [Add your own intent](/guides/custom-intent/) and the [intent manifest](/ref
 
 In Codex the same skills run as `$<skill> <url>`. `{{command}} install --print-skill <name>` prints one.
 
-The review, address and nudge skills come from one template, filled from each intent's manifest. Every installed skill carries a marker in its front matter:
+The review, address and nudge skills come from one template, filled from each intent's manifest; an intent gets one when its manifest sets `skill = true`, and its target is named as the intent's provider names a unit, with the manifest's `help.target` saying what it is. Every installed skill carries a marker in its front matter:
 
 ```yaml
 metadata:

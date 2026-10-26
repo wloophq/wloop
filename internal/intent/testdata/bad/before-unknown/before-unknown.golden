@@ -1,1 +1,1 @@
-testdata/bad/before-unknown/intents/ask-author/intent.toml:18:10: inputs.adopt.before: unknown before builtin "adopt"; the before builtins are "take_over"
+testdata/bad/before-unknown/intents/ask-author/intent.toml:18:10: inputs.adopt.before: "adopt" is not one of "take_over"

@@ -211,9 +211,11 @@ type Turn struct {
 	Agent        string `json:"agent,omitempty"`
 	BriefRun     int64  `json:"brief_run,omitempty"`
 	AgentSession string `json:"agent_session,omitempty"`
-	// Mode is "" for a session turn; Workflow the workflow that started it.
-	Mode     string `json:"mode,omitempty"`
+	// Runner is "" for a session turn; Workflow the workflow that started it;
+	// Role the role its intent held.
+	Runner   string `json:"runner,omitempty"`
 	Workflow string `json:"workflow,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
 type TurnRecord struct {
@@ -311,6 +313,8 @@ type BriefSummary struct {
 	Goal          string   `json:"goal"`
 	OpenQuestions int      `json:"open_questions"`
 	Tags          []string `json:"tags,omitempty"`
+	// Extra are the brief intent's extra fields, by name.
+	Extra map[string]any `json:"extra,omitempty"`
 }
 
 type Brief struct {
@@ -322,6 +326,10 @@ type Brief struct {
 	RiskWhy       string   `json:"risk_why"`
 	OpenQuestions []string `json:"open_questions"`
 	Tags          []string `json:"tags,omitempty"`
+	// Extra are the brief intent's extra fields, by name; ExtraVersions the
+	// version of each the brief holds.
+	Extra         map[string]any    `json:"extra,omitempty"`
+	ExtraVersions map[string]string `json:"extra_versions,omitempty"`
 }
 
 type BriefView struct {

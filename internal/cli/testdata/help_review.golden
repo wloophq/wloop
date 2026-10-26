@@ -2,8 +2,9 @@ USAGE
   {{command}} review <url> [--no-wait] [--no-brief] [guidance...]
 
 Start or continue a review round on someone else's pull request, in a dedicated
-workspace. Words after the URL are guidance for the turn. It runs as an intake
-this command follows; Ctrl-C stops following, not the intake.
+workspace. The target is a pull request URL; words after it are guidance for the
+turn. It runs as an intake this command follows; Ctrl-C stops following, not the
+intake.
 
 FLAGS
   --no-wait   Print the intake's number instead of following it

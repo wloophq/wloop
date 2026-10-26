@@ -32,7 +32,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	left := dturn.Book{Unit: headlessThread, Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Act), ID: "left", Trigger: dturn.ByHand,
-		State: dturn.Started, SentAt: testNow, StartedAt: testNow, Mode: dturn.ModeHeadless}}}
+		State: dturn.Started, SentAt: testNow, StartedAt: testNow, Runner: dturn.RunnerHeadless}}}
 	if _, err := sqlite.New(db).Save(ctx, left); err != nil {
 		t.Fatal(err)
 	}

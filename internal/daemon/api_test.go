@@ -67,6 +67,9 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Units == nil {
 		d.Units = unit.NewRegistry(pr.Codec{})
 	}
+	if d.Forge == "" {
+		d.Forge = unit.GitHub
+	}
 	u := inventory.ByUnit{Store: st}
 	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
 	d.RowProviders = prRows(st, nil)
@@ -118,7 +121,7 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	})
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	st.UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
-	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
+	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
 		Viewer: func(context.Context) (string, []string, error) { return "me", []string{"acme/search"}, nil },
 		Log:    func(string, ...any) {}, Explorer: openOnGitHub{}}, st)
 	if log != nil {
@@ -484,7 +487,7 @@ func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
 
 func TestHealthSaysWhenAReviewStalls(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Cfg.Stalled.Review = config.Days(72 * time.Hour) })
+	s := newServerWith(t, func(d *Deps) { d.Cfg.GitHub.Stalled.Review = config.Days(72 * time.Hour) })
 	var h api.Health
 	get(t, s, "/api/health", &h)
 	if h.StalledReviewHours != 72 {

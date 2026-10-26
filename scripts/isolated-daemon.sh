@@ -231,12 +231,13 @@ cmd_setup() {
 		{
 		  "http": {"port": $((47910 + index))},
 		  "mcp": {"port": $((47810 + index))},
-		  "rounds": {"per_pr_per_day": 1},
+		  "turns": {"per_unit_per_day": 1},
 		  "brief": {"enabled": false},
 		  "workflows": {$wf
 		  },
-		  "plugins": {"github": {"enabled": false}, "slack": {"enabled": $slack_on}},
+		  "github": {"enabled": false},
 		  "slack": {
+		    "enabled": $slack_on,
 		    "keychain_service": "wloop-e2e-slack",
 		    "post_allowlist": $(json_list "$dm"),
 		    "request_log": true

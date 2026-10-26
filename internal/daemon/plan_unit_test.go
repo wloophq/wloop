@@ -24,10 +24,10 @@ func TestThePlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	base := r.eng.Workflows
 	r.eng.Workflows = func() []workflow.Workflow {
 		return append(base(),
-			workflow.Workflow{Name: "review-first-round", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+			workflow.Workflow{Name: "review-first-round", Provider: unit.GitHub, Slot: "pr", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.steps.Step("session.close")},
 				When: automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["pr.first.due"] == true }, "pr.first.due")},
-			workflow.Workflow{Name: "after-merge", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+			workflow.Workflow{Name: "after-merge", Provider: unit.GitHub, Slot: "pr", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerEvent, On: []string{"merged", "closed"}}, Steps: []workflow.Step{r.steps.Step("session.close")}})
 	}
 	gen := r.log.Gen()
@@ -37,7 +37,7 @@ func TestThePlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 	}
 	want := []api.UnitWorkflow{
 		{Workflow: "after-merge", Trigger: "event", Outcome: "waits", Reason: "decides when a merged or closed event arrives"},
-		{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not matched",
+		{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not_matched",
 			Facts: []api.Fact{{Name: "pr.first.due", Value: "false"}, {Name: "pr.first.reason", Value: "the author is a bot"}}},
 	}
 	if len(res.Workflows) != len(want) {
@@ -82,7 +82,7 @@ func TestThePlanOfAUnitReadsMarksOnlyForAWorkflowThatCallsHandled(t *testing.T) 
 	never := automationtest.MatchFunc(func(v workflow.Vars) bool { return v.Facts["pr.first.due"] == true }, "pr.first.due")
 	r.eng.Workflows = func() []workflow.Workflow {
 		wf := func(name string, when workflow.Predicate) workflow.Workflow {
-			return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
+			return workflow.Workflow{Name: name, Provider: unit.GitHub, Slot: "pr", Observe: false,
 				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.steps.Step("session.close")}, When: when}
 		}
 		return []workflow.Workflow{wf("plain", never), wf("marked", readsHead{never})}
@@ -92,7 +92,7 @@ func TestThePlanOfAUnitReadsMarksOnlyForAWorkflowThatCallsHandled(t *testing.T) 
 	for _, w := range res.Workflows {
 		got[w.Workflow] = w
 	}
-	if got["plain"].Outcome != "not matched" {
+	if got["plain"].Outcome != "not_matched" {
 		t.Errorf("a workflow without handled(): %+v", got["plain"])
 	}
 	if got["marked"].Outcome != "error" || !strings.Contains(got["marked"].Reason, "marks unreadable") {

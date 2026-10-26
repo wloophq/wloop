@@ -1,24 +1,37 @@
 label   = "Act"
-summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
+summary = "Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop"
 verb    = "delegate"
-workspace = "pr_else_main"
+role    = "headless"
+workspace = "linked_else_main"
 provider  = "any"
-modes     = ["headless", "session"]
+runners   = ["headless", "session"]
 session   = { strategy = "new", title = "act", close_when_done = true }
-brief     = { render = false, wait = false }
+brief     = { render = true, wait = false }
+
+[drafts]
+allowed_effects = ["entry.nudged", "unit.closed"]
+
+[help]
+target   = "a pull request URL, a Slack message permalink or <provider>:<key> of a unit the intent serves"
+summary  = "Resolve a unit's open items, replies as drafts"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday"]
+docs     = "concepts/gtd"
 
 [guidance]
 help = "what to do about the items"
 
 [headline]
-resumed = "act on {{.Wording.Ref}}"
+resumed = "act on {{.unit.ref}}"
 [[headline.new]]
-text = "Act on the open items of {{.Wording.Ref}}, {{.Who}}."
+line = 'Act on the open items of {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
-enabled    = "row.yours"
-reason_off = "Not yours: take it over first"
-hint = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+note = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval{{if .row.recommended}} (recommended: {{.row.recommended}}){{end}}"
+
+[[action.refuse]]
+when = "!(row.yours)"
+why  = "Not yours: take it over first"
 
 [record]
 states = ["done", "asked", "failed"]

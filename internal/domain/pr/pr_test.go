@@ -15,6 +15,8 @@ func TestParseURL(t *testing.T) {
 		{in: "https://github.com/acme/api/pull/7", want: Ref{"acme", "api", 7}},
 		{in: " https://github.com/acme/api/pull/7/files ", want: Ref{"acme", "api", 7}},
 		{in: "https://github.com/acme/api/pull/7#discussion_r1", want: Ref{"acme", "api", 7}},
+		{in: "http://github.com/acme/api/pull/7", want: Ref{"acme", "api", 7}},
+		{in: "ftp://github.com/acme/api/pull/7", err: true},
 		{in: "https://github.com/acme/api/issues/7", err: true},
 		{in: "https://gitlab.com/acme/api/pull/7", err: true},
 		{in: "https://github.com/acme/api/pull/0", err: true},
@@ -53,6 +55,11 @@ func TestKeysRoundTripThroughTheCodec(t *testing.T) {
 	reg := unit.NewRegistry(Codec{})
 	if back, err := reg.Parse("github", "o/r#12"); err != nil || back != ref.Unit() {
 		t.Errorf("Parse = %v %v", back, err)
+	}
+	for _, link := range []string{"https://github.com/o/r/pull/12", "http://github.com/o/r/pull/12/files"} {
+		if u, ok := reg.ParseURL(link); !ok || u != ref.Unit() {
+			t.Errorf("ParseURL(%q) = %v %v", link, u, ok)
+		}
 	}
 	for _, key := range []string{"o/r#x", "o/r#012"} {
 		if _, err := reg.Parse("github", key); err == nil {

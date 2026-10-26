@@ -91,8 +91,10 @@ type Controller struct {
 	health    api.Health
 	hasHealth bool
 	sections  []api.MenubarSection
-	entries   map[gtd.View][]api.EntryView
-	counters  *api.Counters
+	// plugins are the served plugins, read with the sections.
+	plugins  []api.Plugin
+	entries  map[gtd.View][]api.EntryView
+	counters *api.Counters
 }
 
 func New(cfg Config) *Controller {
@@ -317,7 +319,7 @@ func (c *Controller) loadSections(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	c.sections = nil
+	c.sections, c.plugins = nil, ps
 	for _, p := range ps {
 		if p.Enabled && p.UI != nil {
 			c.sections = append(c.sections, p.UI.Menubar...)
@@ -419,7 +421,7 @@ func (c *Controller) section(name, view string, rows []api.Row, open string) []M
 
 func (c *Controller) rowItem(view string, r api.Row, open string) MenuItem {
 	action := func(context.Context) error { return c.open(viewRoute(view) + "&" + unitRoute(r.Unit)) }
-	if r.Unit.Provider != unit.GitHub && strings.HasPrefix(r.Link, "https://") {
+	if !api.PluginCan(c.plugins, r.Unit.Provider, api.CapabilityDetail) && strings.HasPrefix(r.Link, "https://") {
 		action = func(context.Context) error { return c.cfg.OpenURL(r.Link) }
 	}
 	return MenuItem{
@@ -444,9 +446,10 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 		if st.ID == "open" {
 			title = open
 		}
+		tip := actionTooltip(spec, st)
 		if !st.Enabled {
 			title += " (" + st.Reason + ")"
-			items = append(items, MenuItem{Title: title})
+			items = append(items, MenuItem{Title: title, Tooltip: tip})
 			continue
 		}
 		do := c.later(func(ctx context.Context) error {
@@ -454,12 +457,22 @@ func (c *Controller) rowActions(r api.Row, open string) []MenuItem {
 			return err
 		})
 		if st.Confirm == "" {
-			items = append(items, MenuItem{Title: title, Enabled: true, Action: do})
+			items = append(items, MenuItem{Title: title, Tooltip: tip, Enabled: true, Action: do})
 			continue
 		}
-		items = append(items, MenuItem{Title: title + "…", Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
+		items = append(items, MenuItem{Title: title + "…", Tooltip: tip, Enabled: true, Children: []MenuItem{{Title: st.Confirm, Enabled: true, Action: do}}})
 	}
 	return items
+}
+
+// actionTooltip is what the action does, then what it would do on this row
+// when enabled or why it is off, as the web shows it.
+func actionTooltip(spec api.ActionSpec, st api.ActionState) string {
+	extra := st.Reason
+	if st.Enabled {
+		extra = st.Note
+	}
+	return strings.Join(slices.DeleteFunc([]string{spec.Summary, extra}, func(s string) bool { return s == "" }), "\n")
 }
 
 func label(r api.Row) string { return r.Summary.Line }

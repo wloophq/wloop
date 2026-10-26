@@ -150,7 +150,7 @@ func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 	var main wsdomain.Workspace
 	for _, w := range all {
 		r, ok := ofRepo[w.RepoID]
-		if !ok || w.HostID != wsdomain.LocalHost || wsdomain.MainOnDefault(w, r) || (!w.IsMain && strings.HasPrefix(w.DisplayName, cfg.ReviewPrefix)) {
+		if !ok || w.HostID != wsdomain.LocalHost || wsdomain.MainOnDefault(w, r) || (!w.IsMain && strings.HasPrefix(w.DisplayName, cfg.GitHub.ReviewPrefix)) {
 			continue
 		}
 		onHead := pr.HeadRefName != "" && w.PRBranch() == pr.HeadRefName

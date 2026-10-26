@@ -28,7 +28,7 @@ func TestWindowExpiresWithoutAWrite(t *testing.T) {
 	if n, err := e.svc.Tick(ctx); n != 1 || err != nil {
 		t.Fatalf("tick %d %v", n, err)
 	}
-	if got := e.get(d.ID); got.State != draft.Approved || got.Would.Outcome != draft.OutcomeAuto {
+	if got := e.get(d.ID); got.State != draft.Approved || got.Would.Outcome != draft.OutcomeReleased {
 		t.Fatalf("%+v", got)
 	}
 	if n, _ := e.svc.Tick(ctx); n != 0 {
@@ -86,7 +86,7 @@ func TestEditStopsTheWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Approval != always || !got.Deadline.IsZero() {
+	if got.Approval != waiting || !got.Deadline.IsZero() {
 		t.Fatalf("after the edit %+v", got)
 	}
 	e.clock.now = t0.Add(time.Hour)
@@ -110,7 +110,7 @@ func TestEditStopsTheWindow(t *testing.T) {
 	if n, _ := e.svc.Tick(ctx); n != 0 {
 		t.Fatalf("tick approved a draft edited under it: %d", n)
 	}
-	if got := e.get(raced.ID); got.State != draft.Proposed || got.Approval != always {
+	if got := e.get(raced.ID); got.State != draft.Proposed || got.Approval != waiting {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -190,7 +190,7 @@ func TestConcurrentTicksApproveOnce(t *testing.T) {
 		if seen[id] > 1 {
 			t.Errorf("draft %d published %d times", id, seen[id])
 		}
-		if d.Would.Outcome == draft.OutcomeAuto {
+		if d.Would.Outcome == draft.OutcomeReleased {
 			auto++
 			if d.Edited {
 				t.Errorf("draft %d edited and auto-approved", id)

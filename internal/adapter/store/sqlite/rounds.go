@@ -30,18 +30,18 @@ func NewRounds(db *DB) *Rounds { return &Rounds{db: db} }
 func (r *Rounds) Load(ctx context.Context) (*round.Store, error) {
 	st := round.New()
 	err := r.db.Read(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT unit_key, sent_at, round_at, agent_home, first_round_skipped FROM round_state WHERE provider = 'github'`)
+		rows, err := tx.QueryContext(ctx, `SELECT unit_key, sent_at, agent_home, first_round_skipped FROM round_state WHERE provider = 'github'`)
 		if err != nil {
 			return err
 		}
 		for rows.Next() {
-			var key, sent, roundAt string
+			var key, sent string
 			var p round.PR
-			if err := rows.Scan(&key, &sent, &roundAt, &p.AgentHome, &p.FirstRoundSkipped); err != nil {
+			if err := rows.Scan(&key, &sent, &p.AgentHome, &p.FirstRoundSkipped); err != nil {
 				rows.Close()
 				return err
 			}
-			p.SentAt, p.RoundAt = parseTime(sent), parseTime(roundAt)
+			p.SentAt = parseTime(sent)
 			st.PRs[key] = p
 		}
 		rows.Close()
@@ -214,7 +214,6 @@ func saveFields(ctx context.Context, tx *Tx, ref pr.Ref, p round.PR, f round.Fie
 		value  any
 	}{
 		{round.FieldSentAt, "sent_at", formatTime(p.SentAt)},
-		{round.FieldRoundAt, "round_at", formatTime(p.RoundAt)},
 		{round.FieldAgentHome, "agent_home", p.AgentHome},
 		{round.FieldFirstRoundSkipped, "first_round_skipped", p.FirstRoundSkipped},
 	} {

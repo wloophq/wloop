@@ -59,7 +59,7 @@ func TestDMWindowShowsEarlierMessagesAsContext(t *testing.T) {
 func TestLongUnitEscalatesToFrontierWithinTheCaps(t *testing.T) {
 	r := newRig(t)
 	r.cfg.Slack.Extraction.EscalateOverChars = 400
-	r.cfg.Slack.Extraction.MaxCall = 0.07
+	r.cfg.Slack.Extraction.PerCallUSD = 0.07
 	r.facts.post(jChan, ts(1), "", jOther, "short ask", jT0)
 	r.facts.post(jChan, ts(2), "", jOther, strings.Repeat("a long ask with many details ", 30), jT0)
 	r.run(jT0.Add(2 * time.Minute))
@@ -107,7 +107,7 @@ func TestEscalationOverTheCallCapFallsBackToTheBaseTier(t *testing.T) {
 func TestEscalationFallbackRespectsTheDailyCap(t *testing.T) {
 	r := newRig(t)
 	r.cfg.Slack.Extraction.EscalateOverChars = 1
-	r.cfg.Slack.Extraction.MaxCalls = 1
+	r.cfg.Slack.Extraction.PerDay = 1
 	r.asker.reply = func(_ int, q turns.Ask) ([]byte, error) {
 		if q.Tier == turns.TierFrontier {
 			return nil, turns.ErrOverBudget

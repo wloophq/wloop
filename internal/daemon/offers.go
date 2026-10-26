@@ -170,7 +170,7 @@ func (s *Server) inventoryPR(ctx context.Context, u unit.Unit) (dinv.PR, bool, e
 	if err != nil {
 		return dinv.PR{}, false, err
 	}
-	if i := slices.IndexFunc(all, func(p dinv.PR) bool { return sameUnit(p.Ref.Unit(), u) }); i >= 0 {
+	if i := slices.IndexFunc(all, func(p dinv.PR) bool { return s.sameUnit(p.Ref.Unit(), u) }); i >= 0 {
 		return all[i], true, nil
 	}
 	return dinv.PR{}, false, nil
@@ -220,7 +220,7 @@ func (s *Server) waitingIntakes(ctx context.Context) (map[unit.Unit][]intake.Int
 func (s *Server) handleActions(w http.ResponseWriter, _ *http.Request) {
 	l := s.loaded()
 	off := s.disabledPlugins(l)
-	writeJSON(w, api.ActionsResponse{Version: catalog.VersionFor(l, off), Specs: catalog.SpecsFor(l, off), Plan: catalog.PlanSpecs()})
+	writeJSON(w, api.ActionsResponse{Version: catalog.VersionFor(l, off), Specs: catalog.SpecsFor(l, off), Plan: catalog.PlanSpecs(l)})
 }
 
 // disabledPlugins are the disabled plugins some action of l belongs to.

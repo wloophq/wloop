@@ -40,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -89,13 +90,24 @@ func (r storeRecorder) OpenQuestions(books map[unit.Unit]dturn.Book) map[github.
 	out := map[github.Ref]map[string]bool{}
 	for u, b := range books {
 		ref := prOf(u)
-		for _, i := range []dturn.Intent{dturn.Intent(dintent.Review), dturn.Intent(dintent.Address)} {
+		for _, i := range roleIntents(b, builtin.RoleReview, builtin.RoleAddress) {
 			if b.OpenQuestion(i) {
 				if out[ref] == nil {
 					out[ref] = map[string]bool{}
 				}
 				out[ref][string(i)] = true
 			}
+		}
+	}
+	return out
+}
+
+// roleIntents are the intents of b's turns whose intent held one of roles.
+func roleIntents(b dturn.Book, roles ...string) []dturn.Intent {
+	var out []dturn.Intent
+	for _, t := range b.Turns {
+		if slices.Contains(roles, t.Role) && !slices.Contains(out, t.Intent) {
+			out = append(out, t.Intent)
 		}
 	}
 	return out
@@ -161,7 +173,13 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	e.Rec = storeRecorder{store}
 	e.interrupted = new(atomic.Bool)
 	e.Rounds = sqlite.NewRounds(db)
-	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey}
+	endpoint := mcpEndpoint{port: *mcpPort, log: logf, slack: e.slack, key: e.mcpKey,
+		intents: func() *dintent.Registry {
+			if l := e.loadedIntents(); l != nil {
+				return l.Registry
+			}
+			return nil
+		}}
 	e.observeGit(ctx, &daemon.GitAccessLog{Store: store}, logf)
 	startCfg, err := e.readConfig()
 	if err != nil {
@@ -241,6 +259,9 @@ type mcpEndpoint struct {
 	// key is read on each request, so a key install writes later applies
 	// without a restart.
 	key func() string
+	// intents is the loaded registry, whose drafts.allowed_effects bound an agent's
+	// drafts; nil allows no effect.
+	intents func() *dintent.Registry
 }
 
 func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
@@ -267,7 +288,7 @@ func (f clockFunc) Now() time.Time { return f() }
 // restoreBudget sets the client's floors from cfg and seeds its budget with
 // the one the last sweep kept.
 func (e *Env) restoreBudget(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) {
-	e.GitHub.SetFloors(github.DefaultFloors(cfg.Sweep.RateLimitFraction))
+	e.GitHub.SetFloors(github.DefaultFloors(cfg.GitHub.RateLimitFraction))
 	limits, err := storedGitHubBudget(ctx, inventory.New(db))
 	if err != nil {
 		logf("GitHub budget: %v", err)
@@ -297,23 +318,14 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	store := inventory.New(db)
 	store.UseClock(e.Now)
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
+	var queue *brief.Queue
 	var briefs *interruptFirst
 	var intakeBriefs intake.Briefs
 	var unavailable string
-	if cfg.Brief.Enabled && !e.noJobs && cfg.PluginEnabled(string(unit.GitHub)) {
-		var q *brief.Queue
-		if q, unavailable = e.briefQueue(cfg, store, logf); q != nil {
-			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: q}, brief.Intakes{Q: q}
-			if err := q.Interrupted(ctx); err != nil {
-				logf("brief: marking the runs a stop cut short: %v", err)
-			} else {
-				e.interruptedFlag().Store(true)
-			}
-			go func() {
-				lctx, scope := meter.Start(ctx, meter.Loop("brief"))
-				defer scope.End()
-				q.Start(lctx)
-			}()
+	if cfg.Brief.Enabled && !e.noJobs {
+		queue, unavailable = e.briefQueue(cfg, store, logf)
+		if unavailable == "" {
+			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
 	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
@@ -350,6 +362,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Turns:    e.Turns,
 		Sessions: sessions,
 		Agents:   lastAgents(sessions),
+		Activity: db,
 		Views:    e.Views,
 		Actions:  envActions{e, store},
 		Intents:  e.loadedIntents,
@@ -370,6 +383,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			teams, err := githubTeams(ctx, store)
 			return login, teams, err
 		},
+		Forge:    unit.GitHub,
 		Now:      e.Now,
 		Version:  Version,
 		Log:      logf,
@@ -420,16 +434,44 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 	e.viewFacts().set(authorFacts(mods))
 	notices := &noticeFeed{}
 	d.Notices = notices
-	ed := engineDeps{DB: db, Modules: mods, Pub: notices, Log: logf}
-	if briefs != nil {
-		ed.Briefs = briefs.Queue
-	}
+	ed := engineDeps{DB: db, Modules: mods, Pub: notices, Log: logf, Briefs: queue}
 	if !e.noJobs {
 		if a, err := e.asker(cfg, filepath.Join(e.StateDir, "classify")); err == nil {
 			ed.Asker = a
 		}
 	}
+	w := &serveWiring{DB: db, Cfg: cfg, Modules: mods, Log: logf, Deps: &d, Engine: &ed}
+	for _, wire := range e.wireParts() {
+		wire(w)
+	}
+	if briefs != nil && briefsItself(mods) {
+		e.startBriefs(ctx, queue, logf)
+	}
 	return withEngine(d, e, ed)
+}
+
+// briefsItself says a module's units are briefed by the queue's own calls,
+// which the queue's loop makes; an OnDemand source's job writes its briefs.
+func briefsItself(mods []source.Module) bool {
+	return slices.ContainsFunc(mods, func(m source.Module) bool {
+		_, onDemand := m.Briefs.(brief.OnDemand)
+		return m.Briefs != nil && !onDemand
+	})
+}
+
+// startBriefs marks the runs a stopped daemon left running and starts q's
+// loop.
+func (e *Env) startBriefs(ctx context.Context, q *brief.Queue, logf func(string, ...any)) {
+	if err := q.Interrupted(ctx); err != nil {
+		logf("brief: marking the runs a stop cut short: %v", err)
+	} else {
+		e.interruptedFlag().Store(true)
+	}
+	go func() {
+		lctx, scope := meter.Start(ctx, meter.Loop("brief"))
+		defer scope.End()
+		q.Start(lctx)
+	}()
 }
 
 // withEngine is d with the workflows' engine as the sweep, its pending
@@ -443,7 +485,7 @@ func withEngine(d daemon.Deps, e *Env, ed engineDeps) daemon.Deps {
 	eng := meteredEngine{e.newEngine(ed)}
 	d.Sweep = eng
 	pd := ed
-	pd.WorkspaceFacts = siblingFacts(ed.WorkspaceFacts)
+	pd.WorkspaceFacts, pd.Withdrawals = siblingFacts(ed.WorkspaceFacts), nil
 	d.Plan = servedPlan{eng: eng, plan: e.planEngine(pd)}
 	d.Pending = enginePending{e}
 	return d
@@ -479,11 +521,11 @@ func (p servedPlan) Drop(ctx context.Context, u unit.Unit, why string) error {
 
 func (p servedPlan) DueRun(ctx context.Context) error { return p.eng.DueRun(ctx) }
 
-// authorFacts is the github module's facts provider as the views read it;
-// nil without one.
+// authorFacts is the facts provider of the first module that serves the
+// views' author facts; nil without one.
 func authorFacts(mods []source.Module) views.Facts {
 	for _, m := range mods {
-		if f, ok := m.Facts.(views.Facts); ok && m.ID == unit.GitHub {
+		if f, ok := m.Facts.(views.Facts); ok {
 			return f
 		}
 	}
@@ -1158,33 +1200,36 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 	return daemon.New(deps).Run(dctx)
 }
 
-// briefQueue is nil, with the reason logged and answered, when the agent
-// cannot brief.
+// briefQueue is the brief queue and, when the agent cannot brief, why: the
+// queue then briefs only the units an OnDemand source writes the briefs of.
 func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(string, ...any)) (*brief.Queue, string) {
-	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
-	if err != nil {
-		logf("brief: %v; no briefs", err)
-		return nil, err.Error()
-	}
 	var changes port.Changes
 	if e.changes != nil {
 		changes = e.changes
 	}
-	return brief.New(brief.Deps{
+	d := brief.Deps{
 		Enabled:      cfg.Brief.Enabled,
 		Store:        store,
 		Source:       brief.Source{GitHub: e.GitHub},
-		Runner:       brief.AskRunner{Asker: asker},
 		Taxonomy:     func(github.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,
-		MaxDiffBytes: cfg.Brief.MaxDiffBytes,
+		MaxDiffBytes: cfg.Brief.MaxInputBytes,
 		Retry:        time.Duration(cfg.Sweep.Slow),
 		Allow:        e.GitHub.Allow,
 		Changes:      changes,
 		Now:          e.Now,
 		Log:          logf,
-	}), ""
+		Intent:       e.briefIntents(logf),
+	}
+	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
+	if err != nil {
+		logf("brief: %v; only on-demand briefs", err)
+		d.Unavailable = err.Error()
+	} else {
+		d.Runner = brief.AskRunner{Asker: asker}
+	}
+	return brief.New(d), d.Unavailable
 }
 
 func (e *Env) interruptedFlag() *atomic.Bool {

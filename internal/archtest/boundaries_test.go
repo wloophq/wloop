@@ -140,24 +140,27 @@ func actionLiterals(fset *token.FileSet, file string, info *types.Info, f *ast.F
 	return out
 }
 
-var programFields = []string{"Visible", "Enabled", "Primary", "ActionTexts"}
+var programFields = []string{"When", "Refuse", "Primary", "ActionTexts"}
 
-// programField says whether v is one of programFields of internal/intent.Programs.
+// programField says whether v is one of programFields of internal/intent.Programs,
+// or of its ActionPrograms.
 func programField(v *types.Var) bool {
 	if !v.IsField() || v.Pkg() == nil || v.Pkg().Path() != module+"internal/intent" || !slices.Contains(programFields, v.Name()) {
 		return false
 	}
-	obj := v.Pkg().Scope().Lookup("Programs")
-	if obj == nil {
-		return false
-	}
-	st, ok := obj.Type().Underlying().(*types.Struct)
-	if !ok {
-		return false
-	}
-	for i := range st.NumFields() {
-		if st.Field(i) == v {
-			return true
+	for _, name := range []string{"Programs", "ActionPrograms"} {
+		obj := v.Pkg().Scope().Lookup(name)
+		if obj == nil {
+			continue
+		}
+		st, ok := obj.Type().Underlying().(*types.Struct)
+		if !ok {
+			continue
+		}
+		for i := range st.NumFields() {
+			if st.Field(i) == v {
+				return true
+			}
 		}
 	}
 	return false
@@ -188,15 +191,21 @@ func programReads(fset *token.FileSet, file string, info *types.Info, f *ast.Fil
 }
 
 // builtinTables are the files that may spell a builtin's dotted or snake name.
-var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
+var builtinTables = []string{"internal/intent/builtin/builtin.go", "internal/intent/builtin/steps.go", "internal/intent/builtin/effects.go",
+	"internal/intent/builtin/roles.go", "internal/cli/builtins.go", "internal/cli/builtins_effects.go",
+	"internal/daemon/builtins.go", "internal/cli/steps.go", "internal/cli/root.go"}
 
-// builtinNames are the on_sent, prepare, workspace and workflow step names
+// builtinNames are the effect, prepare, workspace and workflow step names
 // holding a . or _.
 func builtinNames() map[string]bool {
 	var all []string
-	for _, slot := range []builtin.Slot{builtin.SlotOnSent, builtin.SlotPrepare, builtin.SlotWorkspace} {
-		all = append(all, builtin.Names[slot]...)
+	for _, e := range builtin.Effects {
+		all = append(all, e.Name)
 	}
+	for _, r := range builtin.Roles {
+		all = append(all, r.Prepare)
+	}
+	all = append(all, builtin.Names[builtin.SlotWorkspace]...)
 	for _, st := range builtin.Steps {
 		all = append(all, st.Name)
 	}
@@ -311,10 +320,16 @@ func TestTheBoundaryAnchorsExist(t *testing.T) {
 	if loader == nil || loader.Scope().Lookup("Programs") == nil {
 		t.Fatal("internal/intent.Programs is missing; R5 would match nothing")
 	}
-	programs := loader.Scope().Lookup("Programs").Type()
 	for _, name := range programFields {
-		obj, _, _ := types.LookupFieldOrMethod(programs, false, loader, name)
-		if v, ok := obj.(*types.Var); !ok || !programField(v) {
+		found := false
+		for _, typ := range []string{"Programs", "ActionPrograms"} {
+			if o := loader.Scope().Lookup(typ); o != nil {
+				obj, _, _ := types.LookupFieldOrMethod(o.Type(), false, loader, name)
+				v, ok := obj.(*types.Var)
+				found = found || ok && programField(v)
+			}
+		}
+		if !found {
 			missing = append(missing, "Programs."+name+" is missing; R5 would match nothing")
 		}
 	}

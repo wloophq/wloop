@@ -17,7 +17,7 @@ import (
 
 func planItem(wf string, u unit.Unit, value, decision, reason string) api.PlanItem {
 	return api.PlanItem{ID: wf + "/" + string(u.Provider) + "/" + u.Key + "/" + value, Workflow: wf, Decision: decision, Reason: reason,
-		Mode: "apply", Unit: u, Steps: []string{}, Actions: []api.ActionState{}}
+		Unit: u, Steps: []string{}, Actions: []api.ActionState{}}
 }
 
 // planFixture is a plan of every decision: rounds of the review workflows
@@ -29,8 +29,8 @@ func planFixture() []api.PlanItem {
 	manual := planItem("session-manual-quiet", unit.Unit{Provider: unit.Session, Key: "term_3"}, "aa00bb11cc22dd33", "pending", "!session.managed, session.agent_state = done, session.idle_for = 30h0m0s")
 	manual.Default, manual.Steps, manual.Gain = "wait", []string{"session.close"}, api.Gain{MemoryBytes: 300 << 20}
 	temp := planItem("workspace-temporary", unit.Unit{Provider: unit.Workspace, Key: "wt-9"}, "0099887766554433", "pending", "workspace.temporary = true")
-	temp.Default, temp.Mode, temp.Steps, temp.Gain = "wait", "observe", []string{"workspace.remove"}, api.Gain{DiskBytes: 2 << 30}
-	capped := planItem("address", unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}, "3c3c3c3c3c3c3c3c", "blocked", "per-PR daily cap reached (3)")
+	temp.Default, temp.Observe, temp.Steps, temp.Gain = "wait", true, []string{"workspace.remove"}, api.Gain{DiskBytes: 2 << 30}
+	capped := planItem("address", unit.Unit{Provider: unit.GitHub, Key: "acme/api#3"}, "3c3c3c3c3c3c3c3c", "blocked", "turns.per_unit_per_day reached (3)")
 	capped.Steps, capped.Attempts, capped.Error = []string{"turn.start"}, 1, "launching: the app\nwas closed"
 	first := planItem("review-first-round", unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, "7a7a7a7a7a7a7a7a", "run", "my review was requested")
 	first.Steps = []string{"turn.start"}
@@ -189,7 +189,7 @@ func TestPlanApplyAndDismiss(t *testing.T) {
 	}
 
 	te.err.Reset()
-	if code := te.run("plan", "apply", "3c3c3c3c"); code == 0 || !strings.Contains(te.err.String(), "per-PR daily cap reached (3)") || !strings.Contains(te.err.String(), "1 of 1 item(s) not applied") {
+	if code := te.run("plan", "apply", "3c3c3c3c"); code == 0 || !strings.Contains(te.err.String(), "turns.per_unit_per_day reached (3)") || !strings.Contains(te.err.String(), "1 of 1 item(s) not applied") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	for _, args := range [][]string{{"apply", "ffffffff"}, {"apply", "1f2e3d4"}, {"dismiss", "1f2e"}, {"apply"}} {
@@ -267,7 +267,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 		queries = append(queries, r.URL.Query().Get("unit"))
 		json.NewEncoder(w).Encode(api.PlanResponse{Items: []api.PlanItem{followup}, Errors: []string{}, Unit: "github:acme/api#7", Label: "acme/api#7", Title: "Batch export", Workflows: []api.UnitWorkflow{
 			{Workflow: "after-merge", Trigger: "event", Outcome: "waits", Reason: "decides when a merged or closed event arrives"},
-			{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not matched",
+			{Workflow: "review-first-round", Trigger: "sweep", Outcome: "not_matched",
 				Facts: []api.Fact{{Name: "pr.first.due", Value: "false"}, {Name: "pr.first.reason", Value: "the author is a bot"}}},
 		}})
 	})
@@ -288,7 +288,7 @@ func TestPlanOfAUnitSaysWhyEachWorkflowGivesNoItem(t *testing.T) {
 		"            Batch export · runs in 4m0s · steps turn.start\n" +
 		"no item (2)\n" +
 		"  after-merge  event, waits: decides when a merged or closed event arrives\n" +
-		"  review-first-round  sweep, not matched\n" +
+		"  review-first-round  sweep, not_matched\n" +
 		"            pr.first.due = false · pr.first.reason = the author is a bot\n"
 	if te.out.String() != want {
 		t.Fatalf("printed\n%s\nwant\n%s", te.out, want)

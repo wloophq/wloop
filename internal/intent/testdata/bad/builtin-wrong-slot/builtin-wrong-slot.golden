@@ -1,1 +1,1 @@
-testdata/bad/builtin-wrong-slot/intents/ask-author/intent.toml:5:28: on_sent[1]: nudge.prepare belongs in prepare, not in on_sent
+testdata/bad/builtin-wrong-slot/intents/ask-author/intent.toml:5:25: effects[1]: "nudge.prepare" is not one of "plan.cleared", "guidance.handed", "pr.round_sent", "pr.reviewed", "pr.addressed" or "pr.nudged"

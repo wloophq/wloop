@@ -42,7 +42,11 @@ func printWorkflowFacts(e *Env, subject string) error {
 			}
 			return usageError{usage: workflowsUsage, why: fmt.Sprintf("unknown subject %s: one of %s", subject, strings.Join(names, ", "))}
 		}
-		slots = []string{slot, "trigger", "config"}
+		slots = []string{slot}
+		if slices.Contains(builtin.BriefSubjects, slot) {
+			slots = append(slots, "brief")
+		}
+		slots = append(slots, builtin.DraftSlot, "trigger", "config")
 	}
 	w := tabwriter.NewWriter(e.Out, 0, 4, 2, ' ', 0)
 	for i, slot := range slots {
@@ -65,6 +69,12 @@ func slotHeading(slot string) string {
 			return fmt.Sprintf("%s (subject %s)", slot, p)
 		}
 	}
+	switch slot {
+	case "brief":
+		return slot + " (subjects whose units have a brief)"
+	case builtin.DraftSlot:
+		return slot + " ([withdraw] when, of each draft)"
+	}
 	return slot + " (every workflow)"
 }
 
@@ -81,8 +91,8 @@ func printWorkflowSteps(e *Env) error {
 			subjects = strings.Join(names, ", ")
 		}
 		args := "-"
-		if len(d.Args) > 0 {
-			args = strings.Join(d.Args, ", ")
+		if a := builtin.StepArgs(d.Name); len(a) > 0 {
+			args = strings.Join(a, ", ")
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", d.Name, subjects, args, d.Doc)
 	}

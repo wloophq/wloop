@@ -54,8 +54,8 @@ func TestActOfferedWhateverTheRecommendedMode(t *testing.T) {
 		if !st.Enabled || st.Primary != (mode == "headless") {
 			t.Errorf("recommended %q: act on a thread %+v, want enabled and primary only when headless is recommended", mode, st)
 		}
-		if mode != "" && !strings.Contains(st.Hint, "recommended: "+mode) {
-			t.Errorf("recommended %q: hint %q", mode, st.Hint)
+		if mode != "" && !strings.Contains(st.Note, "recommended: "+mode) {
+			t.Errorf("recommended %q: hint %q", mode, st.Note)
 		}
 	}
 }

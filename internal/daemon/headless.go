@@ -49,12 +49,12 @@ func (s *Server) runModes(w http.ResponseWriter, r *http.Request, d dintent.Def)
 		}
 	}
 	switch mode := req.Mode; {
-	case mode == string(turn.ModeSession) && d.Runs(mode):
+	case mode == string(turn.RunnerSession) && d.Runs(mode):
 		r.Body = io.NopCloser(bytes.NewReader(raw))
 		r.SetPathValue("action", string(d.Name))
 		s.runAction(w, r)
 		return
-	case mode != "" && mode != string(turn.ModeHeadless), !d.Runs(string(turn.ModeHeadless)):
+	case mode != "" && mode != string(turn.RunnerHeadless), !d.Runs(string(turn.RunnerHeadless)):
 		writeError(w, http.StatusBadRequest, "mode is headless or session, as the intent "+string(d.Name)+"'s manifest allows")
 		return
 	}

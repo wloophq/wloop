@@ -54,7 +54,7 @@ func (w *linkWiring) serve(d daemon.Deps, mods []source.Module) daemon.Deps {
 	if len(events) == 0 || w.e.changes == nil {
 		return d
 	}
-	r := &links.Resolver{Links: w.store, Events: events, Ledger: w.e.itemsLedger(w.db, w.cfg, w.logf), Clock: clockFunc(w.e.Now), Log: w.logf}
+	r := &links.Resolver{Links: w.store, Events: events, Ledger: w.e.itemsLedger(w.db, w.cfg, w.logf), Clock: clockFunc(w.e.Now), Log: w.logf, Codecs: d.Units}
 	changes := w.e.changes
 	d.Runtimes = append(d.Runtimes, daemon.PluginRuntime{ID: linksRuntime, Run: func(ctx context.Context) error {
 		return resolveNoted(ctx, r.Run, w.db.LinkTargets, changes, w.logf)

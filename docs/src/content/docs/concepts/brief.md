@@ -1,6 +1,6 @@
 ---
 title: The brief
-description: A short preview of every pull request, written by the agent, that rows, filters and profile blocks read.
+description: A short preview of every pull request and Slack conversation, written by the agent, that rows, filters, workflows and profile blocks read.
 ---
 
 With briefs on, the daemon writes a short preview of every open pull request in scope:
@@ -22,10 +22,43 @@ With briefs on, the daemon writes a short preview of every open pull request in 
 
 The cockpit shows the brief in the detail panel, and size and risk as pills on each row. The `/` filter searches the goal, and the `type:`, `size:`, `risk:` and `tag:` qualifiers read it. Profile blocks can depend on it: a block under `kind=fix/` or `tags/lang=go/` applies only to pull requests whose brief says so.
 
+## Slack conversations
+
+Each pass of the Slack extraction writes the brief of the thread or channel it read, in the same call: its goal and context, its **kind** (`question`, `request`, `incident`, `decision` or `announcement`), its risk, up to three open questions and tags under `domain`, `audience` and `concern`. A Slack brief has no size. Each topic of a direct message conversation gets its own brief. A pass that finds nothing new keeps the brief the conversation has, unless that brief has no kind or lacks a field of the brief intent at its current version (a brief carried over from an older release, or one written before the field was added): then the pass's brief replaces it; at most one brief is written per conversation a day, updated by later passes that day.
+
+The first turn of a Slack unit without a brief asks the extraction to read it at its next pass, without waiting for the conversation to go quiet, and waits up to 2 minutes for it; when nothing of the conversation is left to read, or the pass does not come in time, the turn starts without a brief. This holds with the GitHub plugin off, and when no agent can write pull request briefs. An `act` turn shows the brief of its thread, and workflows over Slack units and GTD entries read the `brief.*` facts of their unit.
+
+## Fields of your own
+
+The brief is an intent of the profile, the one whose manifest says `builds = "brief"`. Its prompt is `prompts/brief.md` and its taxonomy `prompts/brief-taxonomy.md`; a file of your profile at either path replaces the bundled one, and briefs are written again at their next refresh. To add fields, give your profile its own brief intent with a `schema.json` beside its manifest:
+
+```toml
+# intents/brief/intent.toml
+label    = "Brief"
+summary  = "The brief, with how each change solves its goal"
+builds   = "brief"
+provider = ["github", "slack"]
+prompt   = "prompts/brief.md"
+schema   = "schema.json"
+```
+
+```json
+{"type": "object", "properties": {
+  "solution": {"type": "string", "maxLength": 300},
+  "approach": {"type": "string", "enum": ["patch", "rewrite", "config"]}
+}}
+```
+
+The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword, a nested object, or a field of another type (a number, a null, a list of anything but strings) fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one for the providers it lists, and each provider's units, their facts and the Slack extraction read the fields of their own provider's intent.
+
+Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
+
+Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them. An intent that lists fields under `brief = { need = [...] }` makes its first turn wait for that call; a call that fails lets the turn start with the brief as it is. Slack briefs carry the fields from the extraction's next pass; a pass whose fields break the schema keeps the previous brief's fields that are still at their version.
+
 ## Turn it on
 
 ```json
-"brief": { "enabled": true, "tier": "fast", "max_diff_bytes": 60000 }
+"brief": { "enabled": true, "tier": "fast", "max_input_bytes": 60000 }
 ```
 
 The daemon reads `brief` when it starts; restart it after turning briefs on or off (on macOS, `launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`).
@@ -34,7 +67,7 @@ Each brief is one headless call of the agent, billed to your account with it. Fo
 
 ## When briefs run
 
-A `brief` job runs after each fast sweep and briefs up to 5 pull requests per run, 2 at a time. Each reads the title, the description, the first linked issue, the file list and the diff cut to `brief.max_diff_bytes` (at most 200000). A pull request is briefed again when its description is edited, when a new head adds more than 5 files, or when a new release changes the prompt. While the GitHub budget is low, briefs wait.
+A `brief` job runs after each fast sweep and briefs up to 5 pull requests per run, 2 at a time. Each reads the title, the description, the first linked issue, the file list and the diff cut to `brief.max_input_bytes` (at most 200000). A pull request is briefed again when its description is edited, when a new head adds more than 5 files, or when a new release changes the prompt. While the GitHub budget is low, briefs wait.
 
 The **first turn** of a pull request, whatever its intent, waits for its brief. `{{command}} review` prints `briefing` while it waits. `--no-brief`, `{{command}} intake without <n>`, or "Start without brief" in the cockpit and the menu bar start without it. Later turns take the brief there is and never wait.
 

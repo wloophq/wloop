@@ -16,7 +16,7 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "surface is web, tui or menubar")
 		return
 	}
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs())})
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(s.loaded()))})
 }
 
 func keyViews(surface keys.Surface, specs, plan []api.ActionSpec) []api.KeyView {
@@ -29,7 +29,7 @@ func keyViews(surface keys.Surface, specs, plan []api.ActionSpec) []api.KeyView 
 	add := func(specs []api.ActionSpec, ctx keys.Context) {
 		for _, s := range specs {
 			if s.Key != "" && slices.Contains(keys.SurfacesOf(s.Surfaces), surface) {
-				out = append(out, api.KeyView{Key: s.Key, Action: s.ID, Context: string(ctx), Owner: keyOwner(s), Help: s.Label})
+				out = append(out, api.KeyView{Key: s.Key, Action: s.ID, Context: string(ctx), Owner: keyOwner(s), Help: s.Label, Summary: s.Summary})
 			}
 		}
 	}

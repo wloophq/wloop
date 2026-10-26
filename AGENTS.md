@@ -15,14 +15,20 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Intents (manifest, instructions) | `profiles/default/intents/<name>/` |
 | Workflows (when, steps, texts) | `profiles/default/workflows/<name>/` |
 | Judgment blocks | `profiles/default/intent=<name>.md` |
+| Partials every intent's instructions share | `profiles/default/partials/` |
+| Prompts of the loop's own calls (the headless wrapper) | `profiles/default/prompts/` |
 | Facts a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go` |
 | Workflow steps | `builtin.Steps` in `internal/intent/builtin/builtin.go`, adapted in `internal/cli/steps.go` |
-| Workflow subjects | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
-| Intent built-ins (`on_sent`, `prepare`, `workspace`, ...) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
+| Workflow providers | `builtin.Slots` in `internal/intent/builtin/builtin.go` |
+| Roles, and what each implies (round kind, reconcile, prepare, policy, row driving) | `builtin.Roles` in `internal/intent/builtin/roles.go` |
+| Effects a sent turn or draft applies | `builtin.Effects` in `internal/intent/builtin/effects.go` |
+| Intent built-ins (`workspace`, `before`) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
+| Every reserved key of a manifest, `actions.toml` and the configuration | `builtin.Grammar` in `internal/intent/builtin/grammar*.go`; `make docs-ref` regenerates the schemas and the reference |
+| The words of the built-in actions | `profiles/default/actions.toml` |
 | What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |
 | Visual tokens, brand book, components | `design/`, which the clients follow; `go generate ./internal/web` writes `app.css`'s token region from `design/tokens.json` |
 
-Adding a fact, a step or an effect: add it to its table with its doc, wire it, test it, then `make docs-ref` to regenerate the reference pages.
+Adding a fact, a step, an effect or a reserved key: add it to its table with its doc, wire it, test it, then `make docs-ref` to regenerate the reference pages.
 
 ## Accepted mechanism in Go
 
@@ -32,9 +38,9 @@ These stay in Go and are exposed as facts for the profile to act on:
 - working-day arithmetic and `owedBy`'s fallback;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard that never sends a GitHub comment under the user's name without approval.
+- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
 
-Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them; `internal/archtest`'s shrinking allowlists hold the prose): the turn partials, the headless wrapper, the Slack extraction prompt, the brief prompt and taxonomy, the Slack proposal rules in `internal/core/proposals`, what a sent draft does and the Outbox's send verdict (both keyed on the draft's kind), the workflow subjects (pull requests, sessions and workspaces) and `turn.start` (pull requests only).
+Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), and the notification titles, the digest and the menu bar's copy.
 
 ## Conventions
 
@@ -64,7 +70,7 @@ The architecture docs describe the code as it is; each rule below is a test in `
 - One adapter reaches each outside tool: the store, GitHub, Orca, Claude Desktop, the agent. Outside it, a tool's name appears only in the composition root.
 - Only the daemon, and the `store` commands under the store's lock, write the store; clients speak `internal/api` and decide nothing. [The daemon and its clients](docs/src/content/docs/architecture/daemon-and-clients.md)
 - The core is keyed by `unit.Unit`, names no provider and imports no plugin; a source is a plugin registered in `internal/cli/sources.go`. [Plugins](docs/src/content/docs/architecture/plugins.md)
-- Go never enumerates intents; facts, steps and builtins live in their tables in `internal/intent/builtin`. [Profile first](docs/src/content/docs/architecture/profile-first.md)
+- Go never enumerates intents; facts, steps, roles, effects, builtins and every reserved key live in their tables in `internal/intent/builtin`. [Profile first](docs/src/content/docs/architecture/profile-first.md)
 - Every outbound post is a draft that a person, or their approval policy, approves; authority never comes from an agent.
 - Every user-visible name derives from `internal/brand`.
 

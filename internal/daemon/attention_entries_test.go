@@ -137,7 +137,7 @@ var waitFixtures = []catalogFixture{
 		sessions.SetAgents(turns.AgentObservation{WorkspaceID: "w7", Pane: "t:1", State: turn.AgentWaiting})
 		c.s.deps.Agents = snapshotOf(sessions)
 		at := catalogNow.Add(-30 * time.Minute)
-		b := turn.Book{Unit: r7u, Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term-7",
+		b := turn.Book{Unit: r7u, Turns: []turn.Turn{{Intent: turn.Intent(dintent.Address), Role: "pr.address", ID: "r7", Trigger: turn.Automated, Head: "h2", Session: "term-7",
 			State: turn.Started, SentAt: at, StartedAt: at}}}
 		if _, err := c.repo.Save(ctx, b, port.Event{Unit: r7u, Kind: turns.KindTurnSent, Key: "r", At: at}); err != nil {
 			t.Fatal(err)
@@ -262,7 +262,7 @@ func withOutbox(r *entriesRig, drafts ...draft.Draft) *fakeOutbox {
 }
 
 func proposed(id int64, entry string) draft.Draft {
-	return draft.Draft{ID: draft.ID(id), Unit: r7u, Entry: entry, Kind: draft.Comment, Text: "Thanks, merging.\nmore", State: draft.Proposed,
+	return draft.Draft{ID: draft.ID(id), Unit: r7u, Entry: entry, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Proposed,
 		CreatedAt: entriesNow.Add(-time.Hour), UpdatedAt: entriesNow.Add(-time.Duration(id) * time.Minute)}
 }
 

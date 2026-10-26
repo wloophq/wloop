@@ -58,6 +58,9 @@ func (s Session) State() SessionState {
 	return SessionDormant
 }
 
+// IsSession says whether u is a session.
+func IsSession(u unit.Unit) bool { return u.Provider == unit.Session }
+
 // SessionCodec is the unit codec of provider "session".
 type SessionCodec struct{}
 

@@ -111,13 +111,13 @@ func (s *Server) draftsHeadless(ctx context.Context, g *coregtd.Service, e gtd.E
 		return false
 	}
 	st, runs := b.runs()
-	return runs && s.bridgeMode(st.ID, string(turn.ModeHeadless)) == nil
+	return runs && s.bridgeMode(st.ID, string(turn.RunnerHeadless)) == nil
 }
 
 // rowNotice is the notice of e's first unit's row; served says the unit is a pull request the read model
 // serves, ok that its row notifies.
 func (ev *entryViewer) rowNotice(ctx context.Context, e gtd.Entry) (n prrow.Notice, row api.Row, served, ok bool) {
-	if len(e.Units) == 0 || e.Units[0].Provider != unit.GitHub {
+	if len(e.Units) == 0 || !isPullRequest(e.Units[0]) {
 		return prrow.Notice{}, api.Row{}, false, false
 	}
 	rd, served, err := ev.s.readRow(ctx, e.Units[0])
@@ -319,12 +319,12 @@ func (ev *entryViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
 
 func draftBody(d draft.Draft) string {
 	text := d.Text
-	if d.Kind == draft.React {
+	if d.Reaction != "" {
 		text = ":" + d.Reaction + ":"
 	}
 	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
 	if r := []rune(line); len(r) > 200 {
 		line = string(r[:200]) + "…"
 	}
-	return string(d.Kind) + ": " + line
+	return d.Purpose + ": " + line
 }

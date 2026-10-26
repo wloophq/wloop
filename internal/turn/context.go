@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/instructions"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -179,6 +178,8 @@ type TurnFacts struct {
 	Mine, CrossRepository                                                             bool
 	LastReviewVerdict                                                                 string
 	AddressReviews, AddressChecks, FollowupsWithoutWorkspace, AddressWithoutWorkspace bool
+	// RequestedTeams are the teams a review was requested through, as <org>-<slug>.
+	RequestedTeams []string
 }
 
 type Context struct {
@@ -202,7 +203,7 @@ type Context struct {
 	Records            bool
 	AutomatedReviewers []string
 	Guide              profile.Guide
-	// Guides are the composed guides by profile: the main one and each also_profiles one that applies.
+	// Guides are the composed guides by profile: the main one and each also_profile one that applies.
 	Guides        map[string]profile.Guide
 	Brief         *Brief
 	BriefMissing  string
@@ -309,11 +310,3 @@ func (c Context) prior() *PriorReview {
 }
 
 func (c Context) Automated() bool { return c.Trigger == Automated }
-
-// Who says who started the turn, for headlines.
-func (c Context) Who() string {
-	if c.Automated() {
-		return "started by " + brand.Name
-	}
-	return "asked for by you"
-}

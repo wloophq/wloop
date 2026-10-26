@@ -98,6 +98,8 @@ type Candidate struct {
 	ConflictHead string
 	LastReviewAt time.Time
 	Observed     bool
+	// Reason is why the planner plans the round.
+	Reason string
 }
 
 // Provider is the github source's facts.
@@ -169,7 +171,7 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 		for k, t := range r.dues {
 			dues[k] = earliestOf(dues[k], t)
 		}
-		if r.runs() && v.rounds.CapReason(ref.String(), now, v.cfg.Rounds.PerPRPerDay) != "" {
+		if r.runs() && v.rounds.CapReason(ref.String(), now, v.cfg.Turns.PerUnitPerDay) != "" {
 			dues["cap"] = nextDay(now)
 		}
 	}
@@ -235,16 +237,17 @@ func (p *Provider) Candidate(ctx context.Context, u unit.Unit, round string) (Ca
 		if r.review.action != actionFollowup {
 			return Candidate{}, false, nil
 		}
-		c.Workspace, c.Fingerprint, c.LastReviewAt, c.Observed = r.review.ws, r.review.fingerprint, r.review.lastReviewAt, r.review.observed
+		c.Workspace, c.Fingerprint, c.LastReviewAt, c.Observed, c.Reason = r.review.ws, r.review.fingerprint, r.review.lastReviewAt, r.review.observed, r.review.reason
 	case RoundFirst:
 		if !r.first.due {
 			return Candidate{}, false, nil
 		}
+		c.Reason = r.first.reason
 	case RoundAddress:
 		if !r.address.due {
 			return Candidate{}, false, nil
 		}
-		c.Workspace, c.Fingerprint, c.ChecksHead, c.ConflictHead, c.Observed = r.address.ws, r.address.fingerprint, r.address.checksHead, r.address.conflictHead, r.address.observed
+		c.Workspace, c.Fingerprint, c.ChecksHead, c.ConflictHead, c.Observed, c.Reason = r.address.ws, r.address.fingerprint, r.address.checksHead, r.address.conflictHead, r.address.observed, r.address.reason
 	default:
 		return Candidate{}, false, fmt.Errorf("no round %q of a pull request", round)
 	}

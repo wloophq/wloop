@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/turn"
@@ -126,8 +127,8 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 		if w := strings.Join(who, ", "); proposedWho(g) != w {
 			t.Errorf("%s: the proposal asks %q, the offer %q", r.Unit.Label(), proposedWho(g), w)
 		}
-		if want := (draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: r.Unit.String()}); g.Origin != want || g.Kind != draft.Nudge {
-			t.Errorf("%s: origin %+v kind %s", r.Unit.Label(), g.Origin, g.Kind)
+		if want := (draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: r.Unit.String()}); g.Origin != want || !slices.Equal(g.Effects, []string{builtin.EffectPRNudged, builtin.EffectEntryNudged}) {
+			t.Errorf("%s: origin %+v effects %v", r.Unit.Label(), g.Origin, g.Effects)
 		}
 	}
 	for u := range byUnit {
@@ -199,7 +200,7 @@ func TestNoNudgeForCardOnlyStates(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s: no nudge for a stalled pull request (%s)", name, ghsourcetest.Derive(s).Kind)
 		}
-		if p.Text == "" || p.Kind != draft.Nudge || p.Unit != s.PR.Ref.Unit() {
+		if p.Text == "" || p.Purpose != nudgePurpose || p.Unit != s.PR.Ref.Unit() {
 			t.Fatalf("%s: %+v", name, p)
 		}
 	}
@@ -263,7 +264,7 @@ func TestIntentNudgeAndDraftNudgeShareTheWindow(t *testing.T) {
 
 	p, f, evs := testPublisher(t)
 	prop, _ := propose(s)
-	d := draft.Draft{ID: 3, Unit: prop.Unit, Kind: prop.Kind, Text: prop.Text, State: draft.Sending}
+	d := draft.Draft{ID: 3, Unit: prop.Unit, Purpose: prop.Purpose, Effects: prop.Effects, Text: prop.Text, State: draft.Sending}
 	f.now = ghsourcetest.Now
 	if _, err := p.Publish(context.Background(), d); err != nil {
 		t.Fatal(err)
@@ -291,7 +292,7 @@ func TestDraftNudgeCommentIsANudgeComment(t *testing.T) {
 	if !ok {
 		t.Fatal("no proposal")
 	}
-	ev, err := p.Publish(context.Background(), draft.Draft{ID: 4, Unit: prop.Unit, Kind: prop.Kind, Text: prop.Text, State: draft.Sending})
+	ev, err := p.Publish(context.Background(), draft.Draft{ID: 4, Unit: prop.Unit, Purpose: prop.Purpose, Effects: prop.Effects, Text: prop.Text, State: draft.Sending})
 	if err != nil {
 		t.Fatal(err)
 	}

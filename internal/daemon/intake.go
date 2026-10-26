@@ -102,7 +102,18 @@ func (s *Server) newIntakes(d Deps) *intake.Service {
 		return nil
 	}
 	return &intake.Service{Store: d.Intakes, Briefs: intakeBriefs(d), Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
-		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf}
+		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf, Needs: briefNeeds(d)}
+}
+
+// briefNeeds are the brief fields an intent's manifest needs.
+func briefNeeds(d Deps) func(string) []string {
+	if d.Intents == nil {
+		return nil
+	}
+	return func(name string) []string {
+		def, _ := d.Intents().Registry.Get(dintent.Name(name))
+		return def.Brief.Need
+	}
 }
 
 type clockFunc func() time.Time
@@ -126,14 +137,14 @@ type unavailableBriefs struct {
 	why string
 }
 
-func (u unavailableBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (u unavailableBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	return intake.Readiness{Go: true, Without: true, Note: "briefs are unavailable: " + u.why}, nil
 }
 
 // offBriefs starts every intake at once, as briefs that are off.
 type offBriefs struct{}
 
-func (offBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (offBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	return intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff}, nil
 }
 
@@ -357,16 +368,16 @@ func (s *Server) startedBySweep(i intake.Intake, t turn.Turn, out io.Writer) err
 	var err error
 	switch how := sweepLacks(def, d.Inputs, t.Inputs); {
 	case d.Guidance != "" && d.Guidance != t.Guidance:
-		err = conflict{sent + "; your guidance was not sent, ask again once that turn ends"}
+		err = conflict{msg: sent + "; your guidance was not sent, ask again once that turn ends"}
 	case how != "":
-		err = conflict{sent + " " + how + "; ask again once that turn ends"}
+		err = conflict{msg: sent + " " + how + "; ask again once that turn ends"}
 	default:
 		fmt.Fprintln(out, sent+"; nothing more was sent")
 	}
 	if i.Source == sourceSession {
 		outcome := err
 		if outcome == nil {
-			outcome = conflict{sent + "; run this command again to follow that turn"}
+			outcome = conflict{msg: sent + "; run this command again to follow that turn"}
 		}
 		s.byHand.Store(i.Seq, byHandOutcome{err: outcome})
 	}
@@ -577,17 +588,19 @@ func (s *Server) intentOf(ctx context.Context, action string, row api.Row) (turn
 	mine := login != "" && strings.EqualFold(p.Author, login)
 	name, err := catalog.RunNowIntent(s.loaded().Registry, p.Workspace, p.Override, mine)
 	if err != nil {
-		return "", conflict{err.Error()}
+		return "", conflict{msg: err.Error()}
 	}
 	return turn.Intent(name), nil
 }
 
-type conflict struct{ msg string }
+// conflict is a request the row's state refuses; refusal is the code of
+// the profile text msg is, "" when msg is the loop's own.
+type conflict struct{ msg, refusal string }
 
 func (e conflict) Error() string { return e.msg }
 
 func joinRefused(open intake.Intake, how string) error {
-	return conflict{catalog.JoinRefusalText(open.Seq, string(open.Intent), how)}
+	return conflict{msg: catalog.JoinRefusalText(open.Seq, string(open.Intent), how)}
 }
 
 // joinsAction refuses a request from the command line, the cockpit, the
@@ -859,7 +872,7 @@ func (s *Server) handleIntake(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleIntakeWithout(w http.ResponseWriter, r *http.Request) {
 	s.changeIntake(w, r, func(ctx context.Context, i intake.Intake) error {
 		if i.Source == sourceSession {
-			return conflict{catalog.SessionWithout(i.Seq)}
+			return conflict{msg: catalog.SessionWithout(i.Seq)}
 		}
 		return s.intakes.Without(ctx, i.Seq)
 	}, "intake %d starts without the brief")
@@ -881,7 +894,7 @@ func (s *Server) changeIntake(w http.ResponseWriter, r *http.Request, change fun
 		return
 	}
 	if s.intakes == nil {
-		if s.refusePlugin(w, unit.Unit{Provider: unit.GitHub}) {
+		if s.refusePlugin(w, unit.Unit{Provider: s.deps.Forge}) {
 			return
 		}
 		writeError(w, http.StatusServiceUnavailable, errIntakesUnavailable.Error())
@@ -934,7 +947,7 @@ func (s *Server) BriefReady(ctx context.Context, u unit.Unit) (intake.Readiness,
 	if err != nil {
 		return intake.Readiness{}, err
 	}
-	return intakeBriefs(s.deps).Ready(ctx, u, first)
+	return intakeBriefs(s.deps).Ready(ctx, u, first, nil)
 }
 
 // OpenIntakes lists the open intakes but the session ones nobody asks for;

@@ -26,9 +26,9 @@ nudges should be shorter
 The skill maps the sentence to intents and conditions, shows the diff and applies it on your yes. It drives the same commands you can run yourself:
 
 ```sh
-{{command}} profile where review --org acme        # which block a rule for acme reviews goes in
-{{command}} profile add review,address --org acme -- 'Every pull request adds an entry to CHANGELOG.md.'
-{{command}} profile add review,address --org acme --apply -- 'Every pull request adds an entry to CHANGELOG.md.'
+{{command}} profile where review --organization acme        # which block a rule for acme reviews goes in
+{{command}} profile add review,address --organization acme -- 'Every pull request adds an entry to CHANGELOG.md.'
+{{command}} profile add review,address --organization acme --apply -- 'Every pull request adds an entry to CHANGELOG.md.'
 {{command}} profile check
 ```
 
@@ -46,7 +46,7 @@ A block is a Markdown file whose path holds its conditions and ends in `intent=<
   organization=acme/intent=review.md               reviews in acme's repositories
   organization=acme/repo=api/intent=review.md      reviews in acme/api
   user=dependabot[bot]/intent=review.md            reviews of dependabot's pull requests
-  round=follow-up/intent=review.md                 follow-up reviews only
+  stage=follow-up/intent=review.md                 follow-up reviews only
   kind=fix/intent=review.md                        reviews of fixes (needs the brief)
   tags/lang=go/intent=review.md                    reviews of Go changes (needs the brief)
 ```

@@ -66,8 +66,8 @@ func (c *Collector) branchOf(w wsdomain.Workspace) string {
 	switch {
 	case w.IsMain:
 		return w.PRBranch()
-	case strings.HasPrefix(w.DisplayName, c.Cfg.ReviewPrefix):
-		return strings.TrimPrefix(w.DisplayName, c.Cfg.ReviewPrefix)
+	case strings.HasPrefix(w.DisplayName, c.Cfg.GitHub.ReviewPrefix):
+		return strings.TrimPrefix(w.DisplayName, c.Cfg.GitHub.ReviewPrefix)
 	}
 	return w.HeadBranch()
 }
@@ -194,7 +194,7 @@ func (c *Collector) linkWorkspaces(ctx context.Context, list []local, l *links, 
 		before[pr.Ref] = pr.Workspace
 		linked[pr.Ref] = dinv.Workspace{
 			Manager: w.Manager, ID: w.ID, DisplayName: w.DisplayName, Status: w.Status,
-			IsReview:    !w.IsMain && strings.HasPrefix(w.DisplayName, c.Cfg.ReviewPrefix),
+			IsReview:    !w.IsMain && strings.HasPrefix(w.DisplayName, c.Cfg.GitHub.ReviewPrefix),
 			AgentStates: activity[w.ID].States,
 			Comment:     termfmt.OneLine(w.Comment, 1000),
 			IsMain:      w.IsMain,
@@ -302,7 +302,7 @@ func (c *Collector) readDevelopedThreads(ctx context.Context, list []local, l *l
 	var refs []github.Ref
 	for _, w := range list {
 		p, found := l.of(w)
-		if !found || p.State != dgh.StateOpen || (!w.IsMain && strings.HasPrefix(w.DisplayName, c.Cfg.ReviewPrefix)) ||
+		if !found || p.State != dgh.StateOpen || (!w.IsMain && strings.HasPrefix(w.DisplayName, c.Cfg.GitHub.ReviewPrefix)) ||
 			strings.EqualFold(p.Author, resolved.Viewer) || slices.Contains(refs, p.Ref) {
 			continue
 		}

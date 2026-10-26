@@ -110,7 +110,7 @@ func TestSeededHistoryIsCoherent(t *testing.T) {
 		{"events outside their pull request's life", `SELECT count(*) FROM events e JOIN pull_requests p ON e.provider = 'github' AND e.unit_key = p.owner || '/' || p.repo || '#' || p.number
 			WHERE e.at < p.created_at OR (p.closed_at != '' AND e.at > p.closed_at)`, 0},
 		{"brief_ended events of no run", `SELECT count(*) FROM events e WHERE e.kind = 'brief_ended'
-			AND NOT EXISTS (SELECT 1 FROM brief_runs r WHERE r.id = CAST(e.key AS INTEGER) AND e.provider = 'github' AND e.unit_key = r.owner || '/' || r.repo || '#' || r.number)`, 0},
+			AND NOT EXISTS (SELECT 1 FROM brief_runs r WHERE r.id = CAST(e.key AS INTEGER) AND e.provider = r.provider AND e.unit_key = r.unit_key)`, 0},
 		{"brief_ended events", `SELECT count(*) FROM events WHERE kind = 'brief_ended'`, Live.BriefRuns},
 		{"session events on a pull request", `SELECT count(*) FROM events WHERE kind IN ('session_idle', 'session_active') AND provider = 'github'`, 0},
 		{"turn_ended events without their record", `SELECT count(*) FROM events e WHERE e.kind = 'turn_ended'

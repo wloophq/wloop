@@ -38,7 +38,8 @@ func (t *tally) add(r result) {
 // trigger, saves the plan, advances the event cursors and drops the run
 // items whose source moved. Under the lock it drops the run items whose unit
 // was noted after the plan's generation and no longer match, notes the
-// refusals, runs the run items and the due pending ones, and settles.
+// refusals, runs the run items and the due pending ones, withdraws the
+// drafts the workflows no longer call for, and settles.
 func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped string, err error) {
 	if e.Reachable != nil {
 		if err := e.Reachable(ctx); err != nil {
@@ -110,7 +111,7 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 		}
 	}()
 	for _, pl := range ev.items {
-		if pl.refusedStep < 0 || pl.w.Mode != workflow.ModeApply {
+		if pl.refusedStep < 0 || pl.w.Observe {
 			continue
 		}
 		if err := e.Steps.Note(ctx, pl.w.Steps[pl.refusedStep], pl.item.Unit, pl.item.Why, pl.refusal); err != nil {
@@ -150,6 +151,9 @@ func (e *Engine) Sweep(ctx context.Context, loop sync.Locker) (summary, skipped 
 	}
 	t.ran, t.failed, t.refused, t.deferred, t.transient = t.ran+due.ran, t.failed+due.failed,
 		t.refused+due.refused, t.deferred+due.deferred, t.transient+due.transient
+	if err := e.withdraw(ctx); err != nil {
+		e.logf("withdrawing drafts: %v", err)
+	}
 	if s, ok := e.Units.(Settler); ok {
 		if err := s.Settle(ctx, st); err != nil {
 			return "", "", fmt.Errorf("settling: %w", err)
@@ -205,7 +209,7 @@ func (e *Engine) live() map[string]workflow.Workflow {
 func (e *Engine) fresh(ctx context.Context, items []*planned, t *tally) ([]*planned, error) {
 	var runs []*planned
 	for _, pl := range items {
-		if pl.item.Decision == workflow.DecisionRun && pl.item.Mode == workflow.ModeApply && !pl.carried {
+		if pl.item.Decision == workflow.DecisionRun && !pl.item.Observe && !pl.carried {
 			runs = append(runs, pl)
 		}
 	}
@@ -250,7 +254,7 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if !ch.All && !slices.Contains(ch.Units, pl.item.Unit) {
 			return ""
 		}
-		facts, err := e.Units.Facts(ctx, pl.item.Unit)
+		facts, err := e.factsFor(ctx, pl.w.Name, pl.item.Unit)
 		if err != nil {
 			return "its facts cannot be read: " + err.Error()
 		}
@@ -322,7 +326,7 @@ func (e *Engine) schedule(ctx context.Context, ev *evaluation) error {
 		return err
 	}
 	for _, it := range pending {
-		if it.Default == workflow.OutcomeRun && it.Mode == workflow.ModeApply && it.Deadline.After(now) {
+		if it.Default == workflow.OutcomeRun && !it.Observe && it.Deadline.After(now) {
 			due = earliest(due, it.Deadline)
 		}
 	}

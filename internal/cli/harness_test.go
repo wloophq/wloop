@@ -76,6 +76,16 @@ type fakeGH struct {
 	loop      *sync.Mutex
 	underLock []string
 	prView    string // answers gh pr view; empty fails it
+	prViewDir string // the directory gh pr view ran in
+}
+
+func (f *fakeGH) RunIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "pr" && args[1] == "view" {
+		f.mu.Lock()
+		f.prViewDir = dir
+		f.mu.Unlock()
+	}
+	return f.Run(ctx, args...)
 }
 
 func (f *fakeGH) Run(_ context.Context, args ...string) ([]byte, error) {

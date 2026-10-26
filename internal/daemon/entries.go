@@ -394,7 +394,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if mode == string(turn.ModeSession) && u.Provider != unit.GitHub && s.deps.Placer != nil {
+	if mode == string(turn.RunnerSession) && !s.can(u.Provider, api.CapabilityCheckouts) && s.deps.Placer != nil {
 		if _, err := s.deps.Placer.SessionPlace(r.Context(), u); err != nil {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -434,9 +434,8 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		}
 		res.Output = []string{fmt.Sprintf("%s started headless as turn %d", st.ID, started.Seq)}
 	case rec.code != http.StatusOK:
-		for k, vs := range rec.header {
-			w.Header()[k] = vs
-		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(rec.code)
 		_, _ = w.Write(rec.body.Bytes())
 		return
@@ -468,9 +467,9 @@ func (s *Server) bridgeMode(action, mode string) error {
 	switch mode {
 	case "":
 		return nil
-	case string(turn.ModeHeadless), string(turn.ModeSession):
+	case string(turn.RunnerHeadless), string(turn.RunnerSession):
 	default:
-		return fmt.Errorf("mode is %s or %s, not %q", turn.ModeHeadless, turn.ModeSession, mode)
+		return fmt.Errorf("mode is %s or %s, not %q", turn.RunnerHeadless, turn.RunnerSession, mode)
 	}
 	d, ok := s.loaded().Registry.Get(dintent.Name(action))
 	if !ok || !d.Runs(mode) {
@@ -481,18 +480,18 @@ func (s *Server) bridgeMode(action, mode string) error {
 
 // delegateModes are the modes action runs in on u; a session is disabled with the placer's reason when u
 // has nowhere to run one.
-func (s *Server) delegateModes(ctx context.Context, u unit.Unit, action string) []api.ModeState {
+func (s *Server) delegateModes(ctx context.Context, u unit.Unit, action string) []api.RunnerState {
 	d, ok := s.loaded().Registry.Get(dintent.Name(action))
 	if !ok {
 		return nil
 	}
-	var out []api.ModeState
-	for _, m := range []turn.Mode{turn.ModeHeadless, turn.ModeSession} {
+	var out []api.RunnerState
+	for _, m := range []turn.Runner{turn.RunnerHeadless, turn.RunnerSession} {
 		if !d.Runs(string(m)) {
 			continue
 		}
-		ms := api.ModeState{Mode: string(m), Enabled: true}
-		if m == turn.ModeSession && u.Provider != unit.GitHub && s.deps.Placer != nil {
+		ms := api.RunnerState{Runner: string(m), Enabled: true}
+		if m == turn.RunnerSession && !s.can(u.Provider, api.CapabilityCheckouts) && s.deps.Placer != nil {
 			if _, err := s.deps.Placer.SessionPlace(ctx, u); err != nil {
 				ms.Enabled, ms.Reason = false, err.Error()
 			}
@@ -503,7 +502,7 @@ func (s *Server) delegateModes(ctx context.Context, u unit.Unit, action string) 
 }
 
 func otherMode(mode string) string {
-	if mode == string(turn.ModeHeadless) {
+	if mode == string(turn.RunnerHeadless) {
 		return "hand it to an agent instead"
 	}
 	return "draft it headless instead"
@@ -746,7 +745,7 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 			if !st.Enabled {
 				st.Reason = b.reason()
 			} else if x.verb == gtd.VerbDelegate {
-				st.Modes = ev.s.delegateModes(ctx, b.unit, runs.ID)
+				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:
 			if err := coregtd.Accepts(e, x.verb); err != nil {

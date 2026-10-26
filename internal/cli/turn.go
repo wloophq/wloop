@@ -297,7 +297,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 	}
 	ref := prOf(r.Unit)
 	repo := ""
-	if r.Unit.Provider == unit.GitHub {
+	if isPR(r.Unit) {
 		repo = ref.Owner + "/" + ref.Repo
 	}
 	stored := dinv.StoredTurn{ID: out.ID, Kind: string(r.Intent), Repo: repo,
@@ -310,7 +310,7 @@ func (e *Env) storeTurn(ctx context.Context, cfg config.Config, r turn.Request) 
 	if out.Records && e.Turns != nil {
 		sent.send = &turns.SendRequest{Unit: r.Unit, Intent: dturn.Intent(r.Intent), Turn: out.ID, Trigger: turnTrigger(r.Trigger),
 			Guidance: r.Guidance, Agent: cfg.For(ref.Owner, ref.Repo).Agent, Records: true, Inputs: persisted(c),
-			Items: r.Items, Entry: r.Entry}
+			Items: r.Items, Entry: r.Entry, Role: c.Def.Role}
 		if r.Why != nil {
 			sent.send.Workflow = r.Why.Workflow
 		}
@@ -374,11 +374,20 @@ func (e *Env) sendTurn(ctx context.Context, cfg config.Config, r turn.Request) (
 				return sentTurn{}, err
 			}
 		}
-		if v, ok := b.LastVerdict(dturn.Intent(r.Intent)); ok {
+		if v, ok := e.lastVerdict(b, r.Intent); ok {
 			r.LastVerdict = &turn.RecordedVerdict{Head: v.Head, Endorsed: v.Endorsed, At: v.At}
 		}
 	}
 	return e.storeTurn(ctx, cfg, r)
+}
+
+// lastVerdict is the newest verdict b's turns of intent's role published,
+// whichever intent held the role then; by name for an intent with no role.
+func (e *Env) lastVerdict(b dturn.Book, intent turn.Intent) (dturn.Published, bool) {
+	if d, ok := e.loadedIntents().Registry.Get(dintent.Name(intent)); ok && d.Role != "" {
+		return b.LastRoleVerdict(d.Role)
+	}
+	return b.LastVerdict(dturn.Intent(intent))
 }
 
 // openPR reads the pull request a round is about and refuses one that is

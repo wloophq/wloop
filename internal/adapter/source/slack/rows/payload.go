@@ -29,6 +29,10 @@ type Payload struct {
 	LastHuman       *LastHuman     `json:"last_human,omitempty"`
 	WaitsOn         []items.Person `json:"waits_on,omitempty"`
 	Viewer          string         `json:"viewer,omitempty"`
+	// Turns are the loop's turns on the unit; nil when it had none.
+	Turns *api.TurnFacts `json:"turns,omitempty"`
+	// Next is sorted by At and holds only future instants.
+	Next []api.Upcoming `json:"next,omitempty"`
 }
 
 // LastHuman is the newest message a human other than the viewer wrote.

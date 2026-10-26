@@ -27,7 +27,7 @@ func (r Ref) URL() string {
 	return fmt.Sprintf("https://github.com/%s/%s/pull/%d", r.Owner, r.Repo, r.Number)
 }
 
-var prURL = regexp.MustCompile(`^https://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)(?:[/?#].*)?$`)
+var prURL = regexp.MustCompile(`^https?://github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)(?:[/?#].*)?$`)
 
 func ParseURL(raw string) (Ref, error) {
 	m := prURL.FindStringSubmatch(strings.TrimSpace(raw))
@@ -61,6 +61,16 @@ func ParseKey(key string) (Ref, error) {
 	return ref, nil
 }
 
+// RefOf is the pull request u names; false for a unit of another provider
+// or a key that names none.
+func RefOf(u unit.Unit) (Ref, bool) {
+	if u.Provider != unit.GitHub {
+		return Ref{}, false
+	}
+	ref, err := ParseKey(u.Key)
+	return ref, err == nil
+}
+
 // Unit is the github unit of the reference; the zero reference is the zero unit.
 func (r Ref) Unit() unit.Unit {
 	if r == (Ref{}) {
@@ -74,7 +84,35 @@ type Codec struct{}
 
 func (Codec) Provider() unit.ProviderID { return unit.GitHub }
 
+// Valid refuses a key that is no pull request: number 0 names none.
 func (Codec) Valid(key string) error {
-	_, err := ParseKey(key)
+	ref, err := ParseKey(key)
+	if err == nil && ref.Number <= 0 {
+		return fmt.Errorf("not a pull request key: %q", key)
+	}
 	return err
 }
+
+// URL is the pull request's address; a key that is not one names none.
+func (Codec) URL(key string) string {
+	ref, err := ParseKey(key)
+	if err != nil {
+		return ""
+	}
+	return ref.URL()
+}
+
+// KeyOf is the key of the pull request a URL names.
+func (Codec) KeyOf(raw string) (string, bool) {
+	ref, err := ParseURL(raw)
+	if err != nil {
+		return "", false
+	}
+	return ref.String(), true
+}
+
+// Equal folds case, as GitHub compares owners, repositories and logins.
+func (Codec) Equal(a, b string) bool { return strings.EqualFold(a, b) }
+
+// Target is how a command line names a pull request: its URL.
+func (Codec) Target() string { return "<url>" }

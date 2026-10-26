@@ -2,11 +2,13 @@
   [green]✓[/] gh authenticated
   [green]✓[/] orca reachable
 
-[bold]Config[/]                                                                                 [dim]1 ok[/][dim] · [/][dim]1 info[/]
+[bold]Config[/]                                                                                 [dim]1 ok[/][dim] · [/][dim]2 info[/]
   [green]✓[/] config            [dim]~/.config/{{name}}/config.json[/]
-  [cyan]i[/] effective config  [dim]agent=claude review_prefix="REVIEW " views.orca.columns.working=reviewing[/]
-                      [dim]views.orca.columns.ready=ready-to-merge rounds.per_pr_per_day=5[/]
-                      [dim]automated_reviewers=[lintbot-ai] brief=true[/]
+  [cyan]i[/] effective config  [dim]agent=claude github.review_prefix="REVIEW "[/]
+                      [dim]views.orca.columns.working=reviewing views.orca.columns.ready=ready-to-merge[/]
+                      [dim]github.automated_reviewers=[lintbot-ai] brief=true[/]
+  [cyan]i[/] turn budgets      [dim]turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack,[/]
+                      [dim]workspace)[/]
 
 [bold]Agent homes[/]                                                                [dim]4 ok[/][dim] · [/][dim]2 info[/][dim] · [/][red]1 missing[/]
   [bold]~/.claude[/]

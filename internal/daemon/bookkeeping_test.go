@@ -28,7 +28,7 @@ func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 	f := storetest.Seeded(t, storetest.Live)
 	now := f.Now
 	sessions := turnstest.NewSessions()
-	d := withStore(Deps{Changes: f.Log, Snapshot: f.DB, Intakes: f.DB.Intakes(), Pauses: f.Rounds, Cfg: config.Defaults(), Version: "test",
+	d := withStore(Deps{Activity: f.DB, Changes: f.Log, Snapshot: f.DB, Intakes: f.DB.Intakes(), Pauses: f.Rounds, Cfg: config.Defaults(), Version: "test",
 		Now:      func() time.Time { return now },
 		Viewer:   func(context.Context) (string, []string, error) { return "user-01", nil, nil },
 		Log:      func(string, ...any) {},

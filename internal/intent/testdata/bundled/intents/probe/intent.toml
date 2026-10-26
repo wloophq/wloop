@@ -2,16 +2,14 @@ label = "Probe"
 summary = "Check that an agent home works"
 user_facing = false
 workspace = "given"
+role = "probe"
 session = { strategy = "new", title = "probe", close_when_done = true }
-context = "synthetic"
-launch = "probe"
-policy = "probe"
 reports = false
 
 [headline]
 resumed = "probe"
 [[headline.new]]
-text = "Probe."
+line = "Probe."
 
 [record]
 states = ["done", "failed"]

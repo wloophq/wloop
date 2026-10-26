@@ -31,21 +31,14 @@ var intentTypes = []string{
 	module + "internal/profile.Kind",
 }
 
-var intentConsts = []string{"Review", "Address", "Nudge", "Probe"}
+var intentConsts = []string{"Review", "Address", "Nudge", "Probe", "Act"}
 
 // intentAllowlist are the files that may name the intents Go binds by name.
 var intentAllowlist = map[string]string{
-	"internal/cli/rounds.go":                       "the sweep sends review and address rounds",
-	"internal/cli/stepstart.go":                    "turn.start sends the sweep's review and address rounds and guards a nudge as its prepare does",
-	"internal/cli/serve.go":                        "the sweep's review and address questions and follow-ups",
-	"internal/daemon/probe.go":                     "the probe launches the probe intent",
 	"internal/core/turns/turnstest/store.go":       "test fixtures of today's intents",
 	"internal/core/turns/turnstest/intents.go":     "the test registry of today's intents",
 	"internal/core/intake/intaketest/scenarios.go": "test fixtures of today's intents",
-	"internal/cli/try.go":                          "profile try is a review",
 	"internal/turn/scenarios.go":                   "eval fixtures",
-	"internal/situation/situation.go":              "a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic",
-	"internal/adapter/facts/github/facts.go":       "the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict",
 }
 
 // exempt are where the intent names are declared.

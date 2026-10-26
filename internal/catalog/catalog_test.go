@@ -61,7 +61,7 @@ func TestBuiltinVerbs(t *testing.T) {
 		}
 	}
 	plan := map[string]string{PlanApply: "approve", PlanDismiss: "dismiss"}
-	for _, s := range PlanSpecs() {
+	for _, s := range PlanSpecs(bundled(t)) {
 		if s.Verb != plan[s.ID] {
 			t.Errorf("plan %s: verb %q, want %q", s.ID, s.Verb, plan[s.ID])
 		}
@@ -91,7 +91,7 @@ func TestEveryActionHasItsKey(t *testing.T) {
 		served[s.ID] = s.Key
 	}
 	planned := map[string]string{}
-	for _, s := range PlanSpecs() {
+	for _, s := range PlanSpecs(bundled(t)) {
 		planned[s.ID] = s.Key
 	}
 	for _, c := range []struct {
@@ -123,38 +123,45 @@ func TestBuiltinActionKeysMatchTheCatalog(t *testing.T) {
 
 func TestActionFactsCoverTheActionSlot(t *testing.T) {
 	sources := map[string]func(f *Facts){
-		"pr.mine":                            func(f *Facts) { f.Mine = true },
-		"pr.author":                          func(f *Facts) { f.Author = "ana" },
-		"pr.state":                           func(f *Facts) { f.State = "OPEN" },
-		"pr.slug":                            func(f *Facts) { f.Ref = r7 },
-		"pr.owner":                           func(f *Facts) { f.Ref = r7 },
-		"pr.repo":                            func(f *Facts) { f.Ref = r7 },
-		"pr.base":                            func(f *Facts) { f.Base = "main" },
-		"pr.cross_repository":                func(f *Facts) { f.CrossRepository = true },
-		"pr.draft":                           func(f *Facts) { f.Draft = true },
-		"pr.review_requested_me":             func(f *Facts) { f.ReviewRequestedMe = true },
-		"row.kind":                           func(f *Facts) { f.Row.Kind = "review" },
-		"row.open":                           func(f *Facts) { f.Open = true },
-		"row.tracked":                        func(f *Facts) { f.Tracked = true },
-		"row.adopted":                        func(f *Facts) { f.Override.Adopted = true },
-		"row.held":                           func(f *Facts) { f.Override.Hold = true },
-		"row.muted":                          func(f *Facts) { f.Muted = true },
-		"row.question":                       func(f *Facts) { f.Question = true },
-		"row.pending":                        func(f *Facts) { f.Row.Pending = &api.PendingRound{} },
-		"row.intake":                         func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 1}}} },
-		"row.author_workspace":               func(f *Facts) { f.Workspace.ID = "w" },
-		"row.yours":                          func(f *Facts) { f.Mine = true },
-		"row.review_workspace":               func(f *Facts) { f.Workspace = api.Workspace{ID: "w", IsReview: true} },
-		"row.nudge.who":                      func(f *Facts) { f.NudgeWho = []string{"@ana"} },
-		"row.nudge.why":                      func(f *Facts) { f.NudgeWhy = "waits on a bot" },
-		"row.nudge.refusal":                  func(f *Facts) { f.NudgeRefusal = "no" },
-		"config.address_reviews":             func(f *Facts) { f.Config.AddressReviews = true },
-		"config.address_checks":              func(f *Facts) { f.Config.AddressChecks = true },
-		"config.followups_without_workspace": func(f *Facts) { f.Config.FollowupsWithoutWorkspace = true },
-		"config.address_without_workspace":   func(f *Facts) { f.Config.AddressWithoutWorkspace = true },
+		"pr.mine":                       func(f *Facts) { f.Mine = true },
+		"pr.author":                     func(f *Facts) { f.Author = "ana" },
+		"pr.state":                      func(f *Facts) { f.State = "OPEN" },
+		"pr.slug":                       func(f *Facts) { f.Ref = r7 },
+		"pr.owner":                      func(f *Facts) { f.Ref = r7 },
+		"pr.repo":                       func(f *Facts) { f.Ref = r7 },
+		"pr.repo_name":                  func(f *Facts) { f.Ref = r7 },
+		"pr.base":                       func(f *Facts) { f.Base = "main" },
+		"pr.cross_repository":           func(f *Facts) { f.CrossRepository = true },
+		"pr.draft":                      func(f *Facts) { f.Draft = true },
+		"pr.review_requested_me":        func(f *Facts) { f.ReviewRequestedMe = true },
+		"row.kind":                      func(f *Facts) { f.Row.Kind = "review" },
+		"row.open":                      func(f *Facts) { f.Open = true },
+		"row.tracked":                   func(f *Facts) { f.Tracked = true },
+		"pr.adopted":                    func(f *Facts) { f.Override.Adopted = true },
+		"pr.held":                       func(f *Facts) { f.Override.Hold = true },
+		"pr.muted":                      func(f *Facts) { f.Muted = true },
+		"row.question":                  func(f *Facts) { f.Question = true },
+		"row.pending":                   func(f *Facts) { f.Row.Pending = &api.PendingRound{} },
+		"row.capped":                    func(f *Facts) { f.HeldByCap = true },
+		"row.intake":                    func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 1}}} },
+		"row.intake_seq":                func(f *Facts) { f.Intakes = []Intake{{Intake: api.Intake{Seq: 4}}} },
+		"row.trust_folder":              func(f *Facts) { f.TrustFolder = "/src/api" },
+		"row.trust_homes":               func(f *Facts) { f.TrustHomes = []string{"~/.claude"} },
+		"row.remove_refusal":            func(f *Facts) { f.Forceable = "uncommitted files" },
+		"row.recommended":               func(f *Facts) { f.Recommended = "headless" },
+		"row.author_workspace":          func(f *Facts) { f.Workspace.ID = "w" },
+		"row.yours":                     func(f *Facts) { f.Mine = true },
+		"row.review_workspace":          func(f *Facts) { f.Workspace = api.Workspace{ID: "w", IsReview: true} },
+		"pr.nudge.who":                  func(f *Facts) { f.NudgeWho = []string{"@ana"} },
+		"pr.nudge.why":                  func(f *Facts) { f.NudgeWhy = "waits on a bot" },
+		"pr.nudge.refusal":              func(f *Facts) { f.NudgeRefusal = "no" },
+		"config.github.address_reviews": func(f *Facts) { f.Config.AddressReviews = true },
+		"config.github.address_checks":  func(f *Facts) { f.Config.AddressChecks = true },
+		"config.github.followups_without_workspace": func(f *Facts) { f.Config.FollowupsWithoutWorkspace = true },
+		"config.github.address_without_workspace":   func(f *Facts) { f.Config.AddressWithoutWorkspace = true },
 	}
-	zero := Facts{NudgeWho: []string{}}
-	for name := range builtin.Env(builtin.ActionSlot, nil) {
+	zero := Facts{NudgeWho: []string{}, TrustHomes: []string{}}
+	for _, name := range builtin.Env(builtin.ActionSlot, nil).Names() {
 		set, ok := sources[name]
 		if !ok {
 			t.Errorf("%s has no source in this table", name)
@@ -169,10 +176,10 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 }
 
 func TestAnActionTextThatFailsToRenderSaysSo(t *testing.T) {
-	tmpl := template.Must(template.New("reason_off").Option("missingkey=error").Parse(`{{index .row.nudge.who 3}}`))
-	p := intentload.Programs{ActionTexts: map[string]*template.Template{"reason_off": tmpl}}
-	got := actionText("ask-author", p, "reason_off", intentload.ActionFactMap(Facts{}.Get))
-	if !strings.HasPrefix(got, "the profile has errors: ask-author: action.reason_off: ") {
+	tmpl := template.Must(template.New("refuse[0].why").Option("missingkey=error").Parse(`{{index .pr.nudge.who 3}}`))
+	p := intentload.Programs{Action: intentload.ActionPrograms{ActionTexts: map[string]*template.Template{"refuse[0].why": tmpl}}}
+	got := actionText("ask-author", p, "refuse[0].why", intentload.ActionFactMap(Facts{}.Get))
+	if !strings.HasPrefix(got, "the profile has errors: ask-author: action.refuse[0].why: ") {
 		t.Fatalf("%q", got)
 	}
 }

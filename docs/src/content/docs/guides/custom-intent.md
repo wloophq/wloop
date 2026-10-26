@@ -1,6 +1,6 @@
 ---
 title: Add your own intent
-description: Add a kind of turn to your profile, with its own command, action and key.
+description: Add a kind of turn to your profile, with its own command, action and shortcut.
 ---
 
 An intent of yours lives in your profile and needs no rebuild: the daemon and the CLI read it again when a file under the profile changes. This one asks the author of someone else's pull request one question, after you approve it, and publishes nothing.
@@ -16,7 +16,7 @@ label = "Ask author"
 summary = "Ask the author one question"
 workspace = "review"
 session = { strategy = "new", title = "ask" }
-key = "Q"
+shortcut = "Q"
 start_line = "asking the author"
 
 [inputs.topic]
@@ -28,13 +28,13 @@ persist = true
 
 [action]
 surfaces = ["row", "detail", "tui", "cli"]
-visible = "row.open && !pr.mine"
-hint = "Ask {{.pr.author}} one question"
+when = "row.open && !pr.mine"
+note = "Ask {{.pr.author}} one question"
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = 'Ask the author of {{.pr.slug}} one question, {{template "started_by" .}}.'
 
 [record]
 states = ["done", "asked", "failed"]
@@ -85,7 +85,16 @@ Include `{{template "history" .}}` and `{{template "record" .}}` in any intent t
 {{command}} profile show acme/api --show
 ```
 
-`profile check` loads the manifest and renders the templates against sample turns, so a template that would fail at run time fails here, as `file:line:col: field: message`. `--help` now lists `ask-author <url> [--topic <topic>] [guidance...]`, and `profile show --show` renders its instructions for a placeholder pull request.
+`profile check` loads the manifest and renders the templates against sample turns, so a template that would fail at run time fails here, as `file:line:col: field: message`. `--help` now lists `ask-author <url> [--topic <topic>] [guidance...]` under your intents, and `profile show --show` renders its instructions for a placeholder pull request.
+
+A `[help]` table shapes the command's help: `target` says what the target is, `summary` replaces the summary in the main help, `group` moves the command into a group of the main help such as `"pull requests"`, and `examples` and `docs` give its examples and documentation page:
+
+```toml
+[help]
+target   = "a pull request URL"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/4610 --topic 'the retry cap'"]
+```
 
 ## 4. Run it
 
@@ -105,7 +114,7 @@ A user intent runs only when you ask. To start it on its own, write a [workflow]
 
 With the `#:schema ../intent.schema.json` line at the top of each manifest, editors with Taplo (the "Even Better TOML" extension in VS Code, `taplo lsp` elsewhere) complete keys, show each field's description and flag unknown keys as you type. `profile check` remains the full check.
 
-A broken intent of yours disables only itself: its command exits 1 with its problems, its action stays disabled with the reason, and every other intent keeps working. The [intent manifest](/reference/intent-manifest/) lists every field.
+A broken intent of yours disables only itself: its command exits 1 with its problems, its action stays disabled with the reason, and every other intent keeps working. The [intent manifest](/reference/intent-manifest/) lists every field, and the [profile language](/reference/language/) every reserved word on one page.
 
 ## Change a bundled intent
 
@@ -118,8 +127,23 @@ mkdir -p <profile>/intents/address
 {{command}} profile check
 ```
 
-Each file you write replaces the bundled file of the same name; the files you leave out are the bundled ones. An `intent.toml` of yours replaces the bundled manifest whole, with no merge of keys, so start from a copy of the bundled one. Files whose name starts with `.` are ignored. `profile check` lists the intent as `bundled, overridden: instructions.md.tmpl`. When your files do not load, cannot be read, or break another bundled intent, the bundled intent stays in force, `profile check` reports the problem against your file, and `{{command}} doctor` lists the intent as running as bundled. A problem your manifest causes in a bundled file you did not override, such as a bundled template reading an input your manifest dropped, is reported against your manifest. The judgment blocks that only your override made valid, such as `intent=<name>.md` for a `profile` it added or a `round=` condition for `dims` it added, are skipped until it loads again.
+Each file you write replaces the bundled file of the same name; the files you leave out are the bundled ones. An `intent.toml` of yours replaces the bundled manifest whole, with no merge of keys, so start from a copy of the bundled one. Files whose name starts with `.` are ignored. `profile check` lists the intent as `bundled, overridden: instructions.md.tmpl`. When your files do not load, cannot be read, or break another bundled intent, the bundled intent stays in force, `profile check` reports the problem against your file, and `{{command}} doctor` lists the intent as running as bundled. A problem your manifest causes in a bundled file you did not override, such as a bundled template reading an input your manifest dropped, is reported against your manifest. The judgment blocks that only your override made valid, such as `intent=<name>.md` for a `profile` it added or a `stage=` condition for `dims` it added, are skipped until it loads again.
 
-Your override yields to your own intents: when it claims a key, a flag or a row-driving workspace one of your intents already holds, the override is the one that does not load.
+Your override yields to your own intents: when it claims a shortcut, a flag or a row-driving workspace one of your intents already holds, the override is the one that does not load.
 
 Judgment blocks (`intent=address.md`) remain the way to add to what a turn looks for; override the instructions when you want to change what the turn is.
+
+## Change a partial
+
+The partials are the text every intent's instructions share: `record` (how a turn ends), `history`, `resume`, `brief`, `judgment` (with `review-judgment` in the same file), `items`, `unit`, `dossier`, `why`, `artifact` (the record's sentence per artifact kind) and `started_by` (who started the turn, for headlines). Each is a file of the bundled profile's `partials/`, and a file of yours of the same name replaces it for every intent:
+
+```sh
+{{command}} profile show acme/api --show            # the instructions, rendered
+mkdir -p <profile>/partials
+# write <profile>/partials/record.md.tmpl, defining "record"
+{{command}} profile check
+```
+
+A partial of yours with a new name adds a template your intents may call. `profile check` renders every intent over your partials; a partial that does not parse or breaks an intent is reported against your file, and the bundled partials load in its place. The record partial must still tell the agent the record protocol: the `turn_end` tool, the `turn end ... --turn` command that stands in for it, and the `state` and `summary` fields; one that drops any of them fails `profile check`.
+
+The headless turn's prompt around the unit's instructions is `prompts/headless.md.tmpl`, which defines `before` and `after`; {{name}} writes the unit data's markers, the instructions between them and the answer schema itself. A wrapper of yours that does not parse is logged and the bundled one is used.

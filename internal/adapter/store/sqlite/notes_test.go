@@ -160,7 +160,7 @@ var writes = []writeCase{
 	{
 		method: "Rounds.Save", name: "/fields and a count",
 		call: func(ctx context.Context, e *noteEnv) error {
-			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordFollowup(noteRef.String(), round.Reviewed, "fp", noteAt) })
+			return saveRounds(ctx, e.db, func(st *round.Store) { st.RecordSent(noteRef.String(), round.Reviewed, "fp", noteAt) })
 		},
 		topics: port.TopicRounds, units: []unit.Unit{u7},
 	},
@@ -285,7 +285,7 @@ var writes = []writeCase{
 
 func noteItem(d workflow.Decision) workflow.Item {
 	k := workflow.Key{Workflow: "w", Unit: term1, Value: "v"}
-	it := workflow.Item{ID: k.ID(), Key: k, Workflow: "w", Unit: term1, Decision: d, Mode: workflow.ModeApply, At: noteAt}
+	it := workflow.Item{ID: k.ID(), Key: k, Workflow: "w", Unit: term1, Decision: d, Observe: false, At: noteAt}
 	if d == workflow.DecisionPending {
 		it.Default, it.Deadline = workflow.OutcomeRun, noteAt.Add(time.Minute)
 	}
@@ -295,7 +295,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 // reads are the exported methods of the sqlite store types that note
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
-	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.DossierSpent", "DB.UnitEventKeys",
+	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys",
 	"Store.Books", "Store.BookOf", "Store.UnitsOf", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",

@@ -1,11 +1,7 @@
-description = "Case"
-subject = "session"
-modd = "observe"
+summary = "Case"
+provider = "session"
+observ = true
 when = 'session.managed && session.agent_state == "done"'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"
-

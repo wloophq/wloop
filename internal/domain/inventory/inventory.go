@@ -9,6 +9,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -87,10 +88,15 @@ type Event struct {
 // Reviewer is who a KindReviewRequest or KindReviewRequestRemoved event names.
 func (e Event) Reviewer() string { return e.Data }
 
-// ActivityEvent is a feed event with the pull request it belongs to.
+// ActivityEvent is a feed event with the unit it belongs to, as its pull
+// request row or, for another unit, its card shows it. PR is zero outside
+// GitHub; Mine is the card's word that the viewer started the unit, false
+// for a pull request, whose Author says it.
 type ActivityEvent struct {
 	Event
+	Unit                      unit.Unit
 	Title, URL, Author, State string
+	Mine                      bool
 }
 
 // Situation is a pull request's situation as its row derives it,
@@ -175,6 +181,13 @@ var bookkeepingKinds = []string{KindFollowed, KindUnfollowed, KindSituation, "tu
 // reports, which no activity feed or timeline shows.
 func Bookkeeping(kind string) bool { return slices.Contains(bookkeepingKinds, kind) }
 
+// EventKinds are the kinds of a pull request's events, which a workflow's
+// trigger.on names.
+var EventKinds = []string{KindOpened, KindPush, KindReviewRequest, KindReviewRequestRemoved, KindReview, KindComment, KindCheck,
+	KindReady, KindDraft, KindMerged, KindClosed, KindRoundSent, KindRoundHeld, KindRoundPending, KindRoundSkipped, KindGuidance,
+	KindRoundBlocked, KindRoundUnblocked, KindMuted, KindUnmuted, KindHeld, KindReleased, KindAdopted, KindTracked, KindUntracked,
+	KindNudged, KindRemoved, KindStatus, KindWouldReview, KindWouldAddress, KindReviewEnded}
+
 // BookkeepingKinds are the kinds Bookkeeping accepts.
 func BookkeepingKinds() []string { return slices.Clone(bookkeepingKinds) }
 
@@ -188,6 +201,18 @@ type Override struct {
 	Adopted              bool      `json:"adopted"`
 	Tracked              bool      `json:"tracked"`       // added by hand; the store keeps ReasonTracked among its reasons while set
 	NextGuidance         string    `json:"next_guidance"` // and guidance for the next one
+}
+
+// MuteRefusal is why the mute refuses a turn at now: muted until the state
+// changes, or until a time; "" when it does not.
+func (o Override) MuteRefusal(now time.Time) string {
+	switch {
+	case o.MuteUntilStateChange:
+		return "muted until its state changes"
+	case o.MutedUntil.After(now):
+		return "muted until " + o.MutedUntil.Local().Format(time.DateTime)
+	}
+	return ""
 }
 
 // ReasonTracked is the scope reason of a pull request the user tracks.

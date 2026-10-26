@@ -9,14 +9,16 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Name is an intent's name: the directory of its manifest.
 type Name string
 
-// DimRound is the profile dimension that selects by review round.
-const DimRound = "round"
+// DimStage is the profile dimension that selects by the pass over a unit:
+// first or follow-up.
+const DimStage = "stage"
 
 // DimReviewer is the profile dimension that selects an address round by a reviewer it answers.
 const DimReviewer = "reviewer"
@@ -31,31 +33,34 @@ const (
 )
 
 type Def struct {
-	Name         Name
-	Label        string
-	Summary      string
-	Key          string
-	Verb         string // the gtd verb its action fulfills; "" for none
-	UserFacing   bool
-	Workspace    string // review | author | pr_else_main | given
-	Session      Session
-	Context      string // pr | synthetic
-	Launch       string // "" | probe
-	Policy       string // round | probe
-	Intake       bool
-	StartLine    string
-	OwnerOnly    bool
-	Answerable   bool
-	Board        string // review | author | none
-	DrivesRow    bool
-	Reports      bool
-	Reconcile    string // "" | my_review
-	Brief        Brief
-	Profile      string // "" means none
-	Dims         []string
-	Records      Pred
-	Prepare      string
-	OnSent       []string
+	Name       Name
+	Label      string
+	Summary    string
+	Key        string
+	Verb       string // the gtd verb its action fulfills; "" for none
+	UserFacing bool
+	Workspace  string // review | author | linked_else_main | given
+	Session    Session
+	Context    string // pr | synthetic, from the role
+	Launch     string // "" | probe, from the role
+	Policy     string // round | probe, from the role
+	Intake     bool
+	StartLine  string
+	OwnerOnly  bool
+	Answerable bool
+	Board      string // review | author | none, from the workspace
+	DrivesRow  bool   // from the role, moved to a user intent that takes it
+	Reports    bool
+	Reconcile  string // "" | my_review, from the role
+	Brief      Brief
+	Profile    string // "" means none
+	Dims       []string
+	// Records is [record] when.
+	Records Pred
+	Prepare string // from the role
+	// Effects are what sending the turn applies, turn effects of
+	// builtin.Effects.
+	Effects      []string
 	Headline     Headline
 	Guidance     Guidance
 	Inputs       []Input // sorted by name
@@ -68,18 +73,74 @@ type Def struct {
 	Bundled      bool
 	// Provider is the manifest's provider; default "github".
 	Provider unit.ProviderID
-	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
-	DraftApproval *draft.Approval
-	// Modes are turn.Mode values; default ["session"].
-	Modes []string
+	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
+	DraftApproval *draft.Policy
+	// Runners are turn.Runner values; default ["session"].
+	Runners []string
+	// Providers are the providers of a manifest whose provider is a list,
+	// Provider the first; nil for a single provider.
+	Providers []unit.ProviderID
+	// Role is what Go resolves the intent by (Registry.ByRole), one of
+	// builtin.Roles; "" none.
+	Role string
+	// Builds is what a builder intent builds, such as "brief": it is never
+	// started as a turn. Prompt and Schema are its prompt, resolved through
+	// the profile layers, and its schema, in its directory.
+	Builds, Prompt, Schema string
+	// Extra are a brief builder's extra fields, the top-level properties of
+	// its Schema as the loader compiled it; nil for any other intent.
+	Extra []jsonschema.Property
+	// WorkspaceRepo is a manifest's workspace table: the repository the
+	// turn runs in, named outright or by an input; nil for a workspace
+	// builtin.
+	WorkspaceRepo *WorkspaceRepo
+	// AllowedEffects are the effects the intent's agents may declare on the
+	// drafts they propose, names of builtin.Effects.
+	AllowedEffects []string
+	// RoundKind is the sweep round the intent's turns are, from its role:
+	// "review" (first or follow-up, by the step's stage) or "address"; ""
+	// none.
+	RoundKind string
+	// Why is the template, over the unit's workflow facts, that says why
+	// the intent's turn is due; empty for none.
+	Why Text
+	// Refuse are the refusals of turn.start, in order: the first whose when
+	// holds refuses with its why.
+	Refuse []Refuse
+	// Skill says whether install writes the intent a turn skill.
+	Skill bool
+	Help  Help
 }
 
-// Runs says whether the intent's turns may run in mode, a turn.Mode value; nil Modes run as session only.
-func (d Def) Runs(mode string) bool {
-	if d.Modes == nil {
-		return mode == "session"
+// Help is how the intent's command and turn skill present it.
+type Help struct {
+	// Target says what the command's target is, such as "a pull request
+	// URL"; the turn skill and the command's help read it.
+	Target string
+	// Summary is the main help's line for the command, Summary when empty.
+	Summary string
+	// Group is the title of the main help's group the command joins, in
+	// any case; "" or a title the help has not joins the user's intents.
+	Group string
+	// Examples are command lines without the command's name.
+	Examples []string
+	// Docs is a page path of the documentation site.
+	Docs string
+}
+
+// WorkspaceRepo is where a turn runs when its manifest names a repository:
+// Repo (owner/name) outright, or the input RepoInput holds.
+type WorkspaceRepo struct {
+	Repo, RepoInput string
+}
+
+// Runs says whether the intent's turns may run under runner, a turn.Runner
+// value; nil Runners run as session only.
+func (d Def) Runs(runner string) bool {
+	if d.Runners == nil {
+		return runner == "session"
 	}
-	return slices.Contains(d.Modes, mode)
+	return slices.Contains(d.Runners, runner)
 }
 
 type Session struct {
@@ -88,7 +149,12 @@ type Session struct {
 	CloseWhenDone bool
 }
 
-type Brief struct{ Render, Wait bool }
+type Brief struct {
+	Render, Wait bool
+	// Need are the brief intent's extra fields the turn needs: a brief
+	// missing one is completed before the turn starts.
+	Need []string
+}
 
 type Pos struct {
 	File      string
@@ -138,20 +204,17 @@ type Input struct {
 }
 
 type AlsoProfile struct {
-	Profile, Round, Define, SourcePrefix string
-	When                                 Pred
+	Profile, Define, Prefix string
+	// Dims pins dimensions of the other judgment, such as stage = first.
+	Dims map[string]string
+	When Pred
 }
 
-type Action struct {
-	Group            string
-	Surfaces         []string
-	Visible          Pred
-	Enabled          Pred
-	ReasonOff        Text
-	Primary          Pred
-	Confirm          Text
-	Hint             Text
-	NoteWhenQuestion string
+// Refuse is a refusal of turn.start: when holds over the unit's workflow
+// facts, why says it.
+type Refuse struct {
+	When Pred
+	Why  Text
 }
 
 type Join struct{ DiffersOn []string }
@@ -170,7 +233,9 @@ type Require struct {
 	Fields          []string
 }
 
-type Resume struct{ HeadMoved string }
+// Resume holds Changed, the text a resumed turn reads when its unit changed
+// since the question.
+type Resume struct{ Changed string }
 
 type Source struct {
 	Layer, Dir string // Dir "" for bundled
@@ -295,17 +360,58 @@ const AnyProvider unit.ProviderID = "any"
 
 // Serves says whether the intent's turns run on units of p.
 func (d Def) Serves(p unit.ProviderID) bool {
+	if d.Providers != nil {
+		return slices.Contains(d.Providers, p) || slices.Contains(d.Providers, AnyProvider)
+	}
 	own := d.ProviderOrDefault()
 	return own == AnyProvider || own == p
 }
 
-// ProviderOrDefault is the provider whose units the intent's turns run on.
-func (d Def) ProviderOrDefault() unit.ProviderID {
-	if d.Provider == "" {
-		return unit.GitHub
+// ByRole is the intent holding role for units of p: a user's intent over
+// the bundled one; the loader refuses two holders in one layer.
+func (r *Registry) ByRole(role string, p unit.ProviderID) (Def, bool) {
+	var found Def
+	ok := false
+	for _, d := range r.defs {
+		if role == "" || d.Role != role || !d.Serves(p) {
+			continue
+		}
+		if !d.Bundled {
+			return d, true
+		}
+		if !ok {
+			found, ok = d, true
+		}
 	}
-	return d.Provider
+	return found, ok
 }
+
+// Builder is the intent that builds what for units of p, such as the brief:
+// the user's holder over the bundled one.
+func (r *Registry) Builder(what string, p unit.ProviderID) (Def, bool) {
+	if what == "" {
+		return Def{}, false
+	}
+	var found Def
+	ok := false
+	for _, d := range r.defs {
+		if d.Builds != what || !d.Serves(p) {
+			continue
+		}
+		if !d.Bundled {
+			return d, true
+		}
+		if !ok {
+			found, ok = d, true
+		}
+	}
+	return found, ok
+}
+
+// ProviderOrDefault is the provider whose units the intent's turns run on;
+// the loader fills it from the profile's defaults when the manifest names
+// none.
+func (d Def) ProviderOrDefault() unit.ProviderID { return d.Provider }
 
 // ForProvider is the intents whose turns run on units of p.
 func (r *Registry) ForProvider(p unit.ProviderID) []Def {

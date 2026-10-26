@@ -411,8 +411,8 @@ func TestSlackSendRefusesWhileDisabled(t *testing.T) {
 	te.saveToken(t, fakeToken())
 	te.fakeChannel()
 	off := false
-	te.cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
-	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 1 || !strings.Contains(te.err.String(), "plugins.slack.enabled") {
+	te.cfg.Slack.Enabled = &off
+	if code := te.run("slack", "send", "--yes", "C0000000001", "hi"); code != 1 || !strings.Contains(te.err.String(), "slack.enabled") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if n := len(te.srv.Calls("chat.postMessage")); n != 0 {
@@ -424,7 +424,7 @@ func TestSlackAuthCommandsWorkWhileDisabled(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	off := false
-	te.cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
+	te.cfg.Slack.Enabled = &off
 	te.fakeOAuth()
 	te.srv.Handle("auth.revoke", func(url.Values) any { return nil })
 	te.slack.Open = func(u string) error { browse(t, u); return nil }

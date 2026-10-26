@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type notes struct {
@@ -45,38 +45,23 @@ func eventually(t *testing.T, what string, ok func() bool) {
 	}
 }
 
-func TestWatchRunsOnItemsAndStampsOnDrafts(t *testing.T) {
+func TestWatchRunsAtOnceAndOnItems(t *testing.T) {
 	e := newEnv(t)
-	e.svc.OnSent = nil
 	e.job.Log = nil
+	src := &githubSource{}
+	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
+	calls := func() int { src.mu.Lock(); defer src.mu.Unlock(); return src.calls }
 	ch := &notes{}
 	wctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() { e.job.Watch(wctx, ch, 10*time.Millisecond, time.Hour); close(done) }()
 	defer func() { cancel(); <-done }()
+	eventually(t, "the first pass", func() bool { return calls() == 1 })
 	eventually(t, "the subscription", func() bool { ch.mu.Lock(); defer ch.mu.Unlock(); return len(ch.fns) == 1 })
 
-	stalledThread(e)
+	src.mu.Lock()
+	src.out = []outbox.Proposal{ghNudge(pull)}
+	src.mu.Unlock()
 	ch.note(port.TopicItems)
-	eventually(t, "two nudges", func() bool { return len(e.drafts.all()) == 2 })
-
-	for _, d := range e.drafts.all() {
-		if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
-			t.Fatal(err)
-		}
-	}
-	e.svc.Send(ctx)
-	ch.note(port.TopicDrafts)
-	eventually(t, "the stamps", func() bool {
-		all, _ := e.entries.Entries(ctx, gtd.Query{View: gtd.ViewWaiting})
-		for _, en := range all {
-			if en.Waiting != nil && en.Waiting.LastNudge.IsZero() {
-				return false
-			}
-		}
-		return true
-	})
-	if got := e.list(RuleStalledNudge, draft.Sent); len(got) != 2 {
-		t.Fatalf("%d sent", len(got))
-	}
+	eventually(t, "the nudge", func() bool { return len(e.drafts.all()) == 1 })
 }

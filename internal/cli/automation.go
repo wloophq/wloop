@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
@@ -16,10 +18,14 @@ import (
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gtd"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
@@ -47,6 +53,16 @@ type engineDeps struct {
 	// recorded; with a DB, the steps' are recorded on their units.
 	Pub port.Publisher
 	Log func(format string, args ...any)
+	// Subjects are facts providers of the core-kept subjects beyond the
+	// session and workspace ones, such as entry, by provider.
+	Subjects map[unit.ProviderID]automation.Units
+	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
+	Withdrawals automation.Withdrawals
+	// TurnStart are what turn.start reads on units outside the round
+	// providers.
+	TurnStart turnStartDeps
+	// Drafts are what draft.propose reads; nil refuses it.
+	Drafts *draftDeps
 }
 
 // newEngine assembles the engine over the store, the facts providers and
@@ -69,12 +85,15 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		d.WorkspaceFacts = e.workspaceFacts()
 	}
 	providers := defaultFacts(d.SessionFacts, d.WorkspaceFacts)
-	codecs := []unit.Codec{pr.Codec{}}
+	for id, u := range d.Subjects {
+		providers[id] = u
+	}
+	codecs := []unit.Codec{pr.Codec{}, gtd.Codec{}}
 	for _, m := range d.Modules {
 		if m.Facts != nil {
 			providers[m.ID] = m.Facts
 		}
-		if m.Codec != nil && m.ID != unit.GitHub {
+		if m.Codec != nil && !slices.ContainsFunc(codecs, func(c unit.Codec) bool { return c.Provider() == m.ID }) {
 			codecs = append(codecs, m.Codec)
 		}
 	}
@@ -83,7 +102,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Candidates == nil {
 		d.Candidates = candidatesOf(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Pub: d.Pub, Log: d.Log}
+	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log, Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
 	}
@@ -106,11 +125,16 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	steps := newStepSet(e, sd)
 	workflows := func() []workflow.Workflow {
 		cfg, _ := e.loadConfig()
-		return applyConfig(e.loadedIntents().Workflows, cfg)
+		l := e.loadedIntents()
+		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l.Registry))
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
+	if d.DB != nil {
+		units.briefed = &briefedFacts{store: inventory.New(d.DB), intent: e.briefIntents(func(string, ...any) {})}
+	}
 	eng := &automation.Engine{
 		Workflows: workflows,
+		Broken:    e.brokenWorkflows,
 		Units:     units,
 		Steps:     steps,
 		Guidance:  recGuidance{e},
@@ -128,6 +152,10 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.DB != nil {
 		eng.Ledger, eng.Events, eng.Marks = d.DB.Ledger(), d.DB.Events(), d.DB
 	}
+	if d.Withdrawals != nil {
+		eng.Withdrawals = d.Withdrawals
+		eng.PluginEnabled = func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
+	}
 	if e.WS.Len() > 0 {
 		eng.Reachable = e.WS.Reachable
 	}
@@ -138,6 +166,11 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 }
 
 // currentConfig is the config the daemon holds, the file's outside it.
+// brokenWorkflows are the user workflows that failed to load.
+func (e *Env) brokenWorkflows() []string {
+	return slices.Collect(maps.Keys(e.loadedIntents().BrokenWorkflows))
+}
+
 func (e *Env) currentConfig() config.Config {
 	cfg, _ := e.loadConfig()
 	return cfg
@@ -157,51 +190,160 @@ func (e *Env) automationPause(ctx context.Context) (automation.Pause, error) {
 // applyConfig is the loaded workflows with the config's overrides: those
 // disabled dropped, the mode and approval set.
 func applyConfig(ws []workflow.Workflow, cfg config.Config) []workflow.Workflow {
+	return applyConfigWith(ws, cfg, nil)
+}
+
+// applyConfigWith is applyConfig whose only_when also reads the brief.extra.*
+// facts extras gives for a workflow's provider; nil extras gives none.
+func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit.ProviderID) expr.Env) []workflow.Workflow {
 	out := make([]workflow.Workflow, 0, len(ws))
 	for _, w := range ws {
 		wc := cfg.Workflows[w.Name]
 		if wc.Enabled != nil && !*wc.Enabled {
 			continue
 		}
-		if wc.Mode != "" {
-			w.Mode = workflow.Mode(wc.Mode)
+		if wc.Observe != nil {
+			w.Observe = *wc.Observe
 		}
-		if a := wc.Approval; a != nil {
-			if a.Default != "" {
-				w.Approval.Default = workflow.Outcome(a.Default)
+		if o, ok := runOverlay(wc.Approval); ok {
+			a, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras))
+			if err != nil {
+				w.When = workflow.Refused{Err: fmt.Errorf("workflows.%s.approval: %w", w.Name, err)}
 			}
-			if a.Window != nil {
-				w.Approval.Window = time.Duration(*a.Window)
-			}
+			w.Approval = a
 		}
 		if wc.OnlyWhen != "" {
-			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen))
+			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
 		out = append(out, w)
 	}
 	return out
 }
 
+// configWorkflowProblems are the config's workflows.<name> blocks that do
+// not load over the workflow they change: its only_when and its approval,
+// which stop the workflow, and its drafts.approval over each block it may
+// overlay, which holds every draft of it.
+func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
+	extras := briefExtrasOf(l.Registry)
+	var out []error
+	for _, w := range l.Workflows {
+		wc, ok := cfg.Workflows[w.Name]
+		if !ok {
+			continue
+		}
+		if wc.OnlyWhen != "" {
+			if _, err := expr.CompileWorkflow(wc.OnlyWhen, workflowEnv(w, extras)); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.only_when: %w; the workflow runs nowhere", w.Name, err))
+			}
+		}
+		if o, ok := runOverlay(wc.Approval); ok {
+			if _, err := intentload.OverlayRunApproval(w.Approval, o, workflowEnv(w, extras)); err != nil {
+				out = append(out, fmt.Errorf("workflows.%s.approval: %w; the workflow runs nowhere", w.Name, err))
+			}
+		}
+		for _, base := range draftBases(w, l.Registry) {
+			if _, err := configPolicy(w.Name, w.Slot, base, wc.DraftApproval()); err != nil {
+				out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
+				break
+			}
+		}
+	}
+	return out
+}
+
+// draftBases are the blocks the config's drafts.approval of w may be laid
+// over: its manifest's; without one, wait for the drafts its steps propose
+// and the block of each intent its turn.start steps name.
+func draftBases(w workflow.Workflow, reg *dintent.Registry) []*draft.Policy {
+	if w.DraftApproval != nil {
+		return []*draft.Policy{w.DraftApproval}
+	}
+	var out []*draft.Policy
+	for _, st := range w.Steps {
+		switch st.Use {
+		case builtin.StepDraftPropose:
+			out = append(out, nil)
+		case builtin.StepTurnStart:
+			name, _ := st.Args["intent"].(string)
+			if d, ok := reg.Get(dintent.Name(name)); ok {
+				out = append(out, d.DraftApproval)
+			}
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, nil)
+	}
+	return out
+}
+
 // onlyWhen is the config's only_when of w compiled over w's facts; one that
 // does not compile refuses every unit, so the workflow runs nowhere.
-func onlyWhen(w workflow.Workflow, src string) workflow.Predicate {
-	p, err := expr.CompileWorkflow(src, builtin.WorkflowEnv(w.Slot))
+func onlyWhen(w workflow.Workflow, src string, extras func(unit.ProviderID) expr.Env) workflow.Predicate {
+	p, err := expr.CompileWorkflow(src, workflowEnv(w, extras))
 	if err != nil {
 		return workflow.Refused{Err: fmt.Errorf("workflows.%s.only_when: %w", w.Name, err)}
 	}
 	return p
 }
 
+// workflowEnv is w's facts, with the brief.extra.* facts extras gives for
+// its provider.
+func workflowEnv(w workflow.Workflow, extras func(unit.ProviderID) expr.Env) expr.Env {
+	env := builtin.WorkflowEnv(w.Slot)
+	if extras != nil && slices.Contains(builtin.BriefSubjects, w.Slot) {
+		maps.Copy(env, extras(w.Provider))
+	}
+	return env
+}
+
+// runOverlay is the config's approval block as an overlay; false when it
+// sets none.
+func runOverlay(a *config.ApprovalConfig) (intentload.ApprovalOverlay, bool) {
+	if a == nil {
+		return intentload.ApprovalOverlay{}, false
+	}
+	return overlay(*a), true
+}
+
+// overlay is a, a config approval block, as an overlay of a manifest's.
+func overlay(a config.ApprovalConfig) intentload.ApprovalOverlay {
+	o := intentload.ApprovalOverlay{Mode: a.Mode}
+	if a.Window != nil {
+		d := time.Duration(*a.Window)
+		o.Window = &d
+	}
+	if a.Rule != nil {
+		o.Rules = make([]intentload.RuleOverlay, len(a.Rule))
+		for i, r := range a.Rule {
+			o.Rules[i] = intentload.RuleOverlay{When: r.When, Mode: r.Mode, Window: time.Duration(r.Window)}
+		}
+	}
+	return o
+}
+
+// briefExtrasOf are the brief.extra.* facts of each provider's brief intent
+// in reg.
+func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
+	return func(p unit.ProviderID) expr.Env {
+		d, _ := reg.Builder(builtin.BuildsBrief, p)
+		return builtin.ExtraFacts(d.Extra)
+	}
+}
+
 // configFacts are the config slot of a workflow's predicates.
 func configFacts(cfg config.Config) workflow.Facts {
 	c := cfg.Cleanup
 	return workflow.Facts{
-		"config.cleanup.idle":            time.Duration(c.Idle),
-		"config.cleanup.asked_idle":      time.Duration(c.AskedIdle),
-		"config.cleanup.workspace_grace": time.Duration(c.WorkspaceGrace),
-		"config.cleanup.manual_idle":     time.Duration(c.ManualIdle),
-		"config.cleanup.stale_workspace": time.Duration(c.StaleWorkspace),
-		"config.nudge.silent_days":       cfg.Nudge.SilentDays,
+		"config.cleanup.idle":             time.Duration(c.Idle),
+		"config.cleanup.asked_idle":       time.Duration(c.AskedIdle),
+		"config.cleanup.workspace_grace":  time.Duration(c.WorkspaceGrace),
+		"config.cleanup.manual_idle":      time.Duration(c.ManualIdle),
+		"config.cleanup.stale_workspace":  time.Duration(c.StaleWorkspace),
+		"config.github.nudge.silent_days": cfg.GitHub.Nudge.SilentDays,
+		"config.gtd.stale_waiting_days":   cfg.GTD.StaleWaitingDays,
+		"config.drafts.repeat_after":      time.Duration(cfg.Drafts.RepeatAfter),
+		"config.turns.per_day":            cfg.Turns.PerDay,
 	}
 }
 
@@ -285,7 +427,7 @@ func (e *Env) pendingRounds(ctx context.Context) (map[unit.Unit]round.Pending, e
 		if i < 0 {
 			continue
 		}
-		out[it.Unit] = round.Pending{Intent: startOf(it.Steps[i]).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
+		out[it.Unit] = round.Pending{Intent: e.startOf(it.Steps[i], it.Unit.Provider).kindName(), Reason: it.Reason, Since: it.At, Deadline: it.Deadline}
 	}
 	return out, nil
 }
@@ -337,6 +479,8 @@ type unitSet struct {
 	order     []unit.ProviderID
 	// classified adds the classify outputs to the facts; nil adds none.
 	classified *classifiedUnits
+	// briefed adds the brief.* facts; nil adds none.
+	briefed *briefedFacts
 }
 
 var (
@@ -382,6 +526,9 @@ func (s *unitSet) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error
 		return nil, err
 	}
 	f, err := p.Facts(ctx, u)
+	if err == nil && s.briefed != nil {
+		f, err = s.briefed.add(ctx, u, f)
+	}
 	if err != nil || s.classified == nil {
 		return f, err
 	}

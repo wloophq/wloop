@@ -2,13 +2,13 @@ label = "Ask author"
 summary = "Ask the author one question"
 workspace = "review"
 session = { strategy = "new", title = "ask" }
-dims = ["round"]
-records = 'turn.round == true'
+dims = ["stage"]
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
+when = 'turn.stage == true'
 states = ["done", "asked", "failed"]

@@ -21,14 +21,23 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-const profileUsage = `usage:
-  profile show <owner/repo|pr-url> [--kind <intent>] [--show] [--color auto|always|never]
+var profileUsage = `usage:
+  profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
-  profile schema [--workflow]
+  profile schema [--workflow|--actions|--config]
   profile try <pr-url>
-conditions: --org, --repo, --user, --team, --association, --label, --base, --round, --kind, --size, --risk, --tag <key>=<value> (repeatable)`
+conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
+
+// conditionNames are the condition flags, one per profile dimension.
+func conditionNames() string {
+	out := make([]string, len(profile.Dims))
+	for i, d := range profile.Dims {
+		out[i] = "--" + string(d)
+	}
+	return strings.Join(out, ", ")
+}
 
 type listFlag []string
 
@@ -51,12 +60,13 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 	case "check":
 		return runProfileCheck(e, args[1:])
 	case "schema":
+		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--config": intentload.ConfigSchema}
 		switch {
 		case len(args) == 1:
 			_, err := e.Out.Write(intentload.Schema)
 			return err
-		case len(args) == 2 && args[1] == "--workflow":
-			_, err := e.Out.Write(intentload.WorkflowSchema)
+		case len(args) == 2 && schemas[args[1]] != nil:
+			_, err := e.Out.Write(schemas[args[1]])
 			return err
 		}
 		return usageError{usage: profileUsage}
@@ -71,13 +81,8 @@ type conditions struct {
 
 func addConditions(fs *flag.FlagSet) *conditions {
 	c := &conditions{dims: map[profile.Dim]*string{}}
-	names := map[profile.Dim]string{profile.DimOrganization: "org"}
 	for _, d := range profile.Dims {
-		name := names[d]
-		if name == "" {
-			name = string(d)
-		}
-		c.dims[d] = fs.String(name, "", string(d)+" condition")
+		c.dims[d] = fs.String(string(d), "", string(d)+" condition")
 	}
 	fs.Var(&c.tags, "tag", "tag condition <key>=<value>, repeatable")
 	return c
@@ -87,11 +92,11 @@ func addConditions(fs *flag.FlagSet) *conditions {
 // written in another spelling.
 func (c *conditions) path() (p profile.BlockPath, notes []string, err error) {
 	if *c.dims[profile.DimRepo] != "" && *c.dims[profile.DimOrganization] == "" {
-		return p, nil, errors.New("--repo needs --org: a repository block sits under its organization")
+		return p, nil, errors.New("--repo needs --organization: a repository block sits under its organization")
 	}
 	for _, d := range []profile.Dim{profile.DimOrganization, profile.DimRepo, profile.DimUser, profile.DimTeam} {
 		if v := *c.dims[d]; strings.Contains(v, "/") {
-			return p, nil, fmt.Errorf("%s %s: the value has no /; name a repository with --org <owner> --repo <repo>, a team as <org>-<slug>", d, v)
+			return p, nil, fmt.Errorf("%s %s: the value has no /; name a repository with --organization <owner> --repo <repo>, a team as <org>-<slug>", d, v)
 		}
 	}
 	if v := *c.dims[profile.DimAssociation]; v != "" {
@@ -119,24 +124,24 @@ func (c *conditions) path() (p profile.BlockPath, notes []string, err error) {
 }
 
 func (c *conditions) facts() profile.Facts {
-	v := func(d profile.Dim) string { return *c.dims[d] }
-	f := profile.Facts{Owner: v(profile.DimOrganization), Repo: v(profile.DimRepo), Author: v(profile.DimUser), Association: v(profile.DimAssociation),
-		Base: v(profile.DimBase), Round: v(profile.DimRound), Kind: v(profile.DimKind), Size: v(profile.DimSize), Risk: v(profile.DimRisk)}
-	if t := v(profile.DimTeam); t != "" {
-		f.Teams = []string{t}
-	}
-	if l := v(profile.DimLabel); l != "" {
-		f.Labels = []string{l}
-	}
-	if r := v(profile.DimReviewer); r != "" {
-		f.Reviewers = []string{r}
+	f := profile.Facts{Values: map[string]any{}}
+	for _, d := range profile.Vocabulary(nil) {
+		v, ok := c.dims[d.Name]
+		if !ok || *v == "" {
+			continue
+		}
+		f.Values[d.Fact] = *v
+		if d.List {
+			f.Values[d.Fact] = []string{*v}
+		}
+		f.HasBrief = f.HasBrief || d.Brief
 	}
 	for _, kv := range c.tags {
 		if t, err := profile.NormalizeTag(kv); err == nil {
 			f.Tags = append(f.Tags, t)
 		}
 	}
-	f.HasBrief = f.Kind != "" || f.Size != "" || f.Risk != "" || len(f.Tags) > 0
+	f.HasBrief = f.HasBrief || len(f.Tags) > 0
 	return f
 }
 
@@ -304,10 +309,10 @@ func runProfileAdd(e *Env, args []string) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return usageError{usage: profileUsage}
 	}
-	if *conds.dims[profile.DimRound] != "" {
+	if *conds.dims[profile.DimStage] != "" {
 		for _, k := range kinds {
-			if !slices.Contains(profile.DimsOf(intents, k), string(profile.DimRound)) {
-				return fmt.Errorf("--round does not apply to %s: its manifest's dims do not list round", k)
+			if !slices.Contains(profile.DimsOf(intents, k), string(profile.DimStage)) {
+				return fmt.Errorf("--stage does not apply to %s: its manifest's dims do not list stage", k)
 			}
 		}
 	}
@@ -429,6 +434,9 @@ func runProfileCheck(e *Env, args []string) error {
 		return err
 	}
 	loaded, problems := intentload.Load(layer, turn.BundledFS(), b, turn.CheckTemplate)
+	for _, w := range loaded.Warnings.Sorted() {
+		fmt.Fprintf(e.Err, "warning: %s\n", intentload.Problems{w}.Error())
+	}
 	if out.TTY {
 		e.writeIntents(out, dir, loaded.Registry)
 		e.writeWorkflows(out, dir, loaded.Workflows)

@@ -21,13 +21,7 @@ type Event struct {
 }
 
 // PROf is the pull request of an event on a github unit.
-func PROf(ev Event) (pr.Ref, bool) {
-	if ev.Unit.Provider != unit.GitHub {
-		return pr.Ref{}, false
-	}
-	ref, err := pr.ParseKey(ev.Unit.Key)
-	return ref, err == nil
-}
+func PROf(ev Event) (pr.Ref, bool) { return pr.RefOf(ev.Unit) }
 
 type Clock interface{ Now() time.Time }
 

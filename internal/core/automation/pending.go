@@ -33,7 +33,7 @@ func (e *Engine) DueRun(ctx context.Context) (err error) {
 	return err
 }
 
-// dueRun runs the due items of workflows still loaded in apply mode whose
+// dueRun runs the due items of workflows still loaded and not observing whose
 // unit the pause does not hold.
 func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	var t tally
@@ -45,10 +45,10 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	live := e.live()
 	for _, it := range items {
 		w, ok := live[it.Workflow]
-		if !ok || w.Mode != workflow.ModeApply || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
+		if !ok || w.Observe || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
 			continue
 		}
-		facts, err := e.Units.Facts(ctx, it.Unit)
+		facts, err := e.factsFor(ctx, w.Name, it.Unit)
 		if err != nil {
 			e.logf("%s: not run, its facts cannot be read: %v", it.ID, err)
 			continue

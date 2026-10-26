@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/profile"
 )
 
 // helpFlag is one flag of a command's help: Name with its argument, Text
@@ -22,9 +21,6 @@ type helpTopic struct {
 	Flags    []helpFlag
 	Examples []string
 	Docs     string
-	// intent fills Usage, About and Flags from the registry's manifest of
-	// Names[0]; the topic is left out when the registry has none.
-	intent bool
 }
 
 type helpGroup struct {
@@ -39,16 +35,8 @@ var colorFlag = helpFlag{"--color auto|always|never", "Lay the output out for a 
 // conditionFlags are the flags that name a block of the profile, one per
 // dimension.
 func conditionFlags() []helpFlag {
-	var names []string
-	for _, d := range profile.Dims {
-		if d == profile.DimOrganization {
-			names = append(names, "--org")
-			continue
-		}
-		names = append(names, "--"+string(d))
-	}
 	return []helpFlag{
-		{"--<dimension> <value>", "A condition of the block, one flag per dimension: " + strings.Join(names, ", ")},
+		{"--<dimension> <value>", "A condition of the block, one flag per dimension: " + conditionNames()},
 		{"--tag <key>=<value>", "A tag condition; repeatable"},
 	}
 }
@@ -100,10 +88,6 @@ func helpGroups(manager string) []helpGroup {
 			},
 		}},
 		{"PULL REQUESTS", []helpTopic{
-			{Names: []string{"review"}, Summary: "Review someone else's pull request in its own worktree", intent: true,
-				Examples: []string{"review " + pr, "review " + pr + " look at the migration first"}, Docs: "guides/review"},
-			{Names: []string{"address"}, Summary: "Triage the reviews and failing checks of yours", intent: true,
-				Examples: []string{"address " + pr, "address --self-review " + pr + " the plan is in the description"}, Docs: "guides/address"},
 			{
 				Names:    []string{"take-over"},
 				Summary:  "Make a pull request someone else opened yours",
@@ -112,10 +96,6 @@ func helpGroups(manager string) []helpGroup {
 				Examples: []string{"take-over " + pr},
 				Docs:     "guides/take-over",
 			},
-			{Names: []string{"nudge"}, Summary: "Ask whoever it waits on for the next step", intent: true,
-				Examples: []string{"nudge " + pr, "nudge " + pr + " the release is on Friday"}, Docs: "guides/nudge"},
-			{Names: []string{"act"}, Summary: "Resolve a unit's open items, replies as drafts", intent: true,
-				Examples: []string{"act " + pr, "act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday"}, Docs: "concepts/gtd"},
 			{
 				Names:   []string{"remove"},
 				Summary: "Delete the workspace of a merged or closed one",
@@ -222,8 +202,8 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"pause", "resume"},
 				Summary: "Stop or restart automatic rounds",
 				Usage:   []string{"pause [<url>|<owner/repo>]...", "resume [<url>|<owner/repo>]..."},
-				About: "Stop or restart the workflows in apply mode and the board moves on those pull requests and repositories; with none, everywhere. " +
-					"Workflows in observe mode keep planning.",
+				About: "Stop or restart the workflows that do not observe and the board moves on those pull requests and repositories; with none, everywhere. " +
+					"Workflows that observe keep planning.",
 				Examples: []string{"pause", "pause acme/api", "resume " + pr},
 				Docs:     "concepts/workflows",
 			},
@@ -261,15 +241,15 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"profile show"},
 				Summary: "The blocks that apply to a repository",
-				Usage:   []string{"profile show <owner/repo|url> [--kind <intent>] [--show] [--color auto|always|never]"},
+				Usage:   []string{"profile show <owner/repo|url> [--intent <intent>] [--show] [--color auto|always|never]"},
 				About: "List the profile's blocks per intent, their conditions and which of them apply to that repository or pull request. " +
 					"--show prints the instructions a turn there reads.",
 				Flags: []helpFlag{
-					{"--kind <intent>", "Only this intent's blocks"},
+					{"--intent <intent>", "Only this intent's blocks"},
 					{"--show", "Print the instructions a turn there would read"},
 					colorFlag,
 				},
-				Examples: []string{"profile show acme/api", "profile show " + pr + " --kind review --show"},
+				Examples: []string{"profile show acme/api", "profile show " + pr + " --intent review --show"},
 				Docs:     "guides/review-profile",
 			},
 			{
@@ -278,7 +258,7 @@ func helpGroups(manager string) []helpGroup {
 				Usage:    []string{"profile where <intent> [conditions]"},
 				About:    "Name the block of the profile a rule with these conditions goes in, and the blocks that join it in a turn.",
 				Flags:    conditionFlags(),
-				Examples: []string{"profile where review --org acme --repo api"},
+				Examples: []string{"profile where review --organization acme --repo api"},
 				Docs:     "reference/profile-blocks",
 			},
 			{
@@ -294,7 +274,7 @@ func helpGroups(manager string) []helpGroup {
 					helpFlag{"--paths <glob>", "A glob a changed file must match, for a new block; repeatable"},
 					helpFlag{"--apply", "Write the change; without it, print the diff"},
 				),
-				Examples: []string{"profile add review --org acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
+				Examples: []string{"profile add review --organization acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
 				Docs:     "guides/review-profile",
 			},
 			{
@@ -317,12 +297,12 @@ func helpGroups(manager string) []helpGroup {
 			},
 			{
 				Names:    []string{"profile schema"},
-				Summary:  "The JSON Schema of the manifests",
-				Usage:    []string{"profile schema [--workflow]"},
-				About:    "Print the JSON Schema of intent.toml, or of workflow.toml with --workflow, for an editor's TOML support.",
-				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}},
-				Examples: []string{"profile schema > intent.schema.json"},
-				Docs:     "reference/intent-manifest",
+				Summary:  "The JSON Schemas of the profile files, for editors",
+				Usage:    []string{"profile schema [--workflow|--actions|--config]"},
+				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.",
+				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--config", "The schema of config.json"}},
+				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
+				Docs:     "reference/language",
 			},
 		}},
 		{"SLACK", []helpTopic{

@@ -114,7 +114,7 @@ func appWarning(a api.AppStatus) string {
 	return ""
 }
 
-// Pauses keeps the pause of every workflow in apply mode and board moves.
+// Pauses keeps the pause of every workflow that does not observe and of board moves.
 type Pauses interface {
 	Pause(ctx context.Context) (round.Pause, error)
 	SetPause(ctx context.Context, p round.Pause) error
@@ -191,6 +191,9 @@ type Deps struct {
 	// them, never a call to the manager; nil reads as unknown, so a started
 	// turn's session is never told waiting.
 	Agents readmodel.Agents
+	// Activity reads what the loop spent on each provider's units for their
+	// rows; nil shows none.
+	Activity readmodel.Activities
 	// TurnByHand runs a turn the user asked for in the handle's session, ""
 	// outside Orca; nil answers 503 to AgentAPI's by-hand turns.
 	TurnByHand func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error)
@@ -218,9 +221,12 @@ type Deps struct {
 	LoopMu *sync.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
-	App      *AppState
-	Cfg      config.Config
-	Viewer   func(ctx context.Context) (login string, teams []string, err error)
+	App    *AppState
+	Cfg    config.Config
+	Viewer func(ctx context.Context) (login string, teams []string, err error)
+	// Forge is the plugin of the pull requests the daemon's viewer,
+	// explorer, intakes and budget serve.
+	Forge    unit.ProviderID
 	Now      func() time.Time
 	Version  string
 	Log      func(format string, args ...any)

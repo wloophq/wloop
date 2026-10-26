@@ -1,0 +1,1 @@
+testdata/workflows/bad/stage-not-a-stage/workflows/case-workflow/workflow.toml:8:9: step[0].stage: "third" is not one of "first" or "follow-up"

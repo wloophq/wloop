@@ -404,33 +404,33 @@ func TestProposeNeedsText(t *testing.T) {
 }
 
 type fixedPolicy struct {
-	a    draft.Approval
+	p    draft.Policy
 	seen []draft.Origin
 }
 
-func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Approval, error) {
+func (f *fixedPolicy) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.Policy, error) {
 	f.seen = append(f.seen, o)
-	return f.a, nil
+	return f.p, nil
 }
 
 func TestProposeDefaultsToAlways(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("x"))
-	if d.Approval != (draft.Approval{Mode: draft.Always}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
+	if d.Approval != (draft.Approval{Mode: draft.Wait}) || d.State != draft.Proposed || !d.Deadline.IsZero() {
 		t.Fatalf("%+v", d)
 	}
-	pol := &fixedPolicy{a: draft.Approval{Mode: draft.Window, Window: 10 * time.Minute}}
+	pol := &fixedPolicy{p: *window(10 * time.Minute)}
 	e.svc.Policies = pol
 	w := e.propose(reply("y"))
-	if w.Approval != pol.a || !w.Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Proposed || len(pol.seen) != 1 {
+	if w.Approval != pol.p.Default || !w.Deadline.Equal(t0.Add(10*time.Minute)) || w.State != draft.Proposed || len(pol.seen) != 1 {
 		t.Fatalf("window %+v", w)
 	}
 	p := reply("z")
-	p.Approval = &draft.Approval{Mode: draft.Always}
-	if got := e.propose(p); got.Approval.Mode != draft.Always || len(pol.seen) != 1 {
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Wait})
+	if got := e.propose(p); got.Approval.Mode != draft.Wait || len(pol.seen) != 1 {
 		t.Fatalf("explicit approval %+v, policies asked %d times", got, len(pol.seen))
 	}
-	p.Approval = &draft.Approval{Mode: draft.Window}
+	p.Policy = draft.Fixed(draft.Approval{Mode: draft.Delay})
 	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("bad approval: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestWouldRecordsPolicyAndOutcome(t *testing.T) {
 	over := func() Proposal { p := reply("done"); p.Items = []string{"i1", "i2"}; return p }
 	asIs, edited, gone := e.propose(over()), e.propose(over()), e.propose(over())
 	for _, d := range []draft.Draft{asIs, edited, gone} {
-		if d.Would.Policy != draft.WouldSend || d.Would.Outcome != "" {
+		if d.Would.Policy != draft.WouldRelease || d.Would.Outcome != "" {
 			t.Fatalf("at proposal %+v", d.Would)
 		}
 	}
@@ -451,7 +451,7 @@ func TestWouldRecordsPolicyAndOutcome(t *testing.T) {
 	e.svc.Approve(ctx, edited.ID, &text)
 	e.svc.Discard(ctx, gone.ID, "")
 	for id, want := range map[draft.ID]draft.Outcome{asIs.ID: draft.OutcomeAsIs, edited.ID: draft.OutcomeEdited, gone.ID: draft.OutcomeDiscarded} {
-		if got := e.get(id).Would; got.Policy != draft.WouldSend || got.Outcome != want {
+		if got := e.get(id).Would; got.Policy != draft.WouldRelease || got.Outcome != want {
 			t.Errorf("draft %d would %+v, want outcome %s", id, got, want)
 		}
 	}
@@ -468,20 +468,18 @@ func TestWouldHoldsOnDoubt(t *testing.T) {
 	e.svc.Items = fakeItems{thread: {{ID: "i1", Confidence: items.High}, {ID: "i2", Confidence: items.Low}}}
 	low := reply("x")
 	low.Items = []string{"i1", "i2"}
-	ask := reply("who owns this?")
-	ask.Kind = draft.AskOwner
 	comment := reply("note")
 	comment.Kind = draft.Comment
 	user := reply("mine")
 	user.Origin = draft.Origin{Kind: draft.OriginUser}
-	for name, p := range map[string]Proposal{"low": low, "ask_owner": ask, "comment": comment, "user": user} {
-		if d := e.propose(p); d.Would.Policy != draft.WouldHold || d.Would.Reason == "" {
+	for name, p := range map[string]Proposal{"low": low, "comment": comment, "user": user} {
+		if d := e.propose(p); d.Would.Policy != draft.WouldWait || d.Would.Reason == "" {
 			t.Errorf("%s: %+v", name, d.Would)
 		}
 	}
 	high := reply("x")
 	high.Items = []string{"i1"}
-	if d := e.propose(high); d.Would.Policy != draft.WouldSend {
+	if d := e.propose(high); d.Would.Policy != draft.WouldRelease {
 		t.Errorf("high: %+v", d.Would)
 	}
 }
@@ -516,7 +514,7 @@ func TestSentDraftBecomesItemEvidence(t *testing.T) {
 		t.Fatalf("applied %s %+v", ap.prov, ap.ops)
 	}
 	for i, op := range ap.ops {
-		anchor := unit.Anchor{Unit: thread, Ref: "draft:1:close", Permalink: got.Evidence.Permalink, At: got.Evidence.At}
+		anchor := unit.Anchor{Unit: thread, Ref: "draft:1", Permalink: got.Evidence.Permalink, At: got.Evidence.At}
 		want := items.Op{Op: items.OpEvidence, Unit: thread, Item: p.Items[i], Anchor: anchor,
 			Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: anchor}}
 		if op.Op != want.Op || op.Unit != want.Unit || op.Item != want.Item || op.Anchor != want.Anchor || *op.Evidence != *want.Evidence {
@@ -546,7 +544,7 @@ func TestRecordSentSkipsPublish(t *testing.T) {
 	if d.State != draft.Sent || d.Would != (draft.Would{}) || d.Evidence.Ref != "9.9" || d.Evidence.At.IsZero() {
 		t.Fatalf("%+v", d)
 	}
-	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1:reply" || ran != 1 {
+	if len(e.fx.published) != 0 || len(ap.ops) != 1 || ap.ops[0].Anchor.Ref != "draft:1" || ran != 1 {
 		t.Fatalf("published %v ops %+v onsent %d", e.fx.published, ap.ops, ran)
 	}
 	e.disabled["slack"] = true

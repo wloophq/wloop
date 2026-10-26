@@ -1,16 +1,13 @@
-description = "Address the reviews, failing checks and conflicts of my pull request"
-subject = "github"
+summary = "Address the reviews, failing checks and conflicts of my pull request"
+provider = "github"
 when = 'pr.address.due'
 order = 30
 key = ["pr.fingerprint"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"
 intent = "address"
 
 [approval]
-default = "run"
+mode = "delay"
 window = "60s"

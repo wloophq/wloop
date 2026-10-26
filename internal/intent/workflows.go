@@ -9,11 +9,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -23,31 +25,38 @@ import (
 )
 
 var (
-	workflowNameRe   = regexp.MustCompile(`^[a-z][a-z0-9-]{1,39}$`)
-	approvalOutcomes = []string{string(workflow.OutcomeRun), string(workflow.OutcomeWait)}
-	workflowModes    = []string{string(workflow.ModeObserve), string(workflow.ModeApply)}
-	timeVarying      = []string{"pr.silent_days"}
+	workflowNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]{1,39}$`)
 )
 
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.
 type wManifest struct {
-	Description   string            `toml:"description"`
-	Subject       *string           `toml:"subject"`
-	Trigger       *wTrigger         `toml:"trigger"`
-	When          *string           `toml:"when"`
-	Step          []map[string]any  `toml:"step"`
-	Limits        *wLimits          `toml:"limits"`
-	Mode          *string           `toml:"mode"`
-	AllowVisible  bool              `toml:"allow_visible"`
-	Order         *int              `toml:"order"`
-	Key           []string          `toml:"key"`
-	Marks         map[string]string `toml:"marks"`
-	Approval      *wApproval        `toml:"approval"`
-	DraftApproval *mDraftApproval   `toml:"draft_approval"`
+	Summary  *string           `toml:"summary"`
+	Provider *string           `toml:"provider"`
+	Trigger  *wTrigger         `toml:"trigger"`
+	When     *string           `toml:"when"`
+	Step     []map[string]any  `toml:"step"`
+	Limits   *wLimits          `toml:"limits"`
+	Observe  bool              `toml:"observe"`
+	Order    *int              `toml:"order"`
+	Key      []string          `toml:"key"`
+	Marks    map[string]string `toml:"marks"`
+	Approval *mApproval        `toml:"approval"`
+	Drafts   *wDrafts          `toml:"drafts"`
+}
+
+// wDrafts is the [drafts] table: the approval of the drafts the
+// workflow's steps and turns propose, and when its open ones are withdrawn.
+type wDrafts struct {
+	Approval *mApproval `toml:"approval"`
+	Withdraw *wWithdraw `toml:"withdraw"`
+}
+
+type wWithdraw struct {
+	When   *string `toml:"when"`
+	Reason *string `toml:"reason"`
 }
 
 type wTrigger struct {
-	Every    *string  `toml:"every"`
 	On       []string `toml:"on"`
 	Schedule *string  `toml:"schedule"`
 }
@@ -59,12 +68,6 @@ type wLimits struct {
 	Cooldown      string `toml:"cooldown"`
 }
 
-type wApproval struct {
-	Default  *string `toml:"default"`
-	Window   *string `toml:"window"`
-	WaitWhen *string `toml:"wait_when"`
-}
-
 // wUnit is one workflows/<name>/ directory on its way to a workflow.
 type wUnit struct {
 	name     string
@@ -72,6 +75,7 @@ type wUnit struct {
 	bundled  bool
 	files    files
 	problems Problems
+	warnings Problems
 	wf       workflow.Workflow
 	// whenAt is where the manifest's when is, for a problem found after it loaded.
 	whenAt dintent.Pos
@@ -80,9 +84,9 @@ type wUnit struct {
 // loadWorkflows reads workflows/ of the bundled FS and of each directory layer.
 // A user workflow that fails is listed in broken and left out of loaded; a
 // bundled one whose override fails is listed in reverted and loads without
-// it. intentProblem, when set, is why a turn.start may not name an intent,
-// "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
+// it. turnProblem, when set, is why a turn.start may not name an intent
+// or run it under a runner, with the argument at fault; "" when it may.
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems, warnings Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -124,12 +128,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(intentProblem)
+		u.load(turnProblem, extras)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(intentProblem)
+			u.load(turnProblem, extras)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -152,6 +156,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 			continue
 		}
 		loaded = append(loaded, u.wf)
+		warnings = append(warnings, u.warnings...)
 	}
 	slices.SortFunc(loaded, func(a, b workflow.Workflow) int {
 		if a.Order != b.Order {
@@ -159,7 +164,7 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return loaded, broken, reverted, problems
+	return loaded, broken, reverted, problems, warnings
 }
 
 // markNames are the marks a workflow may read: those the loaded workflows
@@ -181,7 +186,11 @@ func markNames(units []*wUnit) map[string]bool {
 
 func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	var out Problems
-	for _, name := range append(workflow.MarkNames(u.wf.When), workflow.MarkNames(u.wf.Approval.WaitWhen)...) {
+	names := workflow.MarkNames(u.wf.When)
+	for _, p := range u.wf.Approval.Predicates() {
+		names = append(names, workflow.MarkNames(p)...)
+	}
+	for _, name := range names {
 		if !readable[name] {
 			out = append(out, Problem{File: u.wf.Source, Line: u.whenAt.Line, Col: u.whenAt.Col, Field: "when",
 				Msg: fmt.Sprintf("handled(%q): no workflow records that mark and no plugin writes one a workflow can read", name)})
@@ -190,10 +199,10 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(intentProblem func(string) string) {
+func (u *wUnit) load(turnProblem func(intent, runner string) (arg, msg string), extras func(dunit.ProviderID) expr.Env) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file}
-	defer func() { u.problems = s.problems }()
+	s := &sheet{file: file, extras: extras}
+	defer func() { u.problems, u.warnings = s.problems, s.warnings }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
 	}
@@ -207,17 +216,20 @@ func (u *wUnit) load(intentProblem func(string) string) {
 		s.problems = append(s.problems, problems...)
 		return
 	}
-	for i := range problems {
-		if problems[i].Field == "trigger.when" {
-			problems[i].Msg = "when is a top-level key: write it before the [trigger] table"
-		}
-	}
 	defer func() {
 		s.problems = slices.DeleteFunc(s.problems, func(p Problem) bool { return skip != "" && unindexed(p.Field) == unindexed(skip) })
 		s.problems = append(s.problems, problems...)
+		ps := grammar(builtin.SurfaceWorkflow, src)
+		for i := range ps {
+			if ps[i].Path == "trigger.when" {
+				ps[i].Msg = "when is a top-level key: write it before the [trigger] table"
+			}
+		}
+		s.addGrammar(ps)
 	}()
 	s.at = positions(src)
-	u.wf = s.defineWorkflow(u.name, m, intentProblem)
+	u.wf = s.defineWorkflow(u.name, m, turnProblem)
+	s.stepFiles(u.wf.Steps, u.files.read)
 	u.whenAt = s.pos("when")
 	u.wf.Source = file
 	u.wf.Bundled = u.bundled
@@ -239,25 +251,10 @@ func (s *sheet) predicate(path, src string, env expr.Env) workflow.Predicate {
 	return p
 }
 
-func parseWorkflowDuration(src string) (time.Duration, error) {
-	v, err := time.ParseDuration(src)
-	if n, ok := strings.CutSuffix(src, "d"); ok {
-		days, derr := strconv.Atoi(n)
-		if derr != nil {
-			return 0, derr
-		}
-		v, err = time.Duration(days)*24*time.Hour, nil
-	}
-	if err == nil && v < 0 {
-		err = fmt.Errorf("negative")
-	}
-	return v, err
-}
-
 func (s *sheet) duration(path, src string) time.Duration {
-	v, err := parseWorkflowDuration(src)
+	v, err := duration.Parse(src)
 	if err != nil {
-		s.add(path, "%q is not a duration such as 30s, 5m, 2h or 1d", src)
+		s.add(path, "%s", err.Error())
 	}
 	return v
 }
@@ -271,28 +268,33 @@ func providerNames() []string {
 	return names
 }
 
-func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(string) string) workflow.Workflow {
-	w := workflow.Workflow{Name: name, Description: m.Description, AllowVisible: m.AllowVisible, Order: 100, Mode: workflow.ModeApply}
+func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent, runner string) (arg, msg string)) workflow.Workflow {
+	w := workflow.Workflow{Name: name, Observe: m.Observe, Order: 100}
+	if m.Summary == nil || strings.TrimSpace(*m.Summary) == "" {
+		s.add("summary", "is required: one line saying what the workflow does")
+	} else {
+		w.Summary = *m.Summary
+	}
 	slot := ""
-	switch m.Subject {
+	switch m.Provider {
 	case nil:
-		s.add("subject", "is required: the unit provider the workflow matches, one of %s", quoted(providerNames()))
+		s.add("provider", "is required: the unit provider the workflow matches, one of %s", quoted(providerNames()))
 	default:
-		p := dunit.ProviderID(*m.Subject)
+		p := dunit.ProviderID(*m.Provider)
 		var ok bool
 		if slot, ok = builtin.Slots[p]; ok {
 			w.Provider, w.Slot = p, slot
 		} else {
-			s.add("subject", "unknown provider %s; the providers are %s", *m.Subject, strings.Join(providerNames(), ", "))
+			s.oneOf("provider", *m.Provider, builtin.ValuesOf(builtin.SurfaceWorkflow, "provider"))
 		}
 	}
 	s.defineTrigger(&w, m.Trigger)
 	if m.When == nil && !s.has("trigger.when") {
 		s.add("when", "is required: a predicate over the subject's facts, the trigger's and config.*")
 	} else if m.When != nil && slot != "" {
-		w.When = s.predicate("when", *m.When, builtin.WorkflowEnv(slot))
+		w.When = s.predicate("when", *m.When, s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot))
 	}
-	s.defineSteps(&w, m.Step, intentProblem)
+	s.defineSteps(&w, m.Step, turnProblem)
 	if l := m.Limits; l != nil {
 		for k, v := range map[string]int{"per_run": l.PerRun, "per_day": l.PerDay, "per_unit_per_day": l.PerUnitPerDay} {
 			if v < 0 {
@@ -304,41 +306,71 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 			w.Limits.Cooldown = s.duration("limits.cooldown", l.Cooldown)
 		}
 	}
-	if m.Mode != nil {
-		s.oneOf("mode", *m.Mode, workflowModes)
-		w.Mode = workflow.Mode(*m.Mode)
-	}
 	if m.Order != nil {
 		w.Order = *m.Order
 	}
 	s.defineKey(&w, m.Key, slot)
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
-	w.DraftApproval = s.draftApproval(m.DraftApproval)
+	if d := m.Drafts; d != nil {
+		w.DraftApproval = s.draftApprovalAt("drafts.approval", d.Approval, builtin.ApprovalEnv(true, slot))
+		s.defineWithdraw(&w, d.Withdraw, slot)
+	}
+	s.turnBudget(w, m.Limits)
 	return w
 }
 
+func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) {
+	if m == nil {
+		return
+	}
+	if m.When == nil {
+		s.add("drafts.withdraw.when", "is required: a predicate over the unit's facts and draft.* that withdraws an open draft the workflow proposed")
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepDraftPropose }) {
+		s.add("drafts.withdraw", "withdraws drafts the workflow proposed; it has no %s step", builtin.StepDraftPropose)
+	}
+	if slot != "" {
+		w.Withdraw = s.predicate("drafts.withdraw.when", *m.When, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
+	}
+	w.WithdrawReason = draft.WithdrawMoot
+	if m.Reason != nil {
+		w.WithdrawReason = *m.Reason
+	}
+}
+
+// turnBudget refuses a workflow that starts turns on units outside
+// builtin.RoundProviders without limits.per_day.
+func (s *sheet) turnBudget(w workflow.Workflow, l *wLimits) {
+	if w.Provider == "" || slices.Contains(builtin.RoundProviders, w.Provider) {
+		return
+	}
+	if !slices.ContainsFunc(w.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
+		return
+	}
+	if l == nil || l.PerDay <= 0 {
+		s.add("limits.per_day", "is required: a workflow starting turns on %s units caps them per day", w.Provider)
+	}
+}
+
+// defineTrigger reads [trigger]; a workflow without one runs on every sweep.
 func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
+	w.Trigger.Kind = workflow.TriggerSweep
 	if t == nil {
-		s.add("trigger", "is required: one of every = \"sweep\", on = [...] or schedule = \"...\"")
 		return
 	}
 	set := 0
-	for _, k := range []string{"every", "on", "schedule"} {
+	for _, k := range []string{"on", "schedule"} {
 		if s.has("trigger." + k) {
 			set++
 		}
 	}
 	if set != 1 {
-		s.add("trigger", "needs exactly one of every, on or schedule; it has %d", set)
+		s.add("trigger", "needs exactly one of on or schedule; it has %d; a workflow without [trigger] runs on every sweep", set)
 		return
 	}
 	switch {
-	case t.Every != nil:
-		w.Trigger.Kind = workflow.TriggerSweep
-		if *t.Every != "sweep" {
-			s.add("trigger.every", "%q is not \"sweep\"; use on or schedule for other triggers", *t.Every)
-		}
 	case s.has("trigger.on"):
 		w.Trigger = workflow.Trigger{Kind: workflow.TriggerEvent, On: t.On}
 		if len(t.On) == 0 {
@@ -367,15 +399,13 @@ func stepDef(use string) (builtin.StepDef, bool) {
 	return builtin.Steps[i], true
 }
 
-func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intentProblem func(string) string) {
+func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnProblem func(intent, runner string) (arg, msg string)) {
 	if len(steps) == 0 {
 		s.add("step", "is required: at least one [[step]] with use = \"<builtin>\"")
 		return
 	}
-	names := make([]string, len(builtin.Steps))
-	for i, d := range builtin.Steps {
-		names[i] = d.Name
-	}
+	uses := builtin.ValuesOf(builtin.SurfaceWorkflow, "step[].use")
+	names := builtin.ValueNames(uses)
 	for i, raw := range steps {
 		p := fmt.Sprintf("step[%d]", i)
 		use, ok := raw["use"].(string)
@@ -385,7 +415,7 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 		}
 		def, ok := stepDef(use)
 		if !ok {
-			s.add(p+".use", "unknown step %q; the steps are %s", use, quoted(names))
+			s.oneOf(p+".use", use, uses)
 			continue
 		}
 		st := workflow.Step{Use: use, Reach: def.Reach}
@@ -413,16 +443,12 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 				s.add(ap, "force is never available to an automatic run")
 			case k == "reach":
 				s.add(ap, "reach comes from the step's vocabulary; a manifest cannot set it")
-			case !slices.Contains(def.Args, k):
-				if len(def.Args) == 0 {
-					s.add(ap, "%s takes no arguments", use)
-				} else {
-					s.add(ap, "%s takes %s, not %s", use, quoted(def.Args), k)
-				}
+			case !slices.Contains(builtin.StepArgs(use), k):
+				// builtin.CheckStep below says it, as the table does every unknown key.
 			default:
-				v, isString := raw[k].(string)
-				if !isString {
-					s.add(ap, "must be a string")
+				v, ok := stepArg(use, k, raw[k])
+				if !ok {
+					s.add(ap, "must be %s", argKind(use, k))
 					continue
 				}
 				if st.Args == nil {
@@ -436,16 +462,118 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 			if !present {
 				s.add(p+".intent", "is required: the intent the turn runs")
 			}
-			if name, ok := intent.(string); ok && intentProblem != nil {
-				if msg := intentProblem(name); msg != "" {
-					s.add(p+".intent", "%s", msg)
+			if name, ok := intent.(string); ok && turnProblem != nil {
+				runner, _ := st.Args["runner"].(string)
+				if arg, msg := turnProblem(name, runner); msg != "" {
+					s.add(p+"."+arg, "%s", msg)
 				}
 			}
-			if r, ok := raw["round"].(string); ok {
-				s.oneOf(p+".round", r, rounds[1:])
+		}
+		if use == builtin.StepDraftPropose {
+			s.draftPropose(p, st.Args, w.Provider)
+		}
+		args := maps.Clone(raw)
+		delete(args, "use")
+		ps := builtin.CheckStep(use, args)
+		for i := range ps {
+			ps[i].Path = p + "." + ps[i].Path
+		}
+		s.addGrammar(ps)
+		w.Steps = append(w.Steps, st)
+	}
+}
+
+// stepArg is the value v of a step's argument k as the step reads it: a
+// list of strings for a list argument, else a string.
+func stepArg(use, k string, v any) (any, bool) {
+	if argKind(use, k) != "a list of strings" {
+		s, ok := v.(string)
+		return s, ok
+	}
+	raw, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	out := make([]string, len(raw))
+	for i, e := range raw {
+		if out[i], ok = e.(string); !ok {
+			return nil, false
+		}
+	}
+	return out, true
+}
+
+func argKind(use, k string) string {
+	if r, ok := builtin.StepArg(use, k); ok && r.Kind == builtin.KindList {
+		return "a list of strings"
+	}
+	return "a string"
+}
+
+// stepFiles checks the files a step's arguments name beside the manifest,
+// through read: each must exist, and a schema must compile.
+func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, error)) {
+	for i, st := range steps {
+		for _, r := range builtin.StepFiles(st.Use) {
+			name := r.Default
+			if v, ok := st.Args[r.Path].(string); ok {
+				name = v
+			}
+			p := fmt.Sprintf("step[%d].%s", i, r.Path)
+			if name != path.Base(name) || strings.HasPrefix(name, ".") {
+				s.add(p, "%q is not a file of the workflow's directory", name)
+				continue
+			}
+			b, err := read(name)
+			if err != nil {
+				s.add(p, "%s: no such file beside the manifest", name)
+				continue
+			}
+			if r.Path == schemaArg {
+				if _, err := jsonschema.Compile(b, jsonschema.Options{}); err != nil {
+					s.add(p, "%s: %v", name, err)
+				}
 			}
 		}
-		w.Steps = append(w.Steps, st)
+	}
+}
+
+// draftPropose checks draft.propose's arguments.
+func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.ProviderID) {
+	arg := func(k string) (string, bool) {
+		v, ok := args[k].(string)
+		return v, ok
+	}
+	if v, _ := arg("purpose"); strings.TrimSpace(v) == "" {
+		s.add(p+".purpose", "is required: what the draft is for, such as nudge or close")
+	}
+	delivery, _ := arg("delivery")
+	if r, _ := arg("reaction"); slices.Contains(builtin.DraftEmojiDeliveries, delivery) && r == "" {
+		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
+	}
+	if v, ok := arg("repeat_after"); ok {
+		s.repeatAfter(p+".repeat_after", v)
+	}
+	if v, ok := arg("repeat_after_sent"); ok && v != builtin.RepeatForever {
+		s.repeatAfter(p+".repeat_after_sent", v)
+	}
+	effects, _ := args["effects"].([]string)
+	for i, e := range effects {
+		if eff, ok := builtin.EffectOf(e); ok && eff.Provider != "" && provider != "" && eff.Provider != provider {
+			s.add(fmt.Sprintf("%s.effects[%d]", p, i), "%s applies to %s units only; a %s workflow cannot name it", e, eff.Provider, provider)
+		}
+	}
+}
+
+// repeatAfter checks a draft.propose delay: a duration, or a duration of the
+// config slot named by its fact.
+func (s *sheet) repeatAfter(path, v string) {
+	if !strings.HasPrefix(v, "config.") {
+		s.duration(path, v)
+		return
+	}
+	if t, ok := builtin.FactType(v); !ok || t != expr.Duration {
+		s.add(path, "%q is not a duration of the config slot", v)
 	}
 }
 
@@ -457,7 +585,7 @@ func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 			s.add(p, "%s is not a fact of the %s slot", k, slot)
 			continue
 		}
-		if t == expr.Duration || slices.Contains(timeVarying, k) {
+		if t == expr.Duration || builtin.TimeVarying(k) {
 			s.add(p, "%s changes as time passes; a key holds stable facts such as %s.fingerprint", k, slot)
 		}
 	}
@@ -486,18 +614,24 @@ func (s *sheet) defineMarks(w *workflow.Workflow, marks map[string]string, slot 
 	w.Marks = marks
 }
 
-func (s *sheet) defineApproval(w *workflow.Workflow, a *wApproval, slot string) {
-	w.Approval.Default = workflow.OutcomeRun
-	if a != nil {
-		if a.Default != nil {
-			s.oneOf("approval.default", *a.Default, approvalOutcomes)
-			w.Approval.Default = workflow.Outcome(*a.Default)
-		}
-		if a.Window != nil {
-			w.Approval.Window = s.duration("approval.window", *a.Window)
-		}
-		if a.WaitWhen != nil && slot != "" {
-			w.Approval.WaitWhen = s.predicate("approval.wait_when", *a.WaitWhen, builtin.WorkflowEnv(slot))
-		}
+func (s *sheet) defineApproval(w *workflow.Workflow, a *mApproval, slot string) {
+	var env expr.Env
+	if slot != "" {
+		env = s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot)
 	}
+	w.Approval = s.runApproval(a, env)
+}
+
+// schemaArg is the step argument holding the schema the step's agent
+// answers to, which Go validates the answer against.
+const schemaArg = "schema"
+
+// withExtras is env with the brief.extra.* facts of p's brief intent when
+// slot's units have a brief.
+func (s *sheet) withExtras(env expr.Env, p dunit.ProviderID, slot string) expr.Env {
+	if s.extras == nil || !slices.Contains(builtin.BriefSubjects, slot) {
+		return env
+	}
+	maps.Copy(env, s.extras(p))
+	return env
 }

@@ -200,7 +200,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	}
 	it := items[0]
 	if action == "pause" {
-		if it.Unit.Provider != unit.GitHub {
+		if !isPullRequest(it.Unit) {
 			return it, true, badRequest{"pause applies to pull requests; " + it.Unit.Label() + " is not one"}
 		}
 		if _, err := s.applyOverride(ctx, "pause", it.Unit, api.ActionRequest{}); err != nil {
@@ -216,9 +216,9 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	i := slices.IndexFunc(wire.Actions, func(st api.ActionState) bool { return st.ID == planOffers[action] })
 	switch {
 	case i < 0:
-		return it, true, conflict{fmt.Sprintf("%s offers no %s while %s", id, action, it.Decision)}
+		return it, true, conflict{msg: fmt.Sprintf("%s offers no %s while %s", id, action, it.Decision)}
 	case !wire.Actions[i].Enabled:
-		return it, true, conflict{wire.Actions[i].Reason}
+		return it, true, conflict{wire.Actions[i].Reason, wire.Actions[i].Refusal}
 	}
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
@@ -254,7 +254,7 @@ func itemUnits(items []workflow.Item) []unit.Unit {
 // unblock, so only that item reads its row.
 func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readmodel.Presentation) api.PlanItem {
 	p := api.PlanItem{ID: it.ID, Workflow: it.Workflow, Decision: string(it.Decision), Reason: it.Reason, Default: string(it.Default),
-		Mode: string(it.Mode), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
+		Observe: api.ObserveMode(it.Observe), Error: it.Error, Unit: it.Unit, Label: shown.Label, Title: shown.Title, Link: shown.Link, Steps: []string{}, Deadline: it.Deadline,
 		Gain: api.Gain{MemoryBytes: it.Gain.MemoryBytes, DiskBytes: it.Gain.DiskBytes}, Attempts: it.Attempts,
 		Why: api.Why{Trigger: string(it.Why.Trigger), Matched: []api.Fact{}}}
 	for _, st := range it.Steps {
@@ -267,7 +267,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 		p.Why.Matched = append(p.Why.Matched, api.Fact{Name: f.Name, Value: turn.FactText(f.Value)})
 	}
 	var row []api.ActionState
-	if it.Decision == workflow.DecisionBlocked && it.Unit.Provider == unit.GitHub && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
+	if it.Decision == workflow.DecisionBlocked && strings.HasPrefix(it.Reason, catalog.StartBlocked) &&
 		slices.Contains(p.Steps, builtin.StepTurnStart) {
 		if rd, ok, err := s.readRow(ctx, it.Unit); err != nil {
 			s.logf("plan %s: its row: %v", it.ID, err)
@@ -275,7 +275,7 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 			row = rd.Row.Actions
 		}
 	}
-	p.Actions = catalog.PlanStates(p, row)
+	p.Actions = catalog.PlanStates(s.loaded(), p, row)
 	return p
 }
 
@@ -305,7 +305,7 @@ func (s *Server) actOnRound(ctx context.Context, u unit.Unit, a workflow.Action,
 	case !ok && a == workflow.ActionGuide && guidance != "":
 		return "no round pending; the guidance goes with the next automatic round", s.deps.Overrides.SetNextGuidance(ctx, u, guidance)
 	case !ok && a == workflow.ActionApply:
-		return "", conflict{"the row changed: the pending round already went out"}
+		return "", conflict{msg: "the row changed: the pending round already went out"}
 	case !ok:
 		return "", badRequest{"no round pending for " + u.Label() + "; add guidance to send it with the next round"}
 	}
@@ -344,7 +344,7 @@ func (s *Server) dropPaused(ctx context.Context, p round.Pause, why string) erro
 	var errs []error
 	seen := map[unit.Unit]bool{}
 	for _, it := range items {
-		if it.Mode == workflow.ModeObserve {
+		if it.Observe {
 			seen[it.Unit] = true
 		}
 	}
@@ -355,7 +355,7 @@ func (s *Server) dropPaused(ctx context.Context, p round.Pause, why string) erro
 		}
 		seen[u] = true
 		held := p.On
-		if ref := refOf(u); u.Provider == unit.GitHub && ref.Repo != "" {
+		if ref := refOf(u); ref.Repo != "" {
 			held = p.Holds(ref.Owner, ref.Repo)
 		}
 		if held {

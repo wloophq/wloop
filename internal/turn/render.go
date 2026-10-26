@@ -3,7 +3,6 @@ package turn
 import (
 	"bytes"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -23,12 +22,6 @@ import (
 	"github.com/wloophq/wloop/profiles"
 )
 
-//go:embed templates/*.tmpl
-var embedded embed.FS
-
-// partials are the Go-owned templates every intent's instructions may call.
-var partials = []string{"history.md.tmpl", "resume.md.tmpl", "record.md.tmpl", "brief.md.tmpl", "judgment.md.tmpl", "why.md.tmpl", "items.md.tmpl", "unit.md.tmpl", "dossier.md.tmpl"}
-
 type Rendered struct {
 	ID   string
 	Text string
@@ -39,21 +32,7 @@ type Rendered struct {
 	Records bool
 }
 
-var funcs = template.FuncMap{"name": func() string { return brand.Name }, "trim": strings.TrimSpace, "heading": heading, "line": line, "quote": quote, "has": has, "artifactDoc": artifactDoc, "contents": contents}
-
-// artifactDocs are the record step's sentence per artifact kind.
-var artifactDocs = map[string]string{
-	"review-draft": "`artifact` (asked, when the user must read something to decide): the held\n  draft, `kind: review-draft`, `body` and one `items` entry per inline comment.",
-	"triage":       "`artifact` (asked, when the user must read something to decide): the\n  verdict per item, `kind: triage`.",
-}
-
-func artifactDoc(kind string) (string, error) {
-	doc, ok := artifactDocs[kind]
-	if !ok {
-		return "", fmt.Errorf("no record sentence for the artifact kind %s", kind)
-	}
-	return doc, nil
-}
+var funcs = template.FuncMap{"name": func() string { return brand.Name }, "trim": strings.TrimSpace, "heading": heading, "line": line, "quote": quote, "has": has, "contents": contents}
 
 func has(list []string, s string) bool { return slices.Contains(list, s) }
 
@@ -81,32 +60,34 @@ func heading(level int) string { return strings.Repeat("#", level) }
 // line keeps a model's text on one line, so it opens no heading or list.
 func line(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-func load(name, devDir string) (string, error) {
-	if devDir != "" {
-		raw, err := os.ReadFile(filepath.Join(devDir, name))
-		if err == nil {
-			return string(raw), nil
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			return "", err
-		}
-	}
-	raw, err := embedded.ReadFile("templates/" + name)
-	return string(raw), err
-}
-
-// Base is the set every intent's instructions are parsed on: the Go-owned
-// partials and the template functions, with missingkey=error.
+// Base is the set every intent's instructions are parsed on: the bundled
+// partials and the template functions, with missingkey=error. The loader
+// parses a profile's own partials over it.
 func Base() (*template.Template, error) { return base("") }
 
+// base is Base with the partials under devDir/partials, when devDir is set,
+// replacing the bundled ones of their name.
 func base(devDir string) (*template.Template, error) {
 	t := template.New("base").Funcs(funcs).Option("missingkey=error")
-	for _, name := range partials {
-		src, err := load(name, devDir)
+	names, err := fs.Glob(profiles.Default, path.Join("default", profile.PartialsDir, "*.tmpl"))
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range names {
+		src, err := fs.ReadFile(profiles.Default, name)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := t.New(name).Parse(src); err != nil {
+		if devDir != "" {
+			raw, err := os.ReadFile(filepath.Join(devDir, profile.PartialsDir, path.Base(name)))
+			switch {
+			case err == nil:
+				src = raw
+			case !errors.Is(err, fs.ErrNotExist):
+				return nil, err
+			}
+		}
+		if _, err := t.New(path.Base(name)).Parse(string(src)); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 	}
@@ -144,9 +125,10 @@ var Bundled = sync.OnceValues(func() (*intentload.Loaded, error) {
 	return l, nil
 })
 
-// Render writes the instructions of a completed turn. devDir, when set,
-// holds partials, and intents/<name>/instructions.md.tmpl of bundled
-// intents, that replace the loaded ones.
+// Render writes the instructions of a completed turn. devDir, when set, is
+// a profile directory whose partials/ and
+// intents/<name>/instructions.md.tmpl of bundled intents replace the
+// bundled ones.
 func Render(c Context, l *intentload.Loaded, devDir string) (Rendered, error) {
 	if c.Def.Name == "" || string(c.Def.Name) != string(c.Intent) {
 		return Rendered{}, fmt.Errorf("%s: the turn is not completed", c.Intent)
@@ -216,7 +198,7 @@ func instructionsOf(d dintent.Def, l *intentload.Loaded, devDir string) (*templa
 	return t, nil
 }
 
-// sourcesOf lists the main guide's parts, then each also_profiles guide's
+// sourcesOf lists the main guide's parts, then each also_profile guide's
 // under its prefix, then the blocks left out of the text and why.
 func sourcesOf(c Context) []string {
 	out := sources(c.Guide)
@@ -229,7 +211,7 @@ func sourcesOf(c Context) []string {
 }
 
 // Trimmed are the blocks the turn's guides left out to stay within the
-// judgment limit: the main guide's, then each also_profiles guide's under its prefix.
+// judgment limit: the main guide's, then each also_profile guide's under its prefix.
 func Trimmed(c Context) []string {
 	out := slices.Clone(c.Guide.Dropped)
 	for _, a := range alsoGuides(c) {
@@ -245,7 +227,7 @@ type alsoGuide struct {
 	guide  profile.Guide
 }
 
-// alsoGuides are the composed also_profiles guides other than the main one.
+// alsoGuides are the composed also_profile guides other than the main one.
 func alsoGuides(c Context) []alsoGuide {
 	var out []alsoGuide
 	for _, a := range c.Def.AlsoProfiles {
@@ -253,7 +235,7 @@ func alsoGuides(c Context) []alsoGuide {
 		if !ok || a.Profile == c.Def.Profile {
 			continue
 		}
-		out = append(out, alsoGuide{a.SourcePrefix, g})
+		out = append(out, alsoGuide{a.Prefix, g})
 	}
 	return out
 }

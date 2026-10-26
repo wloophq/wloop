@@ -167,7 +167,7 @@ func TestDoctorRepoWithAPullRequestUsesItsTags(t *testing.T) {
 	}
 	seedBriefOf(t, te.Store, r7, "change:refac")
 	agentDaemon(t, te)
-	if code := te.run("profile", "show", r7.URL(), "--kind", "review"); code != 0 {
+	if code := te.run("profile", "show", r7.URL(), "--intent", "review"); code != 0 {
 		t.Fatalf("exit %d: %s%s", code, te.out, te.err)
 	}
 	out := te.out.String()
@@ -180,7 +180,7 @@ func TestDoctorRepoWithAPullRequestUsesItsTags(t *testing.T) {
 		}
 	}
 	te.out.Reset()
-	if code := te.run("profile", "show", "acme/api", "--kind", "review"); code != 0 || !strings.Contains(te.out.String(), "tag change=refac   needs the brief") {
+	if code := te.run("profile", "show", "acme/api", "--intent", "review"); code != 0 || !strings.Contains(te.out.String(), "tag change=refac   needs the brief") {
 		t.Fatalf("exit %d: %s", code, te.out)
 	}
 }
@@ -203,7 +203,7 @@ func TestTheDaemonsFactsCarryTheBriefTextToTheCommandLine(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
-	st, _ := factsTurn{wire}.Facts(ctx, r7)
+	st, _ := factsTurn{wire}.Facts(ctx, r7.Unit())
 	if b := st.Brief; b == nil || b.Goal != "Export in batches" || b.Context != "exports time out" || b.RiskWhy != "touches the export" {
 		t.Fatalf("%+v", st.Brief)
 	}
@@ -213,7 +213,7 @@ func TestDoctorRepoWithAPullRequestWithoutTheDaemon(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.noDaemon(t)
-	if code := te.run("profile", "show", r7.URL(), "--kind", "review"); code != 0 {
+	if code := te.run("profile", "show", r7.URL(), "--intent", "review"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if out := te.out.String(); !strings.Contains(out, "brief facts unavailable: the daemon is not running") || !strings.Contains(out, "bundled  embedded intent=review.md") {

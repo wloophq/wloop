@@ -372,7 +372,7 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.Scope.Teams = []string{"acme/platform", "acme/search"}
+	te.cfg.GitHub.Scope.Teams = []string{"acme/platform", "acme/search"}
 	storeDB, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -785,7 +785,7 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 	ctx := context.Background()
 	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
 	cfg := te.cfg
-	cfg.Scope = config.Scope{People: []string{"ana"}}
+	cfg.GitHub.Scope = config.Scope{People: []string{"ana"}}
 	col := &ghsource.Collector{Store: inventory.New(db), GH: spentBudget{limit: spent}, Cfg: cfg, Now: func() time.Time { return at }, Log: t.Logf}
 	if rep, err := col.Fast(ctx); err != nil || rep.Skipped != "" {
 		t.Fatalf("fast: %+v %v", rep, err)
@@ -793,7 +793,7 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 
 	te.Env.GitHub = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
 		Token: func(context.Context) (string, error) { return "t", nil }})
-	cfg.Sweep.RateLimitFraction = 0.7
+	cfg.GitHub.RateLimitFraction = 0.7
 	te.Env.restoreBudget(ctx, db, cfg, t.Logf)
 	if got := te.Env.GitHub.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
 		t.Fatalf("restored %+v", got)
@@ -1192,9 +1192,9 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	}
 	deadline := testNow.Add(4 * time.Minute)
 	it := workflow.Item{ID: "review-follow-up/github/acme%2Fapi%237/k", Workflow: "review-follow-up", Unit: r7.Unit(), Decision: workflow.DecisionPending,
-		Reason: "runs when its window ends", Default: workflow.OutcomeRun, Deadline: deadline, At: testNow, Mode: workflow.ModeApply,
+		Reason: "runs when its window ends", Default: workflow.OutcomeRun, Deadline: deadline, At: testNow, Observe: false,
 		Key:   workflow.Key{Workflow: "review-follow-up", Unit: r7.Unit(), Value: "k"},
-		Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review), "round": "follow-up"}}}}
+		Steps: []workflow.Step{{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Review), "stage": "follow-up"}}}}
 	if err := storeDB.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{"review-follow-up"}, Items: []workflow.Item{it}}); err != nil {
 		t.Fatal(err)
 	}

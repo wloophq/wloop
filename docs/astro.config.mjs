@@ -71,6 +71,7 @@ export default defineConfig({
           items: [
             'reference/commands',
             'reference/configuration',
+            'reference/language',
             'reference/profile-blocks',
             'reference/intent-manifest',
             'reference/workflow-manifest',

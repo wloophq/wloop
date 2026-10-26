@@ -1,13 +1,16 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -18,10 +21,12 @@ import (
 	"github.com/wloophq/wloop/internal/core/workspaces"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/profile"
 )
 
 // kindNotifySelf is the event notify.self publishes: Key the workflow and
@@ -50,15 +55,21 @@ type stepDeps struct {
 	Changes  port.Changes
 	Removal  removalPorts
 	Classify classifyDeps
-	Pub      port.Publisher
-	Log      func(format string, args ...any)
+	// Drafts are what draft.propose reads; nil refuses it.
+	Drafts *draftDeps
+	Pub    port.Publisher
+	Log    func(format string, args ...any)
+	// Headless starts turn.start's headless turns; Turns counts the
+	// automated turns turns.per_day caps.
+	Headless headlessStarter
+	Turns    automatedTurns
 }
 
 // briefPort is the brief queue as a round asks it: Peek plans, Ready starts
 // the brief a first round waits for.
 type briefPort interface {
-	Peek(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error)
-	Ready(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error)
+	Peek(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error)
+	Ready(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error)
 }
 
 // removalPorts are the workspace removal's ports but its Rounds, which is
@@ -138,6 +149,35 @@ func (c stepCall) arg(name string) string {
 	return v
 }
 
+// file is the file argument name of c's step names beside its workflow's
+// manifest, its default when unset, read through the profile layers.
+func (s *stepSet) file(c stepCall, name string) (string, error) {
+	r, _ := builtin.StepArg(c.st.Use, name)
+	rel := path.Join("workflows", c.why.Workflow, cmp.Or(c.arg(name), r.Default))
+	f, err := profile.Resolve(profile.Chain(s.e.currentConfig()), rel)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", c.st.Use, err)
+	}
+	return string(f.Body), nil
+}
+
+// list is a list argument: []string as loaded, []any once stored.
+func (c stepCall) list(name string) []string {
+	switch v := c.st.Args[name].(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 // stepEntry adapts one builtin; a nil note or dismiss writes nothing.
 type stepEntry struct {
 	check   func(s *stepSet, ctx context.Context, c stepCall, o automation.CheckOpts) (string, error)
@@ -149,15 +189,16 @@ type stepEntry struct {
 // stepRegistry adapts every step of builtin.Steps.
 func stepRegistry() map[string]stepEntry {
 	return map[string]stepEntry{
-		"session.close":        {check: (*stepSet).closeCheck, run: (*stepSet).closeRun},
-		"session.mark_dormant": {check: (*stepSet).markDormantCheck, run: (*stepSet).markDormantRun},
-		"turn.dismiss":         {check: (*stepSet).dismissTurnCheck, run: (*stepSet).dismissTurnRun},
-		"answer.refuse":        {check: (*stepSet).refuseAnswerCheck, run: (*stepSet).refuseAnswerRun},
-		"workspace.remove":     {check: (*stepSet).removeCheck, note: (*stepSet).removeNote, run: (*stepSet).removeRun},
-		"workspace.unregister": {check: (*stepSet).unregisterCheck, run: (*stepSet).unregisterRun},
-		builtin.StepTurnStart:  {check: (*stepSet).startCheck, note: (*stepSet).startNote, run: (*stepSet).startRun, dismiss: (*stepSet).startDismiss},
-		stepClassify:           {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
-		"notify.self":          {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
+		"session.close":          {check: (*stepSet).closeCheck, run: (*stepSet).closeRun},
+		"session.mark_dormant":   {check: (*stepSet).markDormantCheck, run: (*stepSet).markDormantRun},
+		"turn.dismiss":           {check: (*stepSet).dismissTurnCheck, run: (*stepSet).dismissTurnRun},
+		"answer.refuse":          {check: (*stepSet).refuseAnswerCheck, run: (*stepSet).refuseAnswerRun},
+		"workspace.remove":       {check: (*stepSet).removeCheck, note: (*stepSet).removeNote, run: (*stepSet).removeRun},
+		"workspace.unregister":   {check: (*stepSet).unregisterCheck, run: (*stepSet).unregisterRun},
+		builtin.StepTurnStart:    {check: (*stepSet).startCheck, note: (*stepSet).startNote, run: (*stepSet).startRun, dismiss: (*stepSet).startDismiss},
+		builtin.StepDraftPropose: draftProposeStep,
+		stepClassify:             {check: (*stepSet).classifyCheck, run: (*stepSet).classifyRun},
+		"notify.self":            {check: (*stepSet).notifyCheck, run: (*stepSet).notifyRun},
 	}
 }
 
@@ -358,7 +399,7 @@ func (s *stepSet) openTurn(ctx context.Context, c stepCall) (unit.Unit, int64, w
 	if err != nil {
 		return unit.Unit{}, 0, nil, err
 	}
-	if c.u.Provider != unit.Session {
+	if !dturn.IsSession(c.u) {
 		return c.u, factInt(f, "pr.open_turn_seq"), f, nil
 	}
 	t, err := s.turns()
@@ -513,7 +554,7 @@ func (s *stepSet) removeCheck(ctx context.Context, c stepCall, o automation.Chec
 	if why, err := s.d.Removal.Guard.Refusal(ctx, w.ID); err != nil || why != "" {
 		return why, err
 	}
-	key, err := s.lookKey(ctx, c, w, info, o.Mode)
+	key, err := s.lookKey(ctx, c, w, info, o.Observe)
 	if err != nil {
 		return "", err
 	}
@@ -527,7 +568,7 @@ func (s *stepSet) removeCheck(ctx context.Context, c stepCall, o automation.Chec
 	}
 	svc := s.removal(s.d.Removal.Guard, nil)
 	check := svc.RemoveRefusal
-	if o.Mode == workflow.ModeObserve {
+	if o.Observe {
 		check = svc.RemoveRefusalAsFetched
 	}
 	refusal, backup, err := check(ctx, w, info)
@@ -553,7 +594,7 @@ type removeLook struct {
 // lookKey is what moves when a workspace's removal check may answer
 // otherwise, its sessions aside: the facts its local reads give, the pull
 // request's head, the last fetch, the day and the disposable list.
-func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace, info workspaces.PRInfo, mode workflow.Mode) (string, error) {
+func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace, info workspaces.PRInfo, observe bool) (string, error) {
 	f, err := s.facts(ctx, c.u)
 	if err != nil {
 		return "", err
@@ -568,7 +609,7 @@ func (s *stepSet) lookKey(ctx context.Context, c stepCall, w wsdomain.Workspace,
 	for _, name := range []string{"workspace.fingerprint", "workspace.dirty", "workspace.untracked", "workspace.unpushed", "workspace.last_activity", "workspace.path_exists"} {
 		facts = append(facts, fmt.Sprint(f[name]))
 	}
-	return fmt.Sprint(mode, w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
+	return fmt.Sprint(observe, w.Path, info, fetched.UnixNano(), s.e.Now().Format(time.DateOnly), facts, s.d.Removal.Disposable()), nil
 }
 
 // forgetLeft drops the looks of the workspaces the listing no longer has.
@@ -646,20 +687,60 @@ func (s *stepSet) unregisterRun(ctx context.Context, c stepCall, _ automation.Ru
 }
 
 func (s *stepSet) notifyCheck(_ context.Context, c stepCall, _ automation.CheckOpts) (string, error) {
-	if c.arg("text") == "" {
+	t, err := s.notifyTemplate(c)
+	switch {
+	case err != nil:
+		return "", err
+	case t == nil:
 		return "no text to notify", nil
 	}
 	return "", nil
 }
 
-func (s *stepSet) notifyRun(_ context.Context, c stepCall, _ automation.RunOpts) (string, error) {
-	text := c.arg("text")
+func (s *stepSet) notifyRun(ctx context.Context, c stepCall, _ automation.RunOpts) (string, error) {
+	t, err := s.notifyTemplate(c)
+	if err != nil || t == nil {
+		return "", cmp.Or(err, errors.New("no text to notify"))
+	}
 	if s.d.Pub == nil {
 		return "", errors.New("no notifier")
 	}
+	facts, err := s.facts(ctx, c.u)
+	switch {
+	case errors.Is(err, automation.ErrUnitGone):
+		facts = workflow.Facts{}
+	case err != nil:
+		return "", err
+	}
+	var b strings.Builder
+	if err := t.Execute(&b, notifyTextData{Workflow: c.why.Workflow, Unit: c.u.String(), Facts: facts}); err != nil {
+		return "", fmt.Errorf("%s: rendering %s: %w", c.st.Use, t.Name(), err)
+	}
+	text := b.String()
 	now := s.e.Now()
 	s.d.Pub.Publish(port.Event{Unit: c.u, Kind: kindNotifySelf, Key: notifyKey(c.why.Workflow, now), Data: text, At: now})
 	return text, nil
+}
+
+// notifyTextData is what a notify.self text renders: the workflow, the
+// unit and the unit's facts, by name, none when the unit is gone.
+type notifyTextData struct {
+	Workflow, Unit string
+	Facts          workflow.Facts
+}
+
+// notifyTemplate is c's text file parsed as a template; nil when the file
+// holds no text.
+func (s *stepSet) notifyTemplate(c stepCall) (*template.Template, error) {
+	text, err := s.file(c, "text")
+	if err != nil || strings.TrimSpace(text) == "" {
+		return nil, err
+	}
+	t, err := template.New(c.st.Use).Option("missingkey=error").Parse(text)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", c.st.Use, err)
+	}
+	return t, nil
 }
 
 // boundRounds opts a pull request out of its first round in the bound round

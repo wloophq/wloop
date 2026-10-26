@@ -166,9 +166,18 @@ type Published struct {
 // LastVerdict is the newest verdict a turn of intent published, however far
 // back the history it lies.
 func (b *Book) LastVerdict(intent Intent) (Published, bool) {
+	return b.lastVerdict(func(t Turn) bool { return t.Intent == intent })
+}
+
+// LastRoleVerdict is LastVerdict over the turns whose intent held role.
+func (b *Book) LastRoleVerdict(role string) (Published, bool) {
+	return b.lastVerdict(func(t Turn) bool { return t.Role == role })
+}
+
+func (b *Book) lastVerdict(of func(Turn) bool) (Published, bool) {
 	for i := len(b.Turns) - 1; i >= 0; i-- {
 		t := b.Turns[i]
-		if t.Intent != intent || t.State == Withdrawn || !b.published(t.Seq) {
+		if !of(t) || t.State == Withdrawn || !b.published(t.Seq) {
 			continue
 		}
 		last, _ := b.LastRecord(t.Seq)

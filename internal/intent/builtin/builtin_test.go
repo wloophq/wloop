@@ -10,7 +10,7 @@ import (
 )
 
 func TestEnvHasEveryFactOfTheSlotAndTheInputs(t *testing.T) {
-	inputs := []dintent.Input{{Name: "take_over", Type: "flag"}, {Name: "note", Type: "text"}, {Name: "who", Type: "list"}}
+	inputs := []dintent.Input{{Name: "take_over", Type: "bool"}, {Name: "note", Type: "text"}, {Name: "who", Type: "list"}}
 	for _, slot := range []FactSlot{ActionSlot, TurnSlot} {
 		env := Env(slot, inputs)
 		want := 0
@@ -34,8 +34,8 @@ func TestEnvHasEveryFactOfTheSlotAndTheInputs(t *testing.T) {
 				}
 			}
 		}
-		if len(env) != want {
-			t.Errorf("%s env has %d fields, want %d", slot, len(env), want)
+		if n := len(env.Names()); n != want {
+			t.Errorf("%s env has %d fields, want %d", slot, n, want)
 		}
 	}
 	if _, ok := Env(ActionSlot, inputs)["inputs.take_over"]; ok {

@@ -4,7 +4,7 @@ label = "Ask author"
 summary = "Ask the author one question"
 workspace = "review"
 session = { strategy = "new", title = "ask" }
-key = "Q"
+shortcut = "Q"
 start_line = "asking the author"
 owner_only = false
 
@@ -17,13 +17,13 @@ persist = true
 
 [action]
 surfaces = ["row", "detail", "tui", "cli"]
-visible = "row.open && !pr.mine"
-hint = "Ask {{.pr.author}} one question"
+when = "row.open && !pr.mine"
+note = "Ask {{.pr.author}} one question"
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
 states = ["done", "asked", "failed"]

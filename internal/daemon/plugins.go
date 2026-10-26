@@ -112,11 +112,14 @@ func (s *Server) bookUnit(ctx context.Context, k turns.Key) (unit.Unit, bool) {
 	return b.Unit, ok && err == nil
 }
 
-// byHandUnit is the unit a turn by hand names: its URL's, else the
+// byHandUnit is the unit a turn by hand names: its address's, else the
 // session's.
 func (s *Server) byHandUnit(ctx context.Context, req api.ByHandRequest, handle string) (unit.Unit, bool) {
 	if req.URL != "" {
-		u, err := parsePRURL(req.URL)
+		if s.deps.Units == nil {
+			return unit.Unit{}, false
+		}
+		u, err := unitOfAddress(s.deps.Units, req.URL)
 		return u, err == nil
 	}
 	if s.deps.ByHandRef == nil {

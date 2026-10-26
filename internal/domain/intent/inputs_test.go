@@ -27,7 +27,7 @@ func TestNormalizeTakesAValueAsItsInputsType(t *testing.T) {
 		v    any
 		want string
 	}{
-		{Input{Name: "take_over", Flag: "--take-over", Type: "flag"}, "yes", "--take-over takes true or false"},
+		{Input{Name: "take_over", Flag: "--take-over", Type: "bool"}, "yes", "--take-over takes true or false"},
 		{Input{Name: "topic", Type: "text"}, true, "inputs.topic takes a text"},
 		{Input{Name: "x", Type: "date"}, "", "inputs.x takes a known type"},
 	} {
@@ -38,7 +38,7 @@ func TestNormalizeTakesAValueAsItsInputsType(t *testing.T) {
 }
 
 func TestNormalizeAllKeepsOnlyTheDeclaredInputs(t *testing.T) {
-	d := Def{Inputs: []Input{{Name: "who", Type: "list"}, {Name: "fast", Type: "flag"}}}
+	d := Def{Inputs: []Input{{Name: "who", Type: "list"}, {Name: "fast", Type: "bool"}}}
 	got, err := d.NormalizeAll(map[string]any{"who": []any{"@ana"}, "waits_on_maintainers": true})
 	if err != nil || len(got) != 1 || !slices.Equal(got["who"].([]string), []string{"@ana"}) {
 		t.Errorf("stored inputs: %#v %v", got, err)

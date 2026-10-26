@@ -31,8 +31,8 @@ type Retention struct {
 	ClosedSessions time.Duration
 	Stops          time.Duration // turn_stops
 	Instructions   time.Duration // turn_instructions, then the parts no row lists
-	// BriefBodies empties brief and files of the runs started that long ago
-	// that no pr_briefs row or turn references.
+	// BriefBodies empties brief and input of the runs started that long ago
+	// that no unit_briefs row or turn references.
 	BriefBodies time.Duration
 	ViewRows    time.Duration // view_applied rows of pull requests merged or closed that long ago
 	EndedPRs    time.Duration // a pull request merged or closed that long ago, with every row of it
@@ -47,7 +47,10 @@ type Retention struct {
 	UnitlessLoopRows time.Duration
 	Classifications  time.Duration // classifications and classify_days
 	Fetches          time.Duration
-	VacuumPages      int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
+	// SubjectMarks drops the marks of entries done, in the trash or gone,
+	// and of Slack units with no extraction cursor, no item and no entry.
+	SubjectMarks bool
+	VacuumPages  int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
 }
 
 // SessionEventKinds are the bookkeeping kinds SessionEvents drops. Pause
@@ -77,6 +80,7 @@ var DefaultRetention = Retention{
 	UnitlessLoopRows: retentionWindow,
 	Classifications:  retentionWindow,
 	Fetches:          retentionWindow,
+	SubjectMarks:     true,
 	VacuumPages:      4096,
 }
 
@@ -127,16 +131,19 @@ const (
 	retainInstructionsSQL = `DELETE FROM turn_instructions WHERE created_at < ?`
 	retainPartsSQL        = `DELETE FROM instruction_parts WHERE sha NOT IN
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
-	retainBriefBodiesSQL = `UPDATE brief_runs SET brief = '', files = ''
-		WHERE started_at < ? AND (brief != '' OR files != '')
-		AND id NOT IN (SELECT run FROM pr_briefs UNION SELECT last_run FROM pr_briefs UNION SELECT brief_run FROM turns)`
 	retainViewRowsSQL = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN
 		(SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?)`
-	endedPRsSQL              = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
-	retainPlanItemsSQL       = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
-	retainWorkflowRunsSQL    = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
-	retainSessionRunsSQL     = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
-	retainSessionMarksSQL    = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
+	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
+	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
+	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
+	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
+		(provider = 'entry' AND unit_key NOT IN (SELECT id FROM entries WHERE state NOT IN ('done', 'trash')))
+		OR (provider = 'slack'
+			AND NOT EXISTS (SELECT 1 FROM extraction_cursors c WHERE c.provider = 'slack' AND c.unit_key = unit_marks.unit_key)
+			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
+			AND NOT EXISTS (SELECT 1 FROM entry_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
@@ -181,7 +188,7 @@ type endedTable struct {
 
 // endedTables is in delete order: turn_usage goes before the turns it hangs
 // from, pull_requests last.
-var endedTables = []endedTable{
+var endedTables = slices.Concat([]endedTable{
 	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits + `)`, false},
 	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
@@ -194,13 +201,11 @@ var endedTables = []endedTable{
 	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
 	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"pr_briefs", port.TopicBriefs, `DELETE FROM pr_briefs WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"brief_runs", port.TopicBriefs, `DELETE FROM brief_runs WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"pr_tags", port.TopicBriefs, `DELETE FROM pr_tags WHERE (owner, repo, number) IN ` + endedRefs, true},
+}, briefEndedTables, []endedTable{
 	{"pr_seen", 0, `DELETE FROM pr_seen WHERE (owner, repo, number) IN ` + endedRefs, true},
 	{"pr_details", port.TopicPRs, `DELETE FROM pr_details WHERE (owner, repo, number) IN ` + endedRefs, true},
 	{"pull_requests", port.TopicPRs | port.TopicFollow, `DELETE FROM pull_requests WHERE (owner, repo, number) IN ` + endedRefs, true},
-}
+})
 
 // Retain applies p as of now in one write transaction, noting Change.All
 // with the topics of the tables it changed, then runs incremental_vacuum and
@@ -241,7 +246,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("instruction_parts", port.TopicRounds, retainPartsSQL)
 		}
 		if p.BriefBodies > 0 {
-			r.exec("brief_runs", port.TopicBriefs, retainBriefBodiesSQL, cutoff(now, p.BriefBodies))
+			r.briefs(cutoff(now, p.BriefBodies))
 		}
 		if p.ViewRows > 0 {
 			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, cutoff(now, p.ViewRows))
@@ -268,6 +273,9 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 		}
 		if p.Fetches > 0 {
 			r.exec("fetches", 0, retainFetchesSQL, cutoff(now, p.Fetches))
+		}
+		if p.SubjectMarks {
+			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL)
 		}
 		return r.err
 	})

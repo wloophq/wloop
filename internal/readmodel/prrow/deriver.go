@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -65,7 +64,7 @@ type TurnFact struct {
 
 // IgnoreOf is who a row never waits on and a nudge never mentions.
 func IgnoreOf(cfg config.Config) []string {
-	return slices.Concat(cfg.AutomatedReviewers, cfg.AddressSkipReviewers)
+	return slices.Concat(cfg.GitHub.AutomatedReviewers, cfg.GitHub.AddressSkipReviewers)
 }
 
 // TurnFacts reads every book's driving turn, with the session of a started
@@ -80,7 +79,7 @@ func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.
 				continue
 			}
 		}
-		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), State: string(t.State), At: t.SentAt}
+		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), Role: t.Role, State: string(t.State), At: t.SentAt}
 		if !t.StartedAt.IsZero() {
 			f.At = t.StartedAt
 		}
@@ -318,7 +317,7 @@ func (d Deriver) upcoming(next []api.Upcoming, at time.Time, what string) []api.
 
 // AddActivity puts the pull request's turns, usage and brief retry in the
 // payload's facts.
-func (d Deriver) AddActivity(p *Payload, a inventory.Activity) {
+func (d Deriver) AddActivity(p *Payload, a turn.Activity) {
 	f := p.Facts
 	if f == nil {
 		return
@@ -330,7 +329,7 @@ func (d Deriver) AddActivity(p *Payload, a inventory.Activity) {
 
 // BriefSummary is the row's view of a brief.
 func BriefSummary(b brief.Summary) *api.BriefSummary {
-	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags}
+	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra}
 }
 
 func (d Deriver) approved(pr dinv.PR, evs []dinv.Event, r api.Row, p Payload) bool {

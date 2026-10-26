@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -90,7 +91,7 @@ func storedTurnRules(command string, stored []string) [][]string {
 func prIntents(reg *dintent.Registry) []string {
 	var out []string
 	for _, d := range reg.All() {
-		if d.Context == contextPR {
+		if d.Context == contextPR && d.Builds == "" {
 			out = append(out, string(d.Name))
 		}
 	}
@@ -208,7 +209,7 @@ func (e *Env) dryRunTurn(ctx context.Context, r api.DryRunTurnRequest) (api.DryR
 	if err != nil {
 		return api.DryRunTurn{}, err
 	}
-	sent, err := e.storeTurn(ctx, cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.ByHand, Unit: ref.Unit(), Plain: true, Why: r.Why})
+	sent, err := e.storeTurn(ctx, cfg, turn.Request{Intent: turn.Intent(e.roleIntent(builtin.RoleReview)), Trigger: turn.ByHand, Unit: ref.Unit(), Plain: true, Why: r.Why})
 	if err != nil {
 		return api.DryRunTurn{}, err
 	}

@@ -27,13 +27,13 @@ func TestCleanupDefaults(t *testing.T) {
 			t.Errorf("disposable lacks %s: %v", name, cl.Disposable)
 		}
 	}
-	if c.Classify.DailyCap != 50 || c.Nudge.SilentDays != 30 {
-		t.Errorf("classify = %+v, nudge = %+v", c.Classify, c.Nudge)
+	if c.Classify.PerDay != 50 || c.GitHub.Nudge.SilentDays != 30 {
+		t.Errorf("classify = %+v, nudge = %+v", c.Classify, c.GitHub.Nudge)
 	}
 
 	refused := map[string]string{
-		`{"workflows":{"x":{"mode":"later"}}}`:                 `workflows.x.mode: "later" is not one of observe, apply`,
-		`{"workflows":{"x":{"approval":{"default":"never"}}}}`: `workflows.x.approval.default: "never" is not one of run, wait`,
+		`{"workflows":{"x":{"approval":{"mode":"never"}}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
+		`{"workflows":{"x":{"approval":{"window":"0s"}}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {
 		path := filepath.Join(t.TempDir(), "config.json")
@@ -69,13 +69,13 @@ func (f prFacts) Get(field string) any { return f[field] }
 
 func TestProjectSettingsFollowTheirPredicate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"project_settings":{"review":"pr.nope"}}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"intents": {"review": {"project_settings": {"when": "pr.nope"}}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": project_settings.review: ") {
+	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": intents.review.project_settings.when: ") {
 		t.Errorf("err = %v", err)
 	}
-	c := Config{ProjectSettings: map[string]string{"review": `pr.visibility == "private" && pr.owner != "acme"`, "nudge": "false"}}
+	c := Config{Intents: map[string]IntentConfig{"review": {ProjectSettings: &ProjectSettings{When: `pr.visibility == "private" && pr.owner != "acme"`}}, "nudge": {ProjectSettings: &ProjectSettings{When: "false"}}}}
 	for _, k := range []struct {
 		intent string
 		facts  prFacts
@@ -98,8 +98,32 @@ func TestProjectSettingsFollowTheirPredicate(t *testing.T) {
 
 func TestLoadWorkflowConfig(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	body := `{"cleanup":{"idle":"3h","disposable":["tmp"]},"nudge":{"silent_days":10},"classify":{"daily_cap":5},
-		"workflows":{"x":{"mode":"observe","enabled":false,"approval":{"default":"wait","window":"10m"}}}}`
+	body := `{
+		"cleanup": {
+				"idle": "3h",
+				"disposable": [
+						"tmp"
+				]
+		},
+		"github": {
+				"nudge": {
+						"silent_days": 10
+				}
+		},
+		"classify": {
+				"per_day": 5
+		},
+		"workflows": {
+				"x": {
+						"observe": true,
+						"enabled": false,
+						"approval": {
+								"mode": "delay",
+								"window": "10m"
+						}
+				}
+		}
+}`
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -109,10 +133,10 @@ func TestLoadWorkflowConfig(t *testing.T) {
 	}
 	x := c.Workflows["x"]
 	if time.Duration(c.Cleanup.Idle) != 3*time.Hour || time.Duration(c.Cleanup.AskedIdle) != 4*time.Hour ||
-		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.Nudge.SilentDays != 10 || c.Classify.DailyCap != 5 {
-		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.Nudge, c.Classify)
+		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.GitHub.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
+		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.GitHub.Nudge, c.Classify)
 	}
-	if x.Mode != "observe" || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Default != "wait" ||
+	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "delay" ||
 		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
 		t.Errorf("workflows.x = %+v", x)
 	}

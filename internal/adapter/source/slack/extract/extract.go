@@ -6,12 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -32,10 +29,14 @@ type Input struct {
 	NewFrom      string          // first ts after the unit's cursor; "" means all are new
 	Users        map[string]slack.User
 	Ledger       []items.Item // the unit's current items, rendered by their own Item.ID
-	Brief        string
+	Brief        string       // the unit's brief in use, as stored; the prompt reads its goal
+	Vocabulary   string       // the tag vocabulary in use, tag.Vocabulary's lines
+	Extra        *Extra       // the brief intent's extra fields every brief carries; nil asks none
 	Contexts     []string     // placement contexts offered (context map keys)
 	Segments     []slack.Span // a DM's current spans, ascending, rendered s1, s2...
-	WindowChars  int          // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
+	// SegmentBriefs are the briefs in use of Segments, as stored, by index.
+	SegmentBriefs []string
+	WindowChars   int // Render cuts the oldest messages before NewFrom beyond it; 0 keeps all
 	// Context are read-only messages before Messages, rendered c1, c2...: nothing is extracted from them.
 	Context []slack.Message
 	// Segment is the one DM segment the call covers, its bounds marked; zero for a whole conversation.
@@ -44,13 +45,19 @@ type Input struct {
 }
 
 type Result struct {
-	Brief, ViewerRole, Verdict, VerdictWhy string
-	StartedByViewer, ClosurePosted         bool
-	Items                                  []ItemOut
-	Segments                               []SegmentOut // DM conversations only
-	Links                                  []LinkOut
+	// Brief is the conversation's brief as stored, empty when the answer
+	// keeps the brief it has.
+	Brief                           string
+	ViewerRole, Verdict, VerdictWhy string
+	StartedByViewer, ClosurePosted  bool
+	Items                           []ItemOut
+	Segments                        []SegmentOut // DM conversations only
+	Links                           []LinkOut
 	// Dropped counts the items and links left out because they cite a message outside the window.
 	Dropped int
+	// ExtrasDropped counts the briefs kept without their extra fields
+	// because those did not fit the brief intent's schema.
+	ExtrasDropped int
 }
 
 // ItemOut is the schema's item, v2 fields plus ref, mode and place.
@@ -68,12 +75,13 @@ type ItemOut struct {
 	Place struct{ Context, Why string } // Context is one of Input.Contexts or ""
 }
 
-// SegmentOut: Ref "s<N>" names an existing segment, "new" mints one.
-type SegmentOut struct{ Ref, FromTS, ToTS, Topic string }
+// SegmentOut: Ref "s<N>" names an existing segment, "new" mints one. Brief
+// is the segment's brief as stored, empty when it keeps the one it has.
+type SegmentOut struct{ Ref, FromTS, ToTS, Topic, Brief string }
 
 type LinkOut struct {
 	Item, Target, EvidenceTS string    // Target: a URL or "<provider>:<key>" ("github:acme/widget#527")
-	Kind                     link.Kind // "mention" | "review" | "merge"; prompt.md defines each
+	Kind                     link.Kind // "mention" | "review" | "merge"; the extraction prompt defines each
 }
 
 // ParseTarget turns a LinkOut.Target into a unit through the registered codecs;
@@ -83,13 +91,17 @@ type ParseTarget func(target string) (unit.Unit, bool)
 // Extract asks for in's result; ask carries Tier and MaxCostUSD. An answer that does not fit
 // the schema, or names a ref, segment or link item in doesn't hold, fails with turns.ErrUnfit;
 // a new item, an item whose evidence or a link citing a message outside the window, the context's
-// included, is dropped.
+// included, is dropped, and a brief whose extra fields do not fit is kept without them.
 func Extract(ctx context.Context, a turns.Asker, ask turns.Ask, in Input) (Result, turns.Answer, error) {
 	prompt, err := Prompt(in)
 	if err != nil {
 		return Result{}, turns.Answer{}, err
 	}
-	ask.Prompt, ask.Schema = prompt, Schema()
+	schemaJSON, _, err := schemaFor(in.Extra)
+	if err != nil {
+		return Result{}, turns.Answer{}, err
+	}
+	ask.Prompt, ask.Schema = prompt, schemaJSON
 	ans, err := a.Ask(ctx, ask)
 	if err != nil {
 		return Result{}, ans, err
@@ -116,7 +128,7 @@ type Reader interface {
 }
 
 type wireResult struct {
-	Brief           string       `json:"brief"`
+	Brief           wireBrief    `json:"brief"`
 	ViewerRole      string       `json:"viewer_role"`
 	StartedByViewer bool         `json:"started_by_viewer"`
 	Items           []wireItem   `json:"items"`
@@ -161,10 +173,11 @@ type wireItem struct {
 }
 
 type wireSeg struct {
-	Ref    string `json:"ref"`
-	FromTS string `json:"from_ts"`
-	ToTS   string `json:"to_ts"`
-	Topic  string `json:"topic"`
+	Ref    string    `json:"ref"`
+	FromTS string    `json:"from_ts"`
+	ToTS   string    `json:"to_ts"`
+	Topic  string    `json:"topic"`
+	Brief  wireBrief `json:"brief"`
 }
 
 type wireLinkTo struct {
@@ -175,11 +188,8 @@ type wireLinkTo struct {
 }
 
 func decode(raw []byte, in Input) (Result, error) {
-	var doc any
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return Result{}, err
-	}
-	if err := conform(schemaDoc, doc, "$"); err != nil {
+	bad, err := fit(raw, in.Extra)
+	if err != nil {
 		return Result{}, err
 	}
 	var w wireResult
@@ -187,8 +197,15 @@ func decode(raw []byte, in Input) (Result, error) {
 		return Result{}, err
 	}
 	r := Result{
-		Brief: w.Brief, ViewerRole: w.ViewerRole, Verdict: w.Verdict, VerdictWhy: w.VerdictWhy,
+		ViewerRole: w.ViewerRole, Verdict: w.Verdict, VerdictWhy: w.VerdictWhy,
 		StartedByViewer: w.StartedByViewer, ClosurePosted: w.ClosurePosted,
+	}
+	if bad[conversationBrief] {
+		w.Brief.Extra = nil
+		r.ExtrasDropped++
+	}
+	if r.Brief, err = briefJSON(w.Brief, in.Extra, in.Brief); err != nil {
+		return Result{}, err
 	}
 	known := map[string]bool{}
 	for _, it := range in.Ledger {
@@ -239,14 +256,26 @@ func decode(raw []byte, in Input) (Result, error) {
 		}
 		r.Items = append(r.Items, it)
 	}
-	for _, s := range w.Segments {
+	for i, s := range w.Segments {
+		prev := ""
 		if s.Ref != "new" {
 			n, _ := strconv.Atoi(strings.TrimPrefix(s.Ref, "s"))
 			if n < 1 || n > len(in.Segments) {
 				return Result{}, fmt.Errorf("segment %q is not one of the %d rendered", s.Ref, len(in.Segments))
 			}
+			if n <= len(in.SegmentBriefs) {
+				prev = in.SegmentBriefs[n-1]
+			}
 		}
-		r.Segments = append(r.Segments, SegmentOut(s))
+		if bad[i] {
+			s.Brief.Extra = nil
+			r.ExtrasDropped++
+		}
+		brief, err := briefJSON(s.Brief, in.Extra, prev)
+		if err != nil {
+			return Result{}, err
+		}
+		r.Segments = append(r.Segments, SegmentOut{Ref: s.Ref, FromTS: s.FromTS, ToTS: s.ToTS, Topic: s.Topic, Brief: brief})
 	}
 	for _, l := range w.Links {
 		if dropped[l.Item] || (l.EvidenceTS != "" && !inWindow[l.EvidenceTS]) {
@@ -264,69 +293,4 @@ func decode(raw []byte, in Input) (Result, error) {
 func isNewRef(ref string) bool {
 	n, err := strconv.Atoi(strings.TrimPrefix(ref, "n"))
 	return strings.HasPrefix(ref, "n") && err == nil && n > 0
-}
-
-// conform checks v against the subset of JSON Schema schema.json uses.
-func conform(schema map[string]any, v any, path string) error {
-	switch schema["type"] {
-	case "object":
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return fmt.Errorf("%s: not an object", path)
-		}
-		props, _ := schema["properties"].(map[string]any)
-		for _, req := range schema["required"].([]any) {
-			if _, ok := obj[req.(string)]; !ok {
-				return fmt.Errorf("%s: %s is missing", path, req)
-			}
-		}
-		for k, val := range obj {
-			sub, ok := props[k].(map[string]any)
-			if !ok {
-				return fmt.Errorf("%s: unknown field %s", path, k)
-			}
-			if err := conform(sub, val, path+"."+k); err != nil {
-				return err
-			}
-		}
-	case "array":
-		arr, ok := v.([]any)
-		if !ok {
-			return fmt.Errorf("%s: not an array", path)
-		}
-		if limit, ok := schema["maxItems"].(float64); ok && len(arr) > int(limit) {
-			return fmt.Errorf("%s: %d entries, over %d", path, len(arr), int(limit))
-		}
-		sub := schema["items"].(map[string]any)
-		for i, val := range arr {
-			if err := conform(sub, val, fmt.Sprintf("%s[%d]", path, i)); err != nil {
-				return err
-			}
-		}
-	case "string":
-		s, ok := v.(string)
-		if !ok {
-			return fmt.Errorf("%s: not a string", path)
-		}
-		n := utf8.RuneCountInString(s)
-		if limit, ok := schema["maxLength"].(float64); ok && n > int(limit) {
-			return fmt.Errorf("%s: %d characters, over %d", path, n, int(limit))
-		}
-		if limit, ok := schema["minLength"].(float64); ok && n < int(limit) {
-			return fmt.Errorf("%s: %d characters, under %d", path, n, int(limit))
-		}
-		if enum, ok := schema["enum"].([]any); ok && !slices.Contains(enum, any(s)) {
-			return fmt.Errorf("%s: %q is not one of %v", path, s, enum)
-		}
-		if p, ok := schema["pattern"].(string); ok && !regexp.MustCompile(p).MatchString(s) {
-			return fmt.Errorf("%s: %q does not match %s", path, s, p)
-		}
-	case "boolean":
-		if _, ok := v.(bool); !ok {
-			return fmt.Errorf("%s: not a boolean", path)
-		}
-	default:
-		return fmt.Errorf("%s: schema type %v unsupported", path, schema["type"])
-	}
-	return nil
 }

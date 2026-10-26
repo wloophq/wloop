@@ -72,7 +72,7 @@ func newRig(t testing.TB, f *storetest.Fixture) *rig {
 // model is a new read model over the rig's sources, as a restart builds.
 func (r *rig) model() *readmodel.Model {
 	src := prrow.Source{Store: r.f.Inventory, Briefs: brief.New(brief.Deps{Store: r.f.Inventory}),
-		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
+		RowDeps: readmodel.RowDeps{Books: r.f.Turns, Sessions: r.f.Turns, Activity: r.f.DB, Intakes: r.f.DB.Intakes().Open, Intake: intakeView,
 			Settings: func() readmodel.RowSettings { return readmodel.RowSettings{Cfg: r.cfg, Loaded: r.loaded, GateOn: true} }}}
 	m := readmodel.New(r.f.Log, r.f.DB, r, readmodel.AgentsFunc(r.lastAgents), r, counting{prrow.New(src), &r.listed})
 	m.UseClock(r.clock)
@@ -682,7 +682,7 @@ func TestClockFlipsStalledAndRenudge(t *testing.T) {
 		}
 	}
 	asked := f.Now
-	for workday.Between(asked, f.Now) < time.Duration(r.cfg.Stalled.Review) {
+	for workday.Between(asked, f.Now) < time.Duration(r.cfg.GitHub.Stalled.Review) {
 		asked = asked.Add(-time.Minute)
 	}
 	asked = asked.Add(30 * time.Second)

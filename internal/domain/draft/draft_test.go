@@ -38,13 +38,13 @@ func TestApprovalValidate(t *testing.T) {
 		a  Approval
 		ok bool
 	}{
-		{Approval{Mode: Always}, true},
-		{Approval{Mode: None}, true},
-		{Approval{Mode: Observe}, true},
-		{Approval{Mode: Window, Window: time.Minute}, true},
-		{Approval{Mode: Window}, false},
-		{Approval{Mode: Window, Window: -time.Second}, false},
-		{Approval{Mode: Always, Window: time.Minute}, false},
+		{Approval{Mode: Wait}, true},
+		{Approval{Mode: Send}, true},
+		{Approval{Mode: DryRun}, true},
+		{Approval{Mode: Delay, Window: time.Minute}, true},
+		{Approval{Mode: Delay}, false},
+		{Approval{Mode: Delay, Window: -time.Second}, false},
+		{Approval{Mode: Wait, Window: time.Minute}, false},
 		{Approval{Mode: "later"}, false},
 		{Approval{}, false},
 	} {
@@ -88,5 +88,16 @@ func TestShapeAndKindRoundTrip(t *testing.T) {
 	}
 	if got := KindOf("ping", Message); got != Reply {
 		t.Errorf("a message of any other purpose is a reply: %s", got)
+	}
+}
+
+func TestStoredSpellingsAreTheLanguages(t *testing.T) {
+	for _, c := range [][2]string{
+		{string(DryRun), "dry_run"}, {string(WouldWait), "wait"}, {string(WouldRelease), "release"},
+		{string(OutcomeReleased), "released"}, {string(OutcomeDryRun), "dry_run"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("stored %q, want %q", c[0], c[1])
+		}
 	}
 }

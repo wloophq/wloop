@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "session"
+observe = "yes"
+when = 'session.managed && session.agent_state == "done"'
+
+[[step]]
+use = "session.close"

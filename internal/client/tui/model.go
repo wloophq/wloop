@@ -132,6 +132,8 @@ type Model struct {
 	// rows as they read them, nil until one asks.
 	plugins []PluginView
 	set     *rowset.Set
+	// served are the plugins the daemon serves, enabled or not.
+	served []api.Plugin
 
 	// gtd are the core views of GET /api/gtd, after the plan; entries are
 	// each view's entries as last pulled, counters the tabs' counts.

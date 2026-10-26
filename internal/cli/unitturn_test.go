@@ -39,9 +39,9 @@ provider = "thread"
 session = { strategy = "new", title = "discuss" }
 
 [headline]
-resumed = "discussion of {{.Wording.Ref}}"
+resumed = "discussion of {{.unit.ref}}"
 [[headline.new]]
-text = "Discuss {{.Wording.Ref}}, {{.Who}}."
+line = 'Discuss {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
 surfaces = ["row", "cli"]
@@ -331,7 +331,7 @@ func TestAThreadRefusesPullRequestOnlyIntents(t *testing.T) {
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	withThreads(t, te)
 	unoffered := strings.Replace(discussIntent, "[action]\nsurfaces = [\"row\", \"cli\"]\n", "", 1)
-	sent := strings.Replace(discussIntent, `provider = "thread"`, "provider = \"thread\"\non_sent = [\"plan.drop_pending\", \"event.round_sent\"]", 1)
+	sent := strings.Replace(discussIntent, `provider = "thread"`, "provider = \"thread\"\neffects = [\"plan.cleared\"]", 1)
 	userProfile(t, te, map[string]string{
 		"intents/quiet/intent.toml": unoffered, "intents/quiet/instructions.md.tmpl": discussBody,
 		"intents/sent/intent.toml": sent, "intents/sent/instructions.md.tmpl": discussBody,
@@ -341,8 +341,8 @@ func TestAThreadRefusesPullRequestOnlyIntents(t *testing.T) {
 	if _, err := c.Action(context.Background(), thread1, "quiet", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "no quiet on thread:1700000000.1") {
 		t.Errorf("an intent offered on no surface: %v", err)
 	}
-	if _, err := c.Action(context.Background(), thread1, "sent", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "on_sent plan.drop_pending, event.round_sent, which act on pull requests only") {
-		t.Errorf("an on_sent intent: %v", err)
+	if _, err := c.Action(context.Background(), thread1, "sent", api.ActionRequest{}); err == nil || !strings.Contains(err.Error(), "effects plan.cleared, which act on pull requests only") {
+		t.Errorf("an intent with effects: %v", err)
 	}
 	if len(m.Prompts) != 0 || len(m.Writes) != 0 {
 		t.Fatalf("prompts %+v, writes %q", m.Prompts, m.Writes)

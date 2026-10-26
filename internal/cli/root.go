@@ -9,16 +9,19 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
+	factentry "github.com/wloophq/wloop/internal/adapter/facts/entry"
 	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
 	"github.com/wloophq/wloop/internal/adapter/gitcheck"
 	"github.com/wloophq/wloop/internal/adapter/orca"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
+	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/port"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -312,4 +315,20 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 		return false, nil
 	}
 	return closed, nil
+}
+
+// entryFacts is the entry subject's facts provider, reading the config the
+// daemon holds at each read.
+func (e *Env) entryFacts(db *sqlite.DB) *factentry.Provider {
+	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
+	return factentry.New(factentry.Deps{
+		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
+		Cards:   coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Enabled: enabled,
+		Settings: func() factentry.Settings {
+			cfg := e.currentConfig()
+			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
+		},
+		Clock: clockFunc(func() time.Time { return e.Now() }),
+	})
 }

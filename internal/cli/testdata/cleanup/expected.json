@@ -13,42 +13,42 @@
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"closed\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"CLOSED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/gadgets#546",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/gadgets#718",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#131",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#407",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#524",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"asked\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"asked\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/probe#1",
@@ -62,21 +62,21 @@
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/widgets#5111",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/widgets#5158",
    "clock": "A",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "session:term_00000000-0000-4000-a000-000000000001",
@@ -307,7 +307,7 @@
    "clock": "A",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
-   "threshold": "workspace.pr_state \"open\""
+   "threshold": "workspace.pr_state \"OPEN\""
   },
   {
    "unit": "workspace:/Users/user/worktrees/gadgets/scratch-notes",
@@ -327,42 +327,42 @@
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"closed\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"CLOSED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/gadgets#546",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/gadgets#718",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#131",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#407",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/handbook#524",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"asked\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"asked\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/probe#1",
@@ -376,21 +376,21 @@
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/widgets#5111",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"open\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"OPEN\", pr.orphan_answer_id 0"
   },
   {
    "unit": "github:acme/widgets#5158",
    "clock": "B",
    "workflow": "hygiene-turn-on-finished-pr",
    "decision": "not matched",
-   "threshold": "pr.open_turn \"\", pr.state \"merged\", pr.orphan_answer_id 0"
+   "threshold": "pr.open_turn \"\", pr.state \"MERGED\", pr.orphan_answer_id 0"
   },
   {
    "unit": "session:term_00000000-0000-4000-a000-000000000001",
@@ -640,7 +640,7 @@
    "clock": "B",
    "workflow": "workspace-review-finished",
    "decision": "not matched",
-   "threshold": "workspace.pr_state \"open\""
+   "threshold": "workspace.pr_state \"OPEN\""
   },
   {
    "unit": "workspace:/Users/user/worktrees/gadgets/scratch-notes",

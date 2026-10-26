@@ -209,7 +209,7 @@ func TestAnAnswerAfterAPushResumesWithTheHeadMoved(t *testing.T) {
 	if len(m.Prompts) != 2 {
 		t.Fatalf("prompts %+v", m.Prompts)
 	}
-	if text := storedText(t, te, askRound(t, m.Prompts[1].Text)); !strings.Contains(text, intent.DefaultHeadMoved) {
+	if text := storedText(t, te, askRound(t, m.Prompts[1].Text)); !strings.Contains(text, intent.DefaultChanged) {
 		t.Fatalf("the resume does not say the head moved:\n%s", text)
 	}
 	wantNothingUnderLock(t, te)

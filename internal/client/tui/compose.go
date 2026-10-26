@@ -176,12 +176,12 @@ func sessionOff(e api.EntryView) string {
 		if v.Verb != "delegate" {
 			continue
 		}
-		for _, md := range v.Modes {
-			if md.Mode == "session" && !md.Enabled {
+		for _, md := range v.Runners {
+			if md.Runner == "session" && !md.Enabled {
 				return md.Reason
 			}
 		}
-		if len(v.Modes) > 0 && !slices.ContainsFunc(v.Modes, func(md api.ModeState) bool { return md.Mode == "session" }) {
+		if len(v.Runners) > 0 && !slices.ContainsFunc(v.Runners, func(md api.RunnerState) bool { return md.Runner == "session" }) {
 			return "the action does not run a session"
 		}
 	}
@@ -231,7 +231,7 @@ func replyTarget(e api.EntryView) string {
 func (m *Model) draftLines(fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
 	for i, d := range m.listedDrafts() {
-		head := fmt.Sprintf("%d. %s · %s", i+1, d.Kind, d.State)
+		head := fmt.Sprintf("%d. %s · %s", i+1, d.Purpose, d.State)
 		if d.Origin.Kind != "" {
 			head += " · from " + d.Origin.Kind
 		}
@@ -245,7 +245,7 @@ func (m *Model) draftLines(fact func(label, text string, style func(string) stri
 		}
 		fact(label, head, style)
 		text := d.Text
-		if d.Kind == "react" {
+		if d.Reaction != "" {
 			text = ":" + d.Reaction + ":"
 		}
 		para("", text)

@@ -28,6 +28,16 @@ var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
+// ConversationKinds are the kinds a draft on a conversation takes, as an
+// agent names them: all but a review comment.
+var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
+
+// Emoji says whether a draft of kind k posts an emoji, and no text.
+func (k Kind) Emoji() bool {
+	_, d := ShapeOf(k)
+	return d == Reaction
+}
+
 // Delivery is how a draft reaches the provider.
 type Delivery string // "message", "reaction", "comment"
 
@@ -103,21 +113,21 @@ type Evidence struct {
 	At        time.Time
 }
 
-type WouldPolicy string // "send", "hold"
+type WouldPolicy string // "release", "wait"
 
 const (
-	WouldSend WouldPolicy = "send"
-	WouldHold WouldPolicy = "hold"
+	WouldRelease WouldPolicy = "release"
+	WouldWait    WouldPolicy = "wait"
 )
 
-type Outcome string // "", "as_is", "edited", "discarded", "auto" (approved by its policy), "observed" (recorded only)
+type Outcome string // "", "as_is", "edited", "discarded", "released" (approved by its policy), "dry_run" (stored, never sent)
 
 const (
 	OutcomeAsIs      Outcome = "as_is"
 	OutcomeEdited    Outcome = "edited"
 	OutcomeDiscarded Outcome = "discarded"
-	OutcomeAuto      Outcome = "auto"
-	OutcomeObserved  Outcome = "observed"
+	OutcomeReleased  Outcome = "released"
+	OutcomeDryRun    Outcome = "dry_run"
 )
 
 type Would struct {
@@ -142,13 +152,16 @@ type Draft struct {
 	Edited   bool     // Text != Original
 	Origin   Origin
 	Approval Approval  // fixed at proposal
-	Deadline time.Time // Approval.Mode "window": when Tick approves it; zero otherwise
+	Deadline time.Time // Approval.Mode "delay": when Tick approves it; zero otherwise
 	State    State
 	Evidence Evidence // State "sent" only
 	Error    string   // State "failed" only, never a token
-	Reason   string   // State "discarded": "user", "assigned", "observe", ...
+	Reason   string   // State "discarded": "user", "assigned", "dry_run", ...
 	Would    Would
 	Rev      int64 // the stored row's version; every Update bumps it
+	// EffectsAppliedAt is when the Effects of a sent draft were applied;
+	// zero while they are not.
+	EffectsAppliedAt time.Time
 
 	CreatedAt, UpdatedAt, SendingAt time.Time
 }
@@ -173,28 +186,41 @@ var transitions = map[State][]State{
 	Failed:   {Approved, Discarded},
 }
 
-type ApprovalMode string // "always" (default), "window", "none", "observe"
+// The reasons a workflow withdraws a draft it proposed, as Reason of the
+// discarded draft: its person was assigned the items, or it is moot.
+const (
+	WithdrawAssigned = "assigned"
+	WithdrawMoot     = "moot"
+)
+
+type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"
 
 const (
-	Always  ApprovalMode = "always"
-	Window  ApprovalMode = "window"
-	None    ApprovalMode = "none"
-	Observe ApprovalMode = "observe"
+	Wait   ApprovalMode = "wait"
+	Delay  ApprovalMode = "delay"
+	Send   ApprovalMode = "send"
+	DryRun ApprovalMode = "dry_run"
 )
+
+// ApprovalModes are the draft approval's modes.
+var ApprovalModes = []ApprovalMode{Send, Delay, Wait, DryRun}
+
+// Releases says whether m sends a draft with no person approving it.
+func (m ApprovalMode) Releases() bool { return m == Send || m == Delay }
 
 type Approval struct {
 	Mode   ApprovalMode
-	Window time.Duration // Mode "window" only, > 0
+	Window time.Duration // Mode "delay" only, > 0
 }
 
-// Validate refuses an unknown mode, a window <= 0 with window, a window set without window.
+// Validate refuses an unknown mode, a window <= 0 with delay, a window set without delay.
 func (a Approval) Validate() error {
 	switch {
-	case !slices.Contains([]ApprovalMode{Always, Window, None, Observe}, a.Mode):
+	case !slices.Contains(ApprovalModes, a.Mode):
 		return fmt.Errorf("unknown draft approval mode %q", a.Mode)
-	case a.Mode == Window && a.Window <= 0:
-		return errors.New("draft approval window needs a positive window")
-	case a.Mode != Window && a.Window != 0:
+	case a.Mode == Delay && a.Window <= 0:
+		return errors.New("draft approval delay needs a positive window")
+	case a.Mode != Delay && a.Window != 0:
 		return fmt.Errorf("draft approval %s takes no window", a.Mode)
 	}
 	return nil

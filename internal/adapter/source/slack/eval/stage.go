@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/usage"
 )
 
 // Per-call caps: every call carries one, and the run's budget reserves it
@@ -34,6 +35,23 @@ type sidecar struct {
 	Key
 	CostUSD float64 `json:"cost_usd"`
 	Model   string  `json:"model,omitempty"`
+	// Tokens is nil when the agent did not report them.
+	Tokens *Tokens `json:"tokens,omitempty"`
+}
+
+// Tokens are what one call read and wrote.
+type Tokens struct {
+	Input      int64 `json:"input"`
+	Output     int64 `json:"output"`
+	CacheRead  int64 `json:"cache_read"`
+	CacheWrite int64 `json:"cache_write"`
+}
+
+func tokensOf(t *usage.Tokens) *Tokens {
+	if t == nil {
+		return nil
+	}
+	return &Tokens{Input: t.Input, Output: t.Output, CacheRead: t.CacheRead, CacheWrite: t.CacheWrite}
 }
 
 func keyPath(path string) string { return strings.TrimSuffix(path, ".json") + ".key.json" }
@@ -161,7 +179,7 @@ func (s stage) Ask(ctx context.Context, q turns.Ask) (turns.Answer, error) {
 	if err := writeJSON(s.path, doc); err != nil {
 		return ans, err
 	}
-	return ans, writeJSON(keyPath(s.path), sidecar{Key: k, CostUSD: cost, Model: ans.Model})
+	return ans, writeJSON(keyPath(s.path), sidecar{Key: k, CostUSD: cost, Model: ans.Model, Tokens: tokensOf(ans.Tokens)})
 }
 
 // forget removes a stage file whose answer turned out unfit, so the next
@@ -171,18 +189,20 @@ func (s stage) forget() {
 	os.Remove(keyPath(s.path))
 }
 
-func stageCost(path string) float64 {
+// stageSidecar is what the call behind a stage file spent; false when
+// there is no such call.
+func stageSidecar(path string) (sidecar, bool) {
 	var sc sidecar
 	if readJSON(keyPath(path), &sc) != nil {
-		return 0
+		return sidecar{}, false
 	}
-	return sc.CostUSD
+	return sc, true
 }
 
 // fill replaces each placeholder of tmpl once, in one pass, so a value that
 // holds a placeholder stays as written.
 func fill(tmpl string, values map[string]string) string {
-	pairs := make([]string, 0, 2*len(values))
+	var pairs []string
 	for k, v := range values {
 		pairs = append(pairs, "{{"+k+"}}", v)
 	}

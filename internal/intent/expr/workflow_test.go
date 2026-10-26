@@ -22,7 +22,7 @@ var sessionEnv = Env{
 }
 
 func TestPredicateErrorGoldens(t *testing.T) {
-	turn := Env{"turn.round": String, "pr.mine": Bool, "pr.slug": String}
+	turn := Env{"turn.stage": String, "pr.mine": Bool, "pr.slug": String}
 	action := Env{"row.open": Bool, "pr.mine": Bool, "pr.slug": String}
 	cases := []struct {
 		src  string
@@ -31,10 +31,10 @@ func TestPredicateErrorGoldens(t *testing.T) {
 	}{
 		{"", action, "1: empty predicate"},
 		{"pr.slug", action, "1: predicate must be bool, got string"},
-		{"turn.round == true", turn, "12: cannot compare string == bool"},
-		{"row.open && pr.mien", action, "13: unknown field pr.mien; did you mean pr.mine?"},
-		{"pr.mien", turn, "1: unknown field pr.mien; did you mean pr.mine?"},
-		{`turn.round == "first"`, Env{"pr.mine": Bool}, "1: unknown field turn.round"},
+		{"turn.stage == true", turn, "12: cannot compare string == bool"},
+		{"row.open && pr.mien", action, "13: unknown field pr.mien; did you mean \"pr.mine\"?"},
+		{"pr.mien", turn, "1: unknown field pr.mien; did you mean \"pr.mine\"?"},
+		{`turn.stage == "first"`, Env{"pr.mine": Bool}, "1: unknown field turn.stage"},
 	}
 	for _, c := range cases {
 		_, err := Compile(c.src, c.env)
@@ -222,5 +222,30 @@ func TestAPredicateSaysWhetherItReadsMarks(t *testing.T) {
 	both, _ := CompileWorkflow(`handled("w/head", pr.head)`, env)
 	if !workflow.ReadsMarks(workflow.All(nil, both)) {
 		t.Error("All hides that a part reads marks")
+	}
+}
+
+func TestRequiresIsATermEveryMatchHolds(t *testing.T) {
+	env := Env{"draft.delivery": String, "pr.mine": Bool, "pr.author": String}
+	for src, want := range map[string]bool{
+		`draft.delivery == "comment"`:                                    true,
+		`"comment" == draft.delivery`:                                    true,
+		`pr.mine && draft.delivery == "comment"`:                         true,
+		`(pr.author == "bot" && pr.mine) && draft.delivery == "comment"`: true,
+		`pr.mine || draft.delivery == "comment"`:                         false,
+		`!(draft.delivery == "comment")`:                                 false,
+		`draft.delivery != "comment"`:                                    false,
+		`draft.delivery == "message"`:                                    false,
+		`draft.delivery in ["comment"]`:                                  false,
+		`pr.author == "comment"`:                                         false,
+		`pr.mine ? draft.delivery == "comment" : true`:                   false,
+	} {
+		p, err := CompileWorkflow(src, env)
+		if err != nil {
+			t.Fatalf("%s: %v", src, err)
+		}
+		if got := Requires(p, "draft.delivery", "comment"); got != want {
+			t.Errorf("%s: %v, want %v", src, got, want)
+		}
 	}
 }

@@ -22,6 +22,7 @@ var pluginRoots = map[string][]string{
 	},
 	"slack": {
 		"internal/adapter/source/slack",
+		"internal/adapter/facts/slack",
 		"internal/domain/slack",
 		"internal/slack",
 	},

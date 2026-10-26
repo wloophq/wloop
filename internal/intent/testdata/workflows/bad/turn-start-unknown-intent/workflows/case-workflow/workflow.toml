@@ -1,11 +1,8 @@
-description = "Case"
-subject = "github"
+summary = "Case"
+provider = "github"
 when = 'pr.review.action == "follow-up"'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"
 intent = "reveiw"
-round = "follow-up"
+stage = "follow-up"

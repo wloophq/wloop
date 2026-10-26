@@ -13,10 +13,12 @@ import (
 )
 
 // RowDeps are what the daemon supplies to any provider's rows. Books,
-// Sessions, Intakes and Intake may be nil: no turns, no sessions, no intakes.
+// Sessions, Activity, Intakes and Intake may be nil: no turns, no sessions,
+// no activity, no intakes.
 type RowDeps struct {
 	Books    Books
 	Sessions Sessions
+	Activity Activities
 	// Intakes are the open intakes, the oldest first.
 	Intakes func(ctx context.Context) ([]intake.Intake, error)
 	// Intake is a row's view of an open intake, from its unit's brief record
@@ -40,6 +42,12 @@ type RowSettings struct {
 // Books reads turn books.
 type Books interface {
 	Books(ctx context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error)
+}
+
+// Activities reads what the loop spent on a provider's units, those with
+// any.
+type Activities interface {
+	Activities(ctx context.Context, provider unit.ProviderID) (map[unit.Unit]turn.Activity, error)
 }
 
 // Sessions reads the managed sessions.

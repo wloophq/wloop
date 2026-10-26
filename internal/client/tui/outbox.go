@@ -63,7 +63,7 @@ func draftState(e api.EntryView) string {
 		return e.State
 	}
 	parts := []string{d.State}
-	if d.Approval.Mode != "" && d.Approval.Mode != "always" {
+	if d.Approval.Mode != "" && d.Approval.Mode != "wait" {
 		parts = append(parts, d.Approval.Mode)
 	}
 	return strings.Join(parts, " · ")
@@ -74,7 +74,7 @@ func draftState(e api.EntryView) string {
 func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
 	fact("to", draftTarget(api.EntryView{Draft: d}), plain)
-	head := d.Kind
+	head := d.Purpose
 	if d.Edited {
 		head += " · edited"
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
@@ -81,8 +82,14 @@ func createOp(u unit.Unit, id string, origin int, requester items.Person, waitin
 // row is u's row as the read model derives it; false when the provider lists no row for u.
 func (f *fixture) row(t testing.TB, u unit.Unit) (api.Row, bool) {
 	t.Helper()
+	return f.rowWith(t, u, readmodel.RowDeps{})
+}
+
+// rowWith is row with the daemon's row deps rd.
+func (f *fixture) rowWith(t testing.TB, u unit.Unit, rd readmodel.RowDeps) (api.Row, bool) {
+	t.Helper()
 	ctx := context.Background()
-	p := f.p.rows(readmodel.RowDeps{})
+	p := f.p.rows(rd)
 	listed, err := p.Listed(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -179,27 +186,30 @@ func TestCardGTDFields(t *testing.T) {
 	}
 }
 
-func TestSlackCardClosurePostedFromEvidence(t *testing.T) {
+func TestRowsReadUnitClosedFromClosureMarked(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
 	u := f.thread(t)
 	f.state(t, u, sqlite.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
 	l := f.ledger()
 	applyOps(t, l, items.Extracted, createOp(u, "e1", 1, mePerson, otherPerson))
-	if c := f.card(t, u); c.ClosurePosted {
-		t.Fatalf("no closure yet: %+v", c)
+	for i, ref := range []string{"draft:7:reply", "draft:8", "draft:9:close"} {
+		applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
+			Anchor:   unit.Anchor{Unit: u, Ref: ref, At: tsAt(4 + i)},
+			Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: ref, At: tsAt(4 + i)}}})
 	}
-	applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
-		Anchor:   unit.Anchor{Unit: u, Ref: "draft:7:reply", At: tsAt(4)},
-		Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: "draft:7:reply", At: tsAt(4)}}})
 	if c := f.card(t, u); c.ClosurePosted {
-		t.Fatalf("a reply draft is no closure: %+v", c)
+		t.Fatalf("a sent draft's anchor is no closure: %+v", c)
 	}
-	applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
-		Anchor:   unit.Anchor{Unit: u, Ref: "draft:8:close", At: tsAt(5)},
-		Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: "draft:8:close", At: tsAt(5)}}})
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now); err != nil {
+		t.Fatal(err)
+	}
 	if c := f.card(t, u); !c.ClosurePosted {
-		t.Fatalf("a sent closing draft: %+v", c)
+		t.Fatalf("a sent draft's unit.closed: %+v", c)
+	}
+	f.state(t, u, sqlite.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
+	if c := f.card(t, u); !c.ClosurePosted {
+		t.Fatalf("an extraction pass cleared the closure: %+v", c)
 	}
 }
 
@@ -362,5 +372,57 @@ func TestSlackLinksAreDesktopPermalinks(t *testing.T) {
 	dm, _ := f.row(t, segs[0])
 	if want := "https://acme.slack.com/archives/" + dm1 + "/p1700000005000100"; dm.Link != want {
 		t.Errorf("DM link %q, want %q", dm.Link, want)
+	}
+}
+
+type activities map[unit.Unit]turn.Activity
+
+func (a activities) Activities(_ context.Context, p unit.ProviderID) (map[unit.Unit]turn.Activity, error) {
+	out := map[unit.Unit]turn.Activity{}
+	for u, x := range a {
+		if u.Provider == p {
+			out[u] = x
+		}
+	}
+	return out, nil
+}
+
+func TestSlackRowsCarryTheLoopActivity(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.people(t)
+	u := f.thread(t)
+	retry := f.now.Add(time.Hour)
+	rd := readmodel.RowDeps{Activity: activities{
+		u:                               {Turns: 3, OpenTurns: 1, LastIntent: "triage", Tokens: 1200, CostUSD: 0.5, BriefRetryAt: retry},
+		{Provider: "forge", Key: u.Key}: {Turns: 9},
+	}}
+	r, ok := f.rowWith(t, u, rd)
+	if !ok {
+		t.Fatal("no row")
+	}
+	p, _ := slackrows.PayloadOf(r)
+	if want := (api.TurnFacts{Count: 3, Open: 1, LastIntent: "triage", Tokens: 1200, CostUSD: 0.5}); p.Turns == nil || *p.Turns != want {
+		t.Errorf("turns %+v", p.Turns)
+	}
+	if len(p.Next) != 1 || !p.Next[0].At.Equal(retry) || p.Next[0].What != api.UpcomingBriefRetry {
+		t.Errorf("next %+v", p.Next)
+	}
+
+	rd.Activity = activities{u: {Turns: 1, BriefRetryAt: f.now.Add(-time.Minute)}}
+	r, _ = f.rowWith(t, u, rd)
+	if p, _ := slackrows.PayloadOf(r); p.Turns == nil || p.Turns.Count != 1 || len(p.Next) != 0 {
+		t.Errorf("a past retry: turns %+v next %+v", p.Turns, p.Next)
+	}
+
+	r, _ = f.row(t, u)
+	var keys map[string]any
+	if err := json.Unmarshal(r.Payload, &keys); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"turns", "next"} {
+		if _, ok := keys[k]; ok {
+			t.Errorf("a row without activity carries %q", k)
+		}
 	}
 }

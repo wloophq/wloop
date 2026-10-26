@@ -76,7 +76,7 @@ func TestOutboxListGolden(t *testing.T) {
 		Error: "may have been posted: timeout", Origin: draft.Origin{Kind: draft.OriginAuto, Rule: "stalled-nudge"},
 		CreatedAt: testNow.Add(time.Minute), UpdatedAt: testNow.Add(time.Minute)})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "Closing this.", State: draft.Proposed,
-		Approval: draft.Approval{Mode: draft.Window, Window: 10 * time.Minute}, Deadline: testNow.Add(10 * time.Minute),
+		Approval: draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}, Deadline: testNow.Add(10 * time.Minute),
 		CreatedAt: testNow.Add(2 * time.Minute), UpdatedAt: testNow.Add(2 * time.Minute)})
 	insertDraft(t, db, draft.Draft{Unit: threadUnit, Kind: draft.Close, Text: "Left sending by a crash.", State: draft.Sending, SendingAt: testNow,
 		CreatedAt: testNow.Add(3 * time.Minute), UpdatedAt: testNow.Add(3 * time.Minute)})
@@ -363,7 +363,7 @@ func TestOutboxListLaysOutForATerminal(t *testing.T) {
 	if code := te.run("outbox", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
-	if out := te.out.String(); !strings.Contains(out, "NUDGES") || !strings.Contains(out, "\x1b[36m#1") || !strings.Contains(out, "@ana, any news?") {
+	if out := te.out.String(); !strings.Contains(out, "NUDGE") || !strings.Contains(out, "\x1b[36m#1") || !strings.Contains(out, "@ana, any news?") {
 		t.Fatalf("printed\n%s", out)
 	}
 }

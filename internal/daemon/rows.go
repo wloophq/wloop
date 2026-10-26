@@ -227,11 +227,13 @@ func (s *Server) activity(ctx context.Context, limit int) ([]api.ActivityItem, e
 	out := []api.ActivityItem{}
 	for _, e := range evs {
 		url := e.URL
-		if url == "" {
+		if url == "" && e.PR.Number != 0 {
 			url = e.PR.URL()
 		}
-		out = append(out, api.ActivityItem{Event: wireEvent(e.Event), Title: e.Title, URL: url, Author: e.Author, State: e.State,
-			Mine: viewer != "" && strings.EqualFold(e.Author, viewer)})
+		ev := wireEvent(e.Event)
+		ev.Unit = e.Unit
+		out = append(out, api.ActivityItem{Event: ev, Title: e.Title, URL: url, Author: e.Author, State: e.State,
+			Mine: e.Mine || viewer != "" && strings.EqualFold(e.Author, viewer)})
 	}
 	return out, nil
 }
@@ -243,7 +245,7 @@ func (s *Server) newModel() *readmodel.Model {
 	if d.Changes != nil {
 		changes = d.Changes
 	}
-	rd := readmodel.RowDeps{Intake: s.rowIntake, Settings: s.rowSettings, Logf: s.logf}
+	rd := readmodel.RowDeps{Activity: d.Activity, Intake: s.rowIntake, Settings: s.rowSettings, Logf: s.logf}
 	if d.Turns != nil {
 		rd.Books, rd.Sessions = d.Turns.Store, d.Turns.Registry
 	}
@@ -299,7 +301,7 @@ func (m modelSettings) Settings(ctx context.Context) (readmodel.Base, error) {
 	}
 	l := m.s.loaded()
 	off := m.s.disabledPlugins(l)
-	return readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: login}, Teams: teams, Specs: catalog.SpecsFor(l, off),
+	return readmodel.Base{Viewers: map[unit.ProviderID]string{m.s.deps.Forge: login}, Teams: teams, Specs: catalog.SpecsFor(l, off),
 		SpecsVersion: catalog.VersionFor(l, off), Intents: l}, nil
 }
 

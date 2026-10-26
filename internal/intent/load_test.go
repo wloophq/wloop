@@ -1,7 +1,7 @@
 package intent
 
 import (
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -29,7 +29,15 @@ func testBase() *template.Template {
 
 func bundledFS() fs.FS { return os.DirFS("testdata/bundled") }
 
+// testDefaults is the bundled profile's defaults.toml.
+const testDefaults = "provider = \"github\"\n"
+
+// userLayer is the layers of a user profile in dir; dir holds the bundled
+// defaults unless it has its own.
 func userLayer(dir string) []profile.Layer {
+	if _, err := os.Stat(filepath.Join(dir, DefaultsFile)); errors.Is(err, fs.ErrNotExist) {
+		_ = os.WriteFile(filepath.Join(dir, DefaultsFile), []byte(testDefaults), 0o644)
+	}
 	return []profile.Layer{{Name: "bundled", Source: "embedded"}, {Name: "user", Source: dir, Dir: dir}}
 }
 
@@ -39,9 +47,9 @@ workspace = "review"
 session = { strategy = "new", title = "ask" }
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
 states = ["done"]
@@ -154,46 +162,46 @@ func TestDefaultsAreTheSpecsTable(t *testing.T) {
 		Policy:     "round",
 		StartLine:  "starting the ask author",
 		Answerable: true,
-		Board:      "none",
+		Board:      "review",
 		Reports:    true,
 		Brief:      dintent.Brief{Render: true, Wait: true},
 		Records:    dintent.Pred{Src: "true", At: dintent.Pos{File: file}},
 		Headline: dintent.Headline{
-			Resumed: dintent.Text{Src: "ask round on {{.PR.Slug}}", At: dintent.Pos{File: file, Line: 7, Col: 11}},
-			New:     []dintent.Case{{Text: dintent.Text{Src: "Ask the author of {{.PR.Slug}} one question.", At: dintent.Pos{File: file, Line: 9, Col: 8}}}},
+			Resumed: dintent.Text{Src: "ask round on {{.pr.slug}}", At: dintent.Pos{File: file, Line: 7, Col: 11}},
+			New:     []dintent.Case{{Text: dintent.Text{Src: "Ask the author of {{.pr.slug}} one question.", At: dintent.Pos{File: file, Line: 9, Col: 8}}}},
 		},
 		Guidance: dintent.Guidance{Label: "Guidance"},
 		Record:   dintent.RecordRules{States: []string{"done"}},
-		Resume:   dintent.Resume{HeadMoved: DefaultHeadMoved},
+		Resume:   dintent.Resume{Changed: DefaultChanged},
 		Source:   dintent.Source{Layer: "user", Dir: filepath.Join(root, "intents", "ask-author")},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got\n%#v\nwant\n%#v", got, want)
 	}
 	ps := l.Programs["ask-author"]
-	if ps.Records == nil || len(ps.Headline) != 1 || ps.Headline[0] != nil || ps.Visible != nil {
+	if ps.Records == nil || len(ps.Headline) != 1 || ps.Headline[0] != nil || ps.Action.When != nil {
 		t.Errorf("%+v", ps)
 	}
 }
 
 func TestDefaultsOfAnActionAndAnInput(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", minimal+"\n[action]\n\n[inputs.topic]\ntype = \"text\"\nflag = \"--topic\"\nhelp = \"what\"\n\n[[also_profiles]]\nprofile = \"review\"\nwhen = \"true\"\ndefine = \"review-judgment\"\n", "{{.Headline}}\n")
+	writeIntent(t, root, "ask-author", minimal+"\n[action]\n\n[inputs.topic]\ntype = \"text\"\nflag = \"--topic\"\nhelp = \"what\"\n\n[[also_profile]]\nprofile = \"review\"\nwhen = \"true\"\ndefine = \"review-judgment\"\n", "{{.Headline}}\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
 	}
 	d, _ := l.Registry.Get("ask-author")
 	a := d.Action
-	if a == nil || a.Group != "round" || !slices.Equal(a.Surfaces, []string{"row", "detail", "tui", "cli", "explore"}) ||
-		a.Visible.Src != "row.open" || a.Enabled.Src != "true" || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Hint.Src != "" {
+	if a == nil || a.Group != "start" || !slices.Equal(a.Surfaces, []string{"row", "detail", "tui", "cli", "explore"}) ||
+		a.When.Src != "row.open" || len(a.Refuse) != 0 || a.Primary.Src != "false" || a.Confirm.Src != "" || a.Note.Src != "" {
 		t.Errorf("action %+v", a)
 	}
 	in := d.Inputs[0]
 	if in.From != "user" || !slices.Equal(in.Surfaces, []string{"cli", "instructions"}) || in.At.Line != 16 {
 		t.Errorf("input %+v", in)
 	}
-	if d.AlsoProfiles[0].SourcePrefix != "review guide: " {
+	if d.AlsoProfiles[0].Prefix != "review guide: " {
 		t.Errorf("also %+v", d.AlsoProfiles[0])
 	}
 }
@@ -208,11 +216,11 @@ func TestGoodManifestLoads(t *testing.T) {
 		t.Fatalf("%+v", d)
 	}
 	ps := l.Programs["ask-author"]
-	if ps.Visible == nil || ps.Enabled == nil || ps.Primary == nil || ps.ActionTexts["hint"] == nil {
+	if ps.Action.When == nil || ps.Action.Primary == nil || ps.Action.ActionTexts["note"] == nil {
 		t.Fatalf("%+v", ps)
 	}
 	var b strings.Builder
-	if err := ps.ActionTexts["hint"].Execute(&b, ActionFactMap(func(n string) any {
+	if err := ps.Action.ActionTexts["note"].Execute(&b, ActionFactMap(func(n string) any {
 		if n == "pr.author" {
 			return "octo"
 		}
@@ -232,6 +240,7 @@ func TestGoodManifestLoads(t *testing.T) {
 
 func greetBundle() fstest.MapFS {
 	return fstest.MapFS{
+		DefaultsFile:                         {Data: []byte(testDefaults)},
 		"intents/greet/intent.toml":          {Data: []byte(minimal)},
 		"intents/greet/instructions.md.tmpl": {Data: []byte("{{.Headline}}")},
 	}
@@ -269,7 +278,7 @@ func TestUserOverridesABundledTemplateAndInheritsTheManifest(t *testing.T) {
 
 func TestUserOverridesABundledManifestWhole(t *testing.T) {
 	root := t.TempDir()
-	manifest := "context = \"pr\"\n" + strings.Replace(minimal, "one question", "two questions", 1)
+	manifest := "answerable = true\n" + strings.Replace(minimal, "one question", "two questions", 1)
 	writeFile(t, filepath.Join(root, "intents", "greet", "intent.toml"), manifest)
 	l, problems := Load(userLayer(root), greetBundle(), testBase(), nil)
 	if len(problems) > 0 {
@@ -329,7 +338,7 @@ func TestLoadKeepsCleanUserIntentsAndReportsTheRest(t *testing.T) {
 }
 
 func TestReservedNamesApplyToUserLayersOnly(t *testing.T) {
-	bundled := fstest.MapFS{}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}}
 	for _, n := range []string{"review", "address", "nudge", "probe", "pause"} {
 		bundled["intents/"+n+"/intent.toml"] = &fstest.MapFile{Data: []byte(minimal)}
 		bundled["intents/"+n+"/instructions.md.tmpl"] = &fstest.MapFile{Data: []byte("{{.Headline}}")}
@@ -348,10 +357,10 @@ func TestReservedNamesApplyToUserLayersOnly(t *testing.T) {
 
 func TestLowercaseIntentKeyIsDroppedWithAProblem(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "key = \"a\"\nworkspace =", 1), "{{.Headline}}")
+	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "shortcut = \"a\"\nworkspace =", 1), "{{.Headline}}")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
-	if len(problems) != 1 || problems[0].Field != "key" || problems[0].Line != 3 ||
-		problems[0].Msg != "a is the core key of approve on web; the intent loads without a key (palette only)" {
+	if len(problems) != 1 || problems[0].Field != "shortcut" || problems[0].Line != 3 ||
+		problems[0].Msg != "a is the core key of approve on web; the intent loads without a shortcut (palette only)" {
 		t.Fatalf("%v", problems)
 	}
 	d, ok := l.Registry.Get("ask-author")
@@ -362,7 +371,7 @@ func TestLowercaseIntentKeyIsDroppedWithAProblem(t *testing.T) {
 
 func TestAnIntentKeyIsCanonical(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "key = \"shift+k\"\nworkspace =", 1), "{{.Headline}}")
+	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "shortcut = \"shift+k\"\nworkspace =", 1), "{{.Headline}}")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems.Error())
@@ -402,6 +411,24 @@ func TestAVerbNeedsAnAction(t *testing.T) {
 	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "verb = \"delegate\"\nworkspace =", 1), "{{.Headline}}")
 	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if p := l.Broken["ask-author"]; len(p) != 1 || p[0].Field != "verb" || p[0].Msg != "verb needs an [action]" {
+		t.Fatalf("%v", p)
+	}
+}
+
+func TestASkillGoesWithAUserFacingIntent(t *testing.T) {
+	root := t.TempDir()
+	const target = "\n[help]\ntarget = \"a pull request URL\"\n"
+	writeIntent(t, root, "ask-author", "skill = true\n"+minimal+target, "{{.Headline}}")
+	writeIntent(t, root, "ask-quietly", "skill = true\nuser_facing = false\n"+minimal+target, "{{.Headline}}")
+	writeIntent(t, root, "ask-blindly", "skill = true\n"+minimal, "{{.Headline}}")
+	l, _ := Load(userLayer(root), bundledFS(), testBase(), nil)
+	if d, ok := l.Registry.Get("ask-author"); !ok || !d.Skill || d.Help.Target != "a pull request URL" {
+		t.Fatalf("ask-author: %+v %v", d, l.Broken["ask-author"])
+	}
+	if p := l.Broken["ask-quietly"]; len(p) != 1 || p[0].Field != "skill" || p[0].Msg != "applies to user-facing intents only" {
+		t.Fatalf("%v", p)
+	}
+	if p := l.Broken["ask-blindly"]; len(p) != 1 || p[0].Field != "help.target" {
 		t.Fatalf("%v", p)
 	}
 }
@@ -577,71 +604,6 @@ func TestTemplateCheckProblemsBreakTheIntent(t *testing.T) {
 	}
 }
 
-func TestSchemaMatchesTheDecodeStruct(t *testing.T) {
-	var schema map[string]any
-	if err := json.Unmarshal(Schema, &schema); err != nil {
-		t.Fatal(err)
-	}
-	compareSchema(t, "", reflect.TypeOf(manifest{}), schema)
-}
-
-func compareSchema(t *testing.T, path string, typ reflect.Type, node map[string]any) {
-	t.Helper()
-	for typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-	}
-	switch typ.Kind() {
-	case reflect.Struct:
-		if node["type"] != "object" || node["additionalProperties"] != false {
-			t.Errorf("%s: want a closed object, got %v", path, node["type"])
-			return
-		}
-		props, _ := node["properties"].(map[string]any)
-		seen := map[string]bool{}
-		for i := range typ.NumField() {
-			f := typ.Field(i)
-			key := f.Tag.Get("toml")
-			seen[key] = true
-			if typ == reflect.TypeFor[manifest]() && slices.Contains(bundledOnlyKeys, key) {
-				if _, public := props[key]; public {
-					t.Errorf("%s%s: bundled only, yet in the public schema", path, key)
-				}
-				continue
-			}
-			sub, ok := props[key].(map[string]any)
-			if !ok {
-				t.Errorf("%s%s: in the decode struct, not in the schema", path, key)
-				continue
-			}
-			compareSchema(t, path+key+".", f.Type, sub)
-		}
-		for key := range props {
-			if !seen[key] {
-				t.Errorf("%s%s: in the schema, not in the decode struct", path, key)
-			}
-		}
-	case reflect.Map:
-		sub, ok := node["additionalProperties"].(map[string]any)
-		if node["type"] != "object" || !ok {
-			t.Errorf("%s: want an object of values", path)
-			return
-		}
-		compareSchema(t, path+"<name>.", typ.Elem(), sub)
-	case reflect.Slice:
-		sub, ok := node["items"].(map[string]any)
-		if node["type"] != "array" || !ok {
-			t.Errorf("%s: want an array", path)
-			return
-		}
-		compareSchema(t, path, typ.Elem(), sub)
-	default:
-		want := map[reflect.Kind]string{reflect.String: "string", reflect.Bool: "boolean", reflect.Int: "integer"}[typ.Kind()]
-		if node["type"] != want {
-			t.Errorf("%s: schema type %v, decode type %s", path, node["type"], typ.Kind())
-		}
-	}
-}
-
 func TestATypeMismatchInsideAnInlineTableKeepsTheOtherChecks(t *testing.T) {
 	root := t.TempDir()
 	m := strings.Replace(minimal, `session = { strategy = "new", title = "ask" }`, `session = { strategy = 1, title = "ASK" }`, 1)
@@ -655,7 +617,7 @@ func TestATypeMismatchInsideAnInlineTableKeepsTheOtherChecks(t *testing.T) {
 func TestABrokenIntentsRulesCarryItsFirstProblem(t *testing.T) {
 	l, _ := Load(userLayer("testdata/bad/predicate-typo"), bundledFS(), testBase(), nil)
 	_, err := l.Rules("ask-author")
-	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:11: action.visible: 13: unknown field pr.mien; did you mean pr.mine?`
+	want := `the intent "ask-author" does not load: testdata/bad/predicate-typo/intents/ask-author/intent.toml:15:8: action.when: 13: unknown field pr.mien; did you mean "pr.mine"?`
 	if err == nil || err.Error() != want {
 		t.Fatalf("got  %v\nwant %s", err, want)
 	}
@@ -665,16 +627,16 @@ func TestABrokenIntentsRulesCarryItsFirstProblem(t *testing.T) {
 }
 
 func TestABrokenIntentClaimsNoKeyFlagOrRowDriver(t *testing.T) {
-	claims := strings.Replace(minimal, `workspace = "review"`, `workspace = "pr_else_main"
-key = "Q"
-drives_row = true`, 1) + `
+	claims := strings.Replace(minimal, `workspace = "review"`, `workspace = "review"
+role = "pr.review"
+shortcut = "Q"`, 1) + `
 [inputs.topic]
 type = "text"
 flag = "--topic"
 help = "what to ask about"
 `
 	root := t.TempDir()
-	broken := strings.Replace(claims, `summary = `, `records = "pr.mien"
+	broken := strings.Replace(claims, `summary = `, `why = "{{.pr.mien}}"
 summary = `, 1)
 	writeIntent(t, root, "aa-broken", strings.Replace(broken, "[inputs.topic]", "[inputs.subject]", 1), "{{.Headline}}")
 	writeIntent(t, root, "bb-clean", claims, "{{.Headline}}")
@@ -924,44 +886,28 @@ func TestTheTreeIsReadWithItsRegistry(t *testing.T) {
 func TestProviderDefaultsToGitHub(t *testing.T) {
 	root := t.TempDir()
 	writeIntent(t, root, "ask-author", minimal, "{{.Headline}}\n")
-	thread := strings.ReplaceAll(minimal, "{{.PR.Slug}}", "{{.Wording.Ref}}")
-	writeIntent(t, root, "ask-thread", strings.Replace(thread, `workspace = "review"`, "workspace = \"review\"\nprovider = \"thread\"", 1), "{{.Headline}}\n")
+	thread := strings.ReplaceAll(minimal, "{{.pr.slug}}", "{{.unit.ref}}")
+	writeIntent(t, root, "ask-thread", strings.Replace(thread, `workspace = "review"`, "workspace = \"review\"\nprovider = \"slack\"", 1), "{{.Headline}}\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) > 0 {
 		t.Fatal(problems)
 	}
-	for name, want := range map[dintent.Name]dunit.ProviderID{"ask-author": dunit.GitHub, "ask-thread": "thread", "review": dunit.GitHub} {
+	for name, want := range map[dintent.Name]dunit.ProviderID{"ask-author": dunit.GitHub, "ask-thread": "slack", "review": dunit.GitHub} {
 		if d, _ := l.Registry.Get(name); d.Provider != want {
 			t.Errorf("%s: provider %q, want %q", name, d.Provider, want)
 		}
 	}
-	if got := l.Registry.ForProvider("thread"); len(got) != 1 || got[0].Name != "ask-thread" {
-		t.Errorf("ForProvider(thread) = %v", got)
+	if got := l.Registry.ForProvider("slack"); len(got) != 1 || got[0].Name != "ask-thread" {
+		t.Errorf("ForProvider(slack) = %v", got)
 	}
 }
 
 func TestThreadIntentCannotReadPRFacts(t *testing.T) {
 	_, problems := Load(userLayer("testdata/bad/provider-pr-fact"), bundledFS(), testBase(), nil)
 	got := problems.Error()
-	for _, want := range []string{"records: pr.author is a github fact; a thread intent cannot read it", ".PR.Author reads the github pull request; a thread intent cannot read it"} {
+	for _, want := range []string{"record.when: pr.author is a github fact; a slack intent cannot read it", ".PR.Author reads the github pull request; a slack intent cannot read it"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("lacks %q:\n%s", want, got)
 		}
-	}
-}
-
-func TestAUserIntentMayNotSetABundledOnlyKey(t *testing.T) {
-	root := t.TempDir()
-	m := strings.Replace(minimal, `workspace = "review"`, "workspace = \"review\"\ncontext = \"pr\"\nlaunch = \"probe\"\npolicy = \"probe\"\nreconcile = \"my_review\"", 1)
-	writeIntent(t, root, "ask-author", m, "{{.Headline}}")
-	_, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
-	e := problems.Error()
-	for _, key := range bundledOnlyKeys {
-		if !strings.Contains(e, ": "+key+": is reserved for the bundled intents") {
-			t.Errorf("%s not refused:\n%s", key, e)
-		}
-	}
-	if len(problems) != len(bundledOnlyKeys) {
-		t.Errorf("%d problems, want one per key:\n%s", len(problems), e)
 	}
 }

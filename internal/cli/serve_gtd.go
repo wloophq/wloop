@@ -37,7 +37,7 @@ func (e *Env) entries(db *sqlite.DB, cfg config.Config, its coregtd.Items) *core
 // knows them.
 func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID {
 	var out []unit.ProviderID
-	for id := range cfg.Plugins {
+	for _, id := range cfg.PluginSwitches() {
 		if !cfg.PluginEnabled(id) {
 			out = append(out, unit.ProviderID(id))
 		}
@@ -81,6 +81,11 @@ func (e *Env) serveGTD(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []s
 func meOf(ctx context.Context, mods []source.Module) (gtd.Me, error) {
 	var me gtd.Me
 	var errs []error
+	var codecs []unit.Codec
+	for _, m := range mods {
+		codecs = append(codecs, m.Codec)
+	}
+	me.Codecs = unit.NewRegistry(codecs...)
 	for _, m := range mods {
 		if m.Identity == nil {
 			continue
@@ -108,12 +113,15 @@ type identity struct {
 func (i *identity) get() gtd.Me {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	return gtd.Me{Keys: slices.Clone(i.me.Keys)}
+	return gtd.Me{Keys: slices.Clone(i.me.Keys), Codecs: i.me.Codecs}
 }
 
 func (i *identity) set(me gtd.Me) (grew bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	if me.Codecs != nil {
+		i.me.Codecs = me.Codecs
+	}
 	for _, k := range me.Keys {
 		if !slices.Contains(i.me.Keys, k) {
 			i.me.Keys, grew = append(i.me.Keys, k), true

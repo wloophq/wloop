@@ -12,14 +12,14 @@ func (in Input) Label() string {
 	return cmp.Or(in.Flag, "inputs."+in.Name)
 }
 
-// Normalize is v as the input's type: a flag a bool, a text a string,
+// Normalize is v as the input's type: a bool a bool, a text a string,
 // a list a []string, whatever JSON decoded them as.
 func Normalize(spec Input, v any) (any, error) {
 	wrong := func(want string) error {
 		return fmt.Errorf("%s takes %s", spec.Label(), want)
 	}
 	switch spec.Type {
-	case "flag":
+	case "bool":
 		b, ok := v.(bool)
 		if !ok {
 			return nil, wrong("true or false")

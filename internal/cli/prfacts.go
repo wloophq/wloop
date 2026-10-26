@@ -6,7 +6,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -32,7 +31,7 @@ func (e *Env) prFacts(cfg config.Config) func(ctx context.Context, u unit.Unit) 
 		if e.Store == nil {
 			return f, nil
 		}
-		st, err := storedFacts{store: e.Store, briefs: cfg.Brief.Enabled}.Facts(ctx, ref)
+		st, err := storedFacts{store: e.Store, briefs: cfg.Brief.Enabled}.Facts(ctx, ref.Unit())
 		if err != nil {
 			return f, err
 		}
@@ -49,7 +48,7 @@ func (e *Env) prFacts(cfg config.Config) func(ctx context.Context, u unit.Unit) 
 // command line process, which has no store.
 type factsTurn struct{ f api.Facts }
 
-func (t factsTurn) Facts(context.Context, github.Ref) (turn.Stored, error) {
+func (t factsTurn) Facts(context.Context, unit.Unit) (turn.Stored, error) {
 	st := turn.Stored{Teams: t.f.Teams}
 	if t.f.HasBrief {
 		st.Brief = &turn.Brief{Goal: t.f.Goal, Context: t.f.Context, Kind: t.f.Kind, Size: t.f.Size, Risk: t.f.Risk, RiskWhy: t.f.RiskWhy, Tags: t.f.Tags, Files: t.f.Files}

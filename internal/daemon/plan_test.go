@@ -97,7 +97,7 @@ func newPlanRig(t *testing.T, opts ...func(*Deps)) *planRig {
 	}
 	t.Cleanup(func() { db.Close() })
 	r := &planRig{db: db, log: log, units: automationtest.NewUnits(),
-		steps: automationtest.NewSteps(map[string]workflow.Reach{builtin.StepTurnStart: workflow.ReachVisible, "session.close": workflow.ReachLocal}),
+		steps: automationtest.NewSteps(map[string]workflow.Reach{builtin.StepTurnStart: "", "session.close": workflow.ReachLocal}),
 		sess:  unit.Unit{Provider: unit.Session, Key: "term_1"}}
 	r.units.Put(u7, workflow.Facts{"pr.repo": "acme/api", "pr.fingerprint": "h2"})
 	r.units.Put(r.sess, workflow.Facts{"session.repo": "acme/api", "session.fingerprint": "s1"})
@@ -118,13 +118,13 @@ func (r *planRig) engine(d *Deps) *automation.Engine {
 	return &automation.Engine{
 		Workflows: func() []workflow.Workflow {
 			return []workflow.Workflow{
-				{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply, AllowVisible: true,
+				{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Observe: false,
 					Trigger:  workflow.Trigger{Kind: workflow.TriggerSweep},
-					Steps:    []workflow.Step{r.steps.Step(builtin.StepTurnStart, "intent", "review", "round", "follow-up")},
-					Approval: workflow.Approval{Default: workflow.OutcomeRun, Window: 5 * time.Minute}},
-				{Name: "session-quiet", Provider: unit.Session, Slot: "session", Mode: workflow.ModeObserve,
+					Steps:    []workflow.Step{r.steps.Step(builtin.StepTurnStart, "intent", "review", "stage", "follow-up")},
+					Approval: workflow.Approval{Mode: workflow.ApprovalDelay, Window: 5 * time.Minute}},
+				{Name: "session-quiet", Provider: unit.Session, Slot: "session", Observe: true,
 					Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.steps.Step("session.close")},
-					Approval: workflow.Approval{Default: workflow.OutcomeRun}},
+					Approval: workflow.Approval{Mode: workflow.ApprovalRun}},
 			}
 		},
 		Units: r.units, Steps: r.steps, Ledger: r.db.Ledger(), Events: r.db.Events(), Guidance: storeGuidance{inventory.New(r.db)},
@@ -752,7 +752,7 @@ func TestTheActionsCarryThePlanSpecs(t *testing.T) {
 	if code := get(t, r.s, api.Actions, &res); code != http.StatusOK {
 		t.Fatalf("GET %s: %d", api.Actions, code)
 	}
-	if len(res.Plan) != len(catalog.PlanSpecs()) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
+	if len(res.Plan) != len(catalog.PlanSpecs(bundledActions())) || res.Plan[0].ID != catalog.PlanApply || res.Plan[0].Key != "Enter" {
 		t.Fatalf("plan specs %+v", res.Plan)
 	}
 }

@@ -60,7 +60,7 @@ func loadInput(t *testing.T) Input {
 				Basis: "explicit_mention", Confidence: "high", Confirmed: true,
 				Origin: unit.Anchor{Unit: threadUnit, Ref: "C0001/1700000300.000200"}},
 		},
-		Brief:    "Ann asked Bob to review the release notes.",
+		Brief:    `{"goal":"Ann asked Bob to review the release notes."}`,
 		Contexts: []string{"widget", "docs"},
 	}
 }
@@ -305,7 +305,7 @@ func TestUnfitAnswers(t *testing.T) {
 		"duplicate ref":    strings.Replace(good, `"ref": "i3"`, `"ref": "i1"`, 1),
 		"bad state":        strings.Replace(good, `"state": "open"`, `"state": "pending"`, 1),
 		"link to no item":  strings.Replace(good, `{"item": "n1"`, `{"item": "n7"`, 1),
-		"unknown segment":  strings.Replace(good, `"segments": []`, `"segments": [{"ref": "s1", "from_ts": "1700000000.000100", "to_ts": "", "topic": "x"}]`, 1),
+		"unknown segment":  strings.Replace(good, `"segments": []`, `"segments": [{"ref": "s1", "from_ts": "1700000000.000100", "to_ts": "", "topic": "x", "brief": {"unchanged": true, "goal": "", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}}]`, 1),
 		"origin not a ts":  strings.Replace(good, `"origin_ts": "1700007200.000400", "requester": "U0003"`, `"origin_ts": "2023-11-14 22:13", "requester": "U0003"`, 1),
 		"ts with a space":  strings.Replace(good, `"evidence_ts": "1700003600.000300"`, `"evidence_ts": "1700003600.000300 "`, 1),
 		"summary too long": strings.Replace(good, `"Ship the widget toggle on by default?"`, `"`+strings.Repeat("é", 201)+`"`, 1),

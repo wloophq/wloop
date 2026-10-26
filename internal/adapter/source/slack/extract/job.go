@@ -70,6 +70,21 @@ type Job struct {
 	Clock    port.Clock
 	Cfg      func() config.Config
 	Log      func(format string, args ...any)
+	// Vocabulary is the tag vocabulary the brief's domains reuse,
+	// tag.Vocabulary's lines; nil offers none.
+	Vocabulary func(ctx context.Context) (string, error)
+	// Briefed hears of each unit whose brief a pass wrote; nil hears none.
+	Briefed func(u unit.Unit)
+	// Extra is the brief intent's extra fields' schema, which the brief of
+	// every unit carries; nil asks for none.
+	Extra func() Extra
+
+	// wantMu guards wants, the targets a first turn asked a brief of, and
+	// waiting, the targets with changes left to read as the last run left
+	// them; Want reads them while a run holds mu.
+	wantMu  sync.Mutex
+	wants   map[unit.Unit]bool
+	waiting map[unit.Unit]bool
 
 	mu      sync.Mutex
 	loaded  bool
@@ -172,6 +187,8 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	if err := j.scan(ctx, team, now); err != nil {
 		return "", "", err
 	}
+	j.noteWaiting()
+	defer j.noteWaiting()
 	var errs []error
 	unwatched, err := j.sweep(ctx, cfg, now)
 	if err != nil {
@@ -367,7 +384,7 @@ func (j *Job) due(now time.Time, ec config.SlackExtraction) []unit.Unit {
 		if now.Before(p.retryAt) {
 			continue
 		}
-		if now.Sub(p.newest) >= ec.QuietFor() || now.Sub(p.oldest) >= ec.MaxWaitFor() {
+		if now.Sub(p.newest) >= ec.QuietFor() || now.Sub(p.oldest) >= ec.MaxWaitFor() || j.wanted(k) {
 			out = append(out, k)
 		}
 	}
@@ -400,6 +417,15 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 		return outcome{err: err}
 	}
 	in := Input{Unit: k, Now: now, Language: ec.LanguageName(), Conversation: conv, Brief: st.Brief, WindowChars: ec.Window()}
+	if j.Extra != nil {
+		x := j.Extra()
+		in.Extra = &x
+	}
+	if j.Vocabulary != nil {
+		if in.Vocabulary, err = j.Vocabulary(ctx); err != nil {
+			return outcome{err: err}
+		}
+	}
 	for _, c := range cfg.Placement {
 		in.Contexts = append(in.Contexts, c.Match)
 	}
@@ -534,6 +560,14 @@ func (j *Job) readDM(ctx context.Context, team string, ec config.SlackExtraction
 		from = spans[0].FromTS
 	}
 	in.Segments = spans
+	states, err := j.Store.States(ctx, units)
+	if err != nil {
+		return units, err
+	}
+	in.SegmentBriefs = make([]string, len(units))
+	for i, u := range units {
+		in.SegmentBriefs[i] = states[u].Brief
+	}
 	if in.Messages, err = j.DM(ctx, in.Conversation.ID, from); err != nil {
 		return units, err
 	}
@@ -563,6 +597,9 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	if r.Dropped > 0 {
 		j.logf("slack extraction %s: %d items or links citing a message outside the window dropped", k, r.Dropped)
 	}
+	if r.ExtrasDropped > 0 {
+		j.logf("slack extraction %s: %d briefs kept without extra fields that did not fit the brief intent's schema", k, r.ExtrasDropped)
+	}
 	states := map[unit.Unit]sqlite.ExtractionState{}
 	state := sqlite.ExtractionState{LastTS: in.Messages[len(in.Messages)-1].TS, LastSeq: p.maxSeq, Brief: r.Brief, Verdict: r.Verdict,
 		VerdictWhy: r.VerdictWhy, ViewerRole: r.ViewerRole, StartedByViewer: r.StartedByViewer, ClosurePosted: r.ClosurePosted, At: now}
@@ -574,13 +611,13 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 	units := []unit.Unit{k}
 	obj := slack.ObjectRef{Conversation: p.conv}
 	if p.dm {
-		applied, topics, err := j.segment(ctx, team, in, r)
+		applied, segs, err := j.segment(ctx, team, in, r)
 		if err != nil {
 			return 0, &answerError{err}
 		}
 		for i, u := range applied {
 			s := state
-			s.LastTS, s.LastSeq, s.Topic = "", 0, topics[i]
+			s.LastTS, s.LastSeq, s.Topic, s.Brief = "", 0, segs[i].Topic, segs[i].Brief
 			states[u] = s
 		}
 		if ops, err = j.place(ctx, in, ops, applied, itemUnit); err != nil {
@@ -602,6 +639,13 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		return 0, err
 	}
 	j.finish(k, p)
+	if j.Briefed != nil {
+		for u, s := range states {
+			if s.Brief != "" {
+				j.Briefed(u)
+			}
+		}
+	}
 	state.Watched = st.Watched
 	if _, err := j.watch(ctx, cfg, k, obj, units, state, now, true); err != nil {
 		j.logf("slack extraction %s: watch: %v", k, err)
@@ -630,28 +674,31 @@ func (j *Job) applyOps(ctx context.Context, k unit.Unit, ops []items.Op) error {
 
 // segment writes the DM's segments the answer names before any op lands on them. Without
 // segments, a DM never segmented gets one open segment from its first message.
-func (j *Job) segment(ctx context.Context, team string, in Input, r Result) ([]unit.Unit, []string, error) {
+// segment applies the answer's segments and returns each applied unit with
+// the answer's segment it came from; a DM answered without segments is one
+// segment, briefed as the conversation.
+func (j *Job) segment(ctx context.Context, team string, in Input, r Result) ([]unit.Unit, []SegmentOut, error) {
 	var spans []slack.Span
-	var topics []string
-	for _, s := range r.Segments {
+	segs := r.Segments
+	for _, s := range segs {
 		sp := slack.Span{FromTS: s.FromTS, ToTS: s.ToTS}
 		if s.Ref != "new" {
 			n, _ := strconv.Atoi(strings.TrimPrefix(s.Ref, "s"))
 			sp.ID = in.Segments[n-1].ID
 		}
-		spans, topics = append(spans, sp), append(topics, s.Topic)
+		spans = append(spans, sp)
 	}
 	if len(spans) == 0 {
 		if len(in.Segments) > 0 {
 			return nil, nil, nil
 		}
-		spans, topics = []slack.Span{{FromTS: in.Messages[0].TS}}, []string{""}
+		spans, segs = []slack.Span{{FromTS: in.Messages[0].TS}}, []SegmentOut{{Brief: r.Brief}}
 	}
 	applied, err := j.Writer.Apply(ctx, team, in.Conversation.ID, spans)
 	if err != nil {
 		return nil, nil, fmt.Errorf("segments: %w", err)
 	}
-	return applied, topics, nil
+	return applied, segs, nil
 }
 
 // place moves every op onto the segment unit of its item: a new item's segment covers its
@@ -793,7 +840,7 @@ func (j *Job) watch(ctx context.Context, cfg config.Config, k unit.Unit, obj sla
 		if !st.Watched {
 			return false, j.Store.DB.SetWatched(ctx, k, true, now)
 		}
-	case !open && st.Watched && len(its) > 0 && settled(its, now, warmFor(cfg)) && (!st.StartedByViewer || st.ClosurePosted):
+	case !open && st.Watched && len(its) > 0 && settled(its, now, warmFor(cfg)) && (!st.StartedByViewer || st.ClosurePosted || st.ClosureMarked):
 		if err := j.Watcher.Unwatch(ctx, obj); err != nil {
 			return false, err
 		}
@@ -858,4 +905,58 @@ func (j *Job) objectOf(ctx context.Context, k unit.Unit) (slack.ObjectRef, []uni
 	}
 	_, units, err := j.Store.spans(ctx, team, conv)
 	return slack.ObjectRef{Conversation: conv}, units, err
+}
+
+// Want asks the next run to read u's conversation, past quiet_for: true
+// when it has changes left to read, so a brief of u is coming.
+func (j *Job) Want(u unit.Unit) bool {
+	k, ok := targetFor(u)
+	if !ok {
+		return false
+	}
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	if !j.waiting[k] {
+		return false
+	}
+	if j.wants == nil {
+		j.wants = map[unit.Unit]bool{}
+	}
+	j.wants[k] = true
+	return true
+}
+
+func (j *Job) wanted(k unit.Unit) bool {
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	return j.wants[k]
+}
+
+// noteWaiting records the targets left to read; a want of a target read
+// is done.
+func (j *Job) noteWaiting() {
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	j.waiting = map[unit.Unit]bool{}
+	for k := range j.pending {
+		j.waiting[k] = true
+	}
+	for k := range j.wants {
+		if !j.waiting[k] {
+			delete(j.wants, k)
+		}
+	}
+}
+
+// targetFor is the target a unit's brief is written by: a thread is its
+// own, a DM segment its conversation's.
+func targetFor(u unit.Unit) (unit.Unit, bool) {
+	key, err := slack.ParseUnit(u)
+	if err != nil {
+		return unit.Unit{}, false
+	}
+	if key.Segment != "" {
+		return dmKey(key.Team, key.Conversation), true
+	}
+	return u, true
 }

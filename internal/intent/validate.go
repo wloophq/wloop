@@ -2,12 +2,11 @@ package intent
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
-	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/record"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -18,34 +17,21 @@ var (
 	inputNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	flagRe      = regexp.MustCompile(`^--[a-z][a-z0-9-]*$`)
 	titleRe     = regexp.MustCompile(`^[a-z]{1,12}$`)
-
-	strategies     = []string{"reuse_live", "new"}
-	boards         = []string{"review", "author", "none"}
-	inputTypes     = []string{"flag", "text", "list"}
-	inputFroms     = []string{"user", "prepare"}
-	inputSurfaces  = []string{"cli", "instructions", "try"}
-	actionGroups   = []string{"round", "turn", "control", "workspace", "brief", "intake"}
-	actionSurfaces = []string{"row", "detail", "tui", "menubar", "notification", "cli", "explore"}
-	rounds         = []string{"", "first", "follow-up"}
 )
 
-func quoted(vs []string) string {
-	out := make([]string, len(vs))
-	for i, v := range vs {
-		out[i] = fmt.Sprintf("%q", v)
-	}
-	return strings.Join(out, ", ")
-}
+func quoted(vs []string) string { return builtin.OrList(vs) }
 
-func (s *sheet) oneOf(path, v string, allowed []string) {
-	if !slices.Contains(allowed, v) {
-		s.add(path, "%q is not one of %s", v, quoted(allowed))
+// oneOf refuses v at path when it is none of values, in the grammar
+// table's words.
+func (s *sheet) oneOf(path, v string, values []builtin.Value) {
+	if msg, _ := builtin.EnumProblem(v, values); msg != "" {
+		s.add(path, "%s", msg)
 	}
 }
 
-func (s *sheet) eachOneOf(path string, vs, allowed []string) {
+func (s *sheet) eachOneOf(path string, vs []string, values []builtin.Value) {
 	for i, v := range vs {
-		s.oneOf(fmt.Sprintf("%s[%d]", path, i), v, allowed)
+		s.oneOf(fmt.Sprintf("%s[%d]", path, i), v, values)
 	}
 }
 
@@ -54,27 +40,33 @@ func (s *sheet) builtinRef(path string, slot builtin.Slot, v string) {
 	if slices.Contains(builtin.Names[slot], v) {
 		return
 	}
-	for _, other := range []builtin.Slot{builtin.SlotWorkspace, builtin.SlotLaunch, builtin.SlotPrepare, builtin.SlotBefore, builtin.SlotOnSent, builtin.SlotPolicy, builtin.SlotContext, builtin.SlotReconcile} {
+	for _, other := range []builtin.Slot{builtin.SlotWorkspace, builtin.SlotBefore} {
 		if v != "" && slices.Contains(builtin.Names[other], v) {
 			s.add(path, "%s belongs in %s, not in %s", v, other, slot)
 			return
 		}
 	}
-	s.add(path, "unknown %s builtin %q; the %s builtins are %s", slot, v, slot, quoted(builtin.Names[slot]))
+	s.oneOf(path, v, builtin.NameValues(slot))
 }
 
-// bundledOnlyKeys are the manifest keys only a bundled intent sets: the
-// probe's synthetic pull request, launch and policy, and the review's
-// reconcile. The public schema leaves them out.
-var bundledOnlyKeys = []string{"context", "launch", "policy", "reconcile"}
-
-func (s *sheet) refuseBundledOnly(m manifest) {
-	set := map[string]bool{"context": m.Context != nil, "launch": m.Launch != "", "policy": m.Policy != nil, "reconcile": m.Reconcile != ""}
-	for _, k := range bundledOnlyKeys {
-		if set[k] {
-			s.add(k, "is reserved for the bundled intents")
+// effects checks the effects at path against the names applies allows,
+// and that an effect of one provider's is named only by its intents.
+func (s *sheet) effects(path string, d dintent.Def, names []string, applies builtin.Applies, allowed []string) {
+	for i, e := range names {
+		at := fmt.Sprintf("%s[%d]", path, i)
+		eff, ok := builtin.EffectOf(e)
+		switch {
+		case !ok || eff.Applies&applies == 0:
+			s.add(at, "%q is not one of %s%s", e, quoted(allowed), expr.DidYouMean(e, allowed))
+		case eff.Provider != "" && !onlyServes(d, eff.Provider):
+			s.add(at, "%s applies to %s units only; a %s intent cannot name it", e, eff.Provider, d.Provider)
 		}
 	}
+}
+
+// onlyServes says whether every unit d's turns run on is of p.
+func onlyServes(d dintent.Def, p dunit.ProviderID) bool {
+	return !slices.ContainsFunc(providersOf(d), func(q dunit.ProviderID) bool { return q != p })
 }
 
 // validate checks one manifest on its own; cross-manifest rules are in crossCheck.
@@ -82,40 +74,24 @@ func (s *sheet) validate(d dintent.Def) {
 	switch {
 	case d.Verb == "":
 	case !slices.Contains(builtin.IntentVerbs, d.Verb):
-		s.oneOf("verb", d.Verb, builtin.IntentVerbs)
 	case d.Action == nil:
 		s.add("verb", "verb needs an [action]")
 	}
 	if d.Workspace != "" {
 		s.builtinRef("workspace", builtin.SlotWorkspace, d.Workspace)
 	}
-	if d.Session.Strategy != "" {
-		s.oneOf("session.strategy", d.Session.Strategy, strategies)
-	}
 	if d.Session.Title != "" && !titleRe.MatchString(d.Session.Title) {
 		s.add("session.title", "%q must be 1 to 12 lowercase letters", d.Session.Title)
 	}
-	if !dunit.ValidProvider(string(d.Provider)) {
-		s.add("provider", "%q is not a provider id: lowercase letters, digits, _ and -, starting with a letter", d.Provider)
+	s.validateKeys(d)
+	if r, ok := builtin.RoleOf(d.Role); ok && r.Provider != "" && !onlyServes(d, r.Provider) {
+		s.add("role", "%s runs on %s units; a %s intent cannot hold it", d.Role, r.Provider, d.Provider)
 	}
-	if d.Provider != dunit.GitHub && d.Context == "synthetic" {
-		s.add("context", "synthetic is a github pull request; a %s intent cannot use it", d.Provider)
+	if r, ok := builtin.RoleOf(d.Role); ok && r.Workspace != "" && d.Workspace != r.Workspace {
+		s.add("workspace", "%s runs in %s workspaces: an intent holding it names workspace = %q", d.Role, r.Workspace, r.Workspace)
 	}
-	if d.Provider != dunit.GitHub && d.DrivesRow {
-		s.add("drives_row", "a held round drives a github row; a %s intent cannot drive one", d.Provider)
-	}
-	if d.Bundled {
-		s.builtinRef("context", builtin.SlotContext, d.Context)
-		s.builtinRef("launch", builtin.SlotLaunch, d.Launch)
-		s.builtinRef("policy", builtin.SlotPolicy, d.Policy)
-		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
-	}
-	s.builtinRef("prepare", builtin.SlotPrepare, d.Prepare)
-	for i, e := range d.OnSent {
-		s.builtinRef(fmt.Sprintf("on_sent[%d]", i), builtin.SlotOnSent, e)
-	}
-	s.oneOf("board", d.Board, boards)
-	s.eachOneOf("dims", d.Dims, builtin.IntentDims)
+	s.effects("effects", d, d.Effects, builtin.AppliesTurn, builtin.TurnEffectNames())
+	s.effects("drafts.allowed_effects", d, d.AllowedEffects, builtin.AppliesDraft, builtin.EffectNames())
 	if d.Guidance.Max < 0 {
 		s.add("guidance.max", "must be 0 (no limit) or more")
 	}
@@ -123,18 +99,20 @@ func (s *sheet) validate(d dintent.Def) {
 	s.validateHeadline(d.Headline)
 	s.validateRecord(d)
 	for i, a := range d.AlsoProfiles {
-		s.oneOf(fmt.Sprintf("also_profiles[%d].round", i), a.Round, rounds)
-	}
-	if a := d.Action; a != nil {
-		if !d.UserFacing {
-			s.add("action", "applies to user-facing intents only")
-		}
-		s.oneOf("action.group", a.Group, actionGroups)
-		s.eachOneOf("action.surfaces", a.Surfaces, actionSurfaces)
-		if a.Enabled.Src != "true" && a.ReasonOff.Src == "" {
-			s.add("action.reason_off", "is required when enabled is not \"true\"")
+		for _, k := range slices.Sorted(maps.Keys(a.Dims)) {
+			path := fmt.Sprintf("also_profile[%d].dims.%s", i, k)
+			if k == dintent.DimStage {
+				s.oneOf(path, a.Dims[k], builtin.ValuesOf(builtin.SurfaceIntent, "also_profile[].dims.stage"))
+			}
 		}
 	}
+	if d.Skill && !d.UserFacing {
+		s.add("skill", "applies to user-facing intents only")
+	}
+	if d.Skill && d.Help.Target == "" {
+		s.add("help.target", "is required when skill is true: the turn skill says what its target is")
+	}
+	s.validateAction(d)
 }
 
 func (s *sheet) validateInputs(d dintent.Def) {
@@ -144,10 +122,6 @@ func (s *sheet) validateInputs(d dintent.Def) {
 		if !inputNameRe.MatchString(in.Name) {
 			s.add(path, "an input name is lowercase letters, digits and _, starting with a letter")
 		}
-		if in.Type != "" {
-			s.oneOf(path+".type", in.Type, inputTypes)
-		}
-		s.oneOf(path+".from", in.From, inputFroms)
 		if in.Type == "list" && in.From == "user" {
 			s.add(path+".type", "a list input comes from prepare, not from the user")
 		}
@@ -181,7 +155,6 @@ func (s *sheet) validateInputs(d dintent.Def) {
 		if in.Max > 0 && in.Type != "text" {
 			s.add(path+".max", "applies to text inputs only")
 		}
-		s.eachOneOf(path+".surfaces", in.Surfaces, inputSurfaces)
 		persisted[in.Name] = in.Persist
 	}
 	for i, n := range d.Join.DiffersOn {
@@ -209,12 +182,9 @@ func (s *sheet) validateRecord(d dintent.Def) {
 	if r.States != nil && len(r.States) == 0 {
 		s.add("record.states", "must list at least one state")
 	}
-	s.eachOneOf("record.states", r.States, builtin.RecordStates)
 	if slices.Contains(r.States, "asked") && !d.Answerable {
 		s.add("record.states", "asked needs answerable = true")
 	}
-	s.eachOneOf("record.artifacts", r.Artifacts, record.ArtifactKinds)
-	s.eachOneOf("record.outcome", r.Outcome, record.OutcomeFields)
 	if r.HistoryArtifact != "" && !slices.Contains(r.Artifacts, r.HistoryArtifact) {
 		s.add("record.history_artifact", "%s is not in record.artifacts", r.HistoryArtifact)
 	}
@@ -226,17 +196,13 @@ func (s *sheet) validateRecord(d dintent.Def) {
 		if q.Artifact != "" && !slices.Contains(r.Artifacts, q.Artifact) {
 			s.add(path+".artifact", "%s is not in record.artifacts", q.Artifact)
 		}
-		s.eachOneOf(path+".fields", q.Fields, record.OutcomeFields)
+		s.eachOneOf(path+".fields", q.Fields, builtin.ValuesOf(builtin.SurfaceIntent, "record.outcome"))
 	}
 }
 
 // compile compiles every predicate of d in its slot.
 func (s *sheet) compile(d dintent.Def) Programs {
-	turn := builtin.Env(builtin.TurnSlot, d.Inputs)
-	if !slices.Contains(d.Dims, dintent.DimRound) {
-		delete(turn, "turn.round")
-	}
-	action := builtin.Env(builtin.ActionSlot, nil)
+	turn := TurnEnv(d)
 	one := func(path string, p dintent.Pred, env expr.Env) *expr.Program {
 		prog, err := expr.Compile(p.Src, env)
 		if err != nil {
@@ -253,7 +219,10 @@ func (s *sheet) compile(d dintent.Def) Programs {
 		return prog
 	}
 	var ps Programs
-	ps.Records = one("records", d.Records, turn)
+	ps.Records = one("record.when", d.Records, turn)
+	for i, r := range d.Refuse {
+		ps.Refuse = append(ps.Refuse, one(fmt.Sprintf("refuse[%d].when", i), r.When, unitEnv(d)))
+	}
 	for i, c := range d.Headline.New {
 		if i == len(d.Headline.New)-1 {
 			ps.Headline = append(ps.Headline, nil)
@@ -266,12 +235,34 @@ func (s *sheet) compile(d dintent.Def) Programs {
 			ps.Also = append(ps.Also, nil)
 			continue
 		}
-		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profiles[%d].when", i), a.When, turn))
+		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profile[%d].when", i), a.When, turn))
 	}
-	if a := d.Action; a != nil {
-		ps.Visible = one("action.visible", a.Visible, action)
-		ps.Enabled = one("action.enabled", a.Enabled, action)
-		ps.Primary = one("action.primary", a.Primary, action)
+	action := builtin.Env(builtin.ActionSlot, nil)
+	builtin.Narrow(action, servedProviders(d))
+	ps.Action = compileAction(d.Action, func(path string, p dintent.Pred) *expr.Program {
+		return one(path, p, action)
+	})
+	return ps
+}
+
+// unitEnv is the env of a predicate over the workflow facts of the units
+// d's turns run on: each served slot's, with the brief's, trigger.* and
+// config.*.
+func unitEnv(d dintent.Def) expr.Env {
+	env := expr.Env{}
+	for _, slot := range servedSlots(d) {
+		maps.Copy(env, builtin.WorkflowEnv(slot))
+	}
+	builtin.Narrow(env, servedProviders(d))
+	return env
+}
+
+// servedProviders are the providers d's turns run on, none when it serves
+// any.
+func servedProviders(d dintent.Def) []dunit.ProviderID {
+	ps := providersOf(d)
+	if slices.Contains(ps, dintent.AnyProvider) {
+		return nil
 	}
 	return ps
 }

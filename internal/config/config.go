@@ -9,14 +9,13 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -29,10 +28,65 @@ type Config struct {
 	// WorkspaceManagers are the enabled workspace managers in the order a new
 	// worktree picks them: the first that hosts the agent and honors the
 	// session's launch policy owns it.
-	WorkspaceManagers  []string `json:"workspace_managers"`
-	Agent              string   `json:"agent"`
+	WorkspaceManagers []string `json:"workspace_managers"`
+	Agent             string   `json:"agent"`
+	// GitHub is the GitHub plugin's settings.
+	GitHub GitHub `json:"github"`
+	// AgentHome is the agent's own configuration directory (CLAUDE_CONFIG_DIR
+	// for Claude Code), "" for the agent's default.
+	AgentHome string `json:"agent_home"`
+	// Profile is the directory with the reviewer's judgment.
+	Profile string `json:"profile"`
+	// AgentModels pins, per agent, a model tier to one of that agent's
+	// own model names; the loop hands the name to the agent unread.
+	AgentModels map[string]map[turns.Tier]string `json:"agent_models"`
+	// Projects override settings for the pull requests of matching
+	// repositories; the first match wins.
+	Projects []Project `json:"projects"`
+	Sweep    Sweep     `json:"sweep"`
+	HTTP     HTTP      `json:"http"`
+	MCP      MCP       `json:"mcp"`
+	Brief    Brief     `json:"brief"`
+	// Views holds each view sink's own settings by sink name.
+	Views    map[string]SinkConfig `json:"views"`
+	Cleanup  Cleanup               `json:"cleanup"`
+	Classify Classify              `json:"classify"`
+	// Workflows override each workflow's manifest by workflow name.
+	Workflows map[string]WorkflowConfig `json:"workflows"`
+	// Intents set each intent's settings by intent name.
+	Intents map[string]IntentConfig `json:"intents"`
+	// Plugins switch, by provider id, a plugin registered without a settings
+	// namespace, which has no <id>.enabled for the file to set: the
+	// composition root that registers it switches it here, as a test's
+	// plugin is. Every plugin the file knows switches with <id>.enabled.
+	Plugins map[string]Plugin `json:"-"`
+	// Placement is the rules that place units; the first match wins.
+	Placement []PlacementRule `json:"placement,omitempty"`
+	GTD       GTD             `json:"gtd"`
+	// Notifications sets the menu bar's daily digest.
+	Notifications Notifications `json:"notifications"`
+	Slack         Slack         `json:"slack"`
+	Dossiers      Dossiers      `json:"dossiers"`
+	Drafts        Drafts        `json:"drafts"`
+	Items         Items         `json:"items"`
+	Headless      Headless      `json:"headless"`
+	Turns         Turns         `json:"turns"`
+}
+
+// Turns caps the automated turns. PerUnitPerDay stops a runaway loop on one
+// unit whose plugin keeps a per-unit count (GitHub's pull requests), counted
+// per local day; PerDay caps the automated turns on every other unit, all
+// workflows together.
+type Turns struct {
+	PerDay        int `json:"per_day"`
+	PerUnitPerDay int `json:"per_unit_per_day"`
+}
+
+// GitHub is the GitHub plugin's settings.
+type GitHub struct {
+	// Enabled switches the plugin; nil means enabled.
+	Enabled            *bool    `json:"enabled,omitempty"`
 	ReviewPrefix       string   `json:"review_prefix"`
-	Rounds             Rounds   `json:"rounds"`
 	AutomatedReviewers []string `json:"automated_reviewers"`
 	// Owners restricts automated follow-ups to these GitHub owners. Empty
 	// means the owners of every repository the workspace manager knows.
@@ -48,14 +102,6 @@ type Config struct {
 	// develop create its author workspace when it has none; off, the sweep
 	// only records the round it would start.
 	AddressWithoutWorkspace bool `json:"address_without_workspace"`
-	// AgentHome is the agent's own configuration directory (CLAUDE_CONFIG_DIR
-	// for Claude Code), "" for the agent's default.
-	AgentHome string `json:"agent_home"`
-	// Profile is the directory with the reviewer's judgment.
-	Profile string `json:"profile"`
-	// AgentModels pins, per agent, a model tier to one of that agent's
-	// own model names; the loop hands the name to the agent unread.
-	AgentModels map[string]map[turns.Tier]string `json:"agent_models"`
 	// AddressReviews starts a triage round in the author workspace when
 	// someone reviews a pull request I develop.
 	AddressReviews bool `json:"address_reviews"`
@@ -68,40 +114,33 @@ type Config struct {
 	IgnoreChecks  []string `json:"ignore_checks"`
 	// AddressConflicts starts a triage round when a pull request I develop
 	// conflicts with its base past the conflict window.
-	AddressConflicts bool `json:"address_conflicts"`
-	// Projects override settings for the pull requests of matching
-	// repositories; the first match wins.
-	Projects []Project `json:"projects"`
-	Scope    Scope     `json:"scope"`
-	Stalled  Stalled   `json:"stalled"`
-	Sweep    Sweep     `json:"sweep"`
-	HTTP     HTTP      `json:"http"`
-	MCP      MCP       `json:"mcp"`
-	Brief    Brief     `json:"brief"`
-	// Views holds each view sink's own settings by sink name.
-	Views    map[string]SinkConfig `json:"views"`
-	Cleanup  Cleanup               `json:"cleanup"`
-	Nudge    Nudge                 `json:"nudge"`
-	Classify Classify              `json:"classify"`
-	// Workflows override each workflow's manifest by workflow name.
-	Workflows map[string]WorkflowConfig `json:"workflows"`
-	// ProjectSettings maps an intent to a predicate over its pull request's
-	// facts: where it does not hold, the intent's sessions start without the
-	// checkout's own agent settings. An intent it does not name loads them.
-	ProjectSettings map[string]string `json:"project_settings"`
-	// Plugins switch each compiled-in plugin by provider id.
-	Plugins map[string]Plugin `json:"plugins"`
-	// Placement is the rules that place units; the first match wins.
-	Placement []PlacementRule `json:"placement,omitempty"`
-	GTD       GTD             `json:"gtd"`
-	// Notifications sets the menu bar's daily digest.
-	Notifications Notifications `json:"notifications"`
-	Slack         Slack         `json:"slack"`
-	Dossiers      Dossiers      `json:"dossiers"`
-	// Proposals sets the rules that propose drafts on their own.
-	Proposals Proposals `json:"proposals"`
-	Items     Items     `json:"items"`
-	Headless  Headless  `json:"headless"`
+	AddressConflicts bool         `json:"address_conflicts"`
+	Scope            Scope        `json:"scope"`
+	Stalled          Stalled      `json:"stalled"`
+	Drafts           PluginDrafts `json:"drafts"`
+	Nudge            Nudge        `json:"nudge"`
+	// RateLimitFraction is the share of the GitHub rate limit the sweeps
+	// may spend.
+	RateLimitFraction float64 `json:"rate_limit_fraction"`
+}
+
+// Drafts holds the settings every proposer's drafts share.
+type Drafts struct {
+	// RepeatAfter is how long a nudged, discarded, sent or observed draft
+	// keeps its rule or workflow from proposing it again, by default.
+	RepeatAfter Days `json:"repeat_after"`
+}
+
+// IntentConfig is one intent's settings.
+type IntentConfig struct {
+	ProjectSettings *ProjectSettings `json:"project_settings,omitempty"`
+}
+
+// ProjectSettings says where an intent's sessions load the checkout's own
+// agent settings: When is a predicate over its pull request's facts; where
+// it does not hold, they start without them.
+type ProjectSettings struct {
+	When string `json:"when"`
 }
 
 // Headless caps the headless turns: the model tier of their calls, what one call may cost and what they
@@ -177,7 +216,7 @@ type Scope struct {
 	Watch  []string `json:"watch"`
 }
 
-// Days is a duration written as "2d", "36h" or "90m" in the config.
+// Days is a duration written as duration.Parse reads it: "2d", "36h", "90m".
 type Days time.Duration
 
 func (d *Days) UnmarshalJSON(b []byte) error {
@@ -185,7 +224,7 @@ func (d *Days) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	v, err := ParseDays(s)
+	v, err := duration.Parse(s)
 	if err != nil {
 		return err
 	}
@@ -193,35 +232,8 @@ func (d *Days) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes the form ParseDays reads: "2d", "36h", "2m".
 func (d Days) MarshalJSON() ([]byte, error) {
-	v := time.Duration(d)
-	if v > 0 && v%(24*time.Hour) == 0 {
-		return json.Marshal(fmt.Sprintf("%dd", v/(24*time.Hour)))
-	}
-	s := v.String()
-	if strings.HasSuffix(s, "m0s") {
-		s = strings.TrimSuffix(s, "0s")
-	}
-	if strings.HasSuffix(s, "h0m") {
-		s = strings.TrimSuffix(s, "0m")
-	}
-	return json.Marshal(s)
-}
-
-func ParseDays(s string) (time.Duration, error) {
-	if n, ok := strings.CutSuffix(s, "d"); ok {
-		days, err := strconv.Atoi(n)
-		if err != nil {
-			return 0, fmt.Errorf("duration %q: %w", s, err)
-		}
-		return time.Duration(days) * 24 * time.Hour, nil
-	}
-	v, err := time.ParseDuration(s)
-	if err != nil {
-		return 0, fmt.Errorf("duration %q: %w", s, err)
-	}
-	return v, nil
+	return json.Marshal(duration.Format(time.Duration(d)))
 }
 
 type Stalled struct {
@@ -231,9 +243,8 @@ type Stalled struct {
 }
 
 type Sweep struct {
-	Fast              Days    `json:"fast"`
-	Slow              Days    `json:"slow"`
-	RateLimitFraction float64 `json:"rate_limit_fraction"`
+	Fast Days `json:"fast"`
+	Slow Days `json:"slow"`
 }
 
 type HTTP struct {
@@ -250,18 +261,12 @@ const DefaultMCPPort = 47800
 // URL is the endpoint agent homes register.
 func (m MCP) URL() string { return fmt.Sprintf("http://127.0.0.1:%d/mcp", m.Port) }
 
-// Rounds caps the automatic rounds: PerPRPerDay stops a runaway loop on
-// one pull request, counted per local day.
-type Rounds struct {
-	PerPRPerDay int `json:"per_pr_per_day"`
-}
-
 // Brief previews each pull request with one headless call of the agent,
 // outside the sweeps.
 type Brief struct {
-	Enabled      bool       `json:"enabled"`
-	Tier         turns.Tier `json:"tier"`
-	MaxDiffBytes int        `json:"max_diff_bytes"`
+	Enabled       bool       `json:"enabled"`
+	Tier          turns.Tier `json:"tier"`
+	MaxInputBytes int        `json:"max_input_bytes"`
 }
 
 // Cleanup holds the thresholds of the session and workspace cleanup workflows.
@@ -276,18 +281,31 @@ type Cleanup struct {
 	Disposable []string `json:"disposable"`
 }
 
+// WorkflowConfig overlays a workflow's manifest; a field left out keeps the
+// manifest's.
 type WorkflowConfig struct {
-	Mode     string          `json:"mode,omitempty"`
-	Enabled  *bool           `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+	// Observe plans the workflow's items pending, for a person to run.
+	Observe  *bool           `json:"observe,omitempty"`
 	Approval *ApprovalConfig `json:"approval,omitempty"`
 	// OnlyWhen is a predicate over the workflow's facts that must hold
 	// besides its manifest's when; "" adds none.
-	OnlyWhen string `json:"only_when,omitempty"`
+	OnlyWhen string          `json:"only_when,omitempty"`
+	Drafts   *WorkflowDrafts `json:"drafts,omitempty"`
 }
 
+// WorkflowDrafts holds the approval of the drafts a workflow proposes.
+type WorkflowDrafts struct {
+	Approval *ApprovalConfig `json:"approval,omitempty"`
+}
+
+// ApprovalConfig overlays an approval block field by field: Mode and
+// Window replace the manifest's, Rule its rules; "", nil and a nil Rule
+// keep the manifest's, an empty Rule clears them.
 type ApprovalConfig struct {
-	Default string `json:"default,omitempty"`
-	Window  *Days  `json:"window,omitempty"`
+	Mode   string               `json:"mode,omitempty"`
+	Window *Days                `json:"window,omitempty"`
+	Rule   []ApprovalRuleConfig `json:"rule,omitempty"`
 }
 
 type Nudge struct {
@@ -295,7 +313,7 @@ type Nudge struct {
 }
 
 type Classify struct {
-	DailyCap int `json:"daily_cap"`
+	PerDay int `json:"per_day"`
 }
 
 // Project matches repositories by an owner/repo pattern such as
@@ -310,6 +328,12 @@ type Project struct {
 	// WorkspaceManagers orders the managers a new worktree of the project picks from.
 	WorkspaceManagers []string `json:"workspace_managers"`
 
+	GitHub ProjectGitHub `json:"github"`
+}
+
+// ProjectGitHub are the GitHub settings a project overrides; nil keeps the
+// top-level value.
+type ProjectGitHub struct {
 	TrustedAuthors            []string `json:"trusted_authors"`
 	FollowupsWithoutWorkspace *bool    `json:"followups_without_workspace"`
 	AddressWithoutWorkspace   *bool    `json:"address_without_workspace"`
@@ -333,14 +357,14 @@ func (c Config) For(owner, repo string) Config {
 		if p.WorkspaceManagers != nil {
 			c.WorkspaceManagers = p.WorkspaceManagers
 		}
-		if p.TrustedAuthors != nil {
-			c.TrustedAuthors = p.TrustedAuthors
+		if p.GitHub.TrustedAuthors != nil {
+			c.GitHub.TrustedAuthors = p.GitHub.TrustedAuthors
 		}
-		if p.FollowupsWithoutWorkspace != nil {
-			c.FollowupsWithoutWorkspace = *p.FollowupsWithoutWorkspace
+		if p.GitHub.FollowupsWithoutWorkspace != nil {
+			c.GitHub.FollowupsWithoutWorkspace = *p.GitHub.FollowupsWithoutWorkspace
 		}
-		if p.AddressWithoutWorkspace != nil {
-			c.AddressWithoutWorkspace = *p.AddressWithoutWorkspace
+		if p.GitHub.AddressWithoutWorkspace != nil {
+			c.GitHub.AddressWithoutWorkspace = *p.GitHub.AddressWithoutWorkspace
 		}
 		break
 	}
@@ -377,17 +401,20 @@ const DefaultPRDailyCap = 5
 // manager: the composition root picks those.
 func Defaults() Config {
 	return Config{
-		AddressReviews:     true,
-		AddressChecks:      true,
-		AddressConflicts:   true,
-		ReviewPrefix:       "REVIEW ",
-		Rounds:             Rounds{PerPRPerDay: DefaultPRDailyCap},
-		AutomatedReviewers: []string{},
-		Stalled:            Stalled{Review: Days(48 * time.Hour), Reply: Days(24 * time.Hour), Merge: Days(24 * time.Hour)},
-		Sweep:              Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour), RateLimitFraction: 0.5},
-		Brief:              Brief{Tier: turns.TierFast, MaxDiffBytes: 60000},
-		MCP:                MCP{Port: DefaultMCPPort},
-		Views:              map[string]SinkConfig{},
+		GitHub: GitHub{
+			AddressReviews:     true,
+			AddressChecks:      true,
+			AddressConflicts:   true,
+			ReviewPrefix:       "REVIEW ",
+			AutomatedReviewers: []string{},
+			Stalled:            Stalled{Review: Days(48 * time.Hour), Reply: Days(24 * time.Hour), Merge: Days(24 * time.Hour)},
+			Nudge:              Nudge{SilentDays: 30},
+			RateLimitFraction:  0.5,
+		},
+		Sweep: Sweep{Fast: Days(2 * time.Minute), Slow: Days(time.Hour)},
+		Brief: Brief{Tier: turns.TierFast, MaxInputBytes: 60000},
+		MCP:   MCP{Port: DefaultMCPPort},
+		Views: map[string]SinkConfig{},
 		Cleanup: Cleanup{
 			Idle:           Days(2 * time.Hour),
 			AskedIdle:      Days(4 * time.Hour),
@@ -400,14 +427,14 @@ func Defaults() Config {
 				".DS_Store", ".coverage", dturn.ScratchDir,
 			},
 		},
-		Nudge:         Nudge{SilentDays: 30},
-		Classify:      Classify{DailyCap: 50},
+		Classify:      Classify{PerDay: 50},
 		GTD:           GTD{StaleWaitingDays: 2},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
-		Proposals: Proposals{RenudgeAfter: Days(24 * time.Hour)},
-		Headless:  Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
+		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
+		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
+		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
 	}
 }
 
@@ -482,8 +509,8 @@ func LoadFile(file string, base Config) (Config, error) {
 	if err := c.validateTrustedAuthors(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
-	if c.Rounds.PerPRPerDay <= 0 {
-		c.Rounds.PerPRPerDay = DefaultPRDailyCap
+	if c.Turns.PerUnitPerDay <= 0 {
+		c.Turns.PerUnitPerDay = DefaultPRDailyCap
 	}
 	if err := c.validateCockpit(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
@@ -494,16 +521,16 @@ func LoadFile(file string, base Config) (Config, error) {
 	if err := c.validatePlacement(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
-	if err := c.Proposals.validate(); err != nil {
+	if err := c.validatePluginDrafts(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	return c, nil
 }
 
 func (c Config) validateTrustedAuthors() error {
-	lists := map[string][]string{"trusted_authors": c.TrustedAuthors}
+	lists := map[string][]string{"github.trusted_authors": c.GitHub.TrustedAuthors}
 	for i, p := range c.Projects {
-		lists[fmt.Sprintf("projects[%d].trusted_authors", i)] = p.TrustedAuthors
+		lists[fmt.Sprintf("projects[%d].github.trusted_authors", i)] = p.GitHub.TrustedAuthors
 	}
 	for key, list := range lists {
 		if slices.ContainsFunc(list, func(a string) bool { return strings.TrimSpace(a) == "" }) {
@@ -518,9 +545,9 @@ func (c Config) validateCockpit() error {
 		key string
 		v   Days
 	}{
-		{"stalled.review", c.Stalled.Review},
-		{"stalled.reply", c.Stalled.Reply},
-		{"stalled.merge", c.Stalled.Merge},
+		{"github.stalled.review", c.GitHub.Stalled.Review},
+		{"github.stalled.reply", c.GitHub.Stalled.Reply},
+		{"github.stalled.merge", c.GitHub.Stalled.Merge},
 		{"sweep.fast", c.Sweep.Fast},
 		{"sweep.slow", c.Sweep.Slow},
 	}
@@ -534,8 +561,8 @@ func (c Config) validateCockpit() error {
 			return fmt.Errorf("notifications.digest_at must be a local time HH:MM or empty, got %q", at)
 		}
 	}
-	if f := c.Sweep.RateLimitFraction; f < 0 || f > 1 {
-		return fmt.Errorf("sweep.rate_limit_fraction must be between 0 and 1, got %v", f)
+	if f := c.GitHub.RateLimitFraction; f < 0 || f > 1 {
+		return fmt.Errorf("github.rate_limit_fraction must be between 0 and 1, got %v", f)
 	}
 	if c.HTTP.Port < 0 || c.HTTP.Port > 65535 {
 		return fmt.Errorf("http.port must be between 0 and 65535, got %d", c.HTTP.Port)
@@ -543,8 +570,8 @@ func (c Config) validateCockpit() error {
 	if c.MCP.Port < 1 || c.MCP.Port > 65535 {
 		return fmt.Errorf("mcp.port must be between 1 and 65535, got %d", c.MCP.Port)
 	}
-	if b := c.Brief.MaxDiffBytes; b < 1000 || b > 200_000 {
-		return fmt.Errorf("brief.max_diff_bytes must be between 1000 and 200000, got %d", b)
+	if b := c.Brief.MaxInputBytes; b < 1000 || b > 200_000 {
+		return fmt.Errorf("brief.max_input_bytes must be between 1000 and 200000, got %d", b)
 	}
 	if _, err := turns.ParseTier(string(c.Brief.Tier)); err != nil {
 		return fmt.Errorf("brief.tier: %w", err)
@@ -584,35 +611,43 @@ func (c Config) validateWorkflows() error {
 			return fmt.Errorf("%s must be positive, got %s", d.key, time.Duration(d.v))
 		}
 	}
-	if c.Nudge.SilentDays < 1 {
-		return fmt.Errorf("nudge.silent_days must be positive, got %d", c.Nudge.SilentDays)
+	if c.GitHub.Nudge.SilentDays < 1 {
+		return fmt.Errorf("github.nudge.silent_days must be positive, got %d", c.GitHub.Nudge.SilentDays)
 	}
-	if c.Classify.DailyCap < 0 {
-		return fmt.Errorf("classify.daily_cap must not be negative, got %d", c.Classify.DailyCap)
+	if c.Classify.PerDay < 0 {
+		return fmt.Errorf("classify.per_day must not be negative, got %d", c.Classify.PerDay)
 	}
-	for _, intent := range slices.Sorted(maps.Keys(c.ProjectSettings)) {
-		if _, err := expr.Compile(c.ProjectSettings[intent], builtin.PREnv()); err != nil {
-			return fmt.Errorf("project_settings.%s: %w", intent, err)
+	if c.Turns.PerDay < 0 {
+		return fmt.Errorf("turns.per_day must not be negative, got %d", c.Turns.PerDay)
+	}
+	if c.Drafts.RepeatAfter <= 0 {
+		return fmt.Errorf("drafts.repeat_after must be positive, got %s", time.Duration(c.Drafts.RepeatAfter))
+	}
+	for _, intent := range slices.Sorted(maps.Keys(c.Intents)) {
+		ps := c.Intents[intent].ProjectSettings
+		if ps == nil {
+			continue
+		}
+		if _, err := expr.Compile(ps.When, builtin.PREnv()); err != nil {
+			return fmt.Errorf("intents.%s.project_settings.when: %w", intent, err)
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
 		w := c.Workflows[name]
-		if err := oneOf("workflows."+name+".mode", w.Mode, workflow.ModeObserve, workflow.ModeApply); err != nil {
-			return err
-		}
 		if w.OnlyWhen != "" {
-			if _, err := expr.CompileWorkflow(w.OnlyWhen, builtin.WorkflowEnvAll()); err != nil {
-				return fmt.Errorf("workflows.%s.only_when: %w", name, err)
+			if err := workflowRule("workflows."+name+".only_when", w.OnlyWhen, false); err != nil {
+				return err
 			}
 		}
-		if w.Approval == nil {
-			continue
+		if a := w.DraftApproval(); a != nil {
+			if err := a.validateDrafts("workflows." + name + ".drafts.approval"); err != nil {
+				return err
+			}
 		}
-		if err := oneOf("workflows."+name+".approval.default", w.Approval.Default, workflow.OutcomeRun, workflow.OutcomeWait); err != nil {
-			return err
-		}
-		if win := w.Approval.Window; win != nil && *win < 0 {
-			return fmt.Errorf("workflows.%s.approval.window must not be negative, got %s", name, time.Duration(*win))
+		if w.Approval != nil {
+			if err := w.Approval.validateRun("workflows." + name + ".approval"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -622,14 +657,14 @@ func (c Config) validateWorkflows() error {
 // whose facts pr resolves loads the checkout's own agent settings. Without
 // the facts, an intent that has a predicate does not.
 func (c Config) ProjectSettingsFor(intent string, pr expr.Facts) bool {
-	src, ok := c.ProjectSettings[intent]
-	if !ok {
+	ps := c.Intents[intent].ProjectSettings
+	if ps == nil {
 		return true
 	}
 	if pr == nil {
 		return false
 	}
-	p, err := expr.Compile(src, builtin.PREnv())
+	p, err := expr.Compile(ps.When, builtin.PREnv())
 	return err == nil && p.Eval(pr)
 }
 

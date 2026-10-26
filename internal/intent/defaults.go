@@ -2,20 +2,22 @@ package intent
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
-// DefaultHeadMoved is resume.head_moved when a manifest leaves it out: the generic sentence of resume.md.tmpl.
-const DefaultHeadMoved = "The head moved since the question: re-check what changed before acting on the answer."
+// DefaultChanged is resume.changed when a manifest leaves it out: the generic sentence of resume.md.tmpl.
+const DefaultChanged = "The head moved since the question: re-check what changed before acting on the answer."
 
 var (
-	defaultActionSurfaces = []string{"row", "detail", "tui", "cli", "explore"}
-	defaultInputSurfaces  = []string{"cli", "instructions"}
+	defaultInputSurfaces = []string{"cli", "instructions"}
 )
 
 // sheet places problems of one intent.toml by key path.
@@ -23,6 +25,13 @@ type sheet struct {
 	file     string
 	at       map[string]frontmatter.Position
 	problems Problems
+	// warnings are what loads but is deprecated.
+	warnings Problems
+	// extras are the brief.extra.* facts of a provider's brief intent, which
+	// a workflow's predicates over a briefed subject read; nil reads none.
+	extras func(dunit.ProviderID) expr.Env
+	// defaults are the profile's defaults.toml.
+	defaults manifestDefaults
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -45,6 +54,10 @@ func parent(path string) string {
 
 func (s *sheet) add(path, format string, args ...any) {
 	s.problems = append(s.problems, s.problem(path, format, args...))
+}
+
+func (s *sheet) warn(path, format string, args ...any) {
+	s.warnings = append(s.warnings, s.problem(path, format, args...))
 }
 
 func (s *sheet) problem(path, format string, args ...any) Problem {
@@ -98,42 +111,65 @@ func orEmpty(v []string, def []string) []string {
 // define applies the manifest defaults and reports missing required keys.
 func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	d := dintent.Def{
-		Name:          name,
-		Label:         s.required("label", m.Label),
-		Summary:       s.required("summary", m.Summary),
-		Key:           m.Key,
-		Verb:          m.Verb,
-		UserFacing:    boolOr(m.UserFacing, true),
-		Workspace:     s.required("workspace", m.Workspace),
-		Provider:      dunit.ProviderID(str(m.Provider, string(dunit.GitHub))),
-		Context:       str(m.Context, "pr"),
-		Launch:        m.Launch,
-		Policy:        str(m.Policy, "round"),
-		Intake:        m.Intake,
-		OwnerOnly:     m.OwnerOnly,
-		Answerable:    boolOr(m.Answerable, true),
-		Board:         str(m.Board, "none"),
-		DrivesRow:     m.DrivesRow,
-		Reports:       boolOr(m.Reports, true),
-		Reconcile:     m.Reconcile,
-		Brief:         dintent.Brief{Render: true, Wait: true},
-		Dims:          orEmpty(m.Dims, nil),
-		Records:       s.pred("records", m.Records, "true"),
-		Prepare:       m.Prepare,
-		OnSent:        orEmpty(m.OnSent, nil),
-		Guidance:      dintent.Guidance{Label: "Guidance"},
-		Resume:        dintent.Resume{HeadMoved: DefaultHeadMoved},
-		DraftApproval: s.draftApproval(m.DraftApproval),
-		Modes:         s.modes(m.Modes),
+		Name:       name,
+		Label:      s.required("label", m.Label),
+		Summary:    s.required("summary", m.Summary),
+		Key:        m.Shortcut,
+		Verb:       m.Verb,
+		UserFacing: boolOr(m.UserFacing, true),
+		Provider:   s.defaults.Provider,
+		Intake:     m.Intake,
+		OwnerOnly:  m.OwnerOnly,
+		Answerable: boolOr(m.Answerable, true),
+		Reports:    boolOr(m.Reports, true),
+		Brief:      dintent.Brief{Render: true, Wait: true},
+		Dims:       orEmpty(m.Dims, nil),
+		Records:    dintent.Pred{Src: "true", At: dintent.Pos{File: s.file}},
+		Effects:    orEmpty(m.Effects, nil),
+		Guidance:   dintent.Guidance{Label: "Guidance"},
+		Resume:     dintent.Resume{Changed: DefaultChanged},
+		Runners:    s.runners(m.Runners),
+		Role:       m.Role,
+		Builds:     m.Builds,
+		Prompt:     m.Prompt,
+		Schema:     m.Schema,
+		Skill:      m.Skill,
 	}
+	if m.Why != nil {
+		d.Why = s.text("why", m.Why, "")
+	}
+	for i, r := range m.Refuse {
+		path := fmt.Sprintf("refuse[%d]", i)
+		var rf dintent.Refuse
+		if r.When == nil {
+			s.add(path+".when", "is required")
+		} else {
+			rf.When = s.pred(path+".when", r.When, "")
+		}
+		if r.Why == nil {
+			s.add(path+".why", "is required: the text the refusal says")
+		} else {
+			rf.Why = s.text(path+".why", r.Why, "")
+		}
+		d.Refuse = append(d.Refuse, rf)
+	}
+	bindRole(&d)
+	s.provider(&d, m.Provider)
+	if m.Drafts != nil {
+		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
+		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, builtin.ApprovalEnv(false, servedSlots(d)...))
+	}
+	s.workspace(&d, m.Workspace)
+	d.Board = builtin.BoardOf(d.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
 	if p := str(m.Profile, "none"); p != "none" {
 		d.Profile = p
 	}
-	if m.Session == nil {
+	switch {
+	case m.Session == nil && d.Builds == "":
 		s.add("session.strategy", "is required")
 		s.add("session.title", "is required")
-	} else {
+	case m.Session != nil:
 		d.Session = dintent.Session{
 			Strategy:      s.required("session.strategy", m.Session.Strategy),
 			Title:         s.required("session.title", m.Session.Title),
@@ -141,18 +177,26 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		}
 	}
 	if m.Brief != nil {
-		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true)}
+		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true), Need: m.Brief.Need}
+	}
+	if h := m.Help; h != nil {
+		d.Help = dintent.Help{Target: h.Target, Summary: h.Summary, Group: h.Group, Examples: h.Examples, Docs: h.Docs}
 	}
 	if g := m.Guidance; g != nil {
 		d.Guidance = dintent.Guidance{Label: str(g.Label, "Guidance"), Help: g.Help, Max: g.Max}
 	}
-	d.Headline = s.headline(m.Headline)
+	if d.Builds != "" {
+		d.Answerable, d.Reports = false, false
+	}
+	if m.Headline != nil || d.Builds == "" {
+		d.Headline = s.headline(m.Headline)
+	}
 	d.Inputs = s.inputs(m.Inputs)
-	for i, a := range m.AlsoProfiles {
-		path := fmt.Sprintf("also_profiles[%d]", i)
+	for i, a := range m.AlsoProfile {
+		path := fmt.Sprintf("also_profile[%d]", i)
 		ap := dintent.AlsoProfile{
 			Profile: s.required(path+".profile", a.Profile),
-			Round:   a.Round,
+			Dims:    a.Dims,
 			Define:  s.required(path+".define", a.Define),
 		}
 		if a.When == nil {
@@ -160,31 +204,21 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		} else {
 			ap.When = s.pred(path+".when", a.When, "")
 		}
-		ap.SourcePrefix = str(a.SourcePrefix, ap.Profile+" guide: ")
+		ap.Prefix = str(a.Prefix, ap.Profile+" guide: ")
 		d.AlsoProfiles = append(d.AlsoProfiles, ap)
 	}
-	if a := m.Action; a != nil {
-		d.Action = &dintent.Action{
-			Group:            str(a.Group, "round"),
-			Surfaces:         orEmpty(a.Surfaces, defaultActionSurfaces),
-			Visible:          s.pred("action.visible", a.Visible, "row.open"),
-			Enabled:          s.pred("action.enabled", a.Enabled, "true"),
-			ReasonOff:        s.text("action.reason_off", a.ReasonOff, ""),
-			Primary:          s.pred("action.primary", a.Primary, "false"),
-			Confirm:          s.text("action.confirm", a.Confirm, ""),
-			Hint:             s.text("action.hint", a.Hint, ""),
-			NoteWhenQuestion: a.NoteWhenQuestion,
-		}
-	}
+	d.Action = s.decodeAction(m.Action)
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}
-	if r := m.Record; r == nil {
+	switch r := m.Record; {
+	case r == nil && d.Builds == "":
 		s.add("record.states", "is required")
-	} else {
+	case r != nil:
 		if r.States == nil {
 			s.add("record.states", "is required")
 		}
+		d.Records = s.pred("record.when", r.When, "true")
 		d.Record = dintent.RecordRules{
 			States:          r.States,
 			Artifacts:       orEmpty(r.Artifacts, nil),
@@ -201,7 +235,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		}
 	}
 	if m.Resume != nil {
-		d.Resume.HeadMoved = str(m.Resume.HeadMoved, DefaultHeadMoved)
+		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)
 	}
 	return d
 }
@@ -225,10 +259,10 @@ func (s *sheet) headline(h *mHeadline) dintent.Headline {
 		if c.When != nil {
 			cs.When = s.pred(path+".when", c.When, "")
 		}
-		if c.Text == nil {
-			s.add(path+".text", "is required")
+		if c.Line == nil {
+			s.add(path+".line", "is required")
 		} else {
-			cs.Text = s.text(path+".text", c.Text, "")
+			cs.Text = s.text(path+".line", c.Line, "")
 		}
 		out.New = append(out.New, cs)
 	}
@@ -259,6 +293,28 @@ func (s *sheet) inputs(in map[string]mInput) []dintent.Input {
 			Surfaces:   orEmpty(m.Surfaces, defaultInputSurfaces),
 			At:         s.pos(path),
 		})
+	}
+	return out
+}
+
+// bindRole sets what d's role implies: its round, the builtins its turns
+// run and whether they drive their workspace's row.
+func bindRole(d *dintent.Def) {
+	r, _ := builtin.RoleOf(d.Role)
+	d.RoundKind, d.Reconcile, d.Prepare, d.Launch = r.RoundKind, r.Reconcile, r.Prepare, r.Launch
+	d.Context, d.Policy, d.DrivesRow = r.Context, r.Policy, r.DrivesRow
+}
+
+// servedSlots are the workflow slots of the units d's turns run on.
+func servedSlots(d dintent.Def) []string {
+	if d.Serves(dintent.AnyProvider) {
+		return builtin.UnitSlots()
+	}
+	var out []string
+	for _, p := range append([]dunit.ProviderID{d.ProviderOrDefault()}, d.Providers...) {
+		if slot, ok := builtin.Slots[p]; ok && !slices.Contains(out, slot) {
+			out = append(out, slot)
+		}
 	}
 	return out
 }

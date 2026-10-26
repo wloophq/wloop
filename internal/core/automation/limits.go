@@ -69,10 +69,10 @@ type unitOf struct {
 }
 
 // runsAlone says whether an item runs without the user: decided run, or
-// pending in apply mode with default run. Only those take a slot.
+// pending, not observed, with default run. Only those take a slot.
 func runsAlone(it workflow.Item) bool {
 	return it.Decision == workflow.DecisionRun ||
-		it.Decision == workflow.DecisionPending && it.Default == workflow.OutcomeRun && it.Mode == workflow.ModeApply
+		it.Decision == workflow.DecisionPending && it.Default == workflow.OutcomeRun && !it.Observe
 }
 
 // count reserves the item's slots in the limits.

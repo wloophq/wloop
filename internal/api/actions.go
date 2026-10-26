@@ -16,9 +16,10 @@ type ActionsResponse struct {
 type ActionSpec struct {
 	ID       string     `json:"id"`
 	Label    string     `json:"label"`
-	Group    string     `json:"group"`         // round | turn | control | workspace | brief | intake
-	Key      string     `json:"key,omitempty"` // TUI key
-	Surfaces []string   `json:"surfaces"`      // row, detail, tui, menubar, notification, cli, explore
+	Summary  string     `json:"summary,omitempty"` // what pressing it does, from the profile
+	Group    string     `json:"group"`             // start | turn | control | workspace | brief | intake; draft and plan for theirs
+	Key      string     `json:"key,omitempty"`     // TUI key
+	Surfaces []string   `json:"surfaces"`          // row, detail, tui, menubar, notification, cli, explore
 	Input    *InputSpec `json:"input,omitempty"`
 	Intake   bool       `json:"intake,omitempty"`
 	Toggle   string     `json:"toggle,omitempty"` // paired id sharing the key: hold<->release
@@ -42,11 +43,17 @@ type InputSpec struct {
 type ActionState struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
-	Reason  string `json:"reason,omitempty"`
-	Hint    string `json:"hint,omitempty"`
+	// Reason is why a disabled action is off: the profile's why.
+	Reason string `json:"reason,omitempty"`
+	// Refusal names the profile text Reason is, which a client recognizes
+	// a refusal by: BuiltinWhy or RefuseCase; "" for another reason.
+	Refusal string `json:"refusal,omitempty"`
+	// Note is what an enabled action would do on this row.
+	Note    string `json:"note,omitempty"`
 	Label   string `json:"label,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 	Confirm string `json:"confirm,omitempty"`
 	Basis   string `json:"basis,omitempty"`
-	Note    string `json:"note,omitempty"`
+	// Warning is shown under an enabled action.
+	Warning string `json:"warning,omitempty"`
 }

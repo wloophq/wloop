@@ -215,29 +215,32 @@ func TestRetainBriefBodies(t *testing.T) {
 	t.Parallel()
 	db, _ := openTemp(t)
 	run := func(id int, started time.Time) {
-		exec(t, db, `INSERT INTO brief_runs (id, owner, repo, number, trigger, version, attempt_of, started_at, ended_at, outcome, input_tokens, brief, files, tags, dropped_tags)
-			VALUES (?, 'acme', 'api', 1, 'wanted', 'v1', 'h', ?, ?, 'ok', 120, '{"goal":"g"}', '["a.go"]', '["change:fix"]', '["x:y"]')`, id, at(started), at(started.Add(time.Minute)))
+		exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, trigger, version, attempt_of, started_at, ended_at, outcome, input_tokens, brief, input, tags, dropped_tags)
+			VALUES (?, 'github', 'acme/api#1', 'wanted', 'v1', 'h', ?, ?, 'ok', 120, '{"goal":"g"}', '{"changed_files":3,"files":["a.go"]}', '["change:fix"]', '["x:y"]')`, id, at(started), at(started.Add(time.Minute)))
 	}
 	for id := 1; id <= 4; id++ {
 		run(id, retainNow.Add(-8*day))
 	}
 	run(5, retainNow.Add(-6*day))
-	exec(t, db, `INSERT INTO pr_briefs (owner, repo, number, run, last_run) VALUES ('acme', 'api', 1, 1, 2)`)
+	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#1', 1, 2)`)
 	exec(t, db, `INSERT INTO turns (provider, unit_key, intent, turn_id, state, sent_at, brief_run) VALUES ('github', 'acme/api#1', 'review', 'r1', 'done', ?, 3)`, at(past))
 
 	if got := retain(t, db, Retention{BriefBodies: 7 * day}); got["brief_runs"] != 1 || len(got) != 1 {
 		t.Errorf("retained %v, want one brief run compacted", got)
 	}
-	if left := column(t, db, `SELECT id FROM brief_runs WHERE brief != '' AND files != '' ORDER BY id`); !slices.Equal(left, []string{"1", "2", "3", "5"}) {
+	if left := column(t, db, `SELECT id FROM brief_runs WHERE brief != '' AND json_type(input, '$.files') IS NOT NULL ORDER BY id`); !slices.Equal(left, []string{"1", "2", "3", "5"}) {
 		t.Errorf("runs with a body %q, want 1 2 3 5", left)
 	}
-	var outcome, ended, tags, dropped string
+	var outcome, ended, tags, dropped, input string
 	var tokens int
-	if err := db.R().QueryRowContext(context.Background(), `SELECT outcome, ended_at, input_tokens, tags, dropped_tags FROM brief_runs WHERE id = 4`).Scan(&outcome, &ended, &tokens, &tags, &dropped); err != nil {
+	if err := db.R().QueryRowContext(context.Background(), `SELECT outcome, ended_at, input_tokens, tags, dropped_tags, input FROM brief_runs WHERE id = 4`).Scan(&outcome, &ended, &tokens, &tags, &dropped, &input); err != nil {
 		t.Fatal(err)
 	}
-	if outcome != "ok" || ended == "" || tokens != 120 || tags == "" || dropped == "" {
-		t.Errorf("the compacted run lost more than its body: %q %q %d %q %q", outcome, ended, tokens, tags, dropped)
+	if outcome != "ok" || ended == "" || tokens != 120 || tags == "" || dropped == "" || input != `{"changed_files":3}` {
+		t.Errorf("the compacted run lost more than its body and files: %q %q %d %q %q %s", outcome, ended, tokens, tags, dropped, input)
+	}
+	if got := retain(t, db, Retention{BriefBodies: 7 * day}); len(got) != 0 {
+		t.Errorf("a second pass retained %v", got)
 	}
 }
 
@@ -246,9 +249,9 @@ var prTables = map[string]string{
 	"pull_requests": `SELECT count(*) FROM pull_requests WHERE owner = ? AND repo = ? AND number = ?`,
 	"pr_details":    `SELECT count(*) FROM pr_details WHERE owner = ? AND repo = ? AND number = ?`,
 	"pr_seen":       `SELECT count(*) FROM pr_seen WHERE owner = ? AND repo = ? AND number = ?`,
-	"pr_briefs":     `SELECT count(*) FROM pr_briefs WHERE owner = ? AND repo = ? AND number = ?`,
-	"brief_runs":    `SELECT count(*) FROM brief_runs WHERE owner = ? AND repo = ? AND number = ?`,
-	"pr_tags":       `SELECT count(*) FROM pr_tags WHERE owner = ? AND repo = ? AND number = ?`,
+	"unit_briefs":   `SELECT count(*) FROM unit_briefs WHERE provider = 'github' AND unit_key = ?`,
+	"brief_runs":    `SELECT count(*) FROM brief_runs WHERE provider = 'github' AND unit_key = ?`,
+	"unit_tags":     `SELECT count(*) FROM unit_tags WHERE provider = 'github' AND unit_key = ?`,
 	"events":        `SELECT count(*) FROM events WHERE provider = 'github' AND unit_key = ?`,
 	"overrides":     `SELECT count(*) FROM overrides WHERE provider = 'github' AND unit_key = ?`,
 	"round_state":   `SELECT count(*) FROM round_state WHERE provider = 'github' AND unit_key = ?`,
@@ -283,9 +286,9 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	triple := []any{ref.Owner, ref.Repo, ref.Number}
 	exec(t, db, `INSERT INTO pr_details (owner, repo, number, version, read_at, body) VALUES (?, ?, ?, 1, ?, '{}')`, append(triple, when)...)
 	exec(t, db, `INSERT INTO pr_seen (owner, repo, number, at) VALUES (?, ?, ?, ?)`, append(triple, when)...)
-	exec(t, db, `INSERT INTO pr_briefs (owner, repo, number) VALUES (?, ?, ?)`, triple...)
-	exec(t, db, `INSERT INTO brief_runs (owner, repo, number, trigger, version, attempt_of, started_at) VALUES (?, ?, ?, 'wanted', 'v1', 'h', ?)`, append(triple, when)...)
-	exec(t, db, `INSERT INTO pr_tags (owner, repo, number, key, value, run) VALUES (?, ?, ?, 'change', 'fix', 1)`, triple...)
+	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key) VALUES ('github', ?)`, u)
+	exec(t, db, `INSERT INTO brief_runs (provider, unit_key, trigger, version, attempt_of, started_at) VALUES ('github', ?, 'wanted', 'v1', 'h', ?)`, u, when)
+	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', ?, 'change', 'fix', 1)`, u)
 	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('github', ?, 'review', 'r1', ?)`, u, when)
 	exec(t, db, `INSERT INTO overrides (provider, unit_key, hold) VALUES ('github', ?, 1)`, u)
 	exec(t, db, `INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('github', ?, 'f')`, u)
@@ -297,7 +300,7 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	exec(t, db, `INSERT INTO intakes (provider, unit_key, intent, source, request, state, accepted_at) VALUES ('github', ?, 'review', 'cli', '{}', 'started', ?)`, u, when)
 	exec(t, db, `INSERT INTO turn_usage (turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, first_at, last_at) VALUES (?, 'opus', 1, 1, 1, 1, 1, ?, ?)`, seq, when, when)
 	exec(t, db, `INSERT INTO workflow_runs (workflow, provider, unit_key, key_value, status, at) VALUES ('review-follow-up', 'github', ?, 'k', 'dismissed', ?)`, u, when)
-	exec(t, db, `INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, mode, at, saved_at) VALUES (?, 'address', 'github', ?, 'k', 'blocked', 'apply', ?, ?)`, "address/"+u, u, when, when)
+	exec(t, db, `INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, at, saved_at) VALUES (?, 'address', 'github', ?, 'k', 'blocked', ?, ?)`, "address/"+u, u, when, when)
 }
 
 func TestRetainEndedPR(t *testing.T) {
@@ -353,7 +356,7 @@ func seedEveryKind(t *testing.T, db *DB) {
 	exec(t, db, `INSERT INTO turn_stops (session, prompt_id, at) VALUES ('term_1', 'p', ?)`, at(past))
 	exec(t, db, `INSERT INTO instruction_parts (sha, body) VALUES ('orphan', x'00')`)
 	exec(t, db, `INSERT INTO turn_instructions (sha, kind, repo, created_at, parts) VALUES ('old', 'review', 'acme/api', ?, '["orphan"]')`, at(past))
-	exec(t, db, `INSERT INTO brief_runs (owner, repo, number, trigger, version, attempt_of, started_at, brief) VALUES ('acme', 'api', 9, 'wanted', 'v', 'h', ?, '{}')`, at(past))
+	exec(t, db, `INSERT INTO brief_runs (provider, unit_key, trigger, version, attempt_of, started_at, brief) VALUES ('github', 'acme/api#9', 'wanted', 'v', 'h', ?, '{}')`, at(past))
 	merged := pr.Ref{Owner: "acme", Repo: "api", Number: 9}
 	insertPR(t, db, merged, "MERGED", at(past), at(past))
 	exec(t, db, `INSERT INTO view_applied (sink, provider, unit_key, role, at) VALUES ('orca', 'github', ?, 'review', ?)`, merged.String(), at(past))

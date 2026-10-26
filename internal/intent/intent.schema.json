@@ -1,360 +1,66 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/wloophq/wloop/intent.schema.json",
-  "title": "Intent manifest (intent.toml)",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
-  "required": [
-    "label",
-    "summary",
-    "workspace",
-    "session",
-    "headline",
-    "record"
-  ],
   "properties": {
-    "label": {
-      "type": "string",
-      "description": "The intent's name as people read it."
-    },
-    "summary": {
-      "type": "string",
-      "description": "One line on what the intent does."
-    },
-    "key": {
-      "type": "string",
-      "description": "The action's key: one uppercase letter, unique among intents and built-in actions; lowercase letters and digits are the core's.",
-      "pattern": "^[A-Z]$"
-    },
-    "verb": {
-      "type": "string",
-      "description": "The gtd verb the intent's action fulfills, so the entry verb reaches it.",
-      "enum": ["approve", "delegate", "dismiss"]
-    },
-    "user_facing": {
-      "type": "boolean",
-      "description": "Offered as a command and an action. Default true."
-    },
-    "provider": {
-      "type": "string",
-      "description": "The provider whose units the intent's turns run on, a registered provider id. Default \"github\".",
-      "pattern": "^[a-z][a-z0-9_-]{0,31}$"
-    },
-    "workspace": {
-      "type": "string",
-      "description": "Where the turn runs.",
-      "enum": [
-        "review",
-        "author",
-        "pr_else_main",
-        "given"
-      ]
-    },
-    "session": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "strategy": {
-          "type": "string",
-          "description": "Reuse a live session or start a new one.",
-          "enum": [
-            "reuse_live",
-            "new"
-          ]
-        },
-        "title": {
-          "type": "string",
-          "description": "The session title.",
-          "pattern": "^[a-z]{1,12}$"
-        },
-        "close_when_done": {
-          "type": "boolean",
-          "description": "Close the session when the turn ends done. Default false."
-        }
-      },
-      "required": [
-        "strategy",
-        "title"
-      ],
-      "description": "The agent session the turn runs in."
-    },
-    "intake": {
-      "type": "boolean",
-      "description": "Runs through the intake. Default false."
-    },
-    "start_line": {
-      "type": "string",
-      "description": "The intake's start line. Default \"starting the <label in lower case>\"."
-    },
-    "owner_only": {
-      "type": "boolean",
-      "description": "Needs the pull request to be yours or taken over. Default false."
-    },
-    "answerable": {
-      "type": "boolean",
-      "description": "A turn may stop on a question. Default true."
-    },
-    "board": {
-      "type": "string",
-      "description": "Default none.",
-      "enum": [
-        "review",
-        "author",
-        "none"
-      ]
-    },
-    "drives_row": {
-      "type": "boolean",
-      "description": "Default false."
-    },
-    "reports": {
-      "type": "boolean",
-      "description": "Default true."
-    },
-    "brief": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "render": {
-          "type": "boolean",
-          "description": "Default true."
-        },
-        "wait": {
-          "type": "boolean",
-          "description": "Default true."
-        }
-      }
-    },
-    "profile": {
-      "type": "string",
-      "description": "An intent name with judgment blocks, or none. Default none."
-    },
-    "dims": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "round"
-        ]
-      },
-      "description": "Profile dimensions valid under this intent."
-    },
-    "records": {
-      "type": "string",
-      "description": "Whether the turn records. Default \"true\". A predicate: a quoted CEL-subset expression."
-    },
-    "prepare": {
-      "type": "string",
-      "description": "Default \"\".",
-      "enum": [
-        "",
-        "nudge.prepare"
-      ]
-    },
-    "on_sent": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "plan.drop_pending",
-          "event.round_sent",
-          "event.nudged",
-          "record_round",
-          "keeps_guidance",
-          "mark_reviewed",
-          "mark_addressed"
-        ]
-      },
-      "description": "Effects the intent has."
-    },
-    "guidance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "Default Guidance."
-        },
-        "help": {
-          "type": "string",
-          "description": "Default \"\"."
-        },
-        "max": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Runes; 0 is no limit."
-        }
-      }
-    },
-    "headline": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "resumed": {
-          "type": "string",
-          "description": "Template over the turn context."
-        },
-        "new": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "when": {
-                "type": "string",
-                "description": "Turn slot. A predicate: a quoted CEL-subset expression."
-              },
-              "text": {
-                "type": "string",
-                "description": "Template over the turn context."
-              }
-            },
-            "required": [
-              "text"
-            ]
-          },
-          "description": "Cases in order; the last has no when."
-        }
-      },
-      "required": [
-        "resumed",
-        "new"
-      ]
-    },
-    "inputs": {
-      "type": "object",
-      "description": "Inputs by name.",
-      "propertyNames": {
-        "pattern": "^[a-z][a-z0-9_]*$"
-      },
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "flag",
-              "text",
-              "list"
-            ]
-          },
-          "flag": {
-            "type": "string",
-            "description": "Required for from = user.",
-            "pattern": "^--[a-z][a-z0-9-]*$"
-          },
-          "help": {
-            "type": "string",
-            "description": "Required for from = user."
-          },
-          "from": {
-            "type": "string",
-            "description": "Default user.",
-            "enum": [
-              "user",
-              "prepare"
-            ]
-          },
-          "persist": {
-            "type": "boolean",
-            "description": "Stored with the turn, restored on resume."
-          },
-          "hidden": {
-            "type": "boolean",
-            "description": "Not in help."
-          },
-          "by_hand_only": {
-            "type": "boolean",
-            "description": "Automatic rounds never set it."
-          },
-          "before": {
-            "type": "string",
-            "enum": [
-              "take_over"
-            ]
-          },
-          "max": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Runes, text only."
-          },
-          "surfaces": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "cli",
-                "instructions",
-                "try"
-              ]
-            },
-            "description": "Default [\"cli\", \"instructions\"]."
-          }
-        },
-        "required": [
-          "type"
-        ]
-      }
-    },
-    "also_profiles": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "profile": {
-            "type": "string",
-            "description": "An intent with judgment blocks."
-          },
-          "when": {
-            "type": "string",
-            "description": "Turn slot. A predicate: a quoted CEL-subset expression."
-          },
-          "round": {
-            "type": "string",
-            "enum": [
-              "first",
-              "follow-up"
-            ]
-          },
-          "define": {
-            "type": "string",
-            "description": "The template define that renders it."
-          },
-          "source_prefix": {
-            "type": "string",
-            "description": "Default \"<profile> guide: \"."
-          }
-        },
-        "required": [
-          "profile",
-          "when",
-          "define"
-        ]
-      },
-      "description": "Other profiles the turn reads."
-    },
     "action": {
-      "type": "object",
       "additionalProperties": false,
+      "description": "How the intent's action is offered on a row; its description is the intent's summary.",
       "properties": {
+        "confirm": {
+          "description": "The dialog that confirms the action, over the action facts; empty asks nothing.",
+          "type": "string"
+        },
         "group": {
-          "type": "string",
-          "description": "Default round.",
+          "default": "start",
+          "description": "The group the action is listed under.",
           "enum": [
-            "round",
+            "start",
             "turn",
             "control",
             "workspace",
             "brief",
             "intake"
-          ]
+          ],
+          "type": "string"
+        },
+        "note": {
+          "description": "What the action would do on this row, over the action facts.",
+          "type": "string"
+        },
+        "primary": {
+          "additionalProperties": false,
+          "description": "When the action is the row's primary one.",
+          "properties": {
+            "when": {
+              "default": "false",
+              "description": "When the action is the row's primary one.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "refuse": {
+          "description": "A case that offers the action disabled; the first that holds says why.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "when": {
+                "description": "When the action is offered disabled.",
+                "type": "string"
+              },
+              "why": {
+                "description": "Why the action is disabled, over the action facts.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
         },
         "surfaces": {
-          "type": "array",
+          "description": "Where the action is offered: row, detail, tui, cli and explore when absent.",
           "items": {
-            "type": "string",
             "enum": [
               "row",
               "detail",
@@ -363,174 +69,633 @@
               "notification",
               "cli",
               "explore"
-            ]
+            ],
+            "type": "string"
           },
-          "description": "Default [\"row\", \"detail\", \"tui\", \"cli\", \"explore\"]."
+          "type": "array"
         },
-        "visible": {
-          "type": "string",
-          "description": "Action slot. Default \"row.open\". A predicate: a quoted CEL-subset expression."
+        "warning": {
+          "description": "Shown under the action, over the action facts; empty shows nothing.",
+          "type": "string"
         },
-        "enabled": {
-          "type": "string",
-          "description": "Action slot. Default \"true\". A predicate: a quoted CEL-subset expression."
-        },
-        "reason_off": {
-          "type": "string",
-          "description": "Template over the action facts; required when enabled is not \"true\"."
-        },
-        "primary": {
-          "type": "string",
-          "description": "Action slot. Default \"false\". A predicate: a quoted CEL-subset expression."
-        },
-        "confirm": {
-          "type": "string",
-          "description": "Template over the action facts."
-        },
-        "hint": {
-          "type": "string",
-          "description": "Template over the action facts."
-        },
-        "note_when_question": {
+        "when": {
+          "default": "row.open",
+          "description": "When the action is offered on a row.",
           "type": "string"
         }
       },
-      "description": "Absent: not offered anywhere."
+      "type": "object"
     },
-    "join": {
-      "type": "object",
+    "also_profile": {
+      "description": "Other judgment the turn reads.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "define": {
+            "description": "The template define that renders it.",
+            "type": "string"
+          },
+          "dims": {
+            "additionalProperties": false,
+            "description": "Dimensions it pins, such as { stage = \"first\" }.",
+            "properties": {
+              "reviewer": {
+                "description": "The pinned reviewer login.",
+                "type": "string"
+              },
+              "stage": {
+                "description": "The pinned stage.",
+                "enum": [
+                  "first",
+                  "follow-up"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "prefix": {
+            "description": "What its sources are listed under; \"<profile> guide: \" when absent.",
+            "type": "string"
+          },
+          "profile": {
+            "description": "The intent with judgment blocks.",
+            "type": "string"
+          },
+          "when": {
+            "description": "When the turn reads the other judgment.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "answerable": {
+      "default": true,
+      "description": "The turn may stop on a question.",
+      "type": "boolean"
+    },
+    "brief": {
       "additionalProperties": false,
+      "description": "How the turn reads the unit's brief.",
       "properties": {
-        "differs_on": {
-          "type": "array",
+        "need": {
+          "description": "The brief intent's extra fields the turn needs.",
           "items": {
             "type": "string"
           },
-          "description": "Persisted input names."
+          "type": "array"
+        },
+        "render": {
+          "default": true,
+          "description": "The instructions carry the brief.",
+          "type": "boolean"
+        },
+        "wait": {
+          "default": true,
+          "description": "The turn waits for the brief.",
+          "type": "boolean"
         }
-      }
+      },
+      "type": "object"
+    },
+    "builds": {
+      "description": "A builder, never a turn.",
+      "enum": [
+        "brief"
+      ],
+      "type": "string"
+    },
+    "dims": {
+      "description": "The dimensions valid under its profile.",
+      "items": {
+        "enum": [
+          "stage",
+          "reviewer"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "drafts": {
+      "additionalProperties": false,
+      "description": "The drafts its turns' agents propose.",
+      "properties": {
+        "allowed_effects": {
+          "description": "The effects its agents may declare on their drafts.",
+          "items": {
+            "enum": [
+              "entry.nudged",
+              "unit.closed",
+              "pr.nudged"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "approval": {
+          "additionalProperties": false,
+          "description": "The approval of its drafts; wait when absent.",
+          "properties": {
+            "mode": {
+              "description": "The approval when no rule holds.",
+              "enum": [
+                "send",
+                "delay",
+                "wait",
+                "dry_run"
+              ],
+              "type": "string"
+            },
+            "rule": {
+              "description": "A rule; the first whose when holds gives the mode.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "mode": {
+                    "description": "The rule's approval.",
+                    "enum": [
+                      "send",
+                      "delay",
+                      "wait",
+                      "dry_run"
+                    ],
+                    "type": "string"
+                  },
+                  "when": {
+                    "description": "When the approval rule applies to a draft.",
+                    "type": "string"
+                  },
+                  "window": {
+                    "description": "With mode delay only: how long a person has to stop the draft.",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "window": {
+              "description": "With mode delay only: how long a person has to stop the draft.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "effects": {
+      "description": "What sending the turn applies.",
+      "items": {
+        "enum": [
+          "plan.cleared",
+          "guidance.handed",
+          "pr.round_sent",
+          "pr.reviewed",
+          "pr.addressed",
+          "pr.nudged"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "guidance": {
+      "additionalProperties": false,
+      "description": "The guidance a person gives the turn.",
+      "properties": {
+        "help": {
+          "description": "What the guidance is for.",
+          "type": "string"
+        },
+        "label": {
+          "default": "Guidance",
+          "description": "The guidance's label.",
+          "type": "string"
+        },
+        "max": {
+          "default": 0,
+          "description": "The guidance's length cap in runes; 0 for none.",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "headline": {
+      "additionalProperties": false,
+      "description": "The line that opens the turn's prompt.",
+      "properties": {
+        "new": {
+          "description": "A headline case; the last has no when.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "description": "The headline, over the turn's facts.",
+                "type": "string"
+              },
+              "when": {
+                "description": "When the headline case applies.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "resumed": {
+          "description": "What a resumed turn continues, over the turn's facts.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "help": {
+      "additionalProperties": false,
+      "description": "How its command presents it.",
+      "properties": {
+        "docs": {
+          "description": "A page path of the documentation site.",
+          "type": "string"
+        },
+        "examples": {
+          "description": "Command lines without the command's name.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "group": {
+          "description": "The title of the main help's group that lists the command, free text; action.group is the action's.",
+          "type": "string"
+        },
+        "summary": {
+          "description": "The main help's line; the intent's summary when absent.",
+          "type": "string"
+        },
+        "target": {
+          "description": "Free text saying what the command's argument names, such as a pull request URL.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "An input.",
+        "properties": {
+          "before": {
+            "description": "What runs before the turn when it is set.",
+            "enum": [
+              "take_over"
+            ],
+            "type": "string"
+          },
+          "by_hand_only": {
+            "default": false,
+            "description": "An automated turn never sets it.",
+            "type": "boolean"
+          },
+          "flag": {
+            "description": "The CLI flag that sets it; required from the user.",
+            "type": "string"
+          },
+          "from": {
+            "default": "user",
+            "description": "Who sets it.",
+            "enum": [
+              "user",
+              "prepare"
+            ],
+            "type": "string"
+          },
+          "help": {
+            "description": "What it does; required from the user.",
+            "type": "string"
+          },
+          "hidden": {
+            "default": false,
+            "description": "Left out of help.",
+            "type": "boolean"
+          },
+          "max": {
+            "default": 0,
+            "description": "A text input's length cap in runes; 0 for none.",
+            "type": "integer"
+          },
+          "persist": {
+            "default": false,
+            "description": "Stored with the turn, restored on resume.",
+            "type": "boolean"
+          },
+          "surfaces": {
+            "description": "Where it is offered; cli and instructions when absent.",
+            "items": {
+              "enum": [
+                "cli",
+                "instructions",
+                "try"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": {
+            "description": "The input's type.",
+            "enum": [
+              "bool",
+              "text",
+              "list"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "description": "The turn's inputs, by name.",
+      "type": "object"
+    },
+    "intake": {
+      "default": false,
+      "description": "Runs through numbered intake.",
+      "type": "boolean"
+    },
+    "join": {
+      "additionalProperties": false,
+      "description": "When a request joins an open turn.",
+      "properties": {
+        "differs_on": {
+          "description": "Persisted inputs whose change starts a new turn.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "label": {
+      "description": "The name people read. Required.",
+      "type": "string"
+    },
+    "owner_only": {
+      "default": false,
+      "description": "The unit must be yours or taken over.",
+      "type": "boolean"
+    },
+    "profile": {
+      "description": "The intent whose judgment blocks the turn reads, or none; the configuration's profile is the profile directory.",
+      "type": "string"
+    },
+    "prompt": {
+      "description": "A builder's prompt file, through the profile layers.",
+      "type": "string"
+    },
+    "provider": {
+      "description": "The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
     },
     "record": {
-      "type": "object",
       "additionalProperties": false,
+      "description": "The turn's record.",
       "properties": {
-        "states": {
-          "type": "array",
+        "artifacts": {
+          "description": "The artifacts a record may carry.",
           "items": {
-            "type": "string",
+            "enum": [
+              "review-draft",
+              "triage"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "history_artifact": {
+          "description": "The artifact the unit's history shows.",
+          "type": "string"
+        },
+        "outcome": {
+          "description": "The outcome fields a record may carry.",
+          "items": {
+            "enum": [
+              "verdict",
+              "url"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "outcome_doc": {
+          "description": "What the outcome holds, for the instructions.",
+          "type": "string"
+        },
+        "require": {
+          "description": "What a record in a state must carry.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "artifact": {
+                "description": "The artifact it must carry.",
+                "type": "string"
+              },
+              "fields": {
+                "description": "The outcome fields it must carry.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "state": {
+                "description": "The state.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "states": {
+          "description": "The states a record may take. Required.",
+          "items": {
             "enum": [
               "done",
               "settled",
               "asked",
               "failed"
-            ]
-          }
+            ],
+            "type": "string"
+          },
+          "type": "array"
         },
-        "artifacts": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "review-draft",
-              "triage"
-            ]
-          }
-        },
-        "outcome": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "verdict",
-              "url"
-            ]
-          }
-        },
-        "outcome_doc": {
+        "when": {
+          "default": "true",
+          "description": "When the turn records its outcome.",
           "type": "string"
-        },
-        "history_artifact": {
-          "type": "string",
-          "description": "One of artifacts."
-        },
-        "require": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "state": {
-                "type": "string"
-              },
-              "artifact": {
-                "type": "string"
-              },
-              "fields": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "verdict",
-                    "url"
-                  ]
-                }
-              }
-            },
-            "required": [
-              "state"
-            ]
-          }
         }
       },
       "required": [
         "states"
-      ]
+      ],
+      "type": "object"
+    },
+    "refuse": {
+      "description": "A refusal of turn.start; the first whose when holds refuses with its why.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "when": {
+            "description": "When it refuses, over the unit's workflow facts.",
+            "type": "string"
+          },
+          "why": {
+            "description": "What the refusal says, over the unit's workflow facts.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "reports": {
+      "default": true,
+      "description": "The turn reports.",
+      "type": "boolean"
     },
     "resume": {
-      "type": "object",
       "additionalProperties": false,
+      "description": "What a resumed turn reads.",
       "properties": {
-        "head_moved": {
+        "changed": {
+          "description": "The text when the unit changed since the question.",
           "type": "string"
         }
-      }
+      },
+      "type": "object"
     },
-    "modes": {
-      "type": "array",
-      "description": "How the intent's turns may run: session (an agent session in a workspace) and headless (one read-only call with no session). Default [\"session\"].",
-      "minItems": 1,
-      "uniqueItems": true,
+    "role": {
+      "description": "What binds it to a plugin's mechanism. One intent per role and provider.",
+      "enum": [
+        "pr.review",
+        "pr.address",
+        "pr.nudge",
+        "probe",
+        "headless"
+      ],
+      "type": "string"
+    },
+    "runners": {
+      "description": "How its turns may run; [\"session\"] when absent.",
       "items": {
-        "type": "string",
         "enum": [
           "session",
           "headless"
-        ]
-      }
+        ],
+        "type": "string"
+      },
+      "type": "array"
     },
-    "draft_approval": {
-      "type": "object",
+    "schema": {
+      "description": "A builder's extra fields' schema file, beside the manifest.",
+      "type": "string"
+    },
+    "session": {
       "additionalProperties": false,
-      "description": "When the drafts this proposes are sent without the user's click. Absent: always.",
-      "required": [
-        "mode"
-      ],
+      "description": "The agent session its turns run in.",
       "properties": {
-        "mode": {
-          "type": "string",
-          "description": "always: the user approves each draft; window: sent when the window ends unless the user discards or edits it first; none: sent at once; observe: recorded, never sent.",
-          "enum": [
-            "always",
-            "window",
-            "none",
-            "observe"
-          ]
+        "close_when_done": {
+          "default": false,
+          "description": "The session closes when its turn is done.",
+          "type": "boolean"
         },
-        "window": {
-          "type": "string",
-          "description": "With mode window only: how long the user has, such as 10m."
+        "strategy": {
+          "description": "Whether a turn reuses the unit's live session or starts a new one.",
+          "enum": [
+            "reuse_live",
+            "new"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "description": "The session's title: 1 to 12 lowercase letters.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
+    },
+    "shortcut": {
+      "description": "One uppercase letter for its action, not a built-in action's.",
+      "type": "string"
+    },
+    "skill": {
+      "default": false,
+      "description": "Install writes it a turn skill; needs help.target.",
+      "type": "boolean"
+    },
+    "start_line": {
+      "description": "The intake's first line.",
+      "type": "string"
+    },
+    "summary": {
+      "description": "One line on what it does: its action's tooltip, its help line, its profile listing. Required.",
+      "type": "string"
+    },
+    "user_facing": {
+      "default": true,
+      "description": "Offered as a command, a skill and an action.",
+      "type": "boolean"
+    },
+    "verb": {
+      "description": "The GTD verb its action fulfils.",
+      "enum": [
+        "approve",
+        "delegate",
+        "dismiss"
+      ],
+      "type": "string"
+    },
+    "why": {
+      "description": "Why the turn is due, over the unit's workflow facts.",
+      "type": "string"
+    },
+    "workspace": {
+      "description": "Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "repo": {
+              "description": "The repository the turn runs in, owner/name.",
+              "type": "string"
+            },
+            "repo_input": {
+              "description": "The input that holds the repository the turn runs in.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      ]
     }
-  }
+  },
+  "required": [
+    "label",
+    "summary"
+  ],
+  "title": "Intent manifest (intent.toml)",
+  "type": "object"
 }

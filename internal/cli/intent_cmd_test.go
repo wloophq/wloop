@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -10,48 +9,18 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
-
-// withBundled gives te's command line and daemon a registry whose bundled
-// intents are the shipped ones with edit applied.
-func withBundled(t *testing.T, te *testEnv, edit func(fstest.MapFS)) {
-	t.Helper()
-	fsys := fstest.MapFS{}
-	err := fs.WalkDir(turn.BundledFS(), ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		b, err := fs.ReadFile(turn.BundledFS(), p)
-		fsys[p] = &fstest.MapFile{Data: b}
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	edit(fsys)
-	base, err := turn.Base()
-	if err != nil {
-		t.Fatal(err)
-	}
-	st := &envIntents{}
-	st.cache = intentload.NewCache(func() []profile.Layer { return st.profileLayers(te.Env) }, fsys, base, turn.CheckTemplate, intentload.CacheOptions{})
-	te.Env.intents = st
-	if p := te.loadedIntents().Problems; len(p) > 0 {
-		t.Fatal(p)
-	}
-}
 
 // userProfile writes the ask-author fixture, and files, into a profile
 // directory te's config names.
@@ -148,7 +117,8 @@ func TestHelpListsTheRegistrysIntents(t *testing.T) {
 	}
 	out := te.out.String()
 	for _, want := range []string{
-		"\nPULL REQUESTS\n  review ",
+		"\nPULL REQUESTS\n  act ",
+		"\n  review ",
 		"\n  address ",
 		"\n  nudge ",
 		"\n" + groupYourIntents + "\n  ask-author ",
@@ -285,7 +255,7 @@ func TestRoundPolicyAllowsEveryIntentsStoredTurn(t *testing.T) {
 func TestAReviewSessionLoadsProjectSettingsOnlyWhereTheConfigSays(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.ProjectSettings = map[string]string{"review": `pr.visibility == "private"`}
+	te.cfg.Intents = map[string]config.IntentConfig{"review": {ProjectSettings: &config.ProjectSettings{When: `pr.visibility == "private"`}}}
 	pr := func(visibility string) *github.PullRequest {
 		p := &github.PullRequest{}
 		p.Ref, p.Visibility = r7, visibility
@@ -383,18 +353,35 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 	ours, theirs := cliBuiltins(), daemon.Builtins()
 	for slot, names := range builtin.Names {
 		for _, name := range names {
-			if !slices.Contains(ours[slot], name) && !slices.Contains(theirs[slot], name) {
+			if !slices.Contains(ours[string(slot)], name) {
 				t.Errorf("%s %q has no implementation", slot, name)
 			}
 		}
-	}
-	for _, tables := range []map[builtin.Slot][]string{ours, theirs} {
-		for slot, names := range tables {
-			for _, name := range names {
-				if !slices.Contains(builtin.Names[slot], name) {
-					t.Errorf("%s %q is implemented but not in builtin.Names", slot, name)
-				}
+		for _, name := range ours[string(slot)] {
+			if !slices.Contains(names, name) {
+				t.Errorf("%s %q is implemented but not in builtin.Names", slot, name)
 			}
+		}
+	}
+	effects := append(slices.Clone(ours["effects"]), theirs.Effects...)
+	for _, name := range builtin.TurnEffectNames() {
+		if !slices.Contains(effects, name) {
+			t.Errorf("the turn effect %q has no implementation", name)
+		}
+	}
+	for _, name := range effects {
+		if !slices.Contains(builtin.TurnEffectNames(), name) {
+			t.Errorf("the turn effect %q is implemented but not in builtin.Effects", name)
+		}
+	}
+	for _, r := range builtin.Roles {
+		for what, name := range map[string]string{"policy": r.Policy, "context": r.Context, "launch": r.Launch, "reconcile": r.Reconcile} {
+			if !slices.Contains(ours[what], name) {
+				t.Errorf("the role %s binds the %s %q, which has no implementation", r.Name, what, name)
+			}
+		}
+		if r.Prepare != "" && !slices.Contains(theirs.Prepares, r.Prepare) {
+			t.Errorf("the role %s binds the prepare %q, which has no implementation", r.Name, r.Prepare)
 		}
 	}
 }

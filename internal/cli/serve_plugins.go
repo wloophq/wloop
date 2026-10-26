@@ -145,7 +145,7 @@ func pluginList(ps []source.Plugin, mods []source.Module, cfg config.Config) []a
 	for _, p := range ps {
 		ap := api.Plugin{ID: p.ID, Name: p.Name}
 		if m, ok := built[p.ID]; ok && cfg.PluginEnabled(string(p.ID)) {
-			ap.Enabled, ap.UI, ap.Reacts = true, m.UI, m.Reacts
+			ap.Enabled, ap.UI, ap.Reacts, ap.Capabilities = true, m.UI, m.Reacts, m.Capabilities()
 		}
 		out = append(out, ap)
 	}

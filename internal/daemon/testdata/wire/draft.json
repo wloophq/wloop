@@ -1,0 +1,62 @@
+{
+  "id": 1,
+  "unit": "github/acme/api#7",
+  "items": [],
+  "kind": "close",
+  "purpose": "close",
+  "delivery": "message",
+  "effects": [
+    "unit.closed"
+  ],
+  "target": "",
+  "where": "#general in the thread \"acme/api#7\"",
+  "text": "Closing this out",
+  "reaction": "",
+  "original": "Closing this out",
+  "edited": false,
+  "origin": {
+    "kind": "auto",
+    "turn_seq": 0,
+    "intent": "",
+    "workflow": "slack-closure",
+    "rule": "slack-closure"
+  },
+  "approval": {
+    "mode": "wait",
+    "window": ""
+  },
+  "deadline": null,
+  "state": "proposed",
+  "error": "",
+  "reason": "",
+  "permalink": "",
+  "would": {
+    "policy": "",
+    "reason": "",
+    "outcome": ""
+  },
+  "actions": [
+    {
+      "id": "draft.approve",
+      "enabled": true
+    },
+    {
+      "id": "draft.edit",
+      "enabled": true
+    },
+    {
+      "id": "draft.discard",
+      "enabled": true
+    },
+    {
+      "id": "draft.retry",
+      "enabled": false,
+      "reason": "the draft is proposed",
+      "refusal": "draft.retry.why"
+    }
+  ],
+  "rev": 0,
+  "created_at": "2026-10-08T10:00:00Z",
+  "updated_at": "2026-10-08T10:00:00Z",
+  "label": "acme/api#7"
+}

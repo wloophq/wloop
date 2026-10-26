@@ -107,6 +107,7 @@ func TestHealthAtMostThreeQueries(t *testing.T) {
 		Retry: time.Hour, Changes: f.Log, Now: func() time.Time { return f.Now }, Log: t.Logf})
 	s := newServerWith(t, func(d *Deps) {
 		*d = withStore(*d, f.Inventory)
+		d.Activity = f.DB
 		d.Pauses, d.Changes = f.Rounds, f.Log
 		withBriefs(d, q)
 		d.Now = func() time.Time { return f.Now }

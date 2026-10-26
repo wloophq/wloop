@@ -114,8 +114,13 @@ var dueBuckets = []api.Bucket{
 }
 
 // Facets are today's cockpit fields, in its order, plus the time facet due
-// that the is flag "due" reads.
-func (p *Provider) Facets() []api.FacetSpec { return FacetSpecs() }
+// that the is flag "due" reads, then the brief intent's enum extras.
+func (p *Provider) Facets() []api.FacetSpec {
+	if p.src.Settings == nil {
+		return FacetSpecs()
+	}
+	return append(FacetSpecs(), ExtraFacetSpecs(registryOf(p.src.Settings().Loaded))...)
+}
 
 // FacetSpecs are the served facets of Facets.
 func FacetSpecs() []api.FacetSpec {

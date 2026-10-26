@@ -340,12 +340,12 @@ func TestAFollowupWithoutItsWorkspaceIsObserved(t *testing.T) {
 		f.Commits = []pr.Commit{{Oid: "c1", Parents: 1}, {Oid: "c2", Parents: 1}}
 		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
 	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
+	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
 	f := facts(t, w.provider(), r.Unit())
 	if f["pr.review.action"] != "follow-up" || f["pr.review.observed"] != true {
 		t.Fatalf("facts = %v", f)
 	}
-	w.cfg.FollowupsWithoutWorkspace = true
+	w.cfg.GitHub.FollowupsWithoutWorkspace = true
 	if f := facts(t, w.provider(), r.Unit()); f["pr.review.observed"] != false {
 		t.Fatalf("followups_without_workspace still observes: %v", f)
 	}
@@ -479,7 +479,7 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 
 func TestAddressConflictsOffStartsNoRoundForAConflict(t *testing.T) {
 	w := newWorld()
-	w.cfg.AddressConflicts = false
+	w.cfg.GitHub.AddressConflicts = false
 	r := w.mine(5, func(row *dinv.PR, f *pr.Facts) {
 		row.Mergeable, row.MergeableAt, row.ChecksState = "CONFLICTING", t0.Add(-time.Hour), ""
 		f.Reviews, f.Checks = nil, nil
@@ -556,8 +556,8 @@ func TestListReachesMergedPRsWithOpenTurnsOrQueuedAnswers(t *testing.T) {
 	w := newWorld()
 	merged := func(row *dinv.PR, _ *pr.Facts) { row.State, row.MergedAt = "MERGED", t0.Add(-time.Hour) }
 	withTurn, withAnswer, neither := w.add(8, "alice", merged), w.add(9, "alice", merged), w.add(10, "alice", merged)
-	w.books[withTurn.Unit()] = turn.Book{Unit: withTurn.Unit(), Turns: []turn.Turn{{Seq: 2, Intent: "review", State: turn.Sent}}}
-	w.books[withAnswer.Unit()] = turn.Book{Unit: withAnswer.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", State: turn.Done}},
+	w.books[withTurn.Unit()] = turn.Book{Unit: withTurn.Unit(), Turns: []turn.Turn{{Seq: 2, Intent: "review", Role: "pr.review", State: turn.Sent}}}
+	w.books[withAnswer.Unit()] = turn.Book{Unit: withAnswer.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", Role: "pr.review", State: turn.Done}},
 		Answers: []turn.Answer{{ID: 41, TurnSeq: 1, Route: turn.Queued}}}
 	open := w.add(11, "alice", nil)
 	p := w.provider()
@@ -575,7 +575,7 @@ func TestListReachesMergedPRsWithOpenTurnsOrQueuedAnswers(t *testing.T) {
 		t.Fatal("a merged pull request without a turn is listed")
 	}
 	f := facts(t, p, withTurn.Unit())
-	if f["pr.open_turn"] != "sent" || f["pr.open_turn_seq"] != 2 || f["pr.state"] != "merged" {
+	if f["pr.open_turn"] != "sent" || f["pr.open_turn_seq"] != 2 || f["pr.state"] != "MERGED" {
 		t.Fatalf("open turn facts = %v", f)
 	}
 	if f := facts(t, p, withAnswer.Unit()); f["pr.orphan_answer_id"] != 41 || f["pr.open_turn"] != "" {
@@ -762,10 +762,10 @@ func TestWaitsOnUserFollowsTheRow(t *testing.T) {
 			t.Errorf("%s: waits_on_user = %v, want %v", r, got, want)
 		}
 	}
-	if f := facts(t, p, waitsOnBob.Unit()); f["pr.nudge_refusal"] != "" {
-		t.Errorf("a nudge to bob is refused: %q", f["pr.nudge_refusal"])
+	if f := facts(t, p, waitsOnBob.Unit()); f["pr.nudge.refusal"] != "" {
+		t.Errorf("a nudge to bob is refused: %q", f["pr.nudge.refusal"])
 	}
-	if f := facts(t, p, asksMe.Unit()); f["pr.nudge_refusal"] == "" {
+	if f := facts(t, p, asksMe.Unit()); f["pr.nudge.refusal"] == "" {
 		t.Error("a nudge on a pull request waiting on me goes")
 	}
 }
@@ -811,12 +811,12 @@ func TestDueMatchesTheBasesNextDue(t *testing.T) {
 	}{
 		{"review cutoff", func(w *world) {
 			r := w.add(7, "alice", nil)
-			w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", State: turn.Done, SentAt: t0.Add(-10 * day)}}}
+			w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: "review", Role: "pr.review", State: turn.Done, SentAt: t0.Add(-10 * day)}}}
 		}, t0.Add(20 * day)},
 		{"cap rollover", func(w *world) {
 			r := w.review(7, nil)
-			for range w.cfg.Rounds.PerPRPerDay {
-				w.rounds.RecordFollowup(r.String(), round.Reviewed, "", t0)
+			for range w.cfg.Turns.PerUnitPerDay {
+				w.rounds.Count(r.String(), t0)
 			}
 		}, nextDay(t0)},
 		{"conflict window", func(w *world) {
@@ -907,7 +907,7 @@ func TestEveryFactIsDeclaredWithItsType(t *testing.T) {
 			t.Errorf("%s = %#v: declared %v, %v", name, v, typ, ok)
 		}
 	}
-	for name := range builtin.WorkflowEnv("pr") {
+	for _, name := range builtin.WorkflowEnv("pr").Names() {
 		if _, ok := f[name]; !ok && name[:3] == "pr." {
 			t.Errorf("%s is declared and never set", name)
 		}
@@ -921,7 +921,7 @@ func TestListReachesAFollowupWithoutItsWorkspace(t *testing.T) {
 		f.Commits = []pr.Commit{{Oid: "c1", Parents: 1}, {Oid: "c2", Parents: 1}}
 		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
 	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
+	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
 	p := w.provider()
 	got, err := p.List(context.Background(), unit.GitHub)
 	if err != nil || !slices.Contains(got, r.Unit()) {
@@ -959,7 +959,7 @@ func TestMovedNeverReadsAnObservedRound(t *testing.T) {
 		f.Commits = []pr.Commit{{Oid: "c1", Parents: 1}, {Oid: "c2", Parents: 1}}
 		f.Reviews = []pr.Review{{ID: "r1", State: pr.ReviewCommented, Author: me, SubmittedAt: t0.Add(-2 * time.Hour), CommitOid: "c1"}}
 	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
+	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
 	w.stubs.err = errors.New("budget")
 	p := w.provider()
 	if f := facts(t, p, r.Unit()); f["pr.review.observed"] != true {

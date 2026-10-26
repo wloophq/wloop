@@ -148,6 +148,16 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+// writeConflict answers 409 with the conflict's message and its refusal code.
+func writeConflict(w http.ResponseWriter, c conflict) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
+	_ = json.NewEncoder(w).Encode(struct {
+		Error   string `json:"error"`
+		Refusal string `json:"refusal,omitempty"`
+	}{c.msg, c.refusal})
+}
+
 // writeRefusal answers 409 with the reason, the message of the tool that
 // refused and whether force would get past it.
 func writeRefusal(w http.ResponseWriter, r Refusal) {
@@ -169,7 +179,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Jobs:               s.jobStatuses(),
 		Warnings:           s.warnings.list(),
 		Viewer:             s.viewer.cachedLogin(),
-		StalledReviewHours: time.Duration(s.deps.Cfg.Stalled.Review).Hours(),
+		StalledReviewHours: time.Duration(s.deps.Cfg.GitHub.Stalled.Review).Hours(),
 		WorkspaceManagers:  s.deps.WorkspaceManagers,
 		Store:              s.deps.Store,
 	}
@@ -322,8 +332,8 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	prs := make([]unit.Unit, 0, len(req.PRs))
 	for _, key := range req.PRs {
-		u := unit.Unit{Provider: unit.GitHub, Key: key}
-		if refOf(u).Number == 0 {
+		u, err := s.deps.Units.Parse(string(s.deps.Forge), key)
+		if err != nil || refOf(u).Number <= 0 {
 			return badRequest{key + " is not an owner/repo#n"}
 		}
 		prs = append(prs, u)
@@ -342,11 +352,11 @@ func (s *Server) setPause(ctx context.Context, req api.PauseRequest) error {
 	everything := len(req.Repos) == 0 && len(prs) == 0
 	if !req.Paused && !everything {
 		if p.On {
-			return conflict{"everything is paused; resume with no argument resumes everything"}
+			return conflict{msg: "everything is paused; resume with no argument resumes everything"}
 		}
 		for _, u := range prs {
 			if ref := refOf(u); p.HoldsRepo(ref.Owner + "/" + ref.Repo) {
-				return conflict{ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
+				return conflict{msg: ref.Owner + "/" + ref.Repo + " is paused as a whole; resume it to resume " + u.Label()}
 			}
 		}
 	}
@@ -456,13 +466,13 @@ func (s *Server) handleRows(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseUnit is the unit a unit route names, of any provider the daemon
-// registered: provider github takes a key such as "owner/repo#12".
+// registered, whose codec validates the key.
 func (s *Server) parseUnit(r *http.Request) (unit.Unit, bool) {
 	if s.deps.Units == nil {
 		return unit.Unit{}, false
 	}
 	u, err := s.deps.Units.Parse(r.PathValue("provider"), r.PathValue("key"))
-	if err != nil || u.Provider == unit.GitHub && refOf(u).Number <= 0 {
+	if err != nil {
 		return unit.Unit{}, false
 	}
 	return u, true

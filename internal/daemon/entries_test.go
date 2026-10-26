@@ -730,3 +730,16 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 		t.Errorf("areas under a filter: %v", c.Areas)
 	}
 }
+
+func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
+	t.Parallel()
+	c, _ := bridgeRig(t)
+	c.propose(t)
+	rec := post(t, c.s, api.EntryPath("e-r", "approve"), `{"source":"<script>alert(1)</script>"}`)
+	if rec.Code != 400 || strings.Contains(rec.Body.String(), "<script>") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if h := rec.Header(); h.Get("Content-Type") != "application/json" || h.Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("headers %v", h)
+	}
+}

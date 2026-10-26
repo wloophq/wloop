@@ -41,7 +41,7 @@ func TestRowFactsCarryChecksTurnsUsageAndWhatComesNext(t *testing.T) {
 	if err := f.st.SetOverride(ctx, dinv.Override{PR: ref(8), MutedUntil: fixtureNow.Add(-time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
-	exec(`INSERT INTO pr_briefs (owner, repo, number, retry_at) VALUES ('acme', 'api', 7, ?), ('acme', 'api', 8, ?)`,
+	exec(`INSERT INTO unit_briefs (provider, unit_key, retry_at) VALUES ('github', 'acme/api#7', ?), ('github', 'acme/api#8', ?)`,
 		storeTime(retry), storeTime(fixtureNow.Add(-time.Hour)))
 
 	byNumber := map[int]*api.RowFacts{}

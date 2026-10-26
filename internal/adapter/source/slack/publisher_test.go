@@ -143,7 +143,8 @@ func (ps *pubSlack) posted(t *testing.T) url.Values {
 }
 
 func threadDraft(kind draft.Kind, text string) draft.Draft {
-	return draft.Draft{ID: 7, Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: kind, Text: text}
+	purpose, delivery := draft.ShapeOf(kind)
+	return draft.Draft{ID: 7, Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: kind, Purpose: purpose, Delivery: delivery, Text: text}
 }
 
 func (ps *pubSlack) segmentUnit(t *testing.T) unit.Unit {
@@ -278,7 +279,7 @@ func TestPublishToAReplyUsesTheParent(t *testing.T) {
 func TestPublishHonorsThePostAllowlist(t *testing.T) {
 	for name, d := range map[string]draft.Draft{
 		"thread":         threadDraft(draft.Reply, "hi"),
-		"react":          {Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.React, Reaction: "eyes"},
+		"react":          {Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"},
 		"nudge by id":    {Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: other},
 		"nudge by email": {Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "dana@example.com"},
 		"nudge handle":   {Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@dana"},
@@ -406,7 +407,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"two users":  {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@sam"}, want: []string{"U0000000011", "U0000000012"}, is: send.ErrAmbiguous},
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
 		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"slack units"}},
-		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Reaction: "eyes"}, want: []string{"permalink"}},
+		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"permalink"}},
 		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
 	} {
 		t.Run(name, func(t *testing.T) {

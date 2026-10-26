@@ -217,3 +217,29 @@ func TestOptimizeKeepsPlaceholders(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractorTokenMeansSkipUnreportedCalls(t *testing.T) {
+	out := t.TempDir()
+	m := manifest{Fixtures: []manifestEntry{{ID: "a", Split: SplitHoldout}, {ID: "b", Split: SplitHoldout}, {ID: "c", Split: SplitHoldout}}}
+	if err := writeJSON(manifestPath(out, "x"), m); err != nil {
+		t.Fatal(err)
+	}
+	for id, sc := range map[string]sidecar{
+		"a": {CostUSD: 0.03, Tokens: &Tokens{Input: 100, Output: 40, CacheRead: 1000, CacheWrite: 10}},
+		"b": {CostUSD: 0.01},
+	} {
+		if err := writeJSON(keyPath(filepath.Join(out, "x", "ledger", id+".json")), sc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s, err := WriteScore(out, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := PassUsage{Conversations: 2, TokensReported: 1,
+		Total: Usage{CostUSD: 0.04, Input: 100, Output: 40, CacheRead: 1000, CacheWrite: 10},
+		Mean:  Usage{CostUSD: 0.02, Input: 100, Output: 40, CacheRead: 1000, CacheWrite: 10}}
+	if got := s[SplitHoldout].Extractor; got != want {
+		t.Errorf("extractor usage %+v, want %+v", got, want)
+	}
+}

@@ -158,9 +158,6 @@ func TestInstructionsByHandFindsThePullRequestOfTheWorktree(t *testing.T) {
 		!slices.Contains(kinds, dinv.KindGuidance+" look at the migration") {
 		t.Fatalf("events %q", kinds)
 	}
-	if s, _ := te.Rounds.Load(context.Background()); s.RoundAt(r7.String()).IsZero() {
-		t.Fatal("the round was not recorded; the next sweep would send it again")
-	}
 }
 
 func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
@@ -170,7 +167,7 @@ func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
 	agentDaemon(t, te)
 	dir := t.TempDir()
 	te.Harness.Cwd = func() string { return dir }
-	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no pull request here; pass its URL") || te.out.Len() != 0 {
+	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no unit here; pass its target") || te.out.Len() != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if st := te.loadRounds(t); len(st.PRs) != 0 || len(m.Writes) != 0 {
@@ -310,7 +307,7 @@ func TestAnAllowedRoundFormNeverRunsATurnByHand(t *testing.T) {
 		if code := te.run(append([]string{"instructions", "review"}, args...)...); code == 0 || te.out.Len() != 0 {
 			t.Errorf("%s: exit %d out %s", name, code, te.out)
 		}
-		if s, _ := te.Rounds.Load(context.Background()); !s.RoundAt(r7.String()).IsZero() {
+		if s, _ := te.Rounds.Load(context.Background()); len(s.PRs[r7.String()].Marks) != 0 {
 			t.Errorf("%s: recorded a round", name)
 		}
 	}

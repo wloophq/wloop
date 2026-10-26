@@ -57,27 +57,31 @@
       {
         "enabled": false,
         "id": "guide",
-        "reason": "the daemon plans no automatic round; see doctor"
+        "reason": "the daemon plans no automatic round; see doctor",
+        "refusal": "guide.why"
       },
       {
         "enabled": true,
         "id": "review",
-        "note": "Starts a new round; the agent's open question is replaced"
+        "warning": "Starts a new round; the agent's open question is replaced"
       },
       {
         "enabled": false,
         "id": "address",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "act",
-        "reason": "Not yours: take it over first"
+        "reason": "Not yours: take it over first",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": false,
         "id": "nudge",
-        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step"
+        "reason": "acme/api#7 waits on the review loop (publish?); a nudge asks someone else for the next step",
+        "refusal": "action.refuse[0]"
       },
       {
         "enabled": true,
@@ -89,8 +93,8 @@
       },
       {
         "enabled": true,
-        "hint": "Close the question; the pull request goes back to whoever it waits on",
-        "id": "dismiss"
+        "id": "dismiss",
+        "note": "Close the question; the pull request goes back to whoever it waits on"
       },
       {
         "confirm": "Take over acme/api#7? It becomes yours to develop: {{name}} creates or renames its author workspace.",
@@ -120,8 +124,8 @@
       },
       {
         "enabled": true,
-        "hint": "Make this pull request's brief again now",
-        "id": "brief_refresh"
+        "id": "brief_refresh",
+        "note": "Make this pull request's brief again now"
       }
     ],
     "facets": {
@@ -244,7 +248,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "ac084b8d934b",
+    "specs_version": "e06cff654dc4",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -308,6 +312,7 @@
       "head": "h2",
       "id": "r1",
       "intent": "review",
+      "role": "pr.review",
       "sent_at": "2026-10-08T09:00:00Z",
       "sent_to": "term-1",
       "seq": 1,

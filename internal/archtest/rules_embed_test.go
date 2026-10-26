@@ -19,12 +19,7 @@ var embedKept = []embedAllowed{
 }
 
 // embedMoving is prose that moves to the profile; the list only shrinks.
-var embedMoving = []embedAllowed{
-	{"internal/turn/templates", "turn partials"},
-	{"internal/adapter/source/slack/extract/prompt.md", "the Slack extraction prompt"},
-	{"internal/brief/prompt.md", "the brief prompt"},
-	{"internal/brief/taxonomy.md", "the brief taxonomy"},
-}
+var embedMoving = []embedAllowed{}
 
 var proseExts = []string{".md", ".tmpl", ".txt"}
 

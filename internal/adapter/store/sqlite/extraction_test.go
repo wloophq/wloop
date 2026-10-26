@@ -16,9 +16,9 @@ func init() {
 	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
 	writes = append(writes,
 		writeCase{method: "ExtractionStore.Save", call: func(ctx context.Context, e *noteEnv) error {
-			return e.db.Extraction().Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: {Brief: "b", At: noteAt}},
+			return e.db.Extraction().Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: {Brief: `{"goal":"b"}`, At: noteAt}},
 				Hints: map[unit.Unit]map[string]ExtractionHint{u: {"e1": {Mode: "none"}}}})
-		}, topics: port.TopicSourceEvents, units: []unit.Unit{u}},
+		}, topics: port.TopicSourceEvents | port.TopicBriefs, units: []unit.Unit{u}},
 		writeCase{method: "ExtractionStore.SetWatched", call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.Extraction().SetWatched(ctx, u, true, noteAt)
 		}},
@@ -57,7 +57,7 @@ func TestExtractionStoreRoundTrips(t *testing.T) {
 	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1700000000.000100"}
 	other := unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/1"}
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	want := ExtractionState{LastTS: "1700000000.000200", LastSeq: 7, Brief: "b", Verdict: "v", VerdictWhy: "w", ViewerRole: "r",
+	want := ExtractionState{LastTS: "1700000000.000200", LastSeq: 7, Brief: `{"goal":"b","kind":"request"}`, Verdict: "v", VerdictWhy: "w", ViewerRole: "r",
 		Topic: "t", StartedByViewer: true, ClosurePosted: true, At: at}
 	if err := s.Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: want},
 		Hints: map[unit.Unit]map[string]ExtractionHint{u: {"e1": {Mode: "session", Context: "@repo", Why: "y"}}}}); err != nil {
@@ -78,7 +78,7 @@ func TestExtractionStoreRoundTrips(t *testing.T) {
 		t.Fatal(err)
 	}
 	w, err := s.Watched(ctx, "slack")
-	if err != nil || len(w) != 1 || !w[u].Watched || w[u].Brief != "b" {
+	if err != nil || len(w) != 1 || !w[u].Watched || w[u].Brief != want.Brief {
 		t.Fatalf("watched %+v %v", w, err)
 	}
 	h, err := s.Hints(ctx, u)
@@ -124,5 +124,35 @@ func TestOpenSegmentsOfAConversation(t *testing.T) {
 	}
 	if len(got) != 2 || got[0].FromTS != "1700000000.000100" || got[1].FromTS != "1700000000.000300" {
 		t.Fatalf("open segments %+v", got)
+	}
+}
+
+func TestTheExtractionKeepsOneBriefRunPerUnitPerDay(t *testing.T) {
+	db := openExtraction(t)
+	ctx := context.Background()
+	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
+	day := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
+	brief := func(goal string) string { return `{"goal":"` + goal + `"}` }
+	for i, c := range []struct {
+		st   ExtractionState
+		want string
+	}{
+		{ExtractionState{Brief: brief("first"), At: day}, brief("first")},
+		{ExtractionState{Brief: brief("second"), At: day.Add(3 * time.Hour)}, brief("second")},
+		{ExtractionState{At: day.Add(4 * time.Hour)}, brief("second")},
+		{ExtractionState{Brief: brief("next day"), At: day.Add(24 * time.Hour)}, brief("next day")},
+		{ExtractionState{At: day.Add(48 * time.Hour)}, brief("next day")},
+	} {
+		if err := db.Extraction().Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: c.st}}); err != nil {
+			t.Fatalf("save %d: %v", i, err)
+		}
+		got, err := db.Extraction().States(ctx, []unit.Unit{u})
+		if err != nil || got[u].Brief != c.want {
+			t.Fatalf("after save %d the brief is %q, want %q (%v)", i, got[u].Brief, c.want, err)
+		}
+	}
+	var runs int
+	if err := db.R().QueryRowContext(ctx, `SELECT count(*) FROM brief_runs WHERE provider = 'slack' AND trigger = 'extraction'`).Scan(&runs); err != nil || runs != 2 {
+		t.Fatalf("%d runs, %v", runs, err)
 	}
 }

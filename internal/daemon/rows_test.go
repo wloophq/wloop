@@ -59,10 +59,10 @@ func newFixture(t *testing.T) *fixture {
 	st := inventory.New(stDB)
 	t.Cleanup(func() { stDB.Close() })
 	cfg := config.Defaults()
-	cfg.AutomatedReviewers = []string{"robo"}
-	cfg.AddressSkipReviewers = []string{"skipper"}
+	cfg.GitHub.AutomatedReviewers = []string{"robo"}
+	cfg.GitHub.AddressSkipReviewers = []string{"skipper"}
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
-	f.s = New(withStore(Deps{Cfg: cfg, Version: "test", Now: f.clock,
+	f.s = New(withStore(Deps{Cfg: cfg, Activity: stDB, Version: "test", Now: f.clock,
 		Viewer: func(context.Context) (string, []string, error) { return "fer", []string{"acme/search"}, nil },
 		Log:    func(string, ...any) {}}, st))
 	f.s.token = ""
@@ -377,7 +377,7 @@ func (f *fixture) turn(repo *sqlite.Store, n int, intent turn.Intent, state turn
 	f.t.Helper()
 	at := fixtureNow.Add(-30 * time.Minute)
 	ref := pr.Ref(ref(n))
-	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: intent, ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h", Session: session,
+	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: intent, Role: "pr." + string(intent), ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h", Session: session,
 		State: state, SentAt: at, StartedAt: at}}}
 	if state != turn.Started {
 		b.Records = []turn.Record{{Session: session, Hash: "x", At: at, Record: record.Record{State: record.State(state), Summary: "keep it?"}}}
@@ -714,7 +714,7 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 	}
 	setTeams("acme/search")
 	f := &fixture{t: t, st: st, db: stDB, now: fixtureNow}
-	f.s = New(withStore(Deps{Changes: log, Cfg: config.Defaults(), Version: "test", Now: f.clock,
+	f.s = New(withStore(Deps{Changes: log, Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: f.clock,
 		Viewer: func(ctx context.Context) (string, []string, error) {
 			teams, err := ghsource.MyTeams(ctx, st)
 			return "fer", teams, err

@@ -1,14 +1,14 @@
 label = "Ask author"
 summary = "Ask the author one question"
 workspace = "review"
-provider = "thread"
+provider = "slack"
 session = { strategy = "new", title = "ask" }
-records = "pr.author != 'bot'"
 
 [headline]
-resumed = "ask round on {{.Wording.Ref}}"
+resumed = "ask round on {{.unit.ref}}"
 [[headline.new]]
-text = "Ask in {{.Wording.Ref}} one question."
+line = "Ask in {{.unit.ref}} one question."
 
 [record]
+when = "pr.author != 'bot'"
 states = ["done", "asked", "failed"]

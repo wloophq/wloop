@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/transport/mcp"
@@ -90,7 +91,7 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 	for _, id := range []string{draftHandle, "term_other1"} {
 		te.registerSession(t, dturn.Session{ID: id, WorkspaceID: "ws-1"})
 	}
-	w.deps = (mcpEndpoint{slack: te.Env.slack}).wire(serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }}).wire(serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
 	sender, ok := w.srv.Slack.(*slackSender)
 	if !ok {
@@ -209,7 +210,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	}
 	d := ds[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: newest.Seq, Intent: "reply", Workflow: newest.Workflow}
-	if d.Unit != u || d.State != draft.Proposed || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || d.Approval.Mode != draft.Always {
+	if d.Unit != u || d.State != draft.Proposed || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || d.Approval.Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
@@ -357,5 +358,82 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")); n != 3 {
 		t.Fatalf("posts %d", n)
+	}
+}
+
+func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "reply", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close","effects":["unit.closed"]}`)
+	if !isErr || !strings.Contains(got, "the reply intent lists in drafts.allowed_effects") {
+		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a refused effect stored a draft")
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"Closing.","kind":"close"}`); isErr {
+		t.Fatalf("a close draft with no effect: %q", got)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || len(ds[0].Effects) != 0 {
+		t.Fatalf("drafts %+v", ds)
+	}
+}
+
+func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	files := bundledIntentAs(t, "act", "nudging-act")
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], "role    = \"headless\"\n", "", 1)
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `allowed_effects = ["entry.nudged", "unit.closed"]`, `allowed_effects = ["entry.nudged", "pr.nudged"]`, 1)
+	userProfile(t, w.te, files)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "nudging-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"any news?","effects":["pr.nudged"]}`)
+	if !isErr || !strings.Contains(got, "pr.nudged") {
+		t.Fatalf("slack_draft = %q (error %v); broken %v", got, isErr, w.te.loadedIntents().Broken)
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a draft whose effect never applies on Slack was stored")
+	}
+}
+
+func TestASlackDraftOfAnIntentTakesTheRuleItsUnitMatches(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	files := bundledIntentAs(t, "act", "quick-act")
+	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless\"\n", "", 1)
+	files["intents/quick-act/intent.toml"] = m + `
+[drafts.approval]
+mode = "wait"
+[[drafts.approval.rule]]
+when = 'draft.delivery == "message" && slack.channel == "` + sessChannel + `"'
+mode = "delay"
+window = "10m"
+`
+	userProfile(t, w.te, files)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "quick-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
+		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Delay {
+		t.Fatalf("drafts %+v", ds)
 	}
 }

@@ -58,6 +58,7 @@ var migrations = []migration{
 		`ALTER TABLE round_state DROP COLUMN fingerprint`,
 		`ALTER TABLE round_state DROP COLUMN checks_head`,
 	)},
+	{to: 4, name: "units_everywhere", up: v4},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

@@ -11,36 +11,31 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// draftGroups are the Outbox's groups, in the order the list shows them, by draft kind.
-var draftGroups = []struct{ kind, title, one string }{
-	{"nudge", "NUDGES", "nudge"},
-	{"close", "CLOSINGS", "closing"},
-	{"reply", "REPLIES", "reply"},
-	{"react", "REACTIONS", "reaction"},
-	{"ask_owner", "OWNER QUESTIONS", "owner question"},
-	{"comment", "COMMENTS", "comment"},
+// closes says whether sending d closes its unit's items.
+func closes(d api.Draft) bool { return slices.Contains(d.Effects, builtin.EffectUnitClosed) }
+
+// itemsVerb is how d's items read beside it, from what sending it does.
+func itemsVerb(d api.Draft) string {
+	switch {
+	case closes(d):
+		return "Closes"
+	case slices.Contains(d.Effects, builtin.EffectEntryNudged):
+		return "Asks about"
+	}
+	return "Answers"
 }
 
-func groupTitle(kind string) string {
-	for _, g := range draftGroups {
-		if g.kind == kind {
-			return g.title
-		}
-	}
-	return strings.ToUpper(kind)
+func groupTitle(purpose string) string {
+	return strings.ToUpper(purposeName(purpose))
 }
 
-// kindName is one draft's kind as a person reads it.
-func kindName(kind string) string {
-	for _, g := range draftGroups {
-		if g.kind == kind {
-			return g.one
-		}
-	}
-	return strings.ReplaceAll(kind, "_", " ")
+// purposeName is one draft's purpose as a person reads it.
+func purposeName(purpose string) string {
+	return strings.ReplaceAll(purpose, "_", " ")
 }
 
 var mentionToken = regexp.MustCompile(`@\{([^{}\s]+)\}`)
@@ -81,10 +76,10 @@ var bullet = regexp.MustCompile(`^\s*[-*]\s+(.*?)(?::\s*\S+)?\s*$`)
 // gist is the first meaningful line of d: what a closing closes, a reaction's emoji, else the first line
 // of its rendered text.
 func gist(d api.Draft) string {
-	switch d.Kind {
-	case "react":
+	switch {
+	case d.Reaction != "":
 		return ":" + d.Reaction + ":"
-	case "close":
+	case closes(d):
 		var closed []string
 		for _, l := range strings.Split(d.Text, "\n") {
 			if m := bullet.FindStringSubmatch(l); m != nil {
@@ -153,10 +148,10 @@ func writeOutbox(w io.Writer, t termfmt.Term, ds []api.Draft, now time.Time) {
 	cols = append(cols, termfmt.Column{Flex: true})
 	var rows [][]termfmt.Cell
 	var heads []int
-	for _, g := range kindsOf(ds) {
+	for _, g := range purposesOf(ds) {
 		heads = append(heads, len(rows))
 		for _, d := range ds {
-			if d.Kind != g {
+			if d.Purpose != g {
 				continue
 			}
 			r := []termfmt.Cell{{Text: fmt.Sprintf("#%d", d.ID), Style: t.Cyan}, {Text: draftLabel(d)}}
@@ -179,15 +174,15 @@ func writeOutbox(w io.Writer, t termfmt.Term, ds []api.Draft, now time.Time) {
 	lines := t.Columns(width, 2, cols, rows)
 	for i, l := range lines {
 		if g := slices.Index(heads, i); g >= 0 {
-			kind := kindsOf(ds)[g]
+			purpose := purposesOf(ds)[g]
 			n := 0
 			for _, d := range ds {
-				if d.Kind == kind {
+				if d.Purpose == purpose {
 					n++
 				}
 			}
 			fmt.Fprintln(w)
-			fmt.Fprintln(w, t.Bold(groupTitle(kind))+" "+t.Dim(fmt.Sprint(n)))
+			fmt.Fprintln(w, t.Bold(groupTitle(purpose))+" "+t.Dim(fmt.Sprint(n)))
 		}
 		fmt.Fprintln(w, "  "+l)
 	}
@@ -195,17 +190,12 @@ func writeOutbox(w io.Writer, t termfmt.Term, ds []api.Draft, now time.Time) {
 	fmt.Fprintln(w, t.Dim("Next: "+brand.Command+" outbox show <id> · approve <id> · discard <id>"))
 }
 
-// kindsOf are the kinds of ds in the groups' order, any unknown kind after.
-func kindsOf(ds []api.Draft) []string {
+// purposesOf are the purposes of ds in the order they first appear.
+func purposesOf(ds []api.Draft) []string {
 	var out []string
-	for _, g := range draftGroups {
-		if slices.ContainsFunc(ds, func(d api.Draft) bool { return d.Kind == g.kind }) {
-			out = append(out, g.kind)
-		}
-	}
 	for _, d := range ds {
-		if !slices.Contains(out, d.Kind) {
-			out = append(out, d.Kind)
+		if !slices.Contains(out, d.Purpose) {
+			out = append(out, d.Purpose)
 		}
 	}
 	return out
@@ -260,14 +250,14 @@ func draftCommands(d api.Draft) []string {
 // about, where it goes, where it came from and the commands it takes.
 func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 	width := reportWidth(t)
-	head := t.Cyan(fmt.Sprintf("#%d", d.ID)) + "  " + t.Bold(kindName(d.Kind)) + "  " + stateStyle(t, d.State)(d.State)
+	head := t.Cyan(fmt.Sprintf("#%d", d.ID)) + "  " + t.Bold(purposeName(d.Purpose)) + "  " + stateStyle(t, d.State)(d.State)
 	fmt.Fprintln(w, head)
 	fmt.Fprintln(w, t.Link(d.Link, t.Bold(draftLabel(d))))
 	if d.Link != "" {
 		fmt.Fprintln(w, t.Dim(d.Link))
 	}
 	fmt.Fprintln(w)
-	if d.Kind == "react" {
+	if d.Reaction != "" {
 		fmt.Fprintln(w, "  :"+d.Reaction+":")
 	} else {
 		for _, l := range strings.Split(renderedText(d), "\n") {
@@ -292,11 +282,10 @@ func writeDraftView(w io.Writer, t termfmt.Term, d api.Draft, now time.Time) {
 		}
 	}
 	if len(d.ItemDetails) > 0 {
-		verb := map[string]string{"close": "Closes", "nudge": "Asks about"}[d.Kind]
 		for i, it := range d.ItemDetails {
 			label := ""
 			if i == 0 {
-				label = cmp.Or(verb, "Answers")
+				label = itemsVerb(d)
 			}
 			fmt.Fprintln(w, t.Dim(padRight(label, 10))+"  "+cmp.Or(oneLine(it.Summary), it.ID)+" "+t.Dim("("+cmp.Or(it.State, "unknown")+")"))
 		}

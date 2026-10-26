@@ -242,7 +242,7 @@ func (s *Server) byHandRef(ctx context.Context, req api.ByHandRequest, handle st
 	if s.deps.ByHandRef != nil {
 		return s.deps.ByHandRef(ctx, req, handle)
 	}
-	return parsePRURL(req.URL)
+	return unitOfAddress(s.deps.Units, req.URL)
 }
 
 // prepareByHand runs the intent's prepare for a turn by hand, whose
@@ -303,7 +303,7 @@ func (s *Server) handleTurnEnd(w http.ResponseWriter, r *http.Request) {
 		writeAgentError(w, err)
 		return
 	}
-	ended := api.TurnEnded{PR: unitArg(got.Unit), State: string(got.State), Added: got.Added, Note: got.Note}
+	ended := api.TurnEnded{PR: s.unitArg(got.Unit), State: string(got.State), Added: got.Added, Note: got.Note}
 	if d := got.DroppedNote(); d != "" && ended.Note != "" {
 		ended.Note += "; " + d
 	} else if d != "" {

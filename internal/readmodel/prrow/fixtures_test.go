@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -32,7 +31,7 @@ type rowCase struct {
 	pending  *round.Pending
 	brief    *api.BriefSummary
 	intake   *api.Intake
-	activity *inventory.Activity
+	activity *turn.Activity
 }
 
 func ago(d time.Duration) time.Time { return fixtureNow.Add(-d) }
@@ -103,11 +102,11 @@ func rowCases() []rowCase {
 		{name: "round pending", pr: open(21, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer}; p.Workspace = reviewWS }),
 			pending: &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
 		{name: "agent asks", pr: open(22, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
 		{name: "agent working", pr: open(23, "ana", func(p *dinv.PR) { p.Workspace = reviewWS; p.Reasons = nil }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
 		{name: "agent stopped", pr: open(24, fixtureViewer, func(p *dinv.PR) { p.Workspace = authorWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Address, State: "failed", Summary: "tests broke", At: ago(day)}}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Address, Role: "pr.address", State: "failed", Summary: "tests broke", At: ago(day)}}},
 		{name: "workspace agent waiting", pr: open(25, "ana", func(p *dinv.PR) {
 			p.Workspace = reviewWS
 			p.Workspace.AgentStates = []turn.AgentState{turn.AgentWaiting}
@@ -125,7 +124,7 @@ func rowCases() []rowCase {
 			p.ChecksState = "PENDING"
 			p.ReviewRequests = []string{"team:acme/web"}
 			p.Ref.Repo = "web"
-		}), activity: &inventory.Activity{Turns: 3, OpenTurns: 1, LastIntent: "review", Tokens: 1200, CostUSD: 0.5, BriefRetryAt: fixtureNow.Add(2 * time.Hour)}},
+		}), activity: &turn.Activity{Turns: 3, OpenTurns: 1, LastIntent: "review", Tokens: 1200, CostUSD: 0.5, BriefRetryAt: fixtureNow.Add(2 * time.Hour)}},
 		{name: "old stalled review", pr: open(31, "ana", func(p *dinv.PR) {
 			p.ReviewRequests = []string{fixtureViewer}
 			p.CreatedAt = ago(60 * day)
@@ -139,7 +138,7 @@ func rowCases() []rowCase {
 func fixtureDeriver(t *testing.T, at time.Time, cases []rowCase) Deriver {
 	t.Helper()
 	l := bundled(t)
-	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().Stalled, Loaded: l, Cfg: config.Defaults(),
+	d := Deriver{Viewer: fixtureViewer, Teams: []string{"acme/core"}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
 		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]TurnFact{}}
 	for _, c := range cases {
 		if c.pending != nil {

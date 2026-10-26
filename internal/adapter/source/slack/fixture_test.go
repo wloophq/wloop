@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -119,7 +120,7 @@ func newFixture(t testing.TB, opts ...option) *fixture {
 		return map[string]any{"user": map[string]any{"id": v.Get("user"), "name": "person"}}
 	})
 	f.deps = sourcereg.Deps{DB: db, Log: f.logs.logf, Links: db.Links(),
-		Units: func() *unit.Registry { return unit.NewRegistry(dslack.Codec(), unit.OpaqueCodec{ID: unit.GitHub}) }}
+		Units: func() *unit.Registry { return unit.NewRegistry(dslack.Codec(), pullCodec{}) }}
 	for _, o := range opts {
 		o(f)
 	}
@@ -263,3 +264,25 @@ var apiMethods = []string{"conversations.replies", "conversations.history", "con
 	"search.messages", "apps.connections.open"}
 
 var _ port.Facts = facts{}
+
+// pullCodec is a forge whose units are pull requests named by their
+// address, as the GitHub plugin's codec names them.
+type pullCodec struct{}
+
+var pullAddress = regexp.MustCompile(`^https://github\.com/([^/\s]+)/([^/\s]+)/pull/([1-9][0-9]*)(?:[/?#].*)?$`)
+
+func (pullCodec) Provider() unit.ProviderID { return unit.GitHub }
+func (pullCodec) Valid(key string) error {
+	if !strings.Contains(key, "#") {
+		return fmt.Errorf("not a pull request key: %q", key)
+	}
+	return nil
+}
+func (pullCodec) URL(key string) string { return "" }
+func (pullCodec) KeyOf(raw string) (string, bool) {
+	m := pullAddress.FindStringSubmatch(raw)
+	if m == nil {
+		return "", false
+	}
+	return m[1] + "/" + m[2] + "#" + m[3], true
+}

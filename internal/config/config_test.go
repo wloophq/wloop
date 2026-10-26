@@ -29,8 +29,8 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ProjectsDir != "" || c.Profile != "" || c.ReviewPrefix != "REVIEW " || len(c.Views) != 0 ||
-		c.Rounds.PerPRPerDay != 5 || c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, tools().WorkspaceManagers) {
+	if c.ProjectsDir != "" || c.Profile != "" || c.GitHub.ReviewPrefix != "REVIEW " || len(c.Views) != 0 ||
+		c.Turns.PerUnitPerDay != 5 || c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, tools().WorkspaceManagers) {
 		t.Fatalf("defaults = %+v", c)
 	}
 }
@@ -54,14 +54,14 @@ func TestARefusedFileFallsBackToTheBase(t *testing.T) {
 
 func TestLoadOverridesAndExpandsHome(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"projects_dir":"~/projects/work","rounds":{"per_pr_per_day":2},"owners":["acme"]}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"projects_dir": "~/projects/work", "turns": {"per_unit_per_day": 2}, "github": {"owners": ["acme"]}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(path, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ProjectsDir != filepath.Join(Home(), "projects/work") || c.Rounds.PerPRPerDay != 2 || c.Owners[0] != "acme" {
+	if c.ProjectsDir != filepath.Join(Home(), "projects/work") || c.Turns.PerUnitPerDay != 2 || c.GitHub.Owners[0] != "acme" {
 		t.Fatalf("config = %+v", c)
 	}
 }
@@ -130,10 +130,29 @@ func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.json")
-	raw := `{"followups_without_workspace":true,"projects":[
-		{"match":"carol/sandbox","followups_without_workspace":true},
-		{"match":"globex/*","followups_without_workspace":false},
-		{"match":"carol/*","agent_home":"/p/.claude"}]}`
+	raw := `{
+  "github": {
+    "followups_without_workspace": true
+  },
+  "projects": [
+    {
+      "match": "carol/sandbox",
+      "github": {
+        "followups_without_workspace": true
+      }
+    },
+    {
+      "match": "globex/*",
+      "github": {
+        "followups_without_workspace": false
+      }
+    },
+    {
+      "match": "carol/*",
+      "agent_home": "/p/.claude"
+    }
+  ]
+}`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -145,11 +164,11 @@ func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 		owner, repo string
 		want        bool
 	}{{"carol", "loop-sandbox", true}, {"globex", "widgets", false}, {"carol", brand.StateDir(), true}, {"acme", "api", true}} {
-		if got := c.For(tc.owner, tc.repo).FollowupsWithoutWorkspace; got != tc.want {
+		if got := c.For(tc.owner, tc.repo).GitHub.FollowupsWithoutWorkspace; got != tc.want {
 			t.Errorf("%s/%s: %v, want %v", tc.owner, tc.repo, got, tc.want)
 		}
 	}
-	if Defaults().FollowupsWithoutWorkspace {
+	if Defaults().GitHub.FollowupsWithoutWorkspace {
 		t.Error("on by default")
 	}
 }
@@ -158,9 +177,23 @@ func TestAddressWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.json")
-	raw := `{"address_without_workspace":true,"projects":[
-		{"match":"globex/*","address_without_workspace":false},
-		{"match":"carol/*","agent_home":"/p/.claude"}]}`
+	raw := `{
+  "github": {
+    "address_without_workspace": true
+  },
+  "projects": [
+    {
+      "match": "globex/*",
+      "github": {
+        "address_without_workspace": false
+      }
+    },
+    {
+      "match": "carol/*",
+      "agent_home": "/p/.claude"
+    }
+  ]
+}`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -172,21 +205,21 @@ func TestAddressWithoutWorkspaceIsPerProject(t *testing.T) {
 		owner, repo string
 		want        bool
 	}{{"globex", "widgets", false}, {"carol", brand.StateDir(), true}, {"acme", "api", true}} {
-		if got := c.For(tc.owner, tc.repo).AddressWithoutWorkspace; got != tc.want {
+		if got := c.For(tc.owner, tc.repo).GitHub.AddressWithoutWorkspace; got != tc.want {
 			t.Errorf("%s/%s: %v, want %v", tc.owner, tc.repo, got, tc.want)
 		}
 	}
-	if Defaults().AddressWithoutWorkspace {
+	if Defaults().GitHub.AddressWithoutWorkspace {
 		t.Error("on by default")
 	}
 }
 
 func TestCockpitDefaults(t *testing.T) {
 	c := Defaults()
-	if time.Duration(c.Stalled.Review) != 48*time.Hour || time.Duration(c.Stalled.Reply) != 24*time.Hour || time.Duration(c.Stalled.Merge) != 24*time.Hour {
-		t.Fatalf("stalled defaults: %+v", c.Stalled)
+	if time.Duration(c.GitHub.Stalled.Review) != 48*time.Hour || time.Duration(c.GitHub.Stalled.Reply) != 24*time.Hour || time.Duration(c.GitHub.Stalled.Merge) != 24*time.Hour {
+		t.Fatalf("stalled defaults: %+v", c.GitHub.Stalled)
 	}
-	if time.Duration(c.Sweep.Fast) != 2*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.Sweep.RateLimitFraction != 0.5 {
+	if time.Duration(c.Sweep.Fast) != 2*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.GitHub.RateLimitFraction != 0.5 {
 		t.Fatalf("sweep defaults: %+v", c.Sweep)
 	}
 	if c.HTTP.Port != 0 {
@@ -201,23 +234,48 @@ func TestLoadCockpitKeys(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "config.json")
 	os.WriteFile(file, []byte(`{
-	  "scope": {"people": ["ana"], "teams": ["acme/search"], "repos": ["acme/api"], "watch": ["bruno"]},
-	  "stalled": {"review": "3d", "reply": "12h"},
-	  "sweep": {"fast": "5m", "rate_limit_fraction": 0.3},
-	  "http": {"port": 4242},
-	  "mcp": {"port": 47899}
-	}`), 0o644)
+  "github": {
+    "scope": {
+      "people": [
+        "ana"
+      ],
+      "teams": [
+        "acme/search"
+      ],
+      "repos": [
+        "acme/api"
+      ],
+      "watch": [
+        "bruno"
+      ]
+    },
+    "stalled": {
+      "review": "3d",
+      "reply": "12h"
+    },
+    "rate_limit_fraction": 0.3
+  },
+  "sweep": {
+    "fast": "5m"
+  },
+  "http": {
+    "port": 4242
+  },
+  "mcp": {
+    "port": 47899
+  }
+}`), 0o644)
 	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Scope.People[0] != "ana" || c.Scope.Teams[0] != "acme/search" || c.Scope.Repos[0] != "acme/api" || c.Scope.Watch[0] != "bruno" {
-		t.Fatalf("scope: %+v", c.Scope)
+	if c.GitHub.Scope.People[0] != "ana" || c.GitHub.Scope.Teams[0] != "acme/search" || c.GitHub.Scope.Repos[0] != "acme/api" || c.GitHub.Scope.Watch[0] != "bruno" {
+		t.Fatalf("scope: %+v", c.GitHub.Scope)
 	}
-	if time.Duration(c.Stalled.Review) != 72*time.Hour || time.Duration(c.Stalled.Reply) != 12*time.Hour || time.Duration(c.Stalled.Merge) != 24*time.Hour {
-		t.Fatalf("stalled: %+v", c.Stalled)
+	if time.Duration(c.GitHub.Stalled.Review) != 72*time.Hour || time.Duration(c.GitHub.Stalled.Reply) != 12*time.Hour || time.Duration(c.GitHub.Stalled.Merge) != 24*time.Hour {
+		t.Fatalf("stalled: %+v", c.GitHub.Stalled)
 	}
-	if time.Duration(c.Sweep.Fast) != 5*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.Sweep.RateLimitFraction != 0.3 {
+	if time.Duration(c.Sweep.Fast) != 5*time.Minute || time.Duration(c.Sweep.Slow) != time.Hour || c.GitHub.RateLimitFraction != 0.3 {
 		t.Fatalf("sweep: %+v", c.Sweep)
 	}
 	if c.HTTP.Port != 4242 || c.MCP.Port != 47899 {
@@ -225,23 +283,11 @@ func TestLoadCockpitKeys(t *testing.T) {
 	}
 }
 
-func TestParseDays(t *testing.T) {
-	for in, want := range map[string]time.Duration{"2d": 48 * time.Hour, "36h": 36 * time.Hour, "90m": 90 * time.Minute} {
-		got, err := ParseDays(in)
-		if err != nil || got != want {
-			t.Fatalf("%s: got %v, %v", in, got, err)
-		}
-	}
-	if _, err := ParseDays("soon"); err == nil {
-		t.Fatal("expected an error")
-	}
-}
-
 func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	for _, body := range []string{
 		`{"sweep": {"fast": "0s"}}`,
-		`{"stalled": {"review": "-1d"}}`,
-		`{"sweep": {"rate_limit_fraction": 2}}`,
+		`{"github": {"stalled": {"review": "-1d"}}}`,
+		`{"github": {"rate_limit_fraction": 2}}`,
 		`{"http": {"port": 70000}}`,
 		`{"mcp": {"port": 0}}`,
 		`{"mcp": {"port": 65536}}`,
@@ -270,17 +316,17 @@ func loadJSON(t *testing.T, raw string) Config {
 }
 
 func TestBriefDefaultsAndValidation(t *testing.T) {
-	if d := Defaults().Brief; d.Enabled || d.Tier != turns.TierFast || d.MaxDiffBytes != 60000 {
+	if d := Defaults().Brief; d.Enabled || d.Tier != turns.TierFast || d.MaxInputBytes != 60000 {
 		t.Fatalf("defaults %+v", d)
 	}
-	if c := loadJSON(t, `{"brief": {"max_diff_bytes": 200000}}`); c.Brief.MaxDiffBytes != 200000 {
+	if c := loadJSON(t, `{"brief": {"max_input_bytes": 200000}}`); c.Brief.MaxInputBytes != 200000 {
 		t.Fatalf("ceiling refused: %+v", c.Brief)
 	}
 	c := loadJSON(t, `{"brief": {"enabled": true}}`)
-	if !c.Brief.Enabled || c.Brief.Tier != turns.TierFast || c.Brief.MaxDiffBytes != 60000 {
+	if !c.Brief.Enabled || c.Brief.Tier != turns.TierFast || c.Brief.MaxInputBytes != 60000 {
 		t.Fatalf("partial brief lost its defaults: %+v", c.Brief)
 	}
-	for _, bad := range []string{`{"brief": {"max_diff_bytes": 10}}`, `{"brief": {"max_diff_bytes": 200001}}`, `{"brief": {"tier": "haiku"}}`} {
+	for _, bad := range []string{`{"brief": {"max_input_bytes": 10}}`, `{"brief": {"max_input_bytes": 200001}}`, `{"brief": {"tier": "haiku"}}`} {
 		path := filepath.Join(t.TempDir(), "config.json")
 		os.WriteFile(path, []byte(bad), 0o600)
 		if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "brief.") {
@@ -307,9 +353,26 @@ func TestTrustedAuthorsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	file := filepath.Join(dir, "config.json")
-	raw := `{"trusted_authors":["a[bot]"],"projects":[
-		{"match":"acme/api","trusted_authors":["b[bot]"]},
-		{"match":"acme/*"}]}`
+	raw := `{
+  "github": {
+    "trusted_authors": [
+      "a[bot]"
+    ]
+  },
+  "projects": [
+    {
+      "match": "acme/api",
+      "github": {
+        "trusted_authors": [
+          "b[bot]"
+        ]
+      }
+    },
+    {
+      "match": "acme/*"
+    }
+  ]
+}`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -317,10 +380,10 @@ func TestTrustedAuthorsPerProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := c.For("acme", "api").TrustedAuthors; len(got) != 1 || got[0] != "b[bot]" {
+	if got := c.For("acme", "api").GitHub.TrustedAuthors; len(got) != 1 || got[0] != "b[bot]" {
 		t.Errorf("project value = %v", got)
 	}
-	if got := c.For("acme", "web").TrustedAuthors; len(got) != 1 || got[0] != "a[bot]" {
+	if got := c.For("acme", "web").GitHub.TrustedAuthors; len(got) != 1 || got[0] != "a[bot]" {
 		t.Errorf("top-level value = %v", got)
 	}
 }
@@ -329,8 +392,8 @@ func TestEmptyTrustedAuthorIsRefused(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	for _, raw := range []string{
-		`{"trusted_authors":["a[bot]", " "]}`,
-		`{"projects":[{"match":"acme/*","trusted_authors":[""]}]}`,
+		`{"github": {"trusted_authors": ["a[bot]", " "]}}`,
+		`{"projects": [{"match": "acme/*", "github": {"trusted_authors": [""]}}]}`,
 	} {
 		file := filepath.Join(dir, "config.json")
 		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
@@ -457,7 +520,7 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	raw := `{"agnet": "claude", "sweep": {"fast": "2m", "fsat": "1m"}, "projects": [{"match": "a/*", "agent_hom": "/h"}],
-		"workflows": {"address": {"approval": {"windw": "1m"}}}, "proposals": {"closure": {"aproval": {}}}}`
+		"workflows": {"address": {"approval": {"windw": "1m"}}}, "github": {"drafts": {"aproval": {}}}}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -466,8 +529,8 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 	if !errors.As(err, &unknown) || unknown.File != path {
 		t.Fatalf("err %v", err)
 	}
-	want := []string{"agnet", "projects[0].agent_hom", "proposals.closure.aproval", "sweep.fsat", "workflows.address.approval.windw"}
-	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") {
+	want := []string{"agnet", "github.drafts.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
+	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") || !strings.Contains(err.Error(), "; sweep.fsat: did you mean \"fast\"?") {
 		t.Fatalf("keys %v, error %q", unknown.Keys, err)
 	}
 }
@@ -483,5 +546,38 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 	}
 	if _, err := LoadFile(path, tools()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(file, []byte(`{"turns": {"per_day": 7}, "workflows": {"slack-closure": {"drafts": {"approval": {"mode": "delay", "window": "10m"}}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(file, tools())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Turns.PerDay != 7 {
+		t.Errorf("turns %+v", c.Turns)
+	}
+	if a := c.Workflows["slack-closure"].DraftApproval(); a.Mode != "delay" || time.Duration(*a.Window) != 10*time.Minute {
+		t.Errorf("draft approval %+v", a)
+	}
+	if Defaults().Turns.PerDay != 20 {
+		t.Error("the default daily cap is not 20")
+	}
+}
+
+func TestTheGitHubNudgeAndRateLimitKeysLiveUnderGitHub(t *testing.T) {
+	for _, body := range []string{`{"nudge": {"silent_days": 10}}`, `{"sweep": {"rate_limit_fraction": 0.3}}`} {
+		file := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "unknown key") {
+			t.Errorf("%s: %v", body, err)
+		}
 	}
 }

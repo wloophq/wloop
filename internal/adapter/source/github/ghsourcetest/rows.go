@@ -132,7 +132,7 @@ func Derive(s Situation) api.Row {
 	if at.IsZero() {
 		at = Now
 	}
-	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().Stalled, Loaded: l, Cfg: config.Defaults(),
+	d := prrow.Deriver{Viewer: Viewer, Teams: []string{Team}, Now: at, Stalled: config.Defaults().GitHub.Stalled, Loaded: l, Cfg: config.Defaults(),
 		GateOn: true, BriefOn: true, Pending: map[unit.Unit]round.Pending{}, Turns: map[pr.Ref]prrow.TurnFact{}}
 	if s.Pending != nil {
 		d.Pending[s.PR.Ref.Unit()] = *s.Pending
@@ -163,7 +163,7 @@ func (s *Situation) add(kind, actor string, at time.Time, data string) {
 // reviewTurn is a review turn in state; an asked or stopped one holds its question, as an answerable turn's
 // facts do.
 func reviewTurn(state string) *prrow.TurnFact {
-	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
+	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "pr.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
 	if state != "started" {
 		f.Question = &api.QuestionView{State: state, RecordID: 1, Kind: "choice", Text: "which branch?"}
 	}

@@ -68,8 +68,8 @@ func gtdEntries() map[string][]api.EntryView {
 	captured := entry("e3", "Buy cables", "inbox")
 	draft := entry("draft:11", "Reply in the release thread", "outbox")
 	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")
-	draft.Draft = &api.Draft{ID: 11, Rev: 4, Kind: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
-		State: "pending", Approval: api.DraftApproval{Mode: "always"}, Origin: api.DraftOrigin{Kind: "turn"}}
+	draft.Draft = &api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
+		State: "pending", Approval: api.DraftApproval{Mode: "wait"}, Origin: api.DraftOrigin{Kind: "turn"}}
 	return map[string][]api.EntryView{
 		"focus":  {focus},
 		"inbox":  {asked, captured},
@@ -154,7 +154,7 @@ func TestDisabledPluginHasNoTUIView(t *testing.T) {
 	m.SetKeys(servedKeys(specs))
 	r := row(7, "Batch export", "review", "needs-me")
 	m.SetData([]api.Row{r}, api.Health{})
-	m.SetPlugins([]api.Plugin{{ID: unit.GitHub}, {ID: boardProvider}})
+	m.SetPlugins([]api.Plugin{{ID: unit.GitHub, Name: "GitHub"}, {ID: boardProvider}})
 	m.SetGTD(gtdCatalog())
 	for v, es := range gtdEntries() {
 		m.SetEntries(v, es, gtdCounters())
@@ -185,7 +185,7 @@ func TestFakeProviderRowRendersInTUI(t *testing.T) {
 	th.Views = []string{"threads"}
 	m.SetData([]api.Row{th}, api.Health{})
 	chord(m, "gg")
-	if !strings.Contains(m.status, "no GitHub views") {
+	if !strings.Contains(m.status, "no github view") {
 		t.Errorf("g g with only a thread view: %q", m.status)
 	}
 	m.setView(0)

@@ -30,7 +30,7 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 
 ## What reaches an agent from other people
 
-- **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
+- **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `github.address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
 - **Review rounds open the pull request's checkout.** An automated review round starts Claude Code in a worktree at the pull request's head. Claude Code loads that checkout's project settings, so a pull request that changes `.claude/settings.json` (hooks, permissions), `.mcp.json`, `CLAUDE.md` or `AGENTS.md` can run code or steer the agent as you. Claude Code's folder trust is recorded for the repository and covers every pull request worktree of it; where project settings are off, trusting a blocked round from the cockpit trusts that worktree alone. Automated review rounds skip forks and authors outside the members, collaborators, owners and `trusted_authors`, so the author needs push access to the repository; a round you start by hand has no such filter, but its session never loads the checkout's project settings for such a pull request.
 
 ## The settings that limit it
@@ -40,12 +40,12 @@ Two settings control what reaches an agent from other people:
 - an instruction to the agent to treat comments by other accounts as untrusted data, and to stop and alert you when one asks for something suspicious;
 - two switches you can turn off: automatic address rounds, and loading project settings in review sessions.
 
-Both are on by default. The instruction is always on. The two switches are configuration keys whose value is a predicate over the pull request's facts; where the predicate does not hold, the behavior is off. They read the owner, the repository, the author and the visibility, and `project_settings` also reads the author association and the labels. For public repositories, keep both to private ones:
+Both are on by default. The instruction is always on. The two switches are configuration keys whose value is a predicate over the pull request's facts; where the predicate does not hold, the behavior is off. They read the owner, the repository, the author and the visibility, and `intents.<intent>.project_settings.when` also reads the author association and the labels. For public repositories, keep both to private ones:
 
 ```json
 {
   "workflows": { "address": { "only_when": "pr.visibility == \"private\"" } },
-  "project_settings": { "review": "pr.visibility == \"private\"" }
+  "intents": { "review": { "project_settings": { "when": "pr.visibility == \"private\"" } } }
 }
 ```
 

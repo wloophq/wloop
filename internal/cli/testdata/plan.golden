@@ -6,7 +6,7 @@ pending (3)
   00998877  workspace-temporary  workspace:wt-9: workspace.temporary = true
             waits for you · observe · steps workspace.remove · frees 2.0 GiB of disk
 blocked (1)
-  3c3c3c3c  address  acme/api#3: per-PR daily cap reached (3)
+  3c3c3c3c  address  acme/api#3: turns.per_unit_per_day reached (3)
             steps turn.start · attempt 1 failed: launching: the app was closed
 run (1)
   7a7a7a7a  review-first-round  acme/api#7: my review was requested

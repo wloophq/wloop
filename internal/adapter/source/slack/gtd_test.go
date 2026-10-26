@@ -119,7 +119,7 @@ func TestSlackItemsBecomeEntries(t *testing.T) {
 	clock := segClock{tsAt(4)}
 	f.deps.Clock = segClock{time.Now()}
 	f.deps.Turns = &turns.Service{Items: ledgerWithLog{f.ledger()}}
-	answer, err := json.Marshal(map[string]any{"brief": "b", "viewer_role": "assignee", "started_by_viewer": false,
+	answer, err := json.Marshal(map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false,
 		"items": []any{
 			scriptedItem("n1", ts(1), other, []string{me}, "open"),
 			scriptedItem("n2", ts(2), me, []string{other}, "open"),

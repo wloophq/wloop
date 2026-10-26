@@ -13,21 +13,18 @@ import (
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-const followUp = `description = "Follow up a review"
-subject = "github"
+const followUp = `summary = "Follow up a review"
+provider = "github"
 when = 'pr.review.action == "follow-up"'
 key = ["pr.fingerprint"]
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"
 intent = "review"
-round = "follow-up"
+stage = "follow-up"
 
 [approval]
-default = "run"
+mode = "run"
 `
 
 const askQuick = `label = "Ask quick"
@@ -36,15 +33,15 @@ workspace = "review"
 session = { strategy = "new", title = "quick" }
 
 [headline]
-resumed = "quick round on {{.PR.Slug}}"
+resumed = "quick round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask {{.PR.Slug}} one quick question."
+line = "Ask {{.pr.slug}} one quick question."
 
 [record]
 states = ["done"]
 
-[draft_approval]
-mode = "none"
+[drafts.approval]
+mode = "send"
 `
 
 type policyBooks map[unit.Unit]dturn.Book
@@ -61,7 +58,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 		t.Fatal(l.Problems.Error())
 	}
 	u := pr.Ref(r7).Unit()
-	if a, err := te.outboxPolicies().For(context.Background(), u, draft.Origin{Kind: draft.OriginSession}); err != nil || a.Mode != draft.Always {
+	if a, err := te.outboxPolicies().For(context.Background(), u, draft.Origin{Kind: draft.OriginSession}); err != nil || a.Default.Mode != draft.Wait || len(a.Rules) != 0 {
 		t.Fatalf("a session draft without a turn: %+v, %v", a, err)
 	}
 	defs := l.Registry.All()
@@ -71,16 +68,16 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	book := dturn.Book{Unit: u}
 	var origins []draft.Origin
 	for _, d := range defs {
-		if d.DraftApproval != nil {
-			t.Errorf("intent %s declares %+v", d.Name, *d.DraftApproval)
+		if p := d.DraftApproval; p != nil && (p.Default.Mode != draft.Wait || len(p.Rules) != 0) {
+			t.Errorf("intent %s declares %+v", d.Name, *p)
 		}
 		seq := int64(len(book.Turns) + 1)
 		book.Turns = append(book.Turns, dturn.Turn{Seq: seq, Intent: dturn.Intent(d.Name)})
 		origins = append(origins, draft.Origin{Kind: draft.OriginTurn, TurnSeq: seq, Intent: string(d.Name)})
 	}
 	for _, w := range l.Workflows {
-		if w.DraftApproval != nil {
-			t.Errorf("workflow %s declares %+v", w.Name, *w.DraftApproval)
+		if p := w.DraftApproval; p != nil && (p.Default.Mode != draft.Wait || len(p.Rules) != 0) {
+			t.Errorf("workflow %s declares %+v", w.Name, *p)
 		}
 		seq := int64(len(book.Turns) + 1)
 		book.Turns = append(book.Turns, dturn.Turn{Seq: seq, Intent: "review", Workflow: w.Name})
@@ -88,7 +85,7 @@ func TestBundledManifestsDefaultToAlways(t *testing.T) {
 	}
 	pol := outbox.Resolver{Manifests: outboxManifests{loaded: te.loadedIntents, books: policyBooks{u: book}}}
 	for _, o := range origins {
-		if a, err := pol.For(context.Background(), u, o); err != nil || a.Mode != draft.Always {
+		if a, err := pol.For(context.Background(), u, o); err != nil || a.Default.Mode != draft.Wait || len(a.Rules) != 0 {
 			t.Errorf("%+v resolves to %+v, %v", o, a, err)
 		}
 	}
@@ -99,7 +96,7 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	userProfile(t, te, map[string]string{
 		"workflows/follow-up-run/workflow.toml":   followUp,
-		"workflows/follow-up-timed/workflow.toml": followUp + "\n[draft_approval]\nmode = \"window\"\nwindow = \"5m\"\n",
+		"workflows/follow-up-timed/workflow.toml": followUp + "\n[drafts.approval]\nmode = \"delay\"\nwindow = \"5m\"\n",
 		"intents/ask-quick/intent.toml":           askQuick,
 		"intents/ask-quick/instructions.md.tmpl":  "Ask.\n",
 	})
@@ -119,14 +116,14 @@ func TestWorkflowRunApprovalIsNotDraftApproval(t *testing.T) {
 		o    draft.Origin
 		want draft.Approval
 	}{
-		{"a run approval is not a draft approval", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3, Intent: "review", Workflow: "follow-up-run"}, draft.Approval{Mode: draft.Always}},
-		{"a session draft of that workflow's turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 3}, draft.Approval{Mode: draft.Always}},
-		{"a workflow's draft approval", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Workflow: "follow-up-timed"}, draft.Approval{Mode: draft.Window, Window: 5 * time.Minute}},
-		{"a session draft reads its turn's workflow", draft.Origin{Kind: draft.OriginSession, TurnSeq: 4}, draft.Approval{Mode: draft.Window, Window: 5 * time.Minute}},
-		{"a session draft reads its turn's intent", draft.Origin{Kind: draft.OriginSession, TurnSeq: 5}, draft.Approval{Mode: draft.None}},
+		{"a run approval is not a draft approval", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 3, Intent: "review", Workflow: "follow-up-run"}, draft.Approval{Mode: draft.Wait}},
+		{"a session draft of that workflow's turn", draft.Origin{Kind: draft.OriginSession, TurnSeq: 3}, draft.Approval{Mode: draft.Wait}},
+		{"a workflow's draft approval", draft.Origin{Kind: draft.OriginTurn, TurnSeq: 4, Intent: "review", Workflow: "follow-up-timed"}, draft.Approval{Mode: draft.Delay, Window: 5 * time.Minute}},
+		{"a session draft reads its turn's workflow", draft.Origin{Kind: draft.OriginSession, TurnSeq: 4}, draft.Approval{Mode: draft.Delay, Window: 5 * time.Minute}},
+		{"a session draft reads its turn's intent", draft.Origin{Kind: draft.OriginSession, TurnSeq: 5}, draft.Approval{Mode: draft.Send}},
 	} {
 		a, err := pol.For(context.Background(), u, c.o)
-		if err != nil || a != c.want {
+		if err != nil || a.Default != c.want || len(a.Rules) != 0 {
 			t.Errorf("%s: %+v, %v", c.name, a, err)
 		}
 	}

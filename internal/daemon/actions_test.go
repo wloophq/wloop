@@ -258,7 +258,7 @@ func TestAddressCarriesTheTakeOver(t *testing.T) {
 	fa := &fakeActions{}
 	s.deps.Actions = fa
 	address, _ := s.loaded().Registry.Get(dintent.Address)
-	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cockpit"}`); address.Action.ReasonOff.Src == "" || rec.Code != 409 || !strings.Contains(rec.Body.String(), address.Action.ReasonOff.Src) {
+	if rec := post(t, s, "/api/units/github/acme%2Fapi%237/address", `{"source":"cockpit"}`); len(address.Action.Refuse) == 0 || rec.Code != 409 || !strings.Contains(rec.Body.String(), address.Action.Refuse[0].Why.Src) {
 		t.Fatalf("address on a pull request not mine: %d %s", rec.Code, rec.Body)
 	}
 	post(t, s, "/api/units/github/acme%2Fapi%237/take_over", `{}`)
@@ -480,7 +480,7 @@ func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 	t.Cleanup(func() { stDB.Close() })
 	var loop sync.Mutex
 	fa := &fakeActions{}
-	s := New(withStore(Deps{Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
+	s := New(withStore(Deps{Activity: stDB, Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
 	loop.Lock()
 	done := make(chan error, 1)
 	go func() { done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, io.Discard) }()
@@ -1302,7 +1302,7 @@ func TestAnswerWithoutATurnIsRefused(t *testing.T) {
 			t.Fatalf("%d %s", rec.Code, rec.Body)
 		}
 	}
-	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, SentAt: r.s.deps.Now()}}})
+	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r1", State: turn.Done, SentAt: r.s.deps.Now()}}})
 	if rec := post(t, r.s, "/api/units/github/acme%2Fapi%237/answer", `{"guidance":"yes"}`); rec.Code != 409 {
 		t.Fatalf("a done turn: %d %s", rec.Code, rec.Body)
 	}

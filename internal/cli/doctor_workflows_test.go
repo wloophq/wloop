@@ -40,7 +40,8 @@ func workflowDoctorEnv(t *testing.T) (*testEnv, *sqlite.DB) {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	user := t.TempDir()
-	writeUserWorkflow(t, user, "after-merge", `subject = "github"
+	writeUserWorkflow(t, user, "after-merge", `summary = "Case"
+provider = "github"
 when = 'trigger.event.kind == "merged"'
 
 [trigger]
@@ -50,18 +51,16 @@ on = ["merged", "closed"]
 use = "turn.dismiss"
 reason = "merged"
 `)
-	writeUserWorkflow(t, user, "broken-one", `subject = "session"
+	writeUserWorkflow(t, user, "broken-one", `summary = "Case"
+provider = "session"
 when = 'true'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.explode"
 `)
 	te.cfg.Profile = user
-	off := false
-	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-duplicate": {Enabled: &off}, "workspace-temporary": {Mode: "apply"}, "sesion-pr-finished": {Mode: "observe"}, "broken-one": {Mode: "observe"}}
+	off, on := false, true
+	te.cfg.Workflows = map[string]config.WorkflowConfig{"session-duplicate": {Enabled: &off}, "workspace-temporary": {Observe: &off}, "sesion-pr-finished": {Observe: &on}, "broken-one": {Observe: &on}}
 
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -88,14 +87,14 @@ use = "session.explode"
 	}
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	other := workflow.Key{Workflow: "hygiene-orphan-answer", Unit: pr, Value: "fedcba9876543210"}
-	if err := db.Ledger().Record(ctx, workflow.Run{Key: other, Status: workflow.RunRefused, At: now}, workflow.Item{ID: other.ID(), Key: other, Workflow: other.Workflow, Unit: pr, Decision: workflow.DecisionBlocked, Mode: workflow.ModeApply, At: now},
+	if err := db.Ledger().Record(ctx, workflow.Run{Key: other, Status: workflow.RunRefused, At: now}, workflow.Item{ID: other.ID(), Key: other, Workflow: other.Workflow, Unit: pr, Decision: workflow.DecisionBlocked, Observe: false, At: now},
 		port.Event{Unit: pr, Kind: "merged", Key: "m1", At: now.Add(-2 * time.Hour)}, port.Event{Unit: pr, Kind: "closed", Key: "c1", At: now.Add(-time.Minute)}); err != nil {
 		t.Fatal(err)
 	}
 	ws := unit.Unit{Provider: unit.Workspace, Key: "wt-1"}
 	planned := workflow.Key{Workflow: "workspace-review-finished", Unit: ws, Value: "00112233aabbccdd"}
 	if err := db.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{planned.Workflow}, Items: []workflow.Item{{ID: planned.ID(), Key: planned,
-		Workflow: planned.Workflow, Unit: ws, Decision: workflow.DecisionPending, Default: workflow.OutcomeWait, Reason: "observe mode", Mode: workflow.ModeObserve, At: now}}}); err != nil {
+		Workflow: planned.Workflow, Unit: ws, Decision: workflow.DecisionPending, Default: workflow.OutcomeWait, Reason: "observe mode", Observe: true, At: now}}}); err != nil {
 		t.Fatal(err)
 	}
 	return te, db
@@ -117,15 +116,15 @@ func TestDoctorReportsWorkflows(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, want := range map[string]api.DoctorCheck{
-		"workflow session-pr-finished": {Mark: api.DoctorOK, Info: "apply, sweep, last ran 2h ago, 2 refusal(s) in the last day"},
-		"workflow session-manual-quiet": {Mark: api.DoctorOK, Info: "apply, sweep, never ran, 0 refusal(s) in the last day; each item waits for you to apply it" +
-			`; set "workflows": {"session-manual-quiet": {"approval": {"default": "run"}}} in ` + te.ConfigPath + " to run them without you"},
+		"workflow session-pr-finished": {Mark: api.DoctorOK, Info: "sweep, last ran 2h ago, 2 refusal(s) in the last day"},
+		"workflow session-manual-quiet": {Mark: api.DoctorOK, Info: "sweep, never ran, 0 refusal(s) in the last day; each item waits for you to apply it" +
+			`; set "workflows": {"session-manual-quiet": {"approval": {"mode": "run"}}} in ` + te.ConfigPath + " to run them without you"},
 		"workflow workspace-review-finished": {Mark: api.DoctorInfo, Info: "observe, sweep, 1 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-review-finished" +
-			`; set "workflows": {"workspace-review-finished": {"mode": "apply"}} in ` + te.ConfigPath + " to run them"},
+			`; set "workflows": {"workspace-review-finished": {"observe": false}} in ` + te.ConfigPath + " to run them"},
 		"workflow workspace-duplicate": {Mark: api.DoctorInfo, Info: "observe, sweep, 0 item(s) planned and none run; see " + brand.Command + " plan --workflow workspace-duplicate" +
-			`; set "workflows": {"workspace-duplicate": {"mode": "apply"}} in ` + te.ConfigPath + " to run them"},
-		"workflow workspace-temporary": {Mark: api.DoctorOK, Info: "apply, sweep, never ran, 0 refusal(s) in the last day"},
-		"workflow after-merge":         {Mark: api.DoctorOK, Info: "apply, event, never ran, 0 refusal(s) in the last day"},
+			`; set "workflows": {"workspace-duplicate": {"observe": false}} in ` + te.ConfigPath + " to run them"},
+		"workflow workspace-temporary": {Mark: api.DoctorOK, Info: "sweep, never ran, 0 refusal(s) in the last day"},
+		"workflow after-merge":         {Mark: api.DoctorOK, Info: "event, never ran, 0 refusal(s) in the last day"},
 		"workflow session-duplicate":   {Mark: api.DoctorInfo, Info: "disabled by workflows.session-duplicate.enabled in " + te.ConfigPath},
 	} {
 		got, ok := checkNamed(rep.Workflows, name)
@@ -186,6 +185,20 @@ func TestDoctorWarnsOnAnUnknownWorkflowConfig(t *testing.T) {
 		if _, ok := checkNamed(rep.Workflows, name); ok {
 			t.Errorf("%s warned on a known workflow", name)
 		}
+	}
+}
+
+func TestDoctorReportsARunOverlayThatDoesNotMerge(t *testing.T) {
+	t.Parallel()
+	te, db := workflowDoctorEnv(t)
+	te.cfg.Workflows["session-manual-quiet"] = config.WorkflowConfig{Approval: &config.ApprovalConfig{Window: new(config.Days(5 * time.Minute))}}
+	rep, err := te.doctorWith(db)(context.Background(), api.DoctorQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := checkNamed(rep.Workflows, "config workflows")
+	if !ok || got.Mark != api.DoctorMissing || !strings.Contains(got.Info, "workflows.session-manual-quiet.approval") || !strings.Contains(got.Info, "runs nowhere") {
+		t.Fatalf("%+v in %+v", got, rep.Workflows)
 	}
 }
 

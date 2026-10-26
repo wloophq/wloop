@@ -1,6 +1,9 @@
 package profile
 
-import dintent "github.com/wloophq/wloop/internal/domain/intent"
+import (
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
 
 const (
 	Review  Kind = "review"
@@ -10,8 +13,8 @@ const (
 
 // testIntents is the bundled intents as far as blocks see them.
 var testIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}},
-	{Name: "address", Profile: "address", Dims: []string{"reviewer"}},
-	{Name: "nudge", Profile: "nudge"},
-	{Name: "probe"},
+	{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
+	{Name: "address", Profile: "address", Dims: []string{"reviewer"}, Provider: unit.GitHub},
+	{Name: "nudge", Profile: "nudge", Provider: unit.GitHub},
+	{Name: "probe", Provider: unit.GitHub},
 })

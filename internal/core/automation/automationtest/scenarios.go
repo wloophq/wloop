@@ -183,7 +183,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 			Gain:  workflow.Gain{MemoryBytes: 1, DiskBytes: 2},
 			Why: workflow.Why{Workflow: wf, Trigger: workflow.TriggerEvent, Event: &ev,
 				Matched: []workflow.Fact{{Name: "session.state", Value: "done"}}},
-			Mode: workflow.ModeApply, Marks: map[string]mark.Value{wf + "/head": {Value: "h1"}}, Attempts: 1, Error: "e", At: at0}
+			Observe: false, Marks: map[string]mark.Value{wf + "/head": {Value: "h1"}}, Attempts: 1, Error: "e", At: at0}
 		if d == workflow.DecisionPending {
 			it.Default, it.Deadline = workflow.OutcomeRun, at0.Add(5*time.Minute)
 		}
@@ -211,7 +211,7 @@ func RunLedger(t *testing.T, mk func(*testing.T) LedgerBackend) {
 		g := got[0]
 		if g.ID != want.ID || g.Key != want.Key || g.Unit != want.Unit || g.Decision != want.Decision || g.Reason != want.Reason ||
 			g.Default != want.Default || !g.Deadline.Equal(want.Deadline) || g.Guidance != want.Guidance || g.Attempts != 1 ||
-			g.Error != "e" || g.Mode != want.Mode || !g.At.Equal(want.At) || g.Gain != want.Gain || len(g.Steps) != 1 ||
+			g.Error != "e" || g.Observe != want.Observe || !g.At.Equal(want.At) || g.Gain != want.Gain || len(g.Steps) != 1 ||
 			g.Steps[0].Use != "some.step" || g.Steps[0].Args["reason"] != "done" || g.Why.Event == nil ||
 			g.Why.Event.ID != 3 || g.Why.Event.Kind != "merged" || g.Why.Trigger != workflow.TriggerEvent ||
 			len(g.Why.Matched) != 1 || g.Why.Matched[0].Value != "done" || g.Marks[want.Workflow+"/head"] != (mark.Value{Value: "h1"}) {

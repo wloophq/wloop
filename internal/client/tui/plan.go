@@ -309,7 +309,7 @@ func (m *Model) planDetail(it api.PlanItem, width int, now time.Time) []string {
 	default:
 		decision += " · runs in " + left
 	}
-	if it.Mode == "observe" {
+	if it.Observe {
 		decision += " · observe"
 	}
 	fact("workflow", it.Workflow, plain)

@@ -83,7 +83,7 @@ func TestDoctorRepoShow(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
-	if code := te.run("profile", "show", "acme/api", "--kind", "nudge", "--show"); code != 0 {
+	if code := te.run("profile", "show", "acme/api", "--intent", "nudge", "--show"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if out := te.out.String(); !strings.Contains(out, "Instructions ") || !strings.Contains(out, "# Nudge on acme/api#0, asked for by you.") ||

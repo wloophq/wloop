@@ -25,7 +25,7 @@ Anything else is dropped and never stored. Messages of bots and of Slackbot are 
 
 The `extract:slack` job turns the new messages of each unit into item changes, with one model call per unit on the fast tier. It waits until a unit has been quiet for 90 seconds, and never longer than 10 minutes after its oldest change, so a burst of messages costs one call. DM conversations are split into topic segments, each its own unit, with up to 10 earlier messages shown as read-only context: an item or a link that cites one as its origin or evidence is dropped, and message text that looks like the context or segment markers is defused. Your confirmed items are never overwritten.
 
-Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap frees at local midnight, and the job's skip line says when. After 3 failed calls in a row the job pauses for 15 minutes before a trial call. `slack.extraction.enabled: false` turns it off. The [configuration reference](/reference/configuration/#slack) lists every knob, and the [extraction eval](/reference/slack-eval/) measures the extraction against your own conversations.
+Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap frees at local midnight, and the job's skip line says when. After 3 failed calls in a row the job pauses for 15 minutes before a trial call. `slack.extraction.enabled: false` turns it off. The [configuration reference](/reference/configuration/) lists every knob, and the [extraction eval](/reference/slack-eval/) measures the extraction against your own conversations.
 
 ## The agent tools
 

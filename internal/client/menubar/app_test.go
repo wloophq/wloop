@@ -168,7 +168,7 @@ func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 	if f.plugins != nil {
 		return f.plugins, f.err
 	}
-	return []api.Plugin{{ID: unit.GitHub, Enabled: true, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "In loop", View: api.ViewLoop}}}}}, f.err
+	return []api.Plugin{{ID: unit.GitHub, Enabled: true, Capabilities: []string{api.CapabilityDetail}, UI: &api.PluginUI{Menubar: []api.MenubarSection{{Label: "In loop", View: api.ViewLoop}}}}}, f.err
 }
 
 func (f *fakeDaemon) snapshotVerbs() []verbCall {
@@ -452,6 +452,17 @@ func TestRowSubmenuIsTheRowsMenubarActions(t *testing.T) {
 			}
 			if got := titles(it.Children); !slices.Equal(got, want) {
 				t.Fatalf("submenu %q\nwant    %q", got, want)
+			}
+			for _, st := range row.Actions {
+				spec := specOf(t, st.ID)
+				if !slices.Contains(spec.Surfaces, "menubar") || spec.Input != nil {
+					continue
+				}
+				child, _ := find(it.Children, menuTitle(spec, st))
+				want := strings.Join(slices.DeleteFunc([]string{spec.Summary, map[bool]string{true: st.Note, false: st.Reason}[st.Enabled]}, func(s string) bool { return s == "" }), "\n")
+				if child.Tooltip != want || want == "" {
+					t.Errorf("%s: tooltip %q, want %q", st.ID, child.Tooltip, want)
+				}
 			}
 			for _, st := range row.Actions {
 				spec := specOf(t, st.ID)
@@ -957,4 +968,18 @@ func TestMenuListsAThreadRow(t *testing.T) {
 	}
 	it.Action()
 	waitFor(t, func() bool { o := r.openedURLs(); return len(o) == 1 && o[0] == thread.Link })
+}
+
+func TestARowOpensInTheCockpitOnlyWhenItsPluginServesADetail(t *testing.T) {
+	r := newRig(t)
+	row := reviewRow(1)
+	row.Link = "https://forge.example/acme/api/1"
+	r.d.rows["loop"] = []api.Row{row}
+	r.c.Refresh(context.Background())
+	it, ok := find(r.tray.menu, row.Label)
+	if !ok {
+		t.Fatalf("menu %q", titles(r.tray.menu))
+	}
+	it.Action()
+	waitFor(t, func() bool { o := r.openedURLs(); return len(o) == 1 && strings.HasPrefix(o[0], "cockpit#") })
 }

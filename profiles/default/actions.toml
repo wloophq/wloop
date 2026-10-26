@@ -1,0 +1,163 @@
+# The built-in actions' words, one table per action id. label and summary
+# are required; note, warning, confirm and why are templates over the action
+# facts. An empty note, warning or confirm shows nothing; why may not be
+# empty.
+
+[run_now]
+label   = "Run now"
+summary = "Start the round waiting on this pull request now, without waiting for its delay or the daily budget. Skip drops it instead."
+confirm = "{{if and .row.capped (not .row.pending)}}Run the held round on {{.pr.slug}} now? It does not count against the cap.{{end}}"
+
+[skip]
+label   = "Skip"
+summary = "Drop the round waiting on this pull request without running it. Run now starts it instead."
+
+[guide]
+label   = "Guide"
+summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+note    = "{{if not .row.pending}}Kept for the next automatic round{{end}}"
+why     = "the daemon plans no automatic round; see doctor"
+
+[guide.input]
+label = "Guidance"
+help  = "what the next round should look at"
+
+[trust_run]
+label   = "Trust folder and run"
+summary = "Trust the folder the agent was blocked on in your agent homes, then run the round. Dismiss block lifts the block without trusting it."
+note    = "Trust {{.row.trust_folder}} in {{join .row.trust_homes \", \"}}, then run the round"
+
+[unblock]
+label   = "Dismiss block"
+summary = "Lift the block without trusting the folder; the round waits for its next trigger. Trust folder and run trusts it and runs now."
+note    = "Lift the block without trusting; the round waits for a new trigger"
+
+[answer]
+label   = "Answer"
+summary = "Reply to the agent's open question with your text; the agent resumes from your answer."
+why     = "no open question on {{.pr.slug}}"
+
+[answer.input]
+label = "Answer"
+
+[continue]
+label   = "Continue"
+summary = "Let the agent resume without an answer, deciding the open question itself. Answer gives it your reply instead."
+why     = "no open question on {{.pr.slug}}"
+
+[dismiss]
+label   = "Dismiss"
+summary = "Close the agent's open question without resuming it; the pull request goes back to whoever it waits on."
+note    = "Close the question; the pull request goes back to whoever it waits on"
+why     = "no open question on {{.pr.slug}}"
+
+[take_over]
+label   = "Take over"
+summary = "Make someone else's pull request yours to develop: from then on it counts as one of yours, and Address works on it."
+why     = "It is yours already"
+confirm = "Take over {{.pr.slug}}? It becomes yours to develop: {{name}} creates or renames its author workspace."
+
+[pause]
+label   = "Pause"
+summary = "Stop automatic rounds on this pull request until you resume it, and drop the one waiting; it stays in your lists. Mute hides it instead."
+
+[resume]
+label   = "Resume"
+summary = "Let automatic rounds run on this pull request again."
+
+[mute]
+label   = "Mute"
+summary = "Take this pull request out of the lists that wait on you, for a while or until who it waits on changes; review and address rounds still run, unannounced, and no nudge goes out automatically. Pause stops the rounds instead."
+
+[mute.input]
+label = "Mute for"
+help  = "2d, 36h"
+
+[unmute]
+label   = "Unmute"
+summary = "Bring this pull request back into the lists that wait on you."
+
+[track]
+label   = "Track"
+summary = "Follow this pull request like one in scope, though no other reason brings it in."
+
+[untrack]
+label   = "Untrack"
+summary = "Stop following this pull request because you tracked it; another reason may still keep it."
+
+[open]
+label   = "Open"
+summary = "Open the pull request's workspace in its workspace manager, or the pull request itself when it has none."
+
+[remove]
+label   = "Remove"
+summary = "Delete this pull request's workspace when nothing in it would be lost. Force remove deletes it whatever it holds."
+confirm = """Remove the workspace of {{.pr.slug}}? Its checkout is deleted and its terminals are closed. It is refused while its agent works or waits, or when it holds uncommitted files, unpushed commits or ignored files outside build and dependency folders.\
+{{if .row.open}} The pull request is still open: no automatic first round brings the workspace back; Review or Address does.{{end}}"""
+
+[remove_force]
+label   = "Force remove"
+summary = "Delete this pull request's workspace though a remove was refused; what it holds is lost for good."
+note    = "Refused: {{.row.remove_refusal}}"
+confirm = """Force remove the workspace of {{.pr.slug}}?
+
+It was refused:
+{{.row.remove_refusal}}
+
+Forcing deletes its checkout with what is named above, for good."""
+
+[brief_refresh]
+label   = "Refresh brief"
+summary = "Make this pull request's brief again now, from what it holds today."
+note    = "Make this pull request's brief again now"
+why     = "the brief is off; set brief.enabled in the config"
+
+[intake_without]
+label   = "Start without brief"
+summary = "Start the turn this intake waits on now, without waiting for the brief. Cancel drops the intake instead."
+why     = "intake {{.row.intake_seq}} is a turn by hand, which only its session starts; cancel it with {{command}} intake cancel {{.row.intake_seq}}"
+
+[intake_cancel]
+label   = "Cancel"
+summary = "Drop this intake: the turn it waits on never starts."
+
+["draft.approve"]
+label   = "Approve"
+summary = "Send this draft as it stands."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
+
+["draft.edit"]
+label   = "Edit"
+summary = "Change the draft's text; it waits for your approval again."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
+
+["draft.edit".input]
+label = "Text"
+
+["draft.discard"]
+label   = "Discard"
+summary = "Drop this draft for good; nothing is sent."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
+
+["draft.retry"]
+label   = "Retry"
+summary = "Send this draft again after its post failed."
+why     = "{{if eq .draft.refusal \"plugin_off\"}}{{.draft.provider}} is disabled{{else if eq .draft.refusal \"state\"}}the draft is {{.draft.state}}{{else}}{{.draft.provider}} posts nothing{{end}}"
+confirm = "{{if .draft.maybe_posted}}This draft may have been posted already. Check its conversation first: retrying may post it twice.{{end}}"
+
+[plan_apply]
+label   = "Apply"
+summary = "Run this plan item now, with the same guards as the sweep. Dismiss drops it instead."
+
+[plan_dismiss]
+label   = "Dismiss"
+summary = "Drop this plan item for good; it does not run."
+
+[plan_guide]
+label   = "Guide"
+summary = "Tell the agent what its round should look at; your text goes with the round waiting now, or with the next one when none waits."
+note    = "Runs the round now with your guidance"
+
+[plan_guide.input]
+label = "Guidance"
+help  = "what the round should look at"

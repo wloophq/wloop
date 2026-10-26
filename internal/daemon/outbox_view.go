@@ -90,11 +90,11 @@ func draftEntry(d draft.Draft, where string) gtd.Entry {
 }
 
 func draftTitle(d draft.Draft, where string) string {
-	if d.Kind == draft.React {
-		return fmt.Sprintf("react :%s: on %s", d.Reaction, where)
+	if d.Reaction != "" {
+		return fmt.Sprintf("%s :%s: on %s", d.Purpose, d.Reaction, where)
 	}
 	first, _, _ := strings.Cut(strings.TrimSpace(d.Text), "\n")
-	return fmt.Sprintf("%s on %s: %s", d.Kind, where, first)
+	return fmt.Sprintf("%s on %s: %s", d.Purpose, where, first)
 }
 
 // withDraft sets a draft entry's draft on v, and its verbs from the draft's actions: the others are refused.

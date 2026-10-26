@@ -8,6 +8,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brief"
+	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -30,7 +32,35 @@ func teamsOf(requests []string) []string {
 	return out
 }
 
-func (s storedFacts) Facts(ctx context.Context, ref github.Ref) (turn.Stored, error) {
+func (s storedFacts) Facts(ctx context.Context, u unit.Unit) (turn.Stored, error) {
+	ref, err := pr.ParseKey(u.Key)
+	if u.Provider != unit.GitHub || err != nil {
+		return s.unitFacts(ctx, u)
+	}
+	return s.prFacts(ctx, ref)
+}
+
+// unitFacts reads the brief in use of a unit the queue does not brief, as
+// its provider's job wrote it.
+func (s storedFacts) unitFacts(ctx context.Context, u unit.Unit) (turn.Stored, error) {
+	var st turn.Stored
+	if !s.briefs {
+		return st, nil
+	}
+	ub, ok, err := s.store.UnitBrief(ctx, u)
+	if err != nil || !ok {
+		return st, err
+	}
+	b, err := brief.Parse(ub.Brief)
+	if err != nil || b == nil {
+		return st, err
+	}
+	st.Brief = &turn.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk, RiskWhy: b.RiskWhy,
+		OpenQuestions: b.OpenQuestions, Tags: b.Tags, Run: ub.Run, Extra: b.Extra}
+	return st, nil
+}
+
+func (s storedFacts) prFacts(ctx context.Context, ref github.Ref) (turn.Stored, error) {
 	var st turn.Stored
 	pr, known, err := s.store.PR(ctx, ref)
 	if err != nil {
@@ -57,7 +87,7 @@ func (s storedFacts) Facts(ctx context.Context, ref github.Ref) (turn.Stored, er
 		return st, err
 	}
 	st.Brief = &turn.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk, RiskWhy: b.RiskWhy,
-		OpenQuestions: b.OpenQuestions, Tags: tags, Files: run.Files, Run: rec.Run,
+		OpenQuestions: b.OpenQuestions, Tags: tags, Files: run.Files, Run: rec.Run, Extra: b.Extra,
 		HeadMoved: known && rec.HeadOid != pr.HeadOid, OlderFormat: rec.Version != brief.Version(brief.DefaultTaxonomy)}
 	return st, nil
 }

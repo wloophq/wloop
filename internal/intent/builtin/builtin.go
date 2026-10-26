@@ -4,13 +4,14 @@
 package builtin
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -18,28 +19,54 @@ type Slot string
 
 const (
 	SlotWorkspace Slot = "workspace"
-	SlotLaunch    Slot = "launch"
-	SlotPrepare   Slot = "prepare"
 	SlotBefore    Slot = "before"
-	SlotOnSent    Slot = "on_sent"
-	SlotPolicy    Slot = "policy"
-	SlotContext   Slot = "context"
-	SlotReconcile Slot = "reconcile"
 )
 
-// LaunchProbe is the launch of a probe: a synthetic pull request in the
-// workspace the request names.
-const LaunchProbe = "probe"
+// WorkspaceLinkedElseMain runs a turn in the workspace linked to its unit,
+// else in the repository's main checkout.
+const WorkspaceLinkedElseMain = "linked_else_main"
 
+// The workspaces of a round on someone else's pull request and on one you
+// develop.
+const (
+	WorkspaceReview = "review"
+	WorkspaceAuthor = "author"
+)
+
+// Names are the builtins a manifest names, by the key that names them.
 var Names = map[Slot][]string{
-	SlotWorkspace: {"review", "author", "pr_else_main", "given"},
-	SlotLaunch:    {"", LaunchProbe},
-	SlotPrepare:   {"", "nudge.prepare"},
+	SlotWorkspace: {WorkspaceReview, WorkspaceAuthor, WorkspaceLinkedElseMain, "given"},
 	SlotBefore:    {"take_over"},
-	SlotOnSent:    {"plan.drop_pending", "event.round_sent", "event.nudged", "record_round", "keeps_guidance", "mark_reviewed", "mark_addressed"},
-	SlotPolicy:    {"round", "probe"},
-	SlotContext:   {"pr", "synthetic"},
-	SlotReconcile: {"", "my_review"},
+}
+
+// nameDocs say what each builtin of Names is.
+var nameDocs = map[string]string{
+	"review":                "The review workspace, created at the head.",
+	"author":                "The workspace that develops the unit.",
+	WorkspaceLinkedElseMain: "The workspace linked to the unit, else the repository's main checkout.",
+	"given":                 "The workspace the request names.",
+	"take_over":             "Takes the unit over into the loop before the turn.",
+}
+
+// NameValues are the builtins of slot, with what each is.
+func NameValues(slot Slot) []Value {
+	out := make([]Value, len(Names[slot]))
+	for i, n := range Names[slot] {
+		out[i] = Value{Name: n, Doc: nameDocs[n]}
+	}
+	return out
+}
+
+// Boards are the workspaces whose board an intent's turns move: a turn in
+// the review or the author workspace moves that board, any other none.
+var Boards = []string{"review", "author"}
+
+// BoardOf is the board a turn in workspace moves, "none" for none.
+func BoardOf(workspace string) string {
+	if slices.Contains(Boards, workspace) {
+		return workspace
+	}
+	return "none"
 }
 
 // ReservedNames are names a user intent may not take: CLI commands, built-in action ids, profile words, dimensions.
@@ -55,7 +82,7 @@ var ReservedNames = []string{
 
 	"eval", "intents", "settings", "tags", "try",
 
-	"association", "base", "kind", "label", "organization", "repo", "reviewer", "risk", "round", "size", "team", "user",
+	"association", "base", "kind", "label", "organization", "repo", "reviewer", "risk", "size", "stage", "team", "user",
 }
 
 // ActionKeys are the keys of the built-in actions, by id; internal/keys
@@ -87,6 +114,9 @@ const (
 	ActionSlot   FactSlot = "action"
 	TurnSlot     FactSlot = "turn"
 	WorkflowSlot FactSlot = "workflow"
+	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
+	// reads besides its unit's.
+	ApprovalSlot FactSlot = "approval"
 )
 
 type Fact struct {
@@ -97,21 +127,38 @@ type Fact struct {
 	Slot  string // a workflow fact's slot: one of WorkflowSlots
 	// Provider is the provider whose intents alone may read the fact; "" for every provider.
 	Provider unit.ProviderID
+	// Subjects are the workflow slots besides Slot whose when reads the
+	// fact: the brief slot's facts are read on every unit that has a brief.
+	Subjects []string
+	// Dim makes the fact a profile dimension: a block path condition under
+	// the intents of its provider.
+	Dim bool
+	// Enum are the fact's values by provider, "" standing for every
+	// provider; a provider absent takes any value.
+	Enum map[unit.ProviderID][]string
+	// Untrusted says that a third party's text, read by the extraction, the
+	// proposing turn itself or an agent's brief sets the fact's value, so
+	// no [drafts.approval] rule may read it.
+	Untrusted bool
+	// TimeVarying says that the fact changes as time passes with nothing
+	// else changing, so no workflow key may hold it.
+	TimeVarying bool
 }
 
-var inputTypes = map[string]expr.Type{"flag": expr.Bool, "text": expr.String, "list": expr.List}
+// InputTypes are the types an input declares, with the type its fact has.
+var InputTypes = map[string]expr.Type{"bool": expr.Bool, "text": expr.String, "list": expr.List}
 
 // Env is the slot's facts plus, for the turn slot, the intent's declared inputs.
 func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 	env := expr.Env{}
 	for _, f := range Facts {
 		if slices.Contains(f.Slots, slot) {
-			env[f.Name] = f.Type
+			put(env, f)
 		}
 	}
 	if slot == TurnSlot {
 		for _, in := range inputs {
-			if t, ok := inputTypes[in.Type]; ok {
+			if t, ok := InputTypes[in.Type]; ok {
 				env["inputs."+in.Name] = t
 			}
 		}
@@ -123,49 +170,28 @@ func Env(slot FactSlot, inputs []dintent.Input) expr.Env {
 var RecordStates = []string{string(record.Done), string(record.Settled), string(record.Asked), string(record.Failed)}
 
 // IntentDims are the profile dimensions a manifest's dims may list.
-var IntentDims = []string{dintent.DimRound, dintent.DimReviewer}
+var IntentDims = []string{dintent.DimStage, dintent.DimReviewer}
+
+// Stages are the passes over a unit: the first, and each one after.
+var Stages = []string{"first", "follow-up"}
 
 // ReservedFlags are flags the CLI owns; no input may declare them.
 var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
 
-// StepDef is a workflow step the engine can run: the providers whose units it
-// acts on, its reach, the arguments a manifest may set, the triggers it runs
-// under and what it does.
-type StepDef struct {
-	Name      string
-	Providers []unit.ProviderID // empty means any
-	Reach     workflow.Reach    // "" for turn.start: the intent decides
-	Args      []string
-	Trigger   []workflow.TriggerKind // empty means any
-	Doc       string
-}
+// RoundProviders are the providers whose plugin keeps a per-unit count of
+// turns: every automated turn.start on their units spends
+// turns.per_unit_per_day; a workflow starting turns on any other must set
+// limits.per_day.
+var RoundProviders = []unit.ProviderID{unit.GitHub}
 
-// StepTurnStart is the step that starts an agent turn: its reach is its intent's.
-const StepTurnStart = "turn.start"
-
-// Steps is the step vocabulary of workflow manifests.
-var Steps = []StepDef{
-	{"session.close", providers(unit.Session), workflow.ReachLocal, nil, nil,
-		"Closes the agent session."},
-	{"workspace.remove", providers(unit.Workspace), workflow.ReachLocal, nil, nil,
-		"Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load."},
-	{"workspace.unregister", providers(unit.Workspace), workflow.ReachLocal, nil, nil,
-		"Unregisters a workspace whose path is gone."},
-	{"turn.dismiss", providers(unit.Session, unit.GitHub), workflow.ReachLocal, []string{"reason"}, nil,
-		"Dismisses the open turn, recording the reason."},
-	{"answer.refuse", providers(unit.GitHub), workflow.ReachLocal, []string{"reason"}, nil,
-		"Refuses a queued answer whose route is gone."},
-	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil, nil,
-		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
-	{StepTurnStart, providers(unit.GitHub), "", []string{"intent", "round"}, nil,
-		"Starts a turn: `intent`, and `round` (`first` or `follow-up`) for a review. Caps, the brief, busy and held checks apply as for any automatic round."},
-	{"classify", nil, workflow.ReachLocal, []string{"prompt", "schema"}, []workflow.TriggerKind{workflow.TriggerEvent},
-		"A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`."},
-	{"notify.self", nil, workflow.ReachPrivate, []string{"text"}, nil,
-		"A private notification."},
-}
-
-func providers(ps ...unit.ProviderID) []unit.ProviderID { return ps }
+// PayloadProviders are the template roots a provider's payload alone holds,
+// which only an intent of that provider may read.
+var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 
 // Slots name each provider's fact slot.
-var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace"}
+var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
+	unit.Entry: "entry", dslack.Provider: "slack"}
+
+// Providers are the providers an intent may serve: those of Slots, and a
+// plugin whose units have no workflow facts adds its own.
+var Providers = slices.Sorted(maps.Keys(Slots))

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 func TestParsePath(t *testing.T) {
@@ -42,6 +43,7 @@ func TestParsePath(t *testing.T) {
 		{"repo=widgets/intent=review.md", "repo is only valid right after organization", "organization=<owner>/"},
 		{"user=a/organization=b/intent=review.md", "out of order", "rename it to organization=b/user=a/intent=review.md"},
 		{"organisation=x/intent=review.md", "unknown dimension organisation", ""},
+		{"round=first/intent=review.md", "unknown dimension round", "stage, reviewer"},
 		{"organization=x/intent=reveiw.md", "unknown intent reveiw", "address, nudge and review"},
 		{"tags/team=a/intent=review.md", "condition team comes after tags/", "rename it to team=a/intent=review.md"},
 		{"tags/change=refac/user=x/intent=review.md", "condition user comes after tags/", "rename it to user=x/tags/change=refac/intent=review.md"},
@@ -50,7 +52,7 @@ func TestParsePath(t *testing.T) {
 		{"tags/change=fix/tags/lang=go/intent=review.md", "tags appears twice", "keep one tags/ directory"},
 		{"tags/lang=go/lang=go/intent=review.md", "appears twice", "drop the repeated tag"},
 		{"tags/lang=go/change=fix/intent=review.md", "out of order", "rename it to tags/change=fix/lang=go/intent=review.md"},
-		{"round=first/intent=address.md", "round does not apply to address", "dims list round"},
+		{"stage=first/intent=address.md", "stage does not apply to address", "dims list stage"},
 		{"reviewer=jussara-ai/intent=review.md", "reviewer does not apply to review", "dims list reviewer"},
 		{"organization=x/notes.md", "not a block", "intent=<intent>.md"},
 		{"tags/lang=golang/intent=review.md", "spelled lang=go", "rename it to tags/lang=go/intent=review.md"},
@@ -83,7 +85,7 @@ func TestPathValuesFoldCaseAndUnescape(t *testing.T) {
 func TestPathOfRoundTrips(t *testing.T) {
 	for _, p := range []BlockPath{
 		{Intent: Nudge},
-		{Conds: []Cond{{DimOrganization, "globex"}, {DimRepo, "widgets"}, {DimRound, "follow-up"}}, Intent: Review},
+		{Conds: []Cond{{DimOrganization, "globex"}, {DimRepo, "widgets"}, {DimStage, "follow-up"}}, Intent: Review},
 		{Conds: []Cond{{DimBase, "50%/off"}, {DimUser, "dependabot[bot]"}}, Tags: []string{"lang:go", "change:refac"}, Intent: Address},
 		{Conds: []Cond{{DimKind, "fix"}, {DimSize, "xl"}, {DimRisk, "high"}, {DimAssociation, "first-time-contributor"}}, Intent: Review},
 	} {
@@ -107,14 +109,14 @@ func TestPathOfRoundTrips(t *testing.T) {
 
 func TestRoundIsValidOnlyWhereDimsListsIt(t *testing.T) {
 	intents := dintent.NewRegistry([]dintent.Def{
-		{Name: "review", Profile: "review", Dims: []string{"round"}},
-		{Name: "ask-author", Profile: "ask-author", Dims: []string{"round"}},
-		{Name: "address", Profile: "address"},
+		{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
+		{Name: "ask-author", Profile: "ask-author", Dims: []string{"stage"}, Provider: unit.GitHub},
+		{Name: "address", Profile: "address", Provider: unit.GitHub},
 	})
 	for rel, valid := range map[string]bool{
-		"round=first/intent=review.md":         true,
-		"round=follow-up/intent=ask-author.md": true,
-		"round=first/intent=address.md":        false,
+		"stage=first/intent=review.md":         true,
+		"stage=follow-up/intent=ask-author.md": true,
+		"stage=first/intent=address.md":        false,
 	} {
 		if _, ok, err := ParsePath(rel, intents); ok != valid || (err == nil) != valid {
 			t.Errorf("%s: ok %v, %v", rel, ok, err)
@@ -133,16 +135,16 @@ func TestProbeHasNoBlocks(t *testing.T) {
 
 func TestIntentBlocksForAUserIntentLoad(t *testing.T) {
 	intents := dintent.NewRegistry([]dintent.Def{
-		{Name: "review", Profile: "review", Dims: []string{"round"}},
-		{Name: "ask-author", Profile: "ask-author"},
-		{Name: "borrow", Profile: "review"},
+		{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
+		{Name: "ask-author", Profile: "ask-author", Provider: unit.GitHub},
+		{Name: "borrow", Profile: "review", Provider: unit.GitHub},
 	})
 	d := dir(t, map[string]string{"organization=acme/intent=ask-author.md": "Ask kindly.", "intents/ask-author/intent.toml": "label = 1\n", "intents/ask-author/instructions.md.tmpl": "x"})
 	tr, err := Load([]Layer{user(d)}, intents, nil)
 	if err != nil || len(tr.Blocks) != 1 || tr.Blocks[0].Path.Intent != "ask-author" {
 		t.Fatalf("%+v %v", tr.Blocks, err)
 	}
-	if g := tr.Compose("ask-author", Facts{Owner: "acme"}); len(g.Parts) != 1 || !strings.Contains(g.Parts[0].Text, "Ask kindly.") {
+	if g := tr.Compose("ask-author", Facts{Values: map[string]any{"pr.owner": "acme"}}); len(g.Parts) != 1 || !strings.Contains(g.Parts[0].Text, "Ask kindly.") {
 		t.Fatalf("%+v", g)
 	}
 	if _, err := Load([]Layer{user(d)}, testIntents, nil); err == nil {

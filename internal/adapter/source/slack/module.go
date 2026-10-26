@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	slackrows "github.com/wloophq/wloop/internal/adapter/source/slack/rows"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -63,6 +64,7 @@ type plugin struct {
 	log     func(format string, args ...any)
 	logins  logins
 	started time.Time
+	briefs  *briefs
 }
 
 // Module is the Slack source: an ingestion job every minute, the socket
@@ -71,6 +73,9 @@ func Module(cfg config.Config, d sourcereg.Deps, s Slack) (sourcereg.Module, err
 	p := newPlugin(cfg.Slack, d, s)
 	m := p.module()
 	m.Jobs = append(m.Jobs, p.extraction(cfg)...)
+	if p.briefs.job != nil {
+		m.Briefs = p.briefs
+	}
 	if p.src != nil {
 		m.Payload = p.payloads(cfg.Slack.Turns.MaxChars)
 		pl := p.places(cfg)
@@ -93,22 +98,27 @@ func (p *plugin) module() sourcereg.Module {
 
 		Publisher: p.publisher(),
 		Reacts:    true,
+		OnPosted:  p.onPosted(),
 	}
 	if p.cfg.Configured() {
 		m.Identity = p.identity
 	}
+	if p.deps.DB != nil {
+		m.Facts = factslack.New(p.deps.DB, clockFunc(p.now))
+	}
 	return m
 }
 
-func (p *plugin) rows(readmodel.RowDeps) readmodel.Provider {
+func (p *plugin) rows(rd readmodel.RowDeps) readmodel.Provider {
 	if p.src == nil || !p.cfg.Configured() {
 		return noRows{}
 	}
-	return slackrows.New(slackrows.Source{DB: p.deps.DB, Viewer: p.src.store.Viewer, Now: p.now})
+	return slackrows.New(slackrows.Source{DB: p.deps.DB, Viewer: p.src.store.Viewer, Now: p.now, Activity: rd.Activity})
 }
 
 func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	p := &plugin{cfg: cfg, deps: d, slack: s, log: d.Log}
+	p.briefs = &briefs{p: p}
 	switch {
 	case s.Now != nil:
 		p.now = s.Now
@@ -138,7 +148,7 @@ func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	a.users = &userCache{db: db, client: s.Client, now: p.now}
 	heat := HeatScheduler{DB: db, Heat: sqlite.HeatReader{DB: d.DB, Clock: clockFunc(p.now)}, Segments: segs, Log: p.logf}
 	src := &Source{db: db, store: &Store{DB: db, Segments: segs, Scheduler: heat, Now: p.now}, client: s.Client, admit: a, segments: segs,
-		links: d.Links != nil, log: p.logf}
+		links: d.Links != nil, units: d.Units, log: p.logf}
 	a.viewer = func() string { _, u := src.viewer(); return u }
 	if s.Client != nil {
 		src.search = newSearcher(s.Client, db, cfg.Ingest.Terms, cfg.Ingest.Since, src.viewer, p.now, p.slack.Metrics, p.logf)

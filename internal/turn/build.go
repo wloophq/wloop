@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -34,9 +35,11 @@ type Brief struct {
 	// written; OlderFormat, that the loop's brief format changed since.
 	HeadMoved, OlderFormat bool
 	Run                    int64
+	// Extra are the brief intent's extra fields, by name.
+	Extra map[string]any
 }
 
-// Stored is what the loop keeps about a pull request beyond GitHub's read.
+// Stored is what the loop keeps about a unit beyond its provider's read.
 type Stored struct {
 	// Brief is nil when none is stored.
 	Brief *Brief
@@ -44,8 +47,10 @@ type Stored struct {
 	Teams []string
 }
 
+// FactsReader reads what the loop keeps about a unit; a unit with no
+// brief and no teams reads the zero Stored.
 type FactsReader interface {
-	Facts(ctx context.Context, ref github.Ref) (Stored, error)
+	Facts(ctx context.Context, u unit.Unit) (Stored, error)
 }
 
 // GuideReader composes the guide a turn of kind reads for a pull request
@@ -116,9 +121,9 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 	c.Unit, c.Wording = c.Payload.Unit(), c.Payload.Wording()
 	c.WithoutProjectSettings = !b.Config.ProjectSettingsFor(string(r.Intent), PayloadFacts(c.Payload))
 	c.Queued, c.Guidance, c.Local = r.Queued, r.Guidance, r.Local
-	c.AutomatedReviewers = b.Config.AutomatedReviewers
-	c.Facts = TurnFacts{AddressReviews: b.Config.AddressReviews, AddressChecks: b.Config.AddressChecks,
-		FollowupsWithoutWorkspace: b.Config.FollowupsWithoutWorkspace, AddressWithoutWorkspace: b.Config.AddressWithoutWorkspace}
+	c.AutomatedReviewers = b.Config.GitHub.AutomatedReviewers
+	c.Facts = TurnFacts{AddressReviews: b.Config.GitHub.AddressReviews, AddressChecks: b.Config.GitHub.AddressChecks,
+		FollowupsWithoutWorkspace: b.Config.GitHub.FollowupsWithoutWorkspace, AddressWithoutWorkspace: b.Config.GitHub.AddressWithoutWorkspace}
 	var st Stored
 	if pr := c.PR(); pr != nil {
 		c.Facts.CrossRepository, c.Facts.LastReviewVerdict = pr.CrossRepository, pr.LastReviewVerdict
@@ -129,10 +134,10 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 			}
 			c.Facts.Mine = viewer != "" && strings.EqualFold(viewer, pr.Author)
 		}
-		if b.Facts != nil {
-			if st, err = b.Facts.Facts(ctx, pr.ref()); err != nil {
-				st, r.BriefMissing = Stored{}, "reading it failed ("+err.Error()+")"
-			}
+	}
+	if b.Facts != nil {
+		if st, err = b.Facts.Facts(ctx, c.Unit); err != nil {
+			st, r.BriefMissing = Stored{}, "reading it failed ("+err.Error()+")"
 		}
 	}
 	if b.Items != nil {
@@ -159,7 +164,8 @@ func (b Builder) Build(ctx context.Context, r Request) (Context, error) {
 	if c, err = Complete(c, l); err != nil {
 		return Context{}, err
 	}
-	return b.compose(c, l, st.Teams)
+	c.Facts.RequestedTeams = st.Teams
+	return b.compose(c, l)
 }
 
 // payload is the request's payload, else what the unit provider's reader
@@ -187,15 +193,17 @@ func (b Builder) payload(ctx context.Context, r Request) (Payload, error) {
 	return p, nil
 }
 
-// compose reads the turn's guides: the intent's profile with the turn's
-// round, then each also_profiles entry whose when holds, with its round.
-func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Context, error) {
+// compose reads the turn's guides: the intent's profile at the turn's
+// stage, then each also_profile entry whose when holds, with the
+// dimensions it pins.
+func (b Builder) compose(c Context, l *intentload.Loaded) (Context, error) {
 	d := c.Def
 	if d.Profile == "" {
 		return c, nil
 	}
+	dims := profile.Vocabulary(l.Registry)
 	var err error
-	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.facts(teams, c.Round))
+	c.Guide, err = b.Guides.Guide(profile.Kind(d.Profile), c.dimFacts(dims, map[string]string{dintent.DimStage: c.Round}))
 	if err != nil {
 		return Context{}, err
 	}
@@ -205,7 +213,9 @@ func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Conte
 		if i < len(also) && also[i] != nil && !also[i].Eval(turnFacts{&c}) {
 			continue
 		}
-		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.facts(teams, a.Round))
+		pins := map[string]string{dintent.DimStage: ""}
+		maps.Copy(pins, a.Dims)
+		g, err := b.Guides.Guide(profile.Kind(a.Profile), c.dimFacts(dims, pins))
 		if err != nil {
 			return Context{}, err
 		}
@@ -214,18 +224,57 @@ func (b Builder) compose(c Context, l *intentload.Loaded, teams []string) (Conte
 	return c, nil
 }
 
-func (c Context) facts(teams []string, round string) profile.Facts {
-	f := profile.Facts{Teams: teams, Round: round}
-	if pr := c.PR(); pr != nil {
-		f.Owner, f.Repo, f.Author, f.Association, f.Base, f.Labels = pr.Owner, pr.Repo, pr.Author, pr.Association, pr.Base, pr.Labels
-		if pr.Address != nil {
-			f.Reviewers = pr.Address.ReviewerLogins()
+// dimFacts are the values of the dimensions a guide is matched against,
+// with the dimensions pins names set to their pinned values.
+func (c Context) dimFacts(dims []profile.DimDef, pins map[string]string) profile.Facts {
+	f := profile.Facts{Values: map[string]any{}}
+	get := turnFacts{&c}
+	for _, d := range dims {
+		var v any
+		pin, pinned := pins[string(d.Name)]
+		switch {
+		case pinned:
+			v = pin
+			if d.List {
+				v = []string{pin}
+			}
+		case d.Extra != "":
+			if c.Brief != nil {
+				v = c.Brief.Extra[d.Extra]
+			}
+		case d.Brief:
+			v = c.Brief.fact(d.Fact)
+		default:
+			v = get.Get(d.Fact)
+		}
+		if v != nil {
+			f.Values[d.Fact] = v
 		}
 	}
 	if br := c.Brief; br != nil {
-		f.Kind, f.Size, f.Risk, f.Tags, f.Files, f.HasBrief = br.Kind, br.Size, br.Risk, br.Tags, br.Files, true
+		f.Tags, f.Files, f.HasBrief = br.Tags, br.Files, true
 	}
 	return f
+}
+
+// fact is the brief fact name of b; nil without a brief.
+func (b *Brief) fact(name string) any {
+	if b == nil {
+		return nil
+	}
+	switch name {
+	case "brief.goal":
+		return b.Goal
+	case "brief.kind":
+		return b.Kind
+	case "brief.size":
+		return b.Size
+	case "brief.risk":
+		return b.Risk
+	case "brief.tags":
+		return b.Tags
+	}
+	return nil
 }
 
 var mineRef = regexp.MustCompile(`\bpr\.mine\b|\.Facts\.Mine\b`)

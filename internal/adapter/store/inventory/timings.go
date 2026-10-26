@@ -8,6 +8,7 @@ import (
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -103,22 +104,25 @@ func (s *Store) prsByRef(ctx context.Context, refs []github.Ref) (map[github.Ref
 	return out, nil
 }
 
-// activeIn selects the rows, keyed by owner, repo and number, of the pull
-// requests active in the window bound to its one parameter.
-const activeIn = `owner || '/' || repo || '#' || number IN (` + activeRefsSQL + `)`
+// activeIn selects the github rows, keyed by unit, of the pull requests
+// active in the window bound to its one parameter.
+const activeIn = `provider = 'github' AND unit_key IN (` + activeRefsSQL + `)`
 
 // prTags are the tags of the pull requests active in the window.
 func (s *Store) prTags(ctx context.Context, at string) (map[github.Ref][]string, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT owner, repo, number, key, value FROM pr_tags WHERE `+activeIn+` ORDER BY owner, repo, number, key, value`, at)
+	rows, err := s.db.R().QueryContext(ctx, `SELECT unit_key, key, value FROM unit_tags WHERE `+activeIn+` ORDER BY unit_key, key, value`, at)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[github.Ref][]string{}
 	for rows.Next() {
-		var r github.Ref
-		var k, v string
-		if err := rows.Scan(&r.Owner, &r.Repo, &r.Number, &k, &v); err != nil {
+		var key, k, v string
+		if err := rows.Scan(&key, &k, &v); err != nil {
+			return nil, err
+		}
+		r, err := pr.ParseKey(key)
+		if err != nil {
 			return nil, err
 		}
 		out[r] = append(out[r], k+":"+v)
@@ -129,16 +133,20 @@ func (s *Store) prTags(ctx context.Context, at string) (map[github.Ref][]string,
 // prFiles are the files of the briefs in use of the pull requests active in
 // the window.
 func (s *Store) prFiles(ctx context.Context, at string) (map[github.Ref][]string, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT b.owner, b.repo, b.number, r.files FROM pr_briefs b JOIN brief_runs r ON r.id = b.run WHERE b.run > 0 AND b.owner || '/' || b.repo || '#' || b.number IN (`+activeRefsSQL+`)`, at)
+	rows, err := s.db.R().QueryContext(ctx, `SELECT b.unit_key, COALESCE(json_extract(r.input, '$.files'), '') FROM unit_briefs b JOIN brief_runs r ON r.id = b.run
+		WHERE b.run > 0 AND b.provider = 'github' AND b.unit_key IN (`+activeRefsSQL+`)`, at)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[github.Ref][]string{}
 	for rows.Next() {
-		var r github.Ref
-		var raw string
-		if err := rows.Scan(&r.Owner, &r.Repo, &r.Number, &raw); err != nil {
+		var key, raw string
+		if err := rows.Scan(&key, &raw); err != nil {
+			return nil, err
+		}
+		r, err := pr.ParseKey(key)
+		if err != nil {
 			return nil, err
 		}
 		files, err := splitList(raw)
@@ -245,7 +253,7 @@ func (s *Store) timedIntakes(ctx context.Context, at string) ([]dinv.TimedIntake
 	return out, rows.Err()
 }
 
-const tagTalliesSQL = `SELECT key, value, count(*) FROM pr_tags WHERE ` + activeIn + `
+const tagTalliesSQL = `SELECT key, value, count(*) FROM unit_tags WHERE ` + activeIn + `
 	GROUP BY key, value ORDER BY key, count(*) DESC, value`
 
 // tagTallies counts the tags of the pull requests active in the window.

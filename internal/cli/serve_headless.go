@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/placement"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -37,6 +38,7 @@ func (e *Env) serveHeadless(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		Ledger:  ledger,
 		Outbox:  e.outbox,
 		Intents: e.headlessIntent,
+		Default: e.headlessDefault,
 		Caps:    headless.Caps{PerCallUSD: cfg.Headless.PerCallUSD, PerDayUSD: cfg.Headless.PerDayUSD, Tier: cfg.Headless.Tier},
 		Context: ctx,
 		Spent:   e.withDossierSpend(db),
@@ -90,6 +92,15 @@ func (e *Env) headlessIntent(name dturn.Intent) (dintent.Def, bool) {
 		return dintent.Def{}, false
 	}
 	return l.Registry.Get(dintent.Name(name))
+}
+
+// headlessDefault is the intent holding the headless.default role on units of p.
+func (e *Env) headlessDefault(p unit.ProviderID) (dintent.Def, bool) {
+	l := e.loadedIntents()
+	if l == nil {
+		return dintent.Def{}, false
+	}
+	return l.Registry.ByRole(builtin.RoleHeadless, p)
 }
 
 // headlessSpent is the cost of the headless turns started on the local day of day.

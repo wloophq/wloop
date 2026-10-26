@@ -35,7 +35,7 @@ func Complete(c Context, l *intentload.Loaded) (Context, error) {
 	}
 	c.NeedsTakeOver = d.OwnerOnly && !c.Owned && !takeOverSet(d, c.Inputs)
 	c.Round, c.FollowUpApproval = "", false
-	if slices.Contains(d.Dims, "round") {
+	if slices.Contains(d.Dims, dintent.DimStage) {
 		c.Round = "first"
 		if (c.prior() != nil || c.Planned == PlannedFollowUp) && !c.Plain {
 			c.Round = "follow-up"
@@ -77,7 +77,7 @@ func headline(c Context, t *template.Template, p intentload.Programs, f turnFact
 			return "", fmt.Errorf("%s: no %s", c.Def.Name, intentload.HeadlineName(i))
 		}
 		var b bytes.Buffer
-		if err := h.Execute(&b, c); err != nil {
+		if err := h.Execute(&b, c.facts()); err != nil {
 			return "", err
 		}
 		return b.String(), nil
@@ -146,7 +146,7 @@ func normalizeInputs(d dintent.Def, in map[string]any) (map[string]any, error) {
 
 func normalize(decl dintent.Input, v any) (any, error) {
 	switch decl.Type {
-	case "flag":
+	case "bool":
 		switch v := v.(type) {
 		case nil:
 			return false, nil
@@ -186,6 +186,12 @@ func normalize(decl dintent.Input, v any) (any, error) {
 // turnFacts resolves the turn slot's facts of a context for predicates.
 type turnFacts struct{ c *Context }
 
+// facts is the turn's facts map, the data of its inline templates:
+// {{.pr.slug}}, {{.unit.ref}}, {{.inputs.<name>}}.
+func (c Context) facts() map[string]any {
+	return intentload.NestFacts(intentload.TurnEnv(c.Def), turnFacts{&c}.Get)
+}
+
 func (f turnFacts) Get(field string) any {
 	c := f.c
 	if name, ok := strings.CutPrefix(field, "inputs."); ok {
@@ -203,38 +209,46 @@ func (f turnFacts) Get(field string) any {
 		}
 	}
 	switch field {
-	case "turn.trigger":
-		return c.Trigger.String()
 	case "turn.automated":
 		return c.Automated()
+	case "unit.ref":
+		return c.Wording.Ref
 	case "turn.owned":
 		return c.Owned
 	case "turn.needs_take_over":
 		return c.NeedsTakeOver
 	case "turn.resume":
 		return c.Resume != nil
-	case "turn.plain":
+	case "turn.try":
 		return c.Plain
 	case "turn.planned":
 		return c.Planned.String()
-	case "turn.round":
+	case "turn.stage":
 		return c.Round
-	case "last_review.exists":
+	case "pr.requested_teams":
+		if c.PR() == nil {
+			return nil
+		}
+		if c.Facts.RequestedTeams == nil {
+			return []string{}
+		}
+		return c.Facts.RequestedTeams
+	case "pr.last_review.exists":
 		return c.prior() != nil
-	case "last_review.verdict":
+	case "pr.last_review.verdict":
 		return c.Facts.LastReviewVerdict
-	case "last_review.decision":
+	case "pr.last_review.decision":
 		if c.prior() == nil {
 			return ""
 		}
 		return c.prior().Verdict
-	case "config.address_reviews":
+	case "config.github.address_reviews":
 		return c.Facts.AddressReviews
-	case "config.address_checks":
+	case "config.github.address_checks":
 		return c.Facts.AddressChecks
-	case "config.followups_without_workspace":
+	case "config.github.followups_without_workspace":
 		return c.Facts.FollowupsWithoutWorkspace
-	case "config.address_without_workspace":
+	case "config.github.address_without_workspace":
 		return c.Facts.AddressWithoutWorkspace
 	}
 	return nil

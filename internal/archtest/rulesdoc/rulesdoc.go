@@ -31,7 +31,7 @@ type Rule struct {
 }
 
 // Allowlist is a package-level map[string]string, or slice of a struct of
-// strings, that a rule test reaches from its body.
+// strings and ints, that a rule test reaches from its body.
 type Allowlist struct {
 	Name    string
 	Entries []Entry
@@ -155,7 +155,7 @@ func stringFields(e ast.Expr) ([]string, bool) {
 	}
 	var names []string
 	for _, f := range st.Fields.List {
-		if id, ok := f.Type.(*ast.Ident); !ok || id.Name != "string" {
+		if id, ok := f.Type.(*ast.Ident); !ok || id.Name != "string" && id.Name != "int" {
 			return nil, false
 		}
 		for _, n := range f.Names {

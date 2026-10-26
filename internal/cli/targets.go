@@ -10,21 +10,35 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// unitTarget is the unit arg names: a Slack message permalink (its thread), a pull request URL or
-// owner/repo#n, or <provider>:<key> of a compiled-in provider.
+// unitTarget is the unit arg names: <provider>:<key> of a compiled-in
+// provider, an address a provider looks up (a Slack message permalink, to
+// its thread), a web address a codec reads offline (a pull request URL), or
+// owner/repo#n.
 func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
-	if isSlackPermalink(arg) {
-		return e.slackPermalinkUnit(ctx, arg)
-	}
-	if strings.Contains(arg, "://") {
-		ref, err := pr.ParseURL(arg)
-		if err != nil {
-			return unit.Unit{}, fmt.Errorf("%s is neither a Slack message permalink nor a pull request URL", arg)
-		}
-		return ref.Unit(), nil
-	}
-	if p, key, ok := strings.Cut(arg, ":"); ok && key != "" && slices.Contains(e.providerIDs(), unit.ProviderID(p)) {
+	return resolveTarget(ctx, arg, e.providerIDs(), e.resolvers(), pluginCodecs())
+}
+
+// resolveTarget is unitTarget over the providers, their resolvers and
+// their codecs.
+func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID, resolvers map[unit.ProviderID]unit.Resolver, codecs *unit.Registry) (unit.Unit, error) {
+	if p, key, ok := strings.Cut(arg, ":"); ok && key != "" && !strings.HasPrefix(key, "//") && slices.Contains(providers, unit.ProviderID(p)) {
 		return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
+	}
+	for _, p := range providers {
+		r, ok := resolvers[p]
+		if !ok {
+			continue
+		}
+		key, ok, err := r.Resolve(ctx, arg)
+		switch {
+		case err != nil:
+			return unit.Unit{}, err
+		case ok:
+			return unit.Unit{Provider: p, Key: key}, nil
+		}
+	}
+	if u, ok := codecs.ParseURL(arg); ok {
+		return u, nil
 	}
 	if ref, err := pr.ParseKey(arg); err == nil {
 		return ref.Unit(), nil
@@ -32,13 +46,20 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
-// providerIDs are the providers of the compiled-in plugins and GitHub.
+// pluginCodecs are the codecs of the compiled-in plugins.
+func pluginCodecs() *unit.Registry {
+	var codecs []unit.Codec
+	for _, p := range plugins {
+		codecs = append(codecs, p.Codec)
+	}
+	return unit.NewRegistry(codecs...)
+}
+
+// providerIDs are the providers of the compiled-in plugins.
 func (e *Env) providerIDs() []unit.ProviderID {
-	out := []unit.ProviderID{unit.GitHub}
+	var out []unit.ProviderID
 	for _, p := range e.sourcePlugins() {
-		if !slices.Contains(out, p.ID) {
-			out = append(out, p.ID)
-		}
+		out = append(out, p.ID)
 	}
 	return out
 }

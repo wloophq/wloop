@@ -31,7 +31,7 @@ import (
 
 func githubDisabled(cfg *config.Config) {
 	off := false
-	cfg.Plugins = map[string]config.Plugin{string(unit.GitHub): {Enabled: &off}}
+	cfg.GitHub.Enabled = &off
 }
 
 // countedGitHub is the github plugin counting its builds, with a stream,

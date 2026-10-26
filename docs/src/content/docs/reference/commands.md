@@ -70,29 +70,24 @@ See [Troubleshooting](/guides/troubleshooting/).
 
 ## Pull requests
 
-### review
+### act
 
-Review someone else's pull request in its own worktree.
+Resolve a unit's open items, replies as drafts.
 
 ```sh
-{{command}} review <url> [--no-wait] [--no-brief] [guidance...]
+{{command}} act <url|permalink|slack:key> [guidance...]
 ```
 
-Start or continue a review round on someone else's pull request, in a dedicated workspace. Words after the URL are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
-
-| Flag | Description |
-| --- | --- |
-| `--no-wait` | Print the intake's number instead of following it |
-| `--no-brief` | Start the round without its brief |
+Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
 ```sh
-{{command}} review https://github.com/acme/api/pull/7
-{{command}} review https://github.com/acme/api/pull/7 look at the migration first
+{{command}} act https://github.com/acme/api/pull/7
+{{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
 ```
 
-See [Review someone else's pull request](/guides/review/).
+See [Inbox, entries and work units](/concepts/gtd/).
 
 ### address
 
@@ -102,7 +97,7 @@ Triage the reviews and failing checks of yours.
 {{command}} address <url> [--self-review] [--take-over] [--no-wait] [--no-brief] [guidance...]
 ```
 
-Triage the reviews and failing checks of a pull request you develop, in its workspace. Words after the URL are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
+Triage the reviews and failing checks of a pull request you develop, in its workspace, changing its code where they call for it; Act only settles open items and drafts replies. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
 
 | Flag | Description |
 | --- | --- |
@@ -119,6 +114,49 @@ Examples:
 ```
 
 See [Address reviews on your pull request](/guides/address/).
+
+### nudge
+
+Ask whoever it waits on for the next step.
+
+```sh
+{{command}} nudge <url> [guidance...]
+```
+
+Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic. The target is a pull request URL; words after it are guidance for the turn.
+
+Examples:
+
+```sh
+{{command}} nudge https://github.com/acme/api/pull/7
+{{command}} nudge https://github.com/acme/api/pull/7 the release is on Friday
+```
+
+See [Nudge whoever a pull request waits on](/guides/nudge/).
+
+### review
+
+Review someone else's pull request in its own worktree.
+
+```sh
+{{command}} review <url> [--no-wait] [--no-brief] [guidance...]
+```
+
+Start or continue a review round on someone else's pull request, in a dedicated workspace. The target is a pull request URL; words after it are guidance for the turn. It runs as an intake this command follows; Ctrl-C stops following, not the intake.
+
+| Flag | Description |
+| --- | --- |
+| `--no-wait` | Print the intake's number instead of following it |
+| `--no-brief` | Start the round without its brief |
+
+Examples:
+
+```sh
+{{command}} review https://github.com/acme/api/pull/7
+{{command}} review https://github.com/acme/api/pull/7 look at the migration first
+```
+
+See [Review someone else's pull request](/guides/review/).
 
 ### take-over
 
@@ -137,44 +175,6 @@ Examples:
 ```
 
 See [Take over a pull request](/guides/take-over/).
-
-### nudge
-
-Ask whoever it waits on for the next step.
-
-```sh
-{{command}} nudge <url> [guidance...]
-```
-
-Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic. Words after the URL are guidance for the turn.
-
-Examples:
-
-```sh
-{{command}} nudge https://github.com/acme/api/pull/7
-{{command}} nudge https://github.com/acme/api/pull/7 the release is on Friday
-```
-
-See [Nudge whoever a pull request waits on](/guides/nudge/).
-
-### act
-
-Resolve a unit's open items, replies as drafts.
-
-```sh
-{{command}} act <url|permalink|provider:key> [guidance...]
-```
-
-Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
-
-Examples:
-
-```sh
-{{command}} act https://github.com/acme/api/pull/7
-{{command}} act https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday
-```
-
-See [Inbox, entries and work units](/concepts/gtd/).
 
 ### remove
 
@@ -366,7 +366,7 @@ Stop or restart automatic rounds.
 {{command}} resume [<url>|<owner/repo>]...
 ```
 
-Stop or restart the workflows in apply mode and the board moves on those pull requests and repositories; with none, everywhere. Workflows in observe mode keep planning.
+Stop or restart the workflows that do not observe and the board moves on those pull requests and repositories; with none, everywhere. Workflows that observe keep planning.
 
 Examples:
 
@@ -449,14 +449,14 @@ See [Facts and steps](/reference/facts/).
 The blocks that apply to a repository.
 
 ```sh
-{{command}} profile show <owner/repo|url> [--kind <intent>] [--show] [--color auto|always|never]
+{{command}} profile show <owner/repo|url> [--intent <intent>] [--show] [--color auto|always|never]
 ```
 
 List the profile's blocks per intent, their conditions and which of them apply to that repository or pull request. `--show` prints the instructions a turn there reads.
 
 | Flag | Description |
 | --- | --- |
-| `--kind <intent>` | Only this intent's blocks |
+| `--intent <intent>` | Only this intent's blocks |
 | `--show` | Print the instructions a turn there would read |
 | `--color auto\|always\|never` | Lay the output out for a terminal; auto styles it on a terminal alone |
 
@@ -464,7 +464,7 @@ Examples:
 
 ```sh
 {{command}} profile show acme/api
-{{command}} profile show https://github.com/acme/api/pull/7 --kind review --show
+{{command}} profile show https://github.com/acme/api/pull/7 --intent review --show
 ```
 
 See [Write your review profile](/guides/review-profile/).
@@ -481,13 +481,13 @@ Name the block of the profile a rule with these conditions goes in, and the bloc
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 
 Examples:
 
 ```sh
-{{command}} profile where review --org acme --repo api
+{{command}} profile where review --organization acme --repo api
 ```
 
 See [Profile format](/reference/profile-blocks/).
@@ -504,7 +504,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 | `--section <heading>` | The ## heading the rule goes under |
 | `--title <title>` | The block's heading, for a new block |
@@ -515,7 +515,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 Examples:
 
 ```sh
-{{command}} profile add review --org acme -- Every migration needs a down step.
+{{command}} profile add review --organization acme -- Every migration needs a down step.
 {{command}} profile add nudge --apply -- Keep nudges to two sentences.
 ```
 
@@ -564,25 +564,28 @@ See [Write your review profile](/guides/review-profile/).
 
 ### profile schema
 
-The JSON Schema of the manifests.
+The JSON Schemas of the profile files, for editors.
 
 ```sh
-{{command}} profile schema [--workflow]
+{{command}} profile schema [--workflow|--actions|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml with `--workflow`, for an editor's TOML support.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
 | `--workflow` | The schema of workflow.toml |
+| `--actions` | The schema of actions.toml |
+| `--config` | The schema of config.json |
 
 Examples:
 
 ```sh
 {{command}} profile schema > intent.schema.json
+{{command}} profile schema --config > config.schema.json
 ```
 
-See [Intent manifest](/reference/intent-manifest/).
+See [Profile language](/reference/language/).
 
 ## Slack
 

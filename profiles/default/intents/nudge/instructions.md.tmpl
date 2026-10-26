@@ -48,8 +48,13 @@ the rule and say so in your report.
 Run no other command than the `gh` commands in these instructions and the
 record step's.
 
+{{if .Automated -}}
+A workflow of the user's started this nudge. The comment goes out under the
+user's name, to people who will read it as written by the user.
+{{- else -}}
 The user asked for this nudge by hand. The comment goes out under the user's
 name, to people who will read it as written by the user.
+{{- end}}
 
 ## Steps
 {{template "history" .}}

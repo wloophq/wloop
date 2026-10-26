@@ -15,7 +15,9 @@ Every outside tool sits behind a port the core declares (see [Layers](/architect
 | View sinks | `views.ViewSink` | the Orca board, in `internal/adapter/orca` | `internal/adapter/view/testsink` |
 | Sources of units | `port.Source` and `port.SourceStore`, driven by `internal/core/ingest`; the rest of a source is its `source.Module` (see [Plugins](/architecture/plugins/)) | `internal/adapter/source/github`, `internal/adapter/source/slack` | `internal/adapter/source/fakethread`, `core/ingest/ingesttest` |
 | Publishing an approved draft | `port.Effects` (`Publish`, `Verify`), optional `port.Validator` | each source's publisher | a fake publisher in `internal/core/outbox`'s tests |
-| Workflow facts | `automation.Units` | `internal/adapter/facts/github`, `internal/adapter/facts/session`, `internal/adapter/facts/workspace` | `core/automation/automationtest` with its contract suites |
+| A sent draft's effects | `outbox.Applier` (`Apply`, `Pending`), each effect an `outbox.Effect`, a plugin's in `source.Module.OnPosted` | the composition root's effect table, `internal/cli/builtins_effects.go` | `core/outbox/outboxtest` |
+| Drafts a workflow proposed | `automation.Withdrawals` (`Proposed`, `Withdraw`) | the Outbox's store | `core/automation/automationtest` |
+| Workflow facts | `automation.Units`; optional `Refresher`, `Settler`, `Gainer`, `Owner`, `Freshener`, `Seener`, `Dueer` and `Scoper` (the facts of a unit as one workflow reads them, such as `<slot>.settled_at`) | `internal/adapter/facts/github`, `internal/adapter/facts/session`, `internal/adapter/facts/workspace`, `internal/adapter/facts/entry` (the core-kept entry provider), `internal/adapter/facts/slack` (the Slack plugin's) | `core/automation/automationtest` with its contract suites |
 | Git and the file system | `workspaces.Tree`, `workspaces.Remote`, `sweep.LocalGit`, `dossiers.Files` | `internal/adapter/gitcheck`, `internal/gitx`, `internal/adapter/dossier` | the `workspacestest` checkouts |
 | Time and change | `port.Clock`, `port.Changes`, `port.Publisher` | the system clock, `internal/core/change` | fixed clocks in tests |
 

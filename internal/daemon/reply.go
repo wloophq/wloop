@@ -143,9 +143,8 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
-	always := draft.Approval{Mode: draft.Always}
 	d, err := o.Propose(ctx, outbox.Proposal{Unit: c.Unit, Items: c.Items, Entry: c.Entry, Kind: kind, Text: c.Text,
-		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Approval: &always})
+		Reaction: strings.Trim(strings.TrimSpace(c.Reaction), ":"), Origin: draft.Origin{Kind: draft.OriginUser}, Policy: draft.Fixed(draft.Approval{Mode: draft.Wait})})
 	if errors.Is(err, outbox.ErrDisabled) {
 		err = noPublisher{c.Unit.Provider, err}
 	}
@@ -166,12 +165,12 @@ func userDraftKind(c api.DraftCreate) (draft.Kind, error) {
 		if c.Reaction != "" {
 			return "", badRequest{"a reply takes text, not a reaction"}
 		}
-		return draft.Reply, nil
+		return draft.Kind(k), nil
 	case api.DraftReact:
 		if strings.TrimSpace(c.Text) != "" {
 			return "", badRequest{"a reaction takes an emoji, not text"}
 		}
-		return draft.React, nil
+		return draft.Kind(k), nil
 	default:
 		return "", badRequest{fmt.Sprintf("a draft you write is a %s or a %s, not %q", api.DraftReply, api.DraftReact, k)}
 	}

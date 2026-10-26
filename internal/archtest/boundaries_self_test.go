@@ -139,22 +139,22 @@ func TestProgramReadsFlagsAPredicateEvaluatedOutsideTheCatalog(t *testing.T) {
 	_, _, loader := planted(t, fset, module+"internal/intent", "load.go", `package intent
 type Program struct{}
 func (*Program) Eval() bool { return true }
-type Programs struct { Records, Visible, Enabled, Primary *Program; ActionTexts map[string]string }
+type Programs struct { Records, When, Primary *Program; Refuse []*Program; ActionTexts map[string]string }
 type Loaded struct { Programs map[string]Programs }
-type Other struct { Visible bool }
+type Other struct { When bool }
 `, nil)
 	deps := map[string]*types.Package{module + "internal/intent": loader}
 	f, info, _ := planted(t, fset, module+"internal/daemon", "x.go", `package daemon
 import "github.com/wloophq/wloop/internal/intent"
 type wrap struct { intent.Programs }
 func f(l *intent.Loaded, p *intent.Programs, w wrap, o intent.Other) bool {
-	_ = p.ActionTexts["hint"]
-	_ = l.Programs["review"].Enabled.Eval()
+	_ = p.ActionTexts["note"]
+	_ = l.Programs["review"].Refuse[0].Eval()
 	_ = w.Primary
 	_ = p.Records
-	_ = o.Visible
-	_ = intent.Programs{Visible: nil}
-	return p.Visible != nil
+	_ = o.When
+	_ = intent.Programs{When: nil}
+	return p.When != nil
 }
 `, deps)
 	flagged(t, "daemon", programReads(fset, "internal/daemon/x.go", info, f), 4, "only the loader and the catalog evaluate an intent's predicates")
@@ -167,12 +167,12 @@ func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
-const a = "record_round"
+const a = "pr.round_sent"
 const b = "nudge.prepare"
-const c = "pr_else_main"
-const d = "plan.drop_pending"
+const c = "linked_else_main"
+const d = "plan.cleared"
 const e = "review"
-const g = "record_round is fine inside a sentence"
+const g = "pr.round_sent is fine inside a sentence"
 var _ = builtin.Names
 `)
 	flagged(t, "daemon", builtinLiterals(fset, "internal/daemon/x.go", f), 4, "a builtin's name lives in its table")
@@ -195,11 +195,22 @@ const d = "classify"
 	}
 }
 
+func TestBuiltinLiteralsFlagsAnEffectNameOutsideTheTables(t *testing.T) {
+	t.Parallel()
+	fset, f := parse(t, `package cli
+const a = "entry.nudged"
+const b = "unit.closed"
+const c = "draft.propose"
+`)
+	flagged(t, "cli", builtinLiterals(fset, "internal/cli/serve_outbox.go", f), 3, "a builtin's name lives in its table")
+	flagged(t, "the effects table", builtinLiterals(fset, "internal/cli/builtins_effects.go", f), 0, "")
+}
+
 func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
 	var missing, extra []string
-	for _, want := range []string{"record_round", "nudge.prepare", "pr_else_main", "mark_addressed"} {
+	for _, want := range []string{"pr.round_sent", "nudge.prepare", "linked_else_main", "pr.addressed"} {
 		if !names[want] {
 			missing = append(missing, want)
 		}
@@ -210,5 +221,5 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 		}
 	}
 	flagged(t, "builtin names missing", missing, 0, "")
-	flagged(t, "no on_sent, prepare or workspace names with . or _", extra, 0, "")
+	flagged(t, "no effect, prepare or workspace names with . or _", extra, 0, "")
 }

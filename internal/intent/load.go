@@ -3,6 +3,7 @@
 package intent
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -84,11 +86,20 @@ type Loaded struct {
 	Problems  Problems                  // user intents that did not load, and overrides read as bundled
 	Broken    map[dintent.Name]Problems // user intents that failed, keyed by directory name
 	Reverted  map[dintent.Name]Problems // bundled intents read without the user's override, which does not load
+	// Warnings are what the loaded intents and workflows declare that loads
+	// but is deprecated.
+	Warnings Problems
 
 	Workflows       []workflow.Workflow // by order, then name; a user workflow that failed is not here
 	BrokenWorkflows map[string]Problems // user workflows that failed, keyed by directory name
 	// RevertedWorkflows are bundled workflows read without the user's override, which does not load.
 	RevertedWorkflows map[string]Problems
+
+	// Actions are the built-in actions' texts from actions.toml, by catalog id.
+	Actions map[string]BuiltinAction
+	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
+	// from defaults.toml.
+	EmptyRefusal string
 
 	skipped  []dintent.Name // kinds whose blocks need what a reverted override declared
 	layers   []profile.Layer
@@ -112,13 +123,12 @@ func (l *Loaded) Tree() (profile.Tree, error) {
 }
 
 type Programs struct {
-	Records     *expr.Program
-	Headline    []*expr.Program // per Headline.New case; nil for the unconditional last case
-	Also        []*expr.Program
-	Visible     *expr.Program
-	Enabled     *expr.Program
-	Primary     *expr.Program
-	ActionTexts map[string]*template.Template // reason_off, confirm, hint over the action fact map
+	Records  *expr.Program
+	Headline []*expr.Program // per Headline.New case; nil for the unconditional last case
+	Also     []*expr.Program
+	// Refuse are the refusals' when, per Refuse of the definition.
+	Refuse []*expr.Program
+	Action ActionPrograms
 }
 
 // unit is one intents/<name>/ directory on its way to a definition.
@@ -136,21 +146,38 @@ type unit struct {
 	programs Programs
 	// keyProblems are why a user intent loads without its key.
 	keyProblems Problems
+	// takenBy is the user intent that takes this bundled intent's role,
+	// with its key and its row driving.
+	takenBy *unit
+	// declaredKey and declaredDrives are what the bundled intent declared
+	// before takeRoles handed them over.
+	declaredKey    string
+	declaredDrives bool
 }
 
 func (u *unit) broken() bool { return len(u.sheet.problems) > 0 }
 
 // Load reads intents/ of the bundled FS and of each directory layer; check may be nil.
+// The partials under partials/ of each directory layer are parsed over base's;
+// one that does not parse, or that a problem names, is left out and the
+// bundled partials load instead.
 // Layers with an empty Dir are skipped: the bundled intents come from bundled only.
 // A user directory named as a bundled intent overrides its files one by one;
 // when the result does not load, the bundled intent stays and the problems
 // name the user's files.
 func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck) (*Loaded, Problems) {
 	reverted := brokenOverlays{}
+	partials := revertedPartials{}
 	for {
-		l, broken := load(layers, bundled, base, check, reverted)
+		set, problems := withPartials(base, layers, partials)
+		l, broken := load(layers, bundled, set, check, reverted)
+		if partials.breaking(layers, append(problems, l.Problems...)) {
+			continue
+		}
 		if len(broken) == 0 {
-			l.Problems = append(reverted.problems(), l.Problems...)
+			actions, actionProblems := loadActions(layers, bundled)
+			l.Actions = actions
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems
@@ -311,19 +338,22 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			})
 		}
 	}
+	defaults, defaultProblems := readDefaults(layers, bundled)
+	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
-		u.load(base)
-		if u.defined && !u.broken() && check != nil {
+		u.load(base, defaults)
+		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
 	}
 	crossCheck(units)
 	l := &Loaded{
-		Templates: map[dintent.Name]*template.Template{},
-		Programs:  map[dintent.Name]Programs{},
-		Broken:    map[dintent.Name]Problems{},
-		Problems:  dirProblems,
-		layers:    layers,
+		Templates:    map[dintent.Name]*template.Template{},
+		Programs:     map[dintent.Name]Programs{},
+		Broken:       map[dintent.Name]Problems{},
+		Problems:     dirProblems,
+		EmptyRefusal: defaults.Refusal,
+		layers:       layers,
 	}
 	var defs []dintent.Def
 	broken := brokenBy(units)
@@ -337,25 +367,43 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			continue
 		}
 		l.Problems = append(l.Problems, u.keyProblems...)
+		l.Warnings = append(l.Warnings, u.sheet.warnings...)
 		defs = append(defs, u.def)
 		l.Templates[u.name] = u.tmpl
 		l.Programs[u.name] = u.programs
 	}
 	l.Registry = dintent.NewRegistry(defs)
-	var wfProblems Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
+	var wfProblems, wfWarnings Problems
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.briefExtras)
 	l.Problems = append(l.Problems, wfProblems...)
+	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
 }
 
-func (l *Loaded) intentProblem(name string) string {
+// briefExtras are the brief.extra.* facts of p's brief intent.
+func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
+	d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
+	return builtin.ExtraFacts(d.Extra)
+}
+
+func (l *Loaded) turnProblem(name, runner string) (arg, msg string) {
 	if _, ok := l.Broken[dintent.Name(name)]; ok {
-		return fmt.Sprintf("the intent %q does not load", name)
+		return "intent", fmt.Sprintf("the intent %q does not load", name)
 	}
-	if _, ok := l.Registry.Get(dintent.Name(name)); !ok {
-		return fmt.Sprintf("unknown intent %q; the intents are %s", name, l.Registry.AllNames())
+	d, ok := l.Registry.Get(dintent.Name(name))
+	switch {
+	case !ok:
+		return "intent", fmt.Sprintf("unknown intent %q; the intents are %s", name, l.Registry.AllNames())
+	case d.Builds != "":
+		return "intent", fmt.Sprintf("the intent %q builds a %s and is never a turn", name, d.Builds)
+	case runner != "" && !d.Runs(runner):
+		runners := d.Runners
+		if runners == nil {
+			runners = []string{"session"}
+		}
+		return "runner", fmt.Sprintf("the intent %q does not run as %s; its runners are %s", name, runner, strings.Join(runners, ", "))
 	}
-	return ""
+	return "", ""
 }
 
 // BrokenNames is the kinds whose blocks are skipped, sorted: the user
@@ -375,9 +423,9 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) load(base *template.Template) {
+func (u *unit) load(base *template.Template, defaults manifestDefaults) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file}
+	s := &sheet{file: file, defaults: defaults}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})
@@ -389,11 +437,11 @@ func (u *unit) load(base *template.Template) {
 		return
 	}
 	tmplFile := u.files.path("instructions.md.tmpl")
-	body, err := u.files.read("instructions.md.tmpl")
-	if err != nil {
-		s.problems = append(s.problems, readProblem(tmplFile, err, missing))
-	}
+	body, bodyErr := u.files.read("instructions.md.tmpl")
 	m, problems, skip, complete := decode[manifest](file, src)
+	if bodyErr != nil && (m.Builds == "" || !errors.Is(bodyErr, fs.ErrNotExist)) {
+		s.problems = append(s.problems, readProblem(tmplFile, bodyErr, missing))
+	}
 	if !complete {
 		s.problems = append(s.problems, problems...)
 		return
@@ -401,17 +449,16 @@ func (u *unit) load(base *template.Template) {
 	defer func() {
 		s.problems = slices.DeleteFunc(s.problems, func(p Problem) bool { return skip != "" && unindexed(p.Field) == unindexed(skip) })
 		s.problems = append(s.problems, problems...)
+		s.addGrammar(grammar(builtin.SurfaceIntent, src))
 	}()
 	s.at = positions(src)
-	if !u.bundled {
-		s.refuseBundledOnly(m)
-	}
 	d := s.define(u.name, m)
 	d.Source = u.source
 	d.Bundled = u.bundled
+	u.loadExtra(s, &d)
 	s.validate(d)
 	u.programs = s.compile(d)
-	u.programs.ActionTexts = s.parseActionTexts(d.Action)
+	u.programs.Action.ActionTexts = s.parseActionTexts(d.Action)
 	if body != nil {
 		u.tmpl = s.parseMain(d, base, tmplFile, string(body))
 	}
@@ -452,6 +499,7 @@ func crossCheck(units []*unit) {
 		}
 	}
 	refusesBrokenProfiles(ordered)
+	takeRoles(ordered)
 	c := newClaims()
 	var broken []*unit
 	for _, u := range ordered {
@@ -466,6 +514,43 @@ func crossCheck(units []*unit) {
 	for _, u := range broken {
 		c.check(u, false)
 	}
+	for _, u := range ordered {
+		if t := u.takenBy; t != nil && t.broken() {
+			u.def.Key, u.def.DrivesRow = u.declaredKey, u.declaredDrives
+		}
+	}
+}
+
+// takeRoles hands each bundled intent's role to the clean user intent that
+// holds the same role on one of its providers: the user's holder takes its
+// key and its row driving; the bundled one keeps loading without them.
+func takeRoles(ordered []*unit) {
+	for _, u := range ordered {
+		if !u.defined || u.broken() || u.bundled || u.def.Role == "" {
+			continue
+		}
+		for _, b := range ordered {
+			if b.defined && b.bundled && b.def.Role == u.def.Role && slices.ContainsFunc(providersOf(u.def), func(p dunit.ProviderID) bool {
+				return slices.Contains(providersOf(b.def), p)
+			}) {
+				b.takenBy = u
+			}
+		}
+	}
+	for _, b := range ordered {
+		if b.takenBy != nil {
+			b.declaredKey, b.declaredDrives = b.def.Key, b.def.DrivesRow
+			b.def.Key, b.def.DrivesRow = "", false
+		}
+	}
+}
+
+// providersOf is the providers whose units d's turns run on.
+func providersOf(d dintent.Def) []dunit.ProviderID {
+	if d.Providers != nil {
+		return d.Providers
+	}
+	return []dunit.ProviderID{d.ProviderOrDefault()}
 }
 
 func checkProfiles(u *unit, defs map[dintent.Name]dintent.Def) {
@@ -477,16 +562,16 @@ func checkProfiles(u *unit, defs map[dintent.Name]dintent.Def) {
 	}
 	for i, a := range d.AlsoProfiles {
 		if o, ok := defs[dintent.Name(a.Profile)]; a.Profile != "" && (!ok || o.Profile == "") {
-			s.add(fmt.Sprintf("also_profiles[%d].profile", i), "%s is not an intent with judgment blocks", a.Profile)
+			s.add(fmt.Sprintf("also_profile[%d].profile", i), "%s is not an intent with judgment blocks", a.Profile)
 		}
 		if a.Define != "" && u.tmpl != nil && u.tmpl.Lookup(a.Define) == nil {
-			s.add(fmt.Sprintf("also_profiles[%d].define", i), "no template defines %s", a.Define)
+			s.add(fmt.Sprintf("also_profile[%d].define", i), "no template defines %s", a.Define)
 		}
 	}
 }
 
 // refusesBrokenProfiles breaks, until none is left, every clean intent whose
-// profile or also_profiles names a broken one, since that one's blocks are skipped.
+// profile or also_profile names a broken one, since that one's blocks are skipped.
 func refusesBrokenProfiles(ordered []*unit) {
 	byName := map[dintent.Name]*unit{}
 	for _, u := range ordered {
@@ -507,7 +592,7 @@ func refusesBrokenProfiles(ordered []*unit) {
 			}
 			for i, a := range u.def.AlsoProfiles {
 				if broken(a.Profile) {
-					u.sheet.add(fmt.Sprintf("also_profiles[%d].profile", i), "%s does not load; fix its manifest, or name another intent", a.Profile)
+					u.sheet.add(fmt.Sprintf("also_profile[%d].profile", i), "%s does not load; fix its manifest, or name another intent", a.Profile)
 				}
 			}
 			changed = changed || u.broken()
@@ -527,6 +612,15 @@ type claims struct {
 	keys    map[string]string
 	flags   map[string]meaning
 	drivers map[string]dintent.Name
+	roles   map[roleClaim]dintent.Name
+}
+
+// roleClaim is a role on one provider in one layer: a user intent takes a
+// bundled intent's role, two in one layer clash.
+type roleClaim struct {
+	bundled  bool
+	role     string
+	provider dunit.ProviderID
 }
 
 func newClaims() *claims {
@@ -540,7 +634,7 @@ func newClaims() *claims {
 	for k, id := range ids {
 		keys[k] = "the built-in action " + id
 	}
-	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}}
+	return &claims{keys: keys, flags: map[string]meaning{}, drivers: map[string]dintent.Name{}, roles: map[roleClaim]dintent.Name{}}
 }
 
 // key is d's key in canonical form, or why it may not take it on one of the
@@ -573,17 +667,33 @@ func (c *claims) check(u *unit, claim bool) {
 			u.def.Key = k
 			take = append(take, func() { c.keys[k] = string(d.Name) })
 		case u.bundled:
-			s.add("key", "%v", err)
+			s.add("shortcut", "%v", err)
 		default:
 			u.def.Key = ""
-			u.keyProblems = append(u.keyProblems, s.problem("key", "%v; the intent loads without a key (palette only)", err))
+			u.keyProblems = append(u.keyProblems, s.problem("shortcut", "%v; the intent loads without a shortcut (palette only)", err))
 		}
 	}
 	if d.DrivesRow {
 		if owner, taken := c.drivers[d.Workspace]; taken {
-			s.add("drives_row", "%s drives the rows of %s workspaces already; at most one intent per workspace", owner, d.Workspace)
+			s.add("workspace", "%s drives the rows of %s workspaces already: at most one intent per workspace, and %s drives them by its role %s", owner, d.Workspace, d.Name, d.Role)
 		} else {
 			take = append(take, func() { c.drivers[d.Workspace] = d.Name })
+		}
+	}
+	if d.Role != "" || d.Builds != "" {
+		for _, p := range providersOf(d) {
+			rc := roleClaim{u.bundled, d.Role, p}
+			if d.Builds != "" {
+				rc.role = "builds " + d.Builds
+			}
+			if owner, taken := c.roles[rc]; taken && owner != d.Name && d.Builds != "" {
+				s.add("builds", "%s builds the %s of %s units already; one builder per provider", owner, d.Builds, p)
+				continue
+			} else if taken && owner != d.Name {
+				s.add("role", "%s holds the role %s on %s units already; one intent per role and provider", owner, d.Role, p)
+				continue
+			}
+			take = append(take, func() { c.roles[rc] = d.Name })
 		}
 	}
 	own := map[string]meaning{}

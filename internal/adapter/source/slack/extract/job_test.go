@@ -335,9 +335,20 @@ func resolved(evidence string) func(obj) {
 	}
 }
 
+// briefObj is an answer's brief of goal, the kind a request.
+func briefObj(goal string) obj {
+	return obj{"unchanged": false, "goal": goal, "context": "", "kind": "request", "risk": "low", "risk_why": "",
+		"open_questions": []any{}, "tags": obj{"domain": []any{}, "audience": []any{}, "concern": []any{}}}
+}
+
 func answerJSON(t testing.TB, its, segs, links []obj, top obj) []byte {
 	t.Helper()
-	a := obj{"brief": "a brief", "viewer_role": "assignee", "started_by_viewer": false, "items": orEmpty(its), "verdict": "waits_on_viewer",
+	for _, sg := range segs {
+		if _, ok := sg["brief"]; !ok {
+			sg["brief"] = briefObj(fmt.Sprint(sg["topic"]))
+		}
+	}
+	a := obj{"brief": briefObj("a brief"), "viewer_role": "assignee", "started_by_viewer": false, "items": orEmpty(its), "verdict": "waits_on_viewer",
 		"verdict_why": "why", "closure_posted": false, "segments": orEmpty(segs), "links": orEmpty(links)}
 	for k, v := range top {
 		a[k] = v
@@ -440,7 +451,7 @@ func TestFailedCallKeepsTheCursor(t *testing.T) {
 	if its := r.items(u); len(its) != 1 || its[0].ID != "e"+strings.ReplaceAll(ts(1), ".", "") {
 		t.Fatalf("items after the retry %+v", its)
 	}
-	if st, _ := r.job.Store.States(context.Background(), []unit.Unit{u}); st[u].Brief != "a brief" {
+	if st, _ := r.job.Store.States(context.Background(), []unit.Unit{u}); GoalOf(st[u].Brief) != "a brief" {
 		t.Fatalf("state after the retry %+v", st)
 	}
 }
@@ -482,7 +493,7 @@ func TestDMSegmentsBeforeOps(t *testing.T) {
 		t.Fatalf("items deck %v pr %v", r.items(deck), r.items(pr))
 	}
 	st, err := r.job.Store.States(context.Background(), []unit.Unit{deck, pr})
-	if err != nil || st[deck].Topic != "the deck" || st[pr].Topic != "the PR" || st[pr].Brief != "a brief" {
+	if err != nil || st[deck].Topic != "the deck" || st[pr].Topic != "the PR" || GoalOf(st[pr].Brief) != "the PR" || GoalOf(st[deck].Brief) != "the deck" {
 		t.Fatalf("segment states %+v %v", st, err)
 	}
 	r.facts.post(jDM, ts(4), "", jOther, "any news on the PR?", jT0.Add(5*time.Minute))
@@ -546,6 +557,37 @@ func TestWatchCalls(t *testing.T) {
 	}
 }
 
+func TestAClosureMarkUnwatchesAThreadTheViewerStartedAfterWarmFor(t *testing.T) {
+	r := newRig(t)
+	r.cfg.Items.Heat.WarmFor = config.Days(time.Hour)
+	ref := slack.ObjectRef{Conversation: jChan, TS: ts(10)}
+	r.facts.post(jChan, ts(10), "", jViewer, "can someone check this", jT0)
+	r.asker.reply = func(_ int, q turns.Ask) ([]byte, error) {
+		return answerJSON(t, []obj{jItem("n1", ts(10))}, nil, nil, obj{"started_by_viewer": true}), nil
+	}
+	r.run(jT0.Add(2 * time.Minute))
+	r.watch.calls = nil
+	r.facts.post(jChan, ts(11), ts(10), jOther, "checked", jT0.Add(3*time.Minute))
+	id := "e" + strings.ReplaceAll(ts(10), ".", "")
+	r.asker.reply = func(_ int, q turns.Ask) ([]byte, error) {
+		return answerJSON(t, []obj{jItem(id, ts(10), resolved(ts(11)))}, nil, nil, obj{"started_by_viewer": true, "closure_posted": false}), nil
+	}
+	r.run(jT0.Add(6 * time.Minute))
+	r.run(jT0.Add(2 * time.Hour))
+	if len(r.watch.calls) != 0 {
+		t.Fatalf("unwatched with no closure: %+v", r.watch.calls)
+	}
+	if err := r.job.Store.DB.MarkClosed(context.Background(), thread(ts(10)), jT0.Add(2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	r.facts.post(jChan, ts(12), ts(10), jOther, "thanks", jT0.Add(2*time.Hour))
+	r.run(jT0.Add(2*time.Hour + 2*time.Minute))
+	r.run(jT0.Add(4 * time.Hour))
+	if !slices.Equal(r.watch.calls, []watchCall{{obj: ref, off: true}}) {
+		t.Fatalf("after unit.closed: %+v", r.watch.calls)
+	}
+}
+
 func postUnits(r *rig, n int) {
 	for i := range n {
 		r.facts.post(jChan, ts(1+i), "", jOther, fmt.Sprintf("ask %d", i), jT0)
@@ -554,7 +596,7 @@ func postUnits(r *rig, n int) {
 
 func TestDailyCallCap(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCalls, r.cfg.Slack.Extraction.MaxDay = 50, 100
+	r.cfg.Slack.Extraction.PerDay, r.cfg.Slack.Extraction.PerDayUSD = 50, 100
 	postUnits(r, 200)
 	_, skipped := r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 50 {
@@ -573,7 +615,7 @@ func TestDailyCostCap(t *testing.T) {
 	r := newRig(t)
 	cost := 1.0
 	r.asker.cost = &cost
-	r.cfg.Slack.Extraction.MaxDay = 2.5
+	r.cfg.Slack.Extraction.PerDayUSD = 2.5
 	postUnits(r, 5)
 	_, skipped := r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 3 || !strings.Contains(skipped, "2.50") {
@@ -591,7 +633,7 @@ func TestDailyCostCap(t *testing.T) {
 
 func TestUnknownCostCountsAsTheCallCap(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCall, r.cfg.Slack.Extraction.MaxDay = 1, 2
+	r.cfg.Slack.Extraction.PerCallUSD, r.cfg.Slack.Extraction.PerDayUSD = 1, 2
 	postUnits(r, 4)
 	r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 2 {
@@ -652,7 +694,7 @@ func TestBreakerOpensAndTrials(t *testing.T) {
 func TestTierFromConfig(t *testing.T) {
 	r := newRig(t)
 	r.cfg.Slack.Extraction.Tier = "balanced"
-	r.cfg.Slack.Extraction.MaxCall = 0.25
+	r.cfg.Slack.Extraction.PerCallUSD = 0.25
 	postUnits(r, 1)
 	r.run(jT0.Add(2 * time.Minute))
 	if n := r.asker.calls(); n != 1 || r.asker.asks[0].Tier != turns.TierBalanced || r.asker.asks[0].MaxCostUSD != 0.25 {
@@ -804,7 +846,7 @@ func resolveByReview(t *testing.T, r *rig, target unit.Unit) {
 
 func TestDailyCapSaysWhenItFrees(t *testing.T) {
 	r := newRig(t)
-	r.cfg.Slack.Extraction.MaxCalls = 1
+	r.cfg.Slack.Extraction.PerDay = 1
 	postUnits(r, 3)
 	at := jT0.Add(2 * time.Minute)
 	_, skipped := r.run(at)

@@ -63,6 +63,9 @@ func buildMenu(items []menubar.MenuItem) objc.ID {
 		} else {
 			mi.Send(sel("setAction:"), objc.SEL(0))
 		}
+		if it.Tooltip != "" {
+			mi.Send(sel("setToolTip:"), nsString(it.Tooltip))
+		}
 		mi.Send(sel("setEnabled:"), it.Enabled && (it.Action != nil || len(it.Children) > 0))
 		if it.Checked {
 			mi.Send(sel("setState:"), controlStateOn)

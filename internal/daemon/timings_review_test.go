@@ -171,7 +171,7 @@ func prsOf(rep api.TimingsReport) []string {
 func TestARequestOnAPullRequestWithNoTurnTakesTheSweeps(t *testing.T) {
 	t.Parallel()
 	books := turnstest.NewStore()
-	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: t0}}})
+	books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "by-sweep", Trigger: turn.Automated, State: turn.Sent, SentAt: t0}}})
 	s, _ := newIntakeServer(t, nil, func(d *Deps) { d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books} })
 	raw, _ := json.Marshal(actionPayload{Action: "review", AfterTurn: 0})
 	fresh := intake.Intake{Seq: 2, Unit: r7.Unit(), Intent: turn.Intent(dintent.Review), Request: raw}

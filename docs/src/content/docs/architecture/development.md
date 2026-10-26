@@ -46,7 +46,7 @@ cd docs && npm run dev
 
 ## Working on the procedures
 
-`LOOP_INSTRUCTIONS_DIR` points at a directory of `record.md.tmpl`, `history.md.tmpl`, `resume.md.tmpl`, `brief.md.tmpl`, `judgment.md.tmpl` and `intents/<name>/instructions.md.tmpl`, each replacing the embedded template of the same path.
+`LOOP_INSTRUCTIONS_DIR` points at a profile directory, such as a checkout's `profiles/default`: its `partials/<name>.md.tmpl` and `intents/<name>/instructions.md.tmpl` replace the bundled files of the same path when a turn renders, with no rebuild. The user profile's partials do not apply while it is set.
 
 `{{command}} help dev` lists the developer tools, which the main help leaves out. `{{command}} eval-instructions [--scenario <glob>]...` (`make eval-instructions`) judges the rendered turn instructions of every scenario in `internal/turn` and writes the report under the state directory's `eval/`.
 

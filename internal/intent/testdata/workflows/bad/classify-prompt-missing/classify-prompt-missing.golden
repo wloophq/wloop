@@ -1,0 +1,1 @@
+testdata/workflows/bad/classify-prompt-missing/workflows/case-workflow/workflow.toml:10:10: step[0].prompt: ask.md: no such file beside the manifest

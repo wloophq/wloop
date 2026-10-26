@@ -58,9 +58,9 @@ provider = "slack"
 session = { strategy = "new", title = "discuss" }
 
 [headline]
-resumed = "discussion of {{.Wording.Ref}}"
+resumed = "discussion of {{.unit.ref}}"
 [[headline.new]]
-text = "Discuss {{.Wording.Ref}}, {{.Who}}."
+line = 'Discuss {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
 surfaces = ["row", "cli"]
@@ -372,7 +372,56 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 		t.Fatal("the unit's messages follow the schema")
 	}
 	b := slackBook(t, te, slackThread2)
-	if len(b.Turns) != 1 || b.Turns[0].Mode != dturn.ModeHeadless || b.Turns[0].State != dturn.Done {
+	if len(b.Turns) != 1 || b.Turns[0].Runner != dturn.RunnerHeadless || b.Turns[0].State != dturn.Done {
 		t.Fatalf("turns %+v", b.Turns)
+	}
+}
+
+// TestAnActTurnReadsItsSlackThreadsBrief renders the brief the extraction
+// wrote of the thread into an act turn.
+func TestAnActTurnReadsItsSlackThreadsBrief(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.cfg = withoutWindows(te.cfg)
+	checkout := t.TempDir()
+	te.cfg.Placement = []config.PlacementRule{{Match: "slack:#general", Checkout: checkout, Role: "work"}}
+	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), storeFile), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	seedSlack(t, db)
+	te.cfg.Brief.Enabled = true
+	if err := db.Extraction().Save(context.Background(), sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{slackThread2: {
+		Brief: `{"goal":"Answer the second question","kind":"question","risk":"low","tags":["domain:billing"]}`, At: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	if d.Startup != nil {
+		if _, err := d.Startup(ctx); err != nil {
+			t.Fatal(err)
+		}
+		d.Startup = nil
+	}
+	svc, ok := d.Headless.(*headless.Service)
+	if !ok {
+		t.Fatalf("headless %T", d.Headless)
+	}
+	a := &promptAsker{}
+	svc.Asker = a
+	svc.Go = func(run func()) { run() }
+	te.Socket = serveSocket(t, daemon.New(d).Handler())
+	if _, err := client.New(te.Socket).Action(ctx, slackThread2, "act", api.ActionRequest{}); err != nil {
+		t.Fatalf("act: %v\n%s", err, te.err)
+	}
+	if len(a.asks) != 1 {
+		t.Fatalf("%d calls", len(a.asks))
+	}
+	prompt := a.asks[0].Prompt
+	for _, want := range []string{"## Brief", "- Goal: Answer the second question", "- Kind `question`, risk `low`", "`domain:billing`"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, prompt)
+		}
 	}
 }

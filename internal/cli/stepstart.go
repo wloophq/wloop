@@ -47,6 +47,8 @@ type roundCandidate struct {
 	ConflictHead string
 	LastReviewAt time.Time
 	Observed     bool
+	// Reason is why the planner plans the round.
+	Reason string
 }
 
 // roundCandidates is the github facts provider's Candidate: false when the
@@ -59,38 +61,45 @@ type roundCandidates interface {
 // ready.
 const refusalBriefNotReady = "brief not ready"
 
-// startArgs are a turn.start step's intent and round.
-type startArgs struct{ intent, round string }
+// startArgs are a turn.start step's intent, round and runner, with the
+// intent's manifest; def is zero when the intent does not load.
+type startArgs struct {
+	intent, round, runner string
+	def                   dintent.Def
+}
 
-func startOf(st workflow.Step) startArgs {
-	intent, _ := st.Args["intent"].(string)
-	r, _ := st.Args["round"].(string)
-	return startArgs{intent, r}
+// startOf is st's arguments and the manifest of the intent it starts on
+// units of p: the holder of the named intent's role, which is a user's
+// intent when one takes the role.
+func (e *Env) startOf(st workflow.Step, p unit.ProviderID) startArgs {
+	a := startArgs{}
+	a.intent, _ = st.Args["intent"].(string)
+	a.round, _ = st.Args["stage"].(string)
+	a.runner, _ = st.Args["runner"].(string)
+	if l := e.loadedIntents(); l != nil {
+		a.def, _ = l.Registry.Get(dintent.Name(a.intent))
+		if h, ok := l.Registry.ByRole(a.def.Role, p); a.def.Role != "" && ok {
+			a.def, a.intent = h, string(h.Name)
+		}
+	}
+	return a
 }
 
 func isTurnStart(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }
 
-// roundOf is the round of the sweep's that intent and round start, "" for
-// an intent that sends none.
-func roundOf(intent, r string) string {
-	switch dintent.Name(intent) {
-	case dintent.Review:
-		if r == roundFirst {
+// candidate is the sweep's round the intent's role's round kind and the step's
+// round start, "" for an intent that sends none.
+func (a startArgs) candidate() string {
+	switch a.def.RoundKind {
+	case builtin.RoundKindReview:
+		if a.round == roundFirst {
 			return roundFirst
 		}
 		return roundFollowup
-	case dintent.Address:
+	case builtin.RoundKindAddress:
 		return roundAddress
 	}
 	return ""
-}
-
-func (a startArgs) candidate() string { return roundOf(a.intent, a.round) }
-
-// capped says whether the intent's turns spend the day's round budget: the
-// sweep's rounds and the nudges, which post in the user's name.
-func (a startArgs) capped() bool {
-	return a.candidate() != "" || dintent.Name(a.intent) == dintent.Nudge
 }
 
 func (a startArgs) kind() stepKind {
@@ -111,14 +120,31 @@ func (a startArgs) kindName() string {
 	return step{kind: a.kind()}.roundKind()
 }
 
-func (a startArgs) reasonFact() string {
-	switch a.candidate() {
-	case roundFirst:
-		return "pr.first.reason"
-	case roundAddress:
-		return "pr.address.reason"
+// reason is why the round runs: the first round's planner says it, any
+// other round the intent's why over the unit's facts.
+func (s *stepSet) reason(p startPlan) string {
+	if p.args.candidate() == roundFirst {
+		return cmp.Or(p.cand.Reason, p.args.kindName())
 	}
-	return "pr.review.reason"
+	var why string
+	if l := s.e.loadedIntents(); l != nil {
+		var err error
+		if why, err = l.Why(p.args.def.Name, p.facts); err != nil {
+			s.logf("%s: the why of %s: %v", p.ref, p.args.intent, err)
+		}
+	}
+	return cmp.Or(why, p.args.kindName())
+}
+
+// runnerName is the step's runner, else the intent's first runner.
+func (a startArgs) runnerName() string {
+	if a.runner != "" {
+		return a.runner
+	}
+	if len(a.def.Runners) > 0 {
+		return a.def.Runners[0]
+	}
+	return string(dturn.RunnerSession)
 }
 
 // startPlan is what the guards of a turn.start read, for its run.
@@ -140,7 +166,7 @@ func (p startPlan) observed() bool { return p.round && p.cand.Observed }
 
 // address is why the plan's address round runs now; nil for other rounds.
 func (p startPlan) address() *turn.RoundReason {
-	if p.args.kind() != stepAddress {
+	if p.args.def.RoundKind != builtin.RoundKindAddress {
 		return nil
 	}
 	return automatedReason(p.facts, p.cand.Facts.Facts)
@@ -162,7 +188,10 @@ func (s *stepSet) startCheck(ctx context.Context, c stepCall, o automation.Check
 // the loop lock, asks the brief queue for the brief and counts the caps in
 // the bound round state; otherwise it starts nothing and writes nothing.
 func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool) (string, startPlan, error) {
-	p := startPlan{args: startOf(c.st)}
+	p := startPlan{args: s.e.startOf(c.st, c.u.Provider)}
+	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
+		return s.unitGuards(ctx, c, p)
+	}
 	ref, err := githubRef(c.u)
 	if err != nil {
 		return "", p, err
@@ -215,12 +244,10 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 			return why, p, nil
 		}
 	}
-	if dintent.Name(p.args.intent) == dintent.Nudge {
-		if why, err := s.nudgeRefusal(ctx, p); err != nil || why != "" {
-			return why, p, err
-		}
+	if why, err := s.refusal(p); err != nil || why != "" {
+		return why, p, err
 	}
-	if (p.round && !(p.observed() && p.args.kind() == stepFollowup)) || (!p.round && p.args.capped()) {
+	if !(p.observed() && p.args.kind() == stepFollowup) {
 		st := s.bound()
 		if !live {
 			if st, err = s.rounds(ctx, byHand); err != nil {
@@ -234,7 +261,7 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 		if err != nil {
 			return "", p, err
 		}
-		if why := st.CapReason(ref.String(), s.e.Now(), cfg.Rounds.PerPRPerDay); why != "" {
+		if why := st.CapReason(ref.String(), s.e.Now(), cfg.Turns.PerUnitPerDay); why != "" {
 			return why, p, nil
 		}
 	}
@@ -328,7 +355,7 @@ func (s *stepSet) briefGate(ctx context.Context, u unit.Unit, p *startPlan, live
 	if live {
 		ask = s.d.Briefs.Ready
 	}
-	rd, err := ask(ctx, u, p.first)
+	rd, err := ask(ctx, u, p.first, p.args.def.Brief.Need)
 	switch {
 	case err != nil:
 		p.briefMissing = "reading it failed (" + err.Error() + ")"
@@ -345,27 +372,17 @@ func waitText(rd intake.Readiness) string {
 	return fmt.Sprintf("%s, attempt %d", rd.Wait, rd.Attempt)
 }
 
-func (s *stepSet) nudgeRefusal(ctx context.Context, p startPlan) (string, error) {
-	if why := factString(p.facts, "pr.nudge_refusal"); why != "" {
-		return why, nil
-	}
-	if s.e.Rec == nil {
+// refusal is the why of the intent's first [[refuse]] whose when holds
+// over the unit's facts, "" for none.
+func (s *stepSet) refusal(p startPlan) (string, error) {
+	l := s.e.loadedIntents()
+	if l == nil {
 		return "", nil
 	}
-	overrides, err := s.e.Rec.Overrides(ctx)
-	if err != nil {
-		return "", err
-	}
-	switch o := overrides[p.ref]; {
-	case o.MuteUntilStateChange:
-		return "muted until its state changes", nil
-	case o.MutedUntil.After(s.e.Now()):
-		return "muted until " + o.MutedUntil.Local().Format(time.DateTime), nil
-	}
-	return "", nil
+	return l.Refusal(p.args.def.Name, p.facts)
 }
 
-func isCapRefusal(refusal string) bool { return strings.Contains(refusal, "daily cap reached") }
+func isCapRefusal(refusal string) bool { return strings.HasPrefix(refusal, round.CapReached) }
 
 // startNote is what the sweep wrote on a round it held: a first round
 // waiting for its brief starts it and says so; a cap's first hit of the day
@@ -409,7 +426,7 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if err != nil {
 		return err
 	}
-	args := startOf(c.st)
+	args := s.e.startOf(c.st, c.u.Provider)
 	cand, _, err := s.candidate(ctx, c.u, args.candidate())
 	if err != nil || cand.Observed {
 		return err
@@ -421,8 +438,8 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 	if s.e.Rec != nil {
 		errs = append(errs, s.e.Rec.Record(ctx, dinv.Event{PR: ref, Kind: dinv.KindRoundHeld, At: s.e.Now(), Data: why}))
 	}
-	fmt.Fprintf(s.e.Err, "%s held: %s %s, %s; raise the cap in %s or run '"+brand.Command+" review %s'\n",
-		s.e.stamp(), args.kindName(), ref, why, s.e.ConfigPath, ref.URL())
+	fmt.Fprintf(s.e.Err, "%s held: %s %s, %s; raise the cap in %s or run '"+brand.Command+" %s %s'\n",
+		s.e.stamp(), args.kindName(), ref, why, s.e.ConfigPath, args.intent, ref.URL())
 	if cand.Workspace.ID != "" {
 		errs = append(errs, s.e.setCard(ctx, cand.Workspace, "", true))
 	}
@@ -434,6 +451,9 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 // sweep sends no round of. The trigger stays automated, applied by hand
 // or not.
 func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts) (string, error) {
+	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
+		return s.unitStart(ctx, c, o)
+	}
 	st := s.bound()
 	if st == nil {
 		return "", errNoRoundState
@@ -459,19 +479,17 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 	}
 	why := c.why
 	if !p.round {
-		err := cliLauncher{s.e}.Launch(ctx, turns.Launch{Unit: c.u, Intent: dturn.Intent(p.args.intent), Guidance: guidance, Trigger: dturn.Automated, Why: &why})
+		started, err := s.startTurn(ctx, c.u, p.args, guidance, &why)
 		if err != nil {
 			if taken {
 				s.e.keepGuidance(ctx, p.ref, guidance)
 			}
 			return "", startError(err)
 		}
-		if p.args.capped() {
-			st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
-		}
-		return "started a " + p.args.intent + " turn", nil
+		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		return started, nil
 	}
-	reason := cmp.Or(factString(p.facts, p.args.reasonFact()), p.args.kindName())
+	reason := s.reason(p)
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
 		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, ConflictHead: p.cand.ConflictHead, LastReviewAt: p.cand.LastReviewAt,
 		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why, Address: p.address()})
@@ -509,6 +527,9 @@ func startError(err error) error {
 // startDismiss writes what skipping the round wrote: handled until
 // something new happens on the pull request.
 func (s *stepSet) startDismiss(ctx context.Context, c stepCall) error {
+	if !slices.Contains(builtin.RoundProviders, c.u.Provider) {
+		return nil
+	}
 	st := s.bound()
 	if st == nil {
 		return errNoRoundState
@@ -517,7 +538,7 @@ func (s *stepSet) startDismiss(ctx context.Context, c stepCall) error {
 	if err != nil {
 		return err
 	}
-	args := startOf(c.st)
+	args := s.e.startOf(c.st, c.u.Provider)
 	if r := args.candidate(); r != "" {
 		cand, ok, err := s.candidate(ctx, c.u, r)
 		if err != nil {

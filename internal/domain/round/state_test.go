@@ -13,7 +13,7 @@ func TestCapAndFingerprint(t *testing.T) {
 	if s.CapReason("a#1", now, 1) != "" {
 		t.Fatal("capped on a fresh state")
 	}
-	s.RecordFollowup("a#1", Reviewed, "fp1", now)
+	s.RecordSent("a#1", Reviewed, "fp1", now)
 	if s.CapReason("a#1", now, 1) == "" {
 		t.Fatal("per-PR cap not applied")
 	}
@@ -35,12 +35,12 @@ func TestSettersRecordWhatTheyChanged(t *testing.T) {
 	now := time.Date(2026, 10, 9, 10, 0, 0, 0, time.Local)
 	s := New()
 	s.SetHeads("a/b#1", "abc", "")
-	s.RecordFollowup("a/b#1", AddressedReviews, "", now)
+	s.RecordSent("a/b#1", AddressedReviews, "", now)
 	s.ClearFirstRoundSkipped("a/b#2")
 	s.FirstNote("hello", now)
 	s.FirstNote("hello", now)
 	ch := s.Changes()
-	if got, want := ch.PRs["a/b#1"], FieldSentAt|FieldRoundAt; got != want {
+	if got, want := ch.PRs["a/b#1"], FieldSentAt; got != want {
 		t.Fatalf("fields %b, want %b", got, want)
 	}
 	if got := ch.Marks["a/b#1"]; len(got) != 1 || !got[AddressedChecks] {

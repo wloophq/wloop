@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -26,12 +25,11 @@ func (db *DB) Items() coreitems.Store { return itemStore{db} }
 const (
 	itemsOfUnitSQL = `SELECT body FROM items WHERE provider = ? AND unit_key = ? ORDER BY created_at, id`
 	itemsQuerySQL  = `SELECT body FROM items`
-	itemsWaitingOn = `EXISTS (SELECT 1 FROM json_each(items.waiting_on) w WHERE w.value IN (SELECT value FROM json_each(?)))`
 	itemsOrder     = ` ORDER BY provider, unit_key, created_at, id`
-	upsertItemSQL  = `INSERT INTO items (provider, unit_key, id, body, state, waiting_on, confirmed, provenance, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	upsertItemSQL  = `INSERT INTO items (provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key, id) DO UPDATE SET body = excluded.body, state = excluded.state,
-		waiting_on = excluded.waiting_on, confirmed = excluded.confirmed, provenance = excluded.provenance,
+		confirmed = excluded.confirmed, provenance = excluded.provenance,
 		updated_at = excluded.updated_at`
 	insertItemOpSQL = `INSERT INTO item_ops (provider, unit_key, item, op, provenance, outcome, reason, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	itemOpsSQL      = `SELECT item, op, provenance, outcome, reason, at FROM item_ops WHERE provider = ? AND unit_key = ? AND at >= ? ORDER BY seq`
@@ -102,39 +100,11 @@ func (s itemStore) Query(ctx context.Context, q coreitems.Query) ([]items.Item, 
 		}
 		where = append(where, "("+strings.Join(ors, " OR ")+")")
 	}
-	if len(q.WaitingOn) > 0 {
-		keys := make([]string, len(q.WaitingOn))
-		for i, k := range q.WaitingOn {
-			keys[i] = strings.ToLower(k)
-		}
-		list, _ := json.Marshal(keys)
-		where, args = append(where, itemsWaitingOn), append(args, string(list))
-	}
 	query := itemsQuerySQL
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
-	got, err := scanItems(s.db.R().QueryContext(ctx, query+itemsOrder, args...))
-	if err != nil || len(q.WaitingOn) == 0 {
-		return got, err
-	}
-	me := items.Identity{Keys: q.WaitingOn}
-	return slices.DeleteFunc(got, func(it items.Item) bool {
-		return !slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Is(me) })
-	}), nil
-}
-
-// waitingKeys are the lowercased keys and aliases of who it waits on, a superset of what
-// Person.Is matches, for the SQL filter Query narrows in Go.
-func waitingKeys(it items.Item) string {
-	keys := []string{}
-	for _, p := range it.WaitingOn {
-		for _, k := range append([]string{p.Key}, p.Aliases...) {
-			keys = append(keys, strings.ToLower(k))
-		}
-	}
-	raw, _ := json.Marshal(keys)
-	return string(raw)
+	return scanItems(s.db.R().QueryContext(ctx, query+itemsOrder, args...))
 }
 
 func (s itemStore) Proposals(ctx context.Context, state coreitems.ProposalState) ([]coreitems.Proposal, error) {
@@ -215,7 +185,7 @@ func (s itemStore) Commit(ctx context.Context, c coreitems.Commit) error {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, upsertItemSQL, string(it.Unit.Provider), it.Unit.Key, it.ID, string(body),
-				string(it.State), waitingKeys(it), it.Confirmed, string(it.Provenance),
+				string(it.State), it.Confirmed, string(it.Provenance),
 				formatTime(it.CreatedAt), formatTime(it.UpdatedAt)); err != nil {
 				return fmt.Errorf("item %s %s: %w", it.Unit, it.ID, err)
 			}

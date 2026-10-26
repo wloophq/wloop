@@ -1,12 +1,12 @@
-subject = "github"
-when = 'trigger.event.kind == "merged" && pr.state == "merged"'
+summary = "Dismiss the open turn of a merged or closed pull request"
+provider = "github"
+when = 'trigger.event.kind == "merged" && pr.state == "MERGED"'
 
 [trigger]
 on = ["merged", "closed"]
 
 [[step]]
 use = "notify.self"
-text = "merged"
 
 [[step]]
 use = "turn.dismiss"

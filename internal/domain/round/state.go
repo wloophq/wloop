@@ -24,8 +24,6 @@ type PR struct {
 	// Marks are what the rounds covered, by mark name; see mark.Handled.
 	Marks  map[string]string
 	SentAt time.Time
-	// RoundAt is when the last round of any kind was sent.
-	RoundAt time.Time
 	// AgentHome is the agent home of the session that asked for the review,
 	// reused by the rounds the watch starts.
 	AgentHome string
@@ -48,7 +46,6 @@ type Fields uint8
 
 const (
 	FieldSentAt Fields = 1 << iota
-	FieldRoundAt
 	FieldAgentHome
 	FieldFirstRoundSkipped
 )
@@ -133,10 +130,14 @@ func (s *Store) SetMark(key, name, value string) {
 	s.changes.Marks[key][name] = true
 }
 
+// CapReached starts the refusal of a unit whose turns.per_unit_per_day is
+// spent.
+const CapReached = "turns.per_unit_per_day reached"
+
 // CapReason returns why an automated round for key may not run today, or "".
 func (s *Store) CapReason(key string, now time.Time, perPR int) string {
 	if s.Days[DayKey(now)].PerPR[key] >= perPR {
-		return fmt.Sprintf("per-PR daily cap reached (%d)", perPR)
+		return fmt.Sprintf("%s (%d)", CapReached, perPR)
 	}
 	return ""
 }
@@ -172,18 +173,10 @@ func (s *Store) firstNote(kind, text string, now time.Time) bool {
 // HeldToday lists the PRs a cap held back today.
 func (s *Store) HeldToday(now time.Time) []string { return s.Days[DayKey(now)].CapLogged }
 
-func (s *Store) RoundAt(key string) time.Time { return s.PRs[key].RoundAt }
-
 func (s *Store) AgentHome(key string) string { return s.PRs[key].AgentHome }
 
 func (s *Store) SetAgentHome(key, dir string) {
 	s.set(key, FieldAgentHome, func(p *PR) { p.AgentHome = dir })
-}
-
-// RecordRound notes a round the user started by hand: it does not count
-// against the caps.
-func (s *Store) RecordRound(key string, now time.Time) {
-	s.set(key, FieldRoundAt, func(p *PR) { p.RoundAt = now.UTC() })
 }
 
 // SetHeads marks the failing checks and the conflict of the heads an
@@ -197,13 +190,19 @@ func (s *Store) SetHeads(key, checksHead, conflictHead string) {
 	}
 }
 
-// RecordFollowup counts a round sent and sets its mark to fingerprint; an
-// empty fingerprint keeps the mark as it was, for a round no review started.
-func (s *Store) RecordFollowup(key, mark, fingerprint string, now time.Time) {
+// RecordSent notes an automated round sent, spends one of key's turns of
+// now's day, and sets its mark to fingerprint; an empty fingerprint keeps
+// the mark as it was, for a round no review started.
+func (s *Store) RecordSent(key, mark, fingerprint string, now time.Time) {
 	if fingerprint != "" {
 		s.SetMark(key, mark, fingerprint)
 	}
-	s.set(key, FieldSentAt|FieldRoundAt, func(p *PR) { p.SentAt, p.RoundAt = now.UTC(), now.UTC() })
+	s.set(key, FieldSentAt, func(p *PR) { p.SentAt = now.UTC() })
+	s.Count(key, now)
+}
+
+// Count spends one of key's turns of now's day, which CapReason reads.
+func (s *Store) Count(key string, now time.Time) {
 	day := DayKey(now)
 	d := s.Days[day]
 	if d.PerPR == nil {
@@ -227,7 +226,7 @@ func (s *Store) ClearFirstRoundSkipped(key string) {
 	}
 }
 
-// Pause holds every workflow in apply mode and board moves everywhere when
+// Pause holds every workflow that does not observe and board moves everywhere when
 // On, else on the repositories in Repos. A pull request's own pause is its
 // override's Hold.
 type Pause struct {

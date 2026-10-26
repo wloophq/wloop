@@ -58,6 +58,8 @@ func init() {
 			want: []string{"drafts_unit (provider=? AND unit_key=?)"}},
 		hotPlan{name: "drafts of a rule key", query: draftSelect + ` WHERE rule = ? AND rule_key = ?` + draftOrder, args: 2,
 			want: []string{"drafts_rule (rule=? AND rule_key=?)"}},
+		hotPlan{name: "drafts of a workflow on a unit", query: draftSelect + ` WHERE workflow = ? AND provider = ? AND unit_key = ?` + draftOrder, args: 3,
+			want: []string{"drafts_workflow (workflow=? AND provider=? AND unit_key=?)"}},
 	)
 }
 
@@ -65,9 +67,9 @@ func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
 	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Entry: "e1", Kind: draft.Nudge, Target: "#general",
 		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true,
 		Origin:   draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA"},
-		Approval: draft.Approval{Mode: draft.Window, Window: 10 * time.Minute}, Deadline: at.Add(10 * time.Minute),
+		Approval: draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}, Deadline: at.Add(10 * time.Minute),
 		State: draft.Proposed, Error: "", Reason: "",
-		Would:     draft.Would{Policy: draft.WouldSend, Reason: "a nudge", Outcome: ""},
+		Would:     draft.Would{Policy: draft.WouldRelease, Reason: "a nudge", Outcome: ""},
 		CreatedAt: at, UpdatedAt: at}
 }
 
@@ -120,7 +122,7 @@ func TestDraftsStoreRoundTrips(t *testing.T) {
 	discarded := sampleDraft(ghPull, at)
 	discarded.State, discarded.Reason, discarded.Entry = draft.Discarded, "observe", ""
 	discarded.Origin = draft.Origin{Kind: draft.OriginTurn, TurnSeq: 8}
-	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.Observe}, time.Time{}
+	discarded.Approval, discarded.Deadline = draft.Approval{Mode: draft.DryRun}, time.Time{}
 	d2, _ := s.Insert(ctx, discarded)
 	d3, _ := s.Insert(ctx, sampleDraft(slackThread, at))
 
@@ -197,7 +199,7 @@ func TestEvidenceNeverTouchesConfirmedFields(t *testing.T) {
 		t.Fatalf("after %+v %v", after, err)
 	}
 	got, was := after[0], before[0]
-	if len(got.Trail) != 1 || got.Trail[0].Kind != items.EvidenceSentDraft || got.Trail[0].Anchor.Ref != fmt.Sprintf("draft:%d:reply", d.ID) {
+	if len(got.Trail) != 1 || got.Trail[0].Kind != items.EvidenceSentDraft || got.Trail[0].Anchor.Ref != fmt.Sprintf("draft:%d", d.ID) {
 		t.Fatalf("trail %+v", got.Trail)
 	}
 	got.Trail, was.Trail = nil, nil

@@ -18,7 +18,7 @@ const (
 	TopicTurns                          // turns, turn_records, turn_answers
 	TopicSessions                       // sessions, agent_sessions, turn_stops
 	TopicIntakes                        // intakes
-	TopicBriefs                         // pr_briefs, brief_runs, pr_tags
+	TopicBriefs                         // unit_briefs, brief_runs, unit_tags
 	TopicUsage                          // turn_usage
 	TopicRounds                         // round_state, round_days, round_day_prs, round_day_notes, turn_instructions, instruction_parts
 	TopicPause                          // pause
@@ -49,9 +49,14 @@ const (
 		TopicGate | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
-	// SweepInputs leaves out LoopEvents and Rounds: the sweep's own writes.
+	// SweepInputs leaves out LoopEvents and Rounds, the sweep's own writes
+	// that never change its plan. Entries, items and drafts wake the
+	// workflows over GTD entries and Slack units; the drafts draft.propose
+	// writes wake one more pass, which their hold makes idle. The
+	// extraction notes SourceEvents.
 	SweepInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicOverrides | TopicTurns |
-		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer
+		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer |
+		TopicEntries | TopicItems | TopicDrafts
 	// BriefInputs leaves out the queue's own Briefs writes.
 	BriefInputs = TopicPRs | TopicFollow | TopicConfig
 )

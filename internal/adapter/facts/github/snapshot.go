@@ -421,7 +421,7 @@ func (v *view) buildTargets(ctx context.Context) *targets {
 		case w.HostID != wsdomain.LocalHost:
 		case w.IsMain:
 			authorWS = append(authorWS, w)
-		case strings.HasPrefix(w.DisplayName, v.cfg.ReviewPrefix):
+		case strings.HasPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix):
 			reviewWS = append(reviewWS, w)
 		default:
 			authorWS = append(authorWS, w)
@@ -443,7 +443,7 @@ func (v *view) buildTargets(ctx context.Context) *targets {
 		}
 		n := w.LinkedPR
 		if n == 0 {
-			n, _ = v.byBranch(owner, name, strings.TrimPrefix(w.DisplayName, v.cfg.ReviewPrefix))
+			n, _ = v.byBranch(owner, name, strings.TrimPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix))
 		}
 		if n == 0 {
 			continue
@@ -453,7 +453,7 @@ func (v *view) buildTargets(ctx context.Context) *targets {
 		add(t.review, ref, w)
 	}
 	for _, w := range v.workspaces {
-		if owner, name, ok := repoByID[w.RepoID].OwnerName(); ok && !w.IsMain && strings.HasPrefix(w.DisplayName, v.cfg.ReviewPrefix) && w.LinkedPR != 0 {
+		if owner, name, ok := repoByID[w.RepoID].OwnerName(); ok && !w.IsMain && strings.HasPrefix(w.DisplayName, v.cfg.GitHub.ReviewPrefix) && w.LinkedPR != 0 {
 			t.reviewLinked[strings.ToLower(pr.Ref{Owner: owner, Repo: name, Number: w.LinkedPR}.String())] = true
 		}
 	}

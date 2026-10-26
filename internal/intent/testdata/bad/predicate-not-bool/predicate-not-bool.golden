@@ -1,1 +1,1 @@
-testdata/bad/predicate-not-bool/intents/ask-author/intent.toml:15:11: action.primary: 1: predicate must be bool, got string
+testdata/bad/predicate-not-bool/intents/ask-author/intent.toml:15:20: action.primary.when: 1: predicate must be bool, got string

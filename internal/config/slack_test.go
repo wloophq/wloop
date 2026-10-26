@@ -17,9 +17,27 @@ func TestSlackExtractionDefaults(t *testing.T) {
 }
 
 func TestSlackExtractionParses(t *testing.T) {
-	c := loadRaw(t, `{"slack": {"extraction": {"enabled": false, "tier": "balanced", "language": "Portuguese",
-		"max_call_usd": 0.2, "max_day_usd": 1, "max_day_calls": 50, "quiet": "30s", "max_wait": "5m", "window_chars": 1000, "max_failures": 5}},
-		"items": {"heat": {"warm_for": "2d"}}}`)
+	c := loadRaw(t, `{
+		"slack": {
+				"extraction": {
+						"enabled": false,
+						"tier": "balanced",
+						"language": "Portuguese",
+						"per_call_usd": 0.2,
+						"per_day_usd": 1,
+						"per_day": 50,
+						"quiet": "30s",
+						"max_wait": "5m",
+						"window_chars": 1000,
+						"max_failures": 5
+				}
+		},
+		"items": {
+				"heat": {
+						"warm_for": "2d"
+				}
+		}
+}`)
 	e := c.Slack.Extraction
 	if e.On() || e.TierName() != "balanced" || e.LanguageName() != "Portuguese" || e.MaxCallUSD() != 0.2 || e.MaxDayUSD() != 1 ||
 		e.MaxDayCalls() != 50 || e.QuietFor() != 30*time.Second || e.MaxWaitFor() != 5*time.Minute || e.Window() != 1000 || e.GiveUpAfter() != 5 {

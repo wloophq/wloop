@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github/githubtest"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // fakeGitHub serves the issue comments REST endpoints of every pull request.
@@ -283,8 +284,7 @@ func TestGitHubValidateRefusesForeignTargets(t *testing.T) {
 		"other pull request": func(d *draft.Draft) { d.Target = "owner/repo#13" },
 		"other repository":   func(d *draft.Draft) { d.Target = "owner/other#12" },
 		"not a target":       func(d *draft.Draft) { d.Target = "#general" },
-		"react":              func(d *draft.Draft) { d.Kind, d.Reaction = draft.React, "eyes" },
-		"ask_owner":          func(d *draft.Draft) { d.Kind = draft.AskOwner },
+		"react":              func(d *draft.Draft) { d.Kind, d.Delivery, d.Reaction = draft.React, draft.Reaction, "eyes" },
 		"slack unit":         func(d *draft.Draft) { d.Unit = unit.Unit{Provider: "slack", Key: "C000AAA/1.2"} },
 		"empty":              func(d *draft.Draft) { d.Text = "  " },
 	} {
@@ -311,7 +311,7 @@ func (failingEvents) RecordEvent(context.Context, dinv.Event) error {
 func TestGitHubNudgeRecordsOnlyWhatMayHaveGone(t *testing.T) {
 	nudge := func() draft.Draft {
 		d := commentDraft("@{github:alice} @{github:bob} friendly nudge")
-		d.Kind = draft.Nudge
+		d.Kind, d.Effects = draft.Nudge, []string{builtin.EffectPRNudged}
 		return d
 	}
 	ctx := context.Background()
@@ -413,5 +413,14 @@ func TestGitHubWhereNamesThePullRequest(t *testing.T) {
 	}
 	if _, err := p.Where(context.Background(), commentDraft("ask @{slack:U000BBB}")); err == nil {
 		t.Fatal("a draft that cannot post has a destination")
+	}
+}
+
+func TestGitHubDeliversEveryTextDraftAsAComment(t *testing.T) {
+	p := &Publisher{}
+	for in, want := range map[draft.Delivery]draft.Delivery{draft.Message: draft.CommentDelivery, draft.CommentDelivery: draft.CommentDelivery, draft.Reaction: draft.Reaction} {
+		if got := p.Delivers(in); got != want {
+			t.Errorf("%s: %s, want %s", in, got, want)
+		}
 	}
 }

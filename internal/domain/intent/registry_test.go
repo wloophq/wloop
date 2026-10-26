@@ -11,14 +11,14 @@ import (
 func fixture() *Registry {
 	return NewRegistry([]Def{
 		{Name: "review", UserFacing: true, Answerable: true, Session: Session{Title: "review"}, Reconcile: "my_review",
-			Inputs: []Input{{Name: "dry", Type: "flag", Flag: "--dry"}},
+			Inputs: []Input{{Name: "dry", Type: "bool", Flag: "--dry"}},
 			Record: RecordRules{States: []string{"done", "asked"}, HistoryArtifact: "review-draft"}},
 		{Name: "probe", Session: Session{Title: "probe", CloseWhenDone: true}, Record: RecordRules{States: []string{"done"}}},
 		{Name: "nudge", UserFacing: true, Session: Session{Title: "nudge", CloseWhenDone: true}},
 		{Name: "address", UserFacing: true, Answerable: true, Session: Session{Title: "triage"},
-			Inputs: []Input{{Name: "self_review", Type: "flag", Flag: "--self-review"}, {Name: "take_over", Type: "flag", Flag: "--take-over"}}},
+			Inputs: []Input{{Name: "self_review", Type: "bool", Flag: "--self-review"}, {Name: "take_over", Type: "bool", Flag: "--take-over"}}},
 		{Name: "ask-author", UserFacing: true, Answerable: true, Session: Session{Title: "triage"},
-			Inputs: []Input{{Name: "take_over", Type: "flag", Flag: "--take-over"}}},
+			Inputs: []Input{{Name: "take_over", Type: "bool", Flag: "--take-over"}}},
 	})
 }
 
@@ -112,7 +112,7 @@ func TestClosesWhenDoneReconcileAndSessionTitles(t *testing.T) {
 }
 
 func TestForProviderListsTheProvidersIntentsAndAnyOnes(t *testing.T) {
-	r := NewRegistry([]Def{{Name: "review"}, {Name: "discuss", Provider: "thread"}, {Name: "act", Provider: AnyProvider}})
+	r := NewRegistry([]Def{{Name: "review", Provider: unit.GitHub}, {Name: "discuss", Provider: "thread"}, {Name: "act", Provider: AnyProvider}})
 	names := func(p unit.ProviderID) []Name {
 		var out []Name
 		for _, d := range r.ForProvider(p) {

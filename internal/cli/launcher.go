@@ -36,10 +36,13 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 	if err != nil {
 		return err
 	}
+	if d.Builds != "" {
+		return fmt.Errorf("the intent %s builds a %s and starts no turn", d.Name, d.Builds)
+	}
 	if d.Launch == builtin.LaunchProbe {
 		return c.probe(ctx, d, l)
 	}
-	if l.Unit.Provider != unit.GitHub {
+	if _, ok := dpr.RefOf(l.Unit); !ok {
 		return e.launchUnit(ctx, d, l)
 	}
 	run, ok := workspaceRuns()[d.Workspace]
@@ -105,7 +108,7 @@ func (e *Env) reviewFingerprint(ctx context.Context, cfg config.Config, ref gith
 		fmt.Fprintf(e.Err, "warning: %s: reading the reviews the round covers: %v\n", ref, err)
 		return ""
 	}
-	return dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.TrustedAuthors}).Fingerprint
+	return dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}).Fingerprint
 }
 
 // updateRounds applies a resume's effects to the round state.
@@ -235,7 +238,7 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 	if base.For(ref.Owner, ref.Repo).AgentHome == "" {
 		remember = home
 	}
-	return e.handRound(ctx, routeAsked, ref, guidance, d, func(st *round.Store, sr *sentRound) (bool, error) {
+	return e.handRound(ctx, routeAsked, ref, guidance, d, remember != "", func(st *round.Store, sr *sentRound) (bool, error) {
 		pr, err := e.openPR(ctx, ref)
 		if err != nil {
 			return false, err
@@ -252,10 +255,16 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 }
 
 func githubRef(u unit.Unit) (github.Ref, error) {
-	if u.Provider != unit.GitHub {
+	if u.Provider != (dpr.Codec{}).Provider() {
 		return github.Ref{}, fmt.Errorf("the %s unit %s is not a pull request", u.Provider, u.Key)
 	}
 	return dpr.ParseKey(u.Key)
+}
+
+// isPR says whether u names a pull request.
+func isPR(u unit.Unit) bool {
+	_, ok := dpr.RefOf(u)
+	return ok
 }
 
 func prOf(u unit.Unit) github.Ref {

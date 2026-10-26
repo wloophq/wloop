@@ -1,38 +1,46 @@
 label   = "Review"
 summary = "Start or continue a review round on someone else's pull request, in a dedicated workspace"
 verb    = "delegate"
-key     = "V"
+shortcut = "V"
+role    = "pr.review"
+provider = "github"
+skill = true
+why     = "{{.pr.review.reason}}"
 workspace = "review"
 session   = { strategy = "reuse_live", title = "review" }
 intake    = true
 start_line = "starting the review"
-board     = "review"
-drives_row = true
-reconcile = "my_review"
 profile   = "review"
-dims      = ["round"]
-records   = '!turn.plain'
-on_sent   = ["mark_reviewed", "record_round", "keeps_guidance", "event.round_sent", "plan.drop_pending"]
+dims      = ["stage"]
+effects   = ["pr.reviewed", "guidance.handed", "pr.round_sent", "plan.cleared"]
+
+[help]
+target   = "a pull request URL"
+summary  = "Review someone else's pull request in its own worktree"
+group    = "pull requests"
+examples = ["https://github.com/acme/api/pull/7", "https://github.com/acme/api/pull/7 look at the migration first"]
+docs     = "guides/review"
 
 [guidance]
 help = "what the round should look at"
 
 [headline]
-resumed = "review of {{.PR.Slug}}"
+resumed = "review of {{.pr.slug}}"
 [[headline.new]]
-when = 'turn.plain'
-text = "Dry-run review of {{.PR.Slug}}: trying a profile, nothing is published."
+when = 'turn.try'
+line = "Dry-run review of {{.pr.slug}}: trying a profile, nothing is published."
 [[headline.new]]
-when = 'turn.round == "follow-up"'
-text = "Follow-up review of {{.PR.Slug}}, {{.Who}}."
+when = 'turn.stage == "follow-up"'
+line = 'Follow-up review of {{.pr.slug}}, {{template "started_by" .}}.'
 [[headline.new]]
-text = "First review of {{.PR.Slug}}, {{.Who}}."
+line = 'First review of {{.pr.slug}}, {{template "started_by" .}}.'
 
 [action]
-primary = "!row.question && !pr.mine && !row.adopted"
-note_when_question = "Starts a new round; the agent's open question is replaced"
+primary = { when = "!row.question && !pr.mine && !pr.adopted" }
+warning = "{{if .row.question}}Starts a new round; the agent's open question is replaced{{end}}"
 
 [record]
+when      = '!turn.try'
 states    = ["done", "settled", "asked", "failed"]
 artifacts = ["review-draft"]
 outcome   = ["verdict", "url"]
@@ -46,4 +54,4 @@ require = [
 ]
 
 [resume]
-head_moved = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."
+changed = "Review the commits since; if they change anything the draft says, ask again (record `asked`) before publishing an approval."

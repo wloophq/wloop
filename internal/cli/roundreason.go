@@ -41,7 +41,7 @@ func automatedReason(f workflow.Facts, read dpr.Facts) *turn.RoundReason {
 // the last round, and the checks failing and the conflict now, each marked
 // handled when the last round covered this head.
 func handReason(f dpr.Facts, viewer string, handled time.Time, checksHead, conflictHead string, cfg config.Config) *turn.RoundReason {
-	in := dchange.AddressInput{PR: f, Viewer: viewer, SkipReviewers: cfg.AddressSkipReviewers}
+	in := dchange.AddressInput{PR: f, Viewer: viewer, SkipReviewers: cfg.GitHub.AddressSkipReviewers}
 	all, _ := dchange.ReviewsToAddress(in)
 	in.Handled = handled
 	since, _ := dchange.ReviewsToAddress(in)
@@ -55,7 +55,7 @@ func handReason(f dpr.Facts, viewer string, handled time.Time, checksHead, confl
 		r.Reviewers = append(r.Reviewers, turn.RoundReviewer{Login: who, Handled: !containsLogin(since, who)})
 	}
 	for _, c := range f.Checks {
-		if !c.Failed || containsLogin(cfg.IgnoreChecks, c.Name) || slices.ContainsFunc(r.Checks, func(x turn.FailingCheck) bool { return x.Name == c.Name }) {
+		if !c.Failed || containsLogin(cfg.GitHub.IgnoreChecks, c.Name) || slices.ContainsFunc(r.Checks, func(x turn.FailingCheck) bool { return x.Name == c.Name }) {
 			continue
 		}
 		r.Checks = append(r.Checks, turn.FailingCheck{Name: c.Name, Summary: c.Summary, URL: c.URL, Handled: f.HeadRefOid != "" && f.HeadRefOid == checksHead})

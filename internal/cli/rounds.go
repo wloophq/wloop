@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -97,11 +98,18 @@ func (s step) roundKind() string {
 }
 
 // blockedIntent is the intent of the round b holds.
-func blockedIntent(b inventory.StartBlock) dintent.Name {
+func (e *Env) blockedIntent(b inventory.StartBlock) dintent.Name {
 	if b.Round == (step{kind: stepAddress}).roundKind() {
-		return dintent.Address
+		return e.roleIntent(builtin.RoleAddress)
 	}
-	return dintent.Review
+	return e.roleIntent(builtin.RoleReview)
+}
+
+// roleIntent is the intent holding role on pull requests; "" when none
+// loads.
+func (e *Env) roleIntent(role string) dintent.Name {
+	d, _ := e.loadedIntents().Registry.ByRole(role, builtin.RoundProviders[0])
+	return d.Name
 }
 
 func (s step) describe() string {
@@ -331,18 +339,18 @@ func withGuidance(reason, guidance string) string {
 func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
-		if !cfg.FollowupsWithoutWorkspace {
+		if !cfg.GitHub.FollowupsWithoutWorkspace {
 			s.observe(ctx, st)
 			return false, nil
 		}
 		return s.openRound(ctx, st, guidance, turn.PlannedFollowUp)
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: turn.PlannedFollowUp, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance,
 		BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return false, err
 	}
-	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(dintent.Review, roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
+	submitted, verb, err := s.e.startRound(ctx, cfg, st.ws, st.pr, &sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{confirmed: st.confirmed, trusted: trusts(cfg, st.read), head: trackedHead(st.ws, st.read), pr: st.read}))
 	s.e.recordGuidance(ctx, st.pr, guidance)
 	if err != nil {
 		return false, err
@@ -357,7 +365,7 @@ func (s *sweep) followup(ctx context.Context, st step, guidance string) (bool, e
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s: %s", st.describe(), verb)
 	return true, nil
@@ -393,12 +401,12 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 	if err != nil {
 		return false, err
 	}
-	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(dintent.Review), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
+	sent, err := s.e.sendTurn(ctx, cfg, turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleReview)), Trigger: turn.Automated, Planned: planned, Unit: st.pr.Unit(), Payload: turnPR(pr), Guidance: guidance,
 		BriefMissing: st.briefMissing, Why: st.why})
 	if err != nil {
 		return false, err
 	}
-	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(dintent.Review, roundOptions{pr: pr}))
+	submitted, err := s.e.openReview(ctx, cfg, st.pr, pr, sent, s.e.sweepOptions(s.e.roleIntent(builtin.RoleReview), roundOptions{pr: pr}))
 	s.e.recordGuidance(ctx, st.pr, guidance)
 	if err != nil {
 		return false, err
@@ -407,7 +415,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 		s.logf("%s: created, but its submission was not observed; check the session", st.describe())
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), sent.ID))
 	s.logf("%s", st.describe())
 	return true, nil
@@ -440,7 +448,7 @@ func (s *sweep) observeAddress(ctx context.Context, st step) {
 func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, error) {
 	cfg := s.prConfig(st)
 	if st.ws.ID == "" {
-		if !cfg.AddressWithoutWorkspace {
+		if !cfg.GitHub.AddressWithoutWorkspace {
 			s.observeAddress(ctx, st)
 			return false, nil
 		}
@@ -457,8 +465,8 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		}
 		st.ws = ws
 	}
-	r := turn.Request{Intent: turn.Intent(dintent.Address), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, BriefMissing: st.briefMissing, Why: st.why}
-	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(dintent.Address, roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
+	r := turn.Request{Intent: turn.Intent(s.e.roleIntent(builtin.RoleAddress)), Trigger: turn.Automated, Unit: st.pr.Unit(), Payload: st.payload(), Guidance: guidance, BriefMissing: st.briefMissing, Why: st.why}
+	submitted, verb, turnID, err := s.e.startAddress(ctx, cfg, st.ws, r, s.e.sweepOptions(s.e.roleIntent(builtin.RoleAddress), roundOptions{trusted: trusts(cfg, st.read), pr: st.read}))
 	if err != nil {
 		return false, err
 	}
@@ -466,7 +474,7 @@ func (s *sweep) address(ctx context.Context, st step, guidance string) (bool, er
 		s.logf("%s: %s, but its submission was not observed; the next sweep retries", st.describe(), verb)
 		return false, nil
 	}
-	s.st.RecordFollowup(st.key(), st.mark(), st.fingerprint, s.now)
+	s.st.RecordSent(st.key(), st.mark(), st.fingerprint, s.now)
 	s.record(context.WithoutCancel(ctx), st, dinv.KindRoundSent, withInstructions(withGuidance(st.reason, guidance), turnID))
 	s.st.SetHeads(st.key(), st.checksHead, st.conflictHead)
 	s.logf("%s: %s", st.describe(), verb)

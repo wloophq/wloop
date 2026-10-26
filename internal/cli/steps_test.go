@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -73,7 +74,7 @@ func TestASessionCloseRefusedAtRunIsAGuardRefusal(t *testing.T) {
 	te.registerSession(t, dturn.Session{ID: "term-1", WorkspaceID: "ws1", StartedAt: testNow})
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds})
 	u := unit.Unit{Provider: unit.Session, Key: "term-1"}
-	refusal, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := s.Check(context.Background(), wfStep("session.close"), u, workflow.Why{}, automation.CheckOpts{Observe: false})
 	if err != nil || refusal == "" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -113,9 +114,9 @@ func newRemovalRig(t *testing.T, c wt.Checkout) *removalRig {
 	return r
 }
 
-func (r *removalRig) check(t *testing.T, mode workflow.Mode) string {
+func (r *removalRig) check(t *testing.T, observe bool) string {
 	t.Helper()
-	refusal, err := r.s.Check(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, automation.CheckOpts{Mode: mode})
+	refusal, err := r.s.Check(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, automation.CheckOpts{Observe: observe})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,10 +126,10 @@ func (r *removalRig) check(t *testing.T, mode workflow.Mode) string {
 func TestWorkspaceRemoveSkipsTheFetchDayInObserve(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
-	if got := r.check(t, workflow.ModeApply); got != workspaces.NotFetchedToday {
+	if got := r.check(t, false); got != workspaces.NotFetchedToday {
 		t.Fatalf("apply: %q", got)
 	}
-	if got := r.check(t, workflow.ModeObserve); got != "" {
+	if got := r.check(t, true); got != "" {
 		t.Fatalf("observe: %q", got)
 	}
 	if len(r.world.Remote.(*wt.Git).Fetches()) != 0 {
@@ -145,7 +146,7 @@ func TestWorkspaceRemoveNoteFetchesTheItemsPullRequest(t *testing.T) {
 	if got := r.world.Remote.(*wt.Git).Fetches(); len(got) != 1 || r.fetches.Marks() != 1 {
 		t.Fatalf("fetches %v, marks %d", got, r.fetches.Marks())
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("after the fetch: %q", got)
 	}
 	if err := r.s.Note(context.Background(), wfStep("workspace.remove"), r.u, workflow.Why{}, "1 modified tracked file in /w/ws"); err != nil {
@@ -162,7 +163,7 @@ func TestWorkspaceRemoveAppendsTheBackupCommand(t *testing.T) {
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "2 commits not pushed") || !strings.Contains(got, "; back them up with: git push origin HEAD:refs/heads/") {
+	if got := r.check(t, false); !strings.Contains(got, "2 commits not pushed") || !strings.Contains(got, "; back them up with: git push origin HEAD:refs/heads/") {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -175,33 +176,33 @@ func TestWorkspaceRemoveCheckReusesItsLookWhileTheFactsHold(t *testing.T) {
 	if err := r.fetches.Mark(context.Background(), "ws1", testNow); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("first look: %q", got)
 	}
 	dir := r.world.Tree.(*wt.Git).Dirs[r.world.Dir]
 	dir.Untracked = append(dir.Untracked, "threads.txt")
 	r.world.Files.(*wt.Files).Put(r.world.Dir+"/threads.txt", "notes")
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("the facts did not move, yet it looked again: %q", got)
 	}
 	r.sessions.Refuse = map[string]string{"ws1": "its agent is working"}
-	if got := r.check(t, workflow.ModeApply); got != "its agent is working" {
+	if got := r.check(t, false); got != "its agent is working" {
 		t.Fatalf("the sessions are always asked: %q", got)
 	}
 	r.sessions.Refuse = nil
 	r.units.Put(r.u, workflow.Facts{"workspace.pr": "acme/api#7", "workspace.pr_state": "OPEN", "workspace.repo": "acme/api", "workspace.untracked": 1})
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "threads.txt") {
+	if got := r.check(t, false); !strings.Contains(got, "threads.txt") {
 		t.Fatalf("moved facts: %q", got)
 	}
 	dir.Untracked = nil
-	if got := r.check(t, workflow.ModeApply); !strings.Contains(got, "threads.txt") {
+	if got := r.check(t, false); !strings.Contains(got, "threads.txt") {
 		t.Fatalf("a refusal is reused too: %q", got)
 	}
 	now = now.Add(2 * time.Hour)
 	if err := r.fetches.Mark(context.Background(), "ws1", now); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(t, workflow.ModeApply); got != "" {
+	if got := r.check(t, false); got != "" {
 		t.Fatalf("a look older than sweep.slow: %q", got)
 	}
 }
@@ -318,7 +319,7 @@ func TestWorkspaceRemoveForgetsTheLookOfAWorkspaceThatLeft(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.s.looks["gone"] = removeLook{}
-	r.check(t, workflow.ModeObserve)
+	r.check(t, true)
 	if _, ok := r.s.looks["gone"]; ok {
 		t.Fatal("kept the look of a workspace the manager no longer lists")
 	}
@@ -359,7 +360,7 @@ func TestWorkspaceUnregisterRefusesWhatItWouldRefuseToRun(t *testing.T) {
 		edit(&r.mgr.Workspaces[0])
 		r.u = wsdomain.UnitOf(r.mgr.Workspaces[0].Path)
 		r.units.Put(r.u, workflow.Facts{"workspace.pr": "acme/api#7", "workspace.pr_state": "OPEN", "workspace.repo": "acme/api"})
-		refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+		refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Observe: false})
 		if err != nil || refusal != want {
 			t.Errorf("check %q %v, want %q", refusal, err, want)
 		}
@@ -370,7 +371,7 @@ func TestWorkspaceUnregisterRefusesAnExistingPath(t *testing.T) {
 	t.Parallel()
 	r := newRemovalRig(t, wt.Checkout{})
 	r.world.Files.(*wt.Files).Put(r.world.Dir+"/README", "x")
-	refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := r.s.Check(context.Background(), wfStep("workspace.unregister"), r.u, workflow.Why{}, automation.CheckOpts{Observe: false})
 	if err != nil || refusal != "its path still exists" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -387,16 +388,75 @@ func (p *recordingPub) Publish(evs ...port.Event) {
 	p.evs = append(p.evs, evs...)
 }
 
+// besideWorkflow writes files beside workflow's manifest in a profile
+// directory te's config names.
+func besideWorkflow(t *testing.T, te *testEnv, workflow string, files map[string]string) {
+	t.Helper()
+	dir := t.TempDir()
+	wd := filepath.Join(dir, "workflows", workflow)
+	if err := os.MkdirAll(wd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(wd, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	te.cfg.Profile = dir
+}
+
 func TestNotifySelfPublishesItsText(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": "look at it", "named.md": "named text"})
+	pub := &recordingPub{}
+	units := automationtest.NewUnits()
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	units.Put(u, workflow.Facts{})
+	s := newStepSet(te.Env, stepDeps{Units: units, Rounds: te.Rounds, Pub: pub})
+	if _, err := s.Run(context.Background(), wfStep("notify.self", "text", "named.md"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.evs) != 2 || pub.evs[0].Kind != kindNotifySelf || pub.evs[0].Data != "named text" || pub.evs[1].Data != "look at it" || pub.evs[0].Unit != u {
+		t.Fatalf("published %+v", pub.evs)
+	}
+}
+
+func TestNotifySelfRendersItsTemplate(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": `{{.Workflow}}: {{index .Facts "pr.slug"}} at {{.Unit}}`, "broken.md": "{{.Workflow"})
+	pub := &recordingPub{}
+	units := automationtest.NewUnits()
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	units.Put(u, workflow.Facts{"pr.slug": "acme/api#7"})
+	s := newStepSet(te.Env, stepDeps{Units: units, Rounds: te.Rounds, Pub: pub})
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.evs) != 1 || pub.evs[0].Data != "ping: acme/api#7 at "+u.String() {
+		t.Fatalf("published %+v", pub.evs)
+	}
+	refusal, err := s.Check(context.Background(), wfStep("notify.self", "text", "broken.md"), u, workflow.Why{Workflow: "ping"}, automation.CheckOpts{})
+	if err == nil && refusal == "" {
+		t.Fatal("a template that does not parse passed the check")
+	}
+}
+
+func TestNotifySelfNotifiesAGoneUnitWithNoFacts(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": `{{.Workflow}}: {{len .Facts}} facts at {{.Unit}}`})
 	pub := &recordingPub{}
 	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds, Pub: pub})
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
-	if _, err := s.Run(context.Background(), wfStep("notify.self", "text", "look at it"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(pub.evs) != 1 || pub.evs[0].Kind != kindNotifySelf || pub.evs[0].Data != "look at it" || pub.evs[0].Unit != u {
+	if len(pub.evs) != 1 || pub.evs[0].Data != "ping: 0 facts at "+u.String() {
 		t.Fatalf("published %+v", pub.evs)
 	}
 }
@@ -437,15 +497,17 @@ type classifyRig struct {
 func newClassifyRig(t *testing.T, limit int) *classifyRig {
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
-	te.cfg.Classify.DailyCap = limit
+	te.cfg.Classify.PerDay = limit
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "c.db"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
 	r := &classifyRig{units: automationtest.NewUnits(), asker: &blockingAsker{release: make(chan struct{}), answer: `{"kind":"bug","urgent":true}`}, db: db, te: te,
-		u: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, st: wfStep("classify", "prompt", "what is it", "schema", `{"type":"object"}`),
+		u: unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}, st: wfStep("classify"),
 		why: workflow.Why{Workflow: "triage-bugs", Trigger: workflow.TriggerEvent}}
+	besideWorkflow(t, te, "triage-bugs", map[string]string{"prompt.md": "what is it", "schema.json": `{"type":"object"}`,
+		"strict.json": `{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","enum":["feature","chore"]},"urgent":{"type":"boolean"}}}`})
 	r.units.Put(r.u, workflow.Facts{"pr.fingerprint": "fp1", "pr.repo": "acme/api"})
 	r.s = newStepSet(te.Env, stepDeps{Units: r.units, Rounds: te.Rounds, Classify: classifyDeps{Store: db.Classifications(), Asker: r.asker}})
 	t.Cleanup(func() {
@@ -540,7 +602,7 @@ func TestClassifyStopsAtTheDailyCap(t *testing.T) {
 	}
 	r.s.classify.wait()
 	r.units.Set(r.u, "pr.fingerprint", "fp2")
-	refusal, err := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal, err := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Observe: false})
 	if err != nil || refusal != "daily classify cap 1 reached" {
 		t.Fatalf("check %q %v", refusal, err)
 	}
@@ -553,8 +615,8 @@ func TestClassifyStopsAtTheDailyCap(t *testing.T) {
 		t.Fatalf("asked %d times", r.asker.n())
 	}
 	r.s.d.Classify.BreakerOpen = func() bool { return true }
-	r.te.cfg.Classify.DailyCap = 5
-	if refusal, _ := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Mode: workflow.ModeApply}); refusal != "the brief breaker is open" {
+	r.te.cfg.Classify.PerDay = 5
+	if refusal, _ := r.s.Check(context.Background(), r.st, r.u, r.why, automation.CheckOpts{Observe: false}); refusal != "the brief breaker is open" {
 		t.Fatalf("breaker: %q", refusal)
 	}
 }
@@ -592,5 +654,25 @@ func TestAFailedClassifyIsAnAttemptNotAnotherCharge(t *testing.T) {
 	}
 	if spent, _ := r.db.Classifications().Spent(context.Background(), testNow); spent != 1 || asker.calls != 1 {
 		t.Fatalf("spent %d, asked %d", spent, asker.calls)
+	}
+}
+
+func TestAClassifyAnswerOutsideItsSchemaIsRefused(t *testing.T) {
+	t.Parallel()
+	r := newClassifyRig(t, 5)
+	r.st = wfStep("classify", "schema", "strict.json")
+	close(r.asker.release)
+	if _, err := r.run(t); !errors.As(err, new(automation.Deferred)) {
+		t.Fatalf("first run: %v", err)
+	}
+	r.s.classify.wait()
+	if _, err := r.run(t); err == nil || !strings.Contains(err.Error(), "bug is not one of") {
+		t.Fatalf("an answer outside the schema: %v", err)
+	}
+	units := classifiedUnits{Units: r.units, c: r.s.classify, workflows: func() []workflow.Workflow {
+		return []workflow.Workflow{{Name: "triage-bugs", Provider: unit.GitHub, Slot: "pr", Steps: []workflow.Step{r.st}}}
+	}}
+	if facts, _ := units.Facts(context.Background(), r.u); facts["classify.triage-bugs.kind"] != nil {
+		t.Fatalf("the refused answer became facts: %v", facts)
 	}
 }

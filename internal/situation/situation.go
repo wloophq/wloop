@@ -13,6 +13,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/workday"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 type Kind string
@@ -75,7 +76,9 @@ type Input struct {
 
 // TurnFacts is what the loop's store says of a turn.
 type TurnFacts struct {
-	Intent         dintent.Name
+	Intent dintent.Name
+	// Role is the role the turn's intent held.
+	Role           string
 	State, Summary string
 	// At is when the turn reached its state; AnsweredAt is when an answer
 	// was typed or resumed after its last record, zero without one.
@@ -266,7 +269,7 @@ func Derive(in Input) Result {
 // addressedSince says whether a round, an address turn, a push or a review
 // or comment of mine came on the pull request after at.
 func addressedSince(in Input, evs []dinv.Event, at time.Time) bool {
-	if in.Turn != nil && in.Turn.Intent == dintent.Address && in.Turn.At.After(at) {
+	if in.Turn != nil && in.Turn.Role == builtin.RoleAddress && in.Turn.At.After(at) {
 		return true
 	}
 	return slices.ContainsFunc(evs, func(e dinv.Event) bool {
@@ -336,7 +339,7 @@ const ReasonMax = 200
 // turn leaves it to GitHub and Orca's agent states.
 func turnSituation(in Input) (Result, bool) {
 	t := in.Turn
-	if t == nil || (t.Intent != dintent.Review && t.Intent != dintent.Address) {
+	if t == nil || (t.Role != builtin.RoleReview && t.Role != builtin.RoleAddress) {
 		return Result{}, false
 	}
 	at := func(k Kind, reason string) (Result, bool) {

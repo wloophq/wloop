@@ -20,7 +20,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
-	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -120,7 +119,7 @@ func seedRound(t *testing.T, te *testEnv, key string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.RecordFollowup(key, round.Reviewed, "", testNow)
+	st.Count(key, testNow)
 	if err := te.Rounds.Save(context.Background(), st); err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +271,7 @@ func addressScenario(t *testing.T) sweepCase {
 
 func exhaustCap(t *testing.T, sc sweepCase) {
 	t.Helper()
-	sc.te.cfg.Rounds.PerPRPerDay = 1
+	sc.te.cfg.Turns.PerUnitPerDay = 1
 	seedRound(t, sc.te, sc.ref.String())
 }
 
@@ -375,7 +374,7 @@ func TestALeftoverBranchAtAStoredHeadIsResetOnlyWithTheFlag(t *testing.T) {
 	}{{"stored head, flag on", true, "c1", true}, {"stored head, flag off", false, "c1", false}, {"unknown tip, flag on", true, "c9", false}} {
 		t.Run(c.name, func(t *testing.T) {
 			sc := lostWorkspaceScenario(t)
-			sc.te.cfg.FollowupsWithoutWorkspace = c.flag
+			sc.te.cfg.GitHub.FollowupsWithoutWorkspace = c.flag
 			sc.te.git.tips["feat/x"] = c.tip
 			pr, err := sc.te.openPR(context.Background(), sc.ref)
 			if err != nil {

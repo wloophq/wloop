@@ -47,7 +47,7 @@ func (m *Model) SetPlugins(ps []api.Plugin) {
 	registryMu.Lock()
 	regs := slices.Clone(registered)
 	registryMu.Unlock()
-	m.plugins = nil
+	m.plugins, m.served = nil, slices.Clone(ps)
 	for _, r := range regs {
 		if slices.ContainsFunc(ps, func(p api.Plugin) bool {
 			return p.ID == r.provider && p.Enabled && p.UI != nil && slices.Contains(p.UI.TUIViews, r.view.ID())

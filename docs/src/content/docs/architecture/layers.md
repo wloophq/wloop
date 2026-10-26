@@ -70,8 +70,10 @@ The commands call the daemon through `internal/api/client`. Those that work with
 |---|---|---|
 | A behavior: when something happens, on which units, with which text | the profile: a workflow under `profiles/default/workflows/<name>/` or an intent under `profiles/default/intents/<name>/` | see [Profile first](/architecture/profile-first/) |
 | A fact a predicate reads | `builtin.Facts` in `internal/intent/builtin/facts.go`, computed by the provider's facts adapter (`internal/adapter/facts/<provider>`) | `make docs-ref` |
-| A trigger that fires once per signal | a workflow with `[marks]` and `handled()` in its `when`; the signal as a fact of its provider if it is not one yet | see [Marks](/reference/workflow-manifest/#marks) |
+| A trigger that fires once per signal | a workflow with `[marks]` and `handled()` in its `when`; the signal as a fact of its provider if it is not one yet | see [Marks](/reference/workflow-manifest/) |
 | A workflow step or an intent builtin | its name in `internal/intent/builtin/builtin.go`, its implementation in `internal/cli/steps.go` or `internal/cli/builtins.go` (`internal/daemon/builtins.go` for the daemon's routes) | `make docs-ref` |
+| A key of a manifest, `actions.toml` or the configuration | a row of `builtin.Grammar` in `internal/intent/builtin/grammar*.go`, with its kind, values, default and doc, and the field that decodes it | `make docs-ref` |
+| A role or an effect | `builtin.Roles` in `internal/intent/builtin/roles.go`, `builtin.Effects` in `internal/intent/builtin/effects.go` | `make docs-ref` |
 | A use case | a package under `internal/core`, with the ports it needs declared there and a fake in `<name>test` | |
 | A value or a pure rule | `internal/domain/<name>` | |
 | An outside tool | an adapter under `internal/adapter/<tool>` implementing the core's port, plus one entry in `internal/cli/root.go` | |

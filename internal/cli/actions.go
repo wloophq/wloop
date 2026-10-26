@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -318,7 +319,7 @@ func (a envActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error
 }
 
 func (a envActions) Intent(ctx context.Context, name string, u unit.Unit, c daemon.Call) error {
-	if u.Provider != unit.GitHub {
+	if !slices.Contains(builtin.RoundProviders, u.Provider) {
 		e := a.call(c)
 		d, err := e.intentDef(name)
 		if err != nil {
@@ -436,10 +437,9 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
-	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.TrustedAuthors}); d.Fingerprint != "" {
+	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}); d.Fingerprint != "" {
 		st.SetMark(ref.String(), round.Reviewed, d.Fingerprint)
 	}
-	st.RecordRound(ref.String(), e.Now())
 	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
 	return rounds.Save(ctx, st)
 }

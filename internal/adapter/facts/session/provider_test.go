@@ -460,7 +460,7 @@ func TestPRStateJoinsTheInventory(t *testing.T) {
 	w.book(prUnit(7), turn.Turn{Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Done, Session: "term_1", SentTo: "term_1", SentAt: t0.Add(-4 * time.Hour), StartedAt: t0.Add(-4 * time.Hour), EndedAt: t0.Add(-3 * time.Hour)})
 	w.prs[prUnit(7)] = dinv.PR{State: "MERGED"}
 	f := w.facts(t, "term_1")
-	if f["session.pr_state"] != "merged" || f["session.repo"] != "acme/api" {
+	if f["session.pr_state"] != "MERGED" || f["session.repo"] != "acme/api" {
 		t.Errorf("pr_state %v, repo %v", f["session.pr_state"], f["session.repo"])
 	}
 	if f["session.newest_state"] != "done" || f["session.newest_intent"] != "review" || f["session.newest_age"] != 4*time.Hour {

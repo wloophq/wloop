@@ -131,7 +131,7 @@ func TestAFailedViewerRecordsNoSituation(t *testing.T) {
 func TestWaitingUnreadSkipsSituation(t *testing.T) {
 	t.Parallel()
 	store := turnstest.NewStore()
-	store.Put(turn.Book{Unit: pr.Ref(situationR7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "r1", State: turn.Started, Session: "term_1",
+	store.Put(turn.Book{Unit: pr.Ref(situationR7).Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r1", State: turn.Started, Session: "term_1",
 		SentAt: time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC), StartedAt: time.Date(2026, 10, 8, 9, 1, 0, 0, time.UTC)}}})
 	reg := turnstest.NewRegistry()
 	reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws-1"})

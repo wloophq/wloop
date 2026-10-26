@@ -75,7 +75,7 @@ func TestDoctorRepoShowPrintsTheInstructionsUnstyled(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	agentDaemon(t, te)
-	if code := te.run("profile", "show", "acme/api", "--kind", "nudge", "--show", "--color", "always"); code != 0 {
+	if code := te.run("profile", "show", "acme/api", "--intent", "nudge", "--show", "--color", "always"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	out := te.out.String()

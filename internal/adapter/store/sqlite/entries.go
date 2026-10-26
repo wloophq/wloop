@@ -54,8 +54,12 @@ func candidates(v gtd.View) string {
 	switch v {
 	case gtd.ViewFocus:
 		return `focus_on = 1 AND ` + notEnded
-	case gtd.ViewInbox, gtd.ViewWaiting, gtd.ViewSomeday:
-		return `state = '` + string(v) + `'`
+	case gtd.ViewInbox:
+		return `state = 'inbox'`
+	case gtd.ViewWaiting:
+		return `state = 'waiting'`
+	case gtd.ViewSomeday:
+		return `state = 'someday'`
 	case gtd.ViewNext:
 		return `state = 'next' OR (project != '' AND state NOT IN ('done', 'trash', 'reference')) OR (kind = 'project' AND sequential = 1)`
 	case gtd.ViewProjects:

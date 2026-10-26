@@ -62,7 +62,7 @@ func intentProfile(t *testing.T) string {
 		t.Fatal(err)
 	}
 	manifest := "label = \"Ask author\"\nsummary = \"Ask\"\nworkspace = \"review\"\nsession = { strategy = \"new\", title = \"ask\" }\n" +
-		"[headline]\nresumed = \"ask\"\n[[headline.new]]\ntext = \"Ask.\"\n[record]\nstates = [\"done\", \"failed\"]\n"
+		"[headline]\nresumed = \"ask\"\n[[headline.new]]\nline = \"Ask.\"\n[record]\nstates = [\"done\", \"failed\"]\n"
 	if err := os.WriteFile(filepath.Join(at, "intent.toml"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}

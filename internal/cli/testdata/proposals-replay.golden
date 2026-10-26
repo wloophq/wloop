@@ -1,0 +1,53 @@
+Mon 10-05 09:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Mon 10-05 09:00 propose close message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="e-d" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d1,d2 approval=wait text="Closing this out:\n\n- Item d1 of the thread: done\n- Item d2 of the thread: resolved"
+Mon 10-05 09:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000001.000100 entry="e-a" key=e-a:slack:U000ANA items=a1,a3 approval=wait text="@{slack:U000ANA}, any news on these?\n\n- Item a1 of the thread\n- Item a3 of the thread"
+Mon 10-05 09:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000001.000100 entry="e-a" key=e-a:slack:U000BOB items=a2 approval=wait text="@{slack:U000BOB}, any news on this?\n\n- Item a2 of the thread"
+Mon 10-05 09:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="e-b" key=e-b:slack:U000CID items=b1 approval=wait text="@{slack:U000CID}, any news on this?\n\n- Item b1 of the thread"
+Mon 10-05 12:00 send ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Mon 10-05 12:00 discard close key=slack:T000TEAM/C000CHAN/1700000004.000100
+Mon 10-05 12:00 send nudge key=e-a:slack:U000BOB
+Mon 10-05 12:00 discard nudge key=e-b:slack:U000CID
+Mon 10-05 18:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000006.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000006.000100 items=f1 approval=wait text="Who owns this?\n\n- Item f1 of the thread"
+Tue 10-06 09:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000009.000100 entry="e-k" key=e-k:slack:U000EVE items=k1 approval=wait text="@{slack:U000EVE}, any news on this?\n\n- Item k1 of the thread"
+Tue 10-06 12:00 discard nudge key=e-k:slack:U000EVE
+Tue 10-06 12:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Tue 10-06 12:00 propose close message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="e-d" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d1,d2 approval=wait text="Closing this out:\n\n- Item d1 of the thread: done\n- Item d2 of the thread: resolved"
+Tue 10-06 12:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000001.000100 entry="e-a" key=e-a:slack:U000BOB items=a2 approval=wait text="@{slack:U000BOB}, any news on this?\n\n- Item a2 of the thread"
+Tue 10-06 12:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="e-b" key=e-b:slack:U000CID items=b1 approval=wait text="@{slack:U000CID}, any news on this?\n\n- Item b1 of the thread"
+Tue 10-06 15:00 discard ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Tue 10-06 15:00 send nudge key=e-a:slack:U000BOB
+Tue 10-06 15:00 discard nudge key=e-b:slack:U000CID
+Tue 10-06 15:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000009.000100 entry="e-k" key=e-k:slack:U000FAY items=k2 approval=wait text="@{slack:U000FAY}, any news on this?\n\n- Item k2 of the thread"
+Tue 10-06 18:00 discard nudge key=e-k:slack:U000FAY
+Wed 10-07 12:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000009.000100 entry="e-k" key=e-k:slack:U000EVE items=k1 approval=wait text="@{slack:U000EVE}, any news on this?\n\n- Item k1 of the thread"
+Wed 10-07 15:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Wed 10-07 15:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000001.000100 entry="e-a" key=e-a:slack:U000BOB items=a1,a3 approval=wait text="@{slack:U000BOB}, any news on these?\n\n- Item a1 of the thread\n- Item a3 of the thread"
+Wed 10-07 15:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="e-b" key=e-b:slack:U000CID items=b1 approval=wait text="@{slack:U000CID}, any news on this?\n\n- Item b1 of the thread"
+Wed 10-07 15:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000003.000100 entry="e-c" key=e-c:slack:U000DAN items=c1 approval=wait text="@{slack:U000DAN}, any news on this?\n\n- Item c1 of the thread"
+Wed 10-07 18:00 discard ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Wed 10-07 18:00 send nudge key=e-b:slack:U000CID
+Wed 10-07 18:00 discard nudge key=e-c:slack:U000DAN
+Wed 10-07 18:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000009.000100 entry="e-k" key=e-k:slack:U000FAY items=k2 approval=wait text="@{slack:U000FAY}, any news on this?\n\n- Item k2 of the thread"
+Thu 10-08 18:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Thu 10-08 18:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="e-b" key=e-b:slack:U000CID items=b1 approval=wait text="@{slack:U000CID}, any news on this?\n\n- Item b1 of the thread"
+Thu 10-08 18:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000003.000100 entry="e-c" key=e-c:slack:U000DAN items=c1 approval=wait text="@{slack:U000DAN}, any news on this?\n\n- Item c1 of the thread"
+Thu 10-08 21:00 send ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Thu 10-08 21:00 discard nudge key=e-b:slack:U000CID
+Fri 10-09 12:00 propose close message on slack:T000TEAM/C000CHAN/1700000008.000100 entry="e-h" key=slack:T000TEAM/C000CHAN/1700000008.000100 items=h1 approval=wait text="Closing this out:\n\n- Item h1 of the thread: done"
+Fri 10-09 15:00 send close key=slack:T000TEAM/C000CHAN/1700000008.000100
+Fri 10-09 21:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Fri 10-09 21:00 propose nudge message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="e-b" key=e-b:slack:U000CID items=b1 approval=wait text="@{slack:U000CID}, any news on this?\n\n- Item b1 of the thread"
+Sat 10-10 00:00 discard ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Sun 10-11 00:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Sun 10-11 03:00 send ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Mon 10-12 03:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Mon 10-12 06:00 discard ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Mon 10-12 09:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000002.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000002.000100 items=b2 approval=wait text="Who owns this?\n\n- Item b2 of the thread"
+Mon 10-12 09:00 withdraw nudge key=e-c:slack:U000DAN reason=moot
+Tue 10-13 06:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Tue 10-13 09:00 send ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Tue 10-13 12:00 withdraw nudge key=e-a:slack:U000ANA reason=moot
+Wed 10-14 09:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Wed 10-14 12:00 discard ask_owner key=slack:T000TEAM/C000CHAN/1700000004.000100
+Thu 10-15 12:00 propose ask_owner message on slack:T000TEAM/C000CHAN/1700000004.000100 entry="" key=slack:T000TEAM/C000CHAN/1700000004.000100 items=d3 approval=wait text="Who owns this?\n\n- Item d3 of the thread"
+Fri 10-16 09:00 withdraw ask_owner key=slack:T000TEAM/C000CHAN/1700000002.000100 reason=assigned

@@ -48,10 +48,10 @@ func TestWorkflowsFactsWithoutASubjectListEverySlot(t *testing.T) {
 func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	if code := te.run("workflows", "facts", "slack"); code == 0 {
+	if code := te.run("workflows", "facts", "gmail"); code == 0 {
 		t.Fatal("exit 0")
 	}
-	if !strings.Contains(te.err.String(), "github, session, workspace") {
+	if !strings.Contains(te.err.String(), "entry, github, session, slack, workspace") {
 		t.Fatal(te.err.String())
 	}
 }
@@ -67,7 +67,7 @@ func TestWorkflowsStepsListTheVocabularyWithArguments(t *testing.T) {
 		if !strings.Contains(out, d.Name+" ") {
 			t.Errorf("lacks %s", d.Name)
 		}
-		for _, a := range d.Args {
+		for _, a := range builtin.StepArgs(d.Name) {
 			if !strings.Contains(out, a) {
 				t.Errorf("lacks %s's argument %s", d.Name, a)
 			}
@@ -83,5 +83,15 @@ func TestProfileSchemaPrintsTheWorkflowSchemaOnRequest(t *testing.T) {
 	}
 	if !bytes.Equal(te.out.Bytes(), intentload.WorkflowSchema) {
 		t.Fatal(te.out.String())
+	}
+}
+
+func TestProfileSchemaPrintsTheActionsAndConfigSchemas(t *testing.T) {
+	t.Parallel()
+	for flag, want := range map[string][]byte{"--actions": intentload.ActionsSchema, "--config": intentload.ConfigSchema} {
+		te := newTestEnv(t, &fake.Manager{})
+		if code := te.run("profile", "schema", flag); code != 0 || !bytes.Equal(te.out.Bytes(), want) {
+			t.Errorf("%s: exit %d: %s", flag, code, te.err)
+		}
 	}
 }

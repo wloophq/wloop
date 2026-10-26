@@ -28,7 +28,7 @@ func wireBriefView(v *brief.View) *api.BriefView {
 	out := &api.BriefView{State: v.State, Model: v.Model, At: v.At, Error: v.Error, Stale: v.Stale}
 	if b := v.Brief; b != nil {
 		out.Brief = &api.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk,
-			RiskWhy: b.RiskWhy, OpenQuestions: b.OpenQuestions, Tags: b.Tags}
+			RiskWhy: b.RiskWhy, OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra, ExtraVersions: b.ExtraVersions}
 	}
 	return out
 }
@@ -85,5 +85,5 @@ func wireTurn(t turn.Turn) api.Turn {
 	return api.Turn{Seq: t.Seq, Intent: string(t.Intent), ID: t.ID, Trigger: string(t.Trigger), Guidance: t.Guidance, Head: t.Head,
 		SentTo: t.SentTo, Session: t.Session, State: string(t.State), SentAt: t.SentAt, StartedAt: t.StartedAt, EndedAt: t.EndedAt,
 		ResumeOf: t.ResumeOf, ReplacedBy: t.ReplacedBy, Before: string(t.Before),
-		Agent: t.Agent, BriefRun: t.BriefRun, AgentSession: t.AgentSession, Mode: string(t.Mode), Workflow: t.Workflow}
+		Agent: t.Agent, BriefRun: t.BriefRun, AgentSession: t.AgentSession, Runner: string(t.Runner), Workflow: t.Workflow, Role: t.Role}
 }

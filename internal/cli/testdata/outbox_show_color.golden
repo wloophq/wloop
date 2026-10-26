@@ -10,7 +10,7 @@
 [dim]Mentions  [/]  @ana
 [dim]To        [/]  acme/api#7
 [dim]Origin    [/]  rule stalled-nudge, 26h ago
-[dim]Approval  [/]  always
+[dim]Approval  [/]  wait
 
 [dim]{{command}} outbox approve 12[/]
 [dim]{{command}} outbox edit 12 <markdown>[/]

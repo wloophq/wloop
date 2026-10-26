@@ -14,9 +14,11 @@ never write or rename a block path by hand.
    people's pull requests to `review`; how to answer reviews of the user's
    pull requests to `address`; the tone of reminders to `nudge`; an intent of the user's
    that names a `profile` takes blocks the same way. Map the
-   scope to conditions: `--org`, `--repo` (only with `--org`), `--user` (the
-   author), `--team`, `--association`, `--label`, `--base`, `--round`
-   (`first` or `follow-up`, review only), `--kind`, `--size`, `--risk`,
+   scope to conditions: `--organization`, `--repo` (only with
+   `--organization`), `--user` (the author), `--team`, `--association`,
+   `--label`, `--base`, `--stage` (`first` or `follow-up`, review only),
+   `--reviewer` (a reviewer the round answers, address only),
+   `--kind`, `--size`, `--risk`,
    `--tag <key>=<value>`. No condition means every pull request. Ask only
    when the scope is ambiguous.
 2. Run `{{command}} profile where <intent> [conditions]` for each intent and

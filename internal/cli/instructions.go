@@ -39,7 +39,7 @@ func instructionsUsage(reg *dintent.Registry) string {
 			byHand = append(byHand, string(d.Name))
 		}
 	}
-	return "usage: instructions " + strings.Join(byHand, "|") + " [<pr-url>] [<intent flags>] [--agent <name>] [-- <guidance...>]\n" +
+	return "usage: instructions " + strings.Join(byHand, "|") + " [<target>] [<intent flags>] [--agent <name>] [-- <guidance...>]\n" +
 		"       instructions " + strings.Join(stored, "|") + " --turn <id> [<pr-url>]"
 }
 
@@ -90,7 +90,7 @@ func runInstructions(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	if len(pos) > 1 {
-		return fmt.Errorf("one pull request URL at most\n%s", usage)
+		return fmt.Errorf("one target at most\n%s", usage)
 	}
 	var url string
 	if len(pos) == 1 {
@@ -145,7 +145,7 @@ func (e *Env) storedInstructions(ctx context.Context, reg *dintent.Registry, int
 	}
 	switch {
 	case len(pos) > 1:
-		return fmt.Errorf("one pull request URL at most\n%s", usage)
+		return fmt.Errorf("one target at most\n%s", usage)
 	case id == "":
 		return errors.New("--turn needs the id of a turn")
 	case len(given) > 0:

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/config"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -55,7 +56,8 @@ func TestEveryCommandHasItsHelp(t *testing.T) {
 		if len(tp.Usage) == 0 || tp.About == "" || tp.Summary == "" || len(tp.Examples) == 0 {
 			t.Errorf("%s lacks a usage, description, summary or example: %+v", tp.label(), tp)
 		}
-		if _, ok := commands()[strings.Fields(tp.Names[0])[0]]; !ok && !tp.intent {
+		_, intent := te.loadedIntents().Registry.Get(dintent.Name(tp.Names[0]))
+		if _, ok := commands()[strings.Fields(tp.Names[0])[0]]; !ok && !intent {
 			t.Errorf("%s names no command", tp.label())
 		}
 	}
@@ -79,7 +81,7 @@ func TestUsageListsEveryCommandByTask(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	got := helpOut(t, te, "--help")
-	for _, want := range []string{"\nGET STARTED\n  init ", "\nPULL REQUESTS\n  review ", "\nWHAT WAITS ON YOU\n", "\nAUTOMATION\n", "\nPROFILE\n", "\nSLACK\n", "\nSETUP\n", "\nTROUBLESHOOTING\n",
+	for _, want := range []string{"\nGET STARTED\n  init ", "\nPULL REQUESTS\n  act ", "\nWHAT WAITS ON YOU\n", "\nAUTOMATION\n", "\nPROFILE\n", "\nSLACK\n", "\nSETUP\n", "\nTROUBLESHOOTING\n",
 		"  pause/resume ", "  track/untrack ", "  slack follow/unfollow ", "  app install ", "  turn show ", "  probe ", "Run '" + te.command() + " <command> --help'"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("usage lacks %q", want)
@@ -138,7 +140,7 @@ func TestACommandsHelpComesFromEitherSpelling(t *testing.T) {
 	}{
 		{[]string{"plan", "--help"}, "  " + te.command() + " plan apply <id|url>..."},
 		{[]string{"plan", "apply", "-h"}, "  " + te.command() + " plan dismiss <id|url>..."},
-		{[]string{"profile", "show", "acme/api", "--help"}, "--kind <intent>"},
+		{[]string{"profile", "show", "acme/api", "--help"}, "--intent <intent>"},
 		{[]string{"slack", "follow", "--help"}, te.command() + " slack unfollow <permalink>"},
 		{[]string{"resume", "--help"}, te.command() + " pause [<url>|<owner/repo>]..."},
 		{[]string{"review", "https://github.com/acme/api/pull/7", "--help"}, "--no-brief"},
@@ -266,7 +268,7 @@ func TestHelpDevListsTheDeveloperTools(t *testing.T) {
 	}
 }
 
-func TestBundledIntentsKeepTheirPlace(t *testing.T) {
+func TestTheBundledIntentsLeadTheGroupTheirManifestsName(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	var prs []string
@@ -277,7 +279,7 @@ func TestBundledIntentsKeepTheirPlace(t *testing.T) {
 			}
 		}
 	}
-	if want := []string{"review", "address", "take-over", "nudge", "act", "remove"}; !slices.Equal(prs, want) {
+	if want := []string{"act", "address", "nudge", "review", "take-over", "remove"}; !slices.Equal(prs, want) {
 		t.Errorf("PULL REQUESTS lists %q, want %q", prs, want)
 	}
 }

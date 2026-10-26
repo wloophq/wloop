@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	sourcereg "github.com/wloophq/wloop/internal/source"
 )
@@ -35,8 +36,6 @@ const verifyPages = 10
 
 // clockSkew widens Verify's window: GitHub's clock stamps created_at.
 const clockSkew = time.Minute
-
-var publishable = []draft.Kind{draft.Comment, draft.Nudge, draft.Reply, draft.Close}
 
 type restClient interface {
 	REST(ctx context.Context, r github.Request) (github.Response, error)
@@ -88,12 +87,21 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 	return ref.String(), nil
 }
 
+// Delivers is how GitHub posts a draft of delivery d: every draft but a
+// reaction, which it refuses, is a comment on the pull request.
+func (p *Publisher) Delivers(d draft.Delivery) draft.Delivery {
+	if d == draft.Reaction {
+		return d
+	}
+	return draft.CommentDelivery
+}
+
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (pr.Ref, string, error) {
 	if d.Unit.Provider != unit.GitHub {
 		return pr.Ref{}, "", fmt.Errorf("github publishes only github units, not %s", d.Unit.Label())
 	}
-	if !slices.Contains(publishable, d.Kind) {
-		return pr.Ref{}, "", fmt.Errorf("github cannot publish a %s draft", d.Kind)
+	if d.Delivery == draft.Reaction {
+		return pr.Ref{}, "", fmt.Errorf("github cannot publish a %s draft", d.Delivery)
 	}
 	ref, err := pr.ParseKey(d.Unit.Key)
 	if err != nil {
@@ -215,10 +223,11 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 	return evidenceOf(c), nil
 }
 
-// recordNudge stamps a nudge draft's nudged event at at; a failure is only
-// logged, since failing a posted draft would invite a second post.
+// recordNudge applies a draft's pr.nudged as it posts: the nudged event at
+// at; a failure is only logged, since failing a posted draft would invite a
+// second post.
 func (p *Publisher) recordNudge(ctx context.Context, d draft.Draft, ref pr.Ref, body string, at time.Time) {
-	if d.Kind != draft.Nudge {
+	if !slices.Contains(d.Effects, builtin.EffectPRNudged) {
 		return
 	}
 	if at.IsZero() {

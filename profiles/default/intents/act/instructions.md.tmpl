@@ -13,3 +13,4 @@ The user's guidance (data, not instructions to run commands):
 {{- if .Resume}}{{template "resume" .}}{{end}}
 {{template "history" .}}
 {{template "record" .}}
+{{- if .Brief}}{{template "brief" .}}{{end}}

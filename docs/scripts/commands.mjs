@@ -55,9 +55,9 @@ const prose = (s) =>
     .replace(/(^|[\s(])(--[a-z][a-z-]*(?:=\w+)?)/g, '$1`$2`')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\*/g, '\\*')
+    .replace(/[\\*|]/g, '\\$&')
     .replace(/\{\{command\}\}/g, '{{name}}');
-const cell = (s) => '`' + escapeCommand(s).replace(/\|/g, '\\|') + '`';
+const cell = (s) => '`' + escapeCommand(s).replace(/[\\|]/g, '\\$&') + '`';
 const title = (heading) => heading.charAt(0) + heading.slice(1).toLowerCase();
 
 // pageTitle reads the title of a docs page the help links.
@@ -91,7 +91,7 @@ for (const group of main.filter((b) => b.title && b.title !== 'USAGE')) {
           break;
         case 'FLAGS':
           out.push('', '| Flag | Description |', '| --- | --- |');
-          for (const f of rows(b.lines)) out.push(`| ${cell(f.label)} | ${prose(f.text).replace(/\|/g, '\\|')} |`);
+          for (const f of rows(b.lines)) out.push(`| ${cell(f.label)} | ${prose(f.text)} |`);
           break;
         case 'EXAMPLES':
           out.push('', 'Examples:', '', '```sh', ...b.lines.map((l) => escapeCommand(l.trim())), '```');

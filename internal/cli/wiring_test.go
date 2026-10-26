@@ -177,7 +177,7 @@ func TestServeStartsTheWantedBriefs(t *testing.T) {
 	defer db.Close()
 	eventually(t, "a wanted brief run", func() bool {
 		var n int
-		return db.R().QueryRowContext(context.Background(), `SELECT count(*) FROM brief_runs WHERE trigger = 'wanted' AND number = 7`).Scan(&n) == nil && n > 0
+		return db.R().QueryRowContext(context.Background(), `SELECT count(*) FROM brief_runs WHERE trigger = 'wanted' AND unit_key LIKE '%#7'`).Scan(&n) == nil && n > 0
 	})
 }
 

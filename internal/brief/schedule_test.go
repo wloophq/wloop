@@ -413,7 +413,7 @@ func TestUnwantWakesTheSchedulerForTheBackgroundBrief(t *testing.T) {
 		t.Fatal("a wanted pull request was due a background brief")
 	default:
 	}
-	if err := s.q.Unwant(ctx, refN(1)); err != nil {
+	if err := s.q.unwantPR(ctx, refN(1)); err != nil {
 		t.Fatal(err)
 	}
 	select {

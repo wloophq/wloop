@@ -131,7 +131,10 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	reg := turnstest.Intents()
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },
+		Default: func(p unit.ProviderID) (dintent.Def, bool) { return reg.ByRole("headless", p) },
 		Caps:    headless.Caps{PerCallUSD: 0.5, PerDayUSD: 5}, Spent: r.spent, Clock: r.clock, Go: func(run func()) { run() }, Log: t.Logf}
+	w := bundledWrapper(t)
+	r.svc.Wrapper = func() (headless.Wrapper, error) { return w, nil }
 	r.turns.Headless = r.svc.Again
 	return r
 }
@@ -196,7 +199,7 @@ func TestHeadlessRunIsATurn(t *testing.T) {
 		t.Fatalf("book %+v", b)
 	}
 	tu := b.Turns[0]
-	if tu.Seq != got.Seq || tu.Mode != turn.ModeHeadless || tu.Intent != turn.Intent(dintent.Act) || tu.ID == "" || tu.Trigger != turn.ByHand ||
+	if tu.Seq != got.Seq || tu.Runner != turn.RunnerHeadless || tu.Intent != turn.Intent(dintent.Act) || tu.ID == "" || tu.Trigger != turn.ByHand ||
 		tu.Guidance != "keep it short" || tu.State != turn.Done || tu.Session != "" || tu.SentTo != "" || !slices.Equal(turns.ItemsOf(tu), []string{"i1"}) {
 		t.Fatalf("turn %+v", tu)
 	}
@@ -231,7 +234,7 @@ func TestOneHeadlessRunPerUnit(t *testing.T) {
 		t.Fatalf("second run: %v", err)
 	}
 	other := &headless.Service{Turns: r.newTurns(), Build: r.svc.Build, Place: r.svc.Place, Asker: r.svc.Asker, Ledger: r.svc.Ledger, Outbox: r.svc.Outbox,
-		Intents: r.svc.Intents, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock}
+		Intents: r.svc.Intents, Default: r.svc.Default, Caps: r.svc.Caps, Spent: r.svc.Spent, Clock: r.svc.Clock, Wrapper: r.svc.Wrapper}
 	if _, err := other.Run(ctx, headless.Request{Unit: thread}); !errors.Is(err, headless.ErrBusy) {
 		t.Fatalf("a second service: %v", err)
 	}
@@ -384,7 +387,7 @@ func TestHeadlessResultAppliesOpsAndDrafts(t *testing.T) {
 	}
 	d := drafts[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: got.Seq, Intent: string(dintent.Act), Workflow: "triage"}
-	if d.Unit != thread || d.Origin != want || d.State != draft.Proposed || d.Approval.Mode != draft.Always || !slices.Equal(d.Items, []string{"i1"}) {
+	if d.Unit != thread || d.Origin != want || d.State != draft.Proposed || d.Approval.Mode != draft.Wait || !slices.Equal(d.Items, []string{"i1"}) {
 		t.Fatalf("draft %+v", d)
 	}
 	if b := r.book(t, thread); b.Turns[0].Workflow != "triage" {
@@ -396,7 +399,7 @@ func TestUnfitAnswerAppliesNothing(t *testing.T) {
 	for name, raw := range map[string]string{
 		"not json":                   "{nope",
 		"unknown field":              `{"record":{"state":"done","summary":"s"},"drafts":[],"log":"","extra":1}`,
-		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"none"}}],"log":""}`,
+		"a draft names its approval": `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","approval":{"mode":"send"}}],"log":""}`,
 		"a draft names its origin":   `{"record":{"state":"done","summary":"s"},"drafts":[{"kind":"reply","text":"hi","origin":{"kind":"auto","turn_seq":9}}],"log":""}`,
 		"bad record":                 `{"record":{"state":"settled","summary":"s","ledger":[{"op":"resolve","item":"i1","anchor":{"ref":"x"}}]},"drafts":[{"kind":"reply","text":"hi"}],"log":""}`,
 	} {
@@ -526,7 +529,7 @@ func TestHeadlessAnswerRunsAgain(t *testing.T) {
 	}
 	b := r.book(t, thread)
 	again := b.Turns[len(b.Turns)-1]
-	if len(b.Turns) != 2 || again.Mode != turn.ModeHeadless || again.ResumeOf != first.Seq || again.Trigger != turn.Automated || again.Workflow != "triage" ||
+	if len(b.Turns) != 2 || again.Runner != turn.RunnerHeadless || again.ResumeOf != first.Seq || again.Trigger != turn.Automated || again.Workflow != "triage" ||
 		again.State != turn.Done || !slices.Equal(turns.ItemsOf(again), []string{"i1", "i2"}) || !strings.Contains(again.Guidance, "Monday") {
 		t.Fatalf("the run again %+v", again)
 	}

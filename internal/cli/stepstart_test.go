@@ -103,18 +103,18 @@ type fakeBriefs struct {
 	intakes     []intake.Intake
 }
 
-func (f *fakeBriefs) Peek(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (f *fakeBriefs) Peek(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	f.peeks++
 	return f.rd, nil
 }
 
-func (f *fakeBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (f *fakeBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	f.gets++
 	return f.rd, nil
 }
 
 func (f *fakeBriefs) BriefReady(ctx context.Context, u unit.Unit) (intake.Readiness, error) {
-	return f.Ready(ctx, u, true)
+	return f.Ready(ctx, u, true, nil)
 }
 
 func (f *fakeBriefs) OpenIntakes(context.Context) ([]intake.Intake, error) { return f.intakes, nil }
@@ -143,7 +143,7 @@ func newStartRig(t *testing.T, sc sweepCase, intent, round string) *startRig {
 	units.Put(u, workflow.Facts{"pr.repo": "acme/api", "pr.held": false, "pr.stale": false, "pr.state": "OPEN",
 		"pr.review.reason": "the author answered", "pr.address.reason": "reviewed by bob", "pr.first.reason": "my review was requested"})
 	r := &startRig{sc: sc, rec: rec, units: units, briefs: briefs, u: u,
-		st:  workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": intent, "round": round}},
+		st:  workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": intent, "stage": round}},
 		why: workflow.Why{Workflow: "review-follow-up", Trigger: workflow.TriggerSweep, Matched: []workflow.Fact{{Name: "pr.review.action", Value: "follow-up"}}}}
 	r.steps = newStepSet(sc.env, stepDeps{Units: units, Candidates: cands, Briefs: briefs, Rounds: sc.te.Rounds})
 	return r
@@ -195,8 +195,8 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
 	ref := sc.ref
 	st := r.load(t)
-	sc.te.cfg.Rounds.PerPRPerDay = 1
-	st.RecordFollowup(ref.String(), round.Reviewed, "", testNow)
+	sc.te.cfg.Turns.PerUnitPerDay = 1
+	st.Count(ref.String(), testNow)
 	guards := []struct {
 		want     string
 		set, off func()
@@ -209,18 +209,18 @@ func TestTurnStartGuardsInTheBasesOrder(t *testing.T) {
 		{"an intake of yours asks for it", func() { r.briefs.intakes = []intake.Intake{{Unit: r.u, Intent: dturn.Intent(dintent.Review)}} }, func() { r.briefs.intakes = nil }},
 		{"round blocked: could not start", func() { r.rec.events = append(r.rec.events, trustBlockEvent(ref, testNow)) }, func() { r.rec.events = nil }},
 		{"brief not ready", func() { r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1} }, func() { r.briefs.rd = intake.Readiness{Go: true} }},
-		{"per-PR daily cap reached (1)", func() {}, func() { sc.te.cfg.Rounds.PerPRPerDay = 5 }},
+		{"turns.per_unit_per_day reached (1)", func() {}, func() { sc.te.cfg.Turns.PerUnitPerDay = 5 }},
 	}
 	for _, g := range guards {
 		g.set()
 	}
 	for _, g := range guards {
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); !strings.HasPrefix(got, g.want) {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); !strings.HasPrefix(got, g.want) {
 			t.Fatalf("refusal %q, want %q", got, g.want)
 		}
 		g.off()
 	}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); got != "" {
+	if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); got != "" {
 		t.Fatalf("with every guard off: %q", got)
 	}
 }
@@ -239,7 +239,7 @@ func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
 		"waiting":     {wsdomain.Activity{Waiting: true}, errWaiting.Error()},
 	} {
 		sc.ws.Activity = map[string]wsdomain.Activity{cand.Workspace.ID: c.a}
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != c.want {
+		if got := r.check(t, automation.CheckOpts{Observe: false}); got != c.want {
 			t.Errorf("%s: refusal %q, want %q", name, got, c.want)
 		}
 	}
@@ -261,7 +261,7 @@ func TestReviewRefusesBusyAndUserActive(t *testing.T) {
 		"busy by hand":        {wsdomain.Activity{Busy: true}, true, errBusy.Error()},
 	} {
 		sc.ws.Activity = map[string]wsdomain.Activity{"ws-rev": c.a}
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: c.byHand}); got != c.want {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: c.byHand}); got != c.want {
 			t.Errorf("%s: refusal %q, want %q", name, got, c.want)
 		}
 	}
@@ -271,7 +271,7 @@ func TestAStaleDetailRefuses(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.units.Set(r.u, "pr.stale", true)
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "its stored detail is stale" {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "its stored detail is stale" {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -280,7 +280,7 @@ func TestCheckNeverStartsABrief(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); !strings.HasPrefix(got, "brief not ready") {
+	if got := r.check(t, automation.CheckOpts{Observe: false}); !strings.HasPrefix(got, "brief not ready") {
 		t.Fatalf("refusal %q", got)
 	}
 	if r.briefs.peeks != 1 || r.briefs.gets != 0 {
@@ -295,7 +295,7 @@ func TestNoteStartsTheBriefAndRecordsBriefWaiting(t *testing.T) {
 	t.Parallel()
 	r := newStartRig(t, followupScenario(t), string(dintent.Review), roundFollowup)
 	r.briefs.rd = intake.Readiness{Wait: intake.WaitBriefing, Attempt: 1}
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
 	r.load(t)
 	if err := r.steps.Note(context.Background(), r.st, r.u, r.why, refusal); err != nil {
 		t.Fatal(err)
@@ -313,12 +313,12 @@ func TestTheCapHoldsOnTheFirstHit(t *testing.T) {
 	t.Parallel()
 	sc := followupScenario(t)
 	r := newStartRig(t, sc, string(dintent.Review), roundFollowup)
-	sc.te.cfg.Rounds.PerPRPerDay = 1
+	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	st.Count(sc.ref.String(), testNow)
 	r.save(t)
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
-	if refusal != "per-PR daily cap reached (1)" {
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
+	if refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("refusal %q", refusal)
 	}
 	for range 2 {
@@ -362,7 +362,7 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sc := c.sc(t)
 			r := newStartRig(t, sc, c.intent, c.round)
-			cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, roundOf(c.intent, c.round))
+			cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, sc.env.startOf(r.st, r.u.Provider).candidate())
 			r.load(t)
 			if err := r.steps.Dismiss(context.Background(), r.st, r.u, r.why); err != nil {
 				t.Fatal(err)
@@ -502,8 +502,8 @@ func TestAStartBlockIsABlockedItemNeverTrusted(t *testing.T) {
 	ledger := automationtest.NewLedger()
 	eng := &automation.Engine{
 		Workflows: func() []workflow.Workflow {
-			return []workflow.Workflow{{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Mode: workflow.ModeApply,
-				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.st}, Approval: workflow.Approval{Default: workflow.OutcomeRun}}}
+			return []workflow.Workflow{{Name: "review-follow-up", Provider: unit.GitHub, Slot: "pr", Observe: false,
+				Trigger: workflow.Trigger{Kind: workflow.TriggerSweep}, Steps: []workflow.Step{r.st}, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}}
 		},
 		Units: r.units, Steps: r.steps, Ledger: ledger, Clock: clockFunc(sc.env.Now), State: r.steps.states(),
 	}
@@ -539,12 +539,12 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	c := cands[key]
 	c.Observed, c.Workspace = true, wsdomain.Workspace{}
 	cands[key] = c
-	sc.te.cfg.Rounds.PerPRPerDay = 1
+	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
-	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	st.Count(sc.ref.String(), testNow)
 	r.save(t)
-	refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply})
-	if refusal != "per-PR daily cap reached (1)" {
+	refusal := r.check(t, automation.CheckOpts{Observe: false})
+	if refusal != "turns.per_unit_per_day reached (1)" {
 		t.Fatalf("observed address: %q", refusal)
 	}
 	r.load(t)
@@ -563,11 +563,11 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	f := fc[fkey]
 	f.Observed = true
 	fc[fkey] = f
-	fsc.te.cfg.Rounds.PerPRPerDay = 1
+	fsc.te.cfg.Turns.PerUnitPerDay = 1
 	fst := fr.load(t)
-	fst.RecordFollowup(fsc.ref.String(), round.Reviewed, "", testNow)
+	fst.Count(fsc.ref.String(), testNow)
 	fr.save(t)
-	if got := fr.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "" {
+	if got := fr.check(t, automation.CheckOpts{Observe: false}); got != "" {
 		t.Fatalf("observed follow-up: %q", got)
 	}
 }
@@ -665,5 +665,27 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 	text := turnText(t, sc.te, sc.ws.Prompts[0].Text)
 	if !strings.Contains(text, "## Why now") || !strings.Contains(text, "- @bob\n- @jussara-ai\n") {
 		t.Fatalf("turn:\n%s", text)
+	}
+}
+
+// TestAnyTurnOnAPullRequestSpendsTheDailyCap: the budget is the unit's
+// plugin's, so an intent holding no role spends it too.
+func TestAnyTurnOnAPullRequestSpendsTheDailyCap(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	files := myReview(t)
+	m := files["intents/my-review/intent.toml"]
+	if !strings.Contains(m, "role    = \"pr.review\"\n") {
+		t.Fatal("the bundled review holds no role")
+	}
+	files["intents/my-review/intent.toml"] = strings.Replace(m, "role    = \"pr.review\"\n", "", 1)
+	userProfile(t, sc.te, files)
+	r := newStartRig(t, sc, "my-review", roundFollowup)
+	sc.te.cfg.Turns.PerUnitPerDay = 1
+	st := r.load(t)
+	st.Count(sc.ref.String(), testNow)
+	r.save(t)
+	if refusal := r.check(t, automation.CheckOpts{Observe: false}); refusal != "turns.per_unit_per_day reached (1)" {
+		t.Fatalf("refusal %q; broken %v", refusal, sc.env.loadedIntents().Broken)
 	}
 }

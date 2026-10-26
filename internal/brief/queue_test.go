@@ -109,6 +109,11 @@ type fakeRunner struct {
 	// res, when set, is what every call returns, with a failure too.
 	res   *Result
 	takes func()
+	// fields are what a missing-fields call answers, by name; asked are
+	// the fields each call asked for.
+	fields     map[string]any
+	failFields error
+	asked      [][]string
 }
 
 func (f *fakeRunner) Run(_ context.Context, c Call) (Result, error) {
@@ -116,6 +121,17 @@ func (f *fakeRunner) Run(_ context.Context, c Call) (Result, error) {
 	defer f.mu.Unlock()
 	f.calls++
 	f.prompts = append(f.prompts, c.Prompt)
+	f.asked = append(f.asked, c.Fields)
+	if len(c.Fields) > 0 && f.failFields != nil {
+		return Result{}, f.failFields
+	}
+	if len(c.Fields) > 0 {
+		out := map[string]any{}
+		for _, n := range c.Fields {
+			out[n] = f.fields[n]
+		}
+		return Result{Fields: out, CostUSD: ptr(0.002)}, nil
+	}
 	if f.takes != nil {
 		f.takes()
 	}
@@ -143,6 +159,7 @@ type rig struct {
 	// changes is the store's change log; the queue reads it only once a
 	// test sets Deps.Changes.
 	changes *change.Log
+	db      *sqlite.DB
 }
 
 func newRig(t *testing.T, n int) *rig {
@@ -161,7 +178,7 @@ func newRig(t *testing.T, n int) *rig {
 			t.Fatal(err)
 		}
 	}
-	r := &rig{st: st, src: &fakeSource{fail: map[string]error{}}, run: &fakeRunner{fail: map[string]error{}}, now: t0, changes: changes}
+	r := &rig{st: st, src: &fakeSource{fail: map[string]error{}}, run: &fakeRunner{fail: map[string]error{}}, now: t0, changes: changes, db: stDB}
 	r.q = New(Deps{Store: st, Source: r.src, Runner: r.run, Taxonomy: func(github.Ref) string { return DefaultTaxonomy },
 		Home: func(github.Ref) string { return "" }, Tier: turns.TierFast, MaxDiffBytes: 1000, Retry: time.Hour, Enabled: true,
 		Now: func() time.Time { return r.now }, Log: func(f string, a ...any) {

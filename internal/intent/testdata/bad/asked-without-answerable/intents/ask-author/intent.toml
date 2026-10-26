@@ -5,9 +5,9 @@ session = { strategy = "new", title = "ask" }
 answerable = false
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}} one question."
+line = "Ask the author of {{.pr.slug}} one question."
 
 [record]
 states = ["done", "asked", "failed"]

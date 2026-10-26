@@ -14,7 +14,7 @@ type PlanItem struct {
 	Decision string        `json:"decision"`
 	Reason   string        `json:"reason,omitempty"`
 	Default  string        `json:"default,omitempty"`
-	Mode     string        `json:"mode"`
+	Observe  ObserveMode   `json:"observe"`
 	Error    string        `json:"error,omitempty"`
 	Unit     unit.Unit     `json:"unit"`
 	Label    string        `json:"label"`           // Unit as a person reads it
@@ -71,7 +71,7 @@ type PlanResponse struct {
 }
 
 // UnitWorkflow is a workflow of the explained unit's provider that gives
-// the unit no item: Outcome is "not matched", "matched", "waits" or
+// the unit no item: Outcome is "not_matched", "matched", "waits" or
 // "error", Facts the facts its `when` read.
 type UnitWorkflow struct {
 	Workflow string `json:"workflow"`
@@ -94,3 +94,7 @@ type PlanActRequest struct {
 	Action   string   `json:"action"`
 	Guidance string   `json:"guidance,omitempty"`
 }
+
+// ObserveMode is a plan item's observe flag: its workflow only plans, and
+// a person applies the item by hand.
+type ObserveMode bool

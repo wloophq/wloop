@@ -8,7 +8,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
@@ -99,7 +98,7 @@ func (f Facts) authorWorkspace() bool {
 // yours says the row's unit is the user's to act on: any unit but a pull request, or a pull request that
 // is the user's, taken over or held by an author workspace.
 func (f Facts) yours() bool {
-	if p := f.Row.Unit.Provider; p != "" && p != unit.GitHub {
+	if !f.Row.Unit.IsZero() && f.Row.Unit != f.Ref.Unit() {
 		return true
 	}
 	return f.Mine || f.Override.Adopted || f.authorWorkspace()
@@ -123,6 +122,8 @@ func (f Facts) Get(field string) any {
 	case "pr.owner":
 		return f.Ref.Owner
 	case "pr.repo":
+		return f.Ref.Owner + "/" + f.Ref.Repo
+	case "pr.repo_name":
 		return f.Ref.Repo
 	case "pr.base":
 		return f.Base
@@ -138,37 +139,52 @@ func (f Facts) Get(field string) any {
 		return f.Open
 	case "row.tracked":
 		return f.Tracked
-	case "row.adopted":
+	case "pr.adopted":
 		return o.Adopted
-	case "row.held":
+	case "pr.held":
 		return o.Hold
-	case "row.muted":
+	case "pr.muted":
 		return f.Muted
 	case "row.question":
 		return f.Question
 	case "row.pending":
 		return f.Row.Pending != nil
+	case "row.capped":
+		return f.HeldByCap
 	case "row.intake":
 		return f.intake() != nil
+	case "row.intake_seq":
+		if i := f.intake(); i != nil {
+			return int(i.Seq)
+		}
+		return 0
+	case "row.trust_folder":
+		return f.TrustFolder
+	case "row.trust_homes":
+		return slices.Clone(f.TrustHomes)
+	case "row.remove_refusal":
+		return f.Forceable
+	case "row.recommended":
+		return f.Recommended
 	case "row.author_workspace":
 		return f.authorWorkspace()
 	case "row.yours":
 		return f.yours()
 	case "row.review_workspace":
 		return f.Workspace.ID != "" && f.Workspace.IsReview
-	case "row.nudge.who":
+	case "pr.nudge.who":
 		return slices.Clone(f.NudgeWho)
-	case "row.nudge.why":
+	case "pr.nudge.why":
 		return f.NudgeWhy
-	case "row.nudge.refusal":
+	case "pr.nudge.refusal":
 		return f.NudgeRefusal
-	case "config.address_reviews":
+	case "config.github.address_reviews":
 		return f.Config.AddressReviews
-	case "config.address_checks":
+	case "config.github.address_checks":
 		return f.Config.AddressChecks
-	case "config.followups_without_workspace":
+	case "config.github.followups_without_workspace":
 		return f.Config.FollowupsWithoutWorkspace
-	case "config.address_without_workspace":
+	case "config.github.address_without_workspace":
 		return f.Config.AddressWithoutWorkspace
 	}
 	return nil

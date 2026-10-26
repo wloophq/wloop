@@ -62,7 +62,7 @@ func TestHandReasonMarksWhatAnEarlierRoundCovered(t *testing.T) {
 	t.Parallel()
 	base := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	at := func(h int) time.Time { return base.Add(time.Duration(h) * time.Hour) }
-	cfg := config.Config{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}
+	cfg := config.Config{GitHub: config.GitHub{AddressSkipReviewers: []string{"noisy"}, IgnoreChecks: []string{"flaky"}}}
 	got := handReason(handFacts(at), "me", at(2), "h2", "", cfg)
 	want := &turn.RoundReason{
 		Reviewers: []turn.RoundReviewer{{Login: "ana", Handled: true}, {Login: "bob"}},

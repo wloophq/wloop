@@ -184,7 +184,7 @@ func (e *Env) slackPermalinkUnit(ctx context.Context, permalink string) (unit.Un
 		return unit.Unit{}, err
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		return unit.Unit{}, fmt.Errorf("%s is a Slack permalink, and the Slack plugin is disabled (plugins.slack.enabled is false)", permalink)
+		return unit.Unit{}, fmt.Errorf("%s is a Slack permalink, and the Slack plugin is disabled (slack.enabled is false)", permalink)
 	}
 	return slackThreadOf(ctx, e.slack.kit(cfg.Slack, nil), permalink)
 }
@@ -412,7 +412,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, a
 		return usageError{usage: slackUsage}
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		return errors.New("the Slack plugin is disabled (plugins.slack.enabled is false)")
+		return errors.New("the Slack plugin is disabled (slack.enabled is false)")
 	}
 	req := send.Request{Target: pos[0], Text: pos[1], Broadcast: *broadcast, Source: "cli"}
 	fs.Visit(func(f *flag.Flag) {
@@ -539,7 +539,7 @@ func (e *Env) slackChecks(cfg config.Config) []check {
 		out = append(out, check{markOK, "slack login", tok.User + " in " + teamLabel(tok) + " (Keychain service " + kit.Store.Service + ")", ""})
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		out = append(out, check{markInfo, "slack plugin", "disabled by plugins.slack.enabled; the Slack tools are off", ""})
+		out = append(out, check{markInfo, "slack plugin", "disabled by slack.enabled; the Slack tools are off", ""})
 	}
 	if len(cfg.Slack.PostAllowlist) > 0 {
 		out = append(out, check{markInfo, "slack post allowlist", strings.Join(cfg.Slack.PostAllowlist, ", "), ""})

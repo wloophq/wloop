@@ -54,7 +54,7 @@ func TestTheRootPicksClaudeAndDesktopThenOrca(t *testing.T) {
 		t.Fatalf("agent %q, managers %q", d.Agent, d.WorkspaceManagers)
 	}
 	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"review_prefix":"R "}`), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte(`{"github": {"review_prefix": "R "}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := config.LoadFile(file, d)

@@ -10,27 +10,40 @@ import (
 
 var thread = unit.Unit{Provider: "slack", Key: "C000AAA/1.2"}
 
-func TestPersonIs(t *testing.T) {
-	me := Identity{Keys: []string{"github:Octocat", "slack:U000AAA", "email:me@example.com"}}
+// foldCodec is a provider whose keys compare without case, as a codec with
+// Equal says.
+type foldCodec struct{ id unit.ProviderID }
+
+func (c foldCodec) Provider() unit.ProviderID { return c.id }
+func (foldCodec) Valid(string) error          { return nil }
+func (foldCodec) Equal(a, b string) bool      { return strings.EqualFold(a, b) }
+
+func TestPersonKeysCompareThroughTheirCodec(t *testing.T) {
+	codecs := unit.NewRegistry(foldCodec{"forge"}, unit.OpaqueCodec{ID: "chat"})
+	me := Identity{Keys: []string{"forge:Octocat", "chat:U000AAA", "email:me@example.com"}, Codecs: codecs}
 	for _, p := range []Person{
-		{Key: "github:octocat"},
-		{Key: "slack:U000AAA"},
-		{Key: "slack:U000BBB", Aliases: []string{"email:me@example.com"}},
-		{Key: "group:x", Aliases: []string{"GITHUB:OCTOCAT"}},
+		{Key: "forge:octocat"},
+		{Key: "chat:U000AAA"},
+		{Key: "chat:U000BBB", Aliases: []string{"email:me@example.com"}},
+		{Key: "group:x", Aliases: []string{"FORGE:OCTOCAT"}},
 	} {
 		if !p.Is(me) {
 			t.Errorf("%+v is not me", p)
 		}
 	}
 	for _, p := range []Person{
-		{Key: "slack:u000aaa"},
+		{Key: "chat:u000aaa"},
 		{Key: "email:ME@example.com"},
-		{Key: "github:someone"},
+		{Key: "forge:someone"},
+		{Key: "chat:Octocat"},
 		{},
 	} {
 		if p.Is(me) {
 			t.Errorf("%+v is me", p)
 		}
+	}
+	if (Person{Key: "forge:octocat"}).Is(Identity{Keys: me.Keys}) {
+		t.Error("without codecs, keys compare byte for byte")
 	}
 }
 

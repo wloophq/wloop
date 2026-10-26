@@ -9,7 +9,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -54,7 +53,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 			return err
 		case uerr != nil:
 			return uerr
-		case u.Provider == unit.GitHub:
+		case isPR(u):
 			ref = prOf(u)
 		default:
 			return runIntentOn(ctx, e, d, u, args[1:])
@@ -67,7 +66,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	}
 	req := api.ActionRequest{Guidance: p.guidance, NoBrief: p.noBrief, Inputs: p.inputs}
 	if beforeSet(d, p.inputs, beforeTakeOver) {
-		if err := e.action(ctx, ref, beforeTakeOver, api.ActionRequest{}, "done by the daemon"); err != nil && !ownedAlready(err, ref) {
+		if err := e.action(ctx, ref, beforeTakeOver, api.ActionRequest{}, "done by the daemon"); err != nil && !ownedAlready(err) {
 			return err
 		}
 	}
@@ -111,10 +110,23 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 }
 
 // ownedAlready tells a take-over refused because the pull request is the
-// user's to develop already: taken over before, or theirs.
-func ownedAlready(err error, ref github.Ref) bool {
-	msg := err.Error()
-	return strings.HasSuffix(msg, catalog.ReasonYours) || strings.HasSuffix(msg, daemon.NotOffered(beforeTakeOver, ref.Unit()))
+// user's to develop already: taken over before, which offers no take-over,
+// or theirs, which take_over's why refuses.
+func ownedAlready(err error) bool {
+	switch refusal(err) {
+	case api.RefusalNotOffered, api.BuiltinWhy(beforeTakeOver):
+		return true
+	}
+	return false
+}
+
+// refusal is the daemon's code of the refusal err is, "" for none.
+func refusal(err error) string {
+	var r interface{ Refusal() string }
+	if errors.As(err, &r) {
+		return r.Refusal()
+	}
+	return ""
 }
 
 // parseIntentArgs reads d's flags up to the first word that is not one, or
@@ -210,7 +222,8 @@ func flagError(reg *dintent.Registry, d dintent.Def, flag string) error {
 // with the command that takes it over first and asks again with the same
 // persisted flags.
 func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]any) error {
-	if err == nil || d.Action == nil || d.Action.ReasonOff.Src == "" || !strings.HasSuffix(err.Error(), d.Action.ReasonOff.Src) {
+	why := actionRefusal(err, d)
+	if why == "" {
 		return err
 	}
 	var takeOver string
@@ -226,7 +239,17 @@ func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]an
 	if takeOver == "" {
 		return err
 	}
-	return fmt.Errorf("%s; run '"+brand.Command+" %s %s %s'", d.Action.ReasonOff.Src, d.Name, strings.Join(append([]string{takeOver}, flags...), " "), ref.URL())
+	return fmt.Errorf("%s; run '"+brand.Command+" %s %s %s'", why, d.Name, strings.Join(append([]string{takeOver}, flags...), " "), ref.URL())
+}
+
+// actionRefusal is the why of d's [[action.refuse]] case, as written, that
+// refused err; "" for none.
+func actionRefusal(err error, d dintent.Def) string {
+	i, ok := api.RefuseCaseIndex(refusal(err))
+	if !ok || d.Action == nil || i >= len(d.Action.Refuse) {
+		return ""
+	}
+	return d.Action.Refuse[i].Why.Src
 }
 
 // inputFlag is the command line words that set an input to v.
@@ -246,18 +269,17 @@ func intentUsage(d dintent.Def) string {
 	return "usage: " + brand.Command + " " + string(d.Name) + " " + target + intentFlags(d, surfaceCLI) + " [guidance...]"
 }
 
-// intentTarget is the target of d's command as a usage line names it: the units d serves.
+// intentTarget is the target of d's command as a usage line names it: the
+// units d serves, as their providers' codecs name them.
 func intentTarget(d dintent.Def) string {
-	switch p := d.ProviderOrDefault(); p {
-	case unit.GitHub:
-		return "<url>"
-	case dintent.AnyProvider:
-		return "<url|permalink|provider:key>"
-	case slackPlugin:
-		return "<permalink|slack:key>"
-	default:
-		return "<" + string(p) + ":key>"
+	ps := d.Providers
+	if ps == nil {
+		ps = []unit.ProviderID{d.ProviderOrDefault()}
 	}
+	if slices.Contains(ps, dintent.AnyProvider) {
+		return pluginCodecs().Targets()
+	}
+	return pluginCodecs().Targets(ps...)
 }
 
 // intentFlags lists the flags of d a surface takes, as a usage line shows them.

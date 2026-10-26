@@ -1,12 +1,10 @@
 package intent
 
 import (
-	"encoding/json"
 	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -20,11 +18,9 @@ import (
 	"github.com/wloophq/wloop/profiles"
 )
 
-const quietSession = `subject = "session"
+const quietSession = `summary = "Close a quiet session"
+provider = "session"
 when = 'session.managed && session.idle_for > config.cleanup.idle'
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "session.close"
@@ -46,9 +42,9 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, broken, _, problems := loadWorkflows(nil, sub, nil)
-	if len(problems) > 0 || len(broken) > 0 {
-		t.Fatalf("%v", problems.Error())
+	loaded, broken, _, problems, warnings := loadWorkflows(nil, sub, nil, nil)
+	if len(problems) > 0 || len(broken) > 0 || len(warnings) > 0 {
+		t.Fatalf("%v\n%v", problems.Error(), warnings.Error())
 	}
 	starts := 0
 	for _, w := range loaded {
@@ -58,7 +54,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 			}
 			if s.Use == builtin.StepTurnStart {
 				starts++
-				if w.Approval.Window != time.Minute {
+				if w.Approval.Mode != workflow.ApprovalDelay && w.Approval.Mode != workflow.ApprovalWait || w.Approval.Mode == workflow.ApprovalDelay && w.Approval.Window != time.Minute {
 					t.Errorf("%s: a turn.start workflow waits %s, want 1m", w.Name, w.Approval.Window)
 				}
 			}
@@ -91,7 +87,7 @@ func TestAWorkflowManifestBecomesTheDomainWorkflow(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Name != "close-quiet" || w.Provider != dunit.Session || w.Slot != "session" || w.Mode != workflow.ModeObserve || w.Order != 100 {
+	if w.Name != "close-quiet" || w.Provider != dunit.Session || w.Slot != "session" || !w.Observe || w.Order != 100 {
 		t.Errorf("%+v", w)
 	}
 	if w.Trigger.Kind != workflow.TriggerSweep || w.Limits != (workflow.Limits{PerRun: 5, PerDay: 50, Cooldown: time.Hour}) {
@@ -100,7 +96,7 @@ func TestAWorkflowManifestBecomesTheDomainWorkflow(t *testing.T) {
 	if len(w.Steps) != 1 || w.Steps[0].Use != "session.close" || w.Steps[0].Reach != workflow.ReachLocal || w.Steps[0].Args != nil {
 		t.Errorf("%+v", w.Steps)
 	}
-	if w.Approval.Default != workflow.OutcomeRun || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
+	if w.Approval.Mode != workflow.ApprovalRun || w.Summary != "Close an agent session that finished and stayed quiet" || w.When == nil || !strings.HasSuffix(w.Source, "close-quiet/workflow.toml") {
 		t.Errorf("%+v", w)
 	}
 	if want := []string{"config.cleanup.idle", "session.agent_state", "session.idle_for", "session.managed", "session.open_turn", "session.user_active"}; !slices.Equal(w.When.Reads(), want) {
@@ -114,10 +110,10 @@ func TestATurnStartWorkflowWithoutAWindowRunsAtOnce(t *testing.T) {
 		t.Fatal(problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Approval.Window != 0 || w.Order != 10 || !slices.Equal(w.Key, []string{"pr.fingerprint"}) {
+	if w.Approval.Mode != workflow.ApprovalRun || w.Approval.Window != 0 || w.Order != 10 || !slices.Equal(w.Key, []string{"pr.fingerprint"}) {
 		t.Errorf("%+v", w)
 	}
-	if got := w.Steps[0].Args; got["intent"] != "review" || got["round"] != "follow-up" || w.Steps[0].Reach != "" {
+	if got := w.Steps[0].Args; got["intent"] != "review" || got["stage"] != "follow-up" || w.Steps[0].Reach != "" {
 		t.Errorf("%v", got)
 	}
 }
@@ -129,7 +125,8 @@ func TestAnEventAndAScheduleWorkflowLoad(t *testing.T) {
 	}
 	l, _ = Load(userLayer("testdata/workflows/good/morning-sweep"), nil, testBase(), nil)
 	w := l.Workflows[0]
-	if w.Trigger.Kind != workflow.TriggerSchedule || w.Trigger.Schedule == nil || w.Approval.Window != 24*time.Hour || w.Approval.Default != workflow.OutcomeWait || w.Approval.WaitWhen == nil {
+	if w.Trigger.Kind != workflow.TriggerSchedule || w.Trigger.Schedule == nil || w.Approval.Window != 24*time.Hour || w.Approval.Mode != workflow.ApprovalDelay ||
+		len(w.Approval.Rules) != 1 || w.Approval.Rules[0].Mode != workflow.ApprovalWait {
 		t.Errorf("%+v", w)
 	}
 }
@@ -170,7 +167,7 @@ func TestBadWorkflowsGolden(t *testing.T) {
 }
 
 func TestAnInvalidUserWorkflowDisablesOnlyItself(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "mine-ok", quietSession)
 	writeWorkflow(t, root, "mine-typo", strings.Replace(quietSession, "session.managed", "session.manged", 1))
@@ -186,7 +183,7 @@ func TestAnInvalidUserWorkflowDisablesOnlyItself(t *testing.T) {
 	if got := slices.Sorted(mapKeys(l.BrokenWorkflows)); !slices.Equal(got, []string{"mine-step", "mine-typo"}) {
 		t.Errorf("broken %v", got)
 	}
-	if !strings.Contains(problems.Error(), "unknown field session.manged; did you mean session.managed?") {
+	if !strings.Contains(problems.Error(), "unknown field session.manged; did you mean \"session.managed\"?") {
 		t.Error(problems.Error())
 	}
 }
@@ -202,7 +199,7 @@ func mapKeys[V any](m map[string]V) func(func(string) bool) {
 }
 
 func TestAUserWorkflowOverridesABundledManifest(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", strings.Replace(quietSession, "config.cleanup.idle", "duration(\"2h\")", 1))
 	l, problems := Load(userLayer(root), bundled, testBase(), nil)
@@ -216,7 +213,7 @@ func TestAUserWorkflowOverridesABundledManifest(t *testing.T) {
 }
 
 func TestABrokenWorkflowOverrideKeepsTheBundledOne(t *testing.T) {
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", quietSession+"bogus = 1\n")
 	l, problems := Load(userLayer(root), bundled, testBase(), nil)
@@ -270,11 +267,8 @@ func TestAWorkflowDirectoryWithoutItsManifestIsAProblem(t *testing.T) {
 func TestNoManifestForces(t *testing.T) {
 	root := t.TempDir()
 	writeWorkflow(t, root, "forced", strings.Replace(quietSession, `use = "session.close"`, "use = \"session.close\"\nforce = \"true\"", 1))
-	writeWorkflow(t, root, "forced-removal", `subject = "workspace"
+	writeWorkflow(t, root, "forced-removal", `provider = "workspace"
 when = "workspace.main"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "workspace.remove"
@@ -300,44 +294,14 @@ func TestACachedLoadReloadsWhenAWorkflowChanges(t *testing.T) {
 	}
 }
 
-func TestWorkflowSchemaMatchesTheDecodeStruct(t *testing.T) {
-	var schema map[string]any
-	if err := json.Unmarshal(WorkflowSchema, &schema); err != nil {
-		t.Fatal(err)
-	}
-	props := schema["properties"].(map[string]any)
-	typ := reflect.TypeFor[wManifest]()
-	seen := map[string]bool{}
-	for i := range typ.NumField() {
-		f := typ.Field(i)
-		key := f.Tag.Get("toml")
-		seen[key] = true
-		sub, ok := props[key].(map[string]any)
-		if !ok {
-			t.Errorf("%s: in the decode struct, not in the schema", key)
-			continue
-		}
-		if f.Type.Kind() == reflect.Pointer && f.Type.Elem().Kind() == reflect.Struct {
-			compareSchema(t, key+".", f.Type.Elem(), sub)
-		}
-	}
-	for key := range props {
-		if !seen[key] {
-			t.Errorf("%s: in the schema, not in the decode struct", key)
-		}
-	}
-}
-
 func TestATurnStartNamesAnIntentThatLoads(t *testing.T) {
 	root := t.TempDir()
 	writeIntent(t, root, "ask-author", minimal, "{{.Headline}}")
 	writeIntent(t, root, "ask-twice", strings.Replace(minimal, `workspace = "review"`, `workspace = "nowhere"`, 1), "{{.Headline}}")
 	starts := func(intent string) string {
-		return `subject = "github"
+		return `summary = "Ask"
+provider = "github"
 when = "true"
-
-[trigger]
-every = "sweep"
 
 [[step]]
 use = "turn.start"

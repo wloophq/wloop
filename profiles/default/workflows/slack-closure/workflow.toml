@@ -1,0 +1,17 @@
+summary = "Close a Slack thread you started once its items resolved, listing each item's resolution"
+provider = "entry"
+when = 'entry.unit_provider == "slack" && entry.kind == "close" && entry.state in ["inbox", "next"] && entry.items_resolved > 0'
+order = 51
+key = ["entry.settled_at"]
+
+[[step]]
+use = "draft.propose"
+purpose = "close"
+items = "resolved"
+effects = ["unit.closed"]
+repeat_after = "config.drafts.repeat_after"
+repeat_after_sent = "forever"
+
+[drafts.withdraw]
+when = '!draft.unit_open'
+reason = "moot"

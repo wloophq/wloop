@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/port"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -46,14 +47,14 @@ func unitIntent(d dintent.Def, u unit.Unit) error {
 		return badRequest{fmt.Sprintf("the intent %s serves %s units, not %s", d.Name, d.ProviderOrDefault(), u.Label())}
 	}
 	if d.Action == nil {
-		return conflict{NotOffered(string(d.Name), u)}
+		return conflict{NotOffered(string(d.Name), u), api.RefusalNotOffered}
 	}
 	var prOnly []string
 	if d.Prepare != "" {
 		prOnly = append(prOnly, "prepare "+d.Prepare)
 	}
-	if len(d.OnSent) > 0 {
-		prOnly = append(prOnly, "on_sent "+strings.Join(d.OnSent, ", "))
+	if len(d.Effects) > 0 {
+		prOnly = append(prOnly, "effects "+strings.Join(d.Effects, ", "))
 	}
 	if d.Intake {
 		prOnly = append(prOnly, "intake")
@@ -67,24 +68,27 @@ func unitIntent(d dintent.Def, u unit.Unit) error {
 	return nil
 }
 
-// parseUnitArg reads a unit as the agent's command line names it: a pull
-// request URL, or "<provider>:<key>" of a provider the daemon knows.
+// parseUnitArg reads a unit as the agent's command line names it: its URL,
+// or "<provider>:<key>" of a provider the daemon knows whose units have no
+// URL.
 func (s *Server) parseUnitArg(raw string) (unit.Unit, error) {
-	u, err := parsePRURL(raw)
-	if err == nil {
+	if u, ok := s.deps.Units.ParseURL(raw); ok {
 		return u, nil
 	}
 	provider, key, ok := strings.Cut(raw, ":")
-	if !ok || s.deps.Units == nil || provider == string(unit.GitHub) || strings.Contains(provider, "/") {
-		return unit.Unit{}, err
+	if !ok || s.deps.Units == nil || s.deps.Units.Linked(unit.ProviderID(provider)) || strings.Contains(provider, "/") {
+		return unit.Unit{}, fmt.Errorf("not a unit: %s; name it by its URL, or as <provider>:<key>", raw)
 	}
 	return s.deps.Units.Parse(provider, key)
 }
 
 // unitArg names u as parseUnitArg reads it.
-func unitArg(u unit.Unit) string {
-	if u.IsZero() || u.Provider == unit.GitHub {
-		return refOf(u).URL()
+func (s *Server) unitArg(u unit.Unit) string {
+	if u.IsZero() {
+		return ""
+	}
+	if url, ok := s.deps.Units.URL(u); ok {
+		return url
 	}
 	return u.String()
 }

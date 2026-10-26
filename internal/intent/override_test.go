@@ -73,7 +73,7 @@ func TestTheBlocksOfDimsOnlyARevertedOverrideDeclaredAreSkipped(t *testing.T) {
 func TestABundledIntentBrokenByAClashBlamesOnlyTheOverrideHoldingTheClaim(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "intents", "address", "intent.toml")
-	writeFile(t, file, strings.Replace(bundledFile(t, "intents/address/intent.toml"), `key = "F"`, `key = "V"`, 1))
+	writeFile(t, file, strings.Replace(bundledFile(t, "intents/address/intent.toml"), `shortcut = "F"`, `shortcut = "V"`, 1))
 	writeFile(t, filepath.Join(root, "intents", "nudge", "instructions.md.tmpl"), "{{.Headline}}\nMy nudge.\n")
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) == 0 {
@@ -98,7 +98,7 @@ func TestABundledIntentBrokenByAClashBlamesOnlyTheOverrideHoldingTheClaim(t *tes
 func TestAManifestOverrideBreakingTheBundledTemplateNamesTheUserManifest(t *testing.T) {
 	root := t.TempDir()
 	m := bundledFile(t, "intents/address/intent.toml")
-	m = strings.Replace(m, "[inputs.self_review]\ntype = \"flag\"\nflag = \"--self-review\"\nhelp = \"reviews the change first\"\npersist = true\nby_hand_only = true\n", "", 1)
+	m = strings.Replace(m, "[inputs.self_review]\ntype = \"bool\"\nflag = \"--self-review\"\nhelp = \"reviews the change first\"\npersist = true\nby_hand_only = true\n", "", 1)
 	m = strings.Replace(m, `when    = "inputs.self_review && !turn.needs_take_over"`, `when    = "!turn.needs_take_over"`, 1)
 	m = strings.Replace(m, "[join]\ndiffers_on = [\"self_review\"]\n", "", 1)
 	file := filepath.Join(root, "intents", "address", "intent.toml")
@@ -149,7 +149,7 @@ func TestAnUnreadableWorkflowOverrideIsAProblemOnTheUserFile(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root reads a mode 000 file")
 	}
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	root := t.TempDir()
 	writeWorkflow(t, root, "close-quiet", quietSession)
 	file := filepath.Join(root, "workflows", "close-quiet", "workflow.toml")
@@ -177,9 +177,9 @@ func TestARevertedOverrideIsListed(t *testing.T) {
 
 func TestAnOverrideClashingWithAUserIntentYields(t *testing.T) {
 	root := t.TempDir()
-	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "key = \"K\"\nworkspace =", 1), "{{.Headline}}")
+	writeIntent(t, root, "ask-author", strings.Replace(minimal, "workspace =", "shortcut = \"K\"\nworkspace =", 1), "{{.Headline}}")
 	file := filepath.Join(root, "intents", "review", "intent.toml")
-	writeFile(t, file, strings.Replace(bundledFile(t, "intents/review/intent.toml"), `key = "V"`, `key = "K"`, 1))
+	writeFile(t, file, strings.Replace(bundledFile(t, "intents/review/intent.toml"), `shortcut = "V"`, `shortcut = "K"`, 1))
 	l, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
 	if len(problems) == 0 {
 		t.Fatal("no problems")
@@ -203,7 +203,7 @@ func TestDotfilesDoNotOverride(t *testing.T) {
 	writeFile(t, filepath.Join(root, "intents", "address", ".DS_Store"), "x")
 	writeFile(t, filepath.Join(root, "intents", "address", "instructions.md.tmpl"), "{{.Headline}}\n")
 	writeFile(t, filepath.Join(root, "workflows", "close-quiet", ".DS_Store"), "x")
-	bundled := fstest.MapFS{"workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
+	bundled := fstest.MapFS{DefaultsFile: {Data: []byte(testDefaults)}, "workflows/close-quiet/workflow.toml": {Data: []byte(quietSession)}}
 	if err := fs.WalkDir(bundledFS(), ".", func(p string, e fs.DirEntry, err error) error {
 		if err == nil && !e.IsDir() {
 			bundled[p] = &fstest.MapFile{Data: []byte(bundledFile(t, p))}

@@ -38,11 +38,8 @@ type CreateRequest struct {
 
 // LinkedPR is the pull request number of a github unit, 0 for any other.
 func LinkedPR(u unit.Unit) int {
-	if u.Provider != unit.GitHub {
-		return 0
-	}
 	ref, err := pr.ParseKey(u.Key)
-	if err != nil {
+	if err != nil || ref.Unit() != u {
 		return 0
 	}
 	return ref.Number

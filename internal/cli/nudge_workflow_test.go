@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -59,7 +58,7 @@ func newSilentRig(t *testing.T) *silentRig {
 }
 
 func silentFacts(days int, last time.Time) workflow.Facts {
-	return workflow.Facts{"pr.repo": "acme/api", "pr.state": "open", "pr.draft": false, "pr.waits_on_user": false,
+	return workflow.Facts{"pr.repo": "acme/api", "pr.state": "OPEN", "pr.draft": false, "pr.waits_on_user": false,
 		"pr.silent_days": days, "pr.last_interaction_at": last, "pr.fingerprint": "fp", "pr.mine": false, "pr.adopted": false}
 }
 
@@ -94,8 +93,8 @@ func TestNudgeSilentSkipsDraftsClosedRecentWaitingOnTheUserOrDevelopedByTheUser(
 	t.Parallel()
 	for name, set := range map[string][2]any{
 		"draft":               {"pr.draft", true},
-		"closed":              {"pr.state", "closed"},
-		"merged":              {"pr.state", "merged"},
+		"closed":              {"pr.state", "CLOSED"},
+		"merged":              {"pr.state", "MERGED"},
 		"recent":              {"pr.silent_days", 29},
 		"waiting on the user": {"pr.waits_on_user", true},
 		"mine":                {"pr.mine", true},
@@ -154,7 +153,7 @@ func nudgeStartRig(t *testing.T) *startRig {
 	r := newStartRig(t, sc, string(dintent.Nudge), "")
 	r.st = workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": string(dintent.Nudge)}}
 	r.why = workflow.Why{Workflow: nudgeSilent, Trigger: workflow.TriggerSweep}
-	r.units.Set(r.u, "pr.nudge_refusal", "")
+	r.units.Set(r.u, "pr.nudge.refusal", "")
 	return r
 }
 
@@ -170,23 +169,23 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		{"held by you", func() { r.units.Set(r.u, "pr.held", true) }, func() { r.units.Set(r.u, "pr.held", false) }},
 		{whyPaused, func() { sc.te.setPause(t, round.Pause{On: true, At: testNow}) }, func() { sc.te.setPause(t, round.Pause{At: testNow}) }},
 		{"muted until", func() {
-			r.rec.overrides = map[github.Ref]dinv.Override{sc.ref: {PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}}
-		}, func() { r.rec.overrides = nil }},
-		{"per-PR daily cap reached (1)", func() {
-			sc.te.cfg.Rounds.PerPRPerDay = 1
-			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
-		}, func() { sc.te.cfg.Rounds = Defaults().Rounds }},
+			r.units.Set(r.u, "pr.mute.refusal", dinv.Override{PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}.MuteRefusal(testNow))
+		}, func() { r.units.Set(r.u, "pr.mute.refusal", "") }},
+		{"turns.per_unit_per_day reached (1)", func() {
+			sc.te.cfg.Turns.PerUnitPerDay = 1
+			st.Count(sc.ref.String(), testNow)
+		}, func() { sc.te.cfg.Turns = Defaults().Turns }},
 	}
 	for _, g := range guards {
 		g.set()
 	}
 	for _, g := range guards {
-		if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); !strings.HasPrefix(got, g.want) {
+		if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); !strings.HasPrefix(got, g.want) {
 			t.Fatalf("refusal %q, want %q", got, g.want)
 		}
 		g.off()
 	}
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply, ByHand: true}); got != "" {
+	if got := r.check(t, automation.CheckOpts{Observe: false, ByHand: true}); got != "" {
 		t.Fatalf("with every guard off: %q", got)
 	}
 }
@@ -194,8 +193,8 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 func TestNudgeSilentHonorsTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
-	r.units.Set(r.u, "pr.nudge_refusal", "it waits on you")
-	if got := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); got != "it waits on you" {
+	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("refusal %q", got)
 	}
 }
@@ -207,13 +206,13 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 		order         int
 		intent, round string
 		when          string
-		dflt          workflow.Outcome
+		mode          workflow.ApprovalMode
 		window        time.Duration
 	}{
-		"review-follow-up":   {10, string(dintent.Review), roundFollowup, "pr.review.action", workflow.OutcomeRun, time.Minute},
-		"review-first-round": {20, string(dintent.Review), roundFirst, "pr.first.due", workflow.OutcomeRun, time.Minute},
-		"address":            {30, string(dintent.Address), "", "pr.address.due", workflow.OutcomeRun, time.Minute},
-		nudgeSilent:          {40, string(dintent.Nudge), "", "pr.silent_days", workflow.OutcomeWait, time.Minute},
+		"review-follow-up":   {10, string(dintent.Review), roundFollowup, "pr.review.action", workflow.ApprovalDelay, time.Minute},
+		"review-first-round": {20, string(dintent.Review), roundFirst, "pr.first.due", workflow.ApprovalDelay, time.Minute},
+		"address":            {30, string(dintent.Address), "", "pr.address.due", workflow.ApprovalDelay, time.Minute},
+		nudgeSilent:          {40, string(dintent.Nudge), "", "pr.silent_days", workflow.ApprovalWait, 0},
 	}
 	if broken := te.loadedIntents().BrokenWorkflows; len(broken) > 0 {
 		t.Fatalf("broken %v", broken)
@@ -221,14 +220,14 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	for name, w := range want {
 		got := bundledWorkflow(t, te, name)
 		args := got.Steps[0].Args
-		if got.Provider != unit.GitHub || got.Trigger.Kind != workflow.TriggerSweep || got.Order != w.order || got.Mode != workflow.ModeApply ||
-			len(got.Steps) != 1 || got.Steps[0].Use != builtin.StepTurnStart || args["intent"] != w.intent || (w.round != "" && args["round"] != w.round) {
+		if got.Provider != unit.GitHub || got.Trigger.Kind != workflow.TriggerSweep || got.Order != w.order || got.Observe ||
+			len(got.Steps) != 1 || got.Steps[0].Use != builtin.StepTurnStart || args["intent"] != w.intent || (w.round != "" && args["stage"] != w.round) {
 			t.Errorf("%s: %+v", name, got)
 		}
 		if !slices.Contains(got.When.Reads(), w.when) {
 			t.Errorf("%s reads %v", name, got.When.Reads())
 		}
-		if got.Approval.Default != w.dflt || got.Approval.Window != w.window {
+		if got.Approval.Mode != w.mode || got.Approval.Window != w.window {
 			t.Errorf("%s approval %+v", name, got.Approval)
 		}
 	}

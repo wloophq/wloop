@@ -14,10 +14,10 @@ import (
 // prepares fill an intent's call before it runs, or refuse it, and return
 // the data of its event.
 var prepares = map[string]func(s *Server, ctx context.Context, u unit.Unit, c *Call) (string, error){
-	"nudge.prepare": (*Server).prepareNudge,
+	builtin.PrepareNudge: (*Server).prepareNudge,
 }
 
-// actionEffect is an on_sent effect of a round asked through the daemon's
+// actionEffect is a turn effect of a round asked through the daemon's
 // action: before runs ahead of the prepare, after once the round went out
 // with the data its prepare returned.
 type actionEffect struct {
@@ -28,30 +28,31 @@ type actionEffect struct {
 
 // actionEffects run in this order within each phase.
 var actionEffects = []actionEffect{
-	{name: "plan.drop_pending", before: func(s *Server, ctx context.Context, u unit.Unit) error {
+	{name: builtin.EffectPlanCleared, before: func(s *Server, ctx context.Context, u unit.Unit) error {
 		return s.dropPending(ctx, u, askedByYou)
 	}},
-	{name: "event.round_sent", after: func(s *Server, ctx context.Context, u unit.Unit, _ string) error {
+	{name: builtin.EffectPRRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit, _ string) error {
 		return s.recordEvent(ctx, u, dinv.KindRoundSent, askedByYou)
 	}},
-	{name: "event.nudged", after: func(s *Server, ctx context.Context, u unit.Unit, data string) error {
+	{name: builtin.EffectPRNudged, after: func(s *Server, ctx context.Context, u unit.Unit, data string) error {
 		return s.recordEvent(ctx, u, dinv.KindNudged, data)
 	}},
 }
 
-// actionEffectsOf are the action effects d's on_sent names, in table order.
+// actionEffectsOf are the action effects d's effects name, in table order.
 func actionEffectsOf(d dintent.Def) []actionEffect {
-	return slices.DeleteFunc(slices.Clone(actionEffects), func(e actionEffect) bool { return !slices.Contains(d.OnSent, e.name) })
+	return slices.DeleteFunc(slices.Clone(actionEffects), func(e actionEffect) bool { return !slices.Contains(d.Effects, e.name) })
 }
 
-// Builtins are the builtin names the daemon implements, by slot.
-func Builtins() map[builtin.Slot][]string {
-	onSent := make([]string, len(actionEffects))
+// Implemented are the builtins the daemon implements: the prepares a role
+// binds and the turn effects it applies.
+type Implemented struct{ Prepares, Effects []string }
+
+// Builtins are the builtins the daemon implements.
+func Builtins() Implemented {
+	effects := make([]string, len(actionEffects))
 	for i, e := range actionEffects {
-		onSent[i] = e.name
+		effects[i] = e.name
 	}
-	return map[builtin.Slot][]string{
-		builtin.SlotPrepare: slices.Sorted(maps.Keys(prepares)),
-		builtin.SlotOnSent:  onSent,
-	}
+	return Implemented{Prepares: slices.Sorted(maps.Keys(prepares)), Effects: effects}
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -261,27 +260,26 @@ func (m *Model) runBinding(b api.KeyView, k Key) (c Command, ok, took bool) {
 	return Command{}, false, true
 }
 
-// navigate shows a GTD view, or the first view of the GitHub views.
+// navigate shows a GTD view, or the first view of a plugin named by its
+// provider id.
 func (m *Model) navigate(to string) {
-	switch to {
-	case "cycle":
+	if to == "cycle" {
 		m.cycle()
 		return
-	case "github":
-		i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider == string(unit.GitHub) })
-		if i < 0 {
-			m.status = "no GitHub views: the plugin is disabled or not loaded"
-			return
-		}
+	}
+	if i := slices.IndexFunc(m.gtd, func(v View) bool { return v.ID == to }); i >= 0 {
+		m.setView(m.gtdBase() + i)
+		return
+	}
+	if i := slices.IndexFunc(m.views, func(v View) bool { return v.Provider == to }); i >= 0 {
 		m.setView(i)
 		return
 	}
-	i := slices.IndexFunc(m.gtd, func(v View) bool { return v.ID == to })
-	if i < 0 {
-		m.status = "no " + to + " view here"
+	if p := slices.IndexFunc(m.served, func(p api.Plugin) bool { return string(p.ID) == to }); p >= 0 {
+		m.status = "no " + cmp.Or(m.served[p].Name, to) + " views: the plugin is disabled or not loaded"
 		return
 	}
-	m.setView(m.gtdBase() + i)
+	m.status = "no " + to + " view here"
 }
 
 // pickArea makes the lists follow area n of the served areas.
@@ -479,7 +477,10 @@ type overlay struct {
 
 type paletteItem struct {
 	label, key string
-	run        func(read uint64) (Command, bool)
+	// about is what the item does, shown beside it in the help and under
+	// the list while it is focused.
+	about string
+	run   func(read uint64) (Command, bool)
 }
 
 func (m *Model) openPalette() {
@@ -503,10 +504,10 @@ func (m *Model) paletteItems() []paletteItem {
 				b, ok := m.binding(v.Verb, ctxList)
 				switch {
 				case v.Enabled && ok:
-					items = append(items, paletteItem{cmp.Or(m.verbLabel(v.Verb), b.Help), b.Key, runKey(b)})
+					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(v.Verb), b.Help), key: b.Key, about: b.Summary, run: runKey(b)})
 				case v.Enabled && slices.Contains(projectVerbs, v.Verb):
 					verb := v.Verb
-					items = append(items, paletteItem{cmp.Or(m.verbLabel(verb), verb), "", func(read uint64) (Command, bool) { return m.entryVerb(verb, read) }})
+					items = append(items, paletteItem{label: cmp.Or(m.verbLabel(verb), verb), run: func(read uint64) (Command, bool) { return m.entryVerb(verb, read) }})
 				}
 			}
 			for _, u := range e.Units {
@@ -516,7 +517,7 @@ func (m *Model) paletteItems() []paletteItem {
 			}
 			if len(e.Units) > 0 {
 				if b, ok := m.binding("open-source", ctxList); ok {
-					items = append(items, paletteItem{b.Help, b.Key, runKey(b)})
+					items = append(items, paletteItem{label: b.Help, key: b.Key, about: b.Summary, run: runKey(b)})
 				}
 			}
 		}
@@ -525,7 +526,7 @@ func (m *Model) paletteItems() []paletteItem {
 	}
 	for _, b := range m.keys {
 		if b.Context == ctxGlobal && b.Action != "palette" && !strings.HasPrefix(b.Action, "area:") {
-			items = append(items, paletteItem{b.Help, b.Key, runKey(b)})
+			items = append(items, paletteItem{label: b.Help, key: b.Key, about: b.Summary, run: runKey(b)})
 		}
 	}
 	return append(items, paletteItem{label: "Area...", run: func(uint64) (Command, bool) {
@@ -543,7 +544,8 @@ func (m *Model) rowItems(r api.Row) []paletteItem {
 			continue
 		}
 		spec := s
-		items = append(items, paletteItem{cmp.Or(st.Label, s.Label) + " " + r.Label, s.Key, func(read uint64) (Command, bool) {
+		about := strings.Join(slices.DeleteFunc([]string{s.Summary, st.Note}, func(x string) bool { return x == "" }), " · ")
+		items = append(items, paletteItem{label: cmp.Or(st.Label, s.Label) + " " + r.Label, key: s.Key, about: about, run: func(read uint64) (Command, bool) {
 			if _, busy := m.busy[r.Unit]; busy {
 				m.status = fmt.Sprintf("%s %s still running", m.busy[r.Unit], r.Label)
 				return Command{}, false
@@ -562,7 +564,7 @@ func (m *Model) openAreas() {
 		if i < 9 {
 			key = fmt.Sprintf("Shift+%d", i+1)
 		}
-		items = append(items, paletteItem{a, key, func(uint64) (Command, bool) { m.setArea(a); return Command{}, false }})
+		items = append(items, paletteItem{label: a, key: key, run: func(uint64) (Command, bool) { m.setArea(a); return Command{}, false }})
 	}
 	m.overlay = &overlay{title: "Area", items: items}
 }
@@ -583,7 +585,7 @@ func (m *Model) openHelp() {
 			if !head {
 				items, head = append(items, paletteItem{label: h.head}), true
 			}
-			items = append(items, paletteItem{label: "  " + b.Help, key: b.Key})
+			items = append(items, paletteItem{label: "  " + b.Help, key: b.Key, about: b.Summary})
 		}
 	}
 	m.overlay = &overlay{title: "Keys", items: items, help: true}
@@ -641,6 +643,8 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 	hint := "Enter runs, Esc closes"
 	if o.help {
 		hint = "any key closes"
+	} else if o.at < len(o.items) && o.items[o.at].about != "" {
+		hint = o.items[o.at].about + " · " + hint
 	}
 	keyW := 0
 	for _, it := range o.items {
@@ -653,6 +657,9 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 			mark = "> "
 		}
 		line := mark + termfmt.Fit(it.key, keyW) + "  " + it.label
+		if o.help && it.about != "" {
+			line += "  " + t.Dim(it.about)
+		}
 		line = termfmt.Cut(line, width)
 		if i == o.at && !o.help && t.Color {
 			line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(line), 0)))
@@ -660,5 +667,5 @@ func (m *Model) renderOverlay(lines []string, width, body int) []string {
 		out = append(out, line)
 	}
 	lines = append(lines, window(out, o.at, body-2)...)
-	return append(lines, "  "+t.Dim(hint))
+	return append(lines, "  "+t.Dim(termfmt.Cut(hint, width-2)))
 }

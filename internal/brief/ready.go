@@ -10,7 +10,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/intake"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -68,11 +67,11 @@ type Readiness struct {
 
 func without(reason string) Readiness { return Readiness{State: Without, Reason: reason} }
 
-// Ready answers for a turn of ref. A first turn waits for a brief at the
+// readyPR answers for a turn of ref. A first turn waits for a brief at the
 // current version, and its wanting one starts that brief at once; a later
 // turn takes the brief there is, stale or not, starts a refresh when one is
 // due, and never waits.
-func (q *Queue) Ready(ctx context.Context, ref github.Ref, first bool) (Readiness, error) {
+func (q *Queue) readyPR(ctx context.Context, ref github.Ref, first bool) (Readiness, error) {
 	if !q.d.Enabled {
 		rd := without(ReasonOff)
 		rd.Cause = intake.CauseOff
@@ -95,7 +94,7 @@ func (q *Queue) Ready(ctx context.Context, ref github.Ref, first bool) (Readines
 	now := q.d.Now()
 	b := stored(rec)
 	if !first {
-		if inInventory && has && refreshDue(p, rec, version, now, q.d.Retry) && !q.isOpen() && q.claim(ref) {
+		if inInventory && has && q.refreshDue(p, rec, version, now) && !q.isOpen() && q.claim(ref) {
 			q.spawn(ctx, p, TriggerRefresh, q.timeout(true), false)
 		}
 		if b == nil {
@@ -103,7 +102,7 @@ func (q *Queue) Ready(ctx context.Context, ref github.Ref, first bool) (Readines
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := attemptOf(p, version)
+	cur := q.attemptKey(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -150,9 +149,9 @@ func (q *Queue) Ready(ctx context.Context, ref github.Ref, first bool) (Readines
 	return rd, nil
 }
 
-// Peek is Ready's answer without starting a brief, waiting or writing: a
+// peekPR is readyPR's answer without starting a brief, waiting or writing: a
 // plan reads it to say whether a round would go now.
-func (q *Queue) Peek(ctx context.Context, ref github.Ref, first bool) (Readiness, error) {
+func (q *Queue) peekPR(ctx context.Context, ref github.Ref, first bool) (Readiness, error) {
 	if !q.d.Enabled {
 		rd := without(ReasonOff)
 		rd.Cause = intake.CauseOff
@@ -179,7 +178,7 @@ func (q *Queue) Peek(ctx context.Context, ref github.Ref, first bool) (Readiness
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := attemptOf(p, version)
+	cur := q.attemptKey(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -231,7 +230,7 @@ func (q *Queue) Attempt(ctx context.Context, ref github.Ref) (int, error) {
 		return 0, err
 	}
 	_, version := q.version(ref)
-	return q.attempt(ref, rec, attemptOf(p, version)), nil
+	return q.attempt(ref, rec, q.attemptKey(p, version)), nil
 }
 
 func (q *Queue) want(ctx context.Context, ref github.Ref, rec dinv.BriefRecord, now time.Time) error {
@@ -347,10 +346,7 @@ func (q *Queue) release(ref github.Ref) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	delete(q.inflight, ref)
-	for _, c := range q.waiters[ref] {
-		close(c)
-	}
-	delete(q.waiters, ref)
+	q.wakeWaiters(ref.Unit())
 	q.wakeUp()
 }
 
@@ -360,76 +356,24 @@ func (q *Queue) inFlight(ref github.Ref) bool {
 	return q.inflight[ref]
 }
 
-// Changed is closed by the next end of a brief run of ref after the call;
-// the func releases it.
-func (q *Queue) Changed(ref github.Ref) (<-chan struct{}, func()) {
-	c := make(chan struct{})
-	q.mu.Lock()
-	if q.waiters == nil {
-		q.waiters = map[github.Ref][]chan struct{}{}
-	}
-	q.waiters[ref] = append(q.waiters[ref], c)
-	q.mu.Unlock()
-	return c, func() {
-		q.mu.Lock()
-		defer q.mu.Unlock()
-		ws := q.waiters[ref]
-		for i, w := range ws {
-			if w == c {
-				q.waiters[ref] = append(ws[:i:i], ws[i+1:]...)
-				break
-			}
-		}
-		if len(q.waiters[ref]) == 0 {
-			delete(q.waiters, ref)
-		}
-	}
-}
-
 // Intakes is the queue as the intake's Briefs port.
 type Intakes struct{ Q *Queue }
 
 var _ intake.Briefs = Intakes{}
 
-func (a Intakes) Ready(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error) {
-	ref, err := pr.ParseKey(u.Key)
-	if err != nil || u.Provider != unit.GitHub {
-		return intake.Readiness{}, fmt.Errorf("no brief for %s", u)
-	}
-	rd, err := a.Q.Ready(ctx, github.Ref(ref), first)
-	if err != nil {
-		return intake.Readiness{}, err
-	}
-	return readinessOf(rd), nil
+func (a Intakes) Ready(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error) {
+	rd, err := a.Q.Ready(ctx, u, first, need)
+	return readinessOf(rd), err
 }
 
-func (a Intakes) Changed(u unit.Unit) (<-chan struct{}, func()) {
-	ref, err := pr.ParseKey(u.Key)
-	if err != nil || u.Provider != unit.GitHub {
-		return make(chan struct{}), func() {}
-	}
-	return a.Q.Changed(github.Ref(ref))
-}
+func (a Intakes) Changed(u unit.Unit) (<-chan struct{}, func()) { return a.Q.Changed(u) }
 
-func (a Intakes) Unwant(ctx context.Context, u unit.Unit) error {
-	ref, err := pr.ParseKey(u.Key)
-	if err != nil || u.Provider != unit.GitHub {
-		return nil
-	}
-	return a.Q.Unwant(ctx, github.Ref(ref))
-}
+func (a Intakes) Unwant(ctx context.Context, u unit.Unit) error { return a.Q.Unwant(ctx, u) }
 
 // Peek is Ready without starting a brief or writing.
-func (a Intakes) Peek(ctx context.Context, u unit.Unit, first bool) (intake.Readiness, error) {
-	ref, err := pr.ParseKey(u.Key)
-	if err != nil || u.Provider != unit.GitHub {
-		return intake.Readiness{}, fmt.Errorf("no brief for %s", u)
-	}
-	rd, err := a.Q.Peek(ctx, github.Ref(ref), first)
-	if err != nil {
-		return intake.Readiness{}, err
-	}
-	return readinessOf(rd), nil
+func (a Intakes) Peek(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error) {
+	rd, err := a.Q.Peek(ctx, u, first, need)
+	return readinessOf(rd), err
 }
 
 func readinessOf(rd Readiness) intake.Readiness {

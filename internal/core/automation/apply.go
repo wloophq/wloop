@@ -189,7 +189,7 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 		return it, err
 	}
 	if w, ok := e.live()[it.Workflow]; ok && !moved {
-		facts, err := e.Units.Facts(ctx, it.Unit)
+		facts, err := e.factsFor(ctx, w.Name, it.Unit)
 		if err != nil {
 			return it, err
 		}
@@ -199,7 +199,7 @@ func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workf
 		return outcomeOf(e.stopped(ctx, it, Refused{Reason: whyMoved}, nil, e.now()))
 	}
 	for _, st := range it.Steps {
-		refusal, err := e.Steps.Check(ctx, st, it.Unit, it.Why, CheckOpts{Mode: it.Mode, ByHand: true})
+		refusal, err := e.Steps.Check(ctx, st, it.Unit, it.Why, CheckOpts{Observe: it.Observe, ByHand: true})
 		if err != nil {
 			return it, err
 		}

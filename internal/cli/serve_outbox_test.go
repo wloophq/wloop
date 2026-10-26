@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -85,7 +86,7 @@ func insertDraft(t *testing.T, db *sqlite.DB, d draft.Draft) draft.Draft {
 		d.Original = d.Text
 	}
 	if d.Approval.Mode == "" {
-		d.Approval.Mode = draft.Always
+		d.Approval.Mode = draft.Wait
 	}
 	if d.CreatedAt.IsZero() {
 		d.CreatedAt, d.UpdatedAt = testNow, testNow
@@ -167,7 +168,7 @@ func TestOutboxEffectsFollowThePlugins(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	cfg := te.cfg
 	off := false
-	cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
+	cfg.Slack.Enabled = &off
 	pub := &recordingPublisher{}
 	mods, err := buildSources([]source.Plugin{publishing(pub)}, cfg, source.Deps{DB: te.db, Clock: clockFunc(te.Now)})
 	if err != nil {
@@ -224,5 +225,16 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 	o := &outbox.Service{Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }}
 	if _, err := o.Propose(ctx, outbox.Proposal{Unit: other, Kind: draft.Reply, Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7}}); !errors.Is(err, outbox.ErrInvalid) {
 		t.Fatalf("propose on another unit: %v", err)
+	}
+}
+
+func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
+	t.Parallel()
+	gh := pinnedEffects{Effects: &ghsource.Publisher{}}
+	if got := gh.Delivers(draft.Message); got != draft.CommentDelivery {
+		t.Errorf("github: %s", got)
+	}
+	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Message); got != draft.Message {
+		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }

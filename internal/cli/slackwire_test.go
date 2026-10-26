@@ -85,7 +85,7 @@ func TestServeLeavesSlackNilWhenDisabled(t *testing.T) {
 		enabled func(unit.ProviderID) bool
 	}{
 		"no client id":    {cfg: func(c *config.Config) { c.Slack.ClientID = "" }},
-		"plugin disabled": {cfg: func(c *config.Config) { c.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}} }},
+		"plugin disabled": {cfg: func(c *config.Config) { c.Slack.Enabled = &off }},
 		"daemon switch":   {cfg: func(*config.Config) {}, enabled: func(p unit.ProviderID) bool { return p != "slack" }},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -171,7 +171,7 @@ func TestServeWiresSlackRead(t *testing.T) {
 	}
 
 	off := false
-	te.cfg.Plugins = map[string]config.Plugin{"slack": {Enabled: &off}}
+	te.cfg.Slack.Enabled = &off
 	srv = (mcpEndpoint{slack: te.Env.slack}).wire(serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
 	if srv.SlackRead != nil {
 		t.Fatal("slack_read wired with the plugin disabled")

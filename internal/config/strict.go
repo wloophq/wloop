@@ -3,17 +3,21 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // UnknownKeysError names the keys of a config file that no setting reads.
 type UnknownKeysError struct {
 	File string
 	Keys []string // paths such as "sweep.fsat" or "projects[0].agent_hom"
+	// Near are the grammar's guesses, by key: "sweep.fsat" did you mean "fast".
+	Near map[string]string
 }
 
 func (e *UnknownKeysError) Error() string {
@@ -21,17 +25,41 @@ func (e *UnknownKeysError) Error() string {
 	if len(e.Keys) > 1 {
 		noun = "keys"
 	}
-	return fmt.Sprintf("%s: unknown %s %s", e.File, noun, strings.Join(e.Keys, ", "))
+	msg := fmt.Sprintf("%s: unknown %s %s", e.File, noun, strings.Join(e.Keys, ", "))
+	for _, k := range e.Keys {
+		if n := e.Near[k]; n != "" {
+			msg += fmt.Sprintf("; %s: did you mean %q?", k, n)
+		}
+	}
+	return msg
 }
 
-// decodeStrict decodes raw into c, refusing a key no field of Config reads.
+// decodeStrict decodes raw into c after the grammar checked it: a key no
+// setting reads is an UnknownKeysError, and a value of the wrong kind or
+// outside its set names its key.
 func decodeStrict(file string, raw []byte, c *Config) error {
-	var tree any
+	var tree map[string]any
 	if err := json.Unmarshal(raw, &tree); err != nil {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
-	if keys := unknownKeys(tree, reflect.TypeFor[Config](), ""); len(keys) > 0 {
-		return &UnknownKeysError{File: file, Keys: keys}
+	unknown := &UnknownKeysError{File: file, Near: map[string]string{}}
+	var bad []error
+	for _, p := range builtin.Check(builtin.SurfaceConfig, tree) {
+		if !p.Unknown {
+			bad = append(bad, fmt.Errorf("%s: %s: %s", file, p.Path, p.Msg))
+			continue
+		}
+		unknown.Keys = append(unknown.Keys, p.Path)
+		if p.Near != "" {
+			unknown.Near[p.Path] = p.Near
+		}
+	}
+	if len(unknown.Keys) > 0 {
+		slices.Sort(unknown.Keys)
+		return unknown
+	}
+	if len(bad) > 0 {
+		return errors.Join(bad...)
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
@@ -41,99 +69,8 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 	return nil
 }
 
-var (
-	unmarshalerType = reflect.TypeFor[json.Unmarshaler]()
-	proposalsType   = reflect.TypeFor[Proposals]()
-)
-
-// unknownKeys lists the paths under v that t has no field for, sorted.
-func unknownKeys(v any, t reflect.Type, at string) []string {
-	for t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	switch {
-	case t == proposalsType:
-		return proposalKeys(v, at)
-	case reflect.PointerTo(t).Implements(unmarshalerType):
-		return nil
-	}
-	switch t.Kind() {
-	case reflect.Struct:
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return nil
-		}
-		fields := jsonFields(t)
-		var out []string
-		for _, k := range slices.Sorted(maps.Keys(obj)) {
-			f, ok := fields[k]
-			if !ok {
-				out = append(out, join(at, k))
-				continue
-			}
-			out = append(out, unknownKeys(obj[k], f, join(at, k))...)
-		}
-		return out
-	case reflect.Map:
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return nil
-		}
-		var out []string
-		for _, k := range slices.Sorted(maps.Keys(obj)) {
-			out = append(out, unknownKeys(obj[k], t.Elem(), join(at, k))...)
-		}
-		return out
-	case reflect.Slice:
-		list, ok := v.([]any)
-		if !ok {
-			return nil
-		}
-		var out []string
-		for i, e := range list {
-			out = append(out, unknownKeys(e, t.Elem(), fmt.Sprintf("%s[%d]", at, i))...)
-		}
-		return out
-	}
-	return nil
-}
-
-func proposalKeys(v any, at string) []string {
-	obj, ok := v.(map[string]any)
-	if !ok {
-		return nil
-	}
-	var out []string
-	for _, k := range slices.Sorted(maps.Keys(obj)) {
-		if k != renudgeAfterKey {
-			out = append(out, unknownKeys(obj[k], reflect.TypeFor[ProposalRule](), join(at, k))...)
-		}
-	}
-	return out
-}
-
-func jsonFields(t reflect.Type) map[string]reflect.Type {
-	out := map[string]reflect.Type{}
-	for i := range t.NumField() {
-		f := t.Field(i)
-		if !f.IsExported() {
-			continue
-		}
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-		switch name {
-		case "-":
-			continue
-		case "":
-			name = f.Name
-		}
-		out[name] = f.Type
-	}
-	return out
-}
-
-func join(at, k string) string {
-	if at == "" {
-		return k
-	}
-	return at + "." + k
+// jsonName is f's key in the file, "" when its tag names none.
+func jsonName(f reflect.StructField) string {
+	name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+	return name
 }

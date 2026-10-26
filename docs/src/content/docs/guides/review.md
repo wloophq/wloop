@@ -61,7 +61,7 @@ To stop the automatic rounds on one pull request:
 
 ## First rounds on their own
 
-A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `owners` (the GitHub owners automated rounds run for) and widen it with `trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a requested review got no first round. Turn first rounds off with:
+A pull request that requests your review by name, from a trusted author in an allowed owner, gets a first round without your asking. Limit it with `github.owners` (the GitHub owners automated rounds run for) and widen it with `github.trusted_authors` (logins such as `github-actions[bot]` whose pull requests count as trusted). `{{command}} plan --unit <url>` says why a requested review got no first round. Turn first rounds off with:
 
 ```json
 "workflows": { "review-first-round": { "enabled": false } }
@@ -69,15 +69,15 @@ A pull request that requests your review by name, from a trusted author in an al
 
 ## The checkout's own agent settings
 
-A review session runs in the pull request's head, and by default loads that checkout's agent settings like any session there: `.claude/settings.json`, `.claude/settings.local.json`, the servers of `.mcp.json` and `CLAUDE.md`. Someone who can push to the pull request can change them. A pull request that fails the trust check (a fork, or an author outside the members, collaborators, owners and `trusted_authors`) never loads them, in a round you start by hand too, so its session runs in a manager that can start Claude Code with your user settings alone, such as Orca. `project_settings` turns them off where a predicate over the pull request's [facts](/reference/facts/#intent-facts) does not hold:
+A review session runs in the pull request's head, and by default loads that checkout's agent settings like any session there: `.claude/settings.json`, `.claude/settings.local.json`, the servers of `.mcp.json` and `CLAUDE.md`. Someone who can push to the pull request can change them. A pull request that fails the trust check (a fork, or an author outside the members, collaborators, owners and `github.trusted_authors`) never loads them, in a round you start by hand too, so its session runs in a manager that can start Claude Code with your user settings alone, such as Orca. `intents.<intent>.project_settings.when` turns them off where a predicate over the pull request's [facts](/reference/facts/#intent-facts) does not hold:
 
 ```json
-"project_settings": { "review": "pr.visibility == \"private\"" }
+"intents": { "review": { "project_settings": { "when": "pr.visibility == \"private\"" } } }
 ```
 
-Where it does not hold, the session starts with `--setting-sources user`: your own settings, hooks and MCP servers, {{name}}'s included, and none of the checkout's. The procedure then tells the agent to read the checkout's `CLAUDE.md` and `AGENTS.md` as text. When such a round stops on Claude Code's trust question, trusting from the cockpit trusts that worktree alone, not the repository. `"review": "false"` turns them off everywhere; `pr.owner`, `pr.repo`, `pr.author`, `pr.association` and `pr.labels` narrow it like `pr.visibility`. An intent the key does not name keeps loading them.
+Where it does not hold, the session starts with `--setting-sources user`: your own settings, hooks and MCP servers, {{name}}'s included, and none of the checkout's. The procedure then tells the agent to read the checkout's `CLAUDE.md` and `AGENTS.md` as text. When such a round stops on Claude Code's trust question, trusting from the cockpit trusts that worktree alone, not the repository. `"when": "false"` turns them off everywhere; `pr.owner`, `pr.repo_name`, `pr.author`, `pr.association` and `pr.labels` narrow it like `pr.visibility`. An intent with no `project_settings` keeps loading them.
 
-Claude Desktop cannot start a session with `--setting-sources user`, so a session with the checkout's settings off goes to the next manager in `workspace_managers` that can launch it, Orca by default. With no such manager the round fails and says why (see [Configuration](/reference/configuration/#workspace_managers)).
+Claude Desktop cannot start a session with `--setting-sources user`, so a session with the checkout's settings off goes to the next manager in `workspace_managers` that can launch it, Orca by default. With no such manager the round fails and says why (see [Configuration](/reference/configuration/)).
 
 ## When it is done
 

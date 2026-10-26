@@ -14,18 +14,18 @@ import (
 
 var golden = []string{
 	"agent_sessions: agent_session, kind, session, home, worktree, transcript, first_seen_at, last_seen_at",
-	"brief_runs: id, owner, repo, number, trigger, intake, version, attempt_of, head_oid, body_edited_at, changed_files, started_at, ended_at, input_ms, call_ms, agent_ms, outcome, error, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, diff_bytes, diff_cut, brief, files, tags, dropped_tags, input_sha, reused_from",
+	"brief_runs: id, trigger, intake, version, attempt_of, started_at, ended_at, input_ms, call_ms, agent_ms, outcome, error, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, input_bytes, input_cut, brief, tags, dropped_tags, input_sha, reused_from, provider, unit_key, revision, input, intent",
 	"classifications: provider, unit_key, fingerprint, workflow, output, at",
 	"classify_days: day, total",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
-	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects",
+	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at",
 	"entries: id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential, snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated, rev",
 	"entry_contexts: entry_id, context, ord",
 	"entry_items: entry_id, provider, unit_key, item",
 	"entry_position: only, epoch, rev",
 	"entry_units: entry_id, provider, unit_key, ord",
 	"events: id, provider, unit_key, kind, key, actor, at, data",
-	"extraction_cursors: provider, unit_key, last_ts, last_seq, brief, verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, at",
+	"extraction_cursors: provider, unit_key, last_ts, last_seq, verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, at, closure_marked",
 	"extraction_days: day, calls, cost_usd",
 	"extraction_hints: provider, unit_key, item_id, mode, context, why",
 	"extraction_runs: id, provider, unit_key, at, model, cost_usd, outcome, error",
@@ -34,25 +34,23 @@ var golden = []string{
 	"intakes: seq, provider, unit_key, intent, source, request, state, brief, note, accepted_at, briefing_at, starting_at, ended_at, turn_seq, turn_id, error, log",
 	"item_ops: seq, provider, unit_key, item, op, provenance, outcome, reason, at",
 	"item_proposals: id, provider, unit_key, item, op, provenance, reason, dedupe, state, at",
-	"items: provider, unit_key, id, body, state, waiting_on, confirmed, provenance, created_at, updated_at",
+	"items: provider, unit_key, id, body, state, confirmed, provenance, created_at, updated_at",
 	"links: provider, unit_key, to_provider, to_key, kind, item, evidence, origin, at",
 	"messages: id, entry_id, provider, unit_key, kind, text, options, recommend, confirm, origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at",
 	"meta: key, value",
 	"overrides: provider, unit_key, muted_until, mute_until_state, hold, taken_over, muted_kind, muted_waiting_on, next_guidance, tracked",
 	"pause: id, paused, repos, at, why",
 	"placements: provider, unit_key, repo, checkout, role, shared, set_at",
-	"plan_items: id, workflow, provider, unit_key, key_value, decision, reason, steps, why, default_outcome, deadline, guidance, attempts, error, mode, at, gain_memory, gain_disk, saved_at",
-	"pr_briefs: owner, repo, number, failures, attempt_of, run, last_run, wanted_at, retry_at, gave_up_at, gave_up_reason",
+	"plan_items: id, workflow, provider, unit_key, key_value, decision, reason, steps, why, default_outcome, deadline, guidance, attempts, error, at, gain_memory, gain_disk, saved_at, observe",
 	"pr_details: owner, repo, number, version, read_at, body",
 	"pr_seen: owner, repo, number, at",
-	"pr_tags: owner, repo, number, key, value, run",
 	"projects: entry_id, slug, review_every, reviewed_at",
 	"pull_requests: owner, repo, number, title, author, state, is_draft, head_oid, head_branch, base_branch, is_fork, checks_state, review_decision, review_requests, url, created_at, updated_at, merged_at, closed_at, body_edited_at, changed_files, reasons, ws_id, ws_name, ws_status, ws_review, ws_agent, ws_comment, ws_main, ws_manager, failing_checks, mergeable, mergeable_at",
 	"review_runs: id, started_at, finished_at, done",
 	"round_day_notes: day, kind, note",
 	"round_day_prs: day, provider, unit_key, rounds",
 	"round_days: day, total",
-	"round_state: provider, unit_key, sent_at, round_at, agent_home, first_round_skipped",
+	"round_state: provider, unit_key, sent_at, agent_home, first_round_skipped",
 	"segment_map: provider, conversation, segment_id, team, from_ts, to_ts, created_at, updated_at, closed",
 	"session_handles: session_id, manager, handle, runtime, from_at, to_at",
 	"sessions: session_id, manager, agent, pane, agent_session, workspace_id, worktree, home, managed, started_at, mcp_at, idle_since, closed_at, typed_at, typed_line, user_prompt_at, prompt_seen_at, provider, unit_key",
@@ -68,9 +66,11 @@ var golden = []string{
 	"turn_records: id, turn_seq, provider, unit_key, session, agent_session, head, hash, at, acked, record",
 	"turn_stops: session, prompt_id, agent_session, at, message, blocked, record_id",
 	"turn_usage: turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, first_at, last_at",
-	"turns: seq, provider, unit_key, intent, turn_id, trigger, guidance, head, sent_to, session, state, sent_at, started_at, ended_at, resume_of, replaced_by, prior_state, agent, brief_run, agent_session, usage_source, usage_read_at, usage_attempts, inputs, mode, workflow",
+	"turns: seq, provider, unit_key, intent, turn_id, trigger, guidance, head, sent_to, session, state, sent_at, started_at, ended_at, resume_of, replaced_by, prior_state, agent, brief_run, agent_session, usage_source, usage_read_at, usage_attempts, inputs, runner, workflow, role",
+	"unit_briefs: provider, unit_key, failures, attempt_of, run, last_run, wanted_at, retry_at, gave_up_at, gave_up_reason",
 	"unit_cards: provider, unit_key, card, at",
 	"unit_marks: provider, unit_key, mark, value",
+	"unit_tags: provider, unit_key, key, value, run",
 	"view_applied: sink, provider, unit_key, role, status, unread, summary, col, override, at",
 	"workflow_cursors: workflow, cursor, last_fire",
 	"workflow_runs: workflow, provider, unit_key, key_value, status, attempts, error, at",
@@ -181,7 +181,7 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.SetHeads(key, "abc", "def")
-	b.RecordFollowup(key, round.Reviewed, "fp", now)
+	b.RecordSent(key, round.Reviewed, "fp", now)
 	b.SetAgentHome(key, "/home/me/.claude")
 	if err := r.Save(ctx, a); err != nil {
 		t.Fatal(err)
@@ -194,18 +194,18 @@ func TestRoundsSaveWritesOnlyChangedFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.PRs[key]
-	if p.Marks[round.AddressedChecks] != "abc" || p.Marks[round.AddressedConflict] != "def" || p.Marks[round.Reviewed] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) || !p.RoundAt.Equal(now) {
+	if p.Marks[round.AddressedChecks] != "abc" || p.Marks[round.AddressedConflict] != "def" || p.Marks[round.Reviewed] != "fp" || p.AgentHome != "/home/me/.claude" || !p.SentAt.Equal(now) {
 		t.Fatalf("%+v", p)
 	}
 	if d := c.Days[round.DayKey(now)]; d.Total != 1 || d.PerPR[key] != 1 {
 		t.Fatalf("day %+v", d)
 	}
 
-	c.RecordFollowup(key, round.Reviewed, "", now)
+	c.Count(key, now)
 	c.SetMark(key, round.AddressedConflict, "")
 	c.FirstCapHit("acme/api#8", now)
 	other, _ := r.Load(ctx)
-	other.RecordFollowup("acme/web#1", round.Reviewed, "", now)
+	other.Count("acme/web#1", now)
 	for _, st := range []*round.Store{c, other} {
 		if err := r.Save(ctx, st); err != nil {
 			t.Fatal(err)

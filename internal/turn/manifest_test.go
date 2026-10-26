@@ -28,7 +28,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			t.Errorf("%s is not marked bundled", d.Name)
 		}
 		p := l.Programs[d.Name]
-		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.Visible == nil || p.Enabled == nil || p.Primary == nil)) {
+		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.Action.When == nil || p.Action.Primary == nil || len(p.Action.Refuse) != len(d.Action.Refuse))) {
 			t.Errorf("%s: a predicate is not compiled: %+v", d.Name, p)
 		}
 		for i, c := range d.Headline.New {
@@ -44,7 +44,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(names, ",") != "act,address,nudge,probe,review" || len(l.Problems) != 0 {
+	if strings.Join(names, ",") != "act,address,brief,nudge,probe,review" || len(l.Problems) != 0 {
 		t.Fatalf("%v %v", names, l.Problems)
 	}
 	if p, _ := l.Registry.Get(dintent.Probe); p.UserFacing {
@@ -53,9 +53,14 @@ func TestBundledManifestsLoad(t *testing.T) {
 }
 
 func TestEveryArtifactKindHasARecordSentence(t *testing.T) {
+	b, err := Base()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, k := range record.ArtifactKinds {
-		if _, err := artifactDoc(k); err != nil {
-			t.Error(err)
+		var out strings.Builder
+		if err := b.ExecuteTemplate(&out, "artifact", k); err != nil || !strings.HasPrefix(out.String(), "`artifact` (asked") || !strings.Contains(out.String(), "`kind: "+k+"`") {
+			t.Errorf("%s: %q %v", k, out.String(), err)
 		}
 	}
 }
@@ -165,20 +170,20 @@ session = { strategy = "new", title = "ask" }
 profile = "review"
 
 [inputs.loud]
-type = "flag"
+type = "bool"
 flag = "--loud"
 help = "asks loudly"
 by_hand_only = true
 
-[[also_profiles]]
+[[also_profile]]
 profile = "nudge"
 when    = "inputs.loud"
 define  = "nudge-judgment"
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}}, {{.Who}}."
+line = 'Ask the author of {{.pr.slug}}, {{template "started_by" .}}.'
 
 [record]
 states = ["done", "asked", "failed"]
@@ -240,14 +245,14 @@ const mineReader = `label = "Mine"
 summary = "Reads pr.mine"
 workspace = "review"
 session = { strategy = "new", title = "mine" }
-records = "!pr.mine"
 
 [headline]
-resumed = "mine on {{.PR.Slug}}"
+resumed = "mine on {{.pr.slug}}"
 [[headline.new]]
-text = "Mine on {{.PR.Slug}}."
+line = "Mine on {{.pr.slug}}."
 
 [record]
+when = "!pr.mine"
 states = ["done", "failed"]
 `
 
@@ -271,28 +276,31 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		}
 	}
 	sources := map[string]func(*Builder, *Request){
-		"pr.mine":              func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "Me" },
-		"pr.author":            func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "bob" },
-		"pr.state":             func(_ *Builder, r *Request) { r.Payload.(*PR).State = "OPEN" },
-		"pr.slug":              func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
-		"pr.owner":             func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "other", Repo: "api", Number: 7}.Unit() },
-		"pr.repo":              func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
-		"pr.base":              func(_ *Builder, r *Request) { r.Payload.(*PR).Base = "main" },
-		"pr.association":       func(_ *Builder, r *Request) { r.Payload.(*PR).Association = "MEMBER" },
-		"pr.cross_repository":  func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
-		"pr.visibility":        func(_ *Builder, r *Request) { r.Payload.(*PR).Visibility = "private" },
-		"pr.labels":            func(_ *Builder, r *Request) { r.Payload.(*PR).Labels = []string{"x"} },
-		"turn.trigger":         func(_ *Builder, r *Request) { r.Trigger = Automated },
-		"turn.automated":       func(_ *Builder, r *Request) { r.Trigger = Automated },
-		"turn.owned":           func(_ *Builder, r *Request) { r.Owned = true },
-		"turn.needs_take_over": func(_ *Builder, r *Request) { r.Owned = true },
-		"turn.resume":          func(_ *Builder, r *Request) { r.Resume = scenario(t, "address/resume/continue").Context.Resume },
-		"turn.plain":           func(_ *Builder, r *Request) { r.Plain = true },
-		"turn.planned":         func(_ *Builder, r *Request) { r.Planned = PlannedFirst },
-		"turn.round":           func(_ *Builder, r *Request) { r.Intent = Intent(dintent.Review) },
-		"last_review.exists":   func(_ *Builder, r *Request) { r.Payload.(*PR).Prior = &PriorReview{} },
-		"last_review.verdict":  func(_ *Builder, r *Request) { r.Payload.(*PR).LastReviewVerdict = "COMMENTED" },
-		"last_review.decision": func(_ *Builder, r *Request) { r.Payload.(*PR).Prior = &PriorReview{Verdict: "APPROVED"} },
+		"pr.mine":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "Me" },
+		"pr.author":               func(_ *Builder, r *Request) { r.Payload.(*PR).Author = "bob" },
+		"pr.state":                func(_ *Builder, r *Request) { r.Payload.(*PR).State = "OPEN" },
+		"pr.slug":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"pr.owner":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "other", Repo: "api", Number: 7}.Unit() },
+		"pr.repo":                 func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.repo_name":            func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "web", Number: 7}.Unit() },
+		"pr.base":                 func(_ *Builder, r *Request) { r.Payload.(*PR).Base = "main" },
+		"pr.association":          func(_ *Builder, r *Request) { r.Payload.(*PR).Association = "MEMBER" },
+		"pr.cross_repository":     func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
+		"pr.visibility":           func(_ *Builder, r *Request) { r.Payload.(*PR).Visibility = "private" },
+		"pr.labels":               func(_ *Builder, r *Request) { r.Payload.(*PR).Labels = []string{"x"} },
+		"pr.requested_teams":      func(b *Builder, _ *Request) { b.Facts = &facts{st: Stored{Teams: []string{"acme-platform"}}} },
+		"turn.trigger":            func(_ *Builder, r *Request) { r.Trigger = Automated },
+		"turn.automated":          func(_ *Builder, r *Request) { r.Trigger = Automated },
+		"unit.ref":                func(_ *Builder, r *Request) { r.Unit = dpr.Ref{Owner: "acme", Repo: "api", Number: 8}.Unit() },
+		"turn.owned":              func(_ *Builder, r *Request) { r.Owned = true },
+		"turn.needs_take_over":    func(_ *Builder, r *Request) { r.Owned = true },
+		"turn.resume":             func(_ *Builder, r *Request) { r.Resume = scenario(t, "address/resume/continue").Context.Resume },
+		"turn.try":                func(_ *Builder, r *Request) { r.Plain = true },
+		"turn.planned":            func(_ *Builder, r *Request) { r.Planned = PlannedFirst },
+		"turn.stage":              func(_ *Builder, r *Request) { r.Intent = Intent(dintent.Review) },
+		"pr.last_review.exists":   func(_ *Builder, r *Request) { r.Payload.(*PR).Prior = &PriorReview{} },
+		"pr.last_review.verdict":  func(_ *Builder, r *Request) { r.Payload.(*PR).LastReviewVerdict = "COMMENTED" },
+		"pr.last_review.decision": func(_ *Builder, r *Request) { r.Payload.(*PR).Prior = &PriorReview{Verdict: "APPROVED"} },
 		"pr.address.reviewers": func(_ *Builder, r *Request) {
 			r.Payload.(*PR).Address = &RoundReason{Reviewers: []RoundReviewer{{Login: "ana"}}}
 		},
@@ -302,10 +310,14 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.address.conflict": func(_ *Builder, r *Request) {
 			r.Payload.(*PR).Address = &RoundReason{Conflict: &RoundConflict{Base: "main"}}
 		},
-		"config.address_reviews":             func(b *Builder, _ *Request) { b.Config = config.Config{AddressReviews: true} },
-		"config.address_checks":              func(b *Builder, _ *Request) { b.Config = config.Config{AddressChecks: true} },
-		"config.followups_without_workspace": func(b *Builder, _ *Request) { b.Config = config.Config{FollowupsWithoutWorkspace: true} },
-		"config.address_without_workspace":   func(b *Builder, _ *Request) { b.Config = config.Config{AddressWithoutWorkspace: true} },
+		"config.github.address_reviews": func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressReviews: true}} },
+		"config.github.address_checks":  func(b *Builder, _ *Request) { b.Config = config.Config{GitHub: config.GitHub{AddressChecks: true}} },
+		"config.github.followups_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{GitHub: config.GitHub{FollowupsWithoutWorkspace: true}}
+		},
+		"config.github.address_without_workspace": func(b *Builder, _ *Request) {
+			b.Config = config.Config{GitHub: config.GitHub{AddressWithoutWorkspace: true}}
+		},
 	}
 	get := func(b Builder, r Request, field string) any {
 		c, err := b.Build(context.Background(), r)
