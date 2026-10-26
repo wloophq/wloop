@@ -126,3 +126,29 @@ func TestOpenSegmentsOfAConversation(t *testing.T) {
 		t.Fatalf("open segments %+v", got)
 	}
 }
+
+func TestTheExtractionKeepsOneBriefRunPerUnitPerDay(t *testing.T) {
+	db := openExtraction(t)
+	ctx := context.Background()
+	u := unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
+	day := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
+	for i, st := range []ExtractionState{{Brief: "first", At: day}, {Brief: "second", At: day.Add(3 * time.Hour)}, {At: day.Add(4 * time.Hour)}, {Brief: "next day", At: day.Add(24 * time.Hour)}} {
+		if err := db.Extraction().Save(ctx, ExtractionSave{States: map[unit.Unit]ExtractionState{u: st}}); err != nil {
+			t.Fatalf("save %d: %v", i, err)
+		}
+		if i == 2 {
+			got, err := db.Extraction().States(ctx, []unit.Unit{u})
+			if err != nil || got[u].Brief != "second" {
+				t.Fatalf("an empty brief dropped the day's: %+v %v", got[u], err)
+			}
+		}
+	}
+	var runs int
+	if err := db.R().QueryRowContext(ctx, `SELECT count(*) FROM brief_runs WHERE provider = 'slack' AND trigger = 'extraction'`).Scan(&runs); err != nil || runs != 2 {
+		t.Fatalf("%d runs, %v", runs, err)
+	}
+	got, err := db.Extraction().States(ctx, []unit.Unit{u})
+	if err != nil || got[u].Brief != "next day" {
+		t.Fatalf("%+v %v", got[u], err)
+	}
+}
