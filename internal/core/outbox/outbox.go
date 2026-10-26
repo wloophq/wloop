@@ -3,6 +3,7 @@
 package outbox
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -119,15 +120,15 @@ const NotConfirmed = "not confirmed after a restart"
 const mayHaveBeenPosted = "may have been posted"
 
 func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) {
+	if err := checkKind(p.Kind); err != nil {
+		return draft.Draft{}, err
+	}
 	now := s.Clock.Now()
-	d := draft.Draft{
+	d := shaped(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Proposed, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
-	}
-	if d.Kind == "" && d.Purpose != "" {
-		d.Kind = draft.KindOf(d.Purpose, d.Delivery)
-	}
+	})
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err
 	}
@@ -135,17 +136,17 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if targetsOutside(d) && approval.Mode != draft.Observe {
+	if (targetsOutside(d) || p.HoldAutoSend) && approval.Mode != draft.Observe {
 		approval = always
 	}
 	d.Approval = approval
-	if dup, ok, err := s.duplicate(ctx, d, now); err != nil || ok {
+	if dup, ok, err := s.duplicate(ctx, d, p.ObservedFor, now); err != nil || ok {
 		return dup, err
 	}
 	if err := s.publishable(ctx, d); err != nil {
 		return draft.Draft{}, err
 	}
-	d.Would = s.would(ctx, d)
+	d.Would = s.would(ctx, d, p.HoldAutoSend)
 	switch approval.Mode {
 	case draft.Window:
 		d.Deadline = now.Add(approval.Window)
@@ -156,7 +157,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	s.logf("draft %d proposed: %s on %s by %s, approval %s, would %s", d.ID, d.Kind, d.Unit, d.Origin.Kind, d.Approval.Mode, d.Would.Policy)
+	s.logf("draft %d proposed: %s on %s by %s, approval %s, would %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind, d.Approval.Mode, d.Would.Policy)
 	if approval.Mode == draft.None {
 		approved, err := s.markAuto(ctx, d)
 		if err != nil {
@@ -167,9 +168,35 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	return d, nil
 }
 
-// duplicate is the open draft an auto proposal d repeats, with ErrDuplicate;
-// under observe, an observed one younger than ObservedFor counts too.
-func (s *Service) duplicate(ctx context.Context, d draft.Draft, now time.Time) (draft.Draft, bool, error) {
+// shaped is d with its purpose and delivery derived from its kind when it
+// names none, and its kind, which only readers of the API see, from them.
+func shaped(d draft.Draft) draft.Draft {
+	if d.Purpose == "" && d.Kind != "" {
+		d.Purpose, d.Delivery = draft.ShapeOf(d.Kind)
+	}
+	if d.Delivery == "" {
+		d.Delivery = draft.Message
+	}
+	d.Kind = draft.KindOf(d.Purpose, d.Delivery)
+	return d
+}
+
+// ResolveApproval is the approval of a workflow's draft: the config's
+// workflows.<name>.draft_approval, then the legacy proposals.<rule>.approval,
+// then the manifest's [draft_approval], else always.
+func ResolveApproval(config, legacy, manifest *draft.Approval) draft.Approval {
+	for _, a := range []*draft.Approval{config, legacy, manifest} {
+		if a != nil {
+			return *a
+		}
+	}
+	return always
+}
+
+// duplicate is the open draft an auto proposal d repeats, with ErrDuplicate:
+// one of the same rule, key, purpose and delivery; under observe, an
+// observed one younger than observedFor (zero: Service.ObservedFor) counts too.
+func (s *Service) duplicate(ctx context.Context, d draft.Draft, observedFor time.Duration, now time.Time) (draft.Draft, bool, error) {
 	if d.Origin.Kind != draft.OriginAuto {
 		return draft.Draft{}, false, nil
 	}
@@ -181,34 +208,46 @@ func (s *Service) duplicate(ctx context.Context, d draft.Draft, now time.Time) (
 	if err != nil {
 		return draft.Draft{}, false, err
 	}
+	if observedFor <= 0 {
+		observedFor = s.ObservedFor
+	}
 	for _, o := range found {
-		if o.Kind != d.Kind || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
+		if o.Purpose != d.Purpose || o.Delivery != d.Delivery || o.Origin.Rule != d.Origin.Rule || o.Origin.Key != d.Origin.Key {
 			continue
 		}
-		if o.State != draft.Discarded || o.Reason == string(draft.Observe) && s.observing(o, now) {
+		if o.State != draft.Discarded || o.Reason == string(draft.Observe) && (observedFor <= 0 || now.Sub(o.UpdatedAt) < observedFor) {
 			return o, true, ErrDuplicate
 		}
 	}
 	return draft.Draft{}, false, nil
 }
 
-func (s *Service) observing(o draft.Draft, now time.Time) bool {
-	return s.ObservedFor <= 0 || now.Sub(o.UpdatedAt) < s.ObservedFor
-}
-
 func checkContent(d draft.Draft) error {
 	switch {
 	case d.Unit.IsZero():
 		return fmt.Errorf("%w: no unit", ErrInvalid)
-	case !d.Kind.Valid():
-		return fmt.Errorf("%w: unknown kind %q", ErrInvalid, d.Kind)
-	case d.Kind == draft.React && strings.TrimSpace(d.Reaction) == "":
+	case !slices.Contains(deliveries, d.Delivery):
+		return fmt.Errorf("%w: unknown delivery %q", ErrInvalid, d.Delivery)
+	case d.Delivery == draft.Reaction && strings.TrimSpace(d.Reaction) == "":
 		return fmt.Errorf("%w: a reaction needs an emoji", ErrInvalid)
-	case d.Kind != draft.React && strings.TrimSpace(d.Text) == "":
+	case d.Delivery != draft.Reaction && strings.TrimSpace(d.Text) == "":
 		return fmt.Errorf("%w: empty text", ErrInvalid)
+	case strings.TrimSpace(d.Purpose) == "":
+		return fmt.Errorf("%w: no purpose", ErrInvalid)
 	}
 	return nil
 }
+
+// checkKind refuses a kind, the input word of agents and the API, that
+// names no shape.
+func checkKind(k draft.Kind) error {
+	if k != "" && !k.Valid() {
+		return fmt.Errorf("%w: unknown kind %q", ErrInvalid, k)
+	}
+	return nil
+}
+
+var deliveries = []draft.Delivery{draft.Message, draft.Reaction, draft.CommentDelivery}
 
 func (s *Service) approval(ctx context.Context, p Proposal) (draft.Approval, error) {
 	if p.Approval != nil {
@@ -225,7 +264,7 @@ func (s *Service) approval(ctx context.Context, p Proposal) (draft.Approval, err
 		err = a.Validate()
 	}
 	if err != nil {
-		s.logf("draft approval of a %s proposal on %s resolved to always: %v", p.Kind, p.Unit, err)
+		s.logf("draft approval of a %s proposal on %s resolved to always: %v", cmp.Or(p.Purpose, string(p.Kind)), p.Unit, err)
 		return always, nil
 	}
 	return a, nil
@@ -238,17 +277,17 @@ func targetsOutside(d draft.Draft) bool {
 	return (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && t != "" && !strings.EqualFold(t, d.Unit.Key)
 }
 
-var autoSendable = []draft.Kind{draft.Reply, draft.Nudge, draft.Close, draft.React}
-
-func (s *Service) would(ctx context.Context, d draft.Draft) draft.Would {
+func (s *Service) would(ctx context.Context, d draft.Draft, held bool) draft.Would {
 	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldHold, Reason: reason} }
 	switch {
 	case targetsOutside(d):
 		return hold("targets outside its unit")
 	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginAuto:
 		return hold(fmt.Sprintf("proposed by %s", d.Origin.Kind))
-	case !slices.Contains(autoSendable, d.Kind):
-		return hold(fmt.Sprintf("a %s is never sent on its own", d.Kind))
+	case held:
+		return hold("its proposer never sends it on its own")
+	case d.Delivery == draft.CommentDelivery:
+		return hold("a comment is never sent on its own")
 	}
 	if len(d.Items) > 0 && s.Items != nil {
 		its, err := s.Items.Items(ctx, d.Unit)
@@ -261,7 +300,7 @@ func (s *Service) would(ctx context.Context, d draft.Draft) draft.Would {
 			}
 		}
 	}
-	return draft.Would{Policy: draft.WouldSend, Reason: fmt.Sprintf("a %s from a %s over confident items", d.Kind, d.Origin.Kind)}
+	return draft.Would{Policy: draft.WouldSend, Reason: fmt.Sprintf("a %s %s from a %s over confident items", d.Purpose, d.Delivery, d.Origin.Kind)}
 }
 
 // publishable refuses d when its provider has no enabled publisher, or its Validator refuses d.
@@ -317,12 +356,12 @@ func (s *Service) save(ctx context.Context, d draft.Draft, from draft.State) (dr
 	if err != nil {
 		return draft.Draft{}, fmt.Errorf("draft %d %s -> %s: %w", d.ID, from, d.State, err)
 	}
-	s.logf("draft %d %s -> %s (%s on %s)", d.ID, from, d.State, d.Kind, d.Unit)
+	s.logf("draft %d %s -> %s (%s on %s)", d.ID, from, d.State, d.Purpose, d.Unit)
 	return got, nil
 }
 
 func setText(d *draft.Draft, text string) error {
-	if d.Kind != draft.React && strings.TrimSpace(text) == "" {
+	if d.Delivery != draft.Reaction && strings.TrimSpace(text) == "" {
 		return fmt.Errorf("%w: empty text", ErrInvalid)
 	}
 	d.Text, d.Edited = text, text != d.Original
@@ -399,6 +438,9 @@ func (s *Service) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 
 // RecordSent stores a post already made outside the outbox (origin session) as sent.
 func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence) (draft.Draft, error) {
+	if err := checkKind(p.Kind); err != nil {
+		return draft.Draft{}, err
+	}
 	now := s.Clock.Now()
 	if p.Origin.Kind == "" {
 		p.Origin.Kind = draft.OriginSession
@@ -406,10 +448,11 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 	if ev.At.IsZero() {
 		ev.At = now
 	}
-	d := draft.Draft{
+	d := shaped(draft.Draft{
 		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
-	}
+		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
+	})
 	if err := checkContent(d); err != nil {
 		return draft.Draft{}, err
 	}
@@ -417,7 +460,7 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Kind, d.Unit, d.Origin.Kind)
+	s.logf("draft %d recorded sent: %s on %s by %s", d.ID, d.Purpose, d.Unit, d.Origin.Kind)
 	return d, s.afterSent(ctx, d)
 }
 
@@ -429,6 +472,12 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 			errs = append(errs, fmt.Errorf("evidence of draft %d: %w", d.ID, err))
 		}
 	}
+	if s.Applier != nil {
+		if err := s.Applier.Apply(ctx, d); err != nil {
+			s.logf("draft %d: its effects were not applied; the next pass retries", d.ID)
+			errs = append(errs, fmt.Errorf("effects of draft %d: %w", d.ID, err))
+		}
+	}
 	for _, hook := range s.OnSent {
 		if err := hook(ctx, d); err != nil {
 			s.logf("draft %d: an after-send hook failed", d.ID)
@@ -438,13 +487,17 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 	return errors.Join(errs...)
 }
 
-// Send is the sender pass: every approved draft -> sending -> sent | failed, one Publish each, no retry.
+// Send is the sender pass: the effects of the sent drafts not applied yet,
+// then every approved draft -> sending -> sent | failed, one Publish each, no retry.
 func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
 	approved, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Approved}})
 	if err != nil {
 		return 0, 0, err
 	}
 	var errs []error
+	if err := s.ApplyPending(ctx); err != nil {
+		errs = append(errs, err)
+	}
 	for _, d := range slices.Backward(approved) {
 		ok, err := s.sendOne(ctx, d)
 		switch {
@@ -507,8 +560,9 @@ func (s *Service) settleSent(ctx context.Context, d draft.Draft, ev draft.Eviden
 	return true, s.afterSent(ctx, saved)
 }
 
-// Recover runs once at daemon start: every sending draft -> Verify -> sent | failed;
-// a draft whose provider answers ErrDisabled stays sending for the next Recover.
+// Recover runs once at daemon start: every sending draft -> Verify -> sent | failed,
+// then the effects of every sent draft not applied yet; a draft whose provider
+// answers ErrDisabled stays sending for the next Recover.
 func (s *Service) Recover(ctx context.Context) error {
 	stuck, err := s.Store.List(ctx, Filter{States: []draft.State{draft.Sending}})
 	if err != nil {
@@ -534,13 +588,16 @@ func (s *Service) Recover(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
+	if err := s.ApplyPending(ctx); err != nil {
+		errs = append(errs, err)
+	}
 	return errors.Join(errs...)
 }
 
 // EvidenceOps are the items ledger ops that record sent draft d on each of its items;
 // the caller applies them with provenance items.Effects.
 func EvidenceOps(d draft.Draft) []items.Op {
-	anchor := unit.Anchor{Unit: d.Unit, Ref: fmt.Sprintf("draft:%d:%s", d.ID, d.Kind), Permalink: d.Evidence.Permalink, At: d.Evidence.At}
+	anchor := unit.Anchor{Unit: d.Unit, Ref: fmt.Sprintf("draft:%d", d.ID), Permalink: d.Evidence.Permalink, At: d.Evidence.At}
 	ops := make([]items.Op, 0, len(d.Items))
 	for _, id := range d.Items {
 		ops = append(ops, items.Op{Op: items.OpEvidence, Unit: d.Unit, Item: id, Anchor: anchor,

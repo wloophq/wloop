@@ -239,7 +239,7 @@ var Facts = []Fact{
 	briefWF("missing", expr.List, "The brief intent's extra fields the unit's brief lacks: new or changed since it was written."),
 	wf("draft", "person_waited", expr.Bool, "The draft's person is still waited on by its entry; true for a draft of no person."),
 	wf("draft", "items_held", expr.Int, "Items of the draft still open and held by its person, or unowned for a draft of no person."),
-	wf("draft", "items_owned", expr.Int, "Items of the draft that gained an owner since it was proposed."),
+	wf("draft", "items_owned", expr.Int, "Items of the draft that have an owner, someone waited on, or are no longer open."),
 	wf("draft", "subject_open", expr.Bool, "The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored."),
 	wf("trigger", "kind", expr.String, "sweep, event or schedule."),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),

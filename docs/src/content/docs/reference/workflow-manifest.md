@@ -48,7 +48,9 @@ round = "follow-up"
 | `[[step]]` | at least one | | `use` names a builtin step; other keys are its arguments, all strings |
 | `[limits]` | | none | `per_run`, `per_day`, `per_unit_per_day`, `cooldown` |
 | `[approval]` | | none | `default`, `window`, `wait_when` |
-| `[draft_approval]` | | the intent's, else `always` | `mode`, `window`: the policy of the drafts the turns this workflow starts propose |
+| `[draft_approval]` | | the intent's, else `always` | `mode`, `window`: the policy of the drafts the turns this workflow starts, and its `draft.propose` steps, propose; `workflows.<name>.draft_approval` in the configuration wins over it |
+| `[withdraw]` | | none | `when`, a predicate over the subject's slot and `draft.*`, withdraws an open draft the workflow's `draft.propose` proposed; `reason` is `moot` (the default) or `assigned` |
+| `auto_send` | | unset | `false` keeps the workflow's drafts for your approval whatever their policy |
 
 ## Steps
 

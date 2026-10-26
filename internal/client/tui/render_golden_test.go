@@ -85,8 +85,8 @@ func draftsGolden(t *testing.T, color bool) *Model {
 	m.openEntry(e, 0)
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Entry: e.ID, Kind: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
-		{ID: 3, Entry: e.ID, Kind: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
+		{ID: 4, Entry: e.ID, Kind: "reply", Purpose: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
+		{ID: 3, Entry: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
 	})
 	m.picked = 4
 	return m

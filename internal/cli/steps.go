@@ -50,8 +50,10 @@ type stepDeps struct {
 	Changes  port.Changes
 	Removal  removalPorts
 	Classify classifyDeps
-	Pub      port.Publisher
-	Log      func(format string, args ...any)
+	// Drafts are what draft.propose reads; nil refuses it.
+	Drafts *draftDeps
+	Pub    port.Publisher
+	Log    func(format string, args ...any)
 }
 
 // briefPort is the brief queue as a round asks it: Peek plans, Ready starts

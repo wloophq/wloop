@@ -163,9 +163,12 @@ var RoundProviders = []unit.ProviderID{unit.GitHub}
 // The values of draft.propose's arguments.
 var (
 	DraftDeliveries = []string{"message", "reaction", "comment"}
-	DraftItems      = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
-	DraftPer        = []string{"subject", "person"}
-	DraftTargets    = []string{"unit", "item"}
+	// DraftEmojiDeliveries are the deliveries that post an emoji, which
+	// need the reaction argument, and no text.
+	DraftEmojiDeliveries = []string{"reaction"}
+	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
+	DraftPer             = []string{"subject", "person"}
+	DraftTargets         = []string{"unit", "item"}
 	// HoldForever is hold_after_sent's value that never proposes again
 	// after a draft was sent.
 	HoldForever = "forever"
@@ -226,11 +229,19 @@ type Effect struct {
 	Doc      string
 }
 
+// The effects code applies by name: a plugin's Module.OnPosted keys and the
+// publishers that apply one as they post.
+const (
+	EffectEntryNudged = "entry.nudged"
+	EffectUnitClosed  = "unit.closed"
+	EffectPRNudged    = "pr.nudged"
+)
+
 // Effects is the effect vocabulary of drafts.
 var Effects = []Effect{
-	{"entry.nudged", "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none."},
-	{"unit.closed", "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin."},
-	{"pr.nudged", unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts."},
+	{EffectEntryNudged, "", "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none."},
+	{EffectUnitClosed, "", "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin."},
+	{EffectPRNudged, unit.GitHub, "Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts."},
 }
 
 // EffectNames are the names of Effects.

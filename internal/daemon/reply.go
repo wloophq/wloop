@@ -166,12 +166,12 @@ func userDraftKind(c api.DraftCreate) (draft.Kind, error) {
 		if c.Reaction != "" {
 			return "", badRequest{"a reply takes text, not a reaction"}
 		}
-		return draft.Reply, nil
+		return draft.Kind(k), nil
 	case api.DraftReact:
 		if strings.TrimSpace(c.Text) != "" {
 			return "", badRequest{"a reaction takes an emoji, not text"}
 		}
-		return draft.React, nil
+		return draft.Kind(k), nil
 	default:
 		return "", badRequest{fmt.Sprintf("a draft you write is a %s or a %s, not %q", api.DraftReply, api.DraftReact, k)}
 	}

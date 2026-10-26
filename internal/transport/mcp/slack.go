@@ -34,6 +34,9 @@ type DraftArgs struct {
 	Target   string   `json:"target,omitempty"`
 	Items    []string `json:"items,omitempty"`
 	Reaction string   `json:"reaction,omitempty"`
+	// Effects are the effects the draft declares, which the session's
+	// intent must list in its draft_effects.
+	Effects []string `json:"effects,omitempty"`
 }
 
 // DraftResult is the proposed draft: where it posts once approved, and its

@@ -732,10 +732,10 @@ func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
 func TestDraftTitleNamesWhereItGoes(t *testing.T) {
 	t.Parallel()
 	u := unit.Unit{Provider: "slack", Key: "T0001/C0001/1700000000.000100"}
-	if got := draftTitle(draft.Draft{Unit: u, Kind: draft.Reply, Text: "on it\nmore"}, "#general"); got != "reply on #general: on it" {
+	if got := draftTitle(draft.Draft{Unit: u, Purpose: "reply", Text: "on it\nmore"}, "#general"); got != "reply on #general: on it" {
 		t.Errorf("title %q", got)
 	}
-	if got := draftTitle(draft.Draft{Unit: u, Kind: draft.React, Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
+	if got := draftTitle(draft.Draft{Unit: u, Purpose: "react", Delivery: draft.Reaction, Reaction: "eyes"}, "#general"); got != "react :eyes: on #general" {
 		t.Errorf("title %q", got)
 	}
 }

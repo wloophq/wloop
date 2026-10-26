@@ -179,27 +179,30 @@ func TestCardGTDFields(t *testing.T) {
 	}
 }
 
-func TestSlackCardClosurePostedFromEvidence(t *testing.T) {
+func TestRowsReadUnitClosedFromClosureMarked(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
 	u := f.thread(t)
 	f.state(t, u, sqlite.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
 	l := f.ledger()
 	applyOps(t, l, items.Extracted, createOp(u, "e1", 1, mePerson, otherPerson))
-	if c := f.card(t, u); c.ClosurePosted {
-		t.Fatalf("no closure yet: %+v", c)
+	for i, ref := range []string{"draft:7:reply", "draft:8", "draft:9:close"} {
+		applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
+			Anchor:   unit.Anchor{Unit: u, Ref: ref, At: tsAt(4 + i)},
+			Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: ref, At: tsAt(4 + i)}}})
 	}
-	applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
-		Anchor:   unit.Anchor{Unit: u, Ref: "draft:7:reply", At: tsAt(4)},
-		Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: "draft:7:reply", At: tsAt(4)}}})
 	if c := f.card(t, u); c.ClosurePosted {
-		t.Fatalf("a reply draft is no closure: %+v", c)
+		t.Fatalf("a sent draft's anchor is no closure: %+v", c)
 	}
-	applyOps(t, l, items.Effects, items.Op{Op: items.OpEvidence, Unit: u, Item: "e1",
-		Anchor:   unit.Anchor{Unit: u, Ref: "draft:8:close", At: tsAt(5)},
-		Evidence: &items.Evidence{Kind: items.EvidenceSentDraft, Anchor: unit.Anchor{Unit: u, Ref: "draft:8:close", At: tsAt(5)}}})
+	if err := f.db.Extraction().MarkClosed(context.Background(), u, f.now); err != nil {
+		t.Fatal(err)
+	}
 	if c := f.card(t, u); !c.ClosurePosted {
-		t.Fatalf("a sent closing draft: %+v", c)
+		t.Fatalf("a sent draft's unit.closed: %+v", c)
+	}
+	f.state(t, u, sqlite.ExtractionState{Verdict: "needs_closure", StartedByViewer: true, At: f.now})
+	if c := f.card(t, u); !c.ClosurePosted {
+		t.Fatalf("an extraction pass cleared the closure: %+v", c)
 	}
 }
 

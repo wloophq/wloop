@@ -179,6 +179,9 @@ type Workflow struct {
 	// and each draft's (the draft slot): an open draft the workflow proposed
 	// is withdrawn when it matches. Nil withdraws none.
 	Withdraw Predicate
+	// WithdrawReason is the Reason of a draft Withdraw withdraws: assigned
+	// or moot.
+	WithdrawReason string
 	// AutoSend false holds the workflow's drafts for a person whatever their
 	// approval; nil keeps the default of their delivery.
 	AutoSend *bool

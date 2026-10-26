@@ -53,6 +53,8 @@ type engineDeps struct {
 	Subjects map[unit.ProviderID]automation.Units
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals automation.Withdrawals
+	// Drafts are what draft.propose reads; nil refuses it.
+	Drafts *draftDeps
 }
 
 // newEngine assembles the engine over the store, the facts providers and
@@ -92,7 +94,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Candidates == nil {
 		d.Candidates = candidatesOf(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Pub: d.Pub, Log: d.Log}
+	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
 	}
@@ -139,6 +141,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	}
 	if d.Withdrawals != nil {
 		eng.Withdrawals = d.Withdrawals
+		eng.PluginEnabled = func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
 	}
 	if e.WS.Len() > 0 {
 		eng.Reachable = e.WS.Reachable

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
@@ -49,7 +50,8 @@ type wManifest struct {
 }
 
 type wWithdraw struct {
-	When *string `toml:"when"`
+	When   *string `toml:"when"`
+	Reason *string `toml:"reason"`
 }
 
 type wTrigger struct {
@@ -341,6 +343,11 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 	if slot != "" {
 		w.Withdraw = s.predicate("withdraw.when", *m.When, builtin.WithdrawEnv(slot))
 	}
+	w.WithdrawReason = draft.WithdrawMoot
+	if m.Reason != nil {
+		s.oneOf("withdraw.reason", *m.Reason, []string{draft.WithdrawAssigned, draft.WithdrawMoot})
+		w.WithdrawReason = *m.Reason
+	}
 }
 
 // turnBudget refuses a workflow that starts turns on units outside
@@ -508,7 +515,7 @@ func (s *sheet) draftPropose(p string, args map[string]any) {
 		delivery = builtin.DraftDeliveries[0]
 	}
 	s.oneOf(p+".delivery", delivery, builtin.DraftDeliveries)
-	if r, _ := arg("reaction"); delivery == "reaction" && r == "" {
+	if r, _ := arg("reaction"); slices.Contains(builtin.DraftEmojiDeliveries, delivery) && r == "" {
 		s.add(p+".reaction", "is required with delivery = \"reaction\": the emoji name, such as white_check_mark")
 	}
 	for k, allowed := range map[string][]string{"items": builtin.DraftItems, "per": builtin.DraftPer, "target": builtin.DraftTargets} {

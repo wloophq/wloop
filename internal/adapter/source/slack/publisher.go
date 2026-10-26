@@ -95,7 +95,7 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 		return plan{}, send.ErrNotLoggedIn
 	}
 	var pl plan
-	if d.Kind == draft.React {
+	if d.Delivery == draft.Reaction {
 		if pl.reaction = strings.Trim(strings.TrimSpace(d.Reaction), ":"); pl.reaction == "" {
 			return plan{}, errors.New("a reaction needs an emoji name")
 		}
@@ -159,7 +159,7 @@ func userOf(target string) string {
 // once the post allowlist holds them.
 func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl *plan) error {
 	t := strings.TrimSpace(d.Target)
-	react := d.Kind == draft.React
+	react := d.Delivery == draft.Reaction
 	switch {
 	case t == "" && k.Segment != "":
 		if react {
@@ -353,7 +353,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		if err != nil && apiCode(err) != "already_reacted" {
 			return draft.Evidence{}, p.failed(pl, err)
 		}
-		p.logf("slack_draft_published draft=%d kind=%s channel=%s ts=%s", d.ID, d.Kind, pl.res.Channel, pl.at)
+		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
 		return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
 	}
 	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS})
@@ -364,7 +364,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		return draft.Evidence{}, fmt.Errorf("%s to %s: Slack's answer names no message", mayHaveBeenPosted, pl.where())
 	}
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
-	p.logf("slack_draft_published draft=%d kind=%s channel=%s ts=%s", d.ID, d.Kind, channel, posted.TS)
+	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
 	return draft.Evidence{Ref: posted.TS, Permalink: p.permalink(ctx, channel, posted.TS), At: postedAt(posted.TS, p.now())}, nil
 }
 

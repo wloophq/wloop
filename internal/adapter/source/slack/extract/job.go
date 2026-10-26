@@ -793,7 +793,7 @@ func (j *Job) watch(ctx context.Context, cfg config.Config, k unit.Unit, obj sla
 		if !st.Watched {
 			return false, j.Store.DB.SetWatched(ctx, k, true, now)
 		}
-	case !open && st.Watched && len(its) > 0 && settled(its, now, warmFor(cfg)) && (!st.StartedByViewer || st.ClosurePosted):
+	case !open && st.Watched && len(its) > 0 && settled(its, now, warmFor(cfg)) && (!st.StartedByViewer || st.ClosurePosted || st.ClosureMarked):
 		if err := j.Watcher.Unwatch(ctx, obj); err != nil {
 			return false, err
 		}

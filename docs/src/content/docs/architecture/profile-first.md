@@ -44,6 +44,7 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - A builtin's name is spelled only in its tables: `internal/intent/builtin/builtin.go`, `internal/cli/builtins.go`, `internal/daemon/builtins.go`.
 - Only `internal/catalog` builds action specs and evaluates an intent's predicates.
 - The automation engine and the rest of the core name no provider.
+- Go never names a draft's kind, compares its purpose with a value, or reads its delivery outside the publishers and the Outbox (`TestNoDraftKindComparisons`).
 - Prose is embedded only from `profiles/`; what Go still embeds is listed with its reason, and the list of what moves only shrinks (`TestProseIsEmbeddedOnlyFromProfiles`).
 - The engine plans every automatic round; the round gate it replaced stays gone (`TestNothingImportsTheGate`).
 
@@ -53,17 +54,14 @@ These texts and decisions are still in Go, and are moving to the profile:
 
 - the Slack extraction prompt (`internal/adapter/source/slack/extract/prompt.md`), and the brief's prompt and taxonomy (`internal/brief`);
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
-- what sending a draft does, which follows its kind and not its declared effects: a sent nudge stamps the entries it served (`internal/core/proposals`), and a nudge on a pull request records the event the next nudge's refusal reads (the GitHub plugin's publisher);
-- the Outbox's verdict, shown beside each draft, of whether it would send the draft on its own, which holds a question to an owner and a comment by their kind (`internal/core/outbox`);
 - the workflow subjects, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`), and `turn.start`, which starts turns on pull requests only;
 - where a turn on a unit other than a pull request runs: placement decides, and the intent's `workspace` is read for pull requests only;
 - notification titles, the digest and the menu bar's copy.
 
 ## Direction
 
-Drafts already carry a purpose, a delivery and the effects of sending them, apart from their kind, but nothing reads those fields yet. Not yet true:
+A draft is what its proposer declares: a purpose, a delivery and the effects sending it applies, each once, through the effect table and a plugin's own (`TestNoDraftKindComparisons`). An agent's draft declares only the effects its intent lists in `draft_effects`, and a workflow proposes, holds and withdraws its drafts with `draft.propose`, its text from the profile. Not yet true:
 
 - the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
-- a sent draft does what its declared effects say, and an agent's draft declares only the effects its intent's manifest allows;
 - workflows start any intent on any unit, each under its own daily limit and all under one daily budget, in the repository the intent names;
 - the Slack extraction prompt and the brief's prompt and taxonomy move to `profiles/default/prompts/`.

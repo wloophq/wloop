@@ -58,7 +58,7 @@ func TestSlackDraftListing(t *testing.T) {
 		t.Fatalf("tools %v", got)
 	}
 	in := slackDraftTool().InputSchema
-	if len(in.Required) != 0 || len(in.Properties) != 5 || in.AdditionalProperties == nil || *in.AdditionalProperties {
+	if len(in.Required) != 0 || len(in.Properties) != 6 || in.AdditionalProperties == nil || *in.AdditionalProperties {
 		t.Fatalf("schema %+v", in)
 	}
 
