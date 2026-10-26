@@ -89,10 +89,10 @@ func (q *Queue) Next(states []inventory.BriefState, now time.Time) (next time.Ti
 		_, v := q.version(p.Ref)
 		switch {
 		case !rec.WantedAt.IsZero():
-			if (rec.Run == 0 || rec.Version != v) && (rec.AttemptOf != attemptOf(p, v) || rec.GaveUpAt.IsZero()) {
+			if (rec.Run == 0 || rec.Version != v) && (rec.AttemptOf != q.attemptKey(p, v) || rec.GaveUpAt.IsZero()) {
 				earliest(rec.RetryAt)
 			}
-		case p.Followed() && tried(rec, true) && rec.Error != "" && rec.AttemptOf == attemptOf(p, v):
+		case p.Followed() && tried(rec, true) && rec.Error != "" && rec.AttemptOf == q.attemptKey(p, v):
 			if at := rec.AttemptedAt.Add(backoff(q.d.Retry, rec.Failures)); at.After(now) {
 				earliest(at)
 			}

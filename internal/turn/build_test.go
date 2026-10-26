@@ -47,7 +47,7 @@ type facts struct {
 	calls int
 }
 
-func (f *facts) Facts(context.Context, github.Ref) (Stored, error) {
+func (f *facts) Facts(context.Context, unit.Unit) (Stored, error) {
 	f.calls++
 	return f.st, f.err
 }

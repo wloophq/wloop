@@ -23,6 +23,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `pr.visibility` | string | turn | The repository's visibility: public, private or internal, from the Basics read. |
 | `pr.draft` | bool | action | The pull request is a draft, from the inventory row. |
 | `pr.review_requested_me` | bool | action | A review is requested from the viewer, from the inventory row. |
+| `pr.requested_teams` | list | turn | The teams a review of the pull request was requested through, as <org>-<slug>. |
 | `pr.labels` | list | turn | The pull request's labels, from the Basics read. |
 | `pr.address.reviewers` | list | turn | The reviewers an address round answers; empty on any other turn. |
 | `pr.address.checks` | list | turn | The failing checks an address round fixes; empty on any other turn. |
@@ -170,9 +171,9 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `entry.unit_provider` | string | The provider of the entry's unit; empty for an entry with none. |
 | `entry.unit_started_by_me` | bool | The viewer started the entry's unit, from the facts GTD receives. |
 | `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. |
-| `entry.items_open` | int | Open items of the entry whose unit is the entry's unit. |
-| `entry.items_resolved` | int | Resolved items of the entry whose unit is the entry's unit. |
-| `entry.items_held` | int | Items of the entry's unit the waited people hold: open, assigned to or waited on from them. |
+| `entry.items_open` | int | Open items of the entry's unit. |
+| `entry.items_resolved` | int | Resolved items of the entry's unit. |
+| `entry.items_held` | int | Open items of the entry's unit that the entry holds. |
 | `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
 | `entry.fingerprint` | string | The entry's id, state and update time. |
 
@@ -182,7 +183,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
 | `slack.started_by_me` | bool | The viewer started the thread. |
 | `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. |
-| `slack.live_entry` | bool | An entry of the unit is open: neither done nor in the trash. |
+| `slack.live_entry` | bool | A live entry, neither done nor in the trash and not muted, is attached to the unit. |
 | `slack.items_open` | int | Open items whose unit is this unit. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. |
 | `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. |
@@ -202,7 +203,7 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 |---|---|---|
 | `draft.person_waited` | bool | The draft's person is still waited on by its entry; true for a draft of no person. |
 | `draft.items_held` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
-| `draft.items_owned` | int | Items of the draft that gained an owner since it was proposed. |
+| `draft.items_owned` | int | Items of the draft that have an owner, someone waited on, or are no longer open. |
 | `draft.subject_open` | bool | The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored. |
 
 | `trigger` fact | Type | Meaning |
@@ -238,7 +239,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
 | `turn.start` | any | Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`. |
-| `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled) and `hold_after_sent` (a duration, or `forever`). Holds while a draft of the workflow, subject and person is open or failed. |
+| `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled, or a duration of the config such as `config.proposals.renudge_after`) and `hold_after_sent` (likewise, or `forever`). Holds while a draft of the workflow, subject and person is open or failed; a run that leaves a person under a hold that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`. |
 | `notify.self` | any | A private notification. |
 

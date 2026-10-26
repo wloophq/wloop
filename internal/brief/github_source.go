@@ -122,7 +122,7 @@ func (g GitHubSource) Describe(in UnitInput) string {
 
 // Stale is the queue's rule: a failed attempt is due when the pull request
 // moved or its backoff passed, a brief when the pull request moved.
-func (g GitHubSource) Stale(w Written, cur At, now time.Time) bool {
+func (g GitHubSource) Stale(w Written, cur At, version string, now time.Time) bool {
 	p, _, err := prAt(cur)
 	if err != nil {
 		return true
@@ -133,7 +133,7 @@ func (g GitHubSource) Stale(w Written, cur At, now time.Time) bool {
 	}
 	rec.Version, rec.Error, rec.Failures, rec.AttemptedAt, rec.AttemptOf = w.Version, w.Error, w.Failures, w.AttemptedAt, w.AttemptOf
 	if rec.Error != "" {
-		return rec.AttemptOf != attemptOf(p, w.Version) || now.Sub(rec.AttemptedAt) >= backoff(g.Retry, rec.Failures)
+		return rec.AttemptOf != attemptOf(p, version) || now.Sub(rec.AttemptedAt) >= backoff(g.Retry, rec.Failures)
 	}
 	return moved(p, rec, now)
 }

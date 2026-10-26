@@ -1,0 +1,4 @@
+Who owns {{if eq (len .Items) 1}}this{{else}}these{{end}}?
+
+{{range $i, $it := .Items}}{{if $i}}
+{{end}}- {{$it.Line}}{{end -}}

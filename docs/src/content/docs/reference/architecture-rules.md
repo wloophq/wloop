@@ -17,9 +17,11 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestCoreImportsNoPlugin` | The core imports no plugin, no plugin imports another, and `pluginDebt` only shrinks. |
 | `TestDaemonImports` | The daemon reaches adapters, GitHub and Orca only through ports. |
 | `TestDomainImports` | The domain imports no adapter, manager or `internal/github`. |
+| `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
 | `TestMeterIsALeaf` | `internal/meter` imports only the standard library. |
+| `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
 | `TestNoProviderKindsInAPI` | A provider's kinds live in its own package, never in the API. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
@@ -30,6 +32,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlySourcesGoNamesASource` | Only `cli/sources.go`, and `cli/slack*.go` for Slack, imports a source. |
 | `TestOnlyTheCatalogBuildsActions` | Only the catalog builds action specs. |
 | `TestOnlyTheCatalogEvaluatesIntentPredicates` | Only the loader and the catalog read an intent's predicates. |
+| `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/`, except the allowlisted ones. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
@@ -56,6 +59,12 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/usage` `internal/domain/pr` | 🧾 | a Turn names its pull request as a pr.Ref |
 | `internal/readmodel` `internal/domain/inventory` | 🧾 | the RowDeps.Intake hook takes an inventory.BriefRecord |
 
+### `TestDraftTextComesFromTheProfile`
+
+| `draftTextAllowlist` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge text, github-nudge |
+
 ### `TestLoopCodeImportsNoPR`
 
 | `prAllowed` entry | Status | Reason |
@@ -71,17 +80,17 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `intentAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/facts/github/facts.go` | ✅ | the GitHub round planners' due logic (pr.first.due, pr.review.action, pr.address.due) reads the newest review turn and its verdict |
-| `internal/cli/rounds.go` | ✅ | the sweep sends review and address rounds |
-| `internal/cli/serve.go` | ✅ | the sweep's review and address questions and follow-ups |
-| `internal/cli/stepstart.go` | ✅ | turn.start sends the sweep's review and address rounds and guards a nudge as its prepare does |
-| `internal/cli/try.go` | ✅ | profile try is a review |
 | `internal/core/intake/intaketest/scenarios.go` | ✅ | test fixtures of today's intents |
 | `internal/core/turns/turnstest/intents.go` | ✅ | the test registry of today's intents |
 | `internal/core/turns/turnstest/store.go` | ✅ | test fixtures of today's intents |
-| `internal/daemon/probe.go` | ✅ | the probe launches the probe intent |
-| `internal/situation/situation.go` | ✅ | a pull request's situation reads whether a review or address turn is in flight or addressed it, the GitHub rounds' due logic |
 | `internal/turn/scenarios.go` | ✅ | eval fixtures |
+
+### `TestOnlyTheDraftStepProposes`
+
+| `pluginProposers` entry | Status | Reason |
+|---|---|---|
+| `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge rule, github-nudge |
+| `internal/core/proposals/proposals.go` | ✅ | the job that runs the plugins' own rules |
 
 ### `TestProseIsEmbeddedOnlyFromProfiles`
 
@@ -89,13 +98,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/source/slack/eval` | ✅ | the extraction eval's own prompts, a dev tool |
 | `skills` | ✅ | the skills install writes into agent homes |
-
-| `embedMoving` entry | Status | Reason |
-|---|---|---|
-| `internal/adapter/source/slack/extract/prompt.md` | ✅ | the Slack extraction prompt |
-| `internal/brief/prompt.md` | ✅ | the brief prompt |
-| `internal/brief/taxonomy.md` | ✅ | the brief taxonomy |
-| `internal/turn/templates` | ✅ | turn partials |
 
 ### `TestProvidersStayInAdaptersAndTheRoot`
 

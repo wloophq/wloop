@@ -1210,6 +1210,7 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 		Changes:      changes,
 		Now:          e.Now,
 		Log:          logf,
+		Intent:       e.briefIntent(logf),
 	}), ""
 }
 

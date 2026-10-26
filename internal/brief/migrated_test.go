@@ -66,10 +66,10 @@ func TestAMigratedPRBriefIsNotDueAgain(t *testing.T) {
 	if run.calls != 0 {
 		t.Fatalf("the migrated store briefed %d pull requests again", run.calls)
 	}
-	if rd, err := q.Peek(ctx, okRef, true); err != nil || rd.State != Ready || rd.Brief == nil || rd.Brief.Goal != "g" {
+	if rd, err := q.peekPR(ctx, okRef, true); err != nil || rd.State != Ready || rd.Brief == nil || rd.Brief.Goal != "g" {
 		t.Errorf("the ok brief reads %+v, %v", rd, err)
 	}
-	if rd, err := q.Peek(ctx, gaveRef, true); err != nil || rd.State != Without || rd.Cause != intake.CauseGaveUp || rd.Attempt != 3 {
+	if rd, err := q.peekPR(ctx, gaveRef, true); err != nil || rd.State != Without || rd.Cause != intake.CauseGaveUp || rd.Attempt != 3 {
 		t.Errorf("the given-up brief reads %+v, %v", rd, err)
 	}
 	if run.calls != 0 {

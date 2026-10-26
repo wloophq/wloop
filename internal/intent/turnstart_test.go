@@ -19,7 +19,9 @@ resumed = "x"
 [[headline.new]]
 text = "x"
 `, "{{.Headline}}")
-	writeFile(t, filepath.Join(root, "intents", "unit-brief", "schema.json"), `{"type": "object", "properties": {}}`)
+	dir := filepath.Join(root, "intents", "unit-brief")
+	writeFile(t, filepath.Join(dir, "schema.json"), `{"type": "object", "properties": {}}`)
+	writeFile(t, filepath.Join(dir, "prompts", "brief.md"), "Brief {{marker}}")
 	writeWorkflow(t, root, "brief-everything", `subject = "github"
 when = 'pr.state == "open"'
 

@@ -73,6 +73,18 @@ type Job struct {
 	// Vocabulary is the tag vocabulary the brief's domains reuse,
 	// tag.Vocabulary's lines; nil offers none.
 	Vocabulary func(ctx context.Context) (string, error)
+	// Briefed hears of each unit whose brief a pass wrote; nil hears none.
+	Briefed func(u unit.Unit)
+	// Extra is the brief intent's extra fields' schema, which the brief of
+	// every unit carries; nil asks for none.
+	Extra func() Extra
+
+	// wantMu guards wants, the targets a first turn asked a brief of, and
+	// waiting, the targets with changes left to read as the last run left
+	// them; Want reads them while a run holds mu.
+	wantMu  sync.Mutex
+	wants   map[unit.Unit]bool
+	waiting map[unit.Unit]bool
 
 	mu      sync.Mutex
 	loaded  bool
@@ -175,6 +187,8 @@ func (j *Job) Run(ctx context.Context) (summary, skipped string, err error) {
 	if err := j.scan(ctx, team, now); err != nil {
 		return "", "", err
 	}
+	j.noteWaiting()
+	defer j.noteWaiting()
 	var errs []error
 	unwatched, err := j.sweep(ctx, cfg, now)
 	if err != nil {
@@ -370,7 +384,7 @@ func (j *Job) due(now time.Time, ec config.SlackExtraction) []unit.Unit {
 		if now.Before(p.retryAt) {
 			continue
 		}
-		if now.Sub(p.newest) >= ec.QuietFor() || now.Sub(p.oldest) >= ec.MaxWaitFor() {
+		if now.Sub(p.newest) >= ec.QuietFor() || now.Sub(p.oldest) >= ec.MaxWaitFor() || j.wanted(k) {
 			out = append(out, k)
 		}
 	}
@@ -403,6 +417,10 @@ func (j *Job) process(ctx context.Context, k unit.Unit, p *pend, team, viewer st
 		return outcome{err: err}
 	}
 	in := Input{Unit: k, Now: now, Language: ec.LanguageName(), Conversation: conv, Brief: st.Brief, WindowChars: ec.Window()}
+	if j.Extra != nil {
+		x := j.Extra()
+		in.Extra = &x
+	}
 	if j.Vocabulary != nil {
 		if in.Vocabulary, err = j.Vocabulary(ctx); err != nil {
 			return outcome{err: err}
@@ -610,6 +628,13 @@ func (j *Job) apply(ctx context.Context, k unit.Unit, p *pend, team string, in I
 		return 0, err
 	}
 	j.finish(k, p)
+	if j.Briefed != nil {
+		for u, s := range states {
+			if s.Brief != "" {
+				j.Briefed(u)
+			}
+		}
+	}
 	state.Watched = st.Watched
 	if _, err := j.watch(ctx, cfg, k, obj, units, state, now, true); err != nil {
 		j.logf("slack extraction %s: watch: %v", k, err)
@@ -869,4 +894,58 @@ func (j *Job) objectOf(ctx context.Context, k unit.Unit) (slack.ObjectRef, []uni
 	}
 	_, units, err := j.Store.spans(ctx, team, conv)
 	return slack.ObjectRef{Conversation: conv}, units, err
+}
+
+// Want asks the next run to read u's conversation, past quiet_for: true
+// when it has changes left to read, so a brief of u is coming.
+func (j *Job) Want(u unit.Unit) bool {
+	k, ok := targetFor(u)
+	if !ok {
+		return false
+	}
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	if !j.waiting[k] {
+		return false
+	}
+	if j.wants == nil {
+		j.wants = map[unit.Unit]bool{}
+	}
+	j.wants[k] = true
+	return true
+}
+
+func (j *Job) wanted(k unit.Unit) bool {
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	return j.wants[k]
+}
+
+// noteWaiting records the targets left to read; a want of a target read
+// is done.
+func (j *Job) noteWaiting() {
+	j.wantMu.Lock()
+	defer j.wantMu.Unlock()
+	j.waiting = map[unit.Unit]bool{}
+	for k := range j.pending {
+		j.waiting[k] = true
+	}
+	for k := range j.wants {
+		if !j.waiting[k] {
+			delete(j.wants, k)
+		}
+	}
+}
+
+// targetFor is the target a unit's brief is written by: a thread is its
+// own, a DM segment its conversation's.
+func targetFor(u unit.Unit) (unit.Unit, bool) {
+	key, err := slack.ParseUnit(u)
+	if err != nil {
+		return unit.Unit{}, false
+	}
+	if key.Segment != "" {
+		return dmKey(key.Team, key.Conversation), true
+	}
+	return u, true
 }

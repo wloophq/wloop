@@ -73,6 +73,26 @@ The thresholds:
 
 `nudge.silent_days` (30) sets the silence before a nudge.
 
+## Tune the Slack proposals
+
+`slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` propose drafts in the Outbox, where they wait for you. `draft_approval` sets when their drafts go out, as the [draft policies](/concepts/approval/#the-outbox) say; `slack-ask-owner`'s questions always wait for you whatever it says:
+
+```json
+"workflows": { "slack-closure": { "draft_approval": { "mode": "window", "window": "10m" } } }
+```
+
+A workflow's `mode` and a draft's `observe` policy differ: `"mode": "observe"` plans the workflow and proposes nothing, while `"draft_approval": {"mode": "observe"}` proposes each draft and records it as what would have been sent, without sending it.
+
+Their texts are `text.md.tmpl` in each workflow's directory, a [template](/reference/workflow-manifest/) over the draft's items, where `.Line` is an item's summary on one line. `<profile>/workflows/slack-closure/text.md.tmpl` closes in your words:
+
+```
+Encerrando:
+{{range .Items}}
+- {{.Line}}: {{or .Resolution "resolvido"}}{{end}}
+```
+
+Your own `<profile>/workflows/slack-closure/workflow.toml` with `delivery = "reaction"`, `reaction = "white_check_mark"` and `target = "item"` in its step closes with a ✅ on the resolved message instead; its `on_posted = "unit.closed"` still ends the close entry.
+
 ## Narrow one to some pull requests
 
 `only_when` keeps a workflow where its predicate holds, in the [predicate language](/reference/workflow-manifest/#predicates) of its manifest. Automatic address rounds, only in private repositories:

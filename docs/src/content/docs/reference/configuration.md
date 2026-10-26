@@ -67,7 +67,7 @@ An empty list is an error. The old `workspace_manager` key is refused; list the 
 | `address_without_workspace` | `false` | an address round may create the author workspace of your pull request |
 | `nudge.silent_days` | `30` | calendar days of silence before `nudge-silent-30d` plans a nudge |
 | `classify.daily_cap` | `50` | headless classifier calls a workflow's `classify` step may spend per day |
-| `workflows.<name>` | `{}` | `enabled`, `mode` (`observe` or `apply`), `approval.default` (`run` or `wait`), `approval.window` and `only_when` (a predicate that must hold besides the manifest's `when`) of a workflow, over its manifest's; see [Tune workflows](/guides/workflows/) |
+| `workflows.<name>` | `{}` | `enabled`, `mode` (`observe` or `apply`), `approval.default` (`run` or `wait`), `approval.window`, `only_when` (a predicate that must hold besides the manifest's `when`) and `draft_approval` (the approval of its drafts, as `proposals.<rule>.approval`) of a workflow, over its manifest's; see [Tune workflows](/guides/workflows/) |
 
 ## Scope and the daemon
 
@@ -122,8 +122,8 @@ The author columns `in-progress`, `in-review` and `completed` map the same way. 
 | `gtd.stale_waiting_days` | `2` | working days before a waiting entry with no nudge gets the focus star |
 | `gtd.areas`, `gtd.contexts` | `[]` | the areas and contexts offered |
 | `notifications.digest_at` | `"09:00"` | local time of the daily digest; `""` for none |
-| `proposals.renudge_after` | `"1d"` | a proposal rule does not propose the same draft again sooner |
-| `proposals.<rule>.approval` | `{"mode": "always"}` | the draft approval of `stalled-nudge`, `closure`, `ask-owner` or `github-nudge`: `mode` `always`, `window` (with `window`), `none` or `observe` |
+| `proposals.renudge_after` | `"1d"` | a proposal rule, or a default workflow through `hold = "config.proposals.renudge_after"`, does not propose the same draft again sooner |
+| `proposals.<rule>.approval` | `{"mode": "always"}` | the draft approval of `github-nudge`: `mode` `always`, `window` (with `window`), `none` or `observe`; `stalled-nudge`, `closure` and `ask-owner` still load, read as the `draft_approval` of `slack-stalled-nudge`, `slack-closure` and `slack-ask-owner` with a warning |
 | `headless.tier` | `"balanced"` | the model tier of headless turns |
 | `headless.per_call_usd` | `0.5` | the cap of one headless call; 0 is uncapped |
 | `headless.per_day_usd` | `5` | the cap of a day of headless calls; 0 is uncapped |

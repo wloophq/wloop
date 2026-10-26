@@ -21,12 +21,16 @@ const (
 	proposalsEvery    = time.Hour
 )
 
-// serveProposals runs the proposals job until ctx ends; serve --no-jobs proposes nothing.
+// serveProposals runs the plugins' proposals job until ctx ends, when a
+// built module proposes on its own; serve --no-jobs proposes nothing.
 func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) {
 	if e.noJobs || e.changes == nil {
 		return
 	}
 	job := e.proposalsJob(db, cfg, mods, logf)
+	if len(job.Sources) == 0 {
+		return
+	}
 	go func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("proposals"))
 		defer scope.End()
@@ -34,12 +38,12 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 	}()
 }
 
-// proposalsJob proposes through an outbox service of its own, over the built modules' publishers; the sender
-// that publishes the drafts runs elsewhere, so the job's Stamp catches up with the nudges it sent.
+// proposalsJob proposes the built modules' own drafts through an outbox
+// service of its own, over their publishers; the sender that publishes the
+// drafts, and applies their effects, runs elsewhere.
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) *proposals.Job {
-	ledger := e.itemsLedger(db, cfg, logf)
 	renudge := time.Duration(cfg.Proposals.RenudgeAfter)
-	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: ledger, Clock: clockFunc(e.Now), Log: logf,
+	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: e.itemsLedger(db, cfg, logf), Clock: clockFunc(e.Now), Log: logf,
 		ObservedFor: renudge}
 	var srcs []proposals.Source
 	for _, m := range mods {
@@ -47,13 +51,13 @@ func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Modul
 			srcs = append(srcs, proposals.Source{Provider: m.ID, Proposals: m.Proposals})
 		}
 	}
+	enabled := func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) }
 	return &proposals.Job{
-		Outbox: svc, Entries: db.Entries(), Nudges: e.entries(db, cfg, ledger), Items: ledger, Sources: srcs,
-		Enabled:   func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) },
-		Facts:     coregtd.CardFacts{Cards: db.Cards(), Enabled: func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) }},
-		Approval:  cfg.Proposals.Approval,
-		StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: renudge,
-		Clock: clockFunc(e.Now), Log: logf,
+		Outbox: svc, Sources: srcs, Enabled: enabled,
+		Facts:        coregtd.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Approval:     cfg.Proposals.Approval,
+		RenudgeAfter: renudge,
+		Clock:        clockFunc(e.Now), Log: logf,
 	}
 }
 

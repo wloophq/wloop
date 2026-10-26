@@ -132,7 +132,9 @@ type Store interface {
 }
 
 type Briefs interface {
-	Ready(ctx context.Context, u unit.Unit, first bool) (Readiness, error)
+	// Ready answers for a turn of u; need are the brief intent's extra
+	// fields the turn's intent needs, which a first turn waits for.
+	Ready(ctx context.Context, u unit.Unit, first bool, need []string) (Readiness, error)
 	// Changed is closed by the next end of a brief run of the unit after the
 	// call, so a run that ends while the caller asks Ready still wakes it;
 	// the func releases it.

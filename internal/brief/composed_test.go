@@ -135,7 +135,7 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 	before, _, _ := r.st.BriefRecord(ctx, ref)
 	c := composed(t)
 	r.q.d.Intent = func() Intent { return Intent{Schema: c} }
-	rd, err := r.q.Peek(ctx, ref, true)
+	rd, err := r.q.peekPR(ctx, ref, true)
 	if err != nil || rd.State != Ready {
 		t.Fatalf("%+v %v", rd, err)
 	}
@@ -143,7 +143,7 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 		t.Fatalf("missing %v", m)
 	}
 	r.run.fields = map[string]any{"approach": "patch", "solution": "batch the export"}
-	if ok, err := r.q.Fill(ctx, ref, []string{"approach"}); err != nil || !ok {
+	if ok, err := r.q.fillPR(ctx, ref, []string{"approach"}); err != nil || !ok {
 		t.Fatalf("fill: %v %v", ok, err)
 	}
 	if r.run.calls != 2 || !slices.Equal(r.run.asked[1], []string{"approach"}) || !strings.Contains(r.run.prompts[1], `"goal":"g"`) {
@@ -167,10 +167,10 @@ func TestAMissingFieldIsFilledWithoutACoreRebrief(t *testing.T) {
 	if _, err := r.q.Run(ctx); err != nil || r.run.calls != 2 {
 		t.Fatalf("the fields run made the core due: %d calls, %v", r.run.calls, err)
 	}
-	if ok, _ := r.q.Fill(ctx, ref, nil); !ok || r.run.calls != 3 || !slices.Equal(r.run.asked[2], []string{"solution"}) {
+	if ok, _ := r.q.fillPR(ctx, ref, nil); !ok || r.run.calls != 3 || !slices.Equal(r.run.asked[2], []string{"solution"}) {
 		t.Fatalf("filling the rest: %v, asked %v", ok, r.run.asked)
 	}
-	if ok, _ := r.q.Fill(ctx, ref, nil); ok || r.run.calls != 3 {
+	if ok, _ := r.q.fillPR(ctx, ref, nil); ok || r.run.calls != 3 {
 		t.Fatal("a brief with every field filled was asked again")
 	}
 }

@@ -26,9 +26,7 @@ func deliveryReader(rel string) bool {
 }
 
 // draftKindAllowlist are the files that may still read a draft's kind.
-var draftKindAllowlist = map[string]string{
-	"internal/core/proposals/proposals.go": "the core proposal rules, which the default workflows replace",
-}
+var draftKindAllowlist = map[string]string{}
 
 // TestNoDraftKindComparisons checks that Go names no draft kind, compares
 // no draft's purpose with a value, and compares its delivery only in the

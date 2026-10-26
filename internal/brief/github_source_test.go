@@ -46,8 +46,10 @@ func TestGitHubSourceStaleIsTheQueuesRule(t *testing.T) {
 		for rn, rec := range recs {
 			w := Written{At: AtOf(dinv.PR{HeadOid: rec.HeadOid, BodyEditedAt: rec.BodyEditedAt, ChangedFiles: rec.ChangedFiles}),
 				Version: rec.Version, Error: rec.Error, Failures: rec.Failures, AttemptedAt: rec.AttemptedAt, AttemptOf: rec.AttemptOf}
-			if got, want := g.Stale(w, cur, t0), Due(p, rec, true, version, t0, time.Hour); got != want {
-				t.Errorf("%s, %s: stale %v, the queue's Due %v", pn, rn, got, want)
+			for _, v := range []string{version, "b1-older"} {
+				if got, want := g.Stale(w, cur, v, t0), Due(p, rec, true, v, t0, time.Hour); got != want {
+					t.Errorf("%s, %s at %s: stale %v, the queue's Due %v", pn, rn, v, got, want)
+				}
 			}
 		}
 	}
