@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -16,7 +17,9 @@ import (
 // round and mode to stage and runner; draft.propose's hold and
 // hold_after_sent to repeat_after and repeat_after_sent, its comma-separated
 // on_posted to the list effects, per = "subject" to "unit", and a duration
-// read from config.proposals.renudge_after to config.drafts.repeat_after.
+// read from config.proposals.renudge_after to config.drafts.repeat_after;
+// classify's inline prompt and schema and notify.self's inline text, which
+// name files from v4, are dropped for the files' default names.
 func v4Vocabulary(ctx context.Context, tx *sql.Tx) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE plan_items SET observe = (mode = 'observe')`); err != nil {
 		return err
@@ -72,13 +75,23 @@ var v4ArgNames = map[string]map[string]string{
 	builtin.StepDraftPropose: {"hold": "repeat_after", "hold_after_sent": "repeat_after_sent", "on_posted": "effects"},
 }
 
+// v4InlineArgs are the step arguments that held their text inline before v4
+// and name a file from v4.
+var v4InlineArgs = map[string][]string{
+	builtin.StepClassify:   {"prompt", "schema"},
+	builtin.StepNotifySelf: {"text"},
+}
+
 func v4StepArgs(use string, in map[string]any) map[string]any {
-	names := v4ArgNames[use]
-	if in == nil || names == nil {
+	names, inline := v4ArgNames[use], v4InlineArgs[use]
+	if in == nil || names == nil && inline == nil {
 		return in
 	}
 	out := make(map[string]any, len(in))
 	for k, v := range in {
+		if slices.Contains(inline, k) {
+			continue
+		}
 		if n, ok := names[k]; ok {
 			k = n
 		}
