@@ -19,7 +19,7 @@ func refN(n int) github.Ref { return github.Ref{Owner: "acme", Repo: "api", Numb
 
 func (r *rig) ready(t *testing.T, ref github.Ref, first bool) Readiness {
 	t.Helper()
-	rd, err := r.q.Ready(context.Background(), ref, first)
+	rd, err := r.q.readyPR(context.Background(), ref, first)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func closes(t *testing.T, c <-chan struct{}) {
 
 func TestFirstTurnWaitsAndWantsTheBrief(t *testing.T) {
 	r := newRig(t, 1)
-	changed, release := r.q.Changed(refN(1))
+	changed, release := r.q.Changed(refN(1).Unit())
 	defer release()
 	if rd := r.ready(t, refN(1), true); rd.State != Wait || rd.Wait != WaitBriefing || rd.Attempt != 1 || rd.LastError != "" {
 		t.Fatalf("%+v", rd)
@@ -106,7 +106,7 @@ func TestReadyJoinsTheBackgroundCall(t *testing.T) {
 		close(done)
 	}()
 	<-entered
-	changed, release := r.q.Changed(refN(1))
+	changed, release := r.q.Changed(refN(1).Unit())
 	defer release()
 	if rd := r.ready(t, refN(1), true); rd.State != Wait || rd.Wait != WaitBriefing || rd.Attempt != 1 {
 		t.Fatalf("%+v", rd)
@@ -190,7 +190,7 @@ func TestAWantedRunUnwantedWhileQueuedDoesNotRun(t *testing.T) {
 	if rd := r.ready(t, refN(1), true); rd.State != Wait {
 		t.Fatalf("%+v", rd)
 	}
-	if err := r.q.Unwant(context.Background(), refN(1)); err != nil {
+	if err := r.q.unwantPR(context.Background(), refN(1)); err != nil {
 		t.Fatal(err)
 	}
 	for range WantedConcurrency {
@@ -311,17 +311,17 @@ func TestIntakesAnswerTheIntakesPort(t *testing.T) {
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 1}
 	changed, release := a.Changed(ref.Unit())
 	defer release()
-	if rd, err := a.Ready(context.Background(), ref.Unit(), true); err != nil || rd != (intake.Readiness{Wait: WaitBriefing, Attempt: 1}) {
+	if rd, err := a.Ready(context.Background(), ref.Unit(), true, nil); err != nil || rd != (intake.Readiness{Wait: WaitBriefing, Attempt: 1}) {
 		t.Fatalf("%+v %v", rd, err)
 	}
 	closes(t, changed)
 	r.settled()
-	rd, err := a.Ready(context.Background(), ref.Unit(), true)
+	rd, err := a.Ready(context.Background(), ref.Unit(), true, nil)
 	if want := (intake.Readiness{Wait: WaitRetry, Attempt: 2, LastError: `the brief does not fit the schema: kind "epic"`, Next: t0.Add(time.Minute)}); err != nil || rd != want {
 		t.Fatalf("%+v %v", rd, err)
 	}
 	r.q.d.Enabled = false
-	if rd, _ := a.Ready(context.Background(), ref.Unit(), true); rd != (intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff, Note: ReasonOff}) {
+	if rd, _ := a.Ready(context.Background(), ref.Unit(), true, nil); rd != (intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff, Note: ReasonOff}) {
 		t.Fatalf("%+v", rd)
 	}
 }
@@ -462,7 +462,7 @@ func TestRefreshesDoNotHoldBackAWantedBrief(t *testing.T) {
 
 func TestPeekAnswersLikeReadyWithoutStartingOrWriting(t *testing.T) {
 	r := newRig(t, 1)
-	rd, err := r.q.Peek(context.Background(), refN(1), true)
+	rd, err := r.q.peekPR(context.Background(), refN(1), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,10 +482,10 @@ func TestPeekAnswersLikeReadyWithoutStartingOrWriting(t *testing.T) {
 
 	r.ready(t, refN(1), true)
 	r.settled()
-	if rd, err := r.q.Peek(context.Background(), refN(1), true); err != nil || rd.State != Ready {
+	if rd, err := r.q.peekPR(context.Background(), refN(1), true); err != nil || rd.State != Ready {
 		t.Fatalf("after the brief: %+v %v", rd, err)
 	}
-	if rd, err := r.q.Peek(context.Background(), refN(2), false); err != nil || rd.State != Without {
+	if rd, err := r.q.peekPR(context.Background(), refN(2), false); err != nil || rd.State != Without {
 		t.Fatalf("a later turn without a brief: %+v %v", rd, err)
 	}
 }

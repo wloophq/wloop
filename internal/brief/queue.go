@@ -18,6 +18,7 @@ import (
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -73,6 +74,7 @@ type Store interface {
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 	BriefRecord(ctx context.Context, ref github.Ref) (dinv.BriefRecord, bool, error)
 	TagVocabulary(ctx context.Context, owner string, keys []string, limit int) (map[string][]tag.Count, error)
+	UnitBrief(ctx context.Context, u unit.Unit) (inventory.UnitBrief, bool, error)
 	RunStore
 }
 
@@ -126,6 +128,11 @@ type Deps struct {
 	// Intent is the brief intent as the profile resolves it now; nil is
 	// the bundled one.
 	Intent func() Intent
+	// Sources are the providers' BriefSources by provider. Pull requests
+	// default to GitHubSource over Store and Source; a GitHub source set
+	// here keeps Retry. A source that is also an OnDemand briefs its units
+	// on a first turn's demand.
+	Sources map[unit.ProviderID]BriefSource
 }
 
 // Intent is what the brief intent sets of a brief: the composed schema,
@@ -150,7 +157,11 @@ type Queue struct {
 	mu       sync.Mutex
 	versions map[string]string // by prompt and taxonomy
 	inflight map[github.Ref]bool
-	waiters  map[github.Ref][]chan struct{}
+	waiters  map[unit.Unit][]chan struct{}
+	// demand is when a first turn first wanted an on-demand unit's brief,
+	// and filling which pull requests' fields failed at which version.
+	demand     map[unit.Unit]time.Time
+	fillFailed map[github.Ref]string
 	breaker  breaker
 	// recent are the last two failures, the newest last.
 	recent []failure
@@ -212,9 +223,9 @@ func (q *Queue) Forget(ctx context.Context, ref github.Ref) error {
 	return q.d.Store.RefreshBrief(ctx, ref)
 }
 
-// Unwant drops the pull request's want of a brief, once no turn waits on
+// unwantPR drops the pull request's want of a brief, once no turn waits on
 // it.
-func (q *Queue) Unwant(ctx context.Context, ref github.Ref) error {
+func (q *Queue) unwantPR(ctx context.Context, ref github.Ref) error {
 	defer q.wakeUp()
 	q.state.Lock()
 	defer q.state.Unlock()
@@ -254,13 +265,44 @@ type View struct {
 // past. A new prompt version alone is not due: the brief in use stays until
 // a turn asks for it.
 func Due(pr dinv.PR, rec dinv.BriefRecord, ok bool, version string, now time.Time, retry time.Duration) bool {
-	switch {
-	case !tried(rec, ok):
+	return !tried(rec, ok) || GitHubSource{Retry: retry}.Stale(writtenOf(rec), AtOf(pr), version, now)
+}
+
+// isDue is Due through the pull request's BriefSource; without backoff, a
+// failed attempt is due at once.
+func (q *Queue) isDue(pr dinv.PR, rec dinv.BriefRecord, ok bool, version string, now time.Time, backoff bool) bool {
+	if !tried(rec, ok) {
 		return true
-	case rec.Error != "":
-		return rec.AttemptOf != attemptOf(pr, version) || now.Sub(rec.AttemptedAt) >= backoff(retry, rec.Failures)
 	}
-	return moved(pr, rec, now)
+	w := writtenOf(rec)
+	if !backoff {
+		w.AttemptedAt = time.Time{}
+	}
+	return q.source(unit.GitHub).Stale(w, AtOf(pr), version, now)
+}
+
+// attemptKey is what an attempt at version on pr is made from, as its
+// BriefSource names it.
+func (q *Queue) attemptKey(pr dinv.PR, version string) string {
+	return q.source(unit.GitHub).AttemptKey(version, AtOf(pr))
+}
+
+// source is the BriefSource of p's units; a pull request without one in
+// Deps.Sources has the GitHub rules with the queue's retry.
+func (q *Queue) source(p unit.ProviderID) BriefSource {
+	if s, ok := q.d.Sources[p]; ok {
+		return s
+	}
+	if p == unit.GitHub {
+		return GitHubSource{Store: q.d.Store, Source: q.d.Source, MaxDiffBytes: q.d.MaxDiffBytes, Retry: q.d.Retry}
+	}
+	return nil
+}
+
+// writtenOf is what rec's brief was made from and how its last attempt went.
+func writtenOf(rec dinv.BriefRecord) Written {
+	return Written{At: AtOf(dinv.PR{HeadOid: rec.HeadOid, BodyEditedAt: rec.BodyEditedAt, ChangedFiles: rec.ChangedFiles}),
+		Version: rec.Version, Error: rec.Error, Failures: rec.Failures, AttemptedAt: rec.AttemptedAt, AttemptOf: rec.AttemptOf}
 }
 
 // tried is a record with a brief in use or a failure counted: a refresh
@@ -293,8 +335,8 @@ func filesMoved(pr dinv.PR, rec dinv.BriefRecord) bool {
 
 // refreshDue is a brief a later turn or a view starts the refresh of: one
 // Due says so, or one made at an older prompt version.
-func refreshDue(pr dinv.PR, rec dinv.BriefRecord, version string, now time.Time, retry time.Duration) bool {
-	return Due(pr, rec, true, version, now, retry) || rec.Error == "" && rec.Version != version
+func (q *Queue) refreshDue(pr dinv.PR, rec dinv.BriefRecord, version string, now time.Time) bool {
+	return q.isDue(pr, rec, true, version, now, true) || rec.Error == "" && rec.Version != version
 }
 
 // backoff doubles retry after each consecutive failure, up to maxBackoff.
@@ -361,7 +403,7 @@ func (q *Queue) Run(ctx context.Context) (string, error) {
 	)
 	one := func(pr dinv.PR) {
 		if !q.claimIf(ctx, pr.Ref, func(rec dinv.BriefRecord, has bool, version string) bool {
-			return rec.WantedAt.IsZero() && Due(pr, rec, has, version, q.d.Now(), q.d.Retry)
+			return rec.WantedAt.IsZero() && q.isDue(pr, rec, has, version, q.d.Now(), true)
 		}) {
 			return
 		}
@@ -404,7 +446,7 @@ func (q *Queue) Run(ctx context.Context) (string, error) {
 func (q *Queue) due(states []inventory.BriefState, now time.Time) []inventory.BriefState {
 	var due, retry []inventory.BriefState
 	for _, st := range states {
-		if _, v := q.version(st.PR.Ref); !st.PR.Followed() || !st.Rec.WantedAt.IsZero() || q.inFlight(st.PR.Ref) || !Due(st.PR, st.Rec, st.Has, v, now, q.d.Retry) {
+		if _, v := q.version(st.PR.Ref); !st.PR.Followed() || !st.Rec.WantedAt.IsZero() || q.inFlight(st.PR.Ref) || !q.isDue(st.PR, st.Rec, st.Has, v, now, true) {
 			continue
 		}
 		if tried(st.Rec, true) && st.Rec.Error != "" {
@@ -430,7 +472,7 @@ func (q *Queue) timeout(wanted bool) time.Duration {
 func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout time.Duration) error {
 	defer q.release(pr.Ref)
 	taxonomy, version := q.version(pr.Ref)
-	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: attemptOf(pr, version),
+	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: q.attemptKey(pr, version),
 		HeadOid: pr.HeadOid, BodyEditedAt: pr.BodyEditedAt, ChangedFiles: pr.ChangedFiles}
 	vocabulary, err := q.d.Store.TagVocabulary(ctx, pr.Ref.Owner, tag.OpenKeys(), VocabularySize)
 	if err != nil {
@@ -789,7 +831,7 @@ func (q *Queue) counts(ctx context.Context) (Status, error) {
 		switch {
 		case tried(rec, ok) && rec.Error != "":
 			st.Failed++
-		case ok && !Due(pr, rec, ok, version, now, q.d.Retry):
+		case ok && !q.isDue(pr, rec, ok, version, now, true):
 			st.Ready++
 		default:
 			st.Pending++
@@ -845,7 +887,7 @@ func summaryOf(rec dinv.BriefRecord) (Summary, bool) {
 // read.
 func (q *Queue) AttemptOf(pr dinv.PR, rec dinv.BriefRecord) int {
 	_, version := q.version(pr.Ref)
-	return q.attempt(pr.Ref, rec, attemptOf(pr, version))
+	return q.attempt(pr.Ref, rec, q.attemptKey(pr, version))
 }
 
 // Views are what the detail panel shows for each of prs, by pull request.
@@ -899,7 +941,7 @@ func (q *Queue) RefreshIfStale(ctx context.Context, pr dinv.PR) error {
 		return err
 	}
 	_, version := q.version(pr.Ref)
-	if refreshDue(pr, rec, version, q.d.Now(), q.d.Retry) && !q.isOpen() && q.claim(pr.Ref) {
+	if q.refreshDue(pr, rec, version, q.d.Now()) && !q.isOpen() && q.claim(pr.Ref) {
 		q.spawn(ctx, pr, TriggerRefresh, q.timeout(true), false)
 	}
 	return nil

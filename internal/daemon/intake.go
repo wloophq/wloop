@@ -102,7 +102,18 @@ func (s *Server) newIntakes(d Deps) *intake.Service {
 		return nil
 	}
 	return &intake.Service{Store: d.Intakes, Briefs: intakeBriefs(d), Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
-		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf}
+		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf, Needs: briefNeeds(d)}
+}
+
+// briefNeeds are the brief fields an intent's manifest needs.
+func briefNeeds(d Deps) func(string) []string {
+	if d.Intents == nil {
+		return nil
+	}
+	return func(name string) []string {
+		def, _ := d.Intents().Registry.Get(dintent.Name(name))
+		return def.Brief.Need
+	}
 }
 
 type clockFunc func() time.Time
@@ -126,14 +137,14 @@ type unavailableBriefs struct {
 	why string
 }
 
-func (u unavailableBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (u unavailableBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	return intake.Readiness{Go: true, Without: true, Note: "briefs are unavailable: " + u.why}, nil
 }
 
 // offBriefs starts every intake at once, as briefs that are off.
 type offBriefs struct{}
 
-func (offBriefs) Ready(context.Context, unit.Unit, bool) (intake.Readiness, error) {
+func (offBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readiness, error) {
 	return intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff}, nil
 }
 
@@ -934,7 +945,7 @@ func (s *Server) BriefReady(ctx context.Context, u unit.Unit) (intake.Readiness,
 	if err != nil {
 		return intake.Readiness{}, err
 	}
-	return intakeBriefs(s.deps).Ready(ctx, u, first)
+	return intakeBriefs(s.deps).Ready(ctx, u, first, nil)
 }
 
 // OpenIntakes lists the open intakes but the session ones nobody asks for;

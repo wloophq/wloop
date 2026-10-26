@@ -16,6 +16,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/usage"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -577,4 +578,25 @@ func (s *Store) BriefStates(ctx context.Context) ([]BriefState, error) {
 		out = append(out, st)
 	}
 	return out, rows.Err()
+}
+
+// UnitBrief is the brief in use of a unit of any provider: its run, its
+// prompt version and its JSON, false when it has none.
+type UnitBrief struct {
+	Run     int64
+	Version string
+	Brief   string
+}
+
+const unitBriefSQL = `SELECT b.run, r.version, r.brief FROM unit_briefs b JOIN brief_runs r ON b.run != 0 AND r.id = b.run
+	WHERE b.provider = ? AND b.unit_key = ? AND r.brief != ''`
+
+// UnitBrief reads u's brief in use.
+func (s *Store) UnitBrief(ctx context.Context, u unit.Unit) (UnitBrief, bool, error) {
+	var b UnitBrief
+	err := s.db.R().QueryRowContext(ctx, unitBriefSQL, string(u.Provider), u.Key).Scan(&b.Run, &b.Version, &b.Brief)
+	if errors.Is(err, sql.ErrNoRows) {
+		return UnitBrief{}, false, nil
+	}
+	return b, err == nil, err
 }
