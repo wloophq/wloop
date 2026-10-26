@@ -10,9 +10,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 )
 
-// Proposals holds the settings of the rules that propose drafts on their own: how long a nudged, discarded,
-// sent or observed proposal keeps its rule from proposing it again, and each rule's approval by rule id
-// ("stalled-nudge", "closure", "ask-owner", "github-nudge"). In JSON the rules sit beside "renudge_after".
+// Proposals holds the settings of the drafts proposed on their own: how long a nudged, discarded, sent or
+// observed proposal keeps its rule or workflow from proposing it again, and a plugin rule's approval by rule id
+// ("github-nudge"). In JSON the rules sit beside "renudge_after". The rules the default workflows replaced
+// ("stalled-nudge", "closure", "ask-owner") still load, their approval read as their workflow's draft_approval.
 type Proposals struct {
 	RenudgeAfter Days
 	Rules        map[string]ProposalRule

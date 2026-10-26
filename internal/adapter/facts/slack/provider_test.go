@@ -12,8 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
-	"github.com/wloophq/wloop/internal/core/outbox"
-	"github.com/wloophq/wloop/internal/core/proposals"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -231,77 +229,5 @@ func TestSlackSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	}
 	if got := f["slack.settled_at"].(time.Time); !got.Equal(monday.Add(-3 * time.Hour)) {
 		t.Errorf("settled_at %v", got)
-	}
-}
-
-// recorder is an Outbox that keeps every proposal and holds none back.
-type recorder struct{ got []outbox.Proposal }
-
-func (r *recorder) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
-	r.got = append(r.got, p)
-	return draft.Draft{}, nil
-}
-
-func (r *recorder) List(context.Context, outbox.Filter) ([]draft.Draft, error) { return nil, nil }
-
-func (r *recorder) Discard(context.Context, draft.ID, string) (draft.Draft, error) {
-	return draft.Draft{}, nil
-}
-
-type itemsOf struct{ db *sqlite.DB }
-
-func (i itemsOf) Items(ctx context.Context, u unit.Unit) ([]items.Item, error) {
-	got, err := i.db.Items().Load(ctx, []unit.Unit{u})
-	return got[u], err
-}
-
-// TestSlackFactsMatchTheAskOwnerJob runs the proposals job and the slack
-// facts over the same store for a week: the job asks for an owner on a unit
-// exactly when it is listed with live_entry and items_unowned_age_days >= 1.
-func TestSlackFactsMatchTheAskOwnerJob(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	e := newEnv(t)
-	e.item(thread, "i1", items.Open, monday.Add(2*time.Hour))
-	e.item(other, "i2", items.Open, monday.Add(-24*time.Hour))
-	e.item(dm, "i3", items.Open, monday.Add(-72*time.Hour), items.Person{Key: "slack:U0001"})
-	e.item(dm, "i4", items.Open, monday.Add(30*time.Hour))
-	e.entry(live("e-01", gtd.Next, thread))
-	muted := live("e-02", gtd.Scheduled, other)
-	muted.Snooze = gtd.Snooze{Mute: true, Return: gtd.Next}
-	e.entry(muted)
-	e.entry(live("e-03", gtd.Waiting, dm))
-	asked := map[string]int{}
-	for h := range 7 * 24 / 3 {
-		e.clock.now = monday.Add(time.Duration(h) * 3 * time.Hour)
-		out := &recorder{}
-		job := &proposals.Job{Outbox: out, Entries: e.db.Entries(), Items: itemsOf{e.db}, Clock: e.clock}
-		if _, err := job.Run(ctx); err != nil {
-			t.Fatal(err)
-		}
-		var byJob, byFacts []string
-		for _, p := range out.got {
-			if p.Origin.Rule == proposals.RuleAskOwner {
-				byJob = append(byJob, p.Unit.String())
-				asked[p.Unit.String()]++
-			}
-		}
-		listed, err := e.p.List(ctx, dslack.Provider)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, u := range listed {
-			if f := e.facts(u); f["slack.live_entry"] == true && f["slack.items_unowned_age_days"].(int) >= 1 {
-				byFacts = append(byFacts, u.String())
-			}
-		}
-		slices.Sort(byJob)
-		slices.Sort(byFacts)
-		if !slices.Equal(byJob, byFacts) {
-			t.Errorf("%s: the job asked on %v, the facts call for %v", e.clock.now.Format(time.DateTime), byJob, byFacts)
-		}
-	}
-	if asked[thread.String()] == 0 || asked[dm.String()] == 0 || asked[other.String()] != 0 {
-		t.Errorf("the scenario's asks: %v", asked)
 	}
 }
