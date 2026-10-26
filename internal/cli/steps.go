@@ -706,7 +706,10 @@ func (s *stepSet) notifyRun(ctx context.Context, c stepCall, _ automation.RunOpt
 		return "", errors.New("no notifier")
 	}
 	facts, err := s.facts(ctx, c.u)
-	if err != nil {
+	switch {
+	case errors.Is(err, automation.ErrUnitGone):
+		facts = workflow.Facts{}
+	case err != nil:
 		return "", err
 	}
 	var b strings.Builder
@@ -720,7 +723,7 @@ func (s *stepSet) notifyRun(ctx context.Context, c stepCall, _ automation.RunOpt
 }
 
 // notifyTextData is what a notify.self text renders: the workflow, the
-// unit and the unit's facts, by name.
+// unit and the unit's facts, by name, none when the unit is gone.
 type notifyTextData struct {
 	Workflow, Unit string
 	Facts          workflow.Facts

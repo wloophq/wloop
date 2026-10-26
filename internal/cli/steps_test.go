@@ -446,6 +446,21 @@ func TestNotifySelfRendersItsTemplate(t *testing.T) {
 	}
 }
 
+func TestNotifySelfNotifiesAGoneUnitWithNoFacts(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	besideWorkflow(t, te, "ping", map[string]string{"text.md.tmpl": `{{.Workflow}}: {{len .Facts}} facts at {{.Unit}}`})
+	pub := &recordingPub{}
+	s := newStepSet(te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: te.Rounds, Pub: pub})
+	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
+	if _, err := s.Run(context.Background(), wfStep("notify.self"), u, workflow.Why{Workflow: "ping"}, automation.RunOpts{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(pub.evs) != 1 || pub.evs[0].Data != "ping: 0 facts at "+u.String() {
+		t.Fatalf("published %+v", pub.evs)
+	}
+}
+
 // blockingAsker answers once release closes, counting its calls.
 type blockingAsker struct {
 	mu      sync.Mutex

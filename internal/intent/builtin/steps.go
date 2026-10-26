@@ -68,7 +68,7 @@ var Steps = []StepDef{
 	{StepClassify, nil, workflow.ReachLocal, []workflow.TriggerKind{workflow.TriggerEvent},
 		"A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`."},
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,
-		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`)."},
+		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
 }
 
 // StepArg is the grammar row of step use's argument k.
