@@ -407,3 +407,26 @@ func TestASlackDraftOfAnIntentThatNeverAutoSendsWaits(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
+
+func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	files := bundledIntentAs(t, "act", "nudging-act")
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], "role    = \"headless.default\"\n", "", 1)
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `draft_effects = ["entry.nudged", "unit.closed"]`, `draft_effects = ["entry.nudged", "pr.nudged"]`, 1)
+	userProfile(t, w.te, files)
+	ctx := context.Background()
+	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
+		{Intent: "nudging-act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"any news?","effects":["pr.nudged"]}`)
+	if !isErr || !strings.Contains(got, "pr.nudged") {
+		t.Fatalf("slack_draft = %q (error %v); broken %v", got, isErr, w.te.loadedIntents().Broken)
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a draft whose effect never applies on Slack was stored")
+	}
+}

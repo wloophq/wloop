@@ -147,6 +147,9 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	if err := s.publishable(ctx, d); err != nil {
 		return draft.Draft{}, err
 	}
+	if err := s.implemented(d); err != nil {
+		return draft.Draft{}, err
+	}
 	d.Would = s.would(ctx, d, p.HoldAutoSend)
 	switch approval.Mode {
 	case draft.Window:
@@ -235,6 +238,21 @@ func checkContent(d draft.Draft) error {
 		return fmt.Errorf("%w: empty text", ErrInvalid)
 	case strings.TrimSpace(d.Purpose) == "":
 		return fmt.Errorf("%w: no purpose", ErrInvalid)
+	}
+	return nil
+}
+
+// implemented refuses an effect of d its Applier has no implementation of
+// for d's provider, which sending would leave pending for good.
+func (s *Service) implemented(d draft.Draft) error {
+	im, ok := s.Applier.(Implementer)
+	if !ok {
+		return nil
+	}
+	for _, name := range d.Effects {
+		if !im.Implements(d.Unit.Provider, name) {
+			return fmt.Errorf("%w: %s on %s: %w", ErrInvalid, name, d.Unit.Provider, ErrUnknownEffect)
+		}
 	}
 	return nil
 }

@@ -106,10 +106,29 @@ func TestASentDraftAppliesItsEffectsOnce(t *testing.T) {
 	if got := l.names(); len(got) != 2 {
 		t.Fatalf("applied again: %v", got)
 	}
-	unknown := reply("an effect nobody implements")
-	unknown.Effects = []string{"unknown.effect"}
-	if d := e.sendNow(t, unknown); !d.EffectsAppliedAt.IsZero() {
+	stored, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "an effect nobody implements now",
+		State: draft.Approved, Effects: []string{"unknown.effect"}, CreatedAt: t0, UpdatedAt: t0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.Send(ctx); !errors.Is(err, ErrUnknownEffect) {
+		t.Fatalf("send: %v", err)
+	}
+	if d := e.get(stored.ID); d.State != draft.Sent || !d.EffectsAppliedAt.IsZero() {
 		t.Fatalf("a draft whose effect has no implementation is marked applied: %+v", d)
+	}
+}
+
+func TestADraftDeclaringAnEffectItsProviderDoesNotImplementIsRefused(t *testing.T) {
+	e := newEnv()
+	withApplier(e)
+	p := reply("an effect nobody implements")
+	p.Effects = []string{"unknown.effect"}
+	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) || !errors.Is(err, ErrUnknownEffect) {
+		t.Fatalf("propose: %v", err)
+	}
+	if ds, _ := e.svc.List(ctx, Filter{}); len(ds) != 0 {
+		t.Fatalf("drafts %+v", ds)
 	}
 }
 
