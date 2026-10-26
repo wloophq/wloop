@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -170,8 +169,8 @@ func TestNudgeSilentRespectsCapsPauseHoldAndMute(t *testing.T) {
 		{"held by you", func() { r.units.Set(r.u, "pr.held", true) }, func() { r.units.Set(r.u, "pr.held", false) }},
 		{whyPaused, func() { sc.te.setPause(t, round.Pause{On: true, At: testNow}) }, func() { sc.te.setPause(t, round.Pause{At: testNow}) }},
 		{"muted until", func() {
-			r.rec.overrides = map[github.Ref]dinv.Override{sc.ref: {PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}}
-		}, func() { r.rec.overrides = nil }},
+			r.units.Set(r.u, "pr.mute.refusal", dinv.Override{PR: sc.ref, MutedUntil: testNow.Add(time.Hour)}.MuteRefusal(testNow))
+		}, func() { r.units.Set(r.u, "pr.mute.refusal", "") }},
 		{"per-PR daily cap reached (1)", func() {
 			sc.te.cfg.Turns.PerUnitPerDay = 1
 			st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)

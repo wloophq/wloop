@@ -103,11 +103,11 @@ func rowCases() []rowCase {
 		{name: "round pending", pr: open(21, "ana", func(p *dinv.PR) { p.ReviewRequests = []string{fixtureViewer}; p.Workspace = reviewWS }),
 			pending: &round.Pending{Intent: "review", Reason: "new push", Since: ago(time.Minute), Deadline: fixtureNow.Add(4 * time.Minute)}},
 		{name: "agent asks", pr: open(22, "ana", func(p *dinv.PR) { p.Workspace = reviewWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "round.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "asked", Summary: "which branch?", At: ago(30 * time.Minute)}}},
 		{name: "agent working", pr: open(23, "ana", func(p *dinv.PR) { p.Workspace = reviewWS; p.Reasons = nil }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "round.review", State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Review, Role: "pr.review", State: "started", At: ago(10 * time.Minute)}, Session: "s1"}},
 		{name: "agent stopped", pr: open(24, fixtureViewer, func(p *dinv.PR) { p.Workspace = authorWS }),
-			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Address, Role: "round.address", State: "failed", Summary: "tests broke", At: ago(day)}}},
+			turn: &TurnFact{Facts: situation.TurnFacts{Intent: dintent.Address, Role: "pr.address", State: "failed", Summary: "tests broke", At: ago(day)}}},
 		{name: "workspace agent waiting", pr: open(25, "ana", func(p *dinv.PR) {
 			p.Workspace = reviewWS
 			p.Workspace.AgentStates = []turn.AgentState{turn.AgentWaiting}

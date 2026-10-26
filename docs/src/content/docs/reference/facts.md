@@ -53,14 +53,13 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `draft.provider` | string | draft_action | The provider of the draft's unit. |
 | `draft.refusal` | string | draft_action | Why the action is disabled: plugin_off, state or posts_nothing; empty when it is enabled. |
 | `draft.maybe_posted` | bool | draft_action | The draft failed after its post may have reached its provider. |
-| `turn.trigger` | string | turn | by-hand or automated. |
 | `turn.automated` | bool | turn | The sweep started the turn. |
 | `turn.owned` | bool | turn | The viewer owns the pull request's loop. |
 | `turn.needs_take_over` | bool | turn | owner_only, not owned, and no input with before = "take_over" set. |
 | `turn.resume` | bool | turn | The turn resumes an earlier one. |
 | `turn.try` | bool | turn | The turn is a dry run (profile try). |
 | `turn.planned` | string | turn | The round the request planned: first, follow-up, or empty for none. |
-| `turn.stage` | string | turn | first or follow-up; only intents with dims = ["round"] may read it. |
+| `turn.stage` | string | turn | first or follow-up; only intents with dims = ["stage"] may read it. |
 | `unit.ref` | string | turn | The unit as the instructions name it, such as owner/repo#12. |
 | `pr.last_review.exists` | bool | turn | The viewer reviewed the pull request before. |
 | `pr.last_review.verdict` | string | turn | The viewer's newest review state, any state; empty when none. |
@@ -272,8 +271,14 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `on_p
 
 | Effect | Unit | Does |
 |---|---|---|
+| `plan.cleared` | any | Drops the unit's pending plan items. |
+| `guidance.handed` | github | Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent. |
+| `pr.counted` | github | Counts the turn against turns.per_unit_per_day. |
+| `pr.round_sent` | github | Records the round-sent event on the pull request. |
+| `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
+| `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `entry.nudged` | any | Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none. |
 | `unit.closed` | any | Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin. |
-| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts. |
+| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.

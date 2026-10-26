@@ -13,7 +13,7 @@ const (
 
 // testIntents is the bundled intents as far as blocks see them.
 var testIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
+	{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
 	{Name: "address", Profile: "address", Dims: []string{"reviewer"}, Provider: unit.GitHub},
 	{Name: "nudge", Profile: "nudge", Provider: unit.GitHub},
 	{Name: "probe", Provider: unit.GitHub},

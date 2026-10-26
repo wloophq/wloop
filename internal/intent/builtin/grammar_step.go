@@ -3,7 +3,7 @@ package builtin
 // stepGrammar is the workflow steps' arguments, each row's Step its step.
 var stepGrammar = []Key{
 	stepKey(StepTurnStart, "intent", KindText, "", "The intent whose turn starts; it must serve the unit. Required."),
-	stepEnum(StepTurnStart, "stage", TurnStages, "", "The pass over the unit, for a review."),
+	stepEnum(StepTurnStart, "stage", Stages, "", "The pass over the unit, for a review."),
 	stepEnum(StepTurnStart, "runner", TurnRunners, "", "How the turn runs; by default the intent's first runner."),
 
 	stepKey(StepDraftPropose, "purpose", KindText, "", "What the draft is for, such as nudge or close. Required."),
@@ -13,7 +13,7 @@ var stepGrammar = []Key{
 	stepEnum(StepDraftPropose, "items", DraftItems, "all", "Which of the unit's items the draft lists."),
 	stepEnum(StepDraftPropose, "per", DraftPer, DraftPer[0], "One draft per unit, or one per person it waits on."),
 	stepEnum(StepDraftPropose, "target", DraftTargets, DraftTargets[0], "Where the draft posts: on the unit, or on each item."),
-	{Path: "effects", In: SurfaceStep, Step: StepDraftPropose, Kind: KindList, Elem: KindEnum, Values: effectValues, Doc: "What sending the draft applies."},
+	{Path: "effects", In: SurfaceStep, Step: StepDraftPropose, Kind: KindList, Elem: KindEnum, Values: effectValues(AppliesDraft), Doc: "What sending the draft applies."},
 	stepKey(StepDraftPropose, "repeat_after", KindText, "", "The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after."),
 	stepKey(StepDraftPropose, "repeat_after_sent", KindText, "", "The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever."),
 
@@ -40,14 +40,6 @@ func names(values []string) []Value {
 	out := make([]Value, len(values))
 	for i, v := range values {
 		out[i] = Value{Name: v}
-	}
-	return out
-}
-
-func effectValues() []Value {
-	out := make([]Value, len(Effects))
-	for i, e := range Effects {
-		out[i] = Value{Name: e.Name, Doc: e.Doc}
 	}
 	return out
 }

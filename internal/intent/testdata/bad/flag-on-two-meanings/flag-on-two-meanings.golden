@@ -1,1 +1,1 @@
-testdata/bad/flag-on-two-meanings/intents/ask-author/intent.toml:16:8: inputs.adopt.flag: --take-over means take_over (flag) in address
+testdata/bad/flag-on-two-meanings/intents/ask-author/intent.toml:16:8: inputs.adopt.flag: --take-over means take_over (bool) in address

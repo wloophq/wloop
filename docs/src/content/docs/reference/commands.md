@@ -449,14 +449,14 @@ See [Facts and steps](/reference/facts/).
 The blocks that apply to a repository.
 
 ```sh
-{{command}} profile show <owner/repo|url> [--kind <intent>] [--show] [--color auto|always|never]
+{{command}} profile show <owner/repo|url> [--intent <intent>] [--show] [--color auto|always|never]
 ```
 
 List the profile's blocks per intent, their conditions and which of them apply to that repository or pull request. `--show` prints the instructions a turn there reads.
 
 | Flag | Description |
 | --- | --- |
-| `--kind <intent>` | Only this intent's blocks |
+| `--intent <intent>` | Only this intent's blocks |
 | `--show` | Print the instructions a turn there would read |
 | `--color auto\|always\|never` | Lay the output out for a terminal; auto styles it on a terminal alone |
 
@@ -464,7 +464,7 @@ Examples:
 
 ```sh
 {{command}} profile show acme/api
-{{command}} profile show https://github.com/acme/api/pull/7 --kind review --show
+{{command}} profile show https://github.com/acme/api/pull/7 --intent review --show
 ```
 
 See [Write your review profile](/guides/review-profile/).
@@ -481,13 +481,13 @@ Name the block of the profile a rule with these conditions goes in, and the bloc
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 
 Examples:
 
 ```sh
-{{command}} profile where review --org acme --repo api
+{{command}} profile where review --organization acme --repo api
 ```
 
 See [Profile format](/reference/profile-blocks/).
@@ -504,7 +504,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 
 | Flag | Description |
 | --- | --- |
-| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--org`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--round`, `--reviewer`, `--kind`, `--size`, `--risk` |
+| `--<dimension> <value>` | A condition of the block, one flag per dimension: `--organization`, `--repo`, `--user`, `--team`, `--association`, `--label`, `--base`, `--stage`, `--reviewer`, `--kind`, `--size`, `--risk` |
 | `--tag <key>=<value>` | A tag condition; repeatable |
 | `--section <heading>` | The ## heading the rule goes under |
 | `--title <title>` | The block's heading, for a new block |
@@ -515,7 +515,7 @@ Add a rule to the block these conditions name, creating the block when it is new
 Examples:
 
 ```sh
-{{command}} profile add review --org acme -- Every migration needs a down step.
+{{command}} profile add review --organization acme -- Every migration needs a down step.
 {{command}} profile add nudge --apply -- Keep nudges to two sentences.
 ```
 

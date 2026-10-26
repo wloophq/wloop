@@ -66,7 +66,7 @@ func (e *Env) profileChecks(cfg config.Config) []check {
 func runProfileShow(ctx context.Context, e *Env, args []string) error {
 	fs := flag.NewFlagSet("profile show", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	kind := fs.String("kind", "", "an intent with judgment blocks (default: all)")
+	kind := fs.String("intent", "", "an intent with judgment blocks (default: all)")
 	show := fs.Bool("show", false, "print the instructions a round there would read")
 	var color termfmt.Mode
 	fs.Var(&color, "color", "lay the report out for a terminal: auto, always or never")
@@ -267,7 +267,7 @@ func describeFacts(f api.Facts) string {
 	return strings.Join(parts, "; ")
 }
 
-var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--kind <intent>] [--show] [--color auto|always|never]"
+var profileShowUsage = "usage: " + brand.Command + " profile show <owner/repo|pr-url> [--intent <intent>] [--show] [--color auto|always|never]"
 
 func parseRepoArg(v string) (github.Ref, error) {
 	if strings.HasPrefix(v, "https://") {

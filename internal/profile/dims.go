@@ -21,7 +21,7 @@ const (
 	DimAssociation  Dim = "association"
 	DimLabel        Dim = "label"
 	DimBase         Dim = "base"
-	DimRound        Dim = dintent.DimRound
+	DimStage        Dim = dintent.DimStage
 	DimReviewer     Dim = dintent.DimReviewer
 	DimKind         Dim = "kind"
 	DimSize         Dim = "size"
@@ -43,7 +43,7 @@ var Aliases = []Alias{
 	{DimAssociation, "pr.association"},
 	{DimLabel, "pr.labels"},
 	{DimBase, "pr.base"},
-	{DimRound, "turn.stage"},
+	{DimStage, "turn.stage"},
 	{DimReviewer, "pr.address.reviewers"},
 	{DimKind, "brief.kind"},
 	{DimSize, "brief.size"},

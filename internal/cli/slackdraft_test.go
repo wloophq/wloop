@@ -390,7 +390,7 @@ func TestASlackDraftDeclaringAGitHubEffectIsRefused(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	files := bundledIntentAs(t, "act", "nudging-act")
-	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], "role    = \"headless.default\"\n", "", 1)
+	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], "role    = \"headless\"\n", "", 1)
 	files["intents/nudging-act/intent.toml"] = strings.Replace(files["intents/nudging-act/intent.toml"], `draft_effects = ["entry.nudged", "unit.closed"]`, `draft_effects = ["entry.nudged", "pr.nudged"]`, 1)
 	userProfile(t, w.te, files)
 	ctx := context.Background()
@@ -413,11 +413,11 @@ func TestASlackDraftOfAnIntentTakesTheRuleItsUnitMatches(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	files := bundledIntentAs(t, "act", "quick-act")
-	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless.default\"\n", "", 1)
+	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless\"\n", "", 1)
 	files["intents/quick-act/intent.toml"] = m + `
-[draft_approval]
+[drafts.approval]
 mode = "wait"
-[[draft_approval.rule]]
+[[drafts.approval.rule]]
 when = 'draft.delivery == "message" && slack.channel == "` + sessChannel + `"'
 mode = "delay"
 window = "10m"

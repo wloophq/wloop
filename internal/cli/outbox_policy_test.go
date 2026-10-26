@@ -33,14 +33,14 @@ workspace = "review"
 session = { strategy = "new", title = "quick" }
 
 [headline]
-resumed = "quick round on {{.PR.Slug}}"
+resumed = "quick round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask {{.PR.Slug}} one quick question."
+line = "Ask {{.pr.slug}} one quick question."
 
 [record]
 states = ["done"]
 
-[draft_approval]
+[drafts.approval]
 mode = "send"
 `
 

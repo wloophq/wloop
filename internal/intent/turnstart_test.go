@@ -17,7 +17,7 @@ schema = "schema.json"
 [headline]
 resumed = "x"
 [[headline.new]]
-text = "x"
+line = "x"
 `, "{{.Headline}}")
 	dir := filepath.Join(root, "intents", "unit-brief")
 	writeFile(t, filepath.Join(dir, "schema.json"), `{"type": "object", "properties": {}}`)

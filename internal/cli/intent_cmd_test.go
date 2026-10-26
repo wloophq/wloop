@@ -385,18 +385,35 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 	ours, theirs := cliBuiltins(), daemon.Builtins()
 	for slot, names := range builtin.Names {
 		for _, name := range names {
-			if !slices.Contains(ours[slot], name) && !slices.Contains(theirs[slot], name) {
+			if !slices.Contains(ours[string(slot)], name) {
 				t.Errorf("%s %q has no implementation", slot, name)
 			}
 		}
-	}
-	for _, tables := range []map[builtin.Slot][]string{ours, theirs} {
-		for slot, names := range tables {
-			for _, name := range names {
-				if !slices.Contains(builtin.Names[slot], name) {
-					t.Errorf("%s %q is implemented but not in builtin.Names", slot, name)
-				}
+		for _, name := range ours[string(slot)] {
+			if !slices.Contains(names, name) {
+				t.Errorf("%s %q is implemented but not in builtin.Names", slot, name)
 			}
+		}
+	}
+	effects := append(slices.Clone(ours["effects"]), theirs.Effects...)
+	for _, name := range builtin.TurnEffectNames() {
+		if !slices.Contains(effects, name) {
+			t.Errorf("the turn effect %q has no implementation", name)
+		}
+	}
+	for _, name := range effects {
+		if !slices.Contains(builtin.TurnEffectNames(), name) {
+			t.Errorf("the turn effect %q is implemented but not in builtin.Effects", name)
+		}
+	}
+	for _, r := range builtin.Roles {
+		for what, name := range map[string]string{"policy": r.Policy, "context": r.Context, "launch": r.Launch, "reconcile": r.Reconcile} {
+			if !slices.Contains(ours[what], name) {
+				t.Errorf("the role %s binds the %s %q, which has no implementation", r.Name, what, name)
+			}
+		}
+		if r.Prepare != "" && !slices.Contains(theirs.Prepares, r.Prepare) {
+			t.Errorf("the role %s binds the prepare %q, which has no implementation", r.Name, r.Prepare)
 		}
 	}
 }

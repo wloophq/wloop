@@ -1,2 +1,2 @@
-testdata/bad/unknown-key/intents/ask-author/intent.toml:5:1: reasn: unknown key; did you mean reason?
+testdata/bad/unknown-key/intents/ask-author/intent.toml:5:1: reasn: unknown key; did you mean refuse?
 testdata/bad/unknown-key/intents/ask-author/intent.toml:6:1: sesion: unknown key; did you mean session?

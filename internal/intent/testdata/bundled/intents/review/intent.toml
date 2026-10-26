@@ -1,23 +1,23 @@
 label = "Review"
 summary = "Review a pull request"
 verb = "delegate"
-key = "V"
+shortcut = "V"
+role = "pr.review"
 workspace = "review"
-drives_row = true
 session = { strategy = "reuse_live", title = "review" }
 profile = "review"
-dims = ["round"]
-records = '!turn.try'
+dims = ["stage"]
 
 [headline]
-resumed = "review round on {{.PR.Slug}}"
+resumed = "review round on {{.pr.slug}}"
 [[headline.new]]
-text = "Review {{.PR.Slug}}."
+line = "Review {{.pr.slug}}."
 
 [action]
 primary = { when = "!row.question && !pr.mine" }
 
 [record]
+when = '!turn.try'
 states = ["done", "asked", "failed"]
 artifacts = ["review-draft"]
 outcome = ["verdict", "url"]

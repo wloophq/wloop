@@ -57,7 +57,7 @@ func TestWireShape(t *testing.T) {
 	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
 	books := turnstest.NewStore()
 	books.Put(turn.Book{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(),
-		Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "r1", Trigger: turn.Automated, Head: "h2", SentTo: "term-1", Session: "term-1",
+		Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r1", Trigger: turn.Automated, Head: "h2", SentTo: "term-1", Session: "term-1",
 			State: turn.Asked, SentAt: at, StartedAt: at}},
 		Records: []turn.Record{{Session: "term-1", Head: "h2", Hash: "x", At: at, Record: record.Record{State: record.Asked, Summary: "publish?",
 			Outcome:  &record.Outcome{Verdict: "APPROVE", NonBlocking: 1},

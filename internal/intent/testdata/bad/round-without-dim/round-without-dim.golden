@@ -1,1 +1,1 @@
-testdata/bad/round-without-dim/intents/ask-author/intent.toml:5:11: records: 1: unknown field turn.stage
+testdata/bad/round-without-dim/intents/ask-author/intent.toml:12:8: record.when: 1: unknown field turn.stage

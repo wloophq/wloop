@@ -8,13 +8,13 @@ import (
 
 const threadIntent = `label = "Sum up"
 summary = "Sum up a thread for its owner"
-workspace = "pr_else_main"
+workspace = "linked_else_main"
 session = { strategy = "new", title = "sumup" }
 
 [headline]
-resumed = "sum up {{.Wording.Ref}}"
+resumed = "sum up {{.unit.ref}}"
 [[headline.new]]
-text = "Sum up {{.Wording.Ref}}, {{.Who}}."
+line = 'Sum up {{.unit.ref}}, {{template "started_by" .}}.'
 
 [record]
 states = ["done"]

@@ -1302,7 +1302,7 @@ func TestAnswerWithoutATurnIsRefused(t *testing.T) {
 			t.Fatalf("%d %s", rec.Code, rec.Body)
 		}
 	}
-	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "round.review", ID: "r1", State: turn.Done, SentAt: r.s.deps.Now()}}})
+	r.store.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: []turn.Turn{{Intent: turn.Intent(dintent.Review), Role: "pr.review", ID: "r1", State: turn.Done, SentAt: r.s.deps.Now()}}})
 	if rec := post(t, r.s, "/api/units/github/acme%2Fapi%237/answer", `{"guidance":"yes"}`); rec.Code != 409 {
 		t.Fatalf("a done turn: %d %s", rec.Code, rec.Body)
 	}

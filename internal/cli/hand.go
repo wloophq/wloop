@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -48,10 +49,13 @@ func (e *Env) byHand(loopMu *sync.Mutex) func(ctx context.Context, r api.ByHandR
 			if err != nil {
 				return api.ByHandResult{}, err
 			}
-			ref := prOf(u)
-			r.URL = ref.URL()
-			if aheadOf(ctx, ref) == nil {
-				ctx = e.ReadAhead(ctx, ref, false)
+			r.URL = u.String()
+			if isPR(u) {
+				ref := prOf(u)
+				r.URL = ref.URL()
+				if aheadOf(ctx, ref) == nil {
+					ctx = e.ReadAhead(ctx, ref, false)
+				}
 			}
 			loopMu.Lock()
 			defer loopMu.Unlock()
@@ -69,13 +73,12 @@ func (e *Env) byHand(loopMu *sync.Mutex) func(ctx context.Context, r api.ByHandR
 	}
 }
 
-// byHandRef is the pull request a turn by hand is about, found as the turn
-// finds it.
+// byHandRef is the unit a turn by hand is about, found as the turn finds
+// it.
 func (e *Env) byHandRef(ctx context.Context, r api.ByHandRequest, _ string) (unit.Unit, error) {
 	repos, all := e.workspaceState(ctx)
 	ws, repo, inWS := workspaceAt(r.Cwd, repos, all)
-	ref, err := e.handRef(ctx, r.URL, ws, repo, inWS)
-	return ref.Unit(), err
+	return e.handUnit(ctx, r.URL, ws, repo, inWS)
 }
 
 // turnByHand runs a round from the agent session the user is in: it writes
@@ -85,10 +88,14 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 	d, cwd := h.def, h.cwd
 	repos, all := e.workspaceState(ctx)
 	ws, repo, inWS := workspaceAt(cwd, repos, all)
-	ref, err := e.handRef(ctx, h.url, ws, repo, inWS)
+	u, err := e.handUnit(ctx, h.url, ws, repo, inWS)
 	if err != nil {
 		return err
 	}
+	if !isPR(u) {
+		return e.unitTurnByHand(ctx, h, u, text)
+	}
+	ref := prOf(u)
 	cfg, err := e.loadConfig()
 	if err != nil {
 		return err
@@ -180,22 +187,54 @@ func (e *Env) workspaceState(ctx context.Context) ([]wsdomain.Repo, []wsdomain.W
 	return nil, nil
 }
 
-// handRef is the pull request a turn by hand is about: the URL given, else
-// the one the worktree is linked to, else the one of the current branch.
-func (e *Env) handRef(ctx context.Context, url string, ws wsdomain.Workspace, repo wsdomain.Repo, inWS bool) (github.Ref, error) {
-	if url != "" {
-		return github.ParseURL(url)
+// handUnit is the unit a turn by hand is about: the target given, as any
+// <intent> <target> command resolves it; else the pull request the
+// workspace holding the caller's directory is linked to; else the unit a
+// provider says the directory holds.
+func (e *Env) handUnit(ctx context.Context, target string, ws wsdomain.Workspace, repo wsdomain.Repo, inWS bool) (unit.Unit, error) {
+	if target != "" {
+		return e.unitTarget(ctx, target)
 	}
 	if inWS && ws.LinkedPR != 0 {
 		if owner, name, ok := repo.OwnerName(); ok {
-			return github.Ref{Owner: owner, Repo: name, Number: ws.LinkedPR}, nil
+			return github.Ref{Owner: owner, Repo: name, Number: ws.LinkedPR}.Unit(), nil
 		}
 	}
-	out, err := e.GH.Run(ctx, "pr", "view", "--json", "url", "--jq", ".url")
-	if err != nil {
-		return github.Ref{}, fmt.Errorf("no pull request here; pass its URL: %w", err)
+	for p, l := range e.locators() {
+		key, ok, err := l.UnitAt(ctx, ".")
+		if err != nil {
+			return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
+		}
+		if ok {
+			return unit.Unit{Provider: p, Key: key}, nil
+		}
 	}
-	return github.ParseURL(strings.TrimSpace(string(out)))
+	return unit.Unit{}, errors.New("no unit here; pass its target")
+}
+
+// unitTurnByHand runs a turn by hand on a unit that is no pull request,
+// through the path a turn.start on it takes: the provider hands its
+// payload, and the turn starts on the caller's session.
+func (e *Env) unitTurnByHand(ctx context.Context, h handTurn, u unit.Unit, text io.Writer) error {
+	cfg, err := e.loadConfig()
+	if err != nil {
+		return err
+	}
+	if !h.def.Serves(u.Provider) {
+		return fmt.Errorf("the intent %s serves %s units, not %s", h.def.Name, h.def.ProviderOrDefault(), u.Label())
+	}
+	r := turn.Request{Intent: turn.Intent(h.def.Name), Trigger: turn.ByHand, Unit: u, Agent: h.agent, Inputs: h.inputs, Guidance: h.guidance}
+	sent, err := e.sendTurn(ctx, cfg, r)
+	if err != nil {
+		return err
+	}
+	if sent.send != nil && e.Turns != nil {
+		if _, err := e.Turns.StartByHand(ctx, *sent.send, h.handle); err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprint(text, sent.Text)
+	return err
 }
 
 // workspaceAt is the local workspace whose checkout holds dir, the

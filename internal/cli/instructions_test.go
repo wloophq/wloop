@@ -170,7 +170,7 @@ func TestInstructionsByHandWithoutAPullRequestRecordsNothing(t *testing.T) {
 	agentDaemon(t, te)
 	dir := t.TempDir()
 	te.Harness.Cwd = func() string { return dir }
-	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no pull request here; pass its URL") || te.out.Len() != 0 {
+	if code := te.run("instructions", "review"); code == 0 || !strings.Contains(te.err.String(), "no unit here; pass its target") || te.out.Len() != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if st := te.loadRounds(t); len(st.PRs) != 0 || len(m.Writes) != 0 {

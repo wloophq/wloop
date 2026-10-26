@@ -27,7 +27,7 @@ type automatedTurns interface {
 
 // unitGuards are a turn.start's checks on a unit outside the round
 // providers: the intent is a turn that serves the unit in the step's mode,
-// its refuse_when is empty, no turn of it is open on the unit, a repository
+// no [[refuse]] of it holds, no turn of it is open on the unit, a repository
 // it names by input is never taken from an automatic run, and the day's
 // automated turns stay under turns.per_day. The workflow's own
 // limits are the engine's.
@@ -47,10 +47,8 @@ func (s *stepSet) unitGuards(ctx context.Context, c stepCall, p startPlan) (stri
 	if p.facts, err = s.facts(ctx, c.u); err != nil {
 		return "", p, err
 	}
-	if d.RefuseWhen != "" {
-		if why := factString(p.facts, d.RefuseWhen); why != "" {
-			return why, p, nil
-		}
+	if why, err := s.refusal(p); err != nil || why != "" {
+		return why, p, err
 	}
 	if w := d.WorkspaceRepo; w != nil && w.RepoInput != "" {
 		return "its repository comes from the input " + w.RepoInput + ", which only a person sets", p, nil

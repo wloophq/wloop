@@ -27,7 +27,7 @@ func (w *world) reviewedWithoutWorkspace(n int, author string, edit func(*dinv.P
 			edit(row, f)
 		}
 	})
-	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "round.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
+	w.books[r.Unit()] = turn.Book{Unit: r.Unit(), Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", State: turn.Done, SentAt: t0.Add(-3 * time.Hour)}}}
 	return r
 }
 
@@ -70,7 +70,7 @@ func TestAVerdictTheLoopRecordedOnTheHeadCountsAsMyReviewOfIt(t *testing.T) {
 	}
 	approve := record.Record{State: record.Done, Summary: "approved", Outcome: &record.Outcome{Verdict: "APPROVE"}}
 	w.books[r.Unit()] = turn.Book{Unit: r.Unit(),
-		Turns:   []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "round.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)}},
+		Turns:   []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), Role: "pr.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)}},
 		Records: []turn.Record{{TurnSeq: 1, Head: "c2", At: t0.Add(-time.Hour), Record: approve}}}
 	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {
 		t.Fatalf("with a verdict recorded on the head: %v (%v)", f["pr.review.action"], f["pr.review.reason"])
@@ -169,8 +169,8 @@ func TestAStoreOfReviewTurnsAndAProfileMyReviewProposesNoNewRound(t *testing.T) 
 	approve := record.Record{State: record.Done, Summary: "approved", Outcome: &record.Outcome{Verdict: "APPROVE"}}
 	w.books[r.Unit()] = turn.Book{Unit: r.Unit(),
 		Turns: []turn.Turn{
-			{Seq: 1, Intent: "review", Role: "round.review", Trigger: turn.ByHand, State: turn.Done, Head: "c1", SentAt: t0.Add(-3 * time.Hour)},
-			{Seq: 2, Intent: "my-review", Role: "round.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)},
+			{Seq: 1, Intent: "review", Role: "pr.review", Trigger: turn.ByHand, State: turn.Done, Head: "c1", SentAt: t0.Add(-3 * time.Hour)},
+			{Seq: 2, Intent: "my-review", Role: "pr.review", Trigger: turn.ByHand, State: turn.Done, Head: "c2", SentAt: t0.Add(-90 * time.Minute)},
 		},
 		Records: []turn.Record{{TurnSeq: 2, Head: "c2", At: t0.Add(-time.Hour), Record: approve}}}
 	if f := facts(t, w.provider(), r.Unit()); f["pr.review.action"] != "" {

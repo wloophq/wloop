@@ -48,9 +48,6 @@ var (
 // TurnRunners are the values of turn.start's runner.
 var TurnRunners = []string{"session", "headless"}
 
-// TurnStages are the values of turn.start's stage.
-var TurnStages = []string{"first", "follow-up"}
-
 // Steps is the step vocabulary of workflow manifests.
 var Steps = []StepDef{
 	{"session.close", providers(unit.Session), workflow.ReachLocal, nil, nil,

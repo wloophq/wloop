@@ -102,17 +102,17 @@ func (r registryActions) States(f Facts) []api.ActionState {
 			continue
 		}
 		p := r.l.Programs[d.Name]
-		if p.When != nil && !p.When.Eval(f) {
+		if p.Action.When != nil && !p.Action.When.Eval(f) {
 			continue
 		}
 		id := string(d.Name)
-		if i := slices.IndexFunc(p.Refuse, func(r intentload.RefusalProgram) bool { return r.When != nil && r.When.Eval(f) }); i >= 0 {
+		if i := slices.IndexFunc(p.Action.Refuse, func(r intentload.RefusalProgram) bool { return r.When != nil && r.When.Eval(f) }); i >= 0 {
 			out = append(out, api.ActionState{ID: id, Reason: actionText(d.Name, p, intentload.RefusalText(i), facts)})
 			continue
 		}
 		st := api.ActionState{ID: id, Enabled: true, Note: actionText(d.Name, p, "note", facts), Confirm: actionText(d.Name, p, "confirm", facts),
 			Warning: actionText(d.Name, p, "warning", facts)}
-		st.Primary = p.Primary != nil && p.Primary.Eval(f)
+		st.Primary = p.Action.Primary != nil && p.Action.Primary.Eval(f)
 		recommend(&st, d, f.Recommended)
 		out = append(out, st)
 	}
@@ -128,7 +128,7 @@ func (r registryActions) States(f Facts) []api.ActionState {
 // actionText renders an action text; one that fails to render says so, so
 // a refusal never reads empty.
 func actionText(intent dintent.Name, p intentload.Programs, name string, facts map[string]any) string {
-	t := p.ActionTexts[name]
+	t := p.Action.ActionTexts[name]
 	if t == nil {
 		return ""
 	}

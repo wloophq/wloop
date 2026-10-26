@@ -39,9 +39,9 @@ provider = "thread"
 session = { strategy = "new", title = "implement" }
 
 [headline]
-resumed = "implement {{.Wording.Ref}}"
+resumed = "implement {{.unit.ref}}"
 [[headline.new]]
-text = "Implement {{.Wording.Ref}}, {{.Who}}."
+line = 'Implement {{.unit.ref}}, {{template "started_by" .}}.'
 
 [record]
 states = ["done", "asked", "failed"]
@@ -240,53 +240,80 @@ func TestTheAutomatedBudgetCountsTheDayOutsideTheRoundProviders(t *testing.T) {
 
 func TestRoundsReadTheManifestKeys(t *testing.T) {
 	t.Parallel()
-	f := workflow.Facts{"pr.review.reason": "the author answered", "pr.address.reason": "reviewed by bob"}
 	for _, c := range []struct {
-		name   string
-		args   startArgs
-		round  string
-		kind   stepKind
-		capped bool
-		reason string
+		name  string
+		args  startArgs
+		round string
+		kind  stepKind
 	}{
-		{"triage under another name", startArgs{intent: "triage", def: dintent.Def{RoundKind: builtin.RoundKindAddress, Cap: builtin.CapRounds, ReasonFact: "pr.address.reason"}},
-			roundAddress, stepAddress, true, "reviewed by bob"},
-		{"a review's first round", startArgs{intent: "critique", round: roundFirst, def: dintent.Def{RoundKind: builtin.RoundKindReview, ReasonFact: "pr.review.reason"}},
-			roundFirst, stepFirstRound, false, "my review was requested"},
-		{"a review's follow-up", startArgs{intent: "critique", def: dintent.Def{RoundKind: builtin.RoundKindReview, ReasonFact: "pr.review.reason"}},
-			roundFollowup, stepFollowup, false, "the author answered"},
-		{"the bundled review's name without its keys", startArgs{intent: string(dintent.Review)}, "", stepFollowup, false, string(dintent.Review)},
+		{"triage under another name", startArgs{intent: "triage", def: dintent.Def{RoundKind: builtin.RoundKindAddress}}, roundAddress, stepAddress},
+		{"a review's first round", startArgs{intent: "critique", round: roundFirst, def: dintent.Def{RoundKind: builtin.RoundKindReview}}, roundFirst, stepFirstRound},
+		{"a review's follow-up", startArgs{intent: "critique", def: dintent.Def{RoundKind: builtin.RoundKindReview}}, roundFollowup, stepFollowup},
+		{"the bundled review's name without its role", startArgs{intent: string(dintent.Review)}, "", stepFollowup},
 	} {
 		if got := c.args.candidate(); got != c.round {
 			t.Errorf("%s: round %q, want %q", c.name, got, c.round)
 		}
-		if c.args.kind() != c.kind || c.args.capped() != c.capped {
-			t.Errorf("%s: kind %v capped %v", c.name, c.args.kind(), c.args.capped())
-		}
-		if got := c.args.reason(f, roundCandidate{Reason: "my review was requested"}); got != c.reason {
-			t.Errorf("%s: reason %q, want %q", c.name, got, c.reason)
+		if c.args.kind() != c.kind {
+			t.Errorf("%s: kind %v", c.name, c.args.kind())
 		}
 	}
-	addr := startPlan{args: startArgs{def: dintent.Def{Reason: builtin.ReasonAddressRound}}, facts: workflow.Facts{"pr.address.reviewers": []string{"bob"}}}
-	if addr.address() == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindAddress}}}).address() != nil {
-		t.Error("the address reason follows the manifest's reason, not its round")
+	addr := startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindAddress}}, facts: workflow.Facts{"pr.address.reviewers": []string{"bob"}}}
+	if addr.address() == nil || (startPlan{args: startArgs{def: dintent.Def{RoundKind: builtin.RoundKindReview}}}).address() != nil {
+		t.Error("the address reason follows the role's round")
 	}
 }
 
-func TestANudgeWithoutRefuseWhenIgnoresTheNudgeRefusal(t *testing.T) {
+// nudgeWithoutRefuse is the bundled nudge's manifest with no [[refuse]].
+func nudgeWithoutRefuse(t *testing.T) string {
+	t.Helper()
+	b, err := fs.ReadFile(profiles.Default, "default/intents/nudge/intent.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := string(b)
+	for strings.Contains(m, "[[refuse]]") {
+		i := strings.Index(m, "[[refuse]]")
+		end := strings.Index(m[i:], "}}\"\n")
+		m = m[:i] + m[i+end+len("}}\"\n"):]
+	}
+	return m
+}
+
+func TestANudgeWithoutRefuseIgnoresTheNudgeRefusal(t *testing.T) {
 	t.Parallel()
 	r := nudgeStartRig(t)
 	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
 	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
 		t.Fatalf("the bundled nudge: %q", got)
 	}
-	b, err := fs.ReadFile(profiles.Default, "default/intents/nudge/intent.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": strings.Replace(string(b), "refuse_when = \"pr.nudge.refusal\"\n", "", 1)})
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t)})
 	if got := r.check(t, automation.CheckOpts{Observe: false}); got == "it waits on you" {
-		t.Fatal("a nudge whose manifest sets no refuse_when read the refusal")
+		t.Fatal("a nudge whose manifest has no [[refuse]] read the refusal")
+	}
+}
+
+func TestRefuseIsFirstMatch(t *testing.T) {
+	t.Parallel()
+	r := nudgeStartRig(t)
+	r.units.Set(r.u, "pr.nudge.refusal", "it waits on you")
+	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "it waits on you" {
+		t.Fatalf("both hold: %q, want the first refusal's", got)
+	}
+	r.units.Set(r.u, "pr.nudge.refusal", "")
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got != "muted until its state changes" {
+		t.Fatalf("the mute alone: %q", got)
+	}
+}
+
+func TestMuteRefusesOnlyWithAnExplicitRefuse(t *testing.T) {
+	t.Parallel()
+	r := nudgeStartRig(t)
+	r.units.Set(r.u, "pr.mute.refusal", "muted until its state changes")
+	userProfile(t, r.sc.te, map[string]string{"intents/nudge/intent.toml": nudgeWithoutRefuse(t)})
+	if got := r.check(t, automation.CheckOpts{Observe: false}); got == "muted until its state changes" {
+		t.Fatal("an intent with no [[refuse]] read the mute")
 	}
 }
 

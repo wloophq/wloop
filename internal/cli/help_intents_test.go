@@ -11,7 +11,7 @@ import (
 
 const triageManifest = `label = "Triage"
 summary = "Triage the open questions of a unit"
-workspace = "pr_else_main"
+workspace = "linked_else_main"
 provider = "any"
 session = { strategy = "new", title = "triage" }
 
@@ -20,9 +20,9 @@ target = "a pull request or a Slack thread"
 examples = ["acme/api#7 start with the oldest"]
 
 [headline]
-resumed = "triage of {{.Wording.Ref}}"
+resumed = "triage of {{.unit.ref}}"
 [[headline.new]]
-text = "Triage {{.Wording.Ref}}."
+line = "Triage {{.unit.ref}}."
 
 [record]
 states = ["done", "failed"]

@@ -100,20 +100,20 @@ func TestATurnStartOutsidePullRequestsNeedsADailyLimit(t *testing.T) {
 
 func TestTheManifestKeysThatReplaceIntentNameSwitchesDecode(t *testing.T) {
 	root := t.TempDir()
-	m := strings.Replace(minimal, `workspace = "review"`, `workspace = { repo_input = "repo" }
+	m := strings.ReplaceAll(strings.Replace(minimal, `workspace = "review"`, `workspace = { repo_input = "repo" }
 provider = ["github", "slack"]
-role = "nudge"
-draft_effects = ["entry.nudged", "unit.closed"]
-round_kind = "address"
-cap = "rounds"
-reason_fact = "pr.address.reason"
-refuse_when = "pr.nudge.refusal"
-reason = "address_round"
-brief = { need = ["solution"] }`, 1) + `
+role = "headless"
+why = "{{.pr.address.reason}}"
+drafts.allowed_effects = ["entry.nudged", "unit.closed"]
+brief = { need = ["solution"] }`, 1), "{{.pr.slug}}", "{{.unit.ref}}") + `
 [inputs.repo]
 type = "text"
 flag = "--repo"
 help = "owner/name"
+
+[[refuse]]
+when = 'pr.nudge.refusal != ""'
+why = "{{.pr.nudge.refusal}}"
 `
 	writeIntent(t, root, "implement", m, "{{.Headline}}")
 	l, problems := Load(userLayer(root), nil, testBase(), nil)
@@ -122,26 +122,27 @@ help = "owner/name"
 	}
 	d, ok := l.Registry.Get("implement")
 	if !ok || d.WorkspaceRepo == nil || d.WorkspaceRepo.RepoInput != "repo" || d.Provider != "github" || len(d.Providers) != 2 ||
-		d.Role != "nudge" || len(d.AllowedEffects) != 2 || d.RoundKind != "address" || d.Cap != "rounds" || d.ReasonFact != "pr.address.reason" ||
-		d.RefuseWhen != "pr.nudge.refusal" || d.Reason != "address_round" || d.Brief.Need[0] != "solution" {
+		d.Role != "headless" || len(d.AllowedEffects) != 2 || d.Why.Src != "{{.pr.address.reason}}" ||
+		len(d.Refuse) != 1 || d.Refuse[0].When.Src != `pr.nudge.refusal != ""` || d.Brief.Need[0] != "solution" {
 		t.Fatalf("%+v", d)
 	}
-	if got, ok := l.Registry.ByRole("nudge", "slack"); !ok || got.Name != "implement" {
+	if got, ok := l.Registry.ByRole("headless", "slack"); !ok || got.Name != "implement" {
 		t.Fatalf("by role: %v %v", got.Name, ok)
 	}
 }
 
 func TestBadManifestKeysAreRefused(t *testing.T) {
 	for edit, want := range map[string]string{
-		`workspace = { repo = "nope" }`:                             `workspace.repo: "nope" is not a repository`,
-		`workspace = { repo_input = "repo" }`:                       `workspace.repo_input: "repo" is no input of the intent`,
-		`workspace = { repo = "a/b", repo_input = "x" }`:            "exactly one of repo or repo_input",
-		"workspace = \"review\"\nrole = \"boss\"":                   `role: "boss" is not one of`,
-		"workspace = \"review\"\ndraft_effects = [\"unit.opened\"]": `draft_effects[0]: "unit.opened" is not an effect`,
-		"workspace = \"review\"\ncap = \"days\"":                    `cap: "days" is not one of`,
-		"workspace = \"review\"\nreason_fact = \"pr.nope\"":         "reason_fact: pr.nope is no workflow fact",
-		"workspace = \"review\"\nrefuse_when = \"pr.held\"":         "refuse_when: pr.held is no string workflow fact",
-		"workspace = \"review\"\nprompt = \"prompts/x.md\"":         "prompt: is read only with builds",
+		`workspace = { repo = "nope" }`:                                           `workspace.repo: "nope" is not a repository`,
+		`workspace = { repo_input = "repo" }`:                                     `workspace.repo_input: "repo" is no input of the intent`,
+		`workspace = { repo = "a/b", repo_input = "x" }`:                          "exactly one of repo or repo_input",
+		"workspace = \"review\"\nrole = \"boss\"":                                 `role: "boss" is not one of`,
+		"workspace = \"review\"\ndrafts.allowed_effects = [\"unit.opened\"]":      `drafts.allowed_effects[0]: "unit.opened" is not one of`,
+		"workspace = \"review\"\neffects = [\"unit.closed\"]":                     `effects[0]: "unit.closed" is not one of`,
+		"workspace = \"review\"\nwhy = \"{{.pr.nope}}\"":                          `why: `,
+		"workspace = \"review\"\nrefuse = [{ when = 'pr.nope', why = \"held\" }]": "refuse[0].when: ",
+		"workspace = \"review\"\nrefuse = [{ when = 'pr.held' }]":                 "refuse[0].why: is required",
+		"workspace = \"review\"\nprompt = \"prompts/x.md\"":                       "prompt: is read only with builds",
 	} {
 		root := t.TempDir()
 		writeIntent(t, root, "implement", strings.Replace(minimal, `workspace = "review"`, edit, 1), "{{.Headline}}")
@@ -154,11 +155,11 @@ func TestBadManifestKeysAreRefused(t *testing.T) {
 
 func TestTwoIntentsOfOneLayerCannotHoldARole(t *testing.T) {
 	root := t.TempDir()
-	m := strings.Replace(minimal, `workspace = "review"`, "workspace = \"review\"\nrole = \"round.review\"", 1)
+	m := strings.Replace(minimal, `workspace = "review"`, "workspace = \"review\"\nrole = \"pr.review\"", 1)
 	writeIntent(t, root, "my-review", m, "{{.Headline}}")
 	writeIntent(t, root, "their-review", strings.Replace(m, `title = "ask"`, `title = "their"`, 1), "{{.Headline}}")
 	_, problems := Load(userLayer(root), nil, testBase(), nil)
-	if !strings.Contains(problems.Error(), "holds the role round.review on github units already") {
+	if !strings.Contains(problems.Error(), "holds the role pr.review on github units already") {
 		t.Fatalf("%s", problems.Error())
 	}
 }
@@ -175,7 +176,7 @@ schema = "schema.json"
 [headline]
 resumed = "x"
 [[headline.new]]
-text = "x"
+line = "x"
 `, "{{.Headline}}")
 	if err := os.WriteFile(filepath.Join(root, "intents", "unit-brief", "schema.json"), []byte(`{"type":"object","properties":{"solution":{"type":"string"}}}`), 0o644); err != nil {
 		t.Fatal(err)

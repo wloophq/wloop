@@ -37,7 +37,7 @@
       "type": "string",
       "description": "One line on what the intent does."
     },
-    "key": {
+    "shortcut": {
       "type": "string",
       "description": "The action's key: one uppercase letter, unique among intents and built-in actions; lowercase letters and digits are the core's.",
       "pattern": "^[A-Z]$"
@@ -45,7 +45,11 @@
     "verb": {
       "type": "string",
       "description": "The gtd verb the intent's action fulfills, so the entry verb reaches it.",
-      "enum": ["approve", "delegate", "dismiss"]
+      "enum": [
+        "approve",
+        "delegate",
+        "dismiss"
+      ]
     },
     "user_facing": {
       "type": "boolean",
@@ -54,56 +58,106 @@
     "provider": {
       "description": "The provider whose units the intent's turns run on, a registered provider id, or a list of them. Default \"github\".",
       "oneOf": [
-        {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$"},
-        {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$"}}
+        {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          }
+        }
       ]
     },
     "workspace": {
-      "description": "Where the turn runs: a workspace builtin, or a table naming the repository outright (repo) or by an input (repo_input).",
+      "description": "Where the turn runs, and the board it moves (review, author; else none): a workspace builtin, or a table naming the repository outright (repo) or by an input (repo_input).",
       "oneOf": [
-        {"type": "string", "enum": ["review", "author", "pr_else_main", "given"]},
+        {
+          "type": "string",
+          "enum": [
+            "review",
+            "author",
+            "linked_else_main",
+            "given"
+          ]
+        },
         {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "repo": {"type": "string", "description": "owner/name.", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
-            "repo_input": {"type": "string", "description": "The input that holds owner/name."}
+            "repo": {
+              "type": "string",
+              "description": "owner/name.",
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            },
+            "repo_input": {
+              "type": "string",
+              "description": "The input that holds owner/name."
+            }
           }
         }
       ]
     },
     "role": {
       "type": "string",
-      "description": "What the loop resolves the intent by; one intent per role and provider, a user's taking it from the bundled one.",
-      "enum": ["round.review", "round.address", "nudge", "probe", "headless.default"]
+      "description": "What binds the intent to a plugin's mechanism, and what that implies: pr.review and pr.address a round that drives its workspace's row, pr.nudge the nudge's prepare, probe a synthetic pull request. One intent per role and provider, a user's taking it from the bundled one.",
+      "enum": [
+        "pr.review",
+        "pr.address",
+        "pr.nudge",
+        "probe",
+        "headless"
+      ]
     },
     "builds": {
       "type": "string",
       "description": "What a builder intent builds; a builder is never started as a turn and needs no workspace, session or record.",
-      "enum": ["brief"]
+      "enum": [
+        "brief"
+      ]
     },
-    "prompt": {"type": "string", "description": "With builds only: the prompt, a path resolved through the profile layers, such as prompts/brief.md."},
-    "schema": {"type": "string", "description": "With builds only: the JSON Schema of the extra fields, a file in the intent's directory."},
-    "draft_effects": {
-      "type": "array",
-      "description": "The effects the intent's agents may declare on their drafts. Default none.",
-      "items": {"type": "string", "enum": ["entry.nudged", "unit.closed", "pr.nudged"]}
+    "prompt": {
+      "type": "string",
+      "description": "With builds only: the prompt, a path resolved through the profile layers, such as prompts/brief.md."
     },
-    "round_kind": {"type": "string", "description": "The sweep round the intent's turns are; defaults from the role (round.review, round.address).", "enum": ["review", "address"]},
-    "cap": {"type": "string", "description": "The budget the intent's turns spend: rounds, the per pull request daily cap; the default for an intent with a round kind or the nudge role.", "enum": ["rounds"]},
-    "reason_fact": {"type": "string", "description": "The workflow fact that says why the intent's round is due or not."},
-    "refuse_when": {"type": "string", "description": "A string workflow fact whose non-empty value refuses the turn with that text."},
-    "reason": {"type": "string", "description": "The why the turn's instructions carry.", "enum": ["address_round"]},
-    "skill": {"type": "boolean", "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt; it needs help.target."},
+    "schema": {
+      "type": "string",
+      "description": "With builds only: the JSON Schema of the extra fields, a file in the intent's directory."
+    },
+    "skill": {
+      "type": "boolean",
+      "description": "true has install write the intent a turn skill, which runs a turn by hand from the agent's prompt; it needs help.target."
+    },
     "help": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "target": {"type": "string", "description": "What the command's target is, such as \"a pull request URL\"; the turn skill and the command's help read it."},
-        "summary": {"type": "string", "description": "The main help's line for the command; default summary."},
-        "group": {"type": "string", "description": "The title of the main help's group the command joins, such as \"pull requests\"; default the group of your intents."},
-        "examples": {"type": "array", "items": {"type": "string"}, "description": "Command lines of the help, without the command's name."},
-        "docs": {"type": "string", "description": "A page path of the documentation site, such as \"guides/review\"."}
+        "target": {
+          "type": "string",
+          "description": "What the command's target is, such as \"a pull request URL\"; the turn skill and the command's help read it."
+        },
+        "summary": {
+          "type": "string",
+          "description": "The main help's line for the command; default summary."
+        },
+        "group": {
+          "type": "string",
+          "description": "The title of the main help's group the command joins, such as \"pull requests\"; default the group of your intents."
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Command lines of the help, without the command's name."
+        },
+        "docs": {
+          "type": "string",
+          "description": "A page path of the documentation site, such as \"guides/review\"."
+        }
       }
     },
     "session": {
@@ -150,19 +204,6 @@
       "type": "boolean",
       "description": "A turn may stop on a question. Default true."
     },
-    "board": {
-      "type": "string",
-      "description": "Default none.",
-      "enum": [
-        "review",
-        "author",
-        "none"
-      ]
-    },
-    "drives_row": {
-      "type": "boolean",
-      "description": "Default false."
-    },
     "reports": {
       "type": "boolean",
       "description": "Default true."
@@ -182,7 +223,9 @@
         "need": {
           "type": "array",
           "description": "The brief intent's extra fields the turn needs; a brief missing one is completed first.",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -195,38 +238,53 @@
       "items": {
         "type": "string",
         "enum": [
-          "round"
+          "stage",
+          "reviewer"
         ]
       },
       "description": "Profile dimensions valid under this intent."
     },
-    "records": {
-      "type": "string",
-      "description": "Whether the turn records. Default \"true\". A predicate: a quoted CEL-subset expression."
-    },
-    "prepare": {
-      "type": "string",
-      "description": "Default \"\".",
-      "enum": [
-        "",
-        "nudge.prepare"
-      ]
-    },
-    "on_sent": {
+    "effects": {
       "type": "array",
       "items": {
         "type": "string",
         "enum": [
-          "plan.drop_pending",
-          "event.round_sent",
-          "event.nudged",
-          "record_round",
-          "keeps_guidance",
-          "mark_reviewed",
-          "mark_addressed"
+          "plan.cleared",
+          "guidance.handed",
+          "pr.counted",
+          "pr.round_sent",
+          "pr.nudged",
+          "pr.reviewed",
+          "pr.addressed"
         ]
       },
-      "description": "Effects the intent has."
+      "description": "What sending the turn applies."
+    },
+    "why": {
+      "type": "string",
+      "description": "Template over the unit's workflow facts: why the turn is due."
+    },
+    "refuse": {
+      "type": "array",
+      "description": "Refusals of turn.start, in order; the first whose when holds refuses with its why.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "when": {
+            "type": "string",
+            "description": "Over the unit's workflow facts. A predicate: a quoted CEL-subset expression."
+          },
+          "why": {
+            "type": "string",
+            "description": "Template over the unit's workflow facts."
+          }
+        },
+        "required": [
+          "when",
+          "why"
+        ]
+      }
     },
     "guidance": {
       "type": "object",
@@ -253,7 +311,7 @@
       "properties": {
         "resumed": {
           "type": "string",
-          "description": "Template over the turn context."
+          "description": "Template over the turn's facts."
         },
         "new": {
           "type": "array",
@@ -265,13 +323,13 @@
                 "type": "string",
                 "description": "Turn slot. A predicate: a quoted CEL-subset expression."
               },
-              "text": {
+              "line": {
                 "type": "string",
-                "description": "Template over the turn context."
+                "description": "Template over the turn's facts."
               }
             },
             "required": [
-              "text"
+              "line"
             ]
           },
           "description": "Cases in order; the last has no when."
@@ -295,7 +353,7 @@
           "type": {
             "type": "string",
             "enum": [
-              "flag",
+              "bool",
               "text",
               "list"
             ]
@@ -358,7 +416,7 @@
         ]
       }
     },
-    "also_profiles": {
+    "also_profile": {
       "type": "array",
       "items": {
         "type": "object",
@@ -372,18 +430,24 @@
             "type": "string",
             "description": "Turn slot. A predicate: a quoted CEL-subset expression."
           },
-          "round": {
-            "type": "string",
-            "enum": [
-              "first",
-              "follow-up"
-            ]
+          "dims": {
+            "type": "object",
+            "description": "Pins dimensions of the other judgment, such as stage = \"first\".",
+            "propertyNames": {
+              "enum": [
+                "stage",
+                "reviewer"
+              ]
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           },
           "define": {
             "type": "string",
             "description": "The template define that renders it."
           },
-          "source_prefix": {
+          "prefix": {
             "type": "string",
             "description": "Default \"<profile> guide: \"."
           }
@@ -494,6 +558,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "when": {
+          "type": "string",
+          "description": "Whether the turn records. Default \"true\". A predicate: a quoted CEL-subset expression."
+        },
         "states": {
           "type": "array",
           "items": {
@@ -570,12 +638,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "head_moved": {
-          "type": "string"
+        "changed": {
+          "type": "string",
+          "description": "The text a resumed turn reads when its unit changed since the question."
         }
       }
     },
-    "modes": {
+    "runners": {
       "type": "array",
       "description": "How the intent's turns may run: session (an agent session in a workspace) and headless (one read-only call with no session). Default [\"session\"].",
       "minItems": 1,
@@ -588,56 +657,74 @@
         ]
       }
     },
-    "draft_approval": {
+    "drafts": {
       "type": "object",
       "additionalProperties": false,
-      "description": "When the drafts this proposes are sent without the user's click. Absent: wait.",
-      "required": [
-        "mode"
-      ],
       "properties": {
-        "mode": {
-          "type": "string",
-          "description": "wait: the user approves each draft; delay: sent when the window ends unless the user discards or edits it first; send: sent at once; record: recorded as what would have been sent, never sent.",
-          "enum": [
-            "wait",
-            "delay",
-            "send",
-            "record"
-          ]
-        },
-        "window": {
-          "type": "string",
-          "description": "With mode delay only: how long the user has, such as 10m."
-        },
-        "rule": {
+        "allowed_effects": {
           "type": "array",
-          "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (send or delay) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+          "description": "The effects the intent's agents may declare on their drafts. Default none.",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "when",
-              "mode"
-            ],
-            "properties": {
-              "when": {
-                "type": "string",
-                "description": "A predicate over draft.delivery, draft.proposer, draft.effects and the facts of the unit the draft is on; never draft.purpose, which the turn's agent names."
-              },
-              "mode": {
-                "type": "string",
-                "enum": [
-                  "wait",
-                  "delay",
-                  "send",
-                  "record"
+            "type": "string",
+            "enum": [
+              "entry.nudged",
+              "unit.closed",
+              "pr.nudged"
+            ]
+          }
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "When the drafts this proposes are sent without the user's click. Absent: wait.",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "description": "wait: the user approves each draft; delay: sent when the window ends unless the user discards or edits it first; send: sent at once; record: recorded as what would have been sent, never sent.",
+              "enum": [
+                "wait",
+                "delay",
+                "send",
+                "record"
+              ]
+            },
+            "window": {
+              "type": "string",
+              "description": "With mode delay only: how long the user has, such as 10m."
+            },
+            "rule": {
+              "type": "array",
+              "description": "Rules tried in order before mode; the first whose when holds gives the mode. A rule that sends on its own (send or delay) applies to a comment draft only when its when has draft.delivery == \"comment\" as a term of its top-level &&.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "when",
+                  "mode"
                 ],
-                "description": "The mode of a draft the rule matches."
-              },
-              "window": {
-                "type": "string",
-                "description": "With mode delay only: how long the user has, such as 10m."
+                "properties": {
+                  "when": {
+                    "type": "string",
+                    "description": "A predicate over draft.delivery, draft.proposer, draft.effects and the facts of the unit the draft is on; never draft.purpose, which the turn's agent names."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "wait",
+                      "delay",
+                      "send",
+                      "record"
+                    ],
+                    "description": "The mode of a draft the rule matches."
+                  },
+                  "window": {
+                    "type": "string",
+                    "description": "With mode delay only: how long the user has, such as 10m."
+                  }
+                }
               }
             }
           }

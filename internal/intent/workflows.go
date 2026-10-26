@@ -474,7 +474,7 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 				}
 			}
 			if r, ok := raw["stage"].(string); ok {
-				s.oneOf(p+".stage", r, builtin.TurnStages)
+				s.oneOf(p+".stage", r, builtin.Stages)
 			}
 			if m, ok := raw["runner"].(string); ok {
 				s.oneOf(p+".runner", m, builtin.TurnRunners)

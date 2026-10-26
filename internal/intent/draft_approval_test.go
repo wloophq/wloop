@@ -24,7 +24,7 @@ func loadWorkflowWith(t *testing.T, extra string) (*Loaded, Problems) {
 
 // The draft approval table of each manifest.
 const (
-	intentDrafts   = "draft_approval"
+	intentDrafts   = "drafts.approval"
 	workflowDrafts = "drafts.approval"
 )
 

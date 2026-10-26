@@ -176,7 +176,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 
 func TestAnActionTextThatFailsToRenderSaysSo(t *testing.T) {
 	tmpl := template.Must(template.New("refuse[0].why").Option("missingkey=error").Parse(`{{index .pr.nudge.who 3}}`))
-	p := intentload.Programs{ActionPrograms: intentload.ActionPrograms{ActionTexts: map[string]*template.Template{"refuse[0].why": tmpl}}}
+	p := intentload.Programs{Action: intentload.ActionPrograms{ActionTexts: map[string]*template.Template{"refuse[0].why": tmpl}}}
 	got := actionText("ask-author", p, "refuse[0].why", intentload.ActionFactMap(Facts{}.Get))
 	if !strings.HasPrefix(got, "the profile has errors: ask-author: action.refuse[0].why: ") {
 		t.Fatalf("%q", got)

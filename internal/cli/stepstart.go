@@ -97,9 +97,6 @@ func (a startArgs) candidate() string {
 	return ""
 }
 
-// capped says whether the intent's turns spend the day's round budget.
-func (a startArgs) capped() bool { return a.def.Cap == builtin.CapRounds }
-
 func (a startArgs) kind() stepKind {
 	switch a.candidate() {
 	case roundFirst:
@@ -119,12 +116,19 @@ func (a startArgs) kindName() string {
 }
 
 // reason is why the round runs: the first round's planner says it, any
-// other round the intent's reason_fact.
-func (a startArgs) reason(f workflow.Facts, cand roundCandidate) string {
-	if a.candidate() == roundFirst {
-		return cmp.Or(cand.Reason, a.kindName())
+// other round the intent's why over the unit's facts.
+func (s *stepSet) reason(p startPlan) string {
+	if p.args.candidate() == roundFirst {
+		return cmp.Or(p.cand.Reason, p.args.kindName())
 	}
-	return cmp.Or(factString(f, a.def.ReasonFact), a.kindName())
+	var why string
+	if l := s.e.loadedIntents(); l != nil {
+		var err error
+		if why, err = l.Why(p.args.def.Name, p.facts); err != nil {
+			s.logf("%s: the why of %s: %v", p.ref, p.args.intent, err)
+		}
+	}
+	return cmp.Or(why, p.args.kindName())
 }
 
 // mode is the step's mode, else the intent's first mode.
@@ -157,7 +161,7 @@ func (p startPlan) observed() bool { return p.round && p.cand.Observed }
 
 // address is why the plan's address round runs now; nil for other rounds.
 func (p startPlan) address() *turn.RoundReason {
-	if p.args.def.Reason != builtin.ReasonAddressRound {
+	if p.args.def.RoundKind != builtin.RoundKindAddress {
 		return nil
 	}
 	return automatedReason(p.facts, p.cand.Facts.Facts)
@@ -235,12 +239,10 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 			return why, p, nil
 		}
 	}
-	if p.args.def.RefuseWhen != "" {
-		if why, err := s.refusal(ctx, p); err != nil || why != "" {
-			return why, p, err
-		}
+	if why, err := s.refusal(p); err != nil || why != "" {
+		return why, p, err
 	}
-	if p.args.capped() && !(p.observed() && p.args.kind() == stepFollowup) {
+	if !(p.observed() && p.args.kind() == stepFollowup) {
 		st := s.bound()
 		if !live {
 			if st, err = s.rounds(ctx, byHand); err != nil {
@@ -365,20 +367,14 @@ func waitText(rd intake.Readiness) string {
 	return fmt.Sprintf("%s, attempt %d", rd.Wait, rd.Attempt)
 }
 
-// refusal is the text of the intent's refuse_when fact, else the mute the
-// user set on the pull request.
-func (s *stepSet) refusal(ctx context.Context, p startPlan) (string, error) {
-	if why := factString(p.facts, p.args.def.RefuseWhen); why != "" {
-		return why, nil
-	}
-	if s.e.Rec == nil {
+// refusal is the why of the intent's first [[refuse]] whose when holds
+// over the unit's facts, "" for none.
+func (s *stepSet) refusal(p startPlan) (string, error) {
+	l := s.e.loadedIntents()
+	if l == nil {
 		return "", nil
 	}
-	overrides, err := s.e.Rec.Overrides(ctx)
-	if err != nil {
-		return "", err
-	}
-	return overrides[p.ref].MuteRefusal(s.e.Now()), nil
+	return l.Refusal(p.args.def.Name, p.facts)
 }
 
 func isCapRefusal(refusal string) bool { return strings.Contains(refusal, "daily cap reached") }
@@ -485,12 +481,10 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			}
 			return "", startError(err)
 		}
-		if p.args.capped() {
-			st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
-		}
+		st.RecordFollowup(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
 		return "started a " + p.args.intent + " turn", nil
 	}
-	reason := p.args.reason(p.facts, p.cand)
+	reason := s.reason(p)
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.cand.Workspace, Unit: c.u, Facts: p.cand.Facts,
 		Reason: reason, Fingerprint: p.cand.Fingerprint, ChecksHead: p.cand.ChecksHead, ConflictHead: p.cand.ConflictHead, LastReviewAt: p.cand.LastReviewAt,
 		Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.cand.Observed, Confirmed: o.Confirmed, Why: &why, Address: p.address()})

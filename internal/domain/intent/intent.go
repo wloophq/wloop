@@ -16,8 +16,9 @@ import (
 // Name is an intent's name: the directory of its manifest.
 type Name string
 
-// DimRound is the profile dimension that selects by review round.
-const DimRound = "round"
+// DimStage is the profile dimension that selects by the pass over a unit:
+// first or follow-up.
+const DimStage = "stage"
 
 // DimReviewer is the profile dimension that selects an address round by a reviewer it answers.
 const DimReviewer = "reviewer"
@@ -32,30 +33,33 @@ const (
 )
 
 type Def struct {
-	Name         Name
-	Label        string
-	Summary      string
-	Key          string
-	Verb         string // the gtd verb its action fulfills; "" for none
-	UserFacing   bool
-	Workspace    string // review | author | pr_else_main | given
-	Session      Session
-	Context      string // pr | synthetic
-	Launch       string // "" | probe
-	Policy       string // round | probe
-	Intake       bool
-	StartLine    string
-	OwnerOnly    bool
-	Answerable   bool
-	Board        string // review | author | none
-	DrivesRow    bool
-	Reports      bool
-	Reconcile    string // "" | my_review
-	Brief        Brief
-	Profile      string // "" means none
-	Dims         []string
-	Records      Pred
-	Prepare      string
+	Name       Name
+	Label      string
+	Summary    string
+	Key        string
+	Verb       string // the gtd verb its action fulfills; "" for none
+	UserFacing bool
+	Workspace  string // review | author | linked_else_main | given
+	Session    Session
+	Context    string // pr | synthetic, from the role
+	Launch     string // "" | probe, from the role
+	Policy     string // round | probe, from the role
+	Intake     bool
+	StartLine  string
+	OwnerOnly  bool
+	Answerable bool
+	Board      string // review | author | none, from the workspace
+	DrivesRow  bool   // from the role, moved to a user intent that takes it
+	Reports    bool
+	Reconcile  string // "" | my_review, from the role
+	Brief      Brief
+	Profile    string // "" means none
+	Dims       []string
+	// Records is [record] when.
+	Records Pred
+	Prepare string // from the role
+	// Effects are what sending the turn applies, turn effects of
+	// builtin.Effects.
 	Effects      []string
 	Headline     Headline
 	Guidance     Guidance
@@ -69,7 +73,7 @@ type Def struct {
 	Bundled      bool
 	// Provider is the manifest's provider; default "github".
 	Provider unit.ProviderID
-	// DraftApproval is the manifest's [draft_approval] block; nil when absent.
+	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
 	DraftApproval *draft.Policy
 	// Runners are turn.Runner values; default ["session"].
 	Runners []string
@@ -93,21 +97,16 @@ type Def struct {
 	// AllowedEffects are the effects the intent's agents may declare on the
 	// drafts they propose, names of builtin.Effects.
 	AllowedEffects []string
-	// RoundKind is the sweep round the intent's turns are: "review" (first
-	// or follow-up, by the step's round) or "address"; "" none.
-	RoundKind string
-	// Cap is the budget the intent's turns spend: "rounds", the per-pull
-	// request daily round cap; "" none.
-	Cap string
-	// ReasonFact is the workflow fact that says why the intent's round is
-	// due or not; "" none.
-	ReasonFact string
-	// RefuseWhen is a string workflow fact whose non-empty value refuses
-	// the turn with that text, such as pr.nudge.refusal; "" none.
-	RefuseWhen string
-	// Reason is the why a turn's instructions carry: "address_round"; ""
+	// RoundKind is the sweep round the intent's turns are, from its role:
+	// "review" (first or follow-up, by the step's stage) or "address"; ""
 	// none.
-	Reason string
+	RoundKind string
+	// Why is the template, over the unit's workflow facts, that says why
+	// the intent's turn is due; empty for none.
+	Why Text
+	// Refuse are the refusals of turn.start, in order: the first whose when
+	// holds refuses with its why.
+	Refuse []Refuse
 	// Skill says whether install writes the intent a turn skill.
 	Skill bool
 	Help  Help
@@ -205,8 +204,17 @@ type Input struct {
 }
 
 type AlsoProfile struct {
-	Profile, Round, Define, SourcePrefix string
-	When                                 Pred
+	Profile, Define, Prefix string
+	// Dims pins dimensions of the other judgment, such as stage = first.
+	Dims map[string]string
+	When Pred
+}
+
+// Refuse is a refusal of turn.start: when holds over the unit's workflow
+// facts, why says it.
+type Refuse struct {
+	When Pred
+	Why  Text
 }
 
 type Join struct{ DiffersOn []string }
@@ -225,7 +233,9 @@ type Require struct {
 	Fields          []string
 }
 
-type Resume struct{ HeadMoved string }
+// Resume holds Changed, the text a resumed turn reads when its unit changed
+// since the question.
+type Resume struct{ Changed string }
 
 type Source struct {
 	Layer, Dir string // Dir "" for bundled

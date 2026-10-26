@@ -22,7 +22,7 @@ import (
 )
 
 func addressed(u unit.Unit) turn.Book {
-	t := turn.Turn{Seq: 1, Intent: turn.Intent(dintent.Address), Role: "round.address", ID: "a1", State: turn.Done, Session: "term_1", SentAt: t0}
+	t := turn.Turn{Seq: 1, Intent: turn.Intent(dintent.Address), Role: "pr.address", ID: "a1", State: turn.Done, Session: "term_1", SentAt: t0}
 	return turn.Book{Unit: u, Turns: []turn.Turn{t},
 		Records: []turn.Record{{ID: 1, TurnSeq: 1, Hash: "pushed", At: t0, Record: record.Record{State: record.Done, Summary: "pushed"}}}}
 }

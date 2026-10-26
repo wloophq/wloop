@@ -1,1 +1,1 @@
-testdata/bad/enum-value/intents/ask-author/intent.toml:5:9: board: "side" is not one of "review", "author", "none"
+testdata/bad/enum-value/intents/ask-author/intent.toml:5:8: role: "round.review" is not one of "pr.review", "pr.address", "pr.nudge", "probe", "headless"

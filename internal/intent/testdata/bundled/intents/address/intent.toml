@@ -1,39 +1,38 @@
 label = "Address"
 summary = "Triage the reviews of a pull request you develop"
 verb = "delegate"
-key = "F"
+shortcut = "F"
+role = "pr.address"
 workspace = "author"
-drives_row = true
 session = { strategy = "reuse_live", title = "triage" }
 owner_only = true
 profile = "address"
-records = "!turn.needs_take_over"
 
 [headline]
-resumed = "address round on {{.PR.Slug}}"
+resumed = "address round on {{.pr.slug}}"
 [[headline.new]]
 when = "inputs.take_over"
-text = "Take over {{.PR.Slug}}."
+line = "Take over {{.pr.slug}}."
 [[headline.new]]
-text = "Address round on {{.PR.Slug}}."
+line = "Address round on {{.pr.slug}}."
 
 [inputs.take_over]
-type   = "flag"
+type   = "bool"
 flag   = "--take-over"
 help   = "takes it over first"
 before = "take_over"
 
 [inputs.self_review]
-type = "flag"
+type = "bool"
 flag = "--self-review"
 help = "reviews the change first"
 persist = true
 by_hand_only = true
 
-[[also_profiles]]
+[[also_profile]]
 profile = "review"
 when    = "inputs.self_review && !turn.needs_take_over"
-round   = "first"
+dims   = { stage = "first" }
 define  = "review-judgment"
 
 [action]
@@ -46,6 +45,7 @@ why  = "Not yours: take it over first"
 differs_on = ["self_review"]
 
 [record]
+when = "!turn.needs_take_over"
 states    = ["done", "asked", "failed"]
 artifacts = ["triage"]
 history_artifact = "triage"

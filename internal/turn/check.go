@@ -50,10 +50,10 @@ func CheckTemplate(d dintent.Def, t *template.Template) []intentload.Problem {
 			if h == nil {
 				continue
 			}
-			if err := h.Execute(io.Discard, c); err != nil {
+			if err := h.Execute(io.Discard, c.facts()); err != nil {
 				txt, field := d.Headline.Resumed, "headline.resumed"
 				if i >= 0 {
-					txt, field = d.Headline.New[i].Text, "headline.new["+strconv.Itoa(i)+"].text"
+					txt, field = d.Headline.New[i].Text, "headline.new["+strconv.Itoa(i)+"].line"
 				}
 				p := execProblem(h.Name(), err)
 				add(intentload.Problem{File: txt.At.File, Line: txt.At.Line, Col: txt.At.Col, Field: field, Msg: p.Msg})
@@ -67,7 +67,7 @@ func samples(d dintent.Def) []Context {
 	set, zero := map[string]any{}, map[string]any{}
 	for _, in := range d.Inputs {
 		switch in.Type {
-		case "flag":
+		case "bool":
 			set[in.Name], zero[in.Name] = true, false
 		case "list":
 			set[in.Name], zero[in.Name] = []string{"sample"}, []string{}
@@ -89,7 +89,7 @@ func samples(d dintent.Def) []Context {
 	base := Context{Intent: Intent(d.Name), Payload: payload, Unit: payload.Unit(), Wording: payload.Wording(), Def: d, Headline: "sample", Records: true, Guidance: "sample", Agent: "sample", Command: brand.Name,
 		Guide: profile.Guide{Parts: []profile.Part{{Label: "sample", Level: 3, Text: "sample"}}}, BriefMissing: noBrief,
 		History: []instructions.PastTurn{{Intent: "sample", Trigger: "by-hand", State: "done", Summary: "sample"}}}
-	if slices.Contains(d.Dims, "round") {
+	if slices.Contains(d.Dims, dintent.DimStage) {
 		base.Round = "first"
 	}
 	base.Guides = map[string]profile.Guide{}

@@ -63,7 +63,7 @@ func Turn(d dintent.Def, target string) Skill {
 func flagsLine(d dintent.Def) string {
 	var flags []string
 	for _, in := range d.Inputs {
-		if in.Type == "flag" && in.Flag != "" && !in.Hidden {
+		if in.Type == "bool" && in.Flag != "" && !in.Hidden {
 			flags = append(flags, "  - `"+in.Flag+"` "+in.Help+"\n")
 		}
 	}

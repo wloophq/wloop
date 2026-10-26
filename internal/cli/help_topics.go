@@ -38,10 +38,6 @@ var colorFlag = helpFlag{"--color auto|always|never", "Lay the output out for a 
 func conditionFlags() []helpFlag {
 	var names []string
 	for _, d := range profile.Dims {
-		if d == profile.DimOrganization {
-			names = append(names, "--org")
-			continue
-		}
 		names = append(names, "--"+string(d))
 	}
 	return []helpFlag{
@@ -250,15 +246,15 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:   []string{"profile show"},
 				Summary: "The blocks that apply to a repository",
-				Usage:   []string{"profile show <owner/repo|url> [--kind <intent>] [--show] [--color auto|always|never]"},
+				Usage:   []string{"profile show <owner/repo|url> [--intent <intent>] [--show] [--color auto|always|never]"},
 				About: "List the profile's blocks per intent, their conditions and which of them apply to that repository or pull request. " +
 					"--show prints the instructions a turn there reads.",
 				Flags: []helpFlag{
-					{"--kind <intent>", "Only this intent's blocks"},
+					{"--intent <intent>", "Only this intent's blocks"},
 					{"--show", "Print the instructions a turn there would read"},
 					colorFlag,
 				},
-				Examples: []string{"profile show acme/api", "profile show " + pr + " --kind review --show"},
+				Examples: []string{"profile show acme/api", "profile show " + pr + " --intent review --show"},
 				Docs:     "guides/review-profile",
 			},
 			{
@@ -267,7 +263,7 @@ func helpGroups(manager string) []helpGroup {
 				Usage:    []string{"profile where <intent> [conditions]"},
 				About:    "Name the block of the profile a rule with these conditions goes in, and the blocks that join it in a turn.",
 				Flags:    conditionFlags(),
-				Examples: []string{"profile where review --org acme --repo api"},
+				Examples: []string{"profile where review --organization acme --repo api"},
 				Docs:     "reference/profile-blocks",
 			},
 			{
@@ -283,7 +279,7 @@ func helpGroups(manager string) []helpGroup {
 					helpFlag{"--paths <glob>", "A glob a changed file must match, for a new block; repeatable"},
 					helpFlag{"--apply", "Write the change; without it, print the diff"},
 				),
-				Examples: []string{"profile add review --org acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
+				Examples: []string{"profile add review --organization acme -- Every migration needs a down step.", "profile add nudge --apply -- Keep nudges to two sentences."},
 				Docs:     "guides/review-profile",
 			},
 			{

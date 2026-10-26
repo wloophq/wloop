@@ -1,1 +1,1 @@
-testdata/bad/on-sent-unknown/intents/ask-author/intent.toml:5:28: on_sent[1]: unknown on_sent builtin "event.asked"; the on_sent builtins are "plan.drop_pending", "event.round_sent", "event.nudged", "record_round", "keeps_guidance", "mark_reviewed", "mark_addressed"
+testdata/bad/on-sent-unknown/intents/ask-author/intent.toml:5:26: effects[1]: "event.asked" is not one of "plan.cleared", "guidance.handed", "pr.counted", "pr.round_sent", "pr.reviewed", "pr.addressed", "pr.nudged"

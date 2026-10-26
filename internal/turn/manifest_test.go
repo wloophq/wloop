@@ -28,7 +28,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			t.Errorf("%s is not marked bundled", d.Name)
 		}
 		p := l.Programs[d.Name]
-		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.When == nil || p.Primary == nil || len(p.Refuse) != len(d.Action.Refuse))) {
+		if p.Records == nil || len(p.Headline) != len(d.Headline.New) || (d.Action != nil && (p.Action.When == nil || p.Action.Primary == nil || len(p.Action.Refuse) != len(d.Action.Refuse))) {
 			t.Errorf("%s: a predicate is not compiled: %+v", d.Name, p)
 		}
 		for i, c := range d.Headline.New {
@@ -170,20 +170,20 @@ session = { strategy = "new", title = "ask" }
 profile = "review"
 
 [inputs.loud]
-type = "flag"
+type = "bool"
 flag = "--loud"
 help = "asks loudly"
 by_hand_only = true
 
-[[also_profiles]]
+[[also_profile]]
 profile = "nudge"
 when    = "inputs.loud"
 define  = "nudge-judgment"
 
 [headline]
-resumed = "ask round on {{.PR.Slug}}"
+resumed = "ask round on {{.pr.slug}}"
 [[headline.new]]
-text = "Ask the author of {{.PR.Slug}}, {{.Who}}."
+line = 'Ask the author of {{.pr.slug}}, {{template "started_by" .}}.'
 
 [record]
 states = ["done", "asked", "failed"]
@@ -245,14 +245,14 @@ const mineReader = `label = "Mine"
 summary = "Reads pr.mine"
 workspace = "review"
 session = { strategy = "new", title = "mine" }
-records = "!pr.mine"
 
 [headline]
-resumed = "mine on {{.PR.Slug}}"
+resumed = "mine on {{.pr.slug}}"
 [[headline.new]]
-text = "Mine on {{.PR.Slug}}."
+line = "Mine on {{.pr.slug}}."
 
 [record]
+when = "!pr.mine"
 states = ["done", "failed"]
 `
 

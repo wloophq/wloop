@@ -227,7 +227,7 @@ type alsoGuide struct {
 	guide  profile.Guide
 }
 
-// alsoGuides are the composed also_profiles guides other than the main one.
+// alsoGuides are the composed also_profile guides other than the main one.
 func alsoGuides(c Context) []alsoGuide {
 	var out []alsoGuide
 	for _, a := range c.Def.AlsoProfiles {
@@ -235,7 +235,7 @@ func alsoGuides(c Context) []alsoGuide {
 		if !ok || a.Profile == c.Def.Profile {
 			continue
 		}
-		out = append(out, alsoGuide{a.SourcePrefix, g})
+		out = append(out, alsoGuide{a.Prefix, g})
 	}
 	return out
 }

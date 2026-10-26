@@ -1,7 +1,6 @@
 package intent
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"sort"
@@ -14,8 +13,8 @@ import (
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
-// DefaultHeadMoved is resume.head_moved when a manifest leaves it out: the generic sentence of resume.md.tmpl.
-const DefaultHeadMoved = "The head moved since the question: re-check what changed before acting on the answer."
+// DefaultChanged is resume.changed when a manifest leaves it out: the generic sentence of resume.md.tmpl.
+const DefaultChanged = "The head moved since the question: re-check what changed before acting on the answer."
 
 var (
 	defaultInputSurfaces = []string{"cli", "instructions"}
@@ -112,47 +111,56 @@ func orEmpty(v []string, def []string) []string {
 // define applies the manifest defaults and reports missing required keys.
 func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	d := dintent.Def{
-		Name:           name,
-		Label:          s.required("label", m.Label),
-		Summary:        s.required("summary", m.Summary),
-		Key:            m.Key,
-		Verb:           m.Verb,
-		UserFacing:     boolOr(m.UserFacing, true),
-		Provider:       s.defaults.Provider,
-		Context:        str(m.Context, "pr"),
-		Launch:         m.Launch,
-		Policy:         str(m.Policy, "round"),
-		Intake:         m.Intake,
-		OwnerOnly:      m.OwnerOnly,
-		Answerable:     boolOr(m.Answerable, true),
-		Board:          str(m.Board, "none"),
-		DrivesRow:      m.DrivesRow,
-		Reports:        boolOr(m.Reports, true),
-		Reconcile:      m.Reconcile,
-		Brief:          dintent.Brief{Render: true, Wait: true},
-		Dims:           orEmpty(m.Dims, nil),
-		Records:        s.pred("records", m.Records, "true"),
-		Prepare:        m.Prepare,
-		Effects:        orEmpty(m.OnSent, nil),
-		Guidance:       dintent.Guidance{Label: "Guidance"},
-		Resume:         dintent.Resume{HeadMoved: DefaultHeadMoved},
-		Runners:        s.modes(m.Modes),
-		Role:           m.Role,
-		Builds:         m.Builds,
-		Prompt:         m.Prompt,
-		Schema:         m.Schema,
-		AllowedEffects: orEmpty(m.DraftEffects, nil),
-		RoundKind:      m.RoundKind,
-		Cap:            m.Cap,
-		ReasonFact:     m.ReasonFact,
-		RefuseWhen:     m.RefuseWhen,
-		Reason:         m.Reason,
-		Skill:          m.Skill,
+		Name:       name,
+		Label:      s.required("label", m.Label),
+		Summary:    s.required("summary", m.Summary),
+		Key:        m.Shortcut,
+		Verb:       m.Verb,
+		UserFacing: boolOr(m.UserFacing, true),
+		Provider:   s.defaults.Provider,
+		Intake:     m.Intake,
+		OwnerOnly:  m.OwnerOnly,
+		Answerable: boolOr(m.Answerable, true),
+		Reports:    boolOr(m.Reports, true),
+		Brief:      dintent.Brief{Render: true, Wait: true},
+		Dims:       orEmpty(m.Dims, nil),
+		Records:    dintent.Pred{Src: "true", At: dintent.Pos{File: s.file}},
+		Effects:    orEmpty(m.Effects, nil),
+		Guidance:   dintent.Guidance{Label: "Guidance"},
+		Resume:     dintent.Resume{Changed: DefaultChanged},
+		Runners:    s.runners(m.Runners),
+		Role:       m.Role,
+		Builds:     m.Builds,
+		Prompt:     m.Prompt,
+		Schema:     m.Schema,
+		Skill:      m.Skill,
 	}
-	roleRound(&d)
+	if m.Why != nil {
+		d.Why = s.text("why", m.Why, "")
+	}
+	for i, r := range m.Refuse {
+		path := fmt.Sprintf("refuse[%d]", i)
+		var rf dintent.Refuse
+		if r.When == nil {
+			s.add(path+".when", "is required")
+		} else {
+			rf.When = s.pred(path+".when", r.When, "")
+		}
+		if r.Why == nil {
+			s.add(path+".why", "is required: the text the refusal says")
+		} else {
+			rf.Why = s.text(path+".why", r.Why, "")
+		}
+		d.Refuse = append(d.Refuse, rf)
+	}
+	bindRole(&d)
 	s.provider(&d, m.Provider)
-	d.DraftApproval = s.draftApproval(m.DraftApproval, builtin.ApprovalEnv(false, servedSlots(d)...))
+	if m.Drafts != nil {
+		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
+		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, builtin.ApprovalEnv(false, servedSlots(d)...))
+	}
 	s.workspace(&d, m.Workspace)
+	d.Board = builtin.BoardOf(d.Workspace)
 	d.StartLine = str(m.StartLine, "starting the "+strings.ToLower(d.Label))
 	if p := str(m.Profile, "none"); p != "none" {
 		d.Profile = p
@@ -184,11 +192,11 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		d.Headline = s.headline(m.Headline)
 	}
 	d.Inputs = s.inputs(m.Inputs)
-	for i, a := range m.AlsoProfiles {
-		path := fmt.Sprintf("also_profiles[%d]", i)
+	for i, a := range m.AlsoProfile {
+		path := fmt.Sprintf("also_profile[%d]", i)
 		ap := dintent.AlsoProfile{
 			Profile: s.required(path+".profile", a.Profile),
-			Round:   a.Round,
+			Dims:    a.Dims,
 			Define:  s.required(path+".define", a.Define),
 		}
 		if a.When == nil {
@@ -196,7 +204,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		} else {
 			ap.When = s.pred(path+".when", a.When, "")
 		}
-		ap.SourcePrefix = str(a.SourcePrefix, ap.Profile+" guide: ")
+		ap.Prefix = str(a.Prefix, ap.Profile+" guide: ")
 		d.AlsoProfiles = append(d.AlsoProfiles, ap)
 	}
 	d.Action = s.decodeAction(m.Action)
@@ -210,6 +218,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		if r.States == nil {
 			s.add("record.states", "is required")
 		}
+		d.Records = s.pred("record.when", r.When, "true")
 		d.Record = dintent.RecordRules{
 			States:          r.States,
 			Artifacts:       orEmpty(r.Artifacts, nil),
@@ -226,7 +235,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 		}
 	}
 	if m.Resume != nil {
-		d.Resume.HeadMoved = str(m.Resume.HeadMoved, DefaultHeadMoved)
+		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)
 	}
 	return d
 }
@@ -250,10 +259,10 @@ func (s *sheet) headline(h *mHeadline) dintent.Headline {
 		if c.When != nil {
 			cs.When = s.pred(path+".when", c.When, "")
 		}
-		if c.Text == nil {
-			s.add(path+".text", "is required")
+		if c.Line == nil {
+			s.add(path+".line", "is required")
 		} else {
-			cs.Text = s.text(path+".text", c.Text, "")
+			cs.Text = s.text(path+".line", c.Line, "")
 		}
 		out.New = append(out.New, cs)
 	}
@@ -288,13 +297,12 @@ func (s *sheet) inputs(in map[string]mInput) []dintent.Input {
 	return out
 }
 
-func roleRound(d *dintent.Def) {
-	r := builtin.RoleRounds[d.Role]
-	d.RoundKind = cmp.Or(d.RoundKind, r.RoundKind)
-	if d.RoundKind != "" {
-		r.Cap = builtin.CapRounds
-	}
-	d.Cap = cmp.Or(d.Cap, r.Cap)
+// bindRole sets what d's role implies: its round, the builtins its turns
+// run and whether they drive their workspace's row.
+func bindRole(d *dintent.Def) {
+	r, _ := builtin.RoleOf(d.Role)
+	d.RoundKind, d.Reconcile, d.Prepare, d.Launch = r.RoundKind, r.Reconcile, r.Prepare, r.Launch
+	d.Context, d.Policy, d.DrivesRow = r.Context, r.Policy, r.DrivesRow
 }
 
 // servedSlots are the workflow slots of the units d's turns run on.

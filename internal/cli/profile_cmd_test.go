@@ -28,7 +28,7 @@ func profileEnv(t *testing.T, files map[string]string) (*testEnv, string) {
 func TestProfileAddIsADryRunByDefault(t *testing.T) {
 	t.Parallel()
 	te, d := profileEnv(t, nil)
-	if code := te.run("profile", "add", "review,address", "--org", "globex", "--", "Every", "PR", "follows", "xyz."); code != 0 {
+	if code := te.run("profile", "add", "review,address", "--organization", "globex", "--", "Every", "PR", "follows", "xyz."); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	out := te.out.String()
@@ -42,7 +42,7 @@ func TestProfileAddIsADryRunByDefault(t *testing.T) {
 	}
 	te.out.Reset()
 	te.In = strings.NewReader("Every PR follows xyz.\n")
-	if code := te.run("profile", "add", "review", "--org", "globex", "--apply"); code != 0 {
+	if code := te.run("profile", "add", "review", "--organization", "globex", "--apply"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	raw, _ := os.ReadFile(filepath.Join(d, "organization=globex", "intent=review.md"))
@@ -79,12 +79,12 @@ func TestAddNormalizesTheTag(t *testing.T) {
 		{"--repo", "op", "--", "x"},
 		{"--tag", "colour=red", "--", "x"},
 		{"--tag", "change=rewrite", "--", "x"},
-		{"--round", "first", "--", "x"},
+		{"--stage", "first", "--", "x"},
 		{"--", "---", "x"},
 	} {
 		te.err.Reset()
 		intent := "review"
-		if args[0] == "--round" {
+		if args[0] == "--stage" {
 			intent = "address"
 		}
 		if code := te.run(append([]string{"profile", "add", intent}, args...)...); code != 1 {
@@ -105,7 +105,7 @@ func TestProfileWithoutAProfile(t *testing.T) {
 func TestProfileWhere(t *testing.T) {
 	t.Parallel()
 	te, d := profileEnv(t, map[string]string{"intent=review.md": "ROOT", "organization=acme/intent=review.md": "ACME", "user=ana/intent=review.md": "ANA"})
-	if code := te.run("profile", "where", "review", "--org", "acme", "--repo", "api"); code != 0 {
+	if code := te.run("profile", "where", "review", "--organization", "acme", "--repo", "api"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	out := te.out.String()
@@ -192,7 +192,7 @@ func TestAddFoldsTheAssociationAndRefusesASlash(t *testing.T) {
 		!strings.Contains(out, "+++ b/association=first-time-contributor/intent=review.md") {
 		t.Fatal(out)
 	}
-	for _, flag := range []string{"--org", "--user", "--team"} {
+	for _, flag := range []string{"--organization", "--user", "--team"} {
 		te.err.Reset()
 		if code := te.run("profile", "add", "review", flag, "a/b", "--", "x"); code != 1 || !strings.Contains(te.err.String(), "the value has no /") {
 			t.Errorf("%s a/b: exit %d: %s", flag, code, te.err)

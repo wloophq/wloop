@@ -21,9 +21,6 @@ type mApproval struct {
 	Rule   []mApprovalRule `toml:"rule"`
 }
 
-// mDraftApproval is an intent's draft approval table.
-type mDraftApproval = mApproval
-
 type mApprovalRule struct {
 	When   *string `toml:"when"`
 	Mode   *string `toml:"mode"`
@@ -34,11 +31,6 @@ var (
 	draftApprovalModes = []string{string(draft.Send), string(draft.Delay), string(draft.Wait), string(draft.DryRun)}
 	runApprovalModes   = []string{string(workflow.ApprovalRun), string(workflow.ApprovalDelay), string(workflow.ApprovalWait)}
 )
-
-// draftApproval is an intent's draft approval at draft_approval.
-func (s *sheet) draftApproval(m *mApproval, env expr.Env) *draft.Policy {
-	return s.draftApprovalAt("draft_approval", m, env)
-}
 
 // draftApprovalAt is the draft policy of m at at, its rules' when compiled
 // over env; nil when m is. A rule that releases while reading draft.delivery

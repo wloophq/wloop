@@ -8,7 +8,6 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -79,8 +78,8 @@ func (s *sheet) workspace(d *dintent.Def, v any) {
 	}
 }
 
-// validateKeys checks the keys that replace Go's switches on intent names,
-// the builder's and the drafts' allowlist.
+// validateKeys checks the keys that replace Go's switches on intent names
+// and the builder's.
 func (s *sheet) validateKeys(d dintent.Def) {
 	for _, p := range d.Providers {
 		if !dunit.ValidProvider(string(p)) && p != dintent.AnyProvider {
@@ -96,7 +95,7 @@ func (s *sheet) validateKeys(d dintent.Def) {
 		}
 	}
 	if d.Role != "" {
-		s.oneOf("role", d.Role, builtin.Roles)
+		s.oneOf("role", d.Role, builtin.RoleNames())
 	}
 	if d.Builds != "" {
 		s.oneOf("builds", d.Builds, builtin.Builds)
@@ -111,30 +110,6 @@ func (s *sheet) validateKeys(d dintent.Def) {
 			if v != "" {
 				s.add(k, "is read only with builds")
 			}
-		}
-	}
-	for i, e := range d.AllowedEffects {
-		if !slices.Contains(builtin.EffectNames(), e) {
-			s.add(fmt.Sprintf("draft_effects[%d]", i), "%q is not an effect; the effects are %s", e, quoted(builtin.EffectNames()))
-		}
-	}
-	if d.RoundKind != "" {
-		s.oneOf("round_kind", d.RoundKind, builtin.RoundKinds)
-	}
-	if d.Cap != "" {
-		s.oneOf("cap", d.Cap, builtin.Caps)
-	}
-	if d.Reason != "" {
-		s.oneOf("reason", d.Reason, builtin.TurnReasons)
-	}
-	if d.ReasonFact != "" {
-		if _, ok := builtin.FactType(d.ReasonFact); !ok {
-			s.add("reason_fact", "%s is no workflow fact", d.ReasonFact)
-		}
-	}
-	if d.RefuseWhen != "" {
-		if t, ok := builtin.FactType(d.RefuseWhen); !ok || t != expr.String {
-			s.add("refuse_when", "%s is no string workflow fact", d.RefuseWhen)
 		}
 	}
 }

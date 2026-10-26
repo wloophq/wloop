@@ -2,6 +2,7 @@ package intent
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,11 +21,9 @@ var (
 	titleRe     = regexp.MustCompile(`^[a-z]{1,12}$`)
 
 	strategies    = []string{"reuse_live", "new"}
-	boards        = []string{"review", "author", "none"}
-	inputTypes    = []string{"flag", "text", "list"}
+	inputTypes    = []string{"bool", "text", "list"}
 	inputFroms    = []string{"user", "prepare"}
 	inputSurfaces = []string{"cli", "instructions", "try"}
-	rounds        = []string{"", "first", "follow-up"}
 )
 
 func quoted(vs []string) string {
@@ -52,7 +51,7 @@ func (s *sheet) builtinRef(path string, slot builtin.Slot, v string) {
 	if slices.Contains(builtin.Names[slot], v) {
 		return
 	}
-	for _, other := range []builtin.Slot{builtin.SlotWorkspace, builtin.SlotLaunch, builtin.SlotPrepare, builtin.SlotBefore, builtin.SlotOnSent, builtin.SlotPolicy, builtin.SlotContext, builtin.SlotReconcile} {
+	for _, other := range []builtin.Slot{builtin.SlotWorkspace, builtin.SlotBefore} {
 		if v != "" && slices.Contains(builtin.Names[other], v) {
 			s.add(path, "%s belongs in %s, not in %s", v, other, slot)
 			return
@@ -61,19 +60,28 @@ func (s *sheet) builtinRef(path string, slot builtin.Slot, v string) {
 	s.add(path, "unknown %s builtin %q; the %s builtins are %s", slot, v, slot, quoted(builtin.Names[slot]))
 }
 
-// bundledOnlyKeys are the manifest keys only a bundled intent sets: the
-// probe's synthetic pull request, launch and policy, and the review's
-// reconcile, which an intent taking a bundled intent's role also sets
-// (crossCheck). The public schema leaves them out.
-var bundledOnlyKeys = []string{"context", "launch", "policy", "reconcile"}
-
-func (s *sheet) refuseBundledOnly(m manifest) {
-	set := map[string]bool{"context": m.Context != nil, "launch": m.Launch != "", "policy": m.Policy != nil, "reconcile": m.Reconcile != "" && m.Role == ""}
-	for _, k := range bundledOnlyKeys {
-		if set[k] {
-			s.add(k, "is reserved for the bundled intents")
+// effects checks the effects at path against the names applies allows,
+// and that an effect of one provider's is named only by its intents.
+func (s *sheet) effects(path string, d dintent.Def, names []string, applies builtin.Applies, allowed []string) {
+	for i, e := range names {
+		at := fmt.Sprintf("%s[%d]", path, i)
+		eff, ok := builtin.EffectOf(e)
+		switch {
+		case !ok || eff.Applies&applies == 0:
+			msg := fmt.Sprintf("%q is not one of %s", e, quoted(allowed))
+			if c := builtin.Closest(e, allowed); c != "" {
+				msg += fmt.Sprintf("; did you mean %q?", c)
+			}
+			s.add(at, "%s", msg)
+		case eff.Provider != "" && !onlyServes(d, eff.Provider):
+			s.add(at, "%s applies to %s units only; a %s intent cannot name it", e, eff.Provider, d.Provider)
 		}
 	}
+}
+
+// onlyServes says whether every unit d's turns run on is of p.
+func onlyServes(d dintent.Def, p dunit.ProviderID) bool {
+	return !slices.ContainsFunc(providersOf(d), func(q dunit.ProviderID) bool { return q != p })
 }
 
 // validate checks one manifest on its own; cross-manifest rules are in crossCheck.
@@ -98,25 +106,11 @@ func (s *sheet) validate(d dintent.Def) {
 	if d.Provider != "" && !dunit.ValidProvider(string(d.Provider)) {
 		s.add("provider", "%q is not a provider id: lowercase letters, digits, _ and -, starting with a letter", d.Provider)
 	}
-	if p, ok := builtin.ContextProviders[d.Context]; ok && d.Provider != p {
-		s.add("context", "%s is a %s unit; a %s intent cannot use it", d.Context, p, d.Provider)
+	if r, ok := builtin.RoleOf(d.Role); ok && r.Provider != "" && !onlyServes(d, r.Provider) {
+		s.add("role", "%s runs on %s units; a %s intent cannot hold it", d.Role, r.Provider, d.Provider)
 	}
-	if d.DrivesRow && !slices.Contains(builtin.RoundProviders, d.Provider) {
-		s.add("drives_row", "a held round drives a %s row; a %s intent cannot drive one", strings.Join(idsOf(builtin.RoundProviders), " or "), d.Provider)
-	}
-	if d.Bundled {
-		s.builtinRef("context", builtin.SlotContext, d.Context)
-		s.builtinRef("launch", builtin.SlotLaunch, d.Launch)
-		s.builtinRef("policy", builtin.SlotPolicy, d.Policy)
-		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
-	} else if d.Reconcile != "" {
-		s.builtinRef("reconcile", builtin.SlotReconcile, d.Reconcile)
-	}
-	s.builtinRef("prepare", builtin.SlotPrepare, d.Prepare)
-	for i, e := range d.Effects {
-		s.builtinRef(fmt.Sprintf("on_sent[%d]", i), builtin.SlotOnSent, e)
-	}
-	s.oneOf("board", d.Board, boards)
+	s.effects("effects", d, d.Effects, builtin.AppliesTurn, builtin.TurnEffectNames())
+	s.effects("drafts.allowed_effects", d, d.AllowedEffects, builtin.AppliesDraft, builtin.EffectNames())
 	s.eachOneOf("dims", d.Dims, builtin.IntentDims)
 	if d.Guidance.Max < 0 {
 		s.add("guidance.max", "must be 0 (no limit) or more")
@@ -125,7 +119,15 @@ func (s *sheet) validate(d dintent.Def) {
 	s.validateHeadline(d.Headline)
 	s.validateRecord(d)
 	for i, a := range d.AlsoProfiles {
-		s.oneOf(fmt.Sprintf("also_profiles[%d].round", i), a.Round, rounds)
+		for _, k := range slices.Sorted(maps.Keys(a.Dims)) {
+			path := fmt.Sprintf("also_profile[%d].dims.%s", i, k)
+			switch {
+			case !slices.Contains(builtin.IntentDims, k):
+				s.oneOf(path, k, builtin.IntentDims)
+			case k == dintent.DimStage:
+				s.oneOf(path, a.Dims[k], builtin.Stages)
+			}
+		}
 	}
 	if d.Skill && !d.UserFacing {
 		s.add("skill", "applies to user-facing intents only")
@@ -231,10 +233,7 @@ func (s *sheet) validateRecord(d dintent.Def) {
 
 // compile compiles every predicate of d in its slot.
 func (s *sheet) compile(d dintent.Def) Programs {
-	turn := builtin.Env(builtin.TurnSlot, d.Inputs)
-	if !slices.Contains(d.Dims, dintent.DimRound) {
-		delete(turn, "turn.stage")
-	}
+	turn := TurnEnv(d)
 	one := func(path string, p dintent.Pred, env expr.Env) *expr.Program {
 		prog, err := expr.Compile(p.Src, env)
 		if err != nil {
@@ -251,7 +250,10 @@ func (s *sheet) compile(d dintent.Def) Programs {
 		return prog
 	}
 	var ps Programs
-	ps.Records = one("records", d.Records, turn)
+	ps.Records = one("record.when", d.Records, turn)
+	for i, r := range d.Refuse {
+		ps.Refuse = append(ps.Refuse, one(fmt.Sprintf("refuse[%d].when", i), r.When, unitEnv(d)))
+	}
 	for i, c := range d.Headline.New {
 		if i == len(d.Headline.New)-1 {
 			ps.Headline = append(ps.Headline, nil)
@@ -264,18 +266,21 @@ func (s *sheet) compile(d dintent.Def) Programs {
 			ps.Also = append(ps.Also, nil)
 			continue
 		}
-		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profiles[%d].when", i), a.When, turn))
+		ps.Also = append(ps.Also, one(fmt.Sprintf("also_profile[%d].when", i), a.When, turn))
 	}
-	ps.ActionPrograms = compileAction(d.Action, func(path string, p dintent.Pred) *expr.Program {
+	ps.Action = compileAction(d.Action, func(path string, p dintent.Pred) *expr.Program {
 		return one(path, p, builtin.Env(builtin.ActionSlot, nil))
 	})
 	return ps
 }
 
-func idsOf(ps []dunit.ProviderID) []string {
-	out := make([]string, len(ps))
-	for i, p := range ps {
-		out[i] = string(p)
+// unitEnv is the env of a predicate over the workflow facts of the units
+// d's turns run on: each served slot's, with the brief's, trigger.* and
+// config.*.
+func unitEnv(d dintent.Def) expr.Env {
+	env := expr.Env{}
+	for _, slot := range servedSlots(d) {
+		maps.Copy(env, builtin.WorkflowEnv(slot))
 	}
-	return out
+	return env
 }

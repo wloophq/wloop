@@ -14,7 +14,7 @@ import (
 
 var todaysFacts = map[Dim]string{
 	DimOrganization: "pr.owner", DimRepo: "pr.repo_name", DimUser: "pr.author", DimTeam: "pr.requested_teams", DimAssociation: "pr.association",
-	DimLabel: "pr.labels", DimBase: "pr.base", DimRound: "turn.stage", DimReviewer: "pr.address.reviewers",
+	DimLabel: "pr.labels", DimBase: "pr.base", DimStage: "turn.stage", DimReviewer: "pr.address.reviewers",
 	DimKind: "brief.kind", DimSize: "brief.size", DimRisk: "brief.risk",
 }
 
@@ -42,14 +42,14 @@ func TestTodaysDimsResolveThroughFacts(t *testing.T) {
 			value = []string{v}
 		}
 		rel := string(d) + "=" + v + "/intent=address.md"
-		if d == DimRound {
+		if d == DimStage {
 			rel = string(d) + "=" + v + "/intent=review.md"
 		}
 		if d == DimRepo {
 			rel = "organization=acme/" + rel
 		}
 		kind := Address
-		if d == DimRound {
+		if d == DimStage {
 			kind = Review
 		}
 		tr := Tree{Blocks: []Block{block(bundled(), rel, "HIT", FrontMatter{})}}
@@ -95,7 +95,7 @@ func withDimFacts(t *testing.T, fs ...builtin.Fact) {
 const chat unit.ProviderID = "chat"
 
 var chatIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
+	{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
 	{Name: "triage", Profile: "triage", Provider: chat},
 })
 
@@ -154,9 +154,9 @@ func blockIn(intents *dintent.Registry, l Layer, rel, text string) Block {
 
 func TestSegLabelsComeFromTheProfile(t *testing.T) {
 	tr, _ := load(t, map[string]string{
-		LabelsFile:                           "[dims]\norganization = \"Org {value}\"\n\n[values]\n\"round=first\" = \"Primeira rodada\"\n",
+		LabelsFile:                           "[dims]\norganization = \"Org {value}\"\n\n[values]\n\"stage=first\" = \"Primeira rodada\"\n",
 		"organization=acme/intent=review.md": "ORG",
-		"round=first/intent=review.md":       "FIRST",
+		"stage=first/intent=review.md":       "FIRST",
 		"base=main/intent=review.md":         "BASE",
 		"tags/change=refac/intent=review.md": "TAG",
 	})
@@ -185,7 +185,7 @@ func TestTheBundledLabelsNameEveryAlias(t *testing.T) {
 }
 
 var briefIntents = dintent.NewRegistry([]dintent.Def{
-	{Name: "review", Profile: "review", Dims: []string{"round"}, Provider: unit.GitHub},
+	{Name: "review", Profile: "review", Dims: []string{"stage"}, Provider: unit.GitHub},
 	{Name: "triage", Profile: "triage", Provider: chat},
 	{Name: "brief", Builds: "brief", Provider: unit.GitHub, Extra: []jsonschema.Property{
 		{Name: "solution", Type: "string"},

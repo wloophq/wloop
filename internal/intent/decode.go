@@ -19,53 +19,51 @@ import (
 
 // manifest is intent.toml as written; a pointer marks a key whose absence matters.
 type manifest struct {
-	Label         *string           `toml:"label"`
-	Summary       *string           `toml:"summary"`
-	Key           string            `toml:"key"`
-	Verb          string            `toml:"verb"`
-	UserFacing    *bool             `toml:"user_facing"`
-	Workspace     any               `toml:"workspace"`
-	Provider      any               `toml:"provider"`
-	Session       *mSession         `toml:"session"`
-	Context       *string           `toml:"context"`
-	Launch        string            `toml:"launch"`
-	Policy        *string           `toml:"policy"`
-	Intake        bool              `toml:"intake"`
-	StartLine     *string           `toml:"start_line"`
-	OwnerOnly     bool              `toml:"owner_only"`
-	Answerable    *bool             `toml:"answerable"`
-	Board         *string           `toml:"board"`
-	DrivesRow     bool              `toml:"drives_row"`
-	Reports       *bool             `toml:"reports"`
-	Reconcile     string            `toml:"reconcile"`
-	Brief         *mBrief           `toml:"brief"`
-	Profile       *string           `toml:"profile"`
-	Dims          []string          `toml:"dims"`
-	Records       *string           `toml:"records"`
-	Prepare       string            `toml:"prepare"`
-	OnSent        []string          `toml:"on_sent"`
-	Guidance      *mGuidance        `toml:"guidance"`
-	Headline      *mHeadline        `toml:"headline"`
-	Inputs        map[string]mInput `toml:"inputs"`
-	AlsoProfiles  []mAlsoProfile    `toml:"also_profiles"`
-	Action        *mAction          `toml:"action"`
-	Join          *mJoin            `toml:"join"`
-	Record        *mRecord          `toml:"record"`
-	Resume        *mResume          `toml:"resume"`
-	DraftApproval *mDraftApproval   `toml:"draft_approval"`
-	Modes         []string          `toml:"modes"`
-	Role          string            `toml:"role"`
-	Builds        string            `toml:"builds"`
-	Prompt        string            `toml:"prompt"`
-	Schema        string            `toml:"schema"`
-	DraftEffects  []string          `toml:"draft_effects"`
-	RoundKind     string            `toml:"round_kind"`
-	Cap           string            `toml:"cap"`
-	ReasonFact    string            `toml:"reason_fact"`
-	RefuseWhen    string            `toml:"refuse_when"`
-	Reason        string            `toml:"reason"`
-	Skill         bool              `toml:"skill"`
-	Help          *mHelp            `toml:"help"`
+	Label       *string           `toml:"label"`
+	Summary     *string           `toml:"summary"`
+	Shortcut    string            `toml:"shortcut"`
+	Verb        string            `toml:"verb"`
+	UserFacing  *bool             `toml:"user_facing"`
+	Workspace   any               `toml:"workspace"`
+	Provider    any               `toml:"provider"`
+	Session     *mSession         `toml:"session"`
+	Intake      bool              `toml:"intake"`
+	StartLine   *string           `toml:"start_line"`
+	OwnerOnly   bool              `toml:"owner_only"`
+	Answerable  *bool             `toml:"answerable"`
+	Reports     *bool             `toml:"reports"`
+	Brief       *mBrief           `toml:"brief"`
+	Profile     *string           `toml:"profile"`
+	Dims        []string          `toml:"dims"`
+	Effects     []string          `toml:"effects"`
+	Why         *string           `toml:"why"`
+	Refuse      []mRefuse         `toml:"refuse"`
+	Drafts      *mDrafts          `toml:"drafts"`
+	Guidance    *mGuidance        `toml:"guidance"`
+	Headline    *mHeadline        `toml:"headline"`
+	Inputs      map[string]mInput `toml:"inputs"`
+	AlsoProfile []mAlsoProfile    `toml:"also_profile"`
+	Action      *mAction          `toml:"action"`
+	Join        *mJoin            `toml:"join"`
+	Record      *mRecord          `toml:"record"`
+	Resume      *mResume          `toml:"resume"`
+	Runners     []string          `toml:"runners"`
+	Role        string            `toml:"role"`
+	Builds      string            `toml:"builds"`
+	Prompt      string            `toml:"prompt"`
+	Schema      string            `toml:"schema"`
+	Skill       bool              `toml:"skill"`
+	Help        *mHelp            `toml:"help"`
+}
+
+type mRefuse struct {
+	When *string `toml:"when"`
+	Why  *string `toml:"why"`
+}
+
+type mDrafts struct {
+	AllowedEffects []string   `toml:"allowed_effects"`
+	Approval       *mApproval `toml:"approval"`
 }
 
 type mHelp struct {
@@ -101,7 +99,7 @@ type mHeadline struct {
 
 type mCase struct {
 	When *string `toml:"when"`
-	Text *string `toml:"text"`
+	Line *string `toml:"line"`
 }
 
 type mInput struct {
@@ -118,11 +116,11 @@ type mInput struct {
 }
 
 type mAlsoProfile struct {
-	Profile      *string `toml:"profile"`
-	When         *string `toml:"when"`
-	Round        string  `toml:"round"`
-	Define       *string `toml:"define"`
-	SourcePrefix *string `toml:"source_prefix"`
+	Profile *string           `toml:"profile"`
+	When    *string           `toml:"when"`
+	Dims    map[string]string `toml:"dims"`
+	Define  *string           `toml:"define"`
+	Prefix  *string           `toml:"prefix"`
 }
 
 type mJoin struct {
@@ -130,6 +128,7 @@ type mJoin struct {
 }
 
 type mRecord struct {
+	When            *string    `toml:"when"`
 	States          []string   `toml:"states"`
 	Artifacts       []string   `toml:"artifacts"`
 	Outcome         []string   `toml:"outcome"`
@@ -145,27 +144,27 @@ type mRequire struct {
 }
 
 type mResume struct {
-	HeadMoved *string `toml:"head_moved"`
+	Changed *string `toml:"changed"`
 }
 
-// turnModes are the turn.Mode values a manifest's modes take.
-var turnModes = []string{"session", "headless"}
+// runners are the turn.Runner values a manifest's runners take.
+var runners = []string{"session", "headless"}
 
-func (s *sheet) modes(m []string) []string {
+func (s *sheet) runners(m []string) []string {
 	if m == nil {
 		return nil
 	}
 	if len(m) == 0 {
-		s.add("modes", "lists at least one of %s", quoted(turnModes))
+		s.add("runners", "lists at least one of %s", quoted(runners))
 		return nil
 	}
 	for i, v := range m {
 		switch {
-		case !slices.Contains(turnModes, v):
-			s.oneOf(fmt.Sprintf("modes[%d]", i), v, turnModes)
+		case !slices.Contains(runners, v):
+			s.oneOf(fmt.Sprintf("runners[%d]", i), v, runners)
 			return nil
 		case slices.Contains(m[:i], v):
-			s.add(fmt.Sprintf("modes[%d]", i), "repeats %q", v)
+			s.add(fmt.Sprintf("runners[%d]", i), "repeats %q", v)
 			return nil
 		}
 	}

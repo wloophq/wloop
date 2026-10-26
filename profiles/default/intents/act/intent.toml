@@ -1,13 +1,15 @@
 label   = "Act"
 summary = "Act on the open items of a unit: resolve what you can, and propose the replies it needs as drafts for you to approve"
 verb    = "delegate"
-role    = "headless.default"
-workspace = "pr_else_main"
+role    = "headless"
+workspace = "linked_else_main"
 provider  = "any"
-modes     = ["headless", "session"]
+runners   = ["headless", "session"]
 session   = { strategy = "new", title = "act", close_when_done = true }
 brief     = { render = true, wait = false }
-draft_effects = ["entry.nudged", "unit.closed"]
+
+[drafts]
+allowed_effects = ["entry.nudged", "unit.closed"]
 
 [help]
 target   = "a pull request URL, a Slack message permalink or <provider>:<key> of a unit the intent serves"
@@ -20,9 +22,9 @@ docs     = "concepts/gtd"
 help = "what to do about the items"
 
 [headline]
-resumed = "act on {{.Wording.Ref}}"
+resumed = "act on {{.unit.ref}}"
 [[headline.new]]
-text = "Act on the open items of {{.Wording.Ref}}, {{.Who}}."
+line = 'Act on the open items of {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
 note = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval{{if .row.recommended}} (recommended: {{.row.recommended}}){{end}}"

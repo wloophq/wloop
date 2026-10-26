@@ -377,7 +377,7 @@ func (f *fixture) turn(repo *sqlite.Store, n int, intent turn.Intent, state turn
 	f.t.Helper()
 	at := fixtureNow.Add(-30 * time.Minute)
 	ref := pr.Ref(ref(n))
-	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: intent, Role: "round." + string(intent), ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h", Session: session,
+	b := turn.Book{Unit: ref.Unit(), Turns: []turn.Turn{{Intent: intent, Role: "pr." + string(intent), ID: "r" + strconv.Itoa(n), Trigger: turn.Automated, Head: "h", Session: session,
 		State: state, SentAt: at, StartedAt: at}}}
 	if state != turn.Started {
 		b.Records = []turn.Record{{Session: session, Hash: "x", At: at, Record: record.Record{State: record.State(state), Summary: "keep it?"}}}
