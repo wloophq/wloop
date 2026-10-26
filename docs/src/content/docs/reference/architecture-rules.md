@@ -158,7 +158,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/serve_plugins.go` `withoutGitHub` `unit.GitHub` `1` | 🧾 | the GitHub facilities the daemon holds go with the GitHub plugin |
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |
 | `internal/cli/sweepinputs.go` `storeInputs.Viewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
-| `internal/cli/targets.go` `Env.providerIDs` `unit.GitHub` `1` | 🧾 | GitHub's provider listed before the plugins |
 | `internal/cli/turn.go` `Env.storedViewer` `unit.GitHub` `1` | 🧾 | the GitHub viewer read outside the plugin |
 | `internal/core/turns/headless.go` `entryInput` `"entry"` `1` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |

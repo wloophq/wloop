@@ -32,13 +32,11 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
-// providerIDs are the providers of the compiled-in plugins and GitHub.
+// providerIDs are the providers of the compiled-in plugins.
 func (e *Env) providerIDs() []unit.ProviderID {
-	out := []unit.ProviderID{unit.GitHub}
+	var out []unit.ProviderID
 	for _, p := range e.sourcePlugins() {
-		if !slices.Contains(out, p.ID) {
-			out = append(out, p.ID)
-		}
+		out = append(out, p.ID)
 	}
 	return out
 }

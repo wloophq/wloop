@@ -89,7 +89,6 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/cli/serve_payloads.go", "Env.payloadReaders", "unit.GitHub", 1, "debt: GitHub's payload reader, wired outside the plugin's Payload"},
 	{"internal/cli/serve_plugins.go", "withoutGitHub", "unit.GitHub", 1, "debt: the GitHub facilities the daemon holds go with the GitHub plugin"},
 	{"internal/cli/storedfacts.go", "storedFacts.Facts", "unit.GitHub", 1, "debt: the stored facts of a pull request's turn"},
-	{"internal/cli/targets.go", "Env.providerIDs", "unit.GitHub", 1, "debt: GitHub's provider listed before the plugins"},
 	{"skills/skills.go", "Bundled", "unit.GitHub", 1, "debt: a turn skill takes a pull request's URL"},
 	{"internal/meter/meter.go", "GitHub", `"github"`, 1, "the meter's resource of a GitHub API request, not a unit provider"},
 }
