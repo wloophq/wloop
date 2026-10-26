@@ -100,6 +100,9 @@ func (s *sheet) validate(d dintent.Def) {
 	if r, ok := builtin.RoleOf(d.Role); ok && r.Provider != "" && !onlyServes(d, r.Provider) {
 		s.add("role", "%s runs on %s units; a %s intent cannot hold it", d.Role, r.Provider, d.Provider)
 	}
+	if r, ok := builtin.RoleOf(d.Role); ok && r.Workspace != "" && d.Workspace != r.Workspace {
+		s.add("workspace", "%s runs in %s workspaces: an intent holding it names workspace = %q", d.Role, r.Workspace, r.Workspace)
+	}
 	s.effects("effects", d, d.Effects, builtin.AppliesTurn, builtin.TurnEffectNames())
 	s.effects("drafts.allowed_effects", d, d.AllowedEffects, builtin.AppliesDraft, builtin.EffectNames())
 	if d.Guidance.Max < 0 {

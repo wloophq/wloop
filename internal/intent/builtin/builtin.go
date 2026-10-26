@@ -25,9 +25,16 @@ const (
 // else in the repository's main checkout.
 const WorkspaceLinkedElseMain = "linked_else_main"
 
+// The workspaces of a round on someone else's pull request and on one you
+// develop.
+const (
+	WorkspaceReview = "review"
+	WorkspaceAuthor = "author"
+)
+
 // Names are the builtins a manifest names, by the key that names them.
 var Names = map[Slot][]string{
-	SlotWorkspace: {"review", "author", WorkspaceLinkedElseMain, "given"},
+	SlotWorkspace: {WorkspaceReview, WorkspaceAuthor, WorkspaceLinkedElseMain, "given"},
 	SlotBefore:    {"take_over"},
 }
 

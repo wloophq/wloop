@@ -1,6 +1,6 @@
 label = "Ask author"
 summary = "Ask the author one question"
-workspace = "given"
+workspace = "review"
 provider = "thread"
 session = { strategy = "new", title = "ask" }
 role = "pr.review"

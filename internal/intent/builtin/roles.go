@@ -58,6 +58,8 @@ type Role struct {
 	RoundKind string
 	// Reconcile, Prepare, Launch: builtins its turns run; "" none.
 	Reconcile, Prepare, Launch string
+	// Workspace is the workspace builtin its holder names; "" any.
+	Workspace string
 	// Context is what its turn is about; Policy the agent policy of its
 	// sessions.
 	Context, Policy string
@@ -68,10 +70,10 @@ type Role struct {
 
 // Roles are what Go resolves an intent by, a manifest's role.
 var Roles = []Role{
-	{Name: RoleReview, Doc: "The review round on someone else's pull request: first or follow-up, reconciled with the review you published; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindReview, Reconcile: ReconcileMyReview, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
-	{Name: RoleAddress, Doc: "The address round on a pull request you develop: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.",
-		Provider: unit.GitHub, RoundKind: RoundKindAddress, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
+	{Name: RoleReview, Doc: "The review round on someone else's pull request, in its review workspace: first or follow-up, reconciled with the review you published; it drives its workspace's row.",
+		Provider: unit.GitHub, RoundKind: RoundKindReview, Reconcile: ReconcileMyReview, Workspace: WorkspaceReview, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
+	{Name: RoleAddress, Doc: "The address round on a pull request you develop, in its author workspace: its reviews, failing checks and conflicts; its instructions say why it is due; it drives its workspace's row.",
+		Provider: unit.GitHub, RoundKind: RoundKindAddress, Workspace: WorkspaceAuthor, Context: ContextPR, Policy: PolicyRound, DrivesRow: true},
 	{Name: RoleNudge, Doc: "The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.",
 		Provider: unit.GitHub, Prepare: PrepareNudge, Context: ContextPR, Policy: PolicyRound},
 	{Name: RoleProbe, Doc: "The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.",
