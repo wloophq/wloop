@@ -330,7 +330,7 @@ func (d Deriver) AddActivity(p *Payload, a inventory.Activity) {
 
 // BriefSummary is the row's view of a brief.
 func BriefSummary(b brief.Summary) *api.BriefSummary {
-	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags}
+	return &api.BriefSummary{Kind: b.Kind, Size: b.Size, Risk: b.Risk, Goal: termfmt.OneLine(b.Goal, 300), OpenQuestions: b.OpenQuestions, Tags: b.Tags, Extra: b.Extra}
 }
 
 func (d Deriver) approved(pr dinv.PR, evs []dinv.Event, r api.Row, p Payload) bool {

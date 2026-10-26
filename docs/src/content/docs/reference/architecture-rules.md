@@ -122,5 +122,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `coreProviderAllowlist` entry | Status | Reason |
 |---|---|---|
 | `internal/core/port/port.go` `unit.GitHub` | 🧾 | PROf reads a pull request from a github event; a pluginDebt edge |
+| `internal/core/turns/headless.go` `"entry"` | ✅ | the headless turn's entry input, which shares the entry provider's spelling |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.

@@ -26,7 +26,7 @@ var (
 	workflowNameRe   = regexp.MustCompile(`^[a-z][a-z0-9-]{1,39}$`)
 	approvalOutcomes = []string{string(workflow.OutcomeRun), string(workflow.OutcomeWait)}
 	workflowModes    = []string{string(workflow.ModeObserve), string(workflow.ModeApply)}
-	timeVarying      = []string{"pr.silent_days"}
+	timeVarying      = []string{"pr.silent_days", "entry.waiting_days", "slack.items_unowned_age_days"}
 )
 
 // wManifest is workflow.toml as written; a step is a table of its use and its arguments.

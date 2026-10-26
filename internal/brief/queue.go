@@ -780,6 +780,8 @@ type Summary struct {
 	OpenQuestions int    `json:"open_questions"`
 	// Tags are the brief's key:value tags, sorted.
 	Tags []string `json:"tags"`
+	// Extra are the brief intent's extra fields the brief holds, by name.
+	Extra map[string]any `json:"extra,omitempty"`
 }
 
 // Briefed reads every brief record in one query, with the summary of each

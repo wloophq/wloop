@@ -211,9 +211,11 @@ type Turn struct {
 	Agent        string `json:"agent,omitempty"`
 	BriefRun     int64  `json:"brief_run,omitempty"`
 	AgentSession string `json:"agent_session,omitempty"`
-	// Mode is "" for a session turn; Workflow the workflow that started it.
+	// Mode is "" for a session turn; Workflow the workflow that started it;
+	// Role the role its intent held.
 	Mode     string `json:"mode,omitempty"`
 	Workflow string `json:"workflow,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
 type TurnRecord struct {
@@ -311,6 +313,8 @@ type BriefSummary struct {
 	Goal          string   `json:"goal"`
 	OpenQuestions int      `json:"open_questions"`
 	Tags          []string `json:"tags,omitempty"`
+	// Extra are the brief intent's extra fields, by name.
+	Extra map[string]any `json:"extra,omitempty"`
 }
 
 type Brief struct {

@@ -68,6 +68,9 @@ type Turn struct {
 	Mode Mode `json:",omitempty"`
 	// Workflow is the workflow whose turn.start step started it, "" none.
 	Workflow string `json:",omitempty"`
+	// Role is the role its intent held when it was sent, so the history
+	// reads by role whatever the intent is named; "" none.
+	Role string `json:",omitempty"`
 }
 
 type Mode string

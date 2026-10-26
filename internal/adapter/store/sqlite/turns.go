@@ -187,7 +187,7 @@ func loadBooks(ctx context.Context, tx *sql.Tx, units []unit.Unit) (map[unit.Uni
 
 const (
 	bookTurnsSQL = `SELECT provider, unit_key, seq, intent, turn_id, trigger, guidance, head, sent_to, session, state, sent_at, started_at, ended_at, resume_of, replaced_by, prior_state,
-		agent, brief_run, agent_session, inputs, mode, workflow FROM turns%s ORDER BY provider, unit_key, seq`
+		agent, brief_run, agent_session, inputs, mode, workflow, role FROM turns%s ORDER BY provider, unit_key, seq`
 	bookRecordsSQL = `SELECT provider, unit_key, id, turn_seq, session, agent_session, head, hash, at, acked, record
 		FROM turn_records%s ORDER BY provider, unit_key, id`
 	bookAnswersSQL = `SELECT provider, unit_key, id, turn_seq, at, text, source, option_id, yes, no, route, session
@@ -226,7 +226,7 @@ func loadChunk(ctx context.Context, tx *sql.Tx, provider unit.ProviderID, keys [
 		var t turn.Turn
 		var sent, started, ended, inputs, mode string
 		if err := rows.Scan(&r.Provider, &r.Key, &t.Seq, &t.Intent, &t.ID, &t.Trigger, &t.Guidance, &t.Head, &t.SentTo, &t.Session, &t.State, &sent, &started, &ended, &t.ResumeOf, &t.ReplacedBy, &t.Before,
-			&t.Agent, &t.BriefRun, &t.AgentSession, &inputs, &mode, &t.Workflow); err != nil {
+			&t.Agent, &t.BriefRun, &t.AgentSession, &inputs, &mode, &t.Workflow, &t.Role); err != nil {
 			return err
 		}
 		t.Mode = turn.Mode(mode)
@@ -410,7 +410,7 @@ func turnColumns(t turn.Turn) ([]any, string, error) {
 		return nil, "", err
 	}
 	return []any{string(t.Intent), t.ID, string(t.Trigger), t.Guidance, t.Head, t.SentTo, t.Session, string(t.State),
-		formatTime(t.SentAt), formatTime(t.StartedAt), formatTime(t.EndedAt), t.ResumeOf, t.ReplacedBy, string(t.Before), t.Agent, t.BriefRun, t.AgentSession, inputs, string(t.Mode), t.Workflow}, inputs, nil
+		formatTime(t.SentAt), formatTime(t.StartedAt), formatTime(t.EndedAt), t.ResumeOf, t.ReplacedBy, string(t.Before), t.Agent, t.BriefRun, t.AgentSession, inputs, string(t.Mode), t.Workflow, t.Role}, inputs, nil
 }
 
 // storedTurn is t as a reload would return it.
@@ -465,7 +465,7 @@ func saveBook(ctx context.Context, tx *Tx, ref unit.Unit, stored, b turn.Book) (
 				continue
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE turns SET intent = ?, turn_id = ?, trigger = ?, guidance = ?, head = ?, sent_to = ?, session = ?, state = ?,
-				sent_at = ?, started_at = ?, ended_at = ?, resume_of = ?, replaced_by = ?, prior_state = ?, agent = ?, brief_run = ?, agent_session = ?, inputs = ?, mode = ?, workflow = ? WHERE seq = ? AND provider = ? AND unit_key = ?`,
+				sent_at = ?, started_at = ?, ended_at = ?, resume_of = ?, replaced_by = ?, prior_state = ?, agent = ?, brief_run = ?, agent_session = ?, inputs = ?, mode = ?, workflow = ?, role = ? WHERE seq = ? AND provider = ? AND unit_key = ?`,
 				append(cols, t.Seq, string(ref.Provider), ref.Key)...); err != nil {
 				return turn.Book{}, false, err
 			}
@@ -474,7 +474,7 @@ func saveBook(ctx context.Context, tx *Tx, ref unit.Unit, stored, b turn.Book) (
 			continue
 		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO turns (provider, unit_key, intent, turn_id, trigger, guidance, head, sent_to, session, state, sent_at, started_at, ended_at, resume_of, replaced_by, prior_state,
-			agent, brief_run, agent_session, inputs, mode, workflow) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
+			agent, brief_run, agent_session, inputs, mode, workflow, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, append([]any{string(ref.Provider), ref.Key}, cols...)...)
 		if err != nil {
 			return turn.Book{}, false, err
 		}

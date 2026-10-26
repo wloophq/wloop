@@ -60,7 +60,7 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 
 ## Workflow facts
 
-A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `config.*` and `now`. `{{command}} workflows facts [github|session|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; in an intent it is the repository name.
+A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `config.*` and `now`; a subject whose units have a brief also reads `brief.*`, and `[withdraw] when` also reads `draft.*`. `{{command}} workflows facts [entry|github|session|slack|workspace]` prints them. In a workflow, `pr.repo` is `owner/repo`; in an intent it is the repository name.
 
 | `pr` fact (subject `github`) | Type | Meaning |
 |---|---|---|
@@ -155,6 +155,56 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `workspace.fingerprint` | string | The worktree path and its head. |
 | `workspace.repo` | string | owner/repo; empty when unknown. |
 
+| `entry` fact (subject `entry`) | Type | Meaning |
+|---|---|---|
+| `entry.id` | string | The entry's id. |
+| `entry.kind` | string | The entry's kind, such as action, waiting, close, message, capture or project. |
+| `entry.state` | string | The entry's state: inbox, next, waiting, scheduled, someday, reference, done or trash. |
+| `entry.waiting_on` | list | The person keys the entry waits on, such as slack:U0123. |
+| `entry.resurface_at` | timestamp | When the entry resurfaces; zero when it has no date. |
+| `entry.waiting_days` | int | Working days the entry has waited, in the configured location, as the GTD rules count them. |
+| `entry.since_nudge` | duration | Time since the entry's last nudge; very large when it was never nudged. |
+| `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then proposals.renudge_after after the last nudge; zero when the entry is not stalled. |
+| `entry.muted` | bool | The entry is muted. |
+| `entry.unit` | string | The entry's unit as provider:key; empty for an entry with none. |
+| `entry.unit_provider` | string | The provider of the entry's unit; empty for an entry with none. |
+| `entry.unit_started_by_me` | bool | The viewer started the entry's unit, from the facts GTD receives. |
+| `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. |
+| `entry.items_open` | int | Open items of the entry whose unit is the entry's unit. |
+| `entry.items_resolved` | int | Resolved items of the entry whose unit is the entry's unit. |
+| `entry.items_held` | int | Items of the entry's unit the waited people hold: open, assigned to or waited on from them. |
+| `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
+| `entry.fingerprint` | string | The entry's id, state and update time. |
+
+| `slack` fact (subject `slack`) | Type | Meaning |
+|---|---|---|
+| `slack.channel` | string | The conversation's channel id. |
+| `slack.conversation` | string | The conversation's kind: channel, dm or group. |
+| `slack.started_by_me` | bool | The viewer started the thread. |
+| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. |
+| `slack.live_entry` | bool | An entry of the unit is open: neither done nor in the trash. |
+| `slack.items_open` | int | Open items whose unit is this unit. |
+| `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. |
+| `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. |
+| `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. |
+| `slack.fingerprint` | string | The unit, its newest message and the update time of its items. |
+
+| `brief` fact | Type | Meaning |
+|---|---|---|
+| `brief.goal` | string | The brief's goal; empty when the unit has no brief. |
+| `brief.risk` | string | The brief's risk: low, medium or high. |
+| `brief.kind` | string | The brief's kind, from the provider's taxonomy. |
+| `brief.size` | string | The brief's size; GitHub briefs only. |
+| `brief.tags` | list | The brief's normalized key:value tags. |
+| `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. |
+
+| `draft` fact | Type | Meaning |
+|---|---|---|
+| `draft.person_waited` | bool | The draft's person is still waited on by its entry; true for a draft of no person. |
+| `draft.items_held` | int | Items of the draft still open and held by its person, or unowned for a draft of no person. |
+| `draft.items_owned` | int | Items of the draft that gained an owner since it was proposed. |
+| `draft.subject_open` | bool | The draft's subject still exists: its entry is neither done nor in the trash, or its unit is stored. |
+
 | `trigger` fact | Type | Meaning |
 |---|---|---|
 | `trigger.kind` | string | sweep, event or schedule. |
@@ -171,6 +221,9 @@ A workflow's `when` reads the facts of its subject's slot, plus `trigger.*`, `co
 | `config.cleanup.manual_idle` | duration | The cleanup.manual_idle setting. |
 | `config.cleanup.stale_workspace` | duration | The cleanup.stale_workspace setting. |
 | `config.nudge.silent_days` | int | The nudge.silent_days setting, in calendar days. |
+| `config.gtd.stale_waiting_days` | int | The gtd.stale_waiting_days setting, in working days. |
+| `config.proposals.renudge_after` | duration | The proposals.renudge_after setting. |
+| `config.turns.automated_per_day` | int | The turns.automated_per_day setting: automated turns on units other than pull requests, all workflows together. |
 
 ## Workflow steps
 
@@ -184,8 +237,19 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `turn.dismiss` | session, github | Dismisses the open turn, recording the reason. |
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
-| `turn.start` | github | Starts a turn: `intent`, and `round` (`first` or `follow-up`) for a review. Caps, the brief, busy and held checks apply as for any automatic round. |
+| `turn.start` | any | Starts a turn of `intent` on the subject, which the intent must serve; `round` (`first` or `follow-up`) for a review; `mode` (`session` or `headless`), by default the intent's first mode. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.automated_per_day`. |
+| `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`subject` or `person`), `target` (`unit` or `item`), `on_posted` (effects, comma-separated), `hold` (a duration after a draft settled) and `hold_after_sent` (a duration, or `forever`). Holds while a draft of the workflow, subject and person is open or failed. |
 | `classify` | any | A headless classification whose output becomes facts. Event triggers only, cached by fingerprint, under `classify.daily_cap`. |
 | `notify.self` | any | A private notification. |
+
+## Draft effects
+
+What a sent draft applies, once: the names a `draft.propose` step lists in `on_posted` and an intent lists in `draft_effects`.
+
+| Effect | Unit | Does |
+|---|---|---|
+| `entry.nudged` | any | Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none. |
+| `unit.closed` | any | Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin. |
+| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads; applied by the GitHub publisher as it posts. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.
