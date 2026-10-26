@@ -3,8 +3,8 @@
 #
 # Prints the packages CI tests in a shard. The rest shard takes every package
 # the named shards leave out, so a new package is never skipped. check fails
-# unless the test-shard matrices of ci.yml and cache.yml list exactly these
-# shards and every package falls in exactly one of them.
+# unless the test-shard and brand matrices of ci.yml and cache.yml list exactly
+# these shards and every package falls in exactly one of them.
 set -euo pipefail
 
 named="daemon store cli sources"
@@ -32,8 +32,8 @@ check() {
 	want="shard: [${named// /, }, rest]"
 	for workflow in .github/workflows/ci.yml .github/workflows/cache.yml; do
 		got=$(grep -o 'shard: \[.*\]' "$workflow")
-		if [ "$got" != "$want" ]; then
-			echo "$workflow has \"$got\", want \"$want\"" >&2
+		if [ "$got" != "$want"$'\n'"$want" ]; then
+			echo "$workflow has \"$got\", want \"$want\" in its test-shard and brand jobs" >&2
 			return 1
 		fi
 	done

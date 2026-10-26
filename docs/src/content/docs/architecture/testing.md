@@ -3,7 +3,7 @@ title: Testing
 description: Fakes and contracts, goldens, budgets, the brand build and the architecture tests that keep the boundaries.
 ---
 
-`make test` runs `go test -race ./...`; `make lint` runs gofmt and golangci-lint. Both pass before a pull request. CI splits the tests into shards that `scripts/test-shard.sh` names; a new package falls in the `rest` shard, and `scripts/test-shard.sh check` fails when the matrices of `ci.yml` and `cache.yml` drift from the script.
+`make test` runs `go test -race ./...`; `make lint` runs gofmt and golangci-lint. Both pass before a pull request. CI splits the tests into shards that `scripts/test-shard.sh` names; a new package falls in the `rest` shard, and `scripts/test-shard.sh check` fails when the test and brand matrices of `ci.yml` and `cache.yml` drift from the script.
 
 ## Fakes and contracts
 
@@ -31,7 +31,7 @@ Tests never touch your home, your agent homes, your workspaces or GitHub: they r
 
 ## The brand
 
-Every user-visible name comes from `internal/brand`. `make test-brand` runs the suite built with a test product name, and `make scan-brand` builds with it and fails when anything the program writes spells the default name.
+Every user-visible name comes from `internal/brand`. `make test-brand` runs the suite built with a test product name, without `-race`, which `make test` already covers; `SHARD=<name>` limits it to one shard, as CI runs it. `make scan-brand` builds with the test name and fails when anything the program writes spells the default name.
 
 ## The architecture tests
 
