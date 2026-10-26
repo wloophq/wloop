@@ -149,14 +149,17 @@ func checkRecord(record *template.Template, c Context) []intentload.Problem {
 	if err := record.Execute(&b, c); err != nil {
 		return nil
 	}
-	var out []intentload.Problem
+	var missing []string
 	for _, must := range recordProtocol {
 		if !strings.Contains(b.String(), must) {
-			out = append(out, intentload.Problem{File: record.Tree.ParseName, Line: 1, Col: 1,
-				Msg: fmt.Sprintf("the record partial does not say %q, which the record protocol needs: an agent could not end its turn", strings.TrimSpace(must))})
+			missing = append(missing, strconv.Quote(strings.TrimSpace(must)))
 		}
 	}
-	return out
+	if len(missing) == 0 {
+		return nil
+	}
+	return []intentload.Problem{{File: record.Tree.ParseName, Line: 1, Col: 1,
+		Msg: fmt.Sprintf("the record partial does not say %s, which the record protocol needs: an agent could not end its turn", strings.Join(missing, ", "))}}
 }
 
 // calls says whether the tree under n invokes the template name.

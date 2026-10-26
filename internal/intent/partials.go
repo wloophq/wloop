@@ -81,11 +81,14 @@ func (r revertedPartials) breaking(layers []profile.Layer, problems Problems) bo
 			continue
 		}
 		for _, p := range problems {
-			if p.File == f.Path || strings.HasPrefix(p.Msg, f.Path+":") {
-				r[f.Path] = append(r[f.Path], Problem{File: p.File, Line: p.Line, Col: p.Col, Field: p.Field,
-					Msg: fmt.Sprintf("%s; the bundled partials load instead", p.Msg)})
-				added = true
+			if p.File != f.Path && !strings.HasPrefix(p.Msg, f.Path+":") {
+				continue
 			}
+			p.Msg = fmt.Sprintf("%s; the bundled partials load instead", p.Msg)
+			if !slices.Contains(r[f.Path], p) {
+				r[f.Path] = append(r[f.Path], p)
+			}
+			added = true
 		}
 	}
 	return added
