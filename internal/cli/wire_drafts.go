@@ -18,6 +18,13 @@ import (
 // withdrawals; the effects' applier is the Outbox's (serveOutbox).
 func (e *Env) wireDrafts(w *serveWiring) {
 	d := e.draftDeps(w.DB.Entries(), e.itemsLedger(w.DB, w.Cfg, w.Log))
+	var codecs []unit.Codec
+	for _, m := range w.Modules {
+		if m.Codec != nil {
+			codecs = append(codecs, m.Codec)
+		}
+	}
+	d.Codecs = unit.NewRegistry(codecs...)
 	w.Engine.Drafts = d
 	w.Engine.Withdrawals = draftWithdrawals{d: d}
 }

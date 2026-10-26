@@ -56,6 +56,8 @@ type draftDeps struct {
 	Now      func() time.Time
 	// Enabled says whether a provider's plugin is on; nil: every one is.
 	Enabled func(unit.ProviderID) bool
+	// Codecs compare a person's keys; nil compares them byte for byte.
+	Codecs unit.KeyComparer
 }
 
 var errNoDraftDeps = errors.New("draft.propose needs the daemon's Outbox")
@@ -232,7 +234,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {
-		its := selectItems(sub, a.items, person, now)
+		its := selectItems(sub, a.items, person, now, deps.Codecs)
 		cd := draftCandidate{person: person.Key}
 		key := sub.unit.String()
 		if a.per == "person" {
@@ -346,11 +348,11 @@ func (s draftSubject) held() []items.Item {
 	return out
 }
 
-func selectItems(s draftSubject, which string, person items.Person, now time.Time) []items.Item {
+func selectItems(s draftSubject, which string, person items.Person, now time.Time, codecs unit.KeyComparer) []items.Item {
 	var out []items.Item
 	switch which {
 	case "owed":
-		return owedBy(person, s.held())
+		return owedBy(person, s.held(), codecs)
 	case "resolved":
 		for _, it := range s.items {
 			if it.State == items.Resolved && it.Unit == s.unit {
@@ -381,13 +383,13 @@ func unownedItem(it items.Item, u unit.Unit) bool {
 	return it.Unit == u && it.State == items.Open && len(it.Assignees)+len(it.WaitingOn) == 0 && cmp.Or(it.Basis, items.NoBasis) == items.NoBasis
 }
 
-// owedBy are the items of its waiting on p; all of them when none names p,
-// a waiting the user set by hand.
-func owedBy(p items.Person, its []items.Item) []items.Item {
-	keys := append([]string{p.Key}, p.Aliases...)
+// owedBy are the items of its waiting on p, keys compared through codecs;
+// all of them when none names p, a waiting the user set by hand.
+func owedBy(p items.Person, its []items.Item, codecs unit.KeyComparer) []items.Item {
+	id := items.Identity{Keys: append([]string{p.Key}, p.Aliases...), Codecs: codecs}
 	var out []items.Item
 	for _, it := range its {
-		if slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Is(items.Identity{Keys: keys}) }) {
+		if slices.ContainsFunc(it.WaitingOn, func(w items.Person) bool { return w.Is(id) }) {
 			out = append(out, it)
 		}
 	}
