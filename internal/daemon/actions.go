@@ -16,10 +16,10 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -207,12 +207,9 @@ var overrideActions = map[string]func(o *dinv.Override, req api.ActionRequest, n
 			}
 			o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = true, string(kind), waitingOn
 		} else {
-			d, err := config.ParseDays(req.Until)
+			d, err := duration.Parse(req.Until)
 			if err != nil {
-				return "", "", badRequest{err.Error()}
-			}
-			if d <= 0 {
-				return "", "", badRequest{"mute duration must be positive"}
+				return "", "", badRequest{"mute " + err.Error()}
 			}
 			o.MutedUntil = now.Add(d)
 			data = "for " + req.Until

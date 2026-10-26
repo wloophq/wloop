@@ -27,6 +27,7 @@ type Slack struct {
 	Ingest     SlackIngest     `json:"ingest"`
 	Extraction SlackExtraction `json:"extraction"`
 	Turns      SlackTurns      `json:"turns"`
+	Drafts     PluginDrafts    `json:"drafts"`
 }
 
 // SlackTurns sets what a turn on a Slack unit reads.

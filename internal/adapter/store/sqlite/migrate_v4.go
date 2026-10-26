@@ -8,8 +8,9 @@ import (
 
 // v4 keys briefs and tags by unit, makes brief_runs provider-neutral, keeps
 // a sent draft's closure and when its effects were applied, records each
-// turn's role, renames the draft approval modes and drops items.waiting_on,
-// which nothing reads. It declares no compatible version: a v3 release
+// turn's role, writes the profile language's stored values (draft approval
+// modes, turns' runner, plan items' observe and step arguments) and drops
+// items.waiting_on, which nothing reads. It declares no compatible version: a v3 release
 // refuses the store. Its data steps run between the additions and the
 // drops, so each reads the columns and tables
 // v4 drops.
@@ -27,6 +28,7 @@ func v4(ctx context.Context, tx *sql.Tx) error {
 		{"approval", v4Approval},
 		{"roles", v4Roles},
 		{"adopt", v4Adopt},
+		{"vocabulary", v4Vocabulary},
 	} {
 		if err := step.run(ctx, tx); err != nil {
 			return fmt.Errorf("v4 %s: %w", step.name, err)
@@ -62,6 +64,8 @@ var v4Add = []string{
 	`ALTER TABLE drafts ADD COLUMN effects_applied_at TEXT NOT NULL DEFAULT ''`,
 	`CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id)`,
 	`ALTER TABLE extraction_cursors ADD COLUMN closure_marked INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE turns RENAME COLUMN mode TO runner`,
+	`ALTER TABLE plan_items ADD COLUMN observe INTEGER NOT NULL DEFAULT 0`,
 }
 
 // v4Drop are the drops of v4, after its data steps.
@@ -77,4 +81,5 @@ var v4Drop = []string{
 	`ALTER TABLE brief_runs DROP COLUMN files`,
 	`ALTER TABLE extraction_cursors DROP COLUMN brief`,
 	`ALTER TABLE items DROP COLUMN waiting_on`,
+	`ALTER TABLE plan_items DROP COLUMN mode`,
 }

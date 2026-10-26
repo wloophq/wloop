@@ -200,12 +200,17 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.Enabled != nil && !*wc.Enabled {
 			continue
 		}
-		if wc.Mode != "" {
-			w.Observe = wc.Mode == string(workflow.ModeObserve)
+		if wc.Observe != nil {
+			w.Observe = *wc.Observe
 		}
 		if a := wc.Approval; a != nil {
-			if a.Default != "" {
-				w.Approval.Default = workflow.Outcome(a.Default)
+			switch a.Mode {
+			case string(workflow.OutcomeRun):
+				w.Approval.Default, w.Approval.Window = workflow.OutcomeRun, 0
+			case "delay":
+				w.Approval.Default = workflow.OutcomeRun
+			case string(workflow.OutcomeWait):
+				w.Approval.Default = workflow.OutcomeWait
 			}
 			if a.Window != nil {
 				w.Approval.Window = time.Duration(*a.Window)
@@ -214,7 +219,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen, extras))
 		}
-		if p, _ := configPolicy(w, wc.DraftApproval); p != nil {
+		if p, _ := configPolicy(w, wc.DraftApproval()); p != nil {
 			w.DraftApproval = p
 		}
 		out = append(out, w)

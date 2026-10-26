@@ -414,36 +414,35 @@ func draftApproval(cfg config.Config, w workflow.Workflow) draft.Policy {
 }
 
 // workflowApproval is the approval policy of w's drafts and of the turns it
-// starts: the config's workflows.<name>.draft_approval, then the
-// proposals.<rule>.approval of the rule w replaced, then the manifest's;
-// nil when none is set.
+// starts: the config's workflows.<name>.drafts.approval, then the
+// manifest's; nil when none is set.
 func workflowApproval(cfg config.Config, w workflow.Workflow) *draft.Policy {
-	p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval)
-	return outbox.ResolveApproval(p, cfg.Proposals.LegacyDraftApproval(w.Name), w.DraftApproval)
+	p, _ := configPolicy(w, cfg.Workflows[w.Name].DraftApproval())
+	return outbox.ResolveApproval(p, nil, w.DraftApproval)
 }
 
-// configApprovalProblems are the config's draft_approval blocks that do not
+// configApprovalProblems are the config's drafts.approval blocks that do not
 // load over their workflow's subject, each holding every draft of it.
 func configApprovalProblems(cfg config.Config, ws []workflow.Workflow) []error {
 	var out []error
 	for _, w := range ws {
-		if _, err := configPolicy(w, cfg.Workflows[w.Name].DraftApproval); err != nil {
+		if _, err := configPolicy(w, cfg.Workflows[w.Name].DraftApproval()); err != nil {
 			out = append(out, fmt.Errorf("%w; every draft of %s waits for you", err, w.Name))
 		}
 	}
 	return out
 }
 
-// configPolicy is the config's draft_approval of w, its rules compiled over
+// configPolicy is the config's drafts.approval of w, its rules compiled over
 // w's subject; nil when a is. One that does not compile is refused, with
 // the error, and holds every draft of w.
-func configPolicy(w workflow.Workflow, a *config.DraftApprovalConfig) (*draft.Policy, error) {
+func configPolicy(w workflow.Workflow, a *config.ApprovalConfig) (*draft.Policy, error) {
 	if a == nil {
 		return nil, nil
 	}
 	p, err := a.Policy(builtin.ApprovalEnv(true, w.Slot))
 	if err != nil {
-		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.draft_approval: %w", w.Name, err)
+		return draft.Fixed(draft.Approval{Mode: draft.Wait}), fmt.Errorf("workflows.%s.drafts.approval: %w", w.Name, err)
 	}
 	return &p, nil
 }

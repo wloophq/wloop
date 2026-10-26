@@ -2,14 +2,14 @@ package cli
 
 import intentload "github.com/wloophq/wloop/internal/intent"
 
-// wireWorkflows warns of each proposals.<rule>.approval the config still
-// sets for a rule a default workflow replaced, which draft.propose applies,
-// and of each deprecated key the profile's manifests still set.
+// wireWorkflows warns of each config drafts.approval rule that never
+// releases a comment draft or does not load, and of each deprecated key the
+// profile's manifests still set.
 func (e *Env) wireWorkflows(w *serveWiring) {
 	if w.Log == nil {
 		return
 	}
-	for _, msg := range append(w.Cfg.Proposals.LegacyWarnings(), w.Cfg.DraftApprovalWarnings()...) {
+	for _, msg := range w.Cfg.DraftApprovalWarnings() {
 		w.Log("config: %s", msg)
 	}
 	for _, err := range configApprovalProblems(w.Cfg, e.loadedIntents().Workflows) {

@@ -23,6 +23,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -218,6 +219,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 		add(markOK, "config", where, "")
 	}
 	add(markInfo, "effective config", e.effectiveConfig(cfg), "")
+	add(markInfo, "turn budgets", turnBudgets(cfg), "")
 	if cfgErr == nil {
 		for _, c := range e.managerChecks(ctx, cfg) {
 			add(c.mark, c.name, c.info, c.fix)
@@ -312,15 +314,31 @@ func async[T any](f func() T) func() T {
 }
 
 func (e *Env) effectiveConfig(c config.Config) string {
-	parts := []string{fmt.Sprintf("agent=%s review_prefix=%q", c.Agent, c.GitHub.ReviewPrefix)}
+	parts := []string{fmt.Sprintf("agent=%s github.review_prefix=%q", c.Agent, c.GitHub.ReviewPrefix)}
 	if sink := e.boardSink(c); sink != "" {
 		for _, status := range []string{config.ColumnWorking, config.ColumnWorkingFallback, config.ColumnReady} {
 			parts = append(parts, fmt.Sprintf("views.%s.columns.%s=%s", sink, status, c.Column(sink, status)))
 		}
 	}
-	parts = append(parts, fmt.Sprintf("rounds.per_pr_per_day=%d automated_reviewers=%v owners=%v brief=%v",
-		c.Turns.PerUnitPerDay, c.GitHub.AutomatedReviewers, c.GitHub.Owners, c.Brief.Enabled))
+	parts = append(parts, fmt.Sprintf("github.automated_reviewers=%v github.owners=%v brief=%v",
+		c.GitHub.AutomatedReviewers, c.GitHub.Owners, c.Brief.Enabled))
 	return strings.Join(parts, " ")
+}
+
+// turnBudgets are the two automated turn budgets, each with the providers
+// whose units spend it: the per-unit one those whose plugin keeps a
+// per-unit count, the daily one every other.
+func turnBudgets(c config.Config) string {
+	var perUnit, perDay []string
+	for _, p := range slices.Sorted(maps.Keys(builtin.Slots)) {
+		if slices.Contains(builtin.RoundProviders, p) {
+			perUnit = append(perUnit, string(p))
+		} else {
+			perDay = append(perDay, string(p))
+		}
+	}
+	return fmt.Sprintf("turns.per_unit_per_day=%d (%s) turns.per_day=%d (%s)",
+		c.Turns.PerUnitPerDay, strings.Join(perUnit, ", "), c.Turns.PerDay, strings.Join(perDay, ", "))
 }
 
 // homeChecks reports, per agent home, each entry the loop needs and its

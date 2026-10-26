@@ -90,3 +90,14 @@ func TestShapeAndKindRoundTrip(t *testing.T) {
 		t.Errorf("a message of any other purpose is a reply: %s", got)
 	}
 }
+
+func TestStoredSpellingsAreTheLanguages(t *testing.T) {
+	for _, c := range [][2]string{
+		{string(DryRun), "dry_run"}, {string(WouldWait), "wait"}, {string(WouldRelease), "release"},
+		{string(OutcomeReleased), "released"}, {string(OutcomeDryRun), "dry_run"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("stored %q, want %q", c[0], c[1])
+		}
+	}
+}

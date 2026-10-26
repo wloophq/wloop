@@ -113,21 +113,21 @@ type Evidence struct {
 	At        time.Time
 }
 
-type WouldPolicy string // "release", "hold"
+type WouldPolicy string // "release", "wait"
 
 const (
 	WouldRelease WouldPolicy = "release"
-	WouldWait    WouldPolicy = "hold"
+	WouldWait    WouldPolicy = "wait"
 )
 
-type Outcome string // "", "as_is", "edited", "discarded", "auto" (approved by its policy), "recorded" (recorded only)
+type Outcome string // "", "as_is", "edited", "discarded", "released" (approved by its policy), "dry_run" (stored, never sent)
 
 const (
 	OutcomeAsIs      Outcome = "as_is"
 	OutcomeEdited    Outcome = "edited"
 	OutcomeDiscarded Outcome = "discarded"
-	OutcomeReleased  Outcome = "auto"
-	OutcomeDryRun    Outcome = "recorded"
+	OutcomeReleased  Outcome = "released"
+	OutcomeDryRun    Outcome = "dry_run"
 )
 
 type Would struct {
@@ -156,7 +156,7 @@ type Draft struct {
 	State    State
 	Evidence Evidence // State "sent" only
 	Error    string   // State "failed" only, never a token
-	Reason   string   // State "discarded": "user", "assigned", "record", ...
+	Reason   string   // State "discarded": "user", "assigned", "dry_run", ...
 	Would    Would
 	Rev      int64 // the stored row's version; every Update bumps it
 	// EffectsAppliedAt is when the Effects of a sent draft were applied;
@@ -193,13 +193,13 @@ const (
 	WithdrawMoot     = "moot"
 )
 
-type ApprovalMode string // "wait" (default), "delay", "send", "record"
+type ApprovalMode string // "wait" (default), "delay", "send", "dry_run"
 
 const (
 	Wait   ApprovalMode = "wait"
 	Delay  ApprovalMode = "delay"
 	Send   ApprovalMode = "send"
-	DryRun ApprovalMode = "record"
+	DryRun ApprovalMode = "dry_run"
 )
 
 type Approval struct {

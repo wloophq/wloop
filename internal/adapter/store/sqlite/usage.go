@@ -28,7 +28,7 @@ func (u usageStore) Pending(ctx context.Context, endedSince time.Time, limit int
 	rows, err := u.db.R().QueryContext(ctx, `SELECT t.seq, t.provider, t.unit_key, t.agent, t.agent_session,
 		COALESCE(a.transcript, ''), COALESCE(a.home, ''), COALESCE(a.worktree, ''), t.sent_at, t.started_at, t.ended_at, t.usage_attempts
 		FROM turns t LEFT JOIN agent_sessions a ON t.agent_session != '' AND a.agent_session = t.agent_session
-		WHERE t.state NOT IN ('sent', 'started', 'asked', 'withdrawn') AND t.ended_at != '' AND t.usage_source = '' AND t.mode != 'headless'
+		WHERE t.state NOT IN ('sent', 'started', 'asked', 'withdrawn') AND t.ended_at != '' AND t.usage_source = '' AND t.runner != 'headless'
 		AND julianday(t.ended_at) >= julianday(?)
 		ORDER BY t.usage_attempts, julianday(t.ended_at), t.seq LIMIT ?`, endedSince.UTC().Format(TimeLayout), limit)
 	if err != nil {
@@ -105,7 +105,7 @@ func nullFloat(p *float64) any {
 func (db *DB) HeadlessSpent(ctx context.Context, from, to time.Time) (float64, error) {
 	var spent float64
 	err := db.R().QueryRowContext(ctx, `SELECT COALESCE(SUM(u.cost_usd), 0) FROM turns t JOIN turn_usage u ON u.turn_seq = t.seq
-		WHERE t.mode = 'headless' AND julianday(t.started_at) >= julianday(?) AND julianday(t.started_at) < julianday(?)`,
+		WHERE t.runner = 'headless' AND julianday(t.started_at) >= julianday(?) AND julianday(t.started_at) < julianday(?)`,
 		from.UTC().Format(TimeLayout), to.UTC().Format(TimeLayout)).Scan(&spent)
 	return spent, err
 }

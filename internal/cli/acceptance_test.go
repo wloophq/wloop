@@ -766,7 +766,8 @@ func (f *fixtureEnv) setMode(name string, m workflow.Mode) {
 		f.te.cfg.Workflows = map[string]config.WorkflowConfig{}
 	}
 	wc := f.te.cfg.Workflows[name]
-	wc.Mode = string(m)
+	observe := m == workflow.ModeObserve
+	wc.Observe = &observe
 	f.te.cfg.Workflows[name] = wc
 }
 
@@ -1348,7 +1349,8 @@ func cleanupRig(t *testing.T, name string, mode workflow.Mode) (*automation.Engi
 	t.Helper()
 	te := newTestEnv(t, &fake.Manager{})
 	if mode != "" {
-		te.cfg.Workflows = map[string]config.WorkflowConfig{name: {Mode: string(mode)}}
+		observe := mode == workflow.ModeObserve
+		te.cfg.Workflows = map[string]config.WorkflowConfig{name: {Observe: &observe}}
 	}
 	i := slices.IndexFunc(applyConfig(te.loadedIntents().Workflows, te.cfg), func(w workflow.Workflow) bool { return w.Name == name })
 	if i < 0 {

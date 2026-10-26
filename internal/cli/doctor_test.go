@@ -449,7 +449,7 @@ func TestDoctorPrintsOrcasColumns(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{ManagerName: "orca"})
 	te.run("doctor")
 	for _, want := range []string{
-		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge rounds.per_pr_per_day=",
+		"views.orca.columns.working=reviewing views.orca.columns.working-fallback=in-review views.orca.columns.ready=ready-to-merge github.automated_reviewers=",
 		"  [info   ] board columns reviewing, needs-me, reviewed, in-review, ready-to-merge, in-progress, completed: not verifiable without writing",
 	} {
 		if !strings.Contains(te.out.String(), want) {
@@ -558,5 +558,14 @@ func TestDoctorNamesTheUnknownConfigKeys(t *testing.T) {
 	te.run("doctor")
 	if out := te.out.String(); !strings.Contains(out, te.ConfigPath+": unknown key gate") || !strings.Contains(out, "remove or rename those keys") {
 		t.Fatalf("%s", out)
+	}
+}
+
+func TestDoctorPrintsBudgetScopes(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.run("doctor")
+	if want := "turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack, workspace)"; !strings.Contains(te.out.String(), want) {
+		t.Errorf("doctor lacks %q:\n%s", want, te.out)
 	}
 }

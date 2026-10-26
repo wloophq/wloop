@@ -65,7 +65,7 @@ var skeleton = map[string][]string{
 		"ViewSpec", "FacetSpec", "Bucket", "SituationSpec", "Message", "GTDCatalog", "EntryView", "EntryView.Message",
 		"EntryView.Draft", "EntriesPage", "CaptureRequest", "EntryRequest", "EntryResult", "Counters", "Change.Counters",
 		"RowsPage.Counters", "Category", "NotificationID", "ParseNotificationID", "Digest", "Draft", "DraftAction", "Draft.Purpose", "Draft.Delivery", "Draft.Effects", "Plugin.Capabilities", "Brief.Extra", "BriefSummary.Extra", "Turn.Role", "ActionSpec.Summary", "ActionState.Note", "ActionState.Warning", "PlanItem.Observe", "ObserveMode", "RunnerState", "Turn.Runner"},
-	"internal/config": {"Plugin", "Config.Plugins", "Config.PluginEnabled", "Turns", "Config.Turns", "WorkflowConfig.DraftApproval", "DraftApprovalConfig", "DraftApprovalConfig.Policy", "ApprovalRuleConfig"},
+	"internal/config": {"Plugin", "Config.Plugins", "Config.PluginEnabled", "Turns", "Config.Turns", "WorkflowConfig.DraftApproval", "ApprovalConfig", "ApprovalConfig.Policy", "ApprovalRuleConfig"},
 	"internal/daemon": {"Deps.Plugins", "Deps.PluginEnabled", "writePluginDisabled", "Server.refusePlugin"},
 	"internal/domain/card": {"Tone", "Signal", "Human", "Mute", "Card", "Card.StartedByMe", "Card.ClosurePosted", "Card.Cares",
 		"Card.LastHuman", "Card.Outcome", "Snapshot", "Store"},

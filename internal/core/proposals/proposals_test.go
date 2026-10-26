@@ -77,10 +77,10 @@ func TestModuleProposalsAreProposed(t *testing.T) {
 	}
 }
 
-func TestRuleApprovalFromConfig(t *testing.T) {
+func TestPluginRulesDraftsTakeTheirPluginsApproval(t *testing.T) {
 	e := newEnv(t)
-	e.job.Approval = func(rule string) draft.Approval {
-		if rule == "github-nudge" {
+	e.job.Approval = func(p unit.ProviderID) draft.Approval {
+		if p == unit.GitHub {
 			return draft.Approval{Mode: draft.Delay, Window: time.Hour}
 		}
 		return draft.Approval{Mode: draft.Wait}
@@ -131,11 +131,11 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 		}
 		e.clock.set(t0.Add(23 * time.Hour))
 		if sum := e.run(); sum.Proposed != 0 {
-			t.Fatalf("re-proposed within renudge_after: %s", sum)
+			t.Fatalf("re-proposed within repeat_after: %s", sum)
 		}
 		e.clock.set(t0.Add(24 * time.Hour))
 		if sum := e.run(); sum.Proposed != 1 {
-			t.Fatalf("after renudge_after: %s", sum)
+			t.Fatalf("after repeat_after: %s", sum)
 		}
 	})
 	t.Run("failed", func(t *testing.T) {
@@ -153,16 +153,16 @@ func TestDiscardedProposalIsNotProposedAgain(t *testing.T) {
 	})
 	t.Run("observed", func(t *testing.T) {
 		e, _ := setup(t)
-		e.job.Approval = func(string) draft.Approval { return draft.Approval{Mode: draft.DryRun} }
+		e.job.Approval = func(unit.ProviderID) draft.Approval { return draft.Approval{Mode: draft.DryRun} }
 		e.run()
 		e.clock.set(t0.Add(23 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != "record" {
-			t.Fatalf("observed twice within renudge_after: %+v", all)
+		if all := e.drafts.all(); len(all) != 1 || all[0].Reason != string(draft.DryRun) {
+			t.Fatalf("observed twice within repeat_after: %+v", all)
 		}
 		e.clock.set(t0.Add(24 * time.Hour))
 		e.run()
-		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != "record" {
+		if all := e.drafts.all(); len(all) != 2 || all[1].Reason != string(draft.DryRun) {
 			t.Fatalf("an observed key is suppressed for good: %+v", all)
 		}
 	})

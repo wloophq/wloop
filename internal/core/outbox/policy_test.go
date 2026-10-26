@@ -215,7 +215,7 @@ func TestDraftPolicyObserveRecordsOnly(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, observe)
 	d := e.propose(reply("x"))
-	if d.State != draft.Discarded || d.Reason != "record" || d.Would.Outcome != draft.OutcomeDryRun || d.Would.Policy != draft.WouldRelease {
+	if d.State != draft.Discarded || d.Reason != string(draft.DryRun) || d.Would.Outcome != draft.OutcomeDryRun || d.Would.Policy != draft.WouldRelease {
 		t.Fatalf("%+v", d)
 	}
 	if got, _ := e.svc.List(ctx, Filter{States: []draft.State{draft.Proposed, draft.Failed}}); len(got) != 0 {
@@ -299,7 +299,7 @@ func TestObservedKeyRecordsAgainAfterRecordedFor(t *testing.T) {
 	}
 	e.clock.now = t0.Add(24 * time.Hour)
 	second, err := e.svc.Propose(ctx, auto)
-	if err != nil || second.ID == first.ID || second.Reason != "record" {
+	if err != nil || second.ID == first.ID || second.Reason != string(draft.DryRun) {
 		t.Fatalf("after RecordedFor: %+v %v", second, err)
 	}
 }

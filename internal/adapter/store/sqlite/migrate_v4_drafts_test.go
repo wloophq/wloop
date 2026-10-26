@@ -109,8 +109,8 @@ func TestV4RenamesTheDraftApprovalModesAndWhatTheyRecorded(t *testing.T) {
 		got = append(got, strings.Join([]string{u, m, r, p, o}, "|"))
 	}
 	rows.Close()
-	want := []string{"C1/1|wait||hold|", "C1/2|delay||release|", "C1/3|send||release|auto", "C1/4|record|record|release|recorded",
-		"C1/5|wait|user|hold|discarded", "C1/6||||"}
+	want := []string{"C1/1|wait||wait|", "C1/2|delay||release|", "C1/3|send||release|released", "C1/4|dry_run|dry_run|release|dry_run",
+		"C1/5|wait|user|wait|discarded", "C1/6||||"}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}

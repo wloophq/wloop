@@ -1,9 +1,6 @@
 package config
 
-import (
-	"reflect"
-	"strings"
-)
+import "reflect"
 
 // Plugin is one plugin's switch; a nil Enabled means enabled.
 type Plugin struct {
@@ -45,7 +42,7 @@ func (c Config) switches() map[string]*bool {
 	v := reflect.ValueOf(c)
 	for i := range v.NumField() {
 		f := v.Type().Field(i)
-		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		name := jsonName(f)
 		if f.Type.Kind() != reflect.Struct || name == "" || name == "-" {
 			continue
 		}
@@ -63,6 +60,5 @@ func KeyOf(field string) string {
 	if !ok {
 		panic("config: no field " + field)
 	}
-	name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-	return name
+	return jsonName(f)
 }

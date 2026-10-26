@@ -9,14 +9,13 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/duration"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -67,12 +66,10 @@ type Config struct {
 	Notifications Notifications `json:"notifications"`
 	Slack         Slack         `json:"slack"`
 	Dossiers      Dossiers      `json:"dossiers"`
-	// Proposals sets the rules that propose drafts on their own.
-	Proposals Proposals `json:"proposals"`
-	Drafts    Drafts    `json:"drafts"`
-	Items     Items     `json:"items"`
-	Headless  Headless  `json:"headless"`
-	Turns     Turns     `json:"turns"`
+	Drafts        Drafts        `json:"drafts"`
+	Items         Items         `json:"items"`
+	Headless      Headless      `json:"headless"`
+	Turns         Turns         `json:"turns"`
 }
 
 // Turns caps the automated turns. PerUnitPerDay stops a runaway loop on one
@@ -116,9 +113,10 @@ type GitHub struct {
 	IgnoreChecks  []string `json:"ignore_checks"`
 	// AddressConflicts starts a triage round when a pull request I develop
 	// conflicts with its base past the conflict window.
-	AddressConflicts bool    `json:"address_conflicts"`
-	Scope            Scope   `json:"scope"`
-	Stalled          Stalled `json:"stalled"`
+	AddressConflicts bool         `json:"address_conflicts"`
+	Scope            Scope        `json:"scope"`
+	Stalled          Stalled      `json:"stalled"`
+	Drafts           PluginDrafts `json:"drafts"`
 }
 
 // Drafts holds the settings every proposer's drafts share.
@@ -213,7 +211,7 @@ type Scope struct {
 	Watch  []string `json:"watch"`
 }
 
-// Days is a duration written as "2d", "36h" or "90m" in the config.
+// Days is a duration written as duration.Parse reads it: "2d", "36h", "90m".
 type Days time.Duration
 
 func (d *Days) UnmarshalJSON(b []byte) error {
@@ -221,7 +219,7 @@ func (d *Days) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
-	v, err := ParseDays(s)
+	v, err := duration.Parse(s)
 	if err != nil {
 		return err
 	}
@@ -229,35 +227,8 @@ func (d *Days) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes the form ParseDays reads: "2d", "36h", "2m".
 func (d Days) MarshalJSON() ([]byte, error) {
-	v := time.Duration(d)
-	if v > 0 && v%(24*time.Hour) == 0 {
-		return json.Marshal(fmt.Sprintf("%dd", v/(24*time.Hour)))
-	}
-	s := v.String()
-	if strings.HasSuffix(s, "m0s") {
-		s = strings.TrimSuffix(s, "0s")
-	}
-	if strings.HasSuffix(s, "h0m") {
-		s = strings.TrimSuffix(s, "0m")
-	}
-	return json.Marshal(s)
-}
-
-func ParseDays(s string) (time.Duration, error) {
-	if n, ok := strings.CutSuffix(s, "d"); ok {
-		days, err := strconv.Atoi(n)
-		if err != nil {
-			return 0, fmt.Errorf("duration %q: %w", s, err)
-		}
-		return time.Duration(days) * 24 * time.Hour, nil
-	}
-	v, err := time.ParseDuration(s)
-	if err != nil {
-		return 0, fmt.Errorf("duration %q: %w", s, err)
-	}
-	return v, nil
+	return json.Marshal(duration.Format(time.Duration(d)))
 }
 
 type Stalled struct {
@@ -306,22 +277,31 @@ type Cleanup struct {
 	Disposable []string `json:"disposable"`
 }
 
+// WorkflowConfig overlays a workflow's manifest; a field left out keeps the
+// manifest's.
 type WorkflowConfig struct {
-	Mode     string          `json:"mode,omitempty"`
-	Enabled  *bool           `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+	// Observe plans the workflow's items pending, for a person to run.
+	Observe  *bool           `json:"observe,omitempty"`
 	Approval *ApprovalConfig `json:"approval,omitempty"`
 	// OnlyWhen is a predicate over the workflow's facts that must hold
 	// besides its manifest's when; "" adds none.
-	OnlyWhen string `json:"only_when,omitempty"`
-	// DraftApproval is the approval of the drafts the workflow proposes,
-	// over its manifest's [draft_approval]: its mode and rules replace the
-	// manifest's.
-	DraftApproval *DraftApprovalConfig `json:"draft_approval,omitempty"`
+	OnlyWhen string          `json:"only_when,omitempty"`
+	Drafts   *WorkflowDrafts `json:"drafts,omitempty"`
 }
 
+// WorkflowDrafts holds the approval of the drafts a workflow proposes.
+type WorkflowDrafts struct {
+	Approval *ApprovalConfig `json:"approval,omitempty"`
+}
+
+// ApprovalConfig overlays an approval block field by field: Mode and
+// Window replace the manifest's, Rule its rules; "", nil and a nil Rule
+// keep the manifest's, an empty Rule clears them.
 type ApprovalConfig struct {
-	Default string `json:"default,omitempty"`
-	Window  *Days  `json:"window,omitempty"`
+	Mode   string               `json:"mode,omitempty"`
+	Window *Days                `json:"window,omitempty"`
+	Rule   []ApprovalRuleConfig `json:"rule,omitempty"`
 }
 
 type Nudge struct {
@@ -536,7 +516,7 @@ func LoadFile(file string, base Config) (Config, error) {
 	if err := c.validatePlacement(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
-	if err := c.Proposals.validate(); err != nil {
+	if err := c.validatePluginDrafts(); err != nil {
 		return base, fmt.Errorf("%s: %w", file, err)
 	}
 	return c, nil
@@ -649,27 +629,20 @@ func (c Config) validateWorkflows() error {
 	}
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
 		w := c.Workflows[name]
-		if err := oneOf("workflows."+name+".mode", w.Mode, workflow.ModeObserve, workflow.ModeApply); err != nil {
-			return err
-		}
 		if w.OnlyWhen != "" {
 			if _, err := expr.CompileWorkflow(w.OnlyWhen, builtin.WorkflowEnvAll()); err != nil {
 				return fmt.Errorf("workflows.%s.only_when: %w", name, err)
 			}
 		}
-		if a := w.DraftApproval; a != nil {
+		if a := w.DraftApproval(); a != nil {
 			if _, err := a.Policy(builtin.ApprovalEnv(true, builtin.UnitSlots()...)); err != nil {
-				return fmt.Errorf("workflows.%s.draft_approval: %w", name, err)
+				return fmt.Errorf("workflows.%s.drafts.approval: %w", name, err)
 			}
 		}
-		if w.Approval == nil {
-			continue
-		}
-		if err := oneOf("workflows."+name+".approval.default", w.Approval.Default, workflow.OutcomeRun, workflow.OutcomeWait); err != nil {
-			return err
-		}
-		if win := w.Approval.Window; win != nil && *win < 0 {
-			return fmt.Errorf("workflows.%s.approval.window must not be negative, got %s", name, time.Duration(*win))
+		if w.Approval != nil {
+			if err := w.Approval.validateRun("workflows." + name + ".approval"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
