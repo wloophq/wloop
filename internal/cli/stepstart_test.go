@@ -667,3 +667,26 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 		t.Fatalf("turn:\n%s", text)
 	}
 }
+
+func TestAUserReviewWithoutCapIsHeldByTheDailyCap(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	files := myReview(t)
+	m := files["intents/my-review/intent.toml"]
+	for _, key := range []string{"cap         = \"rounds\"\n", "round_kind  = \"review\"\n"} {
+		if !strings.Contains(m, key) {
+			t.Fatalf("the bundled review no longer sets %q", key)
+		}
+		m = strings.Replace(m, key, "", 1)
+	}
+	files["intents/my-review/intent.toml"] = m
+	userProfile(t, sc.te, files)
+	r := newStartRig(t, sc, "my-review", roundFollowup)
+	sc.te.cfg.Rounds.PerPRPerDay = 1
+	st := r.load(t)
+	st.RecordFollowup(sc.ref.String(), round.Reviewed, "", testNow)
+	r.save(t)
+	if refusal := r.check(t, automation.CheckOpts{Mode: workflow.ModeApply}); refusal != "per-PR daily cap reached (1)" {
+		t.Fatalf("refusal %q; broken %v", refusal, sc.env.loadedIntents().Broken)
+	}
+}

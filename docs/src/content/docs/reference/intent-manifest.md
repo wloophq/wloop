@@ -36,8 +36,8 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `modes` | | `["session"]` | `session`, `headless`, or both; the first is what `turn.start` runs without a `mode` |
 | `role` | | `""` | what {{name}} resolves the intent by, see [Roles](#roles) |
 | `builds` | | `""` | `brief`: the intent builds the brief and is never a turn |
-| `round_kind` | | `""` | `review` or `address`: the sweep's round the intent's `turn.start` sends on a pull request |
-| `cap` | | `""` | `rounds`: the intent's turns spend the per-pull request daily round cap |
+| `round_kind` | | from `role` | `review` or `address`: the sweep's round the intent's `turn.start` sends on a pull request; `round.review` gives `review`, `round.address` gives `address` |
+| `cap` | | `rounds` with a round kind or the `nudge` role | `rounds`: the intent's turns spend the per-pull request daily round cap |
 | `reason_fact` | | `""` | the workflow fact that says why the round is due; a review's first round says why itself |
 | `refuse_when` | | `""` | a string workflow fact whose non-empty value refuses `turn.start` with that text; on a pull request, a mute refuses too |
 | `reason` | | `""` | `address_round`: the turn carries the reviewers, failing checks and conflict its round answers |

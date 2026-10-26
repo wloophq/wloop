@@ -162,9 +162,9 @@ One entry per decision in force. A pull request that changes one of them changes
 ## Intents by role
 
 - **Context**: Go started the review, address, nudge and probe intents and read their history by name, so a renamed or replaced intent lost every automatic behavior.
-- **Decision**: a manifest's `role` (`round.review`, `round.address`, `nudge`, `probe`, `headless.default`) is what Go resolves an intent by; one of the user's holding a bundled role takes it over. Each turn stores its intent's role, and history readers read by it. How a round behaves comes from manifest keys (`round_kind`, `cap`, `reason_fact`, `refuse_when`, `reason`).
+- **Decision**: a manifest's `role` (`round.review`, `round.address`, `nudge`, `probe`, `headless.default`) is what Go resolves an intent by; one of the user's holding a bundled role takes it over. Each turn stores its intent's role, and history readers read by it. How a round behaves comes from manifest keys (`round_kind`, `cap`, `reason_fact`, `refuse_when`, `reason`); `round_kind` defaults from the role, and every intent with a round kind or the `nudge` role spends the daily round cap (`builtin.RoleRounds`).
 - **Consequence**: an intent `my-review` holding `round.review` gets the sweep's review rounds and their history; the turns stored before roles exist were given theirs by the store's migration from the bundled names.
-- **Enforced by**: `TestNoIntentEnumerations`.
+- **Enforced by**: `TestNoIntentEnumerations`, `TestARoundOrNudgeIntentWithoutCapSpendsTheRoundBudget`, `TestAUserReviewWithoutCapIsHeldByTheDailyCap`, `TestARenamedReviewKeepsTheVerdictTheBundledReviewRecorded`.
 
 ## turn.start on any unit, under a budget
 

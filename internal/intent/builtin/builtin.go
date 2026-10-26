@@ -209,6 +209,18 @@ const (
 	ReasonAddressRound = "address_round"
 )
 
+// RoleRound is the round kind and cap an intent holding a role has when its
+// manifest leaves them out.
+type RoleRound struct{ RoundKind, Cap string }
+
+// RoleRounds are the defaults by role; every intent with a round kind spends
+// the round budget too, so no round or nudge goes out uncapped.
+var RoleRounds = map[string]RoleRound{
+	RoleReview:  {RoundKindReview, CapRounds},
+	RoleAddress: {RoundKindAddress, CapRounds},
+	RoleNudge:   {"", CapRounds},
+}
+
 var (
 	RoundKinds  = []string{RoundKindReview, RoundKindAddress}
 	Caps        = []string{CapRounds}
