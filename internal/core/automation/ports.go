@@ -162,6 +162,24 @@ type Filter struct {
 	ID        string
 }
 
+// Withdrawals are the open drafts a workflow proposed, which the sweep
+// withdraws when the workflow's [withdraw] when matches one; never those of
+// a disabled plugin's units.
+type Withdrawals interface {
+	Proposed(ctx context.Context, workflow string) ([]ProposedDraft, error)
+	// Withdraw discards the draft, Reason reason; a draft no longer open is
+	// left as it is.
+	Withdraw(ctx context.Context, id int64, reason string) error
+}
+
+// ProposedDraft is an open draft a workflow proposed: the subject it was
+// proposed on and the draft slot's facts ("draft.person_waited", ...).
+type ProposedDraft struct {
+	ID      int64
+	Subject unit.Unit
+	Facts   workflow.Facts
+}
+
 // Guidance is the user's stored guidance for a unit's next turn.
 type Guidance interface {
 	Peek(ctx context.Context, u unit.Unit) (string, error)

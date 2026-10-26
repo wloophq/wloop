@@ -25,10 +25,12 @@ type Engine struct {
 	Config    func() workflow.Facts
 	State     StateLoader
 	Marks     Marks // nil reads every unit as having no marks
-	Reachable func(ctx context.Context) error
-	RetryBase time.Duration
-	Pub       port.Publisher
-	Log       func(format string, args ...any)
+	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
+	Withdrawals Withdrawals
+	Reachable   func(ctx context.Context) error
+	RetryBase   time.Duration
+	Pub         port.Publisher
+	Log         func(format string, args ...any)
 
 	mu     sync.Mutex
 	due    time.Time

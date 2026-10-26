@@ -429,6 +429,10 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			ed.Asker = a
 		}
 	}
+	w := &serveWiring{DB: db, Cfg: cfg, Modules: mods, Log: logf, Deps: &d, Engine: &ed}
+	for _, wire := range e.wireParts() {
+		wire(w)
+	}
 	return withEngine(d, e, ed)
 }
 

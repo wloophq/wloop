@@ -16,6 +16,7 @@ import (
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/workspaces"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -47,6 +48,11 @@ type engineDeps struct {
 	// recorded; with a DB, the steps' are recorded on their units.
 	Pub port.Publisher
 	Log func(format string, args ...any)
+	// Subjects are facts providers of the core-kept subjects beyond the
+	// session and workspace ones, such as entry, by provider.
+	Subjects map[unit.ProviderID]automation.Units
+	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
+	Withdrawals automation.Withdrawals
 }
 
 // newEngine assembles the engine over the store, the facts providers and
@@ -69,7 +75,10 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 		d.WorkspaceFacts = e.workspaceFacts()
 	}
 	providers := defaultFacts(d.SessionFacts, d.WorkspaceFacts)
-	codecs := []unit.Codec{pr.Codec{}}
+	for id, u := range d.Subjects {
+		providers[id] = u
+	}
+	codecs := []unit.Codec{pr.Codec{}, gtd.Codec{}}
 	for _, m := range d.Modules {
 		if m.Facts != nil {
 			providers[m.ID] = m.Facts
@@ -128,6 +137,9 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.DB != nil {
 		eng.Ledger, eng.Events, eng.Marks = d.DB.Ledger(), d.DB.Events(), d.DB
 	}
+	if d.Withdrawals != nil {
+		eng.Withdrawals = d.Withdrawals
+	}
 	if e.WS.Len() > 0 {
 		eng.Reachable = e.WS.Reachable
 	}
@@ -177,6 +189,10 @@ func applyConfig(ws []workflow.Workflow, cfg config.Config) []workflow.Workflow 
 		if wc.OnlyWhen != "" {
 			w.When = workflow.All(w.When, onlyWhen(w, wc.OnlyWhen))
 		}
+		if a := wc.DraftApproval; a != nil {
+			da := a.Approval()
+			w.DraftApproval = &da
+		}
 		out = append(out, w)
 	}
 	return out
@@ -202,6 +218,9 @@ func configFacts(cfg config.Config) workflow.Facts {
 		"config.cleanup.manual_idle":     time.Duration(c.ManualIdle),
 		"config.cleanup.stale_workspace": time.Duration(c.StaleWorkspace),
 		"config.nudge.silent_days":       cfg.Nudge.SilentDays,
+		"config.gtd.stale_waiting_days":  cfg.GTD.StaleWaitingDays,
+		"config.proposals.renudge_after": time.Duration(cfg.Proposals.RenudgeAfter),
+		"config.turns.automated_per_day": cfg.Turns.AutomatedPerDay,
 	}
 }
 

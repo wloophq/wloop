@@ -35,7 +35,12 @@ func (p Proposals) Approval(rule string) draft.Approval {
 	if !ok || r.Approval == nil {
 		return draft.Approval{Mode: draft.Always}
 	}
-	return draft.Approval{Mode: draft.ApprovalMode(r.Approval.Mode), Window: time.Duration(r.Approval.Window)}
+	return r.Approval.Approval()
+}
+
+// Approval is a as a draft's approval.
+func (a ProposalApproval) Approval() draft.Approval {
+	return draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}
 }
 
 func (p *Proposals) UnmarshalJSON(b []byte) error {

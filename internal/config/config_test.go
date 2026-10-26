@@ -485,3 +485,31 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(file, []byte(`{"turns": {"automated_per_day": 7}, "workflows": {"slack-closure": {"draft_approval": {"mode": "window", "window": "10m"}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(file, tools())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Turns.AutomatedPerDay != 7 {
+		t.Errorf("turns %+v", c.Turns)
+	}
+	if a := c.Workflows["slack-closure"].DraftApproval.Approval(); a.Mode != "window" || a.Window != 10*time.Minute {
+		t.Errorf("draft approval %+v", a)
+	}
+	if Defaults().Turns.AutomatedPerDay != 20 {
+		t.Error("the default daily cap is not 20")
+	}
+	bad := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(bad, []byte(`{"workflows": {"x": {"draft_approval": {"mode": "window"}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(bad, tools()); err == nil || !strings.Contains(err.Error(), "workflows.x.draft_approval") {
+		t.Fatalf("a window without one loaded: %v", err)
+	}
+}

@@ -102,6 +102,13 @@ type Config struct {
 	Proposals Proposals `json:"proposals"`
 	Items     Items     `json:"items"`
 	Headless  Headless  `json:"headless"`
+	Turns     Turns     `json:"turns"`
+}
+
+// Turns caps the automated turns on units other than pull requests, all
+// workflows together; a pull request's rounds have their own cap (Rounds).
+type Turns struct {
+	AutomatedPerDay int `json:"automated_per_day"`
 }
 
 // Headless caps the headless turns: the model tier of their calls, what one call may cost and what they
@@ -283,6 +290,9 @@ type WorkflowConfig struct {
 	// OnlyWhen is a predicate over the workflow's facts that must hold
 	// besides its manifest's when; "" adds none.
 	OnlyWhen string `json:"only_when,omitempty"`
+	// DraftApproval is the approval of the drafts the workflow proposes,
+	// over its manifest's [draft_approval].
+	DraftApproval *ProposalApproval `json:"draft_approval,omitempty"`
 }
 
 type ApprovalConfig struct {
@@ -408,6 +418,7 @@ func Defaults() Config {
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},
 		Proposals: Proposals{RenudgeAfter: Days(24 * time.Hour)},
 		Headless:  Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
+		Turns:     Turns{AutomatedPerDay: 20},
 	}
 }
 
@@ -590,6 +601,9 @@ func (c Config) validateWorkflows() error {
 	if c.Classify.DailyCap < 0 {
 		return fmt.Errorf("classify.daily_cap must not be negative, got %d", c.Classify.DailyCap)
 	}
+	if c.Turns.AutomatedPerDay < 0 {
+		return fmt.Errorf("turns.automated_per_day must not be negative, got %d", c.Turns.AutomatedPerDay)
+	}
 	for _, intent := range slices.Sorted(maps.Keys(c.ProjectSettings)) {
 		if _, err := expr.Compile(c.ProjectSettings[intent], builtin.PREnv()); err != nil {
 			return fmt.Errorf("project_settings.%s: %w", intent, err)
@@ -603,6 +617,11 @@ func (c Config) validateWorkflows() error {
 		if w.OnlyWhen != "" {
 			if _, err := expr.CompileWorkflow(w.OnlyWhen, builtin.WorkflowEnvAll()); err != nil {
 				return fmt.Errorf("workflows.%s.only_when: %w", name, err)
+			}
+		}
+		if a := w.DraftApproval; a != nil {
+			if err := a.Approval().Validate(); err != nil {
+				return fmt.Errorf("workflows.%s.draft_approval: %w", name, err)
 			}
 		}
 		if w.Approval == nil {

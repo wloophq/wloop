@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
@@ -534,5 +535,27 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 	}
 	if siblingFacts(automationtest.NewUnits()) != nil {
 		t.Fatal("a sibling of another provider")
+	}
+}
+
+func TestApplyConfigSetsAWorkflowsDraftApproval(t *testing.T) {
+	t.Parallel()
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {DraftApproval: &config.ProposalApproval{Mode: "window", Window: config.Days(5 * time.Minute)}}}
+	manifest := draft.Approval{Mode: draft.Always}
+	out := applyConfig([]workflow.Workflow{{Name: "drafts", Mode: workflow.ModeApply, DraftApproval: &manifest}}, cfg)
+	if a := out[0].DraftApproval; a == nil || a.Mode != draft.Window || a.Window != 5*time.Minute {
+		t.Fatalf("draft approval %+v", a)
+	}
+	if manifest.Mode != draft.Always {
+		t.Error("applyConfig changed the manifest's approval")
+	}
+}
+
+func TestConfigFactsCarryTheProposalSettings(t *testing.T) {
+	t.Parallel()
+	f := configFacts(Defaults())
+	if f["config.gtd.stale_waiting_days"] != 2 || f["config.proposals.renudge_after"] != 24*time.Hour || f["config.turns.automated_per_day"] != 20 {
+		t.Fatalf("%v", f)
 	}
 }

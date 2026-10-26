@@ -50,8 +50,11 @@ const (
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
 	// SweepInputs leaves out LoopEvents and Rounds: the sweep's own writes.
+	// Entries, items and drafts wake the workflows over GTD entries and
+	// Slack units; the extraction notes SourceEvents.
 	SweepInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicOverrides | TopicTurns |
-		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer
+		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer |
+		TopicEntries | TopicItems | TopicDrafts
 	// BriefInputs leaves out the queue's own Briefs writes.
 	BriefInputs = TopicPRs | TopicFollow | TopicConfig
 )
