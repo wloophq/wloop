@@ -61,10 +61,22 @@ A draft goes out only once its approval policy lets it:
 
 A draft you write yourself (Reply on an entry or a unit, see [GTD](/concepts/gtd/), `outbox new`, or `slack send` to a thread) is `always` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
-Every bundled intent, workflow and rule uses `always`. Your own intent or workflow can set another with a `[draft_approval]` table, and a proposal rule with `proposals.<rule>.approval` in the configuration. A draft an agent aims outside its own unit is always `always`, unless the policy is `observe`.
+Every bundled intent, workflow and rule uses `always`. Your own intent or workflow can set another with a `[draft_approval]` table, a workflow's drafts with `workflows.<name>.draft_approval` in the configuration, and a proposal rule with `proposals.<rule>.approval`. A draft an agent aims outside its own unit is always `always`, unless the policy is `observe`, and so is a draft whose workflow or intent sets `auto_send = false`.
+
+A draft has a purpose (nudge, close, ask_owner, or any label its proposer names), a delivery (a message, a reaction or a comment) and the effects sending it applies, each exactly once, after a restart too:
+
+| Effect | What it does once the draft is sent |
+|---|---|
+| `entry.nudged` | stamps the last nudge of the draft's entry, or of every live waiting entry of its unit |
+| `unit.closed` | records the unit's closure through its plugin: on Slack, it ends the close entry and lets the thread go unwatched after its warm period, whatever later extraction passes say |
+| `pr.nudged` | records the nudge on the pull request, which the next nudge's refusal reads |
+
+Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `draft_effects`; the draft is refused otherwise, with a message naming the intent.
+
+A workflow proposes drafts with its `draft.propose` step, its text rendered from the workflow's `text.md.tmpl` through the profile's layers, the items' text as data. It holds a draft of the same workflow, subject and person while one is open or failed, for `hold_after_sent` after one was sent (`forever` never proposes again) and for `hold` after one was otherwise settled. Its `[withdraw] when` discards an open draft it no longer calls for, with the reason `moot` or, with `reason = "assigned"`, assigned; a draft whose workflow is no longer loaded is withdrawn `moot`, and no draft of a disabled plugin is. A draft its `[withdraw] when` would withdraw at once is not proposed.
 
 ```sh
-{{command}} outbox                      # drafts that wait on you, by kind
+{{command}} outbox                      # drafts that wait on you, by purpose
 {{command}} outbox show <id>            # one draft as it reads, its items and the commands it takes
 {{command}} outbox new <unit> <markdown> # a reply of yours; --react <emoji> for a reaction, --send to post it now
 {{command}} outbox approve <id>         # shows it and posts it once you say yes
@@ -72,7 +84,7 @@ Every bundled intent, workflow and rule uses `always`. Your own intent or workfl
 {{command}} outbox discard <id> --reason "not needed"
 ```
 
-On a terminal the list groups the drafts by kind (nudges, closings, replies, ...), each with its id, its unit as its row reads (`acme/api#7 · <title>`, `#channel · <thread>`, `DM with <name>`), who it mentions, its age and its first line; a column shows only where the drafts differ, such as the state when one failed. Piped, it prints one tab-separated line per draft for scripts: id, kind, state, unit, label, mentions, creation time (RFC 3339) and first line. A unit is a pull request URL or `owner/repo#n`, a Slack message permalink (its thread) or `<provider>:<key>`.
+On a terminal the list groups the drafts by purpose (nudges, closings, replies, ...), each with its id, its unit as its row reads (`acme/api#7 · <title>`, `#channel · <thread>`, `DM with <name>`), who it mentions, its age and its first line; a column shows only where the drafts differ, such as the state when one failed. Piped, it prints one tab-separated line per draft for scripts: id, kind, state, unit, label, mentions, creation time (RFC 3339) and first line. A unit is a pull request URL or `owner/repo#n`, a Slack message permalink (its thread) or `<provider>:<key>`.
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment or no terminal. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 

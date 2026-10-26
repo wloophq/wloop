@@ -24,7 +24,6 @@ func Intents() *dintent.Registry {
 			}},
 		{Name: dintent.Probe, Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 		{Name: dintent.Act, UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Modes: []string{"headless", "session"}, Verb: "delegate",
-			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}},
-			DraftEffects: []string{"entry.nudged", "unit.closed"}},
+			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 	})
 }

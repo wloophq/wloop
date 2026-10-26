@@ -217,6 +217,11 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		if subjectFacts, err = s.d.Units.Facts(ctx, c.u); err != nil {
 			return nil, err
 		}
+		if sc, ok := s.d.Units.(automation.Scoper); ok {
+			if subjectFacts, err = sc.Scope(ctx, w.Name, c.u, subjectFacts); err != nil {
+				return nil, err
+			}
+		}
 	}
 	var out []draftCandidate
 	for _, person := range sub.people(a.per) {

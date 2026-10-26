@@ -8,6 +8,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/headless"
 	"github.com/wloophq/wloop/internal/core/outbox"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/turn"
 )
 
 func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing.T) {
@@ -18,6 +20,12 @@ func TestAHeadlessDraftDeclaringAnEffectItsIntentDoesNotListIsRefused(t *testing
 	plain := reply("No effect at all.")
 	plain["kind"] = "close"
 	r := newRig(t, scripted{json: answerJSON(t, done, closing, stray, plain)})
+	intents := r.svc.Intents
+	r.svc.Intents = func(n turn.Intent) (dintent.Def, bool) {
+		d, ok := intents(n)
+		d.DraftEffects = []string{"entry.nudged", "unit.closed"}
+		return d, ok
+	}
 	got, err := r.svc.Run(context.Background(), headless.Request{Unit: thread})
 	if err != nil {
 		t.Fatal(err)

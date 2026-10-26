@@ -53,7 +53,7 @@ func (e *Engine) withdrawal(ctx context.Context, live map[string]workflow.Workfl
 	case w.Withdraw == nil || w.Mode != workflow.ModeApply:
 		return "", nil
 	}
-	facts, err := e.Units.Facts(ctx, d.Subject)
+	facts, err := e.factsFor(ctx, d.Workflow, d.Subject)
 	switch {
 	case errors.Is(err, ErrUnitGone):
 		return draft.WithdrawMoot, nil

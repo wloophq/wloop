@@ -166,9 +166,9 @@ var (
 	// DraftEmojiDeliveries are the deliveries that post an emoji, which
 	// need the reaction argument, and no text.
 	DraftEmojiDeliveries = []string{"reaction"}
-	DraftItems      = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
-	DraftPer        = []string{"subject", "person"}
-	DraftTargets    = []string{"unit", "item"}
+	DraftItems           = []string{"owed", "resolved", "unowned", "unowned_aged", "all"}
+	DraftPer             = []string{"subject", "person"}
+	DraftTargets         = []string{"unit", "item"}
 	// HoldForever is hold_after_sent's value that never proposes again
 	// after a draft was sent.
 	HoldForever = "forever"

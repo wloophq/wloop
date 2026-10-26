@@ -2,6 +2,7 @@ package automation_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
@@ -112,5 +113,22 @@ func TestPlanningWithdrawsNothing(t *testing.T) {
 		if _, ok := ws.Withdrawn(id); ok {
 			t.Errorf("planning withdrew draft %d", id)
 		}
+	}
+}
+
+func TestWithdrawWhenReadsTheFactsScopedToItsWorkflow(t *testing.T) {
+	w := withdrawWF("ask", draft.WithdrawAssigned)
+	w.Withdraw = automationtest.MatchFunc(func(v workflow.Vars) bool {
+		at, _ := v.Facts["session.settled"].(time.Time)
+		return !at.IsZero()
+	}, "session.settled")
+	r := newRig(t, w)
+	ws := withWithdrawals(r)
+	r.e.Units = scopedUnits{Units: r.units, settled: map[string]time.Time{"ask": t0}}
+	r.put(s1, "a")
+	ws.Put("ask", owned(1, s1, 0))
+	r.sweep()
+	if got, ok := ws.Withdrawn(1); !ok || got != draft.WithdrawAssigned {
+		t.Fatalf("withdraw when read the unscoped facts: %v %q", ok, got)
 	}
 }
