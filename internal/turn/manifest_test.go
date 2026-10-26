@@ -53,9 +53,14 @@ func TestBundledManifestsLoad(t *testing.T) {
 }
 
 func TestEveryArtifactKindHasARecordSentence(t *testing.T) {
+	b, err := Base()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, k := range record.ArtifactKinds {
-		if _, err := artifactDoc(k); err != nil {
-			t.Error(err)
+		var out strings.Builder
+		if err := b.ExecuteTemplate(&out, "artifact", k); err != nil || !strings.HasPrefix(out.String(), "`artifact` (asked") || !strings.Contains(out.String(), "`kind: "+k+"`") {
+			t.Errorf("%s: %q %v", k, out.String(), err)
 		}
 	}
 }
@@ -282,6 +287,7 @@ func TestTurnFactsCoverTheTurnSlot(t *testing.T) {
 		"pr.cross_repository":  func(_ *Builder, r *Request) { r.Payload.(*PR).CrossRepository = true },
 		"pr.visibility":        func(_ *Builder, r *Request) { r.Payload.(*PR).Visibility = "private" },
 		"pr.labels":            func(_ *Builder, r *Request) { r.Payload.(*PR).Labels = []string{"x"} },
+		"pr.requested_teams":   func(b *Builder, _ *Request) { b.Facts = &facts{st: Stored{Teams: []string{"acme-platform"}}} },
 		"turn.trigger":         func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.automated":       func(_ *Builder, r *Request) { r.Trigger = Automated },
 		"turn.owned":           func(_ *Builder, r *Request) { r.Owned = true },

@@ -119,24 +119,24 @@ func (c *conditions) path() (p profile.BlockPath, notes []string, err error) {
 }
 
 func (c *conditions) facts() profile.Facts {
-	v := func(d profile.Dim) string { return *c.dims[d] }
-	f := profile.Facts{Owner: v(profile.DimOrganization), Repo: v(profile.DimRepo), Author: v(profile.DimUser), Association: v(profile.DimAssociation),
-		Base: v(profile.DimBase), Round: v(profile.DimRound), Kind: v(profile.DimKind), Size: v(profile.DimSize), Risk: v(profile.DimRisk)}
-	if t := v(profile.DimTeam); t != "" {
-		f.Teams = []string{t}
-	}
-	if l := v(profile.DimLabel); l != "" {
-		f.Labels = []string{l}
-	}
-	if r := v(profile.DimReviewer); r != "" {
-		f.Reviewers = []string{r}
+	f := profile.Facts{Values: map[string]any{}}
+	for _, d := range profile.Vocabulary(nil) {
+		v, ok := c.dims[d.Name]
+		if !ok || *v == "" {
+			continue
+		}
+		f.Values[d.Fact] = *v
+		if d.List {
+			f.Values[d.Fact] = []string{*v}
+		}
+		f.HasBrief = f.HasBrief || d.Brief
 	}
 	for _, kv := range c.tags {
 		if t, err := profile.NormalizeTag(kv); err == nil {
 			f.Tags = append(f.Tags, t)
 		}
 	}
-	f.HasBrief = f.Kind != "" || f.Size != "" || f.Risk != "" || len(f.Tags) > 0
+	f.HasBrief = f.HasBrief || len(f.Tags) > 0
 	return f
 }
 

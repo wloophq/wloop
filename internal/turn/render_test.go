@@ -191,7 +191,10 @@ func TestADevDirReplacesABundledIntentsInstructions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "intents", "nudge", "instructions.md.tmpl"), []byte(`# DEV {{.Headline}} {{.Inputs.situation}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "judgment.md.tmpl"), []byte(`{{define "judgment"}}DEV JUDGMENT{{end}}`), 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "partials"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "partials", "judgment.md.tmpl"), []byte(`{{define "judgment"}}DEV JUDGMENT{{end}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	l := bundled(t)
@@ -216,13 +219,13 @@ func TestTemplatesAreAgentNeutral(t *testing.T) {
 			}
 		}
 	}
-	entries, err := fs.ReadDir(embedded, "templates")
-	if err != nil {
-		t.Fatal(err)
+	partials, err := fs.Glob(profiles.Default, "default/partials/*")
+	if err != nil || len(partials) < 9 {
+		t.Fatalf("%v %v", partials, err)
 	}
-	for _, e := range entries {
-		raw, _ := fs.ReadFile(embedded, "templates/"+e.Name())
-		check(e.Name(), raw)
+	for _, name := range partials {
+		raw, _ := fs.ReadFile(profiles.Default, name)
+		check(name, raw)
 	}
 	moved, err := fs.Glob(profiles.Default, "default/intents/*/instructions.md.tmpl")
 	if err != nil || len(moved) < 4 {

@@ -1,6 +1,7 @@
 package prrow
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ func (d Deriver) facetValues(r api.Row, p Payload) map[string][]string {
 		FacetLane:    {boardLane(r, p)},
 		FacetDue:     dueTimes(r, p),
 	}
+	maps.Copy(out, extraValues(registryOf(d.Loaded), brief.Extra))
 	if p.Facts != nil && !p.Facts.CreatedAt.IsZero() {
 		out[FacetOpened] = []string{stamp(p.Facts.CreatedAt)}
 	}

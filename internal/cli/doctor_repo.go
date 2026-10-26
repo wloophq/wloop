@@ -102,7 +102,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 		return err
 	}
 	var st api.DoctorReport
-	base := profile.Facts{Owner: ref.Owner, Repo: ref.Repo}
+	base := profile.Facts{Values: map[string]any{"pr.owner": ref.Owner, "pr.repo": ref.Repo}}
 	var read *api.Facts
 	if c != nil {
 		q := api.DoctorQuery{Repo: ref.Owner + "/" + ref.Repo}
@@ -241,8 +241,9 @@ func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref github.Ref) 
 }
 
 func profileFacts(f api.Facts) profile.Facts {
-	return profile.Facts{Owner: f.Owner, Repo: f.Repo, Author: f.Author, Association: f.Association, Base: f.Base, Teams: f.Teams, Labels: f.Labels,
-		Kind: f.Kind, Size: f.Size, Risk: f.Risk, Tags: f.Tags, Files: f.Files, HasBrief: f.HasBrief}
+	return profile.Facts{Values: map[string]any{"pr.owner": f.Owner, "pr.repo": f.Repo, "pr.author": f.Author, "pr.association": f.Association, "pr.base": f.Base,
+		"pr.requested_teams": f.Teams, "pr.labels": f.Labels, "brief.kind": f.Kind, "brief.size": f.Size, "brief.risk": f.Risk},
+		Tags: f.Tags, Files: f.Files, HasBrief: f.HasBrief}
 }
 
 func describeFacts(f api.Facts) string {

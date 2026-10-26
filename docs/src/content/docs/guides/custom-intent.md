@@ -123,3 +123,18 @@ Each file you write replaces the bundled file of the same name; the files you le
 Your override yields to your own intents: when it claims a key, a flag or a row-driving workspace one of your intents already holds, the override is the one that does not load.
 
 Judgment blocks (`intent=address.md`) remain the way to add to what a turn looks for; override the instructions when you want to change what the turn is.
+
+## Change a partial
+
+The partials are the text every intent's instructions share: `record` (how a turn ends), `history`, `resume`, `brief`, `judgment` (with `review-judgment` in the same file), `items`, `unit`, `dossier`, `why` and `artifact` (the record's sentence per artifact kind). Each is a file of the bundled profile's `partials/`, and a file of yours of the same name replaces it for every intent:
+
+```sh
+{{command}} profile show acme/api --show            # the instructions, rendered
+mkdir -p <profile>/partials
+# write <profile>/partials/record.md.tmpl, defining "record"
+{{command}} profile check
+```
+
+A partial of yours with a new name adds a template your intents may call. `profile check` renders every intent over your partials; a partial that does not parse or breaks an intent is reported against your file, and the bundled partials load in its place. The record partial must still tell the agent the record protocol: the `turn_end` tool, the `turn end ... --turn` command that stands in for it, and the `state` and `summary` fields; one that drops any of them fails `profile check`.
+
+The headless turn's prompt around the unit's instructions is `prompts/headless.md.tmpl`, which defines `before` and `after`; {{name}} writes the unit data's markers, the instructions between them and the answer schema itself. A wrapper of yours that does not parse is logged and the bundled one is used.

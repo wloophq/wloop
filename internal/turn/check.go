@@ -1,12 +1,15 @@
 package turn
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"text/template"
+	"text/template/parse"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/instructions"
@@ -29,9 +32,18 @@ func CheckTemplate(d dintent.Def, t *template.Template) []intentload.Problem {
 			out = append(out, p)
 		}
 	}
+	record := t.Lookup("record")
+	if t.Tree == nil || !calls(t.Tree.Root, "record") {
+		record = nil
+	}
 	for _, c := range samples(d) {
 		if err := t.Execute(io.Discard, c); err != nil {
 			add(execProblem(t.Name(), err))
+		}
+		if record != nil {
+			for _, p := range checkRecord(record, c) {
+				add(p)
+			}
 		}
 		for i := -1; i < len(d.Headline.New); i++ {
 			h := t.Lookup(intentload.HeadlineName(i))
@@ -125,4 +137,47 @@ func execProblem(name string, err error) intentload.Problem {
 		msg = msg[i+2:]
 	}
 	return intentload.Problem{File: m[1], Line: line, Col: col, Msg: msg}
+}
+
+// recordProtocol is what the record partial must tell an agent for the
+// turn's record to reach the loop: the MCP tool, the command that stands in
+// for it, and the record's required fields.
+var recordProtocol = []string{"turn_end", " turn end ", "--turn", "`state`", "`summary`"}
+
+func checkRecord(record *template.Template, c Context) []intentload.Problem {
+	var b bytes.Buffer
+	if err := record.Execute(&b, c); err != nil {
+		return nil
+	}
+	var missing []string
+	for _, must := range recordProtocol {
+		if !strings.Contains(b.String(), must) {
+			missing = append(missing, strconv.Quote(strings.TrimSpace(must)))
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return []intentload.Problem{{File: record.Tree.ParseName, Line: 1, Col: 1,
+		Msg: fmt.Sprintf("the record partial does not say %s, which the record protocol needs: an agent could not end its turn", strings.Join(missing, ", "))}}
+}
+
+// calls says whether the tree under n invokes the template name.
+func calls(n parse.Node, name string) bool {
+	switch n := n.(type) {
+	case *parse.ListNode:
+		if n == nil {
+			return false
+		}
+		return slices.ContainsFunc(n.Nodes, func(c parse.Node) bool { return calls(c, name) })
+	case *parse.TemplateNode:
+		return n.Name == name
+	case *parse.IfNode:
+		return calls(n.List, name) || calls(n.ElseList, name)
+	case *parse.RangeNode:
+		return calls(n.List, name) || calls(n.ElseList, name)
+	case *parse.WithNode:
+		return calls(n.List, name) || calls(n.ElseList, name)
+	}
+	return false
 }

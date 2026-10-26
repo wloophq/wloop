@@ -38,6 +38,25 @@ func (b Block) Rel() string { return write(b.Path) }
 type Tree struct {
 	Chain  []Layer
 	Blocks []Block
+	// Labels are the headings of the blocks' conditions; Dims what their
+	// conditions may name. Load fills both; a tree built without them
+	// reads the bundled labels and the dimensions of no brief intent.
+	Labels *Labels
+	Dims   []DimDef
+}
+
+func (t Tree) labels() Labels {
+	if t.Labels != nil {
+		return *t.Labels
+	}
+	return bundledLabels()
+}
+
+func (t Tree) vocab() []DimDef {
+	if t.Dims != nil {
+		return t.Dims
+	}
+	return Vocabulary(nil)
 }
 
 type SizeError struct {
@@ -77,7 +96,11 @@ func fileName(l Layer, rel string) string {
 // first; intents are the registry blocks are written for, loaded first.
 // Blocks of a broken intent are skipped, so its manifest's problems stay its own.
 func Load(chain []Layer, intents *dintent.Registry, broken []dintent.Name) (Tree, error) {
-	t := Tree{Chain: chain}
+	labels, err := LoadLabels(chain)
+	if err != nil {
+		return Tree{}, err
+	}
+	t := Tree{Chain: chain, Labels: &labels, Dims: Vocabulary(intents)}
 	for _, l := range chain {
 		fsys, done, err := layerFS(l)
 		if err != nil {

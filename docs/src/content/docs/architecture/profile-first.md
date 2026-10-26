@@ -14,6 +14,9 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Intents: a manifest (`intent.toml`) and its instructions (`instructions.md.tmpl`) | `profiles/default/intents/<name>/` | adds intents under `intents/<name>/`, and overrides a bundled one file by file under its name |
 | Workflows: subject, trigger, predicate, steps, approval, limits (`workflow.toml`) | `profiles/default/workflows/<name>/` | adds workflows under `workflows/<name>/`, and overrides a bundled one file by file; `workflows.<name>` in the configuration sets a bundled one's mode, approval and switch |
 | Judgment: what a review looks for, the voice of a reply | the bundled guides, `profiles/default/intent=<name>.md` | blocks whose path says when they apply, such as `repo=api/intent=address.md` |
+| Partials: the text every intent's instructions share, such as the record protocol, the history and the brief | `profiles/default/partials/<name>.md.tmpl` | replaces a partial for every intent under `partials/<name>.md.tmpl`, and adds partials its intents call |
+| Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
+| The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 
@@ -21,7 +24,7 @@ A file of yours replaces the bundled file of the same path; a manifest of yours 
 
 Manifests name Go through a closed vocabulary, listed in `internal/intent/builtin` and checked when the profile loads:
 
-- **Facts**: named, typed values a provider computes for a unit, in `builtin.Facts` (`internal/intent/builtin/facts.go`). Predicates are CEL over the facts of a slot, compiled at load by `internal/intent/expr`; an evaluation error reads as false.
+- **Facts**: named, typed values a provider computes for a unit, in `builtin.Facts` (`internal/intent/builtin/facts.go`). Predicates are CEL over the facts of a slot, compiled at load by `internal/intent/expr`; an evaluation error reads as false. A fact flagged `Dim` is also a condition of a judgment block's path; today's dimension names (`organization`, `reviewer`, `kind`, ...) are aliases of facts in `internal/profile/dims.go`, and an enum field of the brief intent's `extra` is one too.
 - **Steps**: the actions a workflow runs, in `builtin.Steps`, each with its reach and its guards. A profile cannot lower a guard or force a step.
 - **Builtins by slot**: what an intent's `prepare`, `workspace`, `on_sent` and the other slots may name, in `builtin.Names`.
 - **Marks**: what a unit's triggers handled. A workflow records its own with `[marks]` and reads any with `handled()` in a predicate; the core stores and compares them (`internal/domain/mark`), and a plugin exposes the signal a mark holds as a fact.
@@ -48,8 +51,6 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 
 These texts and decisions are still in Go, and are moving to the profile:
 
-- the turn partials (`history`, `resume`, `record`, `brief`, `judgment`, `review-judgment`, `items`, `unit`) in `internal/turn/templates`, which no profile replaces (`LOOP_INSTRUCTIONS_DIR` overrides them for development);
-- the headless turn's wrapper text in `internal/core/headless`;
 - the Slack extraction prompt (`internal/adapter/source/slack/extract/prompt.md`), and the brief's prompt and taxonomy (`internal/brief`);
 - the Slack proposal rules and their texts (`internal/core/proposals`), and the GitHub plugin's `github-nudge` text;
 - what sending a draft does, which follows its kind and not its declared effects: a sent nudge stamps the entries it served (`internal/core/proposals`), and a nudge on a pull request records the event the next nudge's refusal reads (the GitHub plugin's publisher);
@@ -65,4 +66,4 @@ Drafts already carry a purpose, a delivery and the effects of sending them, apar
 - the proposal rules become default workflows over GTD entries and Slack units, with their texts in the profile;
 - a sent draft does what its declared effects say, and an agent's draft declares only the effects its intent's manifest allows;
 - workflows start any intent on any unit, each under its own daily limit and all under one daily budget, in the repository the intent names;
-- the prose above moves to `profiles/default/partials/` and `profiles/default/prompts/`.
+- the Slack extraction prompt and the brief's prompt and taxonomy move to `profiles/default/prompts/`.

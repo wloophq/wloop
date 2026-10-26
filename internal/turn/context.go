@@ -179,6 +179,8 @@ type TurnFacts struct {
 	Mine, CrossRepository                                                             bool
 	LastReviewVerdict                                                                 string
 	AddressReviews, AddressChecks, FollowupsWithoutWorkspace, AddressWithoutWorkspace bool
+	// RequestedTeams are the teams a review was requested through, as <org>-<slug>.
+	RequestedTeams []string
 }
 
 type Context struct {
