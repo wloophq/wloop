@@ -91,7 +91,7 @@ func storedTurnRules(command string, stored []string) [][]string {
 func prIntents(reg *dintent.Registry) []string {
 	var out []string
 	for _, d := range reg.All() {
-		if d.Context == contextPR {
+		if d.Context == contextPR && d.Builds == "" {
 			out = append(out, string(d.Name))
 		}
 	}

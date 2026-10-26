@@ -14,8 +14,8 @@
  ],
  "properties": {
   "brief": {
-   "type": "string",
-   "maxLength": 600
+   "type": "object",
+   "description": "replaced by brief.schema.json"
   },
   "viewer_role": {
    "type": "string",

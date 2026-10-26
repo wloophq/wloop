@@ -8,6 +8,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // DefaultHeadMoved is resume.head_moved when a manifest leaves it out: the generic sentence of resume.md.tmpl.
@@ -23,6 +24,9 @@ type sheet struct {
 	file     string
 	at       map[string]frontmatter.Position
 	problems Problems
+	// extras are the brief.extra.* facts of a provider's brief intent, which
+	// a workflow's predicates over a briefed subject read; nil reads none.
+	extras func(dunit.ProviderID) expr.Env
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -159,7 +163,12 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if g := m.Guidance; g != nil {
 		d.Guidance = dintent.Guidance{Label: str(g.Label, "Guidance"), Help: g.Help, Max: g.Max}
 	}
-	d.Headline = s.headline(m.Headline)
+	if d.Builds != "" {
+		d.Answerable, d.Reports = false, false
+	}
+	if m.Headline != nil || d.Builds == "" {
+		d.Headline = s.headline(m.Headline)
+	}
 	d.Inputs = s.inputs(m.Inputs)
 	for i, a := range m.AlsoProfiles {
 		path := fmt.Sprintf("also_profiles[%d]", i)

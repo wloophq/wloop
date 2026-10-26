@@ -1,6 +1,6 @@
 ---
 title: The brief
-description: A short preview of every pull request, written by the agent, that rows, filters and profile blocks read.
+description: A short preview of every pull request and Slack conversation, written by the agent, that rows, filters, workflows and profile blocks read.
 ---
 
 With briefs on, the daemon writes a short preview of every open pull request in scope:
@@ -21,6 +21,37 @@ With briefs on, the daemon writes a short preview of every open pull request in 
 | `audience` | `end-user`, `internal`, `developer`, `operator` |
 
 The cockpit shows the brief in the detail panel, and size and risk as pills on each row. The `/` filter searches the goal, and the `type:`, `size:`, `risk:` and `tag:` qualifiers read it. Profile blocks can depend on it: a block under `kind=fix/` or `tags/lang=go/` applies only to pull requests whose brief says so.
+
+## Slack conversations
+
+Each pass of the Slack extraction writes the brief of the thread or channel it read, in the same call: its goal and context, its **kind** (`question`, `request`, `incident`, `decision` or `announcement`), its risk, up to three open questions and tags under `domain`, `audience` and `concern`. A Slack brief has no size. Each topic of a direct message conversation gets its own brief. A pass that finds nothing new keeps the brief the conversation has; at most one brief is written per conversation a day, updated by later passes that day.
+
+## Fields of your own
+
+The brief is an intent of the profile, the one whose manifest says `builds = "brief"`. Its prompt is `prompts/brief.md` and its taxonomy `prompts/brief-taxonomy.md`; a file of your profile at either path replaces the bundled one, and briefs are written again at their next refresh. To add fields, give your profile its own brief intent with a `schema.json` beside its manifest:
+
+```toml
+# intents/brief/intent.toml
+label    = "Brief"
+summary  = "The brief, with how each change solves its goal"
+builds   = "brief"
+provider = ["github", "slack"]
+prompt   = "prompts/brief.md"
+schema   = "schema.json"
+```
+
+```json
+{"type": "object", "properties": {
+  "solution": {"type": "string", "maxLength": 300},
+  "approach": {"type": "string", "enum": ["patch", "rewrite", "config"]}
+}}
+```
+
+The schema is a flat object: strings (with or without an `enum`), integers, booleans and lists of strings, under the keywords `type`, `properties`, `required`, `additionalProperties`, `enum`, `minLength`, `maxLength`, `minItems`, `maxItems`, `items`, `pattern` and `description`. Any other keyword or a nested object fails the profile's load and names the field. One profile layer holds at most one brief intent per provider; yours replaces the bundled one.
+
+Each field becomes a fact, `brief.extra.solution`, that a workflow's `when` can read; naming a field the schema does not declare fails the workflow's load. An `enum` field is also a block dimension (`approach=rewrite/intent=review.md`) and a facet (`extra.approach:rewrite`). Partials read it as `.Brief.Extra.solution`.
+
+Every field has its own version, a hash of its schema. A new or changed field is listed in `brief.missing` on the briefs written before it; it is filled at the brief's next refresh, or by a call that asks for the missing fields alone and keeps the rest of the brief. An answer whose fields break the schema keeps the brief without them.
 
 ## Turn it on
 

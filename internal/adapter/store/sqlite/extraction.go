@@ -18,9 +18,13 @@ type ExtractionStore struct{ db *DB }
 func (db *DB) Extraction() *ExtractionStore { return &ExtractionStore{db} }
 
 // ExtractionState is one unit's row. Watched is written only by SetWatched;
-// ClosureMarked, a sent draft's unit.closed, never by Save. Brief is the goal
-// of the unit's brief in use, which Save keeps as the unit's extraction brief
-// run of the day.
+// ClosureMarked, a sent draft's unit.closed, never by Save.
+//
+// Brief is the JSON of the unit's brief in use. Save writes a non-empty one
+// as the unit's extraction brief run of the day, the UTC date of the run's
+// started_at: a second pass that day updates that run, a pass on a later day
+// starts a new one. An empty Brief keeps the brief in use, whichever day
+// wrote it.
 type ExtractionState struct {
 	LastTS                                        string
 	LastSeq                                       int64
@@ -49,7 +53,7 @@ type ExtractionSave struct {
 }
 
 const (
-	extractionStateColumns = `extraction_cursors.provider, extraction_cursors.unit_key, last_ts, last_seq, COALESCE(json_extract(r.brief, '$.goal'), ''),
+	extractionStateColumns = `extraction_cursors.provider, extraction_cursors.unit_key, last_ts, last_seq, COALESCE(r.brief, ''),
 		verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, closure_marked, extraction_cursors.at`
 	extractionFrom = ` FROM extraction_cursors LEFT JOIN unit_briefs b ON b.provider = extraction_cursors.provider AND b.unit_key = extraction_cursors.unit_key
 		LEFT JOIN brief_runs r ON b.run != 0 AND r.id = b.run`
@@ -66,9 +70,9 @@ const (
 	// pass ran, which the pass updates in place.
 	extractionBriefRunSQL = `SELECT r.id FROM unit_briefs b JOIN brief_runs r ON r.id = b.last_run
 		WHERE b.provider = ? AND b.unit_key = ? AND r.trigger = 'extraction' AND substr(r.started_at, 1, 10) = substr(?, 1, 10)`
-	updateExtractionBriefSQL = `UPDATE brief_runs SET brief = json_object('goal', ?), ended_at = ? WHERE id = ?`
+	updateExtractionBriefSQL = `UPDATE brief_runs SET brief = json(?), ended_at = ? WHERE id = ?`
 	insertExtractionBriefSQL = `INSERT INTO brief_runs (provider, unit_key, intent, trigger, version, attempt_of, started_at, ended_at, outcome, brief)
-		VALUES (?, ?, 'brief', 'extraction', 'extraction', '', ?, ?, 'ok', json_object('goal', ?))`
+		VALUES (?, ?, 'brief', 'extraction', 'extraction', '', ?, ?, 'ok', json(?))`
 	useExtractionBriefSQL = `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES (?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key) DO UPDATE SET run = excluded.run, last_run = excluded.last_run`
 	setExtractionWatchedSQL = `INSERT INTO extraction_cursors (provider, unit_key, watched, at) VALUES (?, ?, ?, ?)

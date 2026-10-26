@@ -15,6 +15,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -90,7 +91,7 @@ type wUnit struct {
 // bundled one whose override fails is listed in reverted and loads without
 // it. intentProblem, when set, is why a turn.start may not name an intent,
 // "" when it may.
-func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
+func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(name string) string, extras func(dunit.ProviderID) expr.Env) (loaded []workflow.Workflow, broken, reverted map[string]Problems, problems Problems) {
 	var units []*wUnit
 	bundledUnits := map[string]*wUnit{}
 	if bundled != nil {
@@ -132,12 +133,12 @@ func loadWorkflows(layers []profile.Layer, bundled fs.FS, intentProblem func(nam
 	}
 	broken, reverted = map[string]Problems{}, map[string]Problems{}
 	for _, u := range units {
-		u.load(intentProblem)
+		u.load(intentProblem, extras)
 		if len(u.problems) > 0 && len(u.files.overlay) > 0 {
 			reverted[u.name] = u.files.own(u.problems, "workflow.toml")
 			problems = append(problems, reverted[u.name]...)
 			u.files.overlay = nil
-			u.load(intentProblem)
+			u.load(intentProblem, extras)
 		}
 		if len(u.problems) > 0 {
 			problems = append(problems, u.problems...)
@@ -198,9 +199,9 @@ func (u *wUnit) unknownMarks(readable map[string]bool) Problems {
 	return out
 }
 
-func (u *wUnit) load(intentProblem func(string) string) {
+func (u *wUnit) load(intentProblem func(string) string, extras func(dunit.ProviderID) expr.Env) {
 	file := u.files.path("workflow.toml")
-	s := &sheet{file: file}
+	s := &sheet{file: file, extras: extras}
 	defer func() { u.problems = s.problems }()
 	if !workflowNameRe.MatchString(u.name) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "a workflow name is 2 to 40 lowercase letters, digits and -, starting with a letter"})
@@ -298,7 +299,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, intentProblem func(stri
 	if m.When == nil && !s.has("trigger.when") {
 		s.add("when", "is required: a predicate over the subject's facts, the trigger's and config.*")
 	} else if m.When != nil && slot != "" {
-		w.When = s.predicate("when", *m.When, builtin.WorkflowEnv(slot))
+		w.When = s.predicate("when", *m.When, s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot))
 	}
 	s.defineSteps(&w, m.Step, intentProblem)
 	if l := m.Limits; l != nil {
@@ -341,7 +342,7 @@ func (s *sheet) defineWithdraw(w *workflow.Workflow, m *wWithdraw, slot string) 
 		s.add("withdraw", "withdraws drafts the workflow proposed; it has no %s step", builtin.StepDraftPropose)
 	}
 	if slot != "" {
-		w.Withdraw = s.predicate("withdraw.when", *m.When, builtin.WithdrawEnv(slot))
+		w.Withdraw = s.predicate("withdraw.when", *m.When, s.withExtras(builtin.WithdrawEnv(slot), w.Provider, slot))
 	}
 	w.WithdrawReason = draft.WithdrawMoot
 	if m.Reason != nil {
@@ -471,6 +472,11 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, intent
 					s.add(ap, "must be a string")
 					continue
 				}
+				if k == schemaArg {
+					if _, err := jsonschema.Compile([]byte(v), jsonschema.Options{}); err != nil {
+						s.add(ap, "%v", err)
+					}
+				}
 				if st.Args == nil {
 					st.Args = map[string]any{}
 				}
@@ -586,7 +592,21 @@ func (s *sheet) defineApproval(w *workflow.Workflow, a *wApproval, slot string) 
 			w.Approval.Window = s.duration("approval.window", *a.Window)
 		}
 		if a.WaitWhen != nil && slot != "" {
-			w.Approval.WaitWhen = s.predicate("approval.wait_when", *a.WaitWhen, builtin.WorkflowEnv(slot))
+			w.Approval.WaitWhen = s.predicate("approval.wait_when", *a.WaitWhen, s.withExtras(builtin.WorkflowEnv(slot), w.Provider, slot))
 		}
 	}
+}
+
+// schemaArg is the step argument holding the schema the step's agent
+// answers to, which Go validates the answer against.
+const schemaArg = "schema"
+
+// withExtras is env with the brief.extra.* facts of p's brief intent when
+// slot's units have a brief.
+func (s *sheet) withExtras(env expr.Env, p dunit.ProviderID, slot string) expr.Env {
+	if s.extras == nil || !slices.Contains(builtin.BriefSubjects, slot) {
+		return env
+	}
+	maps.Copy(env, s.extras(p))
+	return env
 }

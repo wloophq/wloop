@@ -3,6 +3,7 @@
 package intent
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -322,7 +323,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	for _, u := range units {
 		u.load(base)
-		if u.defined && !u.broken() && check != nil {
+		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
 	}
@@ -352,9 +353,15 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems = loadWorkflows(layers, bundled, l.intentProblem, l.briefExtras)
 	l.Problems = append(l.Problems, wfProblems...)
 	return l, broken
+}
+
+// briefExtras are the brief.extra.* facts of p's brief intent.
+func (l *Loaded) briefExtras(p dunit.ProviderID) expr.Env {
+	d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
+	return builtin.ExtraFacts(d.Extra)
 }
 
 func (l *Loaded) intentProblem(name string) string {
@@ -402,11 +409,11 @@ func (u *unit) load(base *template.Template) {
 		return
 	}
 	tmplFile := u.files.path("instructions.md.tmpl")
-	body, err := u.files.read("instructions.md.tmpl")
-	if err != nil {
-		s.problems = append(s.problems, readProblem(tmplFile, err, missing))
-	}
+	body, bodyErr := u.files.read("instructions.md.tmpl")
 	m, problems, skip, complete := decode[manifest](file, src)
+	if bodyErr != nil && (m.Builds == "" || !errors.Is(bodyErr, fs.ErrNotExist)) {
+		s.problems = append(s.problems, readProblem(tmplFile, bodyErr, missing))
+	}
 	if !complete {
 		s.problems = append(s.problems, problems...)
 		return
@@ -422,6 +429,7 @@ func (u *unit) load(base *template.Template) {
 	d := s.define(u.name, m)
 	d.Source = u.source
 	d.Bundled = u.bundled
+	u.loadExtra(s, &d)
 	s.validate(d)
 	u.programs = s.compile(d)
 	u.programs.ActionTexts = s.parseActionTexts(d.Action)
@@ -608,14 +616,20 @@ func (c *claims) check(u *unit, claim bool) {
 			take = append(take, func() { c.drivers[d.Workspace] = d.Name })
 		}
 	}
-	if d.Role != "" {
+	if d.Role != "" || d.Builds != "" {
 		providers := d.Providers
 		if providers == nil {
 			providers = []dunit.ProviderID{d.ProviderOrDefault()}
 		}
 		for _, p := range providers {
 			rc := roleClaim{u.bundled, d.Role, p}
-			if owner, taken := c.roles[rc]; taken && owner != d.Name {
+			if d.Builds != "" {
+				rc.role = "builds " + d.Builds
+			}
+			if owner, taken := c.roles[rc]; taken && owner != d.Name && d.Builds != "" {
+				s.add("builds", "%s builds the %s of %s units already; one builder per provider", owner, d.Builds, p)
+				continue
+			} else if taken && owner != d.Name {
 				s.add("role", "%s holds the role %s on %s units already; one intent per role and provider", owner, d.Role, p)
 				continue
 			}

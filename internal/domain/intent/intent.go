@@ -371,17 +371,26 @@ func (r *Registry) ByRole(role string, p unit.ProviderID) (Def, bool) {
 	return found, ok
 }
 
-// Builder is the intent that builds what for units of p, such as the brief.
+// Builder is the intent that builds what for units of p, such as the brief:
+// the user's holder over the bundled one.
 func (r *Registry) Builder(what string, p unit.ProviderID) (Def, bool) {
 	if what == "" {
 		return Def{}, false
 	}
+	var found Def
+	ok := false
 	for _, d := range r.defs {
-		if d.Builds == what && d.Serves(p) {
+		if d.Builds != what || !d.Serves(p) {
+			continue
+		}
+		if !d.Bundled {
 			return d, true
 		}
+		if !ok {
+			found, ok = d, true
+		}
 	}
-	return Def{}, false
+	return found, ok
 }
 
 // ProviderOrDefault is the provider whose units the intent's turns run on.

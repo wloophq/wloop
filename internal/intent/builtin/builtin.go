@@ -186,8 +186,11 @@ const (
 // Roles are what Go resolves an intent by, a manifest's role.
 var Roles = []string{RoleReview, RoleAddress, RoleNudge, RoleProbe, RoleHeadless}
 
+// BuildsBrief is what the brief intent builds.
+const BuildsBrief = "brief"
+
 // Builds are what a builder intent may build.
-var Builds = []string{"brief"}
+var Builds = []string{BuildsBrief}
 
 // The values of a manifest's round_kind, cap and reason.
 const (

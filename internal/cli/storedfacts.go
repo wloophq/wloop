@@ -57,7 +57,7 @@ func (s storedFacts) Facts(ctx context.Context, ref github.Ref) (turn.Stored, er
 		return st, err
 	}
 	st.Brief = &turn.Brief{Goal: b.Goal, Context: b.Context, Kind: b.Kind, Size: b.Size, Risk: b.Risk, RiskWhy: b.RiskWhy,
-		OpenQuestions: b.OpenQuestions, Tags: tags, Files: run.Files, Run: rec.Run,
+		OpenQuestions: b.OpenQuestions, Tags: tags, Files: run.Files, Run: rec.Run, Extra: b.Extra,
 		HeadMoved: known && rec.HeadOid != pr.HeadOid, OlderFormat: rec.Version != brief.Version(brief.DefaultTaxonomy)}
 	return st, nil
 }

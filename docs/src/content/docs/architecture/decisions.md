@@ -172,3 +172,10 @@ One entry per decision in force. A pull request that changes one of them changes
 - **Decision**: `turn.start` starts any intent on any unit, headless or in a session, in the repository its manifest's workspace table names; outside the round providers each workflow needs `limits.per_day`, and `turns.automated_per_day` caps all of them together per local day. A repository named by an input is never taken by a workflow.
 - **Consequence**: a request in a thread can start an implementing turn in a known repository; no thread text chooses the repository, and a runaway workflow stops at its budget.
 - **Enforced by**: the loader (`limits.per_day`) and the step's guards.
+
+## One brief per unit
+
+- **Context**: the brief was keyed by pull request, so a Slack conversation had only a free-text summary that no fact, block or filter could read.
+- **Decision**: briefs, their tags and their runs are keyed by unit. `brief_runs` is provider-neutral: what the unit was at is `revision`, in the provider's format, and its provider's parts of the input are `input`. A provider's `BriefSource` says what a unit is at, reads its input, and decides when a brief is stale and what an attempt was made from; GitHub's rules are the ones the queue had. The Slack extraction writes its brief in the call it already makes, one run per unit a day. The brief's prompt, taxonomy and extra fields are the profile's brief intent, found by `builds`; Go owns the core schema, composes it with the intent's, and validates every structured answer (brief, extraction, `classify`) against the schema that asked for it, with an in-house JSON Schema subset.
+- **Consequence**: `turns.brief_run` points at a run of any provider; a migrated store keeps every pull request brief at its version, so nothing is briefed again on upgrade; a new extra field is filled without briefing the core again.
+- **Enforced by**: `TestTheGitHubBriefVersionIsPinned`, `TestGitHubSourceStaleIsTheQueuesRule`, `TestAMigratedPRBriefIsNotDueAgain`, `TestAModelAnswerOutsideTheComposedSchemaIsRefused`.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -21,6 +22,12 @@ type Call struct {
 	// Home is the agent's configuration directory, "" for its default.
 	Home   string
 	Prompt string
+	// Schema is what the answer is asked for and validated against; the
+	// zero Composed is the core schema.
+	Schema Composed
+	// Fields, when set, asks only these extra fields of a brief that has
+	// its core: the missing-fields call.
+	Fields []string
 }
 
 type Result struct {
@@ -31,6 +38,11 @@ type Result struct {
 	Tokens   *usage.Tokens
 	// DroppedTags are the key:value spellings normalization refused.
 	DroppedTags []string
+	// Fields are a missing-fields call's values, by name.
+	Fields map[string]any
+	// ExtraErr is why the extra fields of an otherwise fitting brief were
+	// refused; the brief holds none of them.
+	ExtraErr error
 }
 
 // AskRunner makes a brief with one headless call of the agent.
@@ -38,12 +50,23 @@ type AskRunner struct{ Asker turns.Asker }
 
 // Run returns, with a failure, what the call cost when the agent said.
 func (a AskRunner) Run(ctx context.Context, c Call) (Result, error) {
-	ans, err := a.Asker.Ask(ctx, turns.Ask{Home: c.Home, Tier: c.Tier, Prompt: c.Prompt, Schema: Schema, MaxCostUSD: maxCostUSD})
+	schema := c.Schema.JSON()
+	if len(c.Fields) > 0 {
+		schema = c.Schema.FieldsJSON(c.Fields)
+	}
+	ans, err := a.Asker.Ask(ctx, turns.Ask{Home: c.Home, Tier: c.Tier, Prompt: c.Prompt, Schema: schema, MaxCostUSD: maxCostUSD})
 	res := Result{Model: ans.Model, CostUSD: ans.CostUSD, Duration: ans.Duration, Tokens: ans.Tokens}
 	if err != nil {
 		return res, err
 	}
-	res.Brief, res.DroppedTags, err = decode(ans.JSON)
+	if len(c.Fields) > 0 {
+		res.Fields, err = c.Schema.DecodeFields(ans.JSON, c.Fields)
+		return res, err
+	}
+	res.Brief, res.DroppedTags, err = c.Schema.decode(ans.JSON)
+	if errors.Is(err, ErrExtra) {
+		res.ExtraErr, err = err, nil
+	}
 	return res, err
 }
 

@@ -216,7 +216,7 @@ func TestRetainBriefBodies(t *testing.T) {
 	db, _ := openTemp(t)
 	run := func(id int, started time.Time) {
 		exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, trigger, version, attempt_of, started_at, ended_at, outcome, input_tokens, brief, input, tags, dropped_tags)
-			VALUES (?, 'github', 'acme/api#1', 'wanted', 'v1', 'h', ?, ?, 'ok', 120, '{"goal":"g"}', '{"files":["a.go"]}', '["change:fix"]', '["x:y"]')`, id, at(started), at(started.Add(time.Minute)))
+			VALUES (?, 'github', 'acme/api#1', 'wanted', 'v1', 'h', ?, ?, 'ok', 120, '{"goal":"g"}', '{"changed_files":3,"files":["a.go"]}', '["change:fix"]', '["x:y"]')`, id, at(started), at(started.Add(time.Minute)))
 	}
 	for id := 1; id <= 4; id++ {
 		run(id, retainNow.Add(-8*day))
@@ -228,16 +228,19 @@ func TestRetainBriefBodies(t *testing.T) {
 	if got := retain(t, db, Retention{BriefBodies: 7 * day}); got["brief_runs"] != 1 || len(got) != 1 {
 		t.Errorf("retained %v, want one brief run compacted", got)
 	}
-	if left := column(t, db, `SELECT id FROM brief_runs WHERE brief != '' AND input != '{}' ORDER BY id`); !slices.Equal(left, []string{"1", "2", "3", "5"}) {
+	if left := column(t, db, `SELECT id FROM brief_runs WHERE brief != '' AND json_type(input, '$.files') IS NOT NULL ORDER BY id`); !slices.Equal(left, []string{"1", "2", "3", "5"}) {
 		t.Errorf("runs with a body %q, want 1 2 3 5", left)
 	}
-	var outcome, ended, tags, dropped string
+	var outcome, ended, tags, dropped, input string
 	var tokens int
-	if err := db.R().QueryRowContext(context.Background(), `SELECT outcome, ended_at, input_tokens, tags, dropped_tags FROM brief_runs WHERE id = 4`).Scan(&outcome, &ended, &tokens, &tags, &dropped); err != nil {
+	if err := db.R().QueryRowContext(context.Background(), `SELECT outcome, ended_at, input_tokens, tags, dropped_tags, input FROM brief_runs WHERE id = 4`).Scan(&outcome, &ended, &tokens, &tags, &dropped, &input); err != nil {
 		t.Fatal(err)
 	}
-	if outcome != "ok" || ended == "" || tokens != 120 || tags == "" || dropped == "" {
-		t.Errorf("the compacted run lost more than its body: %q %q %d %q %q", outcome, ended, tokens, tags, dropped)
+	if outcome != "ok" || ended == "" || tokens != 120 || tags == "" || dropped == "" || input != `{"changed_files":3}` {
+		t.Errorf("the compacted run lost more than its body and files: %q %q %d %q %q %s", outcome, ended, tokens, tags, dropped, input)
+	}
+	if got := retain(t, db, Retention{BriefBodies: 7 * day}); len(got) != 0 {
+		t.Errorf("a second pass retained %v", got)
 	}
 }
 

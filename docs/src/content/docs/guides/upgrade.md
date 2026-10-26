@@ -33,6 +33,8 @@ A build that is not a release, such as `make dev-install` from a checkout, never
 launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}
 ```
 
+Schema version 4 keys briefs and tags by unit; the Slack conversations keep the summary they had as the goal of their brief. A workflow's `classify` schema must use the keywords the brief's extra fields use (see [the brief](/concepts/brief/#fields-of-your-own)); one with another keyword fails the workflow's load, naming the step and the keyword. Releases before it refuse a store at version 4.
+
 ## Going back to an earlier release
 
 A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync.

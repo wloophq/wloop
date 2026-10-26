@@ -290,15 +290,23 @@ func WithdrawEnv(slot string) expr.Env {
 }
 
 // ExtraFacts are the brief.extra.<name> facts the brief intent's extra
-// schema declares, typed from it: a string, a string with an enum, an
-// integer, a boolean or an array of strings with an enum. A predicate's env
-// is extended with them at load.
-func ExtraFacts(extra *jsonschema.Schema) expr.Env {
-	if extra == nil {
-		return expr.Env{}
+// schema declares, typed from its properties: a string (with or without an
+// enum), an integer, a boolean or an array of strings. A number has no fact
+// type and declares none. A predicate's env is extended with them at load,
+// so naming an undeclared extra fails there.
+func ExtraFacts(props []jsonschema.Property) expr.Env {
+	env := expr.Env{}
+	for _, p := range props {
+		t, ok := map[string]expr.Type{"string": expr.String, "integer": expr.Int, "boolean": expr.Bool, "array": expr.List}[p.Type]
+		if ok {
+			env[ExtraPrefix+p.Name] = t
+		}
 	}
-	return expr.Env{}
+	return env
 }
+
+// ExtraPrefix names a brief's extra field as a fact.
+const ExtraPrefix = "brief.extra."
 
 // PREnv is the pull request's own facts of the turn slot, the ones a turn
 // reads before it is built.

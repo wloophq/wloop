@@ -8,20 +8,41 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
+	"path"
 	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/facet"
+	"github.com/wloophq/wloop/profiles"
 )
 
-//go:embed prompt.md
-var promptTemplate string
+// PromptFile and TaxonomyFile are the bundled profile's brief prompt and
+// taxonomy, relative to the profile's root.
+const (
+	PromptFile       = "prompts/brief.md"
+	FieldsPromptFile = "prompts/brief-fields.md"
+	TaxonomyFile     = "prompts/brief-taxonomy.md"
+)
+
+var (
+	promptTemplate = bundled(PromptFile)
+	fieldsTemplate = bundled(FieldsPromptFile)
+)
 
 //go:embed schema.json
 var Schema string
 
-//go:embed taxonomy.md
-var DefaultTaxonomy string
+// DefaultTaxonomy is the bundled profile's taxonomy.
+var DefaultTaxonomy = bundled(TaxonomyFile)
+
+func bundled(rel string) string {
+	b, err := fs.ReadFile(profiles.Default, path.Join("default", rel))
+	if err != nil {
+		panic("brief: the bundled profile has no " + rel + ": " + err.Error())
+	}
+	return string(b)
+}
 
 var ErrInvalid = errors.New("the brief does not fit the schema")
 
@@ -59,8 +80,12 @@ func (b Brief) validate() error {
 
 // Version keys the cache: a new prompt, schema or taxonomy makes every
 // brief stale.
-func Version(taxonomy string) string {
-	h := sha256.Sum256([]byte(promptTemplate + "\x00" + Schema + "\x00" + taxonomy))
+func Version(taxonomy string) string { return versionOf(promptTemplate, taxonomy) }
+
+// versionOf is the version of briefs made from prompt and taxonomy; the
+// extra fields carry their own versions.
+func versionOf(prompt, taxonomy string) string {
+	h := sha256.Sum256([]byte(prompt + "\x00" + Schema + "\x00" + taxonomy))
 	return "b1-" + hex.EncodeToString(h[:6])
 }
 
@@ -82,13 +107,19 @@ type Input struct {
 // data, so the pull request cannot close its own block. The vocabulary is
 // not part of Version, so a new tag value makes no brief stale.
 func Prompt(taxonomy, vocabulary string, in Input) string {
+	return fill(promptTemplate, taxonomy, vocabulary, in, nil)
+}
+
+// fill is Prompt over tmpl; more are further placeholders and their values,
+// replaced in the same pass.
+func fill(tmpl, taxonomy, vocabulary string, in Input, more []string) string {
 	issue := in.Issue
 	if issue == "" {
 		issue = "(none)"
 	}
 	files := strings.Join(in.Files, "\n")
 	h := sha256.Sum256([]byte(strings.Join([]string{in.Title, in.Body, issue, files, in.DiffNote, in.Diff}, "\x00")))
-	return strings.NewReplacer(
+	return strings.NewReplacer(append([]string{
 		"{{marker}}", hex.EncodeToString(h[:8]),
 		"{{taxonomy}}", strings.TrimSpace(taxonomy),
 		"{{vocabulary}}", strings.TrimSpace(vocabulary),
@@ -98,5 +129,5 @@ func Prompt(taxonomy, vocabulary string, in Input) string {
 		"{{files}}", files,
 		"{{diff_note}}", in.DiffNote,
 		"{{diff}}", in.Diff,
-	).Replace(promptTemplate)
+	}, more...)...).Replace(tmpl)
 }

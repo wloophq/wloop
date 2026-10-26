@@ -1,5 +1,5 @@
 {
-  "brief": "Ann asked Bob to review the release notes; Bob did, and Cy decided the widget toggle stays off. Ann now owns the rollout once pull request 527 is reviewed.",
+  "brief": {"unchanged": false, "goal": "Ann asked Bob to review the release notes; Bob did, and Cy decided the widget toggle stays off. Ann now owns the rollout once pull request 527 is reviewed.", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": ["release"], "audience": [], "concern": []}},
   "viewer_role": "both",
   "started_by_viewer": true,
   "items": [

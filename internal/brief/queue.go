@@ -62,6 +62,9 @@ const (
 	TriggerRefresh = "refresh"
 	// TriggerTrial is the breaker's run that tells whether briefs work again.
 	TriggerTrial = "trial"
+	// TriggerFields is a run that fills a brief's missing extra fields,
+	// reusing its core.
+	TriggerFields = "fields"
 )
 
 type Store interface {
@@ -120,12 +123,32 @@ type Deps struct {
 	// configuration changes, or the minute turns; nil reads every call.
 	Changes port.Changes
 	Log     func(format string, args ...any)
+	// Intent is the brief intent as the profile resolves it now; nil is
+	// the bundled one.
+	Intent func() Intent
+}
+
+// Intent is what the brief intent sets of a brief: the composed schema,
+// the zero Composed being the core alone, and the prompt and the
+// missing-fields prompt, empty for the bundled ones.
+type Intent struct {
+	Schema               Composed
+	Prompt, FieldsPrompt string
+}
+
+func (q *Queue) intent() Intent {
+	var in Intent
+	if q.d.Intent != nil {
+		in = q.d.Intent()
+	}
+	in.Prompt, in.FieldsPrompt = cmp.Or(in.Prompt, promptTemplate), cmp.Or(in.FieldsPrompt, fieldsTemplate)
+	return in
 }
 
 type Queue struct {
 	d        Deps
 	mu       sync.Mutex
-	versions map[string]string // by taxonomy
+	versions map[string]string // by prompt and taxonomy
 	inflight map[github.Ref]bool
 	waiters  map[github.Ref][]chan struct{}
 	breaker  breaker
@@ -301,14 +324,16 @@ func (q *Queue) version(ref github.Ref) (taxonomy, version string) {
 	taxonomy = q.d.Taxonomy(ref)
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if v, ok := q.versions[taxonomy]; ok {
+	prompt := q.intent().Prompt
+	key := prompt + "\x00" + taxonomy
+	if v, ok := q.versions[key]; ok {
 		return taxonomy, v
 	}
 	if q.versions == nil {
 		q.versions = map[string]string{}
 	}
-	q.versions[taxonomy] = Version(taxonomy)
-	return taxonomy, q.versions[taxonomy]
+	q.versions[key] = versionOf(prompt, taxonomy)
+	return taxonomy, q.versions[key]
 }
 
 // Run briefs up to Batch due pull requests, Concurrency at a time, leaving
@@ -434,7 +459,12 @@ func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout t
 		if in.DiffBytes > 0 || in.DiffNote == "" {
 			run.DiffBytes = &in.DiffBytes
 		}
-		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Prompt: Prompt(taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in)})
+		bi := q.intent()
+		res, err = q.d.Runner.Run(cctx, Call{Tier: q.d.Tier, Home: q.d.Home(pr.Ref), Schema: bi.Schema,
+			Prompt: fill(bi.Prompt, taxonomy, tag.Vocabulary(tag.WithSeeds(vocabulary, VocabularySize)), in, nil)})
+		if res.ExtraErr != nil {
+			q.d.Log("brief %s: the extra fields are left missing: %v", pr.Ref, res.ExtraErr)
+		}
 		run.CallMS = ms(q.d.Now().Sub(inputAt))
 		if res.Duration > 0 {
 			run.AgentMS = ms(res.Duration)

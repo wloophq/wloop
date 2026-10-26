@@ -6,12 +6,28 @@
   "additionalProperties": false,
   "required": [
     "label",
-    "summary",
-    "workspace",
-    "session",
-    "headline",
-    "record"
+    "summary"
   ],
+  "if": {
+    "not": {
+      "required": [
+        "builds"
+      ]
+    }
+  },
+  "then": {
+    "required": [
+      "workspace",
+      "session",
+      "headline",
+      "record"
+    ]
+  },
+  "else": {
+    "required": [
+      "prompt"
+    ]
+  },
   "properties": {
     "label": {
       "type": "string",

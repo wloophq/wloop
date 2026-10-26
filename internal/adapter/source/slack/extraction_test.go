@@ -47,11 +47,15 @@ func extractionAnswer(t *testing.T, origin string, segments []map[string]string)
 		"assignees": []string{me}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []string{me},
 		"state": "open", "resolution": "none", "evidence_ts": "", "evidence_kind": "none", "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "headless", "place": map[string]string{"context": "", "why": ""}}
-	segs := []map[string]string{}
-	if segments != nil {
-		segs = segments
+	segs := []map[string]any{}
+	for _, sg := range segments {
+		seg := map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`)}
+		for k, v := range sg {
+			seg[k] = v
+		}
+		segs = append(segs, seg)
 	}
-	out, err := json.Marshal(map[string]any{"brief": "b", "viewer_role": "assignee", "started_by_viewer": false, "items": []any{it},
+	out, err := json.Marshal(map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{it},
 		"verdict": "waits_on_viewer", "verdict_why": "w", "closure_posted": false, "segments": segs,
 		"links": []map[string]string{{"item": "n1", "target": "https://github.com/acme/widget/pull/527", "kind": "review", "evidence_ts": origin}}})
 	if err != nil {
@@ -183,7 +187,7 @@ func threadAnswer(t *testing.T, ref, origin, evidence string) []byte {
 		"assignees": []string{me}, "assignment_ts": origin, "assignment_basis": "explicit_mention", "waiting_on": []string{},
 		"state": state, "resolution": resolution, "evidence_ts": evidence, "evidence_kind": kind, "confidence": "high", "ambiguity": "",
 		"links": []any{}, "context": "", "options": []any{}, "deadline": "", "mode": "none", "place": map[string]string{"context": "", "why": ""}}
-	out, err := json.Marshal(map[string]any{"brief": "b", "viewer_role": "assignee", "started_by_viewer": false, "items": []any{it},
+	out, err := json.Marshal(map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false, "items": []any{it},
 		"verdict": "resolved", "verdict_why": "w", "closure_posted": false, "segments": []any{}, "links": []any{}})
 	if err != nil {
 		t.Fatal(err)
