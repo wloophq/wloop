@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/outbox"
@@ -34,34 +35,36 @@ func (n *notes) note(t port.Topic) {
 	}
 }
 
-func eventually(t *testing.T, what string, ok func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !ok() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 func TestWatchRunsAtOnceAndOnItems(t *testing.T) {
-	e := newEnv(t)
-	e.job.Log = nil
-	src := &githubSource{}
-	e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
-	calls := func() int { src.mu.Lock(); defer src.mu.Unlock(); return src.calls }
-	ch := &notes{}
-	wctx, cancel := context.WithCancel(ctx)
-	done := make(chan struct{})
-	go func() { e.job.Watch(wctx, ch, 10*time.Millisecond, time.Hour); close(done) }()
-	defer func() { cancel(); <-done }()
-	eventually(t, "the first pass", func() bool { return calls() == 1 })
-	eventually(t, "the subscription", func() bool { ch.mu.Lock(); defer ch.mu.Unlock(); return len(ch.fns) == 1 })
+	synctest.Test(t, func(t *testing.T) {
+		e := newEnv(t)
+		e.job.Log = nil
+		src := &githubSource{}
+		e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
+		calls := func() int { src.mu.Lock(); defer src.mu.Unlock(); return src.calls }
+		ch := &notes{}
+		wctx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		const debounce = 10 * time.Millisecond
+		go func() { e.job.Watch(wctx, ch, debounce, time.Hour); close(done) }()
+		defer func() { cancel(); <-done }()
+		synctest.Wait()
+		if n := calls(); n != 1 || len(ch.fns) != 1 {
+			t.Fatalf("%d passes and %d subscriptions at start, want 1 and 1", n, len(ch.fns))
+		}
 
-	src.mu.Lock()
-	src.out = []outbox.Proposal{ghNudge(pull)}
-	src.mu.Unlock()
-	ch.note(port.TopicItems)
-	eventually(t, "the nudge", func() bool { return len(e.drafts.all()) == 1 })
+		src.mu.Lock()
+		src.out = []outbox.Proposal{ghNudge(pull)}
+		src.mu.Unlock()
+		ch.note(port.TopicItems)
+		synctest.Wait()
+		if n := calls(); n != 1 {
+			t.Fatalf("a pass ran inside the debounce: %d passes", n)
+		}
+		time.Sleep(debounce)
+		synctest.Wait()
+		if n, all := calls(), e.drafts.all(); n != 2 || len(all) != 1 {
+			t.Fatalf("after the debounce: %d passes, %d drafts", n, len(all))
+		}
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -155,36 +156,38 @@ func TestUserSlotNotQueued(t *testing.T) {
 }
 
 func TestQueuedBackgroundReadSeesTheBudgetThatFreedItsSlot(t *testing.T) {
-	clk := newClock()
-	inServer := make(chan struct{}, 2)
-	release := make(chan struct{})
-	var sent atomic.Int32
-	c := fakeClient(transportFunc(func(r *http.Request) (*http.Response, error) {
-		sent.Add(1)
-		inServer <- struct{}{}
-		<-release
-		return reply(r, http.StatusOK, limitHeader(dgh.ResourceGraphQL, 100, 5000, clk.Now().Add(time.Hour)), okQuery), nil
-	}), Options{Now: clk.Now})
-	background := dgh.WithPriority(context.Background(), dgh.PriorityBackground)
-	first := make(chan error, 1)
-	go func() {
-		_, _, err := c.GraphQL(background, viewerQuery, nil)
-		first <- err
-	}()
-	<-inServer
-	second := make(chan error, 1)
-	go func() {
-		_, _, err := c.GraphQL(background, viewerQuery, nil)
-		second <- err
-	}()
-	time.Sleep(20 * time.Millisecond)
-	close(release)
-	if err := <-first; err != nil {
-		t.Fatal(err)
-	}
-	if err := <-second; !errors.Is(err, dgh.ErrBudget) || sent.Load() != 1 {
-		t.Fatalf("the queued read: %v, %d requests", err, sent.Load())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		clk := newClock()
+		inServer := make(chan struct{}, 2)
+		release := make(chan struct{})
+		var sent atomic.Int32
+		c := fakeClient(transportFunc(func(r *http.Request) (*http.Response, error) {
+			sent.Add(1)
+			inServer <- struct{}{}
+			<-release
+			return reply(r, http.StatusOK, limitHeader(dgh.ResourceGraphQL, 100, 5000, clk.Now().Add(time.Hour)), okQuery), nil
+		}), Options{Now: clk.Now})
+		background := dgh.WithPriority(context.Background(), dgh.PriorityBackground)
+		first := make(chan error, 1)
+		go func() {
+			_, _, err := c.GraphQL(background, viewerQuery, nil)
+			first <- err
+		}()
+		<-inServer
+		second := make(chan error, 1)
+		go func() {
+			_, _, err := c.GraphQL(background, viewerQuery, nil)
+			second <- err
+		}()
+		synctest.Wait()
+		close(release)
+		if err := <-first; err != nil {
+			t.Fatal(err)
+		}
+		if err := <-second; !errors.Is(err, dgh.ErrBudget) || sent.Load() != 1 {
+			t.Fatalf("the queued read: %v, %d requests", err, sent.Load())
+		}
+	})
 }
 
 func TestRestoreDropsResetBucket(t *testing.T) {
