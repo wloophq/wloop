@@ -21,6 +21,8 @@ type fakeSlack struct {
 	sessions []string
 	reacted  []send.Reaction
 	reaction send.Reacted
+	edits    []send.Edit
+	edited   send.Edited
 }
 
 func (f *fakeSlack) LoggedIn() bool { return f.loggedIn }
@@ -28,6 +30,11 @@ func (f *fakeSlack) LoggedIn() bool { return f.loggedIn }
 func (f *fakeSlack) Send(_ context.Context, session string, r send.Request) (send.Sent, error) {
 	f.sent, f.sessions = append(f.sent, r), append(f.sessions, session)
 	return f.answer, f.err
+}
+
+func (f *fakeSlack) Edit(_ context.Context, session string, e send.Edit) (send.Edited, error) {
+	f.edits, f.sessions = append(f.edits, e), append(f.sessions, session)
+	return f.edited, f.err
 }
 
 func (f *fakeSlack) React(_ context.Context, session string, r send.Reaction) (send.Reacted, error) {
@@ -83,7 +90,7 @@ func TestSlackToolListedWhenConfigured(t *testing.T) {
 	}
 	for _, in := range []bool{false, true} {
 		s, sid := slackSession(t, &fakeSlack{loggedIn: in})
-		if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", "slack_react"}) {
+		if got := listedTools(t, call(t, s, sid, unexpanded, list)); !slices.Equal(got, []string{"turn_end", "slack_send_message", "slack_react", "slack_edit"}) {
 			t.Fatalf("logged in %v: %v", in, got)
 		}
 	}

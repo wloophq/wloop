@@ -427,7 +427,9 @@ CREATE TABLE drafts (
   -- when the effects of a sent draft were applied; '' while they are not
   effects_applied_at TEXT NOT NULL DEFAULT '',
   -- the unit of the proposing turn when it is not the draft's; '' when it is
-  origin_provider TEXT NOT NULL DEFAULT '', origin_unit_key TEXT NOT NULL DEFAULT ''
+  origin_provider TEXT NOT NULL DEFAULT '', origin_unit_key TEXT NOT NULL DEFAULT '',
+  -- an edit's: the text it replaced
+  replaced TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);

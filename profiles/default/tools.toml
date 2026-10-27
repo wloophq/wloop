@@ -104,7 +104,7 @@ description = "Add a reaction to a Slack message as the user, or remove one, at 
 "remove" = "remove the user's reaction instead of adding it"
 
 [slack_edit]
-description = "Propose new text for one of the user's own Slack messages, replaced once they approve it in the {{.Name}} Outbox. It edits nothing itself, and refuses a message someone else posted. Name people as in slack_draft."
+description = "Replace the text of one of the user's own Slack messages, at once and without their approval; the {{.Name}} Outbox keeps the text it replaced. It refuses a message someone else posted. When it is unclear whether the user wants the message changed, ask them first. An @handle, an @<user id> or an email that names one person becomes a mention of them."
 
 [slack_edit.params]
 "permalink" = "the permalink of the user's message"

@@ -65,7 +65,7 @@ func init() {
 
 func sampleDraft(u unit.Unit, at time.Time) draft.Draft {
 	return draft.Draft{Unit: u, Items: []string{"i1", "i2"}, Entry: "e1", Kind: draft.Nudge, Target: "#general",
-		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true,
+		Text: "ping @{slack:U000AAA}", Original: "ping", Edited: true, Replaced: "pong",
 		Origin: draft.Origin{Kind: draft.OriginAuto, TurnSeq: 3, Intent: "reply", Workflow: "wf", Rule: "stalled-nudge", Key: "stalled-nudge:e1:slack:U000AAA",
 			Unit: unit.Unit{Provider: unit.GitHub, Key: "acme/widgets#7"}},
 		Approval: draft.Approval{Mode: draft.Delay, Window: 10 * time.Minute}, Deadline: at.Add(10 * time.Minute),

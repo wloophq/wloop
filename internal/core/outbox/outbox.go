@@ -23,7 +23,9 @@ type Proposal struct {
 	Entry                  string
 	Kind                   draft.Kind
 	Target, Text, Reaction string
-	Origin                 draft.Origin
+	// Replaced is the text a recorded edit replaced.
+	Replaced string
+	Origin   draft.Origin
 	// Policy is the draft's approval policy; nil: resolved by
 	// Service.Policies from Origin.
 	Policy *draft.Policy
@@ -518,7 +520,7 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 		ev.At = now
 	}
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
+		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
 		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
 	}))

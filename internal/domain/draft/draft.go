@@ -30,7 +30,7 @@ var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit}
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
 // ConversationKinds are the kinds slack_draft offers on a conversation: all
-// but a review comment and an edit, which slack_edit proposes.
+// but a review comment and an edit, which slack_edit makes at once.
 var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
 
 // Emoji says whether a draft of kind k posts an emoji, and no text.
@@ -158,6 +158,7 @@ type Draft struct {
 	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
 	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
 	Reaction string   // Kind "react" only: emoji name without colons
+	Replaced string   // Kind "edit" only: the text the edit replaced
 	Original string   // Text as proposed
 	Edited   bool     // Text != Original
 	Origin   Origin

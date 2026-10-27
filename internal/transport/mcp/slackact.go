@@ -9,14 +9,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 const (
-	slackReactName   = "slack_react"
-	slackEditName    = "slack_edit"
-	slackEditPurpose = "edit"
+	slackReactName = "slack_react"
+	slackEditName  = "slack_edit"
 )
 
 func slackReactTool() tool {
@@ -62,16 +60,29 @@ func reactedText(r send.Reacted, remove bool, link string) string {
 	return fmt.Sprintf("Reacted :%s: to the message in %s: %s", r.Name, r.Conversation, link)
 }
 
-func (s *Server) slackEdit(ctx context.Context, handle string, arguments json.RawMessage) any {
+func (s *Server) slackEdit(ctx context.Context, session string, arguments json.RawMessage) any {
 	var a struct {
 		Permalink *string `json:"permalink"`
 		Text      *string `json:"text"`
 	}
-	link, body, refusal := actArgs(slackEditName, "text", "Nothing was drafted", arguments, &a, &a.Permalink, &a.Text)
+	link, body, refusal := actArgs(slackEditName, "text", "Nothing was changed", arguments, &a, &a.Permalink, &a.Text)
 	if refusal != nil {
 		return refusal
 	}
-	return s.draft(ctx, handle, DraftArgs{Purpose: slackEditPurpose, Delivery: string(draft.EditDelivery), Target: link, Text: body})
+	if broadcastToken.MatchString(body) {
+		return text("Nothing was changed: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to edit it themselves.", true)
+	}
+	if !s.Slack.LoggedIn() {
+		return text(notLoggedIn(), true)
+	}
+	got, err := s.Slack.Edit(ctx, session, send.Edit{Permalink: link, Text: body})
+	if errors.Is(err, send.ErrNotLoggedIn) {
+		return text(notLoggedIn(), true)
+	}
+	if err != nil {
+		return text("Slack edit failed: "+redactTokens(err.Error()), true)
+	}
+	return text(fmt.Sprintf("Edited the message in %s: %s\n\n%s\n\nIt replaced:\n\n%s", got.Conversation, link, got.Text, got.Replaced), false)
 }
 
 // actArgs decodes the arguments of slack_react or slack_edit into a, whose

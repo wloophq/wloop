@@ -196,6 +196,12 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 			fmt.Fprintln(w, "  "+l)
 		}
 	}
+	if d.Replaced != "" {
+		fmt.Fprintln(w, "replaced:")
+		for _, l := range strings.Split(d.Replaced, "\n") {
+			fmt.Fprintln(w, "  "+l)
+		}
+	}
 }
 
 // userAtTerminal refuses to post from a shell an agent session runs, or one with no terminal to ask in: what

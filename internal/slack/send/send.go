@@ -172,6 +172,7 @@ type wireMessage struct {
 	TS       string `json:"ts"`
 	ThreadTS string `json:"thread_ts"`
 	Text     string `json:"text"`
+	User     string `json:"user"`
 }
 
 // firstMessage reads conversations.replies ts=<ts> limit=1: the message at ts, or the parent of its thread.

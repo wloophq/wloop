@@ -36,8 +36,7 @@ const (
 )
 
 // Publisher posts Slack drafts as the user: messages through send's
-// resolution and post allowlist, reactions with reactions.add, edits of the
-// user's own messages with chat.update.
+// resolution and post allowlist, reactions with reactions.add.
 type Publisher struct {
 	Send *send.Service
 	// Token is the stored user token: its user and granted scopes.
@@ -62,8 +61,7 @@ type plan struct {
 	res      send.Resolved
 	text     string // mrkdwn; messages only
 	reaction string // react only
-	at       string // react and edit: the message the reaction goes on, or the edit replaces
-	edit     bool
+	at       string // react only: the message the reaction goes on
 }
 
 func (pl plan) where() string {
@@ -96,6 +94,9 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
 	}
+	if d.Delivery == draft.EditDelivery {
+		return plan{}, errors.New("an edit goes out through slack_edit at once and is only recorded, never published from the Outbox")
+	}
 	var pl plan
 	if d.Delivery == draft.Reaction {
 		if pl.reaction = strings.Trim(strings.TrimSpace(d.Reaction), ":"); pl.reaction == "" {
@@ -109,11 +110,7 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	} else if strings.TrimSpace(pl.text) == "" {
 		return plan{}, errors.New("the message is empty")
 	}
-	if d.Delivery == draft.EditDelivery {
-		if err := p.editTarget(ctx, d, &pl); err != nil {
-			return plan{}, err
-		}
-	} else if err := p.target(ctx, d, k, &pl); err != nil {
+	if err := p.target(ctx, d, k, &pl); err != nil {
 		return plan{}, err
 	}
 	if err := p.Send.Allowed(pl.res); err != nil {
@@ -217,61 +214,6 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		t = user
 	}
 	return p.resolve(ctx, send.Request{Target: t}, pl)
-}
-
-// editTarget resolves the message an edit replaces: its permalink target,
-// a message the user posted.
-func (p *Publisher) editTarget(ctx context.Context, d draft.Draft, pl *plan) error {
-	conv, ts, threadTS, err := parsePermalink(strings.TrimSpace(d.Target))
-	if err != nil {
-		return fmt.Errorf("an edit needs the permalink of the message it replaces: %w", err)
-	}
-	no := false
-	if err := p.resolve(ctx, send.Request{Target: d.Target, Thread: &no}, pl); err != nil {
-		return err
-	}
-	if p.Token == nil {
-		return send.ErrNotLoggedIn
-	}
-	tok, err := p.Token()
-	if err != nil {
-		return err
-	}
-	m, err := p.message(ctx, conv, ts, threadTS)
-	if err != nil {
-		return err
-	}
-	if m.User != tok.User {
-		return fmt.Errorf("%w: %s ts %s is not the user's; an edit replaces only the user's own messages", send.ErrCannotPost, conv, ts)
-	}
-	pl.at, pl.edit = ts, true
-	return nil
-}
-
-// message is the message at ts in channel, in the thread threadTS when it
-// is a reply.
-func (p *Publisher) message(ctx context.Context, channel, ts, threadTS string) (dslack.Message, error) {
-	c := p.Send.Client
-	args := slackapi.PageArgs{Oldest: ts, Latest: ts, Inclusive: true, Limit: 2}
-	reads := []func() (slackapi.MessagesPage, error){
-		func() (slackapi.MessagesPage, error) { return c.History(ctx, channel, args) },
-		func() (slackapi.MessagesPage, error) { return c.Replies(ctx, channel, ts, args) },
-	}
-	if threadTS != "" && threadTS != ts {
-		reads = []func() (slackapi.MessagesPage, error){func() (slackapi.MessagesPage, error) { return c.Replies(ctx, channel, threadTS, args) }}
-	}
-	for _, read := range reads {
-		page, err := read()
-		if err != nil {
-			return dslack.Message{}, err
-		}
-		for _, raw := range page.Messages {
-			if m, err := dslack.MessageFrom(raw); err == nil && m.TS == ts {
-				return m, nil
-			}
-		}
-	}
-	return dslack.Message{}, fmt.Errorf("%w: no message %s in %s", send.ErrCannotPost, ts, channel)
 }
 
 func (p *Publisher) resolve(ctx context.Context, r send.Request, pl *plan) error {
@@ -409,13 +351,6 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 		return draft.Evidence{}, err
 	}
 	c := p.Send.Client
-	if pl.edit {
-		if err := c.UpdateMessage(ctx, pl.res.Channel, pl.at, pl.text); err != nil {
-			return draft.Evidence{}, p.failed(pl, err)
-		}
-		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
-		return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
-	}
 	if pl.reaction != "" {
 		err := c.AddReaction(ctx, pl.res.Channel, pl.at, pl.reaction)
 		if err != nil && apiCode(err) != "already_reacted" {
@@ -466,16 +401,6 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 	tok, err := p.Token()
 	if err != nil {
 		return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
-	}
-	if pl.edit {
-		m, err := p.message(ctx, pl.res.Channel, pl.at, ThreadOf(d.Target))
-		if err != nil {
-			return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
-		}
-		if m.User != tok.User || normalized(m.Text) != normalized(pl.text) {
-			return draft.Evidence{}, false, nil
-		}
-		return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, true, nil
 	}
 	if pl.reaction != "" {
 		rs, err := p.Send.Client.Reactions(ctx, pl.res.Channel, pl.at)

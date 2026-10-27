@@ -91,8 +91,8 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := checkEffects(def, string(t.Intent), a.Effects); err != nil {
 		return mcp.DraftResult{}, err
 	}
-	return s.propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Purpose: a.Purpose,
-		Delivery: draft.Delivery(a.Delivery), Target: a.Target, Text: a.Text, Reaction: a.Reaction, Effects: a.Effects,
+	return s.propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind),
+		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Effects: a.Effects,
 		Origin: sessionOrigin(b, t, b.Unit, draft.OriginTurn)})
 }
 
@@ -106,7 +106,7 @@ func (s *slackDrafts) draftOutside(ctx context.Context, u unit.Unit, a mcp.Draft
 	case len(a.Effects) > 0:
 		return mcp.DraftResult{}, errors.New("effects: a draft outside the turn's Slack unit declares none")
 	}
-	return s.propose(ctx, outbox.Proposal{Unit: u, Kind: draft.Kind(a.Kind), Purpose: a.Purpose, Delivery: draft.Delivery(a.Delivery),
+	return s.propose(ctx, outbox.Proposal{Unit: u, Kind: draft.Kind(a.Kind),
 		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Origin: origin})
 }
 
@@ -188,6 +188,7 @@ const (
 	sentPurpose      = "reply"
 	reactedPurpose   = "react"
 	unreactedPurpose = "unreact"
+	editedPurpose    = "edit"
 )
 
 // sessionSends records each post a session makes itself as a sent draft, on
@@ -213,6 +214,11 @@ func (r sessionSends) reaction(ctx context.Context, session string, req send.Rea
 	}
 	r.record(ctx, session, got.Channel, got.TS, slacksource.ThreadOf(req.Permalink), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction,
 		Target: req.Permalink, Reaction: got.Name}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+}
+
+func (r sessionSends) edit(ctx context.Context, session string, req send.Edit, got send.Edited) {
+	r.record(ctx, session, got.Channel, got.TS, slacksource.ThreadOf(req.Permalink), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery,
+		Target: req.Permalink, Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
 }
 
 func (r sessionSends) record(ctx context.Context, session, channel, ts, threadTS string, p outbox.Proposal, ev draft.Evidence) {

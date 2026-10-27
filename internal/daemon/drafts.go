@@ -281,7 +281,7 @@ func entryDraftError(err error) error {
 // draftView is d on the wire, with its actions as they stand.
 func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 	v := api.Draft{ID: int64(d.ID), Unit: string(d.Unit.Provider) + "/" + d.Unit.Key, Items: slices.Clone(d.Items), Entry: d.Entry, Kind: string(d.Kind),
-		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Edited: d.Edited,
+		Target: d.Target, Text: d.Text, Reaction: d.Reaction, Original: d.Original, Replaced: d.Replaced, Edited: d.Edited,
 		Origin: api.DraftOrigin{Kind: string(d.Origin.Kind), TurnSeq: d.Origin.TurnSeq, Intent: d.Origin.Intent,
 			Workflow: d.Origin.Workflow, Rule: d.Origin.Rule, Unit: originUnit(d.Origin)},
 		Approval: api.DraftApproval{Mode: string(d.Approval.Mode)},

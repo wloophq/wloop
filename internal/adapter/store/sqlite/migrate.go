@@ -59,9 +59,10 @@ var migrations = []migration{
 		`ALTER TABLE round_state DROP COLUMN checks_head`,
 	)},
 	{to: 4, name: "units_everywhere", up: v4},
-	{to: 5, name: "draft_origin_unit", compatible: 4, up: execAll(
+	{to: 5, name: "draft_origin_and_replaced", compatible: 4, up: execAll(
 		`ALTER TABLE drafts ADD COLUMN origin_provider TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE drafts ADD COLUMN origin_unit_key TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE drafts ADD COLUMN replaced TEXT NOT NULL DEFAULT ''`,
 	)},
 }
 

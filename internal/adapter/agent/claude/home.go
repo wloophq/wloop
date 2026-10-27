@@ -29,8 +29,8 @@ var TurnEndTool = brand.ToolPrefix() + "turn_end"
 // SlackSendTool posts as the user at once, without asking.
 var SlackSendTool = brand.ToolPrefix() + "slack_send_message"
 
-// SlackPostTools post to Slack as the user at once, so install allows them.
-var SlackPostTools = []string{SlackSendTool, brand.ToolPrefix() + "slack_react"}
+// SlackPostTools post, react or edit on Slack as the user at once, so install allows them.
+var SlackPostTools = []string{SlackSendTool, brand.ToolPrefix() + "slack_react", brand.ToolPrefix() + "slack_edit"}
 
 const (
 	orcaHookPort  = "ORCA_AGENT_HOOK_PORT"

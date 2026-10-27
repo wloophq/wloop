@@ -94,6 +94,27 @@ func (s *slackSender) React(ctx context.Context, session string, r send.Reaction
 	return got, err
 }
 
+// Edit replaces the text of one of the user's own messages.
+func (s *slackSender) Edit(ctx context.Context, session string, e send.Edit) (send.Edited, error) {
+	tok, err := s.kit.Store.Load()
+	if errors.Is(err, auth.ErrNotLoggedIn) {
+		s.loggedOut()
+		return send.Edited{}, send.ErrNotLoggedIn
+	}
+	if err != nil {
+		return send.Edited{}, err
+	}
+	e.User = tok.User
+	got, err := s.kit.Send.Edit(ctx, e)
+	if errors.Is(err, send.ErrNotLoggedIn) {
+		s.loggedOut()
+	}
+	if err == nil && s.records != nil {
+		s.records.edit(ctx, session, e, got)
+	}
+	return got, err
+}
+
 func (s *slackSender) permalinkUnit(ctx context.Context, permalink string) (unit.Unit, error) {
 	tok, err := s.kit.Store.Load()
 	if errors.Is(err, auth.ErrNotLoggedIn) {

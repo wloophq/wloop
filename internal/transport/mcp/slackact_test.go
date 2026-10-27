@@ -3,7 +3,6 @@ package mcp
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"testing"
 
@@ -14,18 +13,6 @@ const actLink = "https://acme.slack.com/archives/C0000000001/p1700000000000200"
 
 func toolCallBody(name, args string) string {
 	return `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"` + name + `","arguments":` + args + `}}`
-}
-
-func TestSlackEditIsListedWithSlackDraft(t *testing.T) {
-	list := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
-	s, sid := draftSession(t, &fakeSlack{loggedIn: true}, &fakeDrafts{}, "term_1")
-	if got := listedTools(t, call(t, s, sid, "term_1", list)); !slices.Contains(got, slackEditName) {
-		t.Fatalf("tools %v lack %s", got, slackEditName)
-	}
-	s, sid = draftSession(t, &fakeSlack{loggedIn: true}, nil, "term_1")
-	if got := listedTools(t, call(t, s, sid, "term_1", list)); slices.Contains(got, slackEditName) {
-		t.Fatalf("SlackDraft nil lists %v", got)
-	}
 }
 
 func TestSlackReactPostsAtOnce(t *testing.T) {
@@ -61,24 +48,25 @@ func TestSlackReactPostsAtOnce(t *testing.T) {
 	}
 }
 
-func TestSlackEditProposesADraft(t *testing.T) {
-	d := &fakeDrafts{answer: DraftResult{ID: 5, Unit: "slack T0/C1/1.2", Conversation: "#releases", State: "proposed"}}
-	s, sid := draftSession(t, &fakeSlack{loggedIn: true}, d, "term_1")
-	res := decodeResult(t, call(t, s, sid, "term_1", toolCallBody(slackEditName, `{"permalink":"`+actLink+`","text":"release 1.2 done"}`)))
-	if got := res.Result.Content[0].Text; res.Result.IsError || !strings.Contains(got, "draft 5") || !strings.Contains(got, "approves") {
+func TestSlackEditEditsAtOnce(t *testing.T) {
+	f := &fakeSlack{loggedIn: true, edited: send.Edited{Conversation: "#releases", Text: "release 1.2 *done*", Replaced: "release 1.2 :hourglass:"}}
+	s, sid := draftSession(t, f, nil, "term_1")
+	res := decodeResult(t, call(t, s, sid, "term_1", toolCallBody(slackEditName, `{"permalink":"`+actLink+`","text":"release 1.2 **done**"}`)))
+	if got := res.Result.Content[0].Text; res.Result.IsError || !strings.HasPrefix(got, "Edited the message in #releases: "+actLink) ||
+		!strings.Contains(got, "It replaced:\n\nrelease 1.2 :hourglass:") {
 		t.Fatalf("%q", got)
 	}
-	want := []draftCall{{"term_1", DraftArgs{Purpose: "edit", Delivery: "edit", Target: actLink, Text: "release 1.2 done"}}}
-	if fmt.Sprint(d.calls) != fmt.Sprint(want) {
-		t.Fatalf("calls %+v", d.calls)
+	if want := []send.Edit{{Permalink: actLink, Text: "release 1.2 **done**"}}; fmt.Sprint(f.edits) != fmt.Sprint(want) || f.sessions[0] != "term_1" {
+		t.Fatalf("edits %+v by %v", f.edits, f.sessions)
 	}
-	for _, args := range []string{`{"permalink":"` + actLink + `","text":" "}`, `{"permalink":"C1","text":"x"}`} {
+	for _, args := range []string{`{"permalink":"` + actLink + `","text":" "}`, `{"permalink":"C1","text":"x"}`,
+		`{"permalink":"` + actLink + `","text":"<!here> look"}`} {
 		res := decodeResult(t, call(t, s, sid, "term_1", toolCallBody(slackEditName, args)))
-		if !res.Result.IsError || !strings.HasPrefix(res.Result.Content[0].Text, "Nothing was drafted") {
+		if !res.Result.IsError || !strings.HasPrefix(res.Result.Content[0].Text, "Nothing was changed") {
 			t.Errorf("%s: %+v", args, res.Result)
 		}
 	}
-	if len(d.calls) != 1 {
-		t.Fatalf("bad arguments drafted: %+v", d.calls[1:])
+	if len(f.edits) != 1 {
+		t.Fatalf("bad arguments edited: %+v", f.edits[1:])
 	}
 }

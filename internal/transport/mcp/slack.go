@@ -20,6 +20,7 @@ type Slack interface {
 	LoggedIn() bool
 	Send(ctx context.Context, session string, r send.Request) (send.Sent, error)
 	React(ctx context.Context, session string, r send.Reaction) (send.Reacted, error)
+	Edit(ctx context.Context, session string, e send.Edit) (send.Edited, error)
 }
 
 type SlackReader interface {
@@ -30,13 +31,10 @@ type SlackDrafts interface {
 	Draft(ctx context.Context, handle string, a DraftArgs) (DraftResult, error)
 }
 
-// DraftArgs are the draft slack_draft, slack_react or slack_edit proposes:
-// its kind, the agent's word, or the purpose and delivery it declares.
+// DraftArgs are slack_draft's arguments.
 type DraftArgs struct {
 	Text     string   `json:"text"`
 	Kind     string   `json:"kind,omitempty"`
-	Purpose  string   `json:"purpose,omitempty"`
-	Delivery string   `json:"delivery,omitempty"`
 	Target   string   `json:"target,omitempty"`
 	Items    []string `json:"items,omitempty"`
 	Reaction string   `json:"reaction,omitempty"`
