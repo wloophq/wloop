@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -418,24 +419,27 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 
 func TestSourceActivityReinboxes(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	ctx := context.Background()
-	r.put(t, gtd.Entry{ID: "e-s", State: gtd.Scheduled, Units: []unit.Unit{r7u}, Snooze: gtd.Snooze{OnActivity: true, Return: gtd.Next},
-		SeenAt: entriesNow.Add(-time.Hour), Created: entriesNow.Add(-2 * time.Hour), Updated: entriesNow.Add(-2 * time.Hour)})
-	r.startSync(t)
-	r.log.Note(port.TopicSourceEvents, r7u)
-	time.Sleep(syncMaxDelay + 500*time.Millisecond)
-	if p := r.page(t, "view=inbox"); len(p.Entries) != 0 {
-		t.Fatalf("the source event moved the entry before its card: %+v", p.Entries)
-	}
-	ana := items.Person{Key: "github:ana", Name: "ana"}
-	c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: entriesNow.Add(-time.Minute)}}
-	if _, err := r.db.Cards().Save(ctx, c, entriesNow); err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, "the entry back in the Inbox", func() bool {
-		p := r.page(t, "view=inbox")
-		return len(p.Entries) == 1 && p.Entries[0].ID == "e-s" && p.Entries[0].Changed
+	synctest.Test(t, func(t *testing.T) {
+		r := newEntriesRig(t, nil)
+		ctx := context.Background()
+		r.put(t, gtd.Entry{ID: "e-s", State: gtd.Scheduled, Units: []unit.Unit{r7u}, Snooze: gtd.Snooze{OnActivity: true, Return: gtd.Next},
+			SeenAt: entriesNow.Add(-time.Hour), Created: entriesNow.Add(-2 * time.Hour), Updated: entriesNow.Add(-2 * time.Hour)})
+		r.startSync(t)
+		r.log.Note(port.TopicSourceEvents, r7u)
+		time.Sleep(syncMaxDelay)
+		synctest.Wait()
+		if p := r.page(t, "view=inbox"); len(p.Entries) != 0 {
+			t.Fatalf("the source event moved the entry before its card: %+v", p.Entries)
+		}
+		ana := items.Person{Key: "github:ana", Name: "ana"}
+		c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: entriesNow.Add(-time.Minute)}}
+		if _, err := r.db.Cards().Save(ctx, c, entriesNow); err != nil {
+			t.Fatal(err)
+		}
+		waitUntil(t, "the entry back in the Inbox", func() bool {
+			p := r.page(t, "view=inbox")
+			return len(p.Entries) == 1 && p.Entries[0].ID == "e-s" && p.Entries[0].Changed
+		})
 	})
 }
 
