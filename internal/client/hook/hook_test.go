@@ -107,6 +107,13 @@ var ports = harness.Set{
 // stdinOf is the hook's standard input; "" is one that never closes.
 // bubbled runs f on synctest's clock, which moves only when every goroutine
 // waits: a hook that waits out Budget returns at exactly Budget, at once.
+func tookFor(name string) time.Duration {
+	if name == "input never closes" || name == "client past budget" {
+		return Budget
+	}
+	return 0
+}
+
 func bubbled(f func(*testing.T)) func(*testing.T) {
 	return func(t *testing.T) { synctest.Test(t, f) }
 }
@@ -146,8 +153,8 @@ func TestStopHookFailsOpen(t *testing.T) {
 			var out, errw bytes.Buffer
 			start := time.Now()
 			code := Stop(context.Background(), c.env, stdinOf(t, c.in), &out, &errw, c.agent, ports, "")
-			if took := time.Since(start); took > Budget {
-				t.Errorf("took %v", took)
+			if took, want := time.Since(start), tookFor(name); took != want {
+				t.Errorf("took %v, want %v", took, want)
 			}
 			if code != 0 || out.Len() != 0 || c.agent.calls != c.calls {
 				t.Fatalf("exit %d, out %q, calls %d, err %q", code, out.String(), c.agent.calls, errw.String())
@@ -176,16 +183,18 @@ func TestHookWithOpenStdinGivesUpWithinBudget(t *testing.T) {
 
 func TestHookWithMalformedInputAllows(t *testing.T) {
 	for _, in := range []string{"not json", "{", `{"ID":1}`} {
-		var out, errw bytes.Buffer
-		a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
-		start := time.Now()
-		code := Stop(context.Background(), inTerm, strings.NewReader(in), &out, &errw, a, ports, "")
-		if took := time.Since(start); took > Budget {
-			t.Fatalf("%q took %v", in, took)
-		}
-		if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
-			t.Fatalf("%q: exit %d, out %q, calls %d, err %q", in, code, out.String(), a.calls, errw.String())
-		}
+		t.Run(in, bubbled(func(t *testing.T) {
+			var out, errw bytes.Buffer
+			a := &fakeAgent{answer: api.StopAnswer{Block: true, Reason: "r"}}
+			start := time.Now()
+			code := Stop(context.Background(), inTerm, strings.NewReader(in), &out, &errw, a, ports, "")
+			if took := time.Since(start); took != 0 {
+				t.Fatalf("took %v", took)
+			}
+			if code != 0 || out.Len() != 0 || a.calls != 0 || !strings.Contains(errw.String(), brand.Command+" hook stop: allowing:") {
+				t.Fatalf("exit %d, out %q, calls %d, err %q", code, out.String(), a.calls, errw.String())
+			}
+		}))
 	}
 }
 
@@ -299,8 +308,8 @@ func TestSessionStartPrintsNothing(t *testing.T) {
 			if out := stdout(t, func() { code = SessionStart(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, "") }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget {
-				t.Fatalf("exit %d after %v", code, took)
+			if took, want := time.Since(start), tookFor(name); code != 0 || took != want {
+				t.Fatalf("exit %d after %v, want 0 after %v", code, took, want)
 			}
 		}))
 	}
@@ -337,8 +346,8 @@ func TestPromptHookNeverFails(t *testing.T) {
 			if out := stdout(t, func() { code = Prompt(context.Background(), c.env, stdinOf(t, c.in), &errw, c.agent, ports, c.kind) }); out != "" {
 				t.Fatalf("printed %q", out)
 			}
-			if took := time.Since(start); code != 0 || took > Budget {
-				t.Fatalf("exit %d after %v", code, took)
+			if took, want := time.Since(start), tookFor(name); code != 0 || took != want {
+				t.Fatalf("exit %d after %v, want 0 after %v", code, took, want)
 			}
 			if c.agent.calls != c.calls {
 				t.Fatalf("calls %d, err %q", c.agent.calls, errw.String())

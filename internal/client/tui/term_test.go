@@ -43,14 +43,17 @@ func TestReadSurvivesAPanicInTheDecoder(t *testing.T) {
 		close(ended)
 	}()
 	w.Write([]byte("a"))
-	time.Sleep(20 * time.Millisecond)
+	deadline := time.Now().Add(time.Minute)
+	for tty.Err() == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("the panic was not reported")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	w.Write([]byte("b"))
 	select {
 	case <-ended:
-	case <-time.After(2 * time.Second):
+	case <-time.After(time.Minute):
 		t.Fatal("read stayed blocked after the decoder died")
-	}
-	if tty.Err() == nil {
-		t.Fatal("the panic was not reported")
 	}
 }

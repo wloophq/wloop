@@ -30,8 +30,16 @@ func TestStoreWaitAnswersItsHealthAndRefusesTheRestUntilReady(t *testing.T) {
 		Ready:  ready.Load,
 		Every:  10 * time.Millisecond,
 	}
-	done := make(chan error, 1)
-	go func() { done <- w.Run(context.Background()) }()
+	ctx, cancel := context.WithCancel(context.Background())
+	done, exited := make(chan error, 1), make(chan struct{})
+	go func() {
+		defer close(exited)
+		done <- w.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-exited
+	})
 	hc := &http.Client{Transport: client.UnixTransport(w.Socket), Timeout: 2 * time.Second}
 	var resp *http.Response
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {

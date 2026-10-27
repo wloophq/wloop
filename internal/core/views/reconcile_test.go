@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -77,86 +78,94 @@ func (f *reconcileFixture) settle(t *testing.T, ref unit.Unit) {
 }
 
 func TestFirstReconcileReadsAll(t *testing.T) {
-	f := newReconcileFixture(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.books.Put(asked(r8, "and this?"))
-	if n := f.reconcile(t); n != 2 {
-		t.Fatalf("first reconcile = %d, want 2", n)
-	}
-	calls := f.counted.take()
-	if len(calls) != 1 || len(calls[0]) != 0 {
-		t.Fatalf("books calls = %v, want one read of every book", calls)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		f := newReconcileFixture(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.books.Put(asked(r8, "and this?"))
+		if n := f.reconcile(t); n != 2 {
+			t.Fatalf("first reconcile = %d, want 2", n)
+		}
+		calls := f.counted.take()
+		if len(calls) != 1 || len(calls[0]) != 0 {
+			t.Fatalf("books calls = %v, want one read of every book", calls)
+		}
+	})
 }
 
 func TestQuietReconcileReadsNoBook(t *testing.T) {
-	f := newReconcileFixture(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.reconcile(t)
-	f.settle(t, r7)
-	f.counted.take()
+	synctest.Test(t, func(t *testing.T) {
+		f := newReconcileFixture(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.reconcile(t)
+		f.settle(t, r7)
+		f.counted.take()
 
-	if n := f.reconcile(t); n != 0 {
-		t.Fatalf("quiet reconcile queued %d", n)
-	}
-	if calls := f.counted.take(); len(calls) != 0 {
-		t.Fatalf("quiet reconcile read books %v", calls)
-	}
+		if n := f.reconcile(t); n != 0 {
+			t.Fatalf("quiet reconcile queued %d", n)
+		}
+		if calls := f.counted.take(); len(calls) != 0 {
+			t.Fatalf("quiet reconcile read books %v", calls)
+		}
+	})
 }
 
 func TestReconcileReadsTheTurnedRefs(t *testing.T) {
-	f := newReconcileFixture(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.books.Put(asked(r8, "and this?"))
-	f.reconcile(t)
-	f.settle(t, r7)
-	f.settle(t, r8)
-	f.counted.take()
+	synctest.Test(t, func(t *testing.T) {
+		f := newReconcileFixture(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.books.Put(asked(r8, "and this?"))
+		f.reconcile(t)
+		f.settle(t, r7)
+		f.settle(t, r8)
+		f.counted.take()
 
-	f.books.Put(asked(r7, "changed question"))
-	f.log.Note(port.TopicTurns, r7)
-	if n := f.reconcile(t); n != 1 {
-		t.Fatalf("reconcile after a turn = %d, want 1", n)
-	}
-	calls := f.counted.take()
-	if len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
-		t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
-	}
+		f.books.Put(asked(r7, "changed question"))
+		f.log.Note(port.TopicTurns, r7)
+		if n := f.reconcile(t); n != 1 {
+			t.Fatalf("reconcile after a turn = %d, want 1", n)
+		}
+		calls := f.counted.take()
+		if len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
+			t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
+		}
 
-	f.log.Note(port.TopicConfig)
-	f.reconcile(t)
-	if calls := f.counted.take(); len(calls) != 1 || len(calls[0]) != 0 {
-		t.Fatalf("books calls after a note for all = %v, want one read of every book", calls)
-	}
+		f.log.Note(port.TopicConfig)
+		f.reconcile(t)
+		if calls := f.counted.take(); len(calls) != 1 || len(calls[0]) != 0 {
+			t.Fatalf("books calls after a note for all = %v, want one read of every book", calls)
+		}
+	})
 }
 
 func TestReconcileReadsADriftedCard(t *testing.T) {
-	f := newReconcileFixture(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.books.Put(asked(r8, "and this?"))
-	f.reconcile(t)
-	f.settle(t, r7)
-	f.settle(t, r8)
-	f.counted.take()
+	synctest.Test(t, func(t *testing.T) {
+		f := newReconcileFixture(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.books.Put(asked(r8, "and this?"))
+		f.reconcile(t)
+		f.settle(t, r7)
+		f.settle(t, r8)
+		f.counted.take()
 
-	f.sink.Place(r7, "parked")
-	if n := f.reconcile(t); n != 1 {
-		t.Fatalf("reconcile with a drifted card = %d, want 1", n)
-	}
-	calls := f.counted.take()
-	if len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
-		t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
-	}
-	eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
+		f.sink.Place(r7, "parked")
+		if n := f.reconcile(t); n != 1 {
+			t.Fatalf("reconcile with a drifted card = %d, want 1", n)
+		}
+		calls := f.counted.take()
+		if len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
+			t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
+		}
+		eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
 
-	f.counted.take()
-	f.log.Note(port.TopicViews, r7)
-	if n := f.reconcile(t); n != 0 {
-		t.Fatalf("reconcile with the override stored = %d", n)
-	}
-	if calls := f.counted.take(); len(calls) != 0 {
-		t.Fatalf("books calls = %v, want none", calls)
-	}
+		f.counted.take()
+		f.log.Note(port.TopicViews, r7)
+		if n := f.reconcile(t); n != 0 {
+			t.Fatalf("reconcile with the override stored = %d", n)
+		}
+		if calls := f.counted.take(); len(calls) != 0 {
+			t.Fatalf("books calls = %v, want none", calls)
+		}
+	})
 }
 
 type skippingSink struct {
@@ -184,55 +193,59 @@ func (s *skippingSink) allow(u unit.Unit) {
 }
 
 func TestReconcileRetriesASkippedItemWhenItsLinkAppears(t *testing.T) {
-	inner := testsink.New("test")
-	sink := &skippingSink{Sink: inner, skip: map[unit.Unit]bool{r7: true}}
-	f := newFixture(t, views.Sink{ViewSink: sink, Placements: inner})
-	log := change.NewLog(change.DefaultWindow, t.Logf)
-	counted := &countedBooks{next: f.books}
-	f.svc.Books, f.svc.Changes = counted, log
-	f.run(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.books.Put(asked(r8, "and this?"))
-	if _, err := f.svc.Reconcile(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	eventually(t, "r8 applied", func() bool { _, ok := f.applied(t, "test", r8); return ok })
-	if _, ok := f.applied(t, "test", r7); ok {
-		t.Fatal("r7 applied while skipped")
-	}
-	counted.take()
+	synctest.Test(t, func(t *testing.T) {
+		inner := testsink.New("test")
+		sink := &skippingSink{Sink: inner, skip: map[unit.Unit]bool{r7: true}}
+		f := newFixture(t, views.Sink{ViewSink: sink, Placements: inner})
+		log := change.NewLog(change.DefaultWindow, t.Logf)
+		counted := &countedBooks{next: f.books}
+		f.svc.Books, f.svc.Changes = counted, log
+		f.run(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.books.Put(asked(r8, "and this?"))
+		if _, err := f.svc.Reconcile(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "r8 applied", func() bool { _, ok := f.applied(t, "test", r8); return ok })
+		if _, ok := f.applied(t, "test", r7); ok {
+			t.Fatal("r7 applied while skipped")
+		}
+		counted.take()
 
-	sink.allow(r7)
-	log.Note(port.TopicFollow, r7)
-	if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
-		t.Fatalf("reconcile after the link = %d, %v", n, err)
-	}
-	if calls := counted.take(); len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
-		t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
-	}
-	eventually(t, "r7 applied", func() bool { _, ok := f.applied(t, "test", r7); return ok })
+		sink.allow(r7)
+		log.Note(port.TopicFollow, r7)
+		if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
+			t.Fatalf("reconcile after the link = %d, %v", n, err)
+		}
+		if calls := counted.take(); len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
+			t.Fatalf("books calls = %v, want a read of %v only", calls, r7)
+		}
+		eventually(t, "r7 applied", func() bool { _, ok := f.applied(t, "test", r7); return ok })
+	})
 }
 
 func TestAFailedReconcileIsRedone(t *testing.T) {
-	f := newReconcileFixture(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.reconcile(t)
-	f.settle(t, r7)
-	f.counted.take()
+	synctest.Test(t, func(t *testing.T) {
+		f := newReconcileFixture(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.reconcile(t)
+		f.settle(t, r7)
+		f.counted.take()
 
-	f.books.Put(asked(r7, "changed question"))
-	f.log.Note(port.TopicTurns, r7)
-	f.counted.fail = errors.New("books down")
-	if _, err := f.svc.Reconcile(context.Background()); err == nil {
-		t.Fatal("reconcile hid the books failure")
-	}
-	f.counted.take()
-	if n := f.reconcile(t); n != 1 {
-		t.Fatalf("reconcile after the failure = %d, want 1", n)
-	}
-	if calls := f.counted.take(); len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
-		t.Fatalf("books calls = %v, want a read of %v", calls, r7)
-	}
+		f.books.Put(asked(r7, "changed question"))
+		f.log.Note(port.TopicTurns, r7)
+		f.counted.fail = errors.New("books down")
+		if _, err := f.svc.Reconcile(context.Background()); err == nil {
+			t.Fatal("reconcile hid the books failure")
+		}
+		f.counted.take()
+		if n := f.reconcile(t); n != 1 {
+			t.Fatalf("reconcile after the failure = %d, want 1", n)
+		}
+		if calls := f.counted.take(); len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != r7 {
+			t.Fatalf("books calls = %v, want a read of %v", calls, r7)
+		}
+	})
 }
 
 // heldState holds the flush that saves hold's item until release closes, so
@@ -257,66 +270,72 @@ func (s *heldState) SaveApplied(ctx context.Context, sink string, a view.Applied
 }
 
 func TestReconcileDuringAFlushKeepsTheDriftedCard(t *testing.T) {
-	sink := testsink.New("test")
-	f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
-	held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
-	f.svc.State, f.svc.Changes = held, change.NewLog(change.DefaultWindow, t.Logf)
-	f.run(t)
-	f.books.Put(asked(r7, "keep both?"))
-	if _, err := f.svc.Reconcile(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	<-held.saved
+	synctest.Test(t, func(t *testing.T) {
+		sink := testsink.New("test")
+		f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
+		held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
+		f.svc.State, f.svc.Changes = held, change.NewLog(change.DefaultWindow, t.Logf)
+		f.run(t)
+		f.books.Put(asked(r7, "keep both?"))
+		if _, err := f.svc.Reconcile(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		<-held.saved
 
-	sink.Place(r7, "parked")
-	if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
-		t.Fatalf("reconcile with a drifted card during a flush = %d, %v, want 1", n, err)
-	}
-	close(held.release)
-	eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
+		sink.Place(r7, "parked")
+		if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
+			t.Fatalf("reconcile with a drifted card during a flush = %d, %v, want 1", n, err)
+		}
+		close(held.release)
+		eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
+	})
 }
 
 func TestAForcedFlushDoesNotForceTheDriftedCardAgain(t *testing.T) {
-	sink := testsink.New("test")
-	f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
-	held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
-	f.svc.State, f.svc.Changes = held, change.NewLog(change.DefaultWindow, t.Logf)
-	f.run(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.svc.RoundStarted(context.Background(), r7)
-	<-held.saved
+	synctest.Test(t, func(t *testing.T) {
+		sink := testsink.New("test")
+		f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
+		held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
+		f.svc.State, f.svc.Changes = held, change.NewLog(change.DefaultWindow, t.Logf)
+		f.run(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.svc.RoundStarted(context.Background(), r7)
+		<-held.saved
 
-	sink.Place(r7, "parked")
-	if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
-		t.Fatalf("reconcile with a drifted card during a forced flush = %d, %v, want 1", n, err)
-	}
-	close(held.release)
-	eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
-	if column, _, _ := sink.Card(r7); column != "parked" {
-		t.Fatalf("the card the user parked moved to %q", column)
-	}
+		sink.Place(r7, "parked")
+		if n, err := f.svc.Reconcile(context.Background()); err != nil || n != 1 {
+			t.Fatalf("reconcile with a drifted card during a forced flush = %d, %v, want 1", n, err)
+		}
+		close(held.release)
+		eventually(t, "the override", func() bool { a, _ := f.applied(t, "test", r7); return a.Override == "parked" })
+		if column, _, _ := sink.Card(r7); column != "parked" {
+			t.Fatalf("the card the user parked moved to %q", column)
+		}
+	})
 }
 
 func TestARoundStartedDuringAForcedFlushKeepsItsForce(t *testing.T) {
-	sink := testsink.New("test")
-	f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
-	held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
-	f.svc.State = held
-	f.run(t)
-	f.books.Put(asked(r7, "keep both?"))
-	f.svc.RoundStarted(context.Background(), r7)
-	<-held.saved
+	synctest.Test(t, func(t *testing.T) {
+		sink := testsink.New("test")
+		f := newFixture(t, views.Sink{ViewSink: sink, Placements: sink})
+		held := &heldState{State: f.state, hold: r7, saved: make(chan struct{}), release: make(chan struct{})}
+		f.svc.State = held
+		f.run(t)
+		f.books.Put(asked(r7, "keep both?"))
+		f.svc.RoundStarted(context.Background(), r7)
+		<-held.saved
 
-	sink.Place(r7, "parked")
-	f.svc.RoundStarted(context.Background(), r7)
-	close(held.release)
-	eventually(t, "the second write saved", func() bool {
-		return len(slices.DeleteFunc(f.pub.kinds(r7), func(k string) bool { return k != views.KindViewApplied })) == 2
+		sink.Place(r7, "parked")
+		f.svc.RoundStarted(context.Background(), r7)
+		close(held.release)
+		eventually(t, "the second write saved", func() bool {
+			return len(slices.DeleteFunc(f.pub.kinds(r7), func(k string) bool { return k != views.KindViewApplied })) == 2
+		})
+		if column, _, _ := sink.Card(r7); column == "parked" {
+			t.Fatal("a round start left the card where the user parked it")
+		}
+		if a, _ := f.applied(t, "test", r7); a.Override != "" {
+			t.Fatalf("a round start recorded the override %q", a.Override)
+		}
 	})
-	if column, _, _ := sink.Card(r7); column == "parked" {
-		t.Fatal("a round start left the card where the user parked it")
-	}
-	if a, _ := f.applied(t, "test", r7); a.Override != "" {
-		t.Fatalf("a round start recorded the override %q", a.Override)
-	}
 }

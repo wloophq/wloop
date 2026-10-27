@@ -124,8 +124,15 @@ func TestPluginJobsRegistered(t *testing.T) {
 		t.Fatalf("jobs %+v", h.Jobs)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go s.jobs["extract:thread"].loop(ctx, s.logf, s.jobDone)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.jobs["extract:thread"].loop(ctx, s.logf, s.jobDone)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
 	waitFor(t, func() bool { return n.Load() >= 3 })
 }
 

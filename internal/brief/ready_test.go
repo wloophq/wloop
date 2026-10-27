@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/intake"
@@ -392,54 +393,42 @@ func TestForgetWaitsForARunToSettle(t *testing.T) {
 }
 
 func TestWantedRunsAreBounded(t *testing.T) {
-	r := newRig(t, 3)
-	holds := map[string]chan struct{}{}
-	for i := 1; i <= 3; i++ {
-		holds[fmt.Sprintf("acme/api#%d", i)] = make(chan struct{})
-	}
-	r.src.hold = holds
-	for i := 1; i <= 3; i++ {
-		r.ready(t, refN(i), true)
-	}
-	var started []string
-	deadline := time.After(5 * time.Second)
-	for len(started) < WantedConcurrency {
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig(t, 3)
+		holds := map[string]chan struct{}{}
+		for i := 1; i <= 3; i++ {
+			holds[fmt.Sprintf("acme/api#%d", i)] = make(chan struct{})
+		}
+		r.src.hold = holds
+		for i := 1; i <= 3; i++ {
+			r.ready(t, refN(i), true)
+		}
+		synctest.Wait()
+		var started []string
 		for ref, h := range holds {
-			if slices.Contains(started, ref) {
-				continue
-			}
 			select {
 			case <-h:
 				started = append(started, ref)
-			case <-deadline:
-				t.Fatalf("runs started: %v", started)
-			case <-time.After(time.Millisecond):
+			default:
 			}
 		}
-	}
-	for ref, h := range holds {
-		if slices.Contains(started, ref) {
-			continue
+		if len(started) != WantedConcurrency {
+			t.Fatalf("runs started: %v", started)
 		}
-		select {
-		case <-h:
-			t.Fatal("a third wanted run started")
-		case <-time.After(50 * time.Millisecond):
+		for _, ref := range started {
+			holds[ref] <- struct{}{}
 		}
-	}
-	for _, ref := range started {
-		holds[ref] <- struct{}{}
-	}
-	for ref, h := range holds {
-		if !slices.Contains(started, ref) {
-			<-h
-			h <- struct{}{}
+		for ref, h := range holds {
+			if !slices.Contains(started, ref) {
+				<-h
+				h <- struct{}{}
+			}
 		}
-	}
-	r.settled()
-	if r.run.calls != 3 {
-		t.Fatalf("%d calls", r.run.calls)
-	}
+		r.settled()
+		if r.run.calls != 3 {
+			t.Fatalf("%d calls", r.run.calls)
+		}
+	})
 }
 
 func TestRefreshesDoNotHoldBackAWantedBrief(t *testing.T) {
