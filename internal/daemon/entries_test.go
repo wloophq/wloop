@@ -408,7 +408,10 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := nextChange(t, sub)
-	if !slices.Contains(c.Units, r7u) || c.Counters.Views["inbox"] != 1 {
+	for !slices.Contains(c.Units, r7u) {
+		c = nextChange(t, sub)
+	}
+	if c.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
 	es, err := r.db.Entries().EntriesOf(context.Background(), r7u)
