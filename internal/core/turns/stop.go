@@ -2,11 +2,10 @@ package turns
 
 import (
 	"context"
-	"fmt"
 	"slices"
+	"strings"
 	"time"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -76,6 +75,8 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	b := books[u]
 	t, found := sessionTurn(&b, r.Session)
 	facts := turn.StopFacts{HasTurn: found}
+	queued := s.queuedFor(&b, r.Session)
+	facts.Answered = len(queued) > 0
 	if found {
 		for _, rec := range b.Records {
 			facts.Unacked = facts.Unacked || (rec.TurnSeq == t.Seq && !rec.Acked)
@@ -97,16 +98,30 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	case turn.Allow:
 		return StopAnswer{}, nil, evs, nil
 	case turn.AckAndAllow:
-		for i := range b.Records {
-			if rec := &b.Records[i]; rec.TurnSeq == t.Seq && !rec.Acked {
-				rec.Acked, stop.RecordID = true, rec.ID
-			}
-		}
+		ackRecords(&b, t.Seq, &stop)
 		if _, err := s.Store.Save(ctx, b, stopped); err != nil {
 			return StopAnswer{}, nil, evs, err
 		}
 		evs = append(evs, stopped)
 	case turn.LogAndAllow:
+	case turn.DeliverAnswers:
+		stop.Blocked = facts.BlockedThisPrompt
+		if found {
+			ackRecords(&b, t.Seq, &stop)
+		}
+		notices := make([]string, len(queued))
+		routed := []port.Event{stopped}
+		for n, i := range queued {
+			a := &b.Answers[i]
+			a.Route, a.Session, a.NoticedAt = turn.Hooked, r.Session, now
+			notices[n] = s.answeredNotice(b.Unit, *a)
+			routed = append(routed, s.routed(b.Unit, a.ID, AnswerResult{Route: turn.Hooked, Handle: r.Session}))
+		}
+		if _, err := s.Store.Save(ctx, b, routed...); err != nil {
+			return StopAnswer{}, nil, evs, err
+		}
+		evs = append(evs, routed...)
+		ans, changed = StopAnswer{Block: true, Reason: strings.Join(notices, "\n")}, &b.Unit
 	case turn.Block:
 		stop.Blocked = true
 		stopped = s.event(b.Unit, KindStopBlocked, r.Session+":"+r.PromptID, t.ID)
@@ -135,9 +150,24 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	return ans, changed, evs, nil
 }
 
-func (s *Service) blockReason(ref unit.Unit, id string) string {
-	return fmt.Sprintf("This "+brand.Name+" turn on %[1]s has no record. Call the `turn_end` tool of the "+brand.Name+" MCP server with turn %[2]s "+
-		"(load it with ToolSearch if it is deferred), or, without that tool, write %[4]s/turn-%[2]s.json and run "+
-		"`%[3]s turn end %[1]s --turn %[2]s --file %[4]s/turn-%[2]s.json`, then end your turn. "+
-		"If the turn could not be done, record state failed with what broke.", urlOf(ref), id, s.Command, turn.ScratchDir)
+// queuedFor are the indexes of the answers queued for the turns of handle's session, oldest first, but those a
+// Deliver is routing.
+func (s *Service) queuedFor(b *turn.Book, handle string) []int {
+	var out []int
+	for i, a := range b.Answers {
+		_, routing := s.delivering[a.ID]
+		if t, ok := bySeq(b, a.TurnSeq); ok && a.Route == turn.Queued && t.Session == handle && !routing {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+// ackRecords acks the unacked records of turn seq, the stop that follows them.
+func ackRecords(b *turn.Book, seq int64, stop *turn.Stop) {
+	for i := range b.Records {
+		if rec := &b.Records[i]; rec.TurnSeq == seq && !rec.Acked {
+			rec.Acked, stop.RecordID = true, rec.ID
+		}
+	}
 }

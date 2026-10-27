@@ -163,6 +163,9 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
 | `session.idle_since` | timestamp | When the current idle period started. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.unread_answers` | int | Answers the user gave to the session's turns whose notice reached the session and that its agent has not read with inbox_read. |
+| `session.unread_since` | timestamp | When the notice of the oldest of unread_answers reached the session; zero when none. |
+| `session.unread_for` | duration | Time since unread_since; 0 when none. |
 | `session.pr_state` | string | The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |

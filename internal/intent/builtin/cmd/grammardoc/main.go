@@ -259,6 +259,7 @@ var sections = []struct {
 	{builtin.SurfaceDefaults, "Defaults (`defaults.toml`)"},
 	{builtin.SurfaceLabels, "Block headings (`labels.toml`)"},
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
+	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.json`)"},
 }
@@ -396,6 +397,11 @@ func languagePage() (string, error) {
 		if s.surface == builtin.SurfaceTools {
 			out = append(out, lines(rows(s.surface))...)
 			out = append(out, toolAnswers()...)
+			continue
+		}
+		if s.surface == builtin.SurfaceNotices {
+			out = append(out, lines(rows(s.surface))...)
+			out = append(out, noticeFields()...)
 			continue
 		}
 		if s.surface != builtin.SurfaceStep {
@@ -613,6 +619,29 @@ func stepArgs() []any {
 
 // toolAnswers lists each tool's answers and the fields they read besides
 // the tool data's.
+func noticeFields() []string {
+	out := []string{"", "The fields each notice reads besides `Name` and `Command`:", ""}
+	for _, n := range builtin.Notices {
+		out = append(out, fmt.Sprintf("  - `%s`%s", n.Name, fieldList(n.Fields)))
+	}
+	return out
+}
+
+func fieldList(fields []builtin.AnswerField) string {
+	var names []string
+	for _, x := range fields {
+		n := "`" + x.Name + "`"
+		if x.Number {
+			n += ": number"
+		}
+		names = append(names, n)
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(names, ", ") + ")"
+}
+
 func toolAnswers() []string {
 	out := []string{"", "Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides `Name`, `Command` and `PostsPerTurn`:", ""}
 	for _, tool := range builtin.Tools {
@@ -621,19 +650,7 @@ func toolAnswers() []string {
 			if a.Tool != tool.Name {
 				continue
 			}
-			var names []string
-			for _, x := range a.Fields {
-				n := "`" + x.Name + "`"
-				if x.Number {
-					n += ": number"
-				}
-				names = append(names, n)
-			}
-			f := ""
-			if len(names) > 0 {
-				f = " (" + strings.Join(names, ", ") + ")"
-			}
-			out = append(out, fmt.Sprintf("  - `%s`%s: %s", a.Name, f, cell(a.Doc)))
+			out = append(out, fmt.Sprintf("  - `%s`%s: %s", a.Name, fieldList(a.Fields), cell(a.Doc)))
 		}
 	}
 	return out

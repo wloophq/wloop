@@ -156,7 +156,14 @@ func (s *Server) entryMessage(ctx context.Context, entry string) (*api.Message, 
 	if err != nil || !ok {
 		return nil, err
 	}
+	c, err := s.deps.Messages.Conversation(ctx, m)
+	if err != nil {
+		return nil, err
+	}
 	v := messageView(m)
+	for _, a := range c.Answers {
+		v.Answers = append(v.Answers, wireAnswer(a))
+	}
 	return &v, nil
 }
 

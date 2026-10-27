@@ -40,5 +40,6 @@ session has no such tool, write `.loop/turn-<id>.json` with your file tool
 (make sure `.loop/.gitignore` contains `*`) and run
 `{{.Command}} turn end {{.PR.URL}} --turn <id> --file .loop/turn-<id>.json`.
 Never pass the JSON on the command line. If the tool or the command lists
-problems, fix the record and call again. The answer arrives as your next
-prompt; a long one tells you to run `{{.Command}} turn answer {{.PR.URL}}`.
+problems, fix the record and call again. The user's answer reaches you as a
+notice from {{name}} that names the Inbox message answered, without the answer;
+read it with the `inbox_read` tool, or run `{{.Command}} turn answer {{.PR.URL}}`.

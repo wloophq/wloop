@@ -1,0 +1,6 @@
+# What the loop tells an agent's session. Each is a template over its fields, Name and Command; the
+# reference lists the fields of each.
+
+answered = "The user answered {{if .Message}}your {{.Name}} Inbox message {{.Message}}{{else}}a question of your {{.Name}} turn{{end}}. Read the answer with the `inbox_read` tool of the {{.Name}} MCP server{{if .Message}}, message {{.Message}}{{end}} (load it with ToolSearch if it is deferred), or run `{{.Command}} turn answer {{.Unit}}{{if .Message}} --message {{.Message}}{{end}}`, then act on it."
+
+record_owed = "This {{.Name}} turn on {{.Unit}} has no record. Call the `turn_end` tool of the {{.Name}} MCP server with turn {{.Turn}} (load it with ToolSearch if it is deferred), or, without that tool, write {{.ScratchDir}}/turn-{{.Turn}}.json and run `{{.Command}} turn end {{.Unit}} --turn {{.Turn}} --file {{.ScratchDir}}/turn-{{.Turn}}.json`, then end your turn. If the turn could not be done, record state failed with what broke."

@@ -112,8 +112,11 @@ func (s *Store) Close(_ context.Context, id int64, st message.State, answer stri
 	if i < 0 {
 		return fmt.Errorf("no message %d", id)
 	}
-	if r := &s.rows[i]; r.State == message.Open {
+	switch r := &s.rows[i]; {
+	case r.State == message.Open:
 		r.State, r.Answer, r.ClosedAt = st, answer, at.UTC()
+	case r.State == message.Answered && st == message.Answered:
+		r.Answer = answer
 	}
 	return nil
 }

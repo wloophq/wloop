@@ -23,8 +23,8 @@ type TurnStartRequest struct {
 	Intent string `json:"intent"`
 }
 
-// TurnText is a turn's stored instructions, or the newest answer of the
-// caller's turn.
+// TurnText is a turn's stored instructions, or the answers the caller reads
+// with turn answer.
 type TurnText struct {
 	Text string `json:"text"`
 }

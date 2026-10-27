@@ -284,33 +284,19 @@ var turnActions = map[string]func(s *Server, ctx context.Context, u unit.Unit, r
 
 var answerSources = []turn.Source{turn.Cockpit, turn.Notification, turn.TUI, turn.Terminal}
 
-// answer hands the answer to the turn service, which refuses what the
-// question does not take before anything is stored.
+// answer answers the unit's open question message, as the Inbox answers it.
 func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest, out io.Writer) error {
-	text := strings.TrimSpace(req.Guidance)
-	source := turn.Source(req.Source)
-	if source == "" {
-		source = turn.Cockpit
+	if s.deps.Messages == nil {
+		return errors.New("the Inbox is not wired")
 	}
-	if !slices.Contains(answerSources, source) {
-		return badRequest{fmt.Sprintf("source %q is not one of cockpit, notification, tui, terminal", req.Source)}
-	}
-	ctx = s.readAhead(ctx, u, false)
-	s.deps.LoopMu.Lock()
-	defer s.deps.LoopMu.Unlock()
-	res, err := s.deps.Turns.Answer(ctx, turns.AnswerRequest{Unit: u, Text: text, OptionID: req.OptionID, Yes: req.Yes, No: req.No, Source: source})
+	m, ok, err := s.deps.Messages.Question(ctx, u)
 	if err != nil {
 		return err
 	}
-	switch res.Route {
-	case turn.Typed:
-		fmt.Fprintln(out, "answer sent to the agent session")
-	case turn.Resumed:
-		fmt.Fprintln(out, "answer stored; a new session resumes the turn with it")
-	case turn.Queued:
-		fmt.Fprintln(out, api.AnswerQueued)
+	if !ok {
+		return fmt.Errorf("%w on %s", turn.ErrNoQuestion, u.Label())
 	}
-	return nil
+	return s.answerMessage(ctx, m, req, out)
 }
 
 func clearMute(o *dinv.Override) {
