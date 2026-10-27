@@ -241,6 +241,11 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
+	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it.
+	Message int64 `json:"message_id,omitempty"`
+	Posted  bool  `json:"posted,omitempty"`
+	// ReadAt is when the agent read the answer, absent until it does.
+	ReadAt *time.Time `json:"read_at,omitempty"`
 }
 
 type Detail struct {

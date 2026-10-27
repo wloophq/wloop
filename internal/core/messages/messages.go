@@ -29,10 +29,11 @@ type Books interface {
 	BookOf(ctx context.Context, k turns.Key) (turn.Book, bool, error)
 }
 
-// Turns answers and dismisses a unit's question, as turns.Service does.
+// Turns answers and dismisses a unit's question and notes the answers an agent read, as turns.Service does.
 type Turns interface {
 	Answer(ctx context.Context, r turns.AnswerRequest) (turns.AnswerResult, error)
 	Dismiss(ctx context.Context, u unit.Unit) error
+	MarkRead(ctx context.Context, u unit.Unit, ids []int64) error
 }
 
 // Ledger is the items ledger's proposals.
@@ -516,7 +517,7 @@ func (s *Service) Answer(ctx context.Context, id int64, a Answer) (turns.AnswerR
 		if err := s.current(ctx, m); err != nil {
 			return turns.AnswerResult{}, err
 		}
-		res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No, Source: a.Source})
+		res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No, Source: a.Source})
 		if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
 			s.logf("messages: reconciling %s after an answer: %v", m.Unit, rerr)
 		}
@@ -536,7 +537,9 @@ func (s *Service) Answer(ctx context.Context, id int64, a Answer) (turns.AnswerR
 			}
 			return turns.AnswerResult{}, fmt.Errorf("%w: message %d: the turn that posted it has ended", ErrClosed, m.ID)
 		}
-		res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Turn: m.Origin.TurnSeq, Text: said, Source: a.Source})
+		req := turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Posted: true, Turn: m.Origin.TurnSeq,
+			Text: strings.TrimSpace(a.Text), OptionID: a.OptionID, Yes: a.Yes, No: a.No || (m.Confirm && !a.Yes && a.OptionID == "" && strings.TrimSpace(a.Text) == ""), Source: a.Source}
+		res, err := s.Turns.Answer(ctx, req)
 		if errors.Is(err, turn.ErrClosed) {
 			if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
 				s.logf("messages: reconciling %s: %v", m.Unit, rerr)

@@ -257,9 +257,13 @@ func (c *Client) Prompt(ctx context.Context, handle string, req api.PromptReques
 
 // TurnAnswer reads the newest answer to the caller's turn on the unit arg
 // names: a pull request URL or "<provider>:<key>".
-func (c *Client) TurnAnswer(ctx context.Context, handle, arg string) (api.TurnText, error) {
+func (c *Client) TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error) {
 	var res api.TurnText
-	err := c.doAs(ctx, ReadTimeout, handle, http.MethodGet, api.AgentAnswer+"?pr="+url.QueryEscape(arg), nil, &res)
+	q := url.Values{"pr": {arg}}
+	if message != 0 {
+		q.Set("message", strconv.FormatInt(message, 10))
+	}
+	err := c.doAs(ctx, ReadTimeout, handle, http.MethodGet, api.AgentAnswer+"?"+q.Encode(), nil, &res)
 	return res, err
 }
 

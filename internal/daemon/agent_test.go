@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -17,13 +18,17 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/transport/mcp"
 )
 
@@ -43,8 +48,19 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	t.Cleanup(func() { db.Close() })
 	repo := sqlite.New(db)
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
+	inbox := coregtd.New(coregtd.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: agentClock{}})
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }}, inventory.New(db)))
+		Viewer:   func(context.Context) (string, []string, error) { return "me", nil, nil },
+		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Entries: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
+		ReadText: func(_ context.Context, convs []dmessage.Conversation, id int64) string {
+			var texts []string
+			for _, c := range convs {
+				for _, a := range c.Answers {
+					texts = append(texts, fmt.Sprintf("%d:%s", c.Message.ID, a.Text))
+				}
+			}
+			return fmt.Sprintf("message %d: %s", id, strings.Join(texts, ","))
+		}}, inventory.New(db)))
 	return s, svc
 }
 
@@ -241,7 +257,7 @@ func TestSessionStartAndStopThroughTheAgentAPI(t *testing.T) {
 	}
 	var ans api.StopAnswer
 	rec = agentCall(t, h, "POST", api.AgentSessionsStop, "term_1", `{"agent_session":"sess-1","prompt_id":"p1","last_message":"done"}`)
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &ans) != nil || !ans.Block || !strings.Contains(ans.Reason, "turn abc123abc123") {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &ans) != nil || !ans.Block || !strings.Contains(ans.Reason, "Turn=abc123abc123") {
 		t.Fatalf("first stop: %d %s", rec.Code, rec.Body)
 	}
 	rec = agentCall(t, h, "POST", api.AgentSessionsStop, "term_1", `{"agent_session":"sess-1","prompt_id":"p1","last_message":"done"}`)
@@ -287,7 +303,7 @@ func TestHooksPassTheirAgentKindAndTranscript(t *testing.T) {
 	}
 }
 
-func TestTurnAnswerReadsTheNewestAnswerOfTheCallersTurn(t *testing.T) {
+func TestTurnAnswerReadsTheUnreadAnswersOfTheCallersTurns(t *testing.T) {
 	t.Parallel()
 	s, svc := agentServer(t)
 	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
@@ -296,21 +312,35 @@ func TestTurnAnswerReadsTheNewestAnswerOfTheCallersTurn(t *testing.T) {
 		t.Fatalf("start: %d %s", rec.Code, rec.Body)
 	}
 	path := api.AgentAnswer + "?pr=" + agentRef.URL()
-	if rec := agentCall(t, h, "GET", path, "term_1", ""); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "no answer stored for acme/api#7") {
-		t.Fatalf("before an answer: %d %s", rec.Code, rec.Body)
+	read := func(handle, path string) (int, string) {
+		t.Helper()
+		var text api.TurnText
+		rec := agentCall(t, h, "GET", path, handle, "")
+		_ = json.Unmarshal(rec.Body.Bytes(), &text)
+		return rec.Code, text.Text
+	}
+	if code, text := read("term_1", path); code != 200 || text != "message 0: " {
+		t.Fatalf("before an answer: %d %q", code, text)
 	}
 	b := bookOf(t, svc, agentRef)
-	b.Answer(turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "first line\nsecond line", Source: turn.Cockpit, At: agentNow})
+	b.Answer(turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "first line\nsecond line", Source: turn.Cockpit, At: agentNow}).Route = turn.Typed
 	if _, err := svc.Store.Save(context.Background(), b, port.Event{Unit: agentRef.Unit(), Kind: turns.KindAnswered, At: agentNow}); err != nil {
 		t.Fatal(err)
 	}
-	var text api.TurnText
-	rec := agentCall(t, h, "GET", path, "term_1", "")
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &text) != nil || text.Text != "first line\nsecond line" {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
+	if code, text := read("term_2", path); code != 200 || text != "message 0: " {
+		t.Fatalf("another session read the answer: %d %q", code, text)
 	}
-	if rec := agentCall(t, h, "GET", path, "term_2", ""); rec.Code != http.StatusNotFound {
-		t.Fatalf("another session read the answer: %d %s", rec.Code, rec.Body)
+	if code, text := read("term_1", path); code != 200 || text != "message 0: 0:first line\nsecond line" {
+		t.Fatalf("%d %q", code, text)
+	}
+	if code, text := read("term_1", path); code != 200 || text != "message 0: " {
+		t.Fatalf("read twice: %d %q", code, text)
+	}
+	if code, _ := read("term_1", path+"&message=42"); code != http.StatusNotFound {
+		t.Fatalf("a message of no turn of the session: %d", code)
+	}
+	if code, _ := read("term_1", path+"&message=x"); code != http.StatusBadRequest {
+		t.Fatalf("a bad message id: %d", code)
 	}
 }
 

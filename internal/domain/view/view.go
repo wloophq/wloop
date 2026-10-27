@@ -155,7 +155,7 @@ func typedSince(b *turn.Book, t *turn.Turn) bool {
 		since = r.At
 	}
 	for _, a := range b.Answers {
-		if a.TurnSeq == t.Seq && a.Route == turn.Typed && a.Session == t.Session && a.At.After(since) {
+		if a.TurnSeq == t.Seq && (a.Route == turn.Typed || a.Route == turn.Hooked) && a.Session == t.Session && a.At.After(since) {
 			return true
 		}
 	}

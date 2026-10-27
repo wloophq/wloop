@@ -27,14 +27,15 @@ type AnswerRequest struct {
 	// Yes and No are a confirm's explicit choice; Text is then a note.
 	Yes, No bool
 	Source  turn.Source
-	// Message, when not 0, is the Inbox message an agent posted during turn Turn, and Text the answer as the
-	// agent reads it: typed into the posting session when idle, queued while busy, stored without a resume
-	// when the session is gone.
+	// Message is the Inbox message answered. Posted says the agent posted it during turn Turn, and Text is
+	// then the answer as the agent reads it: noticed to the posting session when idle, queued while busy,
+	// stored without a resume when the session is gone. Else it is the question of the unit's turn.
 	Message, Turn int64
+	Posted        bool
 }
 
 func (r AnswerRequest) answer(seq int64) turn.Answer {
-	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source}
+	return turn.Answer{TurnSeq: seq, Text: r.Text, OptionID: r.OptionID, Yes: r.Yes, No: r.No, Source: r.Source, Message: r.Message}
 }
 
 type AnswerResult struct {
@@ -51,11 +52,11 @@ type AnswerResult struct {
 // turn-capable. An answer to a failed or unrecorded turn always resumes it:
 // only a resume turn owes a record.
 func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, error) {
-	if r.Message != 0 {
+	if r.Posted {
 		return s.answerPosted(ctx, r)
 	}
 	s.mu.Lock()
-	q, id, said, evs, err := s.storeAnswer(ctx, r)
+	q, a, said, evs, err := s.storeAnswer(ctx, r)
 	s.mu.Unlock()
 	if err != nil {
 		return AnswerResult{}, err
@@ -69,16 +70,15 @@ func (s *Service) Answer(ctx context.Context, r AnswerRequest) (AnswerResult, er
 			return AnswerResult{}, err
 		}
 	}
-	return s.dispatch(ctx, r.Unit, q, id, said, route)
+	return s.dispatch(ctx, r.Unit, q, a, said, route)
 }
 
-// dispatch sends the stored answer id the way route says and saves where it
-// went.
-func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, id int64, said string, route AnswerResult) (AnswerResult, error) {
+// dispatch sends the stored answer a the way route says and saves where it went.
+func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, said string, route AnswerResult) (AnswerResult, error) {
 	switch route.Route {
 	case turn.Typed:
 		var err error
-		if route, err = s.typeAnswer(ctx, ref, route, "The user answered", said); err != nil {
+		if route, err = s.typeNotice(ctx, ref, route, a); err != nil {
 			return AnswerResult{}, err
 		}
 	case turn.Resumed:
@@ -92,7 +92,7 @@ func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, id i
 			return AnswerResult{}, err
 		}
 	}
-	if err := s.saveRoute(ctx, ref, q, id, route); err != nil {
+	if err := s.saveRoute(ctx, ref, q, a.ID, route); err != nil {
 		return AnswerResult{}, err
 	}
 	if route.Route == turn.Refused {
@@ -104,13 +104,10 @@ func (s *Service) dispatch(ctx context.Context, ref unit.Unit, q turn.Turn, id i
 	return route, nil
 }
 
-// typeAnswer types said into the route's session after lead, or a pointer to it when it runs over one line;
-// the route turns refused when the agent took the line without submitting it.
-func (s *Service) typeAnswer(ctx context.Context, ref unit.Unit, route AnswerResult, lead, said string) (AnswerResult, error) {
-	line := lead + ": " + said
-	if strings.Contains(strings.TrimSpace(said), "\n") {
-		line = fmt.Sprintf("%s. Run %s turn answer %s to read the answer.", lead, s.Command, urlOf(ref))
-	}
+// typeNotice types into the route's session the notice that a was given, which carries no answer: the agent
+// reads it from the Inbox. The route turns refused when the agent took the line without submitting it.
+func (s *Service) typeNotice(ctx context.Context, ref unit.Unit, route AnswerResult, a turn.Answer) (AnswerResult, error) {
+	line := s.answeredNotice(ref, a)
 	typed := s.Typing(route.Handle)
 	submitted, err := s.Sessions.Type(ctx, route.Handle, line)
 	if err == nil {
@@ -128,13 +125,11 @@ func (s *Service) typeAnswer(ctx context.Context, ref unit.Unit, route AnswerRes
 	return route, nil
 }
 
-const postedLead = "The user answered your Inbox message"
-
 // answerPosted stores the answer to a message the agent posted during its turn and routes it to the session
 // that posted it; it never resumes a turn.
 func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResult, error) {
-	if strings.TrimSpace(r.Text) == "" {
-		return AnswerResult{}, InvalidAnswer{"an answer needs the text, an option or yes"}
+	if strings.TrimSpace(r.Text) == "" && r.OptionID == "" && !r.Yes && !r.No {
+		return AnswerResult{}, InvalidAnswer{"an answer needs the text, an option, yes or no"}
 	}
 	s.mu.Lock()
 	b, err := s.book(ctx, r.Unit)
@@ -152,42 +147,49 @@ func (s *Service) answerPosted(ctx context.Context, r AnswerRequest) (AnswerResu
 		return AnswerResult{}, fmt.Errorf("%w: turn %d on %s is %s; a posted message takes answers only while its turn is started", turn.ErrClosed, r.Turn, r.Unit.Label(), t.State)
 	}
 	q := *t
-	a := turn.Answer{TurnSeq: q.Seq, Text: r.Text, Source: r.Source, At: s.now()}
+	a := r.answer(q.Seq)
+	a.At, a.Posted = s.now(), true
 	b.Answer(a)
-	evs := []port.Event{s.event(r.Unit, KindAnswered, "", oneLine(r.Text, answeredMax))}
+	evs := []port.Event{s.event(r.Unit, KindAnswered, "", oneLine(b.Said(a), answeredMax))}
 	saved, err := s.Store.Save(ctx, b, evs...)
 	s.mu.Unlock()
 	if err != nil {
 		return AnswerResult{}, err
 	}
-	var id int64
-	for _, a := range saved.Answers {
-		if a.TurnSeq == q.Seq {
-			id = max(id, a.ID)
-		}
-	}
+	a = newestOf(saved, q.Seq)
 	s.publish(evs...)
 	s.changed(ctx, r.Unit)
 	route, err := s.route(ctx, q, false, true)
 	if err != nil {
 		return AnswerResult{}, err
 	}
-	return s.dispatchPosted(ctx, r.Unit, q, id, r.Text, route)
+	return s.dispatchPosted(ctx, r.Unit, q, a, route)
 }
 
-// dispatchPosted sends a posted message's stored answer id the way route says; a session that is gone keeps
+// newestOf is the newest stored answer of turn seq.
+func newestOf(b turn.Book, seq int64) turn.Answer {
+	var out turn.Answer
+	for _, a := range b.Answers {
+		if a.TurnSeq == seq && a.ID > out.ID {
+			out = a
+		}
+	}
+	return out
+}
+
+// dispatchPosted sends a posted message's stored answer a the way route says; a session that is gone keeps
 // the answer stored and refused.
-func (s *Service) dispatchPosted(ctx context.Context, ref unit.Unit, q turn.Turn, id int64, said string, route AnswerResult) (AnswerResult, error) {
+func (s *Service) dispatchPosted(ctx context.Context, ref unit.Unit, q turn.Turn, a turn.Answer, route AnswerResult) (AnswerResult, error) {
 	switch route.Route {
 	case turn.Typed:
 		var err error
-		if route, err = s.typeAnswer(ctx, ref, route, postedLead, said); err != nil {
+		if route, err = s.typeNotice(ctx, ref, route, a); err != nil {
 			return AnswerResult{}, err
 		}
 	case turn.Resumed:
 		route = AnswerResult{Route: turn.Refused, Note: "the session that posted the message is gone"}
 	}
-	if err := s.saveRoute(ctx, ref, q, id, route); err != nil {
+	if err := s.saveRoute(ctx, ref, q, a.ID, route); err != nil {
 		return AnswerResult{}, err
 	}
 	if route.Route == turn.Refused && route.Note == "" {
@@ -196,30 +198,22 @@ func (s *Service) dispatchPosted(ctx context.Context, ref unit.Unit, q turn.Turn
 	return route, nil
 }
 
-// posted says whether a answers a message the agent posted during its turn: it was stored before the turn
-// had any record, while an answer to a question always follows the record that asked it.
-func posted(b *turn.Book, a turn.Answer) bool {
-	return a.Route != turn.Direct && !slices.ContainsFunc(b.Records, func(r turn.Record) bool {
-		return r.TurnSeq == a.TurnSeq && !r.At.After(a.At)
-	})
-}
-
 // storeAnswer refuses the turn's queued answer: the newest one replaces it.
-func (s *Service) storeAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, int64, string, []port.Event, error) {
+func (s *Service) storeAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, turn.Answer, string, []port.Event, error) {
 	b, err := s.book(ctx, r.Unit)
 	if err != nil {
-		return turn.Turn{}, 0, "", nil, err
+		return turn.Turn{}, turn.Answer{}, "", nil, err
 	}
 	answerable, err := s.answerable()
 	if err != nil {
-		return turn.Turn{}, 0, "", nil, err
+		return turn.Turn{}, turn.Answer{}, "", nil, err
 	}
 	q, ok := b.Question(answerable)
 	if !ok || (q.State != turn.Asked && !q.State.Stopped()) {
-		return turn.Turn{}, 0, "", nil, fmt.Errorf("%w on %s", turn.ErrNoQuestion, r.Unit.Label())
+		return turn.Turn{}, turn.Answer{}, "", nil, fmt.Errorf("%w on %s", turn.ErrNoQuestion, r.Unit.Label())
 	}
 	if err := answerFits(&b, q.Seq, r); err != nil {
-		return turn.Turn{}, 0, "", nil, err
+		return turn.Turn{}, turn.Answer{}, "", nil, err
 	}
 	evs := s.refuseQueued(&b, q.Seq, true)
 	a := r.answer(q.Seq)
@@ -229,22 +223,16 @@ func (s *Service) storeAnswer(ctx context.Context, r AnswerRequest) (turn.Turn, 
 	evs = append(evs, s.event(r.Unit, KindAnswered, "", oneLine(said, answeredMax)))
 	saved, err := s.Store.Save(ctx, b, evs...)
 	if err != nil {
-		return turn.Turn{}, 0, "", nil, err
+		return turn.Turn{}, turn.Answer{}, "", nil, err
 	}
-	var id int64
-	for _, a := range saved.Answers {
-		if a.TurnSeq == q.Seq {
-			id = max(id, a.ID)
-		}
-	}
-	return *q, id, said, evs, nil
+	return *q, newestOf(saved, q.Seq), said, evs, nil
 }
 
 // refuseQueued refuses the queued answers of turn seq; keepPosted leaves those to messages the agent posted.
 func (s *Service) refuseQueued(b *turn.Book, seq int64, keepPosted bool) []port.Event {
 	var evs []port.Event
 	for i := range b.Answers {
-		if a := &b.Answers[i]; a.TurnSeq == seq && a.Route == turn.Queued && !(keepPosted && posted(b, *a)) {
+		if a := &b.Answers[i]; a.TurnSeq == seq && a.Route == turn.Queued && !(keepPosted && a.Posted) {
 			a.Route = turn.Refused
 			evs = append(evs, s.routed(b.Unit, a.ID, AnswerResult{Route: turn.Refused}))
 		}
@@ -364,7 +352,7 @@ func queuedAnswer(b turn.Book) (turn.Answer, bool) {
 }
 
 func queuedQuestionAnswer(b turn.Book) (turn.Answer, bool) {
-	i := slices.IndexFunc(b.Answers, func(a turn.Answer) bool { return a.Route == turn.Queued && !posted(&b, a) })
+	i := slices.IndexFunc(b.Answers, func(a turn.Answer) bool { return a.Route == turn.Queued && !a.Posted })
 	if i < 0 {
 		return turn.Answer{}, false
 	}
@@ -378,7 +366,7 @@ func (s *Service) deliver(ctx context.Context, ref unit.Unit, handle string) err
 	}
 	var errs []error
 	for _, a := range b.Answers {
-		if a.Route == turn.Queued && posted(&b, a) {
+		if a.Route == turn.Queued && a.Posted {
 			errs = append(errs, s.deliverPosted(ctx, ref, b, a, handle))
 		}
 	}
@@ -408,7 +396,7 @@ func (s *Service) deliverPosted(ctx context.Context, ref unit.Unit, b turn.Book,
 	if ok {
 		q = *t
 	}
-	_, err := s.dispatchPosted(ctx, ref, q, a.ID, b.Said(a), route)
+	_, err := s.dispatchPosted(ctx, ref, q, a, route)
 	if refused := (Refusal{}); errors.As(err, &refused) {
 		s.logf("the queued answer %d on %s: %s", a.ID, ref, refused.Reason)
 		return nil
@@ -449,7 +437,7 @@ func (s *Service) deliverQuestion(ctx context.Context, ref unit.Unit, b turn.Boo
 		return nil
 	}
 	defer s.release(a.ID)
-	_, err = s.dispatch(ctx, ref, *q, a.ID, b.Said(a), route)
+	_, err = s.dispatch(ctx, ref, *q, a, b.Said(a), route)
 	if refused := (Refusal{}); errors.As(err, &refused) {
 		s.logf("the queued answer %d on %s: %s", a.ID, ref, refused.Reason)
 		return nil
@@ -517,6 +505,7 @@ func (s *Service) saveRoute(ctx context.Context, ref unit.Unit, q turn.Turn, id 
 	b.Answers[i].Route, b.Answers[i].Session = route.Route, route.Handle
 	evs := []port.Event{s.routed(ref, id, route)}
 	if route.Route == turn.Resumed {
+		b.Answers[i].ReadAt = s.now()
 		evs = append(evs, s.event(ref, KindTurnResumed, q.ID+":"+strconv.FormatInt(id, 10), ""))
 	}
 	_, err = s.Store.Save(ctx, b, evs...)
@@ -600,23 +589,6 @@ func (s *Service) Dismiss(ctx context.Context, u unit.Unit) error {
 	return nil
 }
 
-// AnswerText is the whole text of the newest answer typed into the handle's
-// session, which a multi-line answer points the agent to.
-func (s *Service) AnswerText(ctx context.Context, handle string) (string, error) {
-	b, ok, err := s.Store.BookOf(ctx, Key{Session: handle})
-	if err != nil {
-		return "", err
-	}
-	if ok {
-		for i := len(b.Answers) - 1; i >= 0; i-- {
-			if a := b.Answers[i]; a.Route == turn.Typed && a.Session == handle {
-				return b.Said(a), nil
-			}
-		}
-	}
-	return "", Refusal{"no answer was typed into this session"}
-}
-
 // runHeadless runs headless turn q again with said; nothing is typed into any session.
 func (s *Service) runHeadless(ctx context.Context, q turn.Turn, said string) AnswerResult {
 	if s.Headless == nil {
@@ -627,4 +599,37 @@ func (s *Service) runHeadless(ctx context.Context, q turn.Turn, said string) Ans
 		return AnswerResult{Route: turn.Refused, Note: err.Error()}
 	}
 	return route
+}
+
+// MarkRead notes that the agent read the answers ids of the unit, now; one read before keeps its time.
+func (s *Service) MarkRead(ctx context.Context, u unit.Unit, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	s.mu.Lock()
+	b, err := s.book(ctx, u)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	now := s.now()
+	var evs []port.Event
+	for i := range b.Answers {
+		if a := &b.Answers[i]; a.ReadAt.IsZero() && slices.Contains(ids, a.ID) {
+			a.ReadAt = now
+			evs = append(evs, s.event(u, KindAnswerRead, strconv.FormatInt(a.ID, 10)+":"+now.Format(time.RFC3339Nano), ""))
+		}
+	}
+	if len(evs) == 0 {
+		s.mu.Unlock()
+		return nil
+	}
+	_, err = s.Store.Save(ctx, b, evs...)
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	s.publish(evs...)
+	s.changed(ctx, u)
+	return nil
 }

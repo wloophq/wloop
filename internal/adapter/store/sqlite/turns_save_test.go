@@ -127,3 +127,37 @@ func TestSaveRekeyedRecordFreesItsOldKey(t *testing.T) {
 		t.Errorf("returned book differs from a reload:\n%+v\n%+v", saved, reloaded)
 	}
 }
+
+func TestAnAnswerKeepsItsMessageAndReadState(t *testing.T) {
+	t.Parallel()
+	s := newStore(t)
+	ctx := context.Background()
+	b := bookOfFive(t, s)
+	if _, err := s.db.w.ExecContext(ctx, `INSERT INTO messages (id, provider, unit_key, kind, text, origin_kind, turn_seq, state, created_at)
+		VALUES (41, ?, ?, 'agent_post', 'q', 'agent', ?, 'open', 'x'), (42, ?, ?, 'question', 'q', 'turn', ?, 'open', 'x')`,
+		string(u7.Provider), u7.Key, b.Turns[0].Seq, string(u7.Provider), u7.Key, b.Turns[0].Seq); err != nil {
+		t.Fatal(err)
+	}
+	read := noteAt.Add(time.Hour)
+	b.Answers = append(b.Answers,
+		turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "post", Source: turn.Cockpit, Route: turn.Typed, At: noteAt, Message: 41, Posted: true, ReadAt: read},
+		turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "question", Source: turn.Cockpit, Route: turn.Queued, At: noteAt, Message: 42})
+	saved, err := s.Save(ctx, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _, err := s.BookOf(ctx, turns.Key{Turn: "r0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(saved.Answers, reloaded.Answers) {
+		t.Fatalf("returned answers differ from a reload:\n%+v\n%+v", saved.Answers, reloaded.Answers)
+	}
+	reloaded.Answers[1].ReadAt = read
+	if saved, err = s.Save(ctx, reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, _, err := s.BookOf(ctx, turns.Key{Turn: "r0"}); err != nil || !again.Answers[1].ReadAt.Equal(read) || again.Answers[1].Posted {
+		t.Fatalf("read state not saved: %+v %v", again.Answers, err)
+	}
+}

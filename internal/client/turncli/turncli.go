@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -22,13 +23,13 @@ import (
 
 const (
 	endUsage    = "usage: turn end <pr-url>|<provider>:<key> --turn <id> --file <path>"
-	answerUsage = "usage: turn answer <pr-url>|<provider>:<key>"
+	answerUsage = "usage: turn answer <pr-url>|<provider>:<key> [--message <id>]"
 )
 
 // Agent is the part of AgentAPI the agent's commands call.
 type Agent interface {
 	EndTurn(ctx context.Context, handle string, r api.TurnEndRequest) (api.TurnEnded, error)
-	TurnAnswer(ctx context.Context, handle, arg string) (api.TurnText, error)
+	TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error)
 }
 
 // End stores the record in the file for the turn it names, and deletes the
@@ -99,7 +100,16 @@ func End(ctx context.Context, env func(string) string, args []string, out, errw 
 
 // Answer prints the newest answer the user gave to the caller's turn.
 func Answer(ctx context.Context, env func(string) string, args []string, out, errw io.Writer, c Agent, h harness.Set) int {
-	if len(args) != 1 {
+	var message int64
+	switch {
+	case len(args) == 3 && args[1] == "--message":
+		n, err := strconv.ParseInt(args[2], 10, 64)
+		if err != nil || n <= 0 {
+			fmt.Fprintln(errw, answerUsage)
+			return 2
+		}
+		message = n
+	case len(args) != 1:
 		fmt.Fprintln(errw, answerUsage)
 		return 2
 	}
@@ -108,7 +118,7 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 		fmt.Fprintln(errw, brand.Command+" turn answer:", err)
 		return 1
 	}
-	got, err := c.TurnAnswer(ctx, handle(env, h), arg)
+	got, err := c.TurnAnswer(ctx, handle(env, h), arg, message)
 	if errors.Is(err, client.ErrDown) {
 		fmt.Fprintf(errw, brand.Name+"'s daemon is not running; start it with `%s`, then run this command again\n", client.Kickstart())
 		return 1

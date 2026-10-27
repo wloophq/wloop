@@ -237,6 +237,8 @@ func (b *Book) Said(a Answer) string {
 
 func (b *Book) choice(a Answer) string {
 	switch {
+	case a.OptionID != "" && a.Posted:
+		return a.OptionID
 	case a.OptionID != "":
 		for i := len(b.Records) - 1; i >= 0; i-- {
 			if q := b.Records[i].Record.Question; b.Records[i].TurnSeq == a.TurnSeq && q != nil {

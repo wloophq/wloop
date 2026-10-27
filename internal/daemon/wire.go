@@ -71,8 +71,7 @@ func wireTurnView(b turn.Book, answerable []string) *api.TurnView {
 	}
 	for _, a := range b.Answers {
 		if a.TurnSeq == t.Seq {
-			v.Answers = append(v.Answers, api.TurnAnswer{ID: a.ID, TurnSeq: a.TurnSeq, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No,
-				Source: string(a.Source), Route: string(a.Route), Session: a.Session, At: a.At})
+			v.Answers = append(v.Answers, wireAnswer(a))
 		}
 	}
 	if last, ok := b.LastRecord(t.Seq); ok && last.Record.State == record.UnrecordedState {
@@ -86,4 +85,13 @@ func wireTurn(t turn.Turn) api.Turn {
 		SentTo: t.SentTo, Session: t.Session, State: string(t.State), SentAt: t.SentAt, StartedAt: t.StartedAt, EndedAt: t.EndedAt,
 		ResumeOf: t.ResumeOf, ReplacedBy: t.ReplacedBy, Before: string(t.Before),
 		Agent: t.Agent, BriefRun: t.BriefRun, AgentSession: t.AgentSession, Runner: string(t.Runner), Workflow: t.Workflow, Role: t.Role}
+}
+
+func wireAnswer(a turn.Answer) api.TurnAnswer {
+	w := api.TurnAnswer{ID: a.ID, TurnSeq: a.TurnSeq, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No,
+		Source: string(a.Source), Route: string(a.Route), Session: a.Session, At: a.At, Message: a.Message, Posted: a.Posted}
+	if !a.ReadAt.IsZero() {
+		w.ReadAt = &a.ReadAt
+	}
+	return w
 }

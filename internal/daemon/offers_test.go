@@ -21,8 +21,10 @@ import (
 	"github.com/wloophq/wloop/internal/brand/brandtest"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
+	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -32,6 +34,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
@@ -100,11 +103,14 @@ func newCatalogRig(t *testing.T) catalogRig {
 	repo := sqlite.New(db)
 	sessions := turnstest.NewSessions()
 	plan := newPendingPlan(catalogNow)
+	ts := &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Intents: turnstest.Intents(), Launcher: noLaunch{}, Clock: clockFunc(func() time.Time { return catalogNow })}
+	inbox := coregtd.New(coregtd.Deps{Store: db.Entries(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: fixedClock(catalogNow)})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(db), Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return catalogNow },
 		Viewer:  func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Log:     func(string, ...any) {},
 		Actions: &fakeActions{}, Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing),
-		Turns:    &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Intents: turnstest.Intents(), Launcher: noLaunch{}, Clock: clockFunc(func() time.Time { return catalogNow })},
+		Turns:    ts,
+		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: ts, Entries: inbox, Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)},
 		Sessions: sessions,
 		Explorer: knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}},
 		StateDir: t.TempDir(),

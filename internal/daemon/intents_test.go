@@ -138,6 +138,7 @@ func TestAProfileEditReachesTheCatalogWithoutARestart(t *testing.T) {
 	r := newTurnRig(t)
 	r.s.deps.Intents = cache.Get
 	r.s.deps.Turns.Intents = cachePort{cache.Get}
+	r.s.deps.Messages.Intents = cachePort{cache.Get}
 	var got api.ActionsResponse
 	get(t, r.s, api.Actions, &got)
 	if _, ok := specOf(got.Specs, "ask-author"); ok {

@@ -154,7 +154,8 @@ CREATE TABLE turn_answers (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
   at TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
   option_id TEXT NOT NULL DEFAULT '', yes INTEGER NOT NULL DEFAULT 0, no INTEGER NOT NULL DEFAULT 0,
-  route TEXT NOT NULL, session TEXT NOT NULL DEFAULT ''
+  route TEXT NOT NULL, session TEXT NOT NULL DEFAULT '',
+  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX turn_answers_unit ON turn_answers(provider, unit_key);
 
@@ -387,6 +388,8 @@ CREATE TABLE placements (
   PRIMARY KEY (provider, unit_key)
 );
 
+-- messages.answer is the answer as the Inbox lists it; a turn's question and an agent post keep
+-- theirs in turn_answers (message_id) too, and a proposal only here.
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY,
   entry_id TEXT NOT NULL DEFAULT '',

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -70,4 +71,11 @@ type Store interface {
 	ByEntry(ctx context.Context, entry string) (Message, bool, error)
 	Open(ctx context.Context) ([]Message, error)
 	Close(ctx context.Context, id int64, st State, answer string, at time.Time) error
+}
+
+// Conversation is an Inbox message and the user's answers to it, oldest first. Message is zero for the answers
+// of a turn stored before each answer named its message.
+type Conversation struct {
+	Message Message
+	Answers []turn.Answer
 }
