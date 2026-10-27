@@ -84,3 +84,15 @@ func TestReactOnARefReactsToItsMessageAndGivesItsPermalink(t *testing.T) {
 		t.Fatalf("chat.getPermalink calls = %d, want 1", n)
 	}
 }
+
+func TestReactOnAStoredRefGivesTheStoredPermalinkWithoutAskingSlack(t *testing.T) {
+	f := reactFixture(t, "")
+	f.svc.Stored, _ = storedMessages(send.StoredMessage{TS: "1700000100.000200", Permalink: "https://example.slack.com/archives/C100/p1700000100000200?stored=1"})
+	got, err := f.svc.React(context.Background(), send.Reaction{Message: "C100/1700000100.000200", Name: "eyes"})
+	if err != nil || got.Permalink != "https://example.slack.com/archives/C100/p1700000100000200?stored=1" {
+		t.Fatalf("React = %+v %v", got, err)
+	}
+	if n := len(f.slack.Calls("chat.getPermalink")); n != 0 {
+		t.Fatalf("chat.getPermalink calls = %d, want 0", n)
+	}
+}

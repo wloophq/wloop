@@ -30,7 +30,7 @@ func readPermalink(ts string, thread string) string {
 	return link
 }
 
-func (f *fixture) reader() *Reader { return ReaderOver(f.db, f.slack.Client) }
+func (f *fixture) reader() *Reader { return ReaderOver(f.db, f.slack.Client, nil) }
 
 func (f *fixture) seedReadThread(t *testing.T) {
 	t.Helper()
@@ -170,11 +170,14 @@ func TestSlackReadRefToANonStoredReplyReadsItsThreadFromSlack(t *testing.T) {
 	f.api.Handle("conversations.info", func(v url.Values) any {
 		return map[string]any{"channel": map[string]any{"id": v.Get("channel"), "name": "general", "is_channel": true}}
 	})
+	f.api.Handle("chat.getPermalink", func(v url.Values) any {
+		return map[string]any{"permalink": readPermalink(v.Get("message_ts"), "")}
+	})
 	got, err := f.reader().Read(context.Background(), readConv+"/"+readReply, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"[m1 " + readConv + "/" + readParent + "] " + other, "[m2 " + readConv + "/" + readReply + "] " + me + "\nlive reply"} {
+	for _, want := range []string{": " + readPermalink(readParent, "") + "\n", "[m1 " + readConv + "/" + readParent + "] " + other, "[m2 " + readConv + "/" + readReply + "] " + me + "\nlive reply"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in\n%s", want, got)
 		}
@@ -217,7 +220,7 @@ func TestSlackReadHoldsNoTokenOnFailure(t *testing.T) {
 	client := &slackapi.Client{BaseURL: f.api.URL}
 	client.Tokens = &auth.Store{Keychain: &keychain{items: map[string][]byte{}}, Service: f.cfg.Slack.Service(),
 		LockPath: filepath.Join(t.TempDir(), "slack.lock"), Client: client, ClientID: "1.2"}
-	_, err = ReaderOver(f.db, client).Read(context.Background(), readPermalink(readReply, readParent), 50)
+	_, err = ReaderOver(f.db, client, nil).Read(context.Background(), readPermalink(readReply, readParent), 50)
 	if !errors.Is(err, auth.ErrNotLoggedIn) {
 		t.Fatalf("logged out: %v", err)
 	}

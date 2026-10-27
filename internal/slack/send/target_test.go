@@ -52,14 +52,14 @@ func TestParseMessageRefusesWhatNamesNoMessage(t *testing.T) {
 
 func storedMessages(ms ...send.StoredMessage) (send.Stored, *[]string) {
 	var asked []string
-	return func(_ context.Context, conv, ts string) (send.StoredMessage, bool, error) {
+	return func(_ context.Context, conv, ts string) (send.StoredMessage, bool) {
 		asked = append(asked, conv+"/"+ts)
 		for _, m := range ms {
 			if m.TS == ts {
-				return m, true, nil
+				return m, true
 			}
 		}
-		return send.StoredMessage{}, false, nil
+		return send.StoredMessage{}, false
 	}, &asked
 }
 

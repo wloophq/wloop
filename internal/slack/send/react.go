@@ -60,17 +60,10 @@ func (s *Service) React(ctx context.Context, r Reaction) (Reacted, error) {
 }
 
 // permalinkOf is the permalink of the message at ts in channel: named, when
-// it is one, else Slack's; "" when Slack gives none.
+// it is one, else the stored one or Slack's.
 func (s *Service) permalinkOf(ctx context.Context, named, channel, ts string) string {
 	if IsPermalink(named) {
 		return strings.TrimSpace(named)
 	}
-	link, err := s.Client.Permalink(ctx, channel, ts)
-	if err != nil {
-		if s.Log != nil {
-			s.Log("slack_permalink channel=%s ts=%s error=%v", channel, ts, err)
-		}
-		return ""
-	}
-	return link
+	return s.Permalink(ctx, channel, ts)
 }

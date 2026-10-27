@@ -106,7 +106,7 @@ failed = "Slack send failed: {{.Error}}"
 problem_target_required = "target: required"
 problem_text_required = "text: required, not empty"
 broadcast = "Nothing was sent: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to post it themselves."
-posted = """Posted to {{.Conversation}}{{with .Parent}} in the thread {{printf "%q" .}}{{end}}: {{if .Permalink}}{{.Permalink}}{{else}}no permalink (channel {{.Channel}}, ts {{.TS}}){{end}}
+posted = """Posted to {{.Conversation}}{{with .Parent}} in the thread {{printf "%q" .}}{{end}}: {{if .Permalink}}{{.Permalink}}{{else}}no permalink ({{.Channel}}/{{.TS}}){{end}}
 
 {{.Text}}"""
 
@@ -128,7 +128,7 @@ problem_target_required = "target: required"
 problem_limit = "limit: an integer from 1 to {{.Max}}"
 
 [slack_search]
-description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink to slack_read to read its thread, or to slack_draft, slack_react, slack_edit or slack_send_message to act on it."
+description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink, or the ref a line without one prints, to slack_read to read its thread, or to slack_draft, slack_react, slack_edit or slack_send_message to act on it."
 
 [slack_search.params]
 "query" = "what to look for, as Slack's search box reads it"

@@ -27,17 +27,16 @@ type Reader struct {
 		UnitsFor(ctx context.Context, conv, ts string) ([]unit.Unit, error)
 	}
 	// Messages finds the thread of a stored message a ref names; nil asks Slack.
-	Messages StoredMessages
+	Messages send.Stored
 	Client   *slackapi.Client
 	// Location is the time zone Search shows times in; nil is the local one.
 	Location *time.Location
 }
 
 // ReaderOver reads the facts the Slack module stores in db.
-func ReaderOver(db *sqlite.DB, c *slackapi.Client) *Reader {
+func ReaderOver(db *sqlite.DB, c *slackapi.Client, log func(string, ...any)) *Reader {
 	segs := Segments{Store: db.Segments()}
-	st := &Store{DB: db.Slack(), Segments: segs}
-	return &Reader{Facts: st, Segments: segs, Messages: st, Client: c}
+	return &Reader{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Messages: StoredOver(db, log), Client: c}
 }
 
 const unitPrefix = string(dslack.Provider) + ":"
@@ -55,13 +54,11 @@ func (r *Reader) Read(ctx context.Context, target string, limit int) (string, er
 		return "", fmt.Errorf("%w; the target is a unit (slack:<key>), a message ref or a message permalink", err)
 	}
 	if threadTS == "" {
-		if threadTS, err = storedThread(ctx, r.Messages, conv, ts); err != nil {
-			return "", err
-		}
+		threadTS = r.Messages.InThread(ctx, send.Message{Conversation: conv, TS: ts}).ThreadTS
 	}
 	anchor := cmp.Or(threadTS, ts)
 	link := ""
-	if IsPermalink(target) {
+	if send.IsPermalink(target) {
 		link = target
 	}
 	c, err := r.conversation(ctx, conv)
@@ -90,6 +87,11 @@ func (r *Reader) Read(ctx context.Context, target string, limit int) (string, er
 	msgs, cutOff, err := r.replies(ctx, conv, anchor)
 	if err != nil {
 		return "", err
+	}
+	if link == "" {
+		if link, err = r.Client.Permalink(ctx, conv, msgs[0].TS); err != nil {
+			link = ""
+		}
 	}
 	out, err := r.render(ctx, c, msgs[0].Anchor(), msgs, link, limit)
 	if cutOff {
@@ -173,7 +175,7 @@ func (r *Reader) render(ctx context.Context, c dslack.Conversation, anchor strin
 		link = msgs[0].Permalink
 	}
 	if link == "" && len(msgs) > 0 {
-		link = fmt.Sprintf("no permalink (channel %s, ts %s)", c.ID, msgs[0].TS)
+		link = fmt.Sprintf("no permalink (%s)", send.Ref(c.ID, msgs[0].TS))
 	}
 	b.WriteString(": " + link + "\n")
 	index := map[string]int{}

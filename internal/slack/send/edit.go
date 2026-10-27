@@ -46,11 +46,7 @@ func (s *Service) Edit(ctx context.Context, e Edit) (Edited, error) {
 	if err := s.Allowed(res); err != nil {
 		return Edited{}, err
 	}
-	if link.ThreadTS == "" {
-		if link.ThreadTS, err = s.storedThread(ctx, link); err != nil {
-			return Edited{}, err
-		}
-	}
+	link = s.Stored.InThread(ctx, link)
 	m, err := s.message(ctx, res.Channel, link.TS, link.ThreadTS)
 	if err != nil {
 		return Edited{}, loggedOut(err)

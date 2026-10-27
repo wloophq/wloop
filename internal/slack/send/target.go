@@ -1,6 +1,7 @@
 package send
 
 import (
+	"cmp"
 	"context"
 	"net/url"
 	"regexp"
@@ -65,12 +66,24 @@ func parsePermalink(s string) (Message, bool) {
 }
 
 // Stored finds the message at ts in conversation as the store holds it; ok
-// is false when the store holds none.
-type Stored func(ctx context.Context, conversation, ts string) (m StoredMessage, ok bool, err error)
+// is false when the store holds none, or cannot say which thread it is in.
+type Stored func(ctx context.Context, conversation, ts string) (m StoredMessage, ok bool)
 
-// StoredMessage is what placing a reply needs of a stored message. ThreadTS
+// StoredMessage is what placing a message needs of its stored copy. ThreadTS
 // is "" or TS for a message that starts no thread or is its parent.
-type StoredMessage struct{ TS, ThreadTS, Text string }
+type StoredMessage struct{ TS, ThreadTS, Text, Permalink string }
+
+// InThread is m with the thread the store holds it in, its own TS when it is
+// in none; m as named when its name says the thread or the store does not.
+func (s Stored) InThread(ctx context.Context, m Message) Message {
+	if m.ThreadTS != "" || s == nil {
+		return m
+	}
+	if got, ok := s(ctx, m.Conversation, m.TS); ok {
+		m.ThreadTS = cmp.Or(got.ThreadTS, got.TS)
+	}
+	return m
+}
 
 // thread is the parent of the thread m is in, m itself when it is in none:
 // read from the store, else from Slack.
@@ -81,10 +94,7 @@ func (s *Service) thread(ctx context.Context, m Message) (wireMessage, error) {
 	}
 	if s.Stored != nil {
 		for range 2 {
-			got, ok, err := s.Stored(ctx, m.Conversation, at)
-			if err != nil {
-				return wireMessage{}, err
-			}
+			got, ok := s.Stored(ctx, m.Conversation, at)
 			if !ok {
 				break
 			}
@@ -104,18 +114,20 @@ func (s *Service) thread(ctx context.Context, m Message) (wireMessage, error) {
 	return msg, nil
 }
 
-// storedThread is the thread the store holds m in, its own TS when it is in
-// none; "" when the store does not hold it.
-func (s *Service) storedThread(ctx context.Context, m Message) (string, error) {
-	if s.Stored == nil {
-		return "", nil
+// Permalink is the permalink of the message at ts in channel: the stored
+// one, else Slack's; "" when Slack gives none.
+func (s *Service) Permalink(ctx context.Context, channel, ts string) string {
+	if s.Stored != nil {
+		if got, ok := s.Stored(ctx, channel, ts); ok && got.Permalink != "" {
+			return got.Permalink
+		}
 	}
-	got, ok, err := s.Stored(ctx, m.Conversation, m.TS)
-	if err != nil || !ok {
-		return "", err
+	link, err := s.Client.Permalink(ctx, channel, ts)
+	if err != nil {
+		if s.Log != nil {
+			s.Log("slack_permalink channel=%s ts=%s error=%v", channel, ts, err)
+		}
+		return ""
 	}
-	if got.ThreadTS != "" {
-		return got.ThreadTS, nil
-	}
-	return got.TS, nil
+	return link
 }

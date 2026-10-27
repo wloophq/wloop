@@ -366,7 +366,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 			return draft.Evidence{}, p.failed(pl, err)
 		}
 		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
-		return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
+		return draft.Evidence{Ref: pl.at, Permalink: p.Send.Permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
 	}
 	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS})
 	if err != nil {
@@ -377,7 +377,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 	}
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
 	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
-	return draft.Evidence{Ref: posted.TS, Permalink: p.permalink(ctx, channel, posted.TS), At: postedAt(posted.TS, p.now())}, nil
+	return draft.Evidence{Ref: posted.TS, Permalink: p.Send.Permalink(ctx, channel, posted.TS), At: postedAt(posted.TS, p.now())}, nil
 }
 
 func (p *Publisher) failed(pl plan, err error) error {
@@ -385,16 +385,6 @@ func (p *Publisher) failed(pl plan, err error) error {
 		return fmt.Errorf("%s to %s: %w", mayHaveBeenPosted, pl.where(), err)
 	}
 	return fmt.Errorf("posting to %s: %w", pl.where(), err)
-}
-
-// permalink is "" when Slack does not give it: the post stands without one.
-func (p *Publisher) permalink(ctx context.Context, channel, ts string) string {
-	link, err := p.Send.Client.Permalink(ctx, channel, ts)
-	if err != nil {
-		p.logf("slack_draft_permalink channel=%s ts=%s error=%v", channel, ts, err)
-		return ""
-	}
-	return link
 }
 
 // Verify looks for d posted by the user at or after startedAt, minus the
@@ -418,7 +408,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 		}
 		for _, r := range rs {
 			if r.Name == pl.reaction && slices.Contains(r.Users, tok.User) {
-				return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, true, nil
+				return draft.Evidence{Ref: pl.at, Permalink: p.Send.Permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, true, nil
 			}
 		}
 		return draft.Evidence{}, false, nil
@@ -442,7 +432,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 				continue
 			}
 			if m.User == tok.User && dslack.CompareTS(m.TS, oldest) >= 0 && normalized(m.Text) == want {
-				return draft.Evidence{Ref: m.TS, Permalink: p.permalink(ctx, pl.res.Channel, m.TS), At: postedAt(m.TS, p.now())}, true, nil
+				return draft.Evidence{Ref: m.TS, Permalink: p.Send.Permalink(ctx, pl.res.Channel, m.TS), At: postedAt(m.TS, p.now())}, true, nil
 			}
 		}
 		if page.NextCursor == "" {
@@ -576,7 +566,7 @@ func (p *plugin) publisher() port.Effects {
 	if p.src == nil || p.slack.Client == nil || p.slack.Tokens == nil {
 		return nil
 	}
-	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.deps.DB)},
+	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.deps.DB, p.log)},
 		p.slack.Tokens.Load, p.now, p.log)
 }
 
@@ -602,14 +592,13 @@ type Landing struct {
 	Facts    dslack.FactsReader
 	Segments dslack.Segments
 	// Messages finds the thread of a stored message; nil asks Slack.
-	Messages StoredMessages
+	Messages send.Stored
 }
 
 // LandingOver reads the facts and segments the Slack module stores in db.
-func LandingOver(db *sqlite.DB) Landing {
+func LandingOver(db *sqlite.DB, log func(string, ...any)) Landing {
 	segs := Segments{Store: db.Segments()}
-	st := &Store{DB: db.Slack(), Segments: segs}
-	return Landing{Facts: st, Segments: segs, Messages: st}
+	return Landing{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Messages: StoredOver(db, log)}
 }
 
 // UnitOf is the unit of a post in team at ts in channel, in the thread

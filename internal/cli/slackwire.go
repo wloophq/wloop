@@ -27,8 +27,8 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 	sender := &slackSender{kit: m.slack.kit(cfg.Slack, m.log)}
 	srv.Slack = sender
 	if db, ok := d.Snapshot.(*sqlite.DB); ok {
-		sender.kit.Send.Stored = slacksource.StoredOver(db)
-		reading := &slackReading{sender: sender, read: slacksource.ReaderOver(db, sender.kit.Client)}
+		sender.kit.Send.Stored = slacksource.StoredOver(db, m.log)
+		reading := &slackReading{sender: sender, read: slacksource.ReaderOver(db, sender.kit.Client, m.log)}
 		srv.SlackRead, srv.SlackSearch = reading, reading
 		if d.Outbox == nil {
 			return
@@ -38,7 +38,7 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 		if d.Turns != nil && d.Turns.Store != nil {
 			books = d.Turns.Store
 		}
-		sender.landing = slacksource.LandingOver(db)
+		sender.landing = slacksource.LandingOver(db, m.log)
 		srv.SlackDraft = &slackDrafts{sender: sender, books: books, items: d.Items, outbox: d.Outbox, pub: pub, intents: m.intents}
 		sender.records = &sessionSends{token: sender.kit.Store.Load, client: sender.kit.Client, landing: sender.landing, books: books, outbox: d.Outbox, log: m.log}
 	}

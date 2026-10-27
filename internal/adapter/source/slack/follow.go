@@ -11,9 +11,6 @@ import (
 	"github.com/wloophq/wloop/internal/slack/send"
 )
 
-// IsPermalink says whether s is a Slack message permalink.
-func IsPermalink(s string) bool { return send.IsPermalink(s) }
-
 // FollowUnit is the thread unit a message ref or permalink names in team:
 // the parent's thread when it names a reply. A name that does not say the
 // thread (a ref, a permalink without thread_ts) costs one
@@ -48,30 +45,25 @@ func followUnit(ctx context.Context, c *slackapi.Client, team, conv, ts, threadT
 	return u, nil
 }
 
-// StoredMessages finds one stored message; the module's Store is one.
-type StoredMessages interface {
-	Message(ctx context.Context, conv, ts string) (dslack.Message, bool, error)
-}
-
-// storedThread is the anchor of the thread the store holds conv's message ts
-// in; "" when stored is nil or holds no such message.
-func storedThread(ctx context.Context, stored StoredMessages, conv, ts string) (string, error) {
-	if stored == nil {
-		return "", nil
-	}
-	m, ok, err := stored.Message(ctx, conv, ts)
-	if err != nil || !ok {
-		return "", err
-	}
-	return m.Anchor(), nil
-}
-
-// StoredOver is the send.Stored over the messages the Slack module stores in db.
-func StoredOver(db *sqlite.DB) send.Stored {
-	st := &Store{DB: db.Slack()}
-	return func(ctx context.Context, conv, ts string) (send.StoredMessage, bool, error) {
-		m, ok, err := st.Message(ctx, conv, ts)
-		return send.StoredMessage{TS: m.TS, ThreadTS: m.ThreadTS, Text: m.Text}, ok, err
+// StoredOver is the send.Stored over the messages the Slack module stores in
+// db. A deleted message, or one search stored with no thread (its permalink
+// may just not say it), is left to Slack; a store error is logged and left to
+// Slack too.
+func StoredOver(db *sqlite.DB, log func(string, ...any)) send.Stored {
+	st := db.Slack()
+	return func(ctx context.Context, conv, ts string) (send.StoredMessage, bool) {
+		rows, err := st.Messages(ctx, conv, sqlite.MessageQuery{TS: ts})
+		if err != nil {
+			if log != nil {
+				log("slack_stored conversation=%s ts=%s error=%v", conv, ts, err)
+			}
+			return send.StoredMessage{}, false
+		}
+		if len(rows) == 0 || rows[0].Deleted || (rows[0].ThreadTS == "" && rows[0].Via == string(dslack.ViaSearch)) {
+			return send.StoredMessage{}, false
+		}
+		r := rows[0]
+		return send.StoredMessage{TS: r.TS, ThreadTS: r.ThreadTS, Text: r.Text, Permalink: r.Permalink}, true
 	}
 }
 
@@ -93,9 +85,7 @@ func (l Landing) MessageUnit(ctx context.Context, c *slackapi.Client, team, mess
 		return unit.Unit{}, err
 	}
 	if threadTS == "" {
-		if threadTS, err = storedThread(ctx, l.Messages, conv, ts); err != nil {
-			return unit.Unit{}, err
-		}
+		threadTS = l.Messages.InThread(ctx, send.Message{Conversation: conv, TS: ts}).ThreadTS
 	}
 	if u, ok, err := l.UnitOf(ctx, team, conv, ts, threadTS); err != nil || ok {
 		return u, err
