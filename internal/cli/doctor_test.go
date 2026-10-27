@@ -58,7 +58,7 @@ func serveJSON(t *testing.T, routes map[string]any) string {
 }
 
 func TestDoctorReportsDaemon(t *testing.T) {
-	t.Run("not running", func(t *testing.T) {
+	t.Run("not running", bubbled(func(t *testing.T) {
 		te := newTestEnv(t, &fake.Manager{})
 		te.Socket = filepath.Join(te.StateDir, "daemon.sock")
 		if err := os.WriteFile(filepath.Join(te.StateDir, "http.json"), []byte(`{"port":1,"token":"t"}`), 0o600); err != nil {
@@ -66,9 +66,8 @@ func TestDoctorReportsDaemon(t *testing.T) {
 		}
 		before, _ := os.ReadDir(te.StateDir)
 		start := time.Now()
-		code := te.run("doctor")
-		if code != 1 || time.Since(start) > time.Second {
-			t.Fatalf("exit %d after %v", code, time.Since(start))
+		if code, took := te.run("doctor"), time.Since(start); code != 1 || took != 0 {
+			t.Fatalf("exit %d after waiting %v", code, took)
 		}
 		if e := te.err.String(); !strings.Contains(e, "launchctl kickstart gui/") || !strings.Contains(e, brand.Command+" serve") {
 			t.Fatalf("stderr:\n%s", e)
@@ -79,7 +78,7 @@ func TestDoctorReportsDaemon(t *testing.T) {
 		if after, _ := os.ReadDir(te.StateDir); len(after) != len(before) {
 			t.Fatalf("state dir changed: %v -> %v", before, after)
 		}
-	})
+	}))
 
 	t.Run("LaunchAgent not loaded", func(t *testing.T) {
 		te := newTestEnv(t, &fake.Manager{})

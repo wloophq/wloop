@@ -38,16 +38,18 @@ func TestCommandsFailFastWithoutTheDaemon(t *testing.T) {
 		{"profile", "show", "acme/api"}, {"explore", "acme/api"}, {"pause"}, {"resume"}, {"open"}, {"open", url},
 		{"tui"}, {"brief", "refresh", url}, {"mute", url, "--until", "2d"}, {"track", url}, {"untrack", url},
 	} {
-		te := newTestEnv(t, &fake.Manager{})
-		te.Socket = filepath.Join(t.TempDir(), "none.sock")
-		start := time.Now()
-		code := te.run(args...)
-		if said := te.out.String() + te.err.String(); code == 0 || time.Since(start) > time.Second || !strings.Contains(said, "launchctl kickstart") {
-			t.Errorf("%v: exit %d after %v: %s", args, code, time.Since(start), te.err)
-		}
-		if _, err := os.Stat(filepath.Join(te.StateDir, "store.db")); !os.IsNotExist(err) {
-			t.Errorf("%v opened the store", args)
-		}
+		t.Run(strings.Join(args, " "), bubbled(func(t *testing.T) {
+			te := newTestEnv(t, &fake.Manager{})
+			te.noDaemon(t)
+			start := time.Now()
+			code := te.run(args...)
+			if said, took := te.out.String()+te.err.String(), time.Since(start); code == 0 || took != 0 || !strings.Contains(said, "launchctl kickstart") {
+				t.Errorf("exit %d after waiting %v: %s", code, took, te.err)
+			}
+			if _, err := os.Stat(filepath.Join(te.StateDir, "store.db")); !os.IsNotExist(err) {
+				t.Error("opened the store")
+			}
+		}))
 	}
 }
 
@@ -208,18 +210,20 @@ func TestDoctorListsAHomeOnlyASessionReported(t *testing.T) {
 func TestHooksAllowWithoutTheDaemon(t *testing.T) {
 	t.Parallel()
 	for _, hook := range []string{"stop", "session-start"} {
-		te := newTestEnv(t, &fake.Manager{})
-		te.noDaemon(t)
-		start := time.Now()
-		if code := te.run("hook", hook); code != 0 || time.Since(start) > time.Second {
-			t.Fatalf("%s: exit %d after %v: %s", hook, code, time.Since(start), te.err)
-		}
-		if hook == "session-start" && te.out.Len() != 0 {
-			t.Errorf("session-start printed %q", te.out)
-		}
-		if _, err := os.Stat(filepath.Join(te.StateDir, "store.db")); !os.IsNotExist(err) {
-			t.Errorf("%s opened the store", hook)
-		}
+		t.Run(hook, bubbled(func(t *testing.T) {
+			te := newTestEnv(t, &fake.Manager{})
+			te.noDaemon(t)
+			start := time.Now()
+			if code, took := te.run("hook", hook), time.Since(start); code != 0 || took != 0 {
+				t.Fatalf("exit %d after waiting %v: %s", code, took, te.err)
+			}
+			if hook == "session-start" && te.out.Len() != 0 {
+				t.Errorf("printed %q", te.out)
+			}
+			if _, err := os.Stat(filepath.Join(te.StateDir, "store.db")); !os.IsNotExist(err) {
+				t.Error("opened the store")
+			}
+		}))
 	}
 }
 
