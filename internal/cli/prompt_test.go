@@ -40,14 +40,14 @@ func TestRoundStopsOnAMissingProfile(t *testing.T) {
 	}
 }
 
-var mintedSessionID = regexp.MustCompile(` --session-id '[^']*'`)
+var mintedFlags = regexp.MustCompile(` --session-id '[^']*'| --name '[^']*'`)
 
-// launches drops the minted session id and the session settings from agent
-// commands, leaving how the agent starts.
+// launches drops the minted session id, the session name and the session
+// settings from agent commands, leaving how the agent starts.
 func launches(cmds []string) []string {
 	out := make([]string, len(cmds))
 	for i, c := range cmds {
-		out[i], _, _ = strings.Cut(mintedSessionID.ReplaceAllString(c, ""), " --settings ")
+		out[i], _, _ = strings.Cut(mintedFlags.ReplaceAllString(c, ""), " --settings ")
 	}
 	return out
 }

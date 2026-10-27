@@ -23,6 +23,8 @@ type manifestDefaults struct {
 	Provider dunit.ProviderID `toml:"provider"`
 	// Refusal is what a [[refuse]] case whose why renders empty says.
 	Refusal string `toml:"refusal"`
+	// SessionName is an intent's session.name when its manifest has none.
+	SessionName string `toml:"session_name"`
 }
 
 func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Problems) {
@@ -45,6 +47,9 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 		}
 		if d.Refusal != "" {
 			out.Refusal = d.Refusal
+		}
+		if d.SessionName != "" {
+			out.SessionName = d.SessionName
 		}
 	}
 	if bundled != nil {

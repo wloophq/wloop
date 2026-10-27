@@ -33,6 +33,7 @@ var intentGroups = []group{
 	{"The pull request (`pr.*`)", []string{"pr"}},
 	{"The row (`row.*`)", []string{"row"}},
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
+	{"A session's name (`session.*`; slot `name`)", []string{"session"}},
 	{"A draft's actions (`draft.*`)", []string{"draft"}},
 	{"The configuration (`config.*`)", []string{"config"}},
 }

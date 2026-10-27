@@ -54,6 +54,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `session` (table): The agent session its turns run in.
 - `session.strategy` (one of `reuse_live`, `new`): Whether a turn reuses the unit's live session or starts a new one.
 - `session.title` (string): The session's title: 1 to 12 lowercase letters.
+- `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
 
 ### How a turn runs
@@ -283,6 +284,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `slack`: Facts under slack.*.
   - `workspace`: Facts under workspace.*.
   - `any`: Every provider's units.
+- `session_name` (template): The session.name of an intent whose manifest has none.
 - `refusal` (string): What a [[refuse]] case whose when holds says when its why renders empty.
 
 ## Block headings (`labels.toml`)

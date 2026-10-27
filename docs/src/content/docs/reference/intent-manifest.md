@@ -62,6 +62,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session` | table |  | The agent session its turns run in. |
 | `session.strategy` | one of `reuse_live`, `new` |  | Whether a turn reuses the unit's live session or starts a new one. |
 | `session.title` | string |  | The session's title: 1 to 12 lowercase letters. |
+| `session.name` | template |  | What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
 
 ### How a turn runs

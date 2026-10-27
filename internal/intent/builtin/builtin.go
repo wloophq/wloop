@@ -117,6 +117,8 @@ const (
 	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
 	// reads besides its unit's.
 	ApprovalSlot FactSlot = "approval"
+	// NameSlot holds the facts a manifest's session.name reads.
+	NameSlot FactSlot = "name"
 )
 
 type Fact struct {

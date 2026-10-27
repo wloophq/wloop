@@ -72,6 +72,9 @@ func (k Agent) flags(s turns.AgentSession) []string {
 	if s.Model != "" {
 		out = append(out, "--model", s.Model)
 	}
+	if s.Name != "" {
+		out = append(out, "--name", s.Name)
+	}
 	if emptyPolicy(s.Policy) {
 		return out
 	}
@@ -102,7 +105,7 @@ func (k Agent) Command(s turns.AgentSession) (string, error) {
 	}
 	flags := k.flags(s)
 	for i, f := range flags {
-		if i > 0 && slices.Contains([]string{"--settings", "--model", "--add-dir", "--resume", "--session-id"}, flags[i-1]) {
+		if i > 0 && slices.Contains([]string{"--settings", "--model", "--name", "--add-dir", "--resume", "--session-id"}, flags[i-1]) {
 			f = shell.Quote(f)
 		}
 		parts = append(parts, f)

@@ -175,6 +175,9 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			Title:         s.required("session.title", m.Session.Title),
 			CloseWhenDone: m.Session.CloseWhenDone,
 		}
+		if m.Session.Name != nil || s.defaults.SessionName != "" {
+			d.Session.Name = s.text("session.name", m.Session.Name, s.defaults.SessionName)
+		}
 	}
 	if m.Brief != nil {
 		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true), Need: m.Brief.Need}

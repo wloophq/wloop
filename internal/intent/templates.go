@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -70,6 +71,7 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 	for i, c := range d.Headline.New {
 		text(fmt.Sprintf("headline.new[%d].line", i), HeadlineName(i), c.Text, turn)
 	}
+	ok = s.parseText(set, "session.name", SessionNameName, d.Session.Name, builtin.Env(builtin.NameSlot, nil)) && ok
 	unit := unitEnv(d)
 	text("why", WhyName, d.Why, unit)
 	for i, r := range d.Refuse {
@@ -87,7 +89,7 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 	for _, in := range d.Inputs {
 		declared[in.Name] = true
 	}
-	inline := map[string]string{HeadlineName(-1): "headline.resumed", WhyName: "why"}
+	inline := map[string]string{HeadlineName(-1): "headline.resumed", WhyName: "why", SessionNameName: "session.name"}
 	for i := range d.Headline.New {
 		inline[HeadlineName(i)] = fmt.Sprintf("headline.new[%d].line", i)
 	}
@@ -202,6 +204,9 @@ func walkBranch(b *parse.BranchNode, f func(parse.Node, []string)) {
 // intent's template set.
 const WhyName = "manifest.why"
 
+// SessionNameName is the name session.name is parsed under.
+const SessionNameName = "session.name"
+
 // RefuseWhyName is the name refuse[i].why is parsed under.
 func RefuseWhyName(i int) string { return fmt.Sprintf("refuse[%d].why", i) }
 
@@ -311,6 +316,29 @@ func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
 		return "", nil
 	}
 	return l.render(name, WhyName, unitEnv(d), facts)
+}
+
+// SessionName renders the session.name of the intent name over facts, its
+// name facts but session.title, which it reads from the manifest; the title
+// when the template is empty or renders blank.
+func (l *Loaded) SessionName(name dintent.Name, facts map[string]any) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok {
+		return "", fmt.Errorf("no intent %s", name)
+	}
+	if d.Session.Name.Src == "" {
+		return d.Session.Title, nil
+	}
+	facts = maps.Clone(facts)
+	if facts == nil {
+		facts = map[string]any{}
+	}
+	facts["session.title"] = d.Session.Title
+	got, err := l.render(name, SessionNameName, builtin.Env(builtin.NameSlot, nil), facts)
+	if err != nil {
+		return "", err
+	}
+	return cmp.Or(strings.Join(strings.Fields(got), " "), d.Session.Title), nil
 }
 
 // Refusal is the why of the intent name's first refusal whose when holds

@@ -149,19 +149,16 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github
 	if !req.CrossRepository && ws.BranchRenamed {
 		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.HeadBranch))
 	}
-	title := cfg.Agent
-	if sent.Prompt != "" {
-		title = opts.title + " " + e.Now().Format(sessionTime)
-	}
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
 		return ws, false, e.discard(ctx, ws, err)
 	}
 	if sent.Prompt == "" {
-		start, err := e.startRequest(cfg, ws, s, title)
+		start, err := e.startRequest(cfg, ws, s, "")
 		if err != nil {
 			return ws, false, e.discard(ctx, ws, err)
 		}
+		start.Title = cfg.Agent
 		p := proc{id: start.Session, m: m}
 		if p.handle, err = m.StartAgentSession(ctx, start); err != nil {
 			return ws, false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, e.explainStart(ctx, cfg, ws, err, opts.trusted))
@@ -171,7 +168,11 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github
 		}
 		return ws, true, nil
 	}
-	p, err := e.startSession(ctx, cfg, ws, ref.Unit(), s, title, opts.keepBlocked, opts.trusted)
+	name, err := e.roundName(opts, ref.Unit())
+	if err != nil {
+		return ws, false, e.discard(ctx, ws, err)
+	}
+	p, err := e.startSession(ctx, cfg, ws, ref.Unit(), s, name, opts.keepBlocked, opts.trusted)
 	if blocked := (*workspace.BlockedError)(nil); errors.As(err, &blocked) && opts.keepBlocked(blocked.Reason) {
 		return ws, false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}

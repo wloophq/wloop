@@ -7,7 +7,7 @@ provider = "github"
 skill = true
 why     = "{{.pr.review.reason}}"
 workspace = "review"
-session   = { strategy = "reuse_live", title = "review" }
+session   = { strategy = "reuse_live", title = "review", name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}' }
 intake    = true
 start_line = "starting the review"
 profile   = "review"
