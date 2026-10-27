@@ -180,40 +180,38 @@ func TestSecondReviewJoinsAndReplacesTheGuidance(t *testing.T) {
 
 func TestIntakeLongPollWakesOnALogLine(t *testing.T) {
 	t.Parallel()
-	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
-	in := ask(t, s, "review", `{"source":"cockpit"}`)
-	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
-	var polled api.Intake
-	if code := get(t, s, fmt.Sprintf("/api/intakes/%d", in.Seq), &polled); code != 200 {
-		t.Fatalf("%d", code)
-	}
-	if polled.Note != "briefing acme/api#7 (attempt 1; briefs take 10 to 20 s)" || polled.Attempt != 1 || !slices.Equal(polled.Log, []string{"briefing acme/api#7 (attempt 1; briefs take 10 to 20 s)"}) {
-		t.Fatalf("polled %+v", polled)
-	}
-	done := make(chan api.Intake)
-	go func() {
-		rec := httptest.NewRecorder()
-		s.Handler().ServeHTTP(rec, apiRequest("GET", fmt.Sprintf("/api/intakes/%d?after=%d&wait=20", in.Seq, polled.LogLen), nil))
-		var got api.Intake
-		json.Unmarshal(rec.Body.Bytes(), &got)
-		done <- got
-	}()
-	time.Sleep(50 * time.Millisecond)
-	start := time.Now()
-	if rec := post(t, s, fmt.Sprintf("/api/intakes/%d/without", in.Seq), ""); rec.Code != 200 {
-		t.Fatalf("without: %d %s", rec.Code, rec.Body)
-	}
-	select {
-	case got := <-done:
+	synctest.Test(t, func(t *testing.T) {
+		s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
+		in := ask(t, s, "review", `{"source":"cockpit"}`)
+		waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
+		var polled api.Intake
+		if code := get(t, s, fmt.Sprintf("/api/intakes/%d", in.Seq), &polled); code != 200 {
+			t.Fatalf("%d", code)
+		}
+		if polled.Note != "briefing acme/api#7 (attempt 1; briefs take 10 to 20 s)" || polled.Attempt != 1 || !slices.Equal(polled.Log, []string{"briefing acme/api#7 (attempt 1; briefs take 10 to 20 s)"}) {
+			t.Fatalf("polled %+v", polled)
+		}
+		done := make(chan api.Intake)
+		go func() {
+			rec := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rec, apiRequest("GET", fmt.Sprintf("/api/intakes/%d?after=%d&wait=20", in.Seq, polled.LogLen), nil))
+			var got api.Intake
+			json.Unmarshal(rec.Body.Bytes(), &got)
+			done <- got
+		}()
+		synctest.Wait()
+		start := time.Now()
+		if rec := post(t, s, fmt.Sprintf("/api/intakes/%d/without", in.Seq), ""); rec.Code != 200 {
+			t.Fatalf("without: %d %s", rec.Code, rec.Body)
+		}
+		got := <-done
 		if len(got.Log) == 0 || got.Log[0] != intake.NoteWithout || got.LogLen <= polled.LogLen {
 			t.Fatalf("woke with %+v", got)
 		}
-		if time.Since(start) > 5*time.Second {
-			t.Fatal("the poll waited out its time")
+		if took := time.Since(start); took != 0 {
+			t.Fatalf("the poll woke %v after the log line, want at once", took)
 		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("the poll never woke")
-	}
+	})
 }
 
 func TestWithoutAndCancelEndpoints(t *testing.T) {
@@ -573,30 +571,32 @@ func (a *sessionAsks) known(seq int64) bool {
 
 func TestAJoinIsNeverExpired(t *testing.T) {
 	t.Parallel()
-	const wait = 20 * time.Millisecond
-	s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), wait)
-	stop := make(chan struct{})
-	read := make(chan struct{})
-	go func() {
-		defer close(read)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
+	synctest.Test(t, func(t *testing.T) {
+		const wait = 20 * time.Millisecond
+		s, _, _ := newByHandServer(t, intaketest.NewBriefs(waitBriefing), wait)
+		stop := make(chan struct{})
+		read := make(chan struct{})
+		go func() {
+			defer close(read)
+			for {
 				var rows []api.Row
 				get(t, s, "/api/rows", &rows)
+				select {
+				case <-stop:
+					return
+				case <-time.After(wait / 4):
+				}
 			}
+		}()
+		defer func() { close(stop); <-read }()
+		for n := range 15 {
+			rec := byHandAs(t, s, "term-1", "review")
+			if rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
+				t.Fatalf("call %d: %d %s", n, rec.Code, rec.Body)
+			}
+			time.Sleep(2*wait - time.Duration(n%5)*time.Millisecond)
 		}
-	}()
-	defer func() { close(stop); <-read }()
-	for n := range 15 {
-		rec := byHandAs(t, s, "term-1", "review")
-		if rec.Code != 409 || !strings.Contains(rec.Body.String(), "not ready yet") {
-			t.Fatalf("call %d: %d %s", n, rec.Code, rec.Body)
-		}
-		time.Sleep(2*wait - time.Duration(n%5)*time.Millisecond)
-	}
+	})
 }
 
 func TestAStopWhileWaitingForTheLoopLeavesTheIntakeStarting(t *testing.T) {
