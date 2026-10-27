@@ -15,11 +15,16 @@ import (
 func TestTheConfigsPinsReachTheAgentsHeadlessCalls(t *testing.T) {
 	t.Parallel()
 	for name, raw := range map[string]string{
-		"agent_models": `{"brief": {"enabled": true}, "agent_models": {"claude": {"fast": "x"}}}`,
+		"agent_models": `[brief]
+enabled = true
+
+[agent_models.claude]
+fast = "x"
+`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			path := filepath.Join(t.TempDir(), "config.json")
+			path := filepath.Join(t.TempDir(), "config.toml")
 			if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 				t.Fatal(err)
 			}

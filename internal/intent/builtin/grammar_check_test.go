@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -159,6 +160,10 @@ func TestCheckReadsANumber(t *testing.T) {
 	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": 0.5}))
 	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": int64(2)}))
 	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": "0.5"}), "per_call_usd: must be a number")
+	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": math.Inf(1)}), "per_call_usd: must be a number")
+	wants(t, check(rows, SurfaceConfig, map[string]any{"per_call_usd": math.NaN()}), "per_call_usd: must be a number")
+	ints := []Key{{Path: "per_day", In: SurfaceConfig, Kind: KindInt}}
+	wants(t, check(ints, SurfaceConfig, map[string]any{"per_day": math.Inf(-1)}), "per_day: must be an integer")
 }
 
 func TestCheckStepReadsOnlyItsStepsArguments(t *testing.T) {

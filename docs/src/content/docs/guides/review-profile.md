@@ -7,8 +7,8 @@ description: Put your judgment in Markdown blocks, scoped by organization, repos
 
 `{{command}} init` can create a personal profile directory with a commented example block for each intent. To do it by hand, make a directory under `~/.config/{{name}}/profiles/` and name it in the configuration:
 
-```json
-"profile": "mine"
+```toml
+profile = "mine"
 ```
 
 `profile` is a name under `~/.config/{{name}}/profiles/`, or a path. An empty profile adds nothing: the bundled guides still apply.

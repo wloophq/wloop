@@ -616,7 +616,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath: t.TempDir() + "/config.json",
+		ConfigPath: t.TempDir() + "/config.toml",
 		StateDir:   t.TempDir(),
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },

@@ -107,7 +107,7 @@ func newSlackTestEnv(t *testing.T) *slackTestEnv {
 		Err:        te.err,
 		In:         strings.NewReader(""),
 		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath: filepath.Join(t.TempDir(), "config.json"),
+		ConfigPath: filepath.Join(t.TempDir(), "config.toml"),
 		StateDir:   t.TempDir(),
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },

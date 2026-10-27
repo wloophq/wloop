@@ -118,7 +118,7 @@ func TestTheOperatorSkillKnowsProfilesAndNudge(t *testing.T) {
 			t.Errorf(brand.Name+" lacks %s", want)
 		}
 	}
-	for _, gone := range []string{"--profile", "timer", "watch.out.log", "review_guidance", "~/.config/" + brand.StateDir() + "/config.json"} {
+	for _, gone := range []string{"--profile", "timer", "watch.out.log", "review_guidance", "~/.config/" + brand.StateDir() + "/config.json", "~/.config/" + brand.StateDir() + "/config.toml"} {
 		if strings.Contains(body, gone) {
 			t.Errorf(brand.Name+" still says %s", gone)
 		}

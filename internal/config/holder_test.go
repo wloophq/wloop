@@ -20,8 +20,8 @@ type holderRig struct {
 
 func newHolderRig(t *testing.T) *holderRig {
 	t.Helper()
-	r := &holderRig{t: t, file: filepath.Join(t.TempDir(), "config.json"), now: time.Unix(1000, 0)}
-	r.write(`{"sweep":{"fast":"2m"}}`)
+	r := &holderRig{t: t, file: filepath.Join(t.TempDir(), "config.toml"), now: time.Unix(1000, 0)}
+	r.write(`sweep = {fast = "2m"}`)
 	cfg, err := LoadFile(r.file, tools())
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestHolderIsStaleAfterAWrite(t *testing.T) {
 	if r.h.Stale() {
 		t.Fatal("stale before any write")
 	}
-	r.write(`{"sweep":{"fast":"5m"}}`)
+	r.write(`sweep = {fast = "5m"}`)
 	r.later()
 	if !r.h.Stale() {
 		t.Fatal("a job interval edit left the holder fresh")
@@ -68,7 +68,7 @@ func TestHolderIsStaleAfterAWrite(t *testing.T) {
 
 func TestHolderStatsAtMostEveryStaleEvery(t *testing.T) {
 	r := newHolderRig(t)
-	r.write(`{"sweep":{"fast":"5m"}}`)
+	r.write(`sweep = {fast = "5m"}`)
 	for range 100 {
 		r.h.Config()
 		r.h.Stale()
@@ -86,7 +86,11 @@ func TestHolderStatsAtMostEveryStaleEvery(t *testing.T) {
 
 func TestHolderFollowsTheProfileAndNotesIt(t *testing.T) {
 	r := newHolderRig(t)
-	r.write(`{"sweep":{"fast":"2m"},"profile":"/tmp/p"}`)
+	r.write(`profile = "/tmp/p"
+
+[sweep]
+fast = "2m"
+`)
 	r.later()
 	if got := r.h.Config().Profile; got != "/tmp/p" {
 		t.Fatalf("profile = %q", got)
@@ -115,7 +119,7 @@ func TestHolderWarnsWhileTheFileIsBrokenAndClearsWhenItLoads(t *testing.T) {
 	if w := r.h.Warning(); w == "" {
 		t.Fatal("a broken file raised no warning")
 	}
-	r.write(`{"sweep":{"fast":"2m"}}`)
+	r.write(`sweep = {fast = "2m"}`)
 	r.later()
 	if w := r.h.Warning(); w != "" {
 		t.Fatalf("warning after the file loads: %q", w)
@@ -139,13 +143,13 @@ func TestHolderBreakAnswersUntilRebase(t *testing.T) {
 
 func TestHolderCallsOnWarningChangeWhenTheWarningFlips(t *testing.T) {
 	r := newHolderRig(t)
-	r.write(`{"sweep":{"fast":"5m"}}`)
+	r.write(`sweep = {fast = "5m"}`)
 	r.later()
 	r.h.Config()
 	if r.flips != 1 {
 		t.Fatalf("%d flips after a stale write, want 1", r.flips)
 	}
-	r.write(`{"sweep":{"fast":"6m"}}`)
+	r.write(`sweep = {fast = "6m"}`)
 	r.later()
 	r.h.Config()
 	if r.flips != 1 {

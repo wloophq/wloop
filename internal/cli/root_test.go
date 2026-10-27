@@ -53,8 +53,8 @@ func TestTheRootPicksClaudeAndDesktopThenOrca(t *testing.T) {
 	if d.Agent != "claude" || !slices.Equal(d.WorkspaceManagers, []string{"claude-desktop", "orca"}) {
 		t.Fatalf("agent %q, managers %q", d.Agent, d.WorkspaceManagers)
 	}
-	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"github": {"review_prefix": "R "}}`), 0o600); err != nil {
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte(`github = {review_prefix = "R "}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := config.LoadFile(file, d)

@@ -57,8 +57,11 @@ Every field has its own version, a hash of its schema. A new or changed field is
 
 ## Turn it on
 
-```json
-"brief": { "enabled": true, "tier": "fast", "max_input_bytes": 60000 }
+```toml
+[brief]
+enabled = true
+tier = "fast"
+max_input_bytes = 60000
 ```
 
 The daemon reads `brief` when it starts; restart it after turning briefs on or off (on macOS, `launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`).
