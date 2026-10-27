@@ -599,10 +599,17 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	if since := s.deps.Now().Add(-72 * time.Hour).Local().Format(time.RFC3339); !strings.Contains(fa.calls[0], " since "+since+", ") {
 		t.Fatalf("the wait is not dated to the second: %v, want %s", fa.calls, since)
 	}
-	evs, _ := s.store().Events(context.Background(), r9)
-	last := evs[len(evs)-1]
-	if last.Kind != dinv.KindNudged || last.Data != "@ana" {
-		t.Fatalf("last event %+v", last)
+	if who, _ := fa.inputs[0]["who"].([]string); !slices.Equal(who, []string{"@ana"}) {
+		t.Fatalf("who %v", fa.inputs[0]["who"])
+	}
+}
+
+// sentNudge records the nudged event the command line records once the
+// nudge turn id goes out.
+func sentNudge(t *testing.T, s *Server, id, who string) {
+	t.Helper()
+	if err := s.store().RecordEvent(context.Background(), dinv.Event{PR: r9, Kind: dinv.KindNudged, Key: id, At: s.deps.Now(), Data: who}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -625,6 +632,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 		!strings.Contains(fa.calls[0], ", no reviewer.") || strings.Contains(fa.calls[0], "@") || !fa.maintainers[0] {
 		t.Fatalf("calls %v, maintainers %v", fa.calls, fa.maintainers)
 	}
+	sentNudge(t, s, "t1", "the maintainers (no reviewer requested)")
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "already nudged the maintainers") {
 		t.Fatalf("a second nudge within a day: %d %s", rec.Code, rec.Body)
 	}
@@ -700,6 +708,7 @@ func TestNudgeOncePerWait(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
+	sentNudge(t, s, "t1", "@ana")
 	start := s.deps.Now()
 	s.deps.Now = func() time.Time { return start.Add(23 * time.Hour) }
 	rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`)
