@@ -584,14 +584,43 @@ func TestBroadcastMentionsAreRefused(t *testing.T) {
 
 func TestTypedSlackTokensAreNeutralized(t *testing.T) {
 	ps := newPubSlack(t)
-	text := "cc <@U0000000042> in <#C0000000009|ops>, <!date^1700000000^{date}|x>, @channel @here and @{slack:U000AAA}; see <https://x.y/1|docs>"
+	text := "cc <@u0000000042> <@U0> <@U0000000042 > in <#C0000000009|ops>, <!date^1700000000^{date}|x>, @channel @here and @{slack:U000AAA}; see <https://x.y/1|docs>"
 	if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
 		t.Fatal(err)
 	}
 	got := ps.posted(t).Get("text")
-	want := "cc &lt;@\u2060U0000000042&gt; in &lt;#C0000000009|ops&gt;, &lt;!date^1700000000^{date}|x&gt;, @\u2060channel @\u2060here and <@U000AAA>; see <https://x.y/1|docs>"
+	want := "cc &lt;@\u2060u0000000042&gt; &lt;@\u2060U0&gt; &lt;@\u2060U0000000042 &gt; in &lt;#C0000000009|ops&gt;, &lt;!date^1700000000^{date}|x&gt;, @\u2060channel @\u2060here and <@U000AAA>; see <https://x.y/1|docs>"
 	if got != want {
 		t.Fatalf("posted %q\nwant   %q", got, want)
+	}
+}
+
+func TestTypedUserMentionsPostAsMentions(t *testing.T) {
+	for text, want := range map[string]string{
+		"<@U0000000042> re-review done":                 "<@U0000000042> re-review done",
+		"<@W0000000042|Ana Souza> re-review **done**":   "<@W0000000042> re-review *done*",
+		"thanks <@U000AAA|a*b_c>, and @{slack:U000BBB}": "thanks <@U000AAA>, and <@U000BBB>",
+		"<@U000AAA|@here> <@U000BBB|!channel>":          "<@U000AAA> <@U000BBB>",
+		"see `<@U0000000042>` here":                     "see `&lt;@\u2060U0000000042&gt;` here",
+		"```\n<@U0000000042>\n```":                      "```\n&lt;@\u2060U0000000042&gt;\n```",
+		"[<@U0000000042>](https://x.y/1)":               "<https://x.y/1|&lt;@\u2060U0000000042&gt;>",
+		"<@B0000000042> stays":                          "&lt;@\u2060B0000000042&gt; stays",
+	} {
+		t.Run(text, func(t *testing.T) {
+			ps := newPubSlack(t)
+			if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
+				t.Fatal(err)
+			}
+			if got := ps.posted(t).Get("text"); got != want {
+				t.Fatalf("posted %q\nwant   %q", got, want)
+			}
+		})
+	}
+}
+
+func TestVerifyMatchesAMentionPostedAsText(t *testing.T) {
+	if got, want := normalized("&lt;@\u2060U0000000042&gt; done"), normalized("<@U0000000042> done"); got != want {
+		t.Fatalf("normalized %q, want %q", got, want)
 	}
 }
 

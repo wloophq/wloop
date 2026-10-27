@@ -18,17 +18,40 @@ var (
 	// spans, Slack tokens, Markdown links and URLs.
 	mentionSkipRE = regexp.MustCompile("`[^`]*`|<[^<>]*>|\\[[^\\]\\n]*\\]\\([^()\\s]*\\)|(?i:https?://|mailto:)\\S+")
 	broadcasts    = []string{"channel", "here", "everyone"}
+
+	typedUserRE = regexp.MustCompile(`<@([UW][A-Z0-9]{2,})(?:\|[^<>]*)?>`)
+	// typedSkipRE are the parts of a line no typed mention is read in: code
+	// spans and Markdown links.
+	typedSkipRE = regexp.MustCompile("`[^`]*`|\\[[^\\]\\n]*\\]\\([^()\\s]*\\)")
 )
 
+// TypedMentions replaces each Slack user mention markdown spells as a token,
+// <@<user id>> or <@<user id>|label>, with mention(<user id>), outside code
+// and Markdown links.
+func TypedMentions(markdown string, mention func(user string) string) string {
+	out, _ := outsideCode(markdown, typedSkipRE, func(s string) (string, error) {
+		return typedUserRE.ReplaceAllStringFunc(s, func(m string) string { return mention(typedUserRE.FindStringSubmatch(m)[1]) }), nil
+	})
+	return out
+}
+
 // Mentions replaces each @handle, @<user id> and email of markdown that names
-// one live user with mention(<user id>), outside code, Slack tokens, URLs
-// and Markdown links. A name no user holds, or one a lookup fails on, stays
-// text; one several users hold fails with ErrAmbiguous.
+// one live user, and each typed user mention, with mention(<user id>), outside
+// code, Slack tokens, URLs and Markdown links. A name no user holds, or one a
+// lookup fails on, stays text; one several users hold fails with ErrAmbiguous.
 func (s *Service) Mentions(ctx context.Context, markdown string, mention func(user string) string) (string, error) {
 	if s.Client == nil {
 		return "", ErrNotLoggedIn
 	}
 	r := &mentionLookup{s: s}
+	return outsideCode(TypedMentions(markdown, mention), mentionSkipRE, func(text string) (string, error) {
+		return r.in(ctx, text, mention)
+	})
+}
+
+// outsideCode is markdown with f applied to each part of a line outside code
+// blocks and outside the matches of skip.
+func outsideCode(markdown string, skip *regexp.Regexp, f func(string) (string, error)) (string, error) {
 	lines := strings.Split(markdown, "\n")
 	inCode := false
 	for i, line := range lines {
@@ -41,13 +64,13 @@ func (s *Service) Mentions(ctx context.Context, markdown string, mention func(us
 		}
 		var b strings.Builder
 		at := 0
-		for _, skip := range append(mentionSkipRE.FindAllStringIndex(line, -1), []int{len(line), len(line)}) {
-			out, err := r.in(ctx, line[at:skip[0]], mention)
+		for _, sk := range append(skip.FindAllStringIndex(line, -1), []int{len(line), len(line)}) {
+			out, err := f(line[at:sk[0]])
 			if err != nil {
 				return "", err
 			}
-			b.WriteString(out + line[skip[0]:skip[1]])
-			at = skip[1]
+			b.WriteString(out + line[sk[0]:sk[1]])
+			at = sk[1]
 		}
 		lines[i] = b.String()
 	}

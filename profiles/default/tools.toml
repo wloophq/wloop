@@ -180,7 +180,7 @@ problem_before_after = "before: a date after after"
 problem_limit = "limit: an integer from 1 to {{.Max}}"
 
 [slack_draft]
-description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on. From a turn on a GTD entry, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; an @handle or an email that names one person becomes that mention."
+description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on. From a turn on a GTD entry, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; a typed <@<user id>>, an @handle or an email that names one person becomes that mention, any other mention, channel or special token posts as text, and a broadcast or group mention is refused."
 
 [slack_draft.params]
 "text" = "the message, in Markdown; empty for a reaction"
