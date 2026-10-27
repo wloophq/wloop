@@ -42,7 +42,7 @@ func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *
 	}
 	name, err := e.roundName(opts, r.Unit)
 	if err != nil {
-		return err
+		return "", err
 	}
 	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, opts.keepBlocked, opts.trusted)
 	if err != nil {
