@@ -70,6 +70,9 @@ type Request struct {
 	Verb   gtd.Verb
 	Args   map[string]string
 	Source string
+	// Automated is a verb a workflow ran: it records no verb event, which
+	// says a person ran it and could start another workflow in turn.
+	Automated bool
 }
 
 type Result struct {

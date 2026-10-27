@@ -75,3 +75,21 @@ func TestAVerbThatChangesNothingRecordsNothing(t *testing.T) {
 		t.Errorf("events %+v", got)
 	}
 }
+
+func TestAnAutomatedVerbRecordsNoEvent(t *testing.T) {
+	r := newRig()
+	e := r.put(t, gtd.Entry{ID: "e-x", Kind: gtd.KindCapture, State: gtd.Next, Origin: gtd.OriginUser})
+	res, err := r.svc.Do(context.Background(), e.ID, coregtd.Request{Verb: gtd.VerbSomeday, Source: "workflow", Automated: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Entry.State != gtd.Someday {
+		t.Fatalf("state %s", res.Entry.State)
+	}
+	if err := r.svc.RecordVerb(context.Background(), res.Entry, coregtd.Request{Verb: gtd.VerbDone, Automated: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := verbEvents(r.store.Events); len(got) > 0 {
+		t.Errorf("events %+v", got)
+	}
+}

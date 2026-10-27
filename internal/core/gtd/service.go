@@ -224,10 +224,10 @@ func (s *Service) RecordVerb(ctx context.Context, e gtd.Entry, req Request) erro
 }
 
 // verbEvents are the event of req's verb on e, which left e's state; none
-// for a verb that records nothing.
+// for a verb that records nothing or an automated one.
 func verbEvents(e gtd.Entry, req Request, now time.Time) []port.Event {
 	kind := gtd.VerbEventKind(req.Verb)
-	if !slices.Contains(gtd.VerbEventKinds, kind) {
+	if req.Automated || !slices.Contains(gtd.VerbEventKinds, kind) {
 		return nil
 	}
 	return []port.Event{{Unit: gtd.UnitOf(e.ID), Kind: kind, Actor: req.Source, Data: string(e.State), At: now}}
