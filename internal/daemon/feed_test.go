@@ -256,10 +256,6 @@ func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 	})
 }
 
-// rowsQuiet is how long the read model waits after a row note before it
-// refreshes.
-const rowsQuiet = 250 * time.Millisecond
-
 func TestTurnEndPublishesItsUnit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		s, _, svc := feedServer(t)
@@ -276,8 +272,8 @@ func TestTurnEndPublishesItsUnit(t *testing.T) {
 		}
 		for m := range msgs {
 			if slices.Contains(m.c.Units, agentRef.Unit()) {
-				if took := time.Since(ended); took != rowsQuiet {
-					t.Fatalf("the turn end reached the stream after %v, want the read model's quiet period, %v", took, rowsQuiet)
+				if took := time.Since(ended); took != readmodel.PokeQuiet {
+					t.Fatalf("the turn end reached the stream after %v, want the read model's quiet period, %v", took, readmodel.PokeQuiet)
 				}
 				return
 			}
