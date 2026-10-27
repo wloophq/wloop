@@ -191,6 +191,9 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `views` (table): The lists of entries, by view.
 - `views.<name>` (table): A view, by its name.
 - `views.<name>.label` (string): The name people read in the list of views. Required.
+- `review` (table): The weekly Review's steps, by step.
+- `review.<name>` (table): A step of the Review: inbox, outbox, waiting, projects, someday or focus.
+- `review.<name>.label` (string): What the step asks of you, as the Review lists it. Required.
 
 ## Workflow manifest (`workflows/<name>/workflow.toml`)
 

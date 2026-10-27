@@ -17,11 +17,12 @@ import (
 // GTDFile is the profile file that words the GTD verbs and views.
 const GTDFile = "gtd.toml"
 
-// GTDTexts are the words of the GTD verbs, by verb, and of the views'
-// labels, by view.
+// GTDTexts are the words of the GTD verbs, by verb, and the labels of the
+// views and of the Review's steps, by id.
 type GTDTexts struct {
-	Verbs map[string]VerbText
-	Views map[string]string
+	Verbs  map[string]VerbText
+	Views  map[string]string
+	Review map[string]string
 }
 
 // VerbText is a verb's words: Input is the question a verb that asks for
@@ -30,7 +31,8 @@ type VerbText struct{ Label, Summary, Input string }
 
 type mGTD struct {
 	Verbs map[string]mVerbText `toml:"verbs"`
-	Views map[string]mViewText `toml:"views"`
+	Views  map[string]mViewText `toml:"views"`
+	Review map[string]mViewText `toml:"review"`
 }
 
 type mVerbText struct {
@@ -53,7 +55,7 @@ func BundledGTD(bundled fs.FS) (GTDTexts, Problems) {
 // names nothing keeps the lower one. A bundled FS without the file, or nil,
 // words nothing.
 func loadGTD(layers []profile.Layer, bundled fs.FS) (GTDTexts, Problems) {
-	out := GTDTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}}
+	out := GTDTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}, Review: map[string]string{}}
 	if bundled == nil {
 		return out, nil
 	}
@@ -95,6 +97,11 @@ func loadGTD(layers []profile.Layer, bundled fs.FS) (GTDTexts, Problems) {
 			problems = append(problems, Problem{File: GTDFile, Field: "views." + v, Msg: "is missing: every view has a table"})
 		}
 	}
+	for _, v := range builtin.GTDReviewSteps {
+		if _, ok := out.Review[v]; !ok {
+			problems = append(problems, Problem{File: GTDFile, Field: "review." + v, Msg: "is missing: every Review step has a table"})
+		}
+	}
 	return out, problems
 }
 
@@ -131,18 +138,28 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		}
 		out.Verbs[id] = w
 	}
-	for _, id := range slices.Sorted(maps.Keys(m.Views)) {
-		if !slices.Contains(builtin.GTDViews, id) {
-			s.add("views."+id, "names no view%s", expr.DidYouMean(id, builtin.GTDViews))
-			continue
-		}
-		label := out.Views[id]
-		text("views."+id+".label", m.Views[id].Label, &label)
-		if label == "" && m.Views[id].Label == nil {
-			s.add("views."+id+".label", "is required")
-		}
-		out.Views[id] = label
-	}
+	labels(s, "views", "view", m.Views, out.Views, builtin.GTDViews)
+	labels(s, "review", "Review step", m.Review, out.Review, builtin.GTDReviewSteps)
 	s.addGrammar(grammar(builtin.SurfaceGTD, src))
 	return s.problems
+}
+
+// labels lays the label tables m of section over out, each id one of ids.
+func labels(s *sheet, section, noun string, m map[string]mViewText, out map[string]string, ids []string) {
+	for _, id := range slices.Sorted(maps.Keys(m)) {
+		path := section + "." + id
+		if !slices.Contains(ids, id) {
+			s.add(path, "names no %s%s", noun, expr.DidYouMean(id, ids))
+			continue
+		}
+		switch v := m[id].Label; {
+		case v == nil && out[id] == "":
+			s.add(path+".label", "is required")
+		case v == nil:
+		case strings.TrimSpace(*v) == "":
+			s.add(path+".label", "is required")
+		default:
+			out[id] = strings.TrimSpace(*v)
+		}
+	}
 }

@@ -114,3 +114,18 @@ func TestAVerbThatAsksNeedsItsQuestion(t *testing.T) {
 		t.Errorf("%q %s", texts.Verbs["waiting"].Input, problems)
 	}
 }
+
+func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
+	texts, problems := loadGTDWith(t, string(defaultGTD()), "[review.waiting]\nlabel = \"Chase what waits\"\n\n[review.inbx]\nlabel = \"x\"\n")
+	if !strings.Contains(problems, "review.inbx: names no Review step; did you mean \"inbox\"?") {
+		t.Errorf("%s", problems)
+	}
+	if texts.Review["waiting"] != "Chase what waits" || texts.Review["inbox"] != "Inbox to zero" {
+		t.Errorf("review %v", texts.Review)
+	}
+	for _, id := range builtin.GTDReviewSteps {
+		if bundled, _ := BundledGTD(os.DirFS("../../profiles/default")); bundled.Review[id] == "" {
+			t.Errorf("review step %s has no label", id)
+		}
+	}
+}

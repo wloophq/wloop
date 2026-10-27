@@ -3,6 +3,24 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "review": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A step of the Review: inbox, outbox, waiting, projects, someday or focus.",
+        "properties": {
+          "label": {
+            "description": "What the step asks of you, as the Review lists it. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "The weekly Review's steps, by step.",
+      "type": "object"
+    },
     "verbs": {
       "additionalProperties": {
         "additionalProperties": false,

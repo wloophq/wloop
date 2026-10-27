@@ -66,8 +66,8 @@ func TestReviewSteps(t *testing.T) {
 	}
 	for _, s := range rv.Steps {
 		w := want[s.ID]
-		if s.View != w.view || s.Count != w.count || s.Label == "" {
-			t.Errorf("step %s: view %s count %d label %q, want %s %d", s.ID, s.View, s.Count, s.Label, w.view, w.count)
+		if s.View != w.view || s.Count != w.count {
+			t.Errorf("step %s: view %s count %d, want %s %d", s.ID, s.View, s.Count, w.view, w.count)
 		}
 	}
 	if rv.ID == "" || !rv.StartedAt.Equal(t0) || rv.Done {

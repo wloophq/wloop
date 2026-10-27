@@ -25,6 +25,15 @@ var GTDViews = []string{
 	string(gtd.ViewReview),
 }
 
+// GTDReviewSteps are the weekly Review's steps, in order.
+var GTDReviewSteps = func() []string {
+	out := make([]string, len(gtd.ReviewSteps))
+	for i, st := range gtd.ReviewSteps {
+		out[i] = st.ID
+	}
+	return out
+}()
+
 // gtdGrammar is the keys of gtd.toml.
 var gtdGrammar = []Key{
 	{Path: "verbs", In: SurfaceGTD, Kind: KindTable, Doc: "The verbs an entry offers, by verb."},
@@ -35,4 +44,7 @@ var gtdGrammar = []Key{
 	{Path: "views", In: SurfaceGTD, Kind: KindTable, Doc: "The lists of entries, by view."},
 	{Path: "views.*", In: SurfaceGTD, Kind: KindTable, Doc: "A view, by its name."},
 	{Path: "views.*.label", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "The name people read in the list of views. Required."},
+	{Path: "review", In: SurfaceGTD, Kind: KindTable, Doc: "The weekly Review's steps, by step."},
+	{Path: "review.*", In: SurfaceGTD, Kind: KindTable, Doc: "A step of the Review: inbox, outbox, waiting, projects, someday or focus."},
+	{Path: "review.*.label", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "What the step asks of you, as the Review lists it. Required."},
 }

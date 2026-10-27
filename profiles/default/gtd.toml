@@ -1,8 +1,8 @@
 # The words of the GTD verbs an entry offers and of the lists of entries.
 # A verb's label is its button; its summary, one line on what pressing it
 # does, is the button's tooltip; input is the question a verb that asks for
-# a value puts first. A user profile's gtd.toml replaces the keys
-# it sets.
+# a value puts first. review words the weekly Review's steps. A user
+# profile's gtd.toml replaces the keys it sets.
 
 [verbs.next]
 label   = "Next"
@@ -117,3 +117,21 @@ label = "Logbook"
 
 [views.review]
 label = "Review"
+
+[review.inbox]
+label = "Inbox to zero"
+
+[review.outbox]
+label = "Outbox"
+
+[review.waiting]
+label = "Waiting: nudge?"
+
+[review.projects]
+label = "Projects without a next action or past their review"
+
+[review.someday]
+label = "Someday"
+
+[review.focus]
+label = "Prune Focus"
