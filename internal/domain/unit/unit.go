@@ -148,7 +148,7 @@ func (r *Registry) Target(p ProviderID) string {
 
 // Targets is how a command line names a unit of any of ps, or of any
 // provider of r when ps is empty: their targets as one, such as
-// <url|permalink|slack:key>.
+// <url|ref|permalink|slack:key>.
 func (r *Registry) Targets(ps ...ProviderID) string {
 	if len(ps) == 0 && r != nil {
 		for p := range r.codecs {
@@ -222,7 +222,7 @@ func (c OpaqueCodec) Valid(key string) error {
 }
 
 // Resolver is a codec whose provider must look an address up to find its
-// unit, such as a Slack permalink to its thread; ok is false for an address
+// unit, such as a Slack message ref or permalink to its thread; ok is false for an address
 // that is not one of the provider's.
 type Resolver interface {
 	Resolve(ctx context.Context, address string) (key string, ok bool, err error)

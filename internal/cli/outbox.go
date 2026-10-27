@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	slacksend "github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
@@ -285,7 +286,7 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) error {
 	fs := flag.NewFlagSet("outbox new", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	react := fs.String("react", "", "react to the unit's message with this emoji instead of replying")
+	react := fs.String("react", "", "react with this emoji instead of replying: to the Slack message named, else to the unit's message")
 	send := fs.Bool("send", false, "post it now instead of saving it to the Outbox")
 	yes := fs.Bool("yes", false, "with --send, post without asking")
 	pos, err := parseInterspersed(fs, args)
@@ -305,6 +306,9 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 	cr := api.DraftCreate{Unit: u, Source: string(dturn.Terminal)}
 	if *react != "" {
 		cr.Kind, cr.Reaction = api.DraftReact, *react
+		if slacksend.IsMessage(pos[0]) {
+			cr.Target = pos[0]
+		}
 	} else {
 		cr.Kind, cr.Text = api.DraftReply, pos[1]
 	}

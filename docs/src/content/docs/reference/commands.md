@@ -75,10 +75,10 @@ See [Troubleshooting](/guides/troubleshooting/).
 Resolve a unit's open items, replies as drafts.
 
 ```sh
-{{command}} act <url|permalink|slack:key> [guidance...]
+{{command}} act <url|ref|permalink|slack:key> [guidance...]
 ```
 
-Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
+Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
@@ -282,12 +282,12 @@ Drafts waiting for your approval, and yours.
 {{command}} outbox discard <id> [--reason <why>]
 ```
 
-List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. new writes a reply, or a reaction, on a unit: a Slack message permalink (its thread), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in the Outbox for your approval; with `--send` it posts once you read it and say yes. approve shows a draft whole and posts it once you say yes, only from a terminal of your own, never an agent's shell; retry posts a failed one again. edit changes a draft's text and discard drops it.
+List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. new writes a reply, or a reaction, on a unit: a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink (its thread, or with `--react` the message itself), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in the Outbox for your approval; with `--send` it posts once you read it and say yes. approve shows a draft whole and posts it once you say yes, only from a terminal of your own, never an agent's shell; retry posts a failed one again. edit changes a draft's text and discard drops it.
 
 | Flag | Description |
 | --- | --- |
 | `--color <when>` | list, show: auto, always or never |
-| `--react <emoji>` | new: react to the unit's message instead of replying |
+| `--react <emoji>` | new: react instead of replying: to the Slack message named, else to the unit's message |
 | `--send` | new: post it now, through the Outbox, instead of saving it there |
 | `--text <markdown>` | approve: post this text instead of the draft's |
 | `--confirm` | retry: post again a draft that may have been posted |

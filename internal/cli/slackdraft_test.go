@@ -143,7 +143,8 @@ func TestSessionSendsToUntrackedPlacesAreRecorded(t *testing.T) {
 	golden(t, "session_send_calls.golden", b.String())
 	var units []unit.Unit
 	for _, d := range w.drafts(t) {
-		if d.State != draft.Sent || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != sessPosted {
+		k, err := dslack.ParseUnit(d.Unit)
+		if err != nil || d.State != draft.Sent || d.Origin != (draft.Origin{Kind: draft.OriginSession}) || d.Evidence.Ref != k.Conversation+"/"+sessPosted {
 			t.Fatalf("draft %+v", d)
 		}
 		units = append(units, d.Unit)
@@ -277,7 +278,7 @@ func TestSessionSendToATrackedThreadIsRecorded(t *testing.T) {
 	}
 	d := ds[0]
 	if d.Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || d.State != draft.Sent || d.Origin.Kind != draft.OriginSession ||
-		d.Evidence.Ref != sessPosted || !strings.Contains(d.Evidence.Permalink, "thread_ts="+sessParent) || d.Text != "a session message" {
+		d.Evidence.Ref != sessThreaded+"/"+sessPosted || !strings.Contains(d.Evidence.Permalink, "thread_ts="+sessParent) || d.Text != "a session message" {
 		t.Fatalf("draft %+v", d)
 	}
 	if len(w.st.srv.Calls("chat.postMessage")) != 1 {
@@ -300,7 +301,7 @@ func TestSessionSendToASegmentIsRecorded(t *testing.T) {
 	}
 	w.send(t, sessUser)
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != units[0] || ds[0].State != draft.Sent || ds[0].Evidence.Ref != sessPosted {
+	if len(ds) != 1 || ds[0].Unit != units[0] || ds[0].State != draft.Sent || ds[0].Evidence.Ref != sessDM+"/"+sessPosted {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -329,7 +330,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 	if len(posts) != 1 || posts[0].Get("channel") != sessChannel || posts[0].Get("thread_ts") != sessParent || posts[0].Get("text") != "on it" {
 		t.Fatalf("posts %v", posts)
 	}
-	if got := w.drafts(t)[0]; got.State != draft.Sent || got.Evidence.Ref != sessPosted {
+	if got := w.drafts(t)[0]; got.State != draft.Sent || got.Evidence.Ref != sessChannel+"/"+sessPosted {
 		t.Fatalf("draft %+v", got)
 	}
 }
@@ -567,7 +568,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 			t.Fatalf("record %d %+v", i, d)
 		}
 	}
-	if d := ds[0]; d.Kind != draft.Edit || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" || d.Evidence.Ref != sessReply {
+	if d := ds[0]; d.Kind != draft.Edit || d.Text != "release 1.2 **done**" || d.Replaced != "release 1.2 :hourglass:" || d.Evidence.Ref != sessThreaded+"/"+sessReply {
 		t.Fatalf("edit record %+v", d)
 	}
 

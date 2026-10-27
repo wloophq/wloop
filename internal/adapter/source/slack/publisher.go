@@ -409,7 +409,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 			return draft.Evidence{}, p.failed(pl, err)
 		}
 		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
-		return draft.Evidence{Ref: pl.at, Permalink: p.Send.Permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
+		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), nil
 	}
 	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS})
 	if err != nil {
@@ -420,7 +420,12 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 	}
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
 	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
-	return draft.Evidence{Ref: posted.TS, Permalink: p.Send.Permalink(ctx, channel, posted.TS), At: postedAt(posted.TS, p.now())}, nil
+	return p.evidence(ctx, channel, posted.TS, postedAt(posted.TS, p.now())), nil
+}
+
+// evidence names the message at ts in channel by its ref and permalink.
+func (p *Publisher) evidence(ctx context.Context, channel, ts string, at time.Time) draft.Evidence {
+	return draft.Evidence{Ref: send.Ref(channel, ts), Permalink: p.Send.Permalink(ctx, channel, ts), At: at}
 }
 
 func (p *Publisher) failed(pl plan, err error) error {
@@ -451,7 +456,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 		}
 		for _, r := range rs {
 			if r.Name == pl.reaction && slices.Contains(r.Users, tok.User) {
-				return draft.Evidence{Ref: pl.at, Permalink: p.Send.Permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, true, nil
+				return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), true, nil
 			}
 		}
 		return draft.Evidence{}, false, nil
@@ -475,7 +480,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 				continue
 			}
 			if m.User == tok.User && dslack.CompareTS(m.TS, oldest) >= 0 && normalized(m.Text) == want {
-				return draft.Evidence{Ref: m.TS, Permalink: p.Send.Permalink(ctx, pl.res.Channel, m.TS), At: postedAt(m.TS, p.now())}, true, nil
+				return p.evidence(ctx, pl.res.Channel, m.TS, postedAt(m.TS, p.now())), true, nil
 			}
 		}
 		if page.NextCursor == "" {

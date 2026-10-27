@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
+	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -59,7 +61,7 @@ func TestAnAgentReactsToTheThirdMessageOfAThreadByTheRefSlackReadPrints(t *testi
 		t.Fatalf("reactions.add %v", adds)
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != thread || ds[0].Purpose != reactedPurpose || ds[0].Target != m[1] ||
-		ds[0].Evidence.Ref != refThird || !strings.Contains(ds[0].Evidence.Permalink, "p"+strings.ReplaceAll(refThird, ".", "")) {
+		ds[0].Evidence.Ref != m[1] || !strings.Contains(ds[0].Evidence.Permalink, "p"+strings.ReplaceAll(refThird, ".", "")) {
 		t.Fatalf("records %+v", ds)
 	}
 	if n := len(w.st.srv.Calls("conversations.replies")); n != 0 {
@@ -126,5 +128,36 @@ func TestSlackDraftOnARefPostsInItsThreadOnceApproved(t *testing.T) {
 	}
 	if n := len(w.st.srv.Calls("conversations.replies")); n != 0 {
 		t.Fatalf("the stored thread was read from Slack %d times", n)
+	}
+}
+
+func TestOutboxNewReactsToTheMessageItNames(t *testing.T) {
+	w := newSessionWiring(t)
+	storeRefThread(t, w)
+	ctx := context.Background()
+	d := w.deps
+	d.Startup = nil
+	w.te.Socket = serveSocket(t, daemon.New(d).Handler())
+	wait := postWait
+	postWait = 10 * time.Millisecond
+	t.Cleanup(func() { postWait = wait })
+	w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
+	tok := fakeToken()
+	tok.Scopes = append(tok.Scopes, "reactions:write")
+	w.st.saveToken(t, tok)
+
+	ref := sessThreaded + "/" + refThird
+	if code := w.te.run("outbox", "new", ref, "--react", ":eyes:", "--send", "--yes"); code != 0 {
+		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
+	}
+	ds := w.drafts(t)
+	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) || ds[0].Kind != draft.React || ds[0].Target != ref {
+		t.Fatalf("drafts %+v", ds)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v; drafts %+v", sent, err, w.drafts(t))
+	}
+	if adds := w.st.srv.Calls("reactions.add"); len(adds) != 1 || adds[0].Get("channel") != sessThreaded || adds[0].Get("timestamp") != refThird {
+		t.Fatalf("reactions.add %v, want one on the message named", adds)
 	}
 }
