@@ -53,6 +53,9 @@ type Facts struct {
 	// joins on; zero for a row served to a client.
 	Asked   Asked
 	Intents *intentload.Loaded
+	// CapturedByUser is a row of an entry the user captured; false for any
+	// other row, a derived entry's included.
+	CapturedByUser bool
 	// Recommended is the execution mode recommended for the row's items ("session", "headless"), "" none;
 	// the row offers every mode's action whatever it says.
 	Recommended string
@@ -172,6 +175,8 @@ func (f Facts) Get(field string) any {
 		return f.yours()
 	case "row.review_workspace":
 		return f.Workspace.ID != "" && f.Workspace.IsReview
+	case "entry.captured_by_user":
+		return f.CapturedByUser
 	case "pr.nudge.who":
 		return slices.Clone(f.NudgeWho)
 	case "pr.nudge.why":

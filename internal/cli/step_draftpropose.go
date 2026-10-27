@@ -272,8 +272,9 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	return out, nil
 }
 
-// subject reads what a step's subject u holds: an entry's own unit, items
-// and the entry, else u's items.
+// subject reads what a step's subject u holds: for an entry, the unit its
+// first item is on, else its first unit, with that unit's items and the
+// entry; else u's items.
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
 	if id, ok := gtd.IDOf(u); ok {
@@ -283,10 +284,10 @@ func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, err
 		}
 		sub.entry = &e
 		switch {
-		case len(e.Units) > 0:
-			sub.unit = e.Units[0]
 		case len(e.Items) > 0:
 			sub.unit = e.Items[0].Unit
+		case len(e.Units) > 0:
+			sub.unit = e.Units[0]
 		default:
 			return sub, fmt.Errorf("entry %s has no unit to post on", e.ID)
 		}

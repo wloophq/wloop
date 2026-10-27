@@ -60,6 +60,9 @@ type roundOptions struct {
 	head string
 	// unit is the round's unit, whose dossier the session is granted; zero for none.
 	unit unit.Unit
+	// names are the name facts the round knows besides the unit's label and
+	// the time, such as the worktree's name.
+	names map[string]any
 	// pr is the round's pull request as read for it, nil for none; the
 	// configuration's project_settings reads its facts.
 	pr *github.PullRequest

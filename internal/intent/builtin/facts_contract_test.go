@@ -1,6 +1,8 @@
 package builtin
 
 import (
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"slices"
 	"testing"
 )
@@ -31,6 +33,15 @@ func TestAnEnumHoldsItsFactsValues(t *testing.T) {
 			if len(slices.Compact(slices.Sorted(slices.Values(vs)))) != len(vs) {
 				t.Errorf("%s: the enum of %q repeats a value", f.Name, p)
 			}
+		}
+	}
+}
+
+func TestEndedFactIsTheSlotsEndedFact(t *testing.T) {
+	for p, want := range map[unit.ProviderID]string{unit.GitHub: "pr.ended", dslack.Provider: "slack.ended", unit.Session: "", unit.Entry: "", "nowhere": ""} {
+		got, ok := EndedFact(p)
+		if got != want || ok != (want != "") {
+			t.Errorf("EndedFact(%s) = %q, %t; want %q", p, got, ok, want)
 		}
 	}
 }

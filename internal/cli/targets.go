@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -21,6 +22,9 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 // resolveTarget is unitTarget over the providers, their resolvers and
 // their codecs.
 func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID, resolvers map[unit.ProviderID]unit.Resolver, codecs *unit.Registry) (unit.Unit, error) {
+	if u, ok := explicitEntry(arg); ok {
+		return u, nil
+	}
 	if p, key, ok := strings.Cut(arg, ":"); ok && key != "" && !strings.HasPrefix(key, "//") && slices.Contains(providers, unit.ProviderID(p)) {
 		return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
 	}
@@ -44,6 +48,16 @@ func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID,
 		return ref.Unit(), nil
 	}
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
+}
+
+// explicitEntry is the GTD entry arg names as entry:<id>, the only way an
+// argument names one.
+func explicitEntry(arg string) (unit.Unit, bool) {
+	key, ok := strings.CutPrefix(arg, string(gtd.Codec{}.Provider())+":")
+	if !ok || (gtd.Codec{}).Valid(key) != nil {
+		return unit.Unit{}, false
+	}
+	return gtd.UnitOf(gtd.ID(key)), true
 }
 
 // pluginCodecs are the codecs of the compiled-in plugins.

@@ -395,7 +395,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"not member": {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubOutside, pubParent), Kind: draft.Reply, Text: "hi"}, want: []string{"not a member", "#elsewhere"}, is: send.ErrCannotPost},
 		"two users":  {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@sam"}, want: []string{"U0000000011", "U0000000012"}, is: send.ErrAmbiguous},
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
-		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"slack units"}},
+		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"needs a target"}},
 		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"needs a target"}},
 		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
 	} {
@@ -630,5 +630,49 @@ func TestAnEditIsNeverPublishedAsADraft(t *testing.T) {
 	}
 	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
 		t.Fatalf("Where = %q %v", where, err)
+	}
+}
+
+func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
+	started := time.Unix(1700000300, 0)
+	ps := newPubSlack(t)
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Kind: draft.Reply, Purpose: "reply", Delivery: draft.Message,
+		Text: "the new search is live", Target: pubConv}
+	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
+		t.Fatalf("Where = %q, %v", where, err)
+	}
+	if _, err := ps.publisher().Publish(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if post := ps.posted(t); post.Get("channel") != pubConv || post.Has("thread_ts") || post.Get("text") != d.Text {
+		t.Fatalf("post %v", post)
+	}
+	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": d.Text})
+	if ev, ok, err := ps.publisher().Verify(context.Background(), d, started); err != nil || !ok || ev.Ref != pubPosted {
+		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
+	}
+}
+
+func TestTakesTheTargetsSlackPostsTo(t *testing.T) {
+	p := &Publisher{}
+	for target, want := range map[string]bool{
+		"https://acme.slack.com/archives/" + pubConv + "/p1700000000000100": true,
+		pubConv:                    true,
+		pubDM:                      true,
+		"#general":                 true,
+		other:                      true,
+		"@ana":                     true,
+		"slack:" + other:           true,
+		"@{slack:" + other + "}":   true,
+		"ana@acme.example":         true,
+		" #general ":               true,
+		"":                         false,
+		"acme/api#3":               false,
+		"general":                  false,
+		"https://acme.example/x/1": false,
+	} {
+		if got := p.Takes(target); got != want {
+			t.Errorf("Takes(%q) = %v, want %v", target, got, want)
+		}
 	}
 }

@@ -153,9 +153,9 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/intent/builtin/cmd/grammardoc/groups.go` `github` `9` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/cmd/grammardoc/groups.go` `slack` `3` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/facts.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
-| `internal/intent/builtin/facts.go` `slack` `12` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/facts.go` `slack` `13` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 | `internal/intent/builtin/grammar_config.go` `github` `26` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
-| `internal/intent/builtin/grammar_config.go` `slack` `30` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
+| `internal/intent/builtin/grammar_config.go` `slack` `31` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
 
 ### `TestProvidersStayInAdaptersAndTheRoot`
 

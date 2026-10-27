@@ -26,12 +26,14 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	ledger := e.itemsLedger(db, cfg, logf)
 	pin := outboxManifests{loaded: e.loadedIntents, books: envBooks{e}}
 	pubs := map[unit.ProviderID]port.Effects{}
+	var targets []unit.ProviderID
 	for _, m := range mods {
 		if m.Publisher != nil {
 			pubs[m.ID] = pinnedEffects{Effects: m.Publisher, turns: pin}
+			targets = append(targets, m.ID)
 		}
 	}
-	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Policies: e.outboxPolicies(), Facts: e.draftFacts,
+	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
 		Broken: e.brokenWorkflows,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
@@ -39,7 +41,8 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		}),
 		Items: ledger, Clock: clockFunc(e.Now), Log: logf,
 		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
-			Effects: effectLookup(effectDeps{Nudges: e.entries(db, cfg, ledger), Modules: mods})}}
+			Effects: effectLookup(effectDeps{Nudges: e.entries(db, cfg, ledger), Modules: mods})},
+		Results: e.newEntryResults(e.entries(db, cfg, ledger), mods)}
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	return d
 }
@@ -109,6 +112,11 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 		return v.Validate(ctx, d)
 	}
 	return nil
+}
+
+func (p pinnedEffects) Takes(target string) bool {
+	t, ok := p.Effects.(port.Targeter)
+	return ok && t.Takes(target)
 }
 
 func (p pinnedEffects) Place(ctx context.Context, d draft.Draft) (string, error) {

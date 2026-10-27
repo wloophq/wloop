@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,15 +33,23 @@ type fakeExec struct {
 	cmds   []Cmd
 	claude func(Cmd) ([]byte, error)
 	open   func(Cmd) error
+	// fetch stands in for git fetch, which would reach the network.
+	fetch func(Cmd) error
 }
 
 func (f *fakeExec) Run(ctx context.Context, c Cmd) ([]byte, error) {
 	f.mu.Lock()
 	f.cmds = append(f.cmds, c)
-	ps, claude, open := f.ps, f.claude, f.open
+	ps, claude, open, fetch := f.ps, f.claude, f.open, f.fetch
 	f.mu.Unlock()
 	switch c.Name {
 	case "git":
+		if slices.Contains(c.Args, "fetch") {
+			if fetch == nil {
+				return nil, fmt.Errorf("unexpected %s", c)
+			}
+			return nil, fetch(c)
+		}
 		return Exec{}.Run(ctx, c)
 	case "ps":
 		return []byte(ps), nil

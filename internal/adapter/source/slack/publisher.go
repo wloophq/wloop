@@ -57,6 +57,7 @@ var (
 	_ port.Validator = (*Publisher)(nil)
 	_ port.Locator   = (*Publisher)(nil)
 	_ port.Placer    = (*Publisher)(nil)
+	_ port.Targeter  = (*Publisher)(nil)
 )
 
 // plan is where and what a draft posts.
@@ -100,8 +101,8 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	k, err := dslack.ParseUnit(d.Unit)
-	if err != nil {
-		return plan{}, fmt.Errorf("slack publishes only slack units: %w", err)
+	if err != nil && strings.TrimSpace(d.Target) == "" {
+		return plan{}, fmt.Errorf("a draft on %s, which is not a Slack unit, needs a target to post to", d.Unit.Label())
 	}
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
@@ -219,6 +220,17 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		t = user
 	}
 	return p.resolve(ctx, send.Request{Target: t}, pl)
+}
+
+// Takes says whether target names a place a draft posts to in Slack: a
+// message permalink, a conversation or a person.
+func (p *Publisher) Takes(target string) bool {
+	t := strings.TrimSpace(target)
+	if _, _, _, err := parsePermalink(t); err == nil {
+		return true
+	}
+	return conversationR.MatchString(t) || strings.HasPrefix(t, "#") || userOf(t) != "" ||
+		strings.Contains(t, "@") && !strings.ContainsAny(t, " /")
 }
 
 // Place names where a draft with no target posts. A thread unit's draft posts

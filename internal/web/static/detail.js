@@ -82,6 +82,32 @@ async function entryAct(entry, verb, args) {
   }
 }
 
+// entryIntentAct runs the intent action id on the entry's own unit, such as
+// start, and asks for a reload.
+async function entryIntentAct(entry, id) {
+  const path = "/api/units/" + ["entry", entry.id, id].map(encodeURIComponent).join("/");
+  try {
+    const out = await detailEnv.post(path, { source: "cockpit" });
+    detailEnv.notice(`${id}: ${entry.title || entry.id}${out && out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
+    detailEnv.changed();
+  } catch (err) {
+    detailEnv.notice(`${id} ${entry.title || entry.id} failed: ${err.message}`, true);
+  }
+}
+
+// entryIntentButtons are the buttons of the intents that serve the entry's
+// own unit, as the entry lists them.
+function entryIntentButtons(e) {
+  return (e.actions || []).map((a) => h("button", {
+    type: "button",
+    class: "act" + (a.enabled ? "" : " off"),
+    disabled: !a.enabled,
+    title: a.enabled ? a.note || undefined : a.reason,
+    "data-focus": `detail:${a.id}:${e.id}`,
+    onclick: () => entryIntentAct(e, a.id),
+  }, a.id.charAt(0).toUpperCase() + a.id.slice(1)));
+}
+
 // draftTarget is the Outbox entry of the draft e carries: e itself, or
 // draft:<id> when e is a message entry that only shows the draft.
 function draftTarget(e) {
@@ -502,7 +528,7 @@ function entryPane(e) {
     e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
     waiting.length ? h("div", {}, "Waiting on ", h("strong", {}, waiting.join(", ")), e.waiting.since ? ` since ${stamp(e.waiting.since)}` : "") : null,
     e.deadline ? h("div", {}, "Due ", stamp(e.deadline)) : null,
-    h("div", { class: "d-actions" }, ...verbButtons(e),
+    h("div", { class: "d-actions" }, ...verbButtons(e), ...entryIntentButtons(e),
       e.message || e.draft ? null : verbButton(e, "approve", "Approve", () => entryAct(e, "approve", {})),
       e.draft ? null : verbButton(e, "dismiss", "Dismiss", () => entryAct(e, "dismiss", {}))),
     itemsBlock(e.items),

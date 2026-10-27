@@ -1,5 +1,5 @@
 {
-  "version": "e06cff654dc4",
+  "version": "b9c41aacfffc",
   "specs": [
     {
       "id": "run_now",
@@ -89,6 +89,27 @@
       ],
       "source": "builtin",
       "scope": "unit"
+    },
+    {
+      "id": "start",
+      "label": "Start",
+      "summary": "Start new work from a brief: in a fresh worktree of a repository, or with no checkout",
+      "group": "start",
+      "surfaces": [
+        "row",
+        "detail",
+        "tui",
+        "cli",
+        "explore"
+      ],
+      "input": {
+        "kind": "text",
+        "label": "Guidance",
+        "placeholder": "the brief: what to build or say, and how to know it is done"
+      },
+      "source": "intents/start/intent.toml",
+      "scope": "unit",
+      "plugin": "entry"
     },
     {
       "id": "review",

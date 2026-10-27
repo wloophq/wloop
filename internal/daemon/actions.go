@@ -97,6 +97,16 @@ type Call struct {
 	// drafts are tied to them.
 	Items []string
 	Entry string
+	// Manager and Parent are the request's: the workspace manager of the
+	// worktree the turn creates and the caller's worktree.
+	Manager, Parent string
+}
+
+// AheadPreparer is Actions that readies, before an intent's round takes the
+// loop mutex, what the round needs and may take long to get, such as a
+// clone of its repository.
+type AheadPreparer interface {
+	PrepareAhead(ctx context.Context, name string, u unit.Unit, c Call) error
 }
 
 const askedByYou = "asked by you"
@@ -348,6 +358,13 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := unitAction(l, name, u, s.deps.Follows); err != nil {
+		writeActionError(w, err)
+		return
+	}
+	if why, err := s.entryRefusal(r.Context(), l, name, u); err != nil || why != "" {
+		if err == nil {
+			err = Refusal{Reason: why}
+		}
 		writeActionError(w, err)
 		return
 	}
@@ -691,6 +708,13 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	if err != nil {
 		return badRequest{err.Error()}
 	}
+	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Entry: req.Entry,
+		Manager: req.Manager, Parent: req.Parent}
+	if a, ok := s.deps.Actions.(AheadPreparer); ok && !LoopHeld(ctx) {
+		if err := a.PrepareAhead(ctx, name, u, call); err != nil {
+			return err
+		}
+	}
 	if !LoopHeld(ctx) {
 		ctx = s.readAhead(ctx, u, false)
 		s.deps.LoopMu.Lock()
@@ -704,7 +728,6 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 			}
 		}
 	}
-	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Entry: req.Entry}
 	data := ""
 	if d.Prepare != "" {
 		prepare, ok := prepares[d.Prepare]

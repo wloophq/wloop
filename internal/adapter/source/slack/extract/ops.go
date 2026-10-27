@@ -92,7 +92,7 @@ func (b *opBuilder) anchor(ts string) unit.Anchor {
 	if ts == "" {
 		ts = b.newest()
 	}
-	a := unit.Anchor{Unit: b.in.Unit, Ref: b.in.Conversation.ID + "/" + ts, At: tsTime(ts)}
+	a := unit.Anchor{Unit: b.in.Unit, Ref: b.in.Conversation.ID + "/" + ts, At: slack.TSTime(ts)}
 	for _, m := range b.in.Messages {
 		if m.TS == ts {
 			a.Permalink = m.Permalink

@@ -485,7 +485,7 @@ func TestDMSegmentsBeforeOps(t *testing.T) {
 			t.Errorf("%s op on %s lands on %s / %s, want %s", op.Op, op.Item, op.Unit, op.Anchor.Unit, want)
 		}
 		if op.Op == items.OpLink && (op.To == nil || *op.To != (unit.Unit{Provider: unit.GitHub, Key: "acme/widget#527"}) ||
-			!op.Anchor.At.Equal(tsTime(ts(3)))) {
+			!op.Anchor.At.Equal(slack.TSTime(ts(3)))) {
 			t.Errorf("link op %+v: want the PR at the message time", op)
 		}
 	}

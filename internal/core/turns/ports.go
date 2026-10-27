@@ -3,6 +3,7 @@ package turns
 import (
 	"context"
 	"errors"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"time"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -68,6 +69,13 @@ type Reports interface {
 	// WithTurns lists the units with at least one turn of i that is not
 	// withdrawn.
 	WithTurns(ctx context.Context, i turn.Intent) ([]unit.Unit, error)
+}
+
+// Results attaches to an entry the unit a turn on it produced.
+type Results interface {
+	// UnitOf is the unit a web address names; false for an address of none.
+	UnitOf(url string) (unit.Unit, bool)
+	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
 }
 
 // Intents is what the turns ask of the loaded intents: the record rules, the

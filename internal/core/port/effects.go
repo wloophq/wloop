@@ -41,3 +41,10 @@ type Deliverer interface {
 type Placer interface {
 	Place(ctx context.Context, d draft.Draft) (string, error)
 }
+
+// Targeter is optional: an Effects value that implements it says whether it
+// posts to target, so a draft on a unit whose provider publishes nothing, such
+// as a GTD entry, is posted by the provider its target names.
+type Targeter interface {
+	Takes(target string) bool
+}

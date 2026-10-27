@@ -40,9 +40,9 @@ var providerStringAllowlist = []providerString{
 	{"internal/intent/builtin/cmd/grammardoc/groups.go", "github", 9, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/cmd/grammardoc/groups.go", "slack", 3, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/facts.go", "github", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/facts.go", "slack", 12, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/facts.go", "slack", 13, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/intent/builtin/grammar_config.go", "github", 26, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
-	{"internal/intent/builtin/grammar_config.go", "slack", 30, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
+	{"internal/intent/builtin/grammar_config.go", "slack", 31, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 }
 
 // providerStringSpellings counts the spellings of id in the string s: s is

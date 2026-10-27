@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +26,8 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/github"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
@@ -35,6 +38,9 @@ type unitRun struct {
 	cfg      config.Config
 	r        turn.Request
 	resumeOf int64
+	// manager and parent are the request's workspace manager and the
+	// caller's worktree, for the worktree the round creates.
+	manager, parent string
 }
 
 // unitRound sends a round of d the user asked for on u, a unit of a
@@ -49,7 +55,10 @@ func (e *Env) unitRound(ctx context.Context, d dintent.Def, u unit.Unit, c daemo
 		cfg.AgentHome = c.AgentHome
 	}
 	r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: u, Guidance: c.Guidance, Inputs: c.Inputs, Items: c.Items, Entry: c.Entry}
-	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r})
+	if r.Inputs, err = e.keptRepo(ctx, d, u, r.Inputs); err != nil {
+		return err
+	}
+	return e.runOnUnit(ctx, unitRun{def: d, cfg: cfg, r: r, manager: c.Manager, parent: c.Parent})
 }
 
 // launchUnit is cliLauncher.Launch on a unit of a provider other than
@@ -99,6 +108,12 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	if err != nil {
 		return err
 	}
+	opts.names = e.nameFacts(ctx, u)
+	if w := run.def.WorkspaceRepo; w != nil && w.Name.Src != "" {
+		if repo, _ := runRepo(run); repo != "" {
+			opts.names["workspace.name"] = ws.DisplayName
+		}
+	}
 	activity, err := e.freshActivity(ctx)
 	if err != nil {
 		return err
@@ -146,27 +161,78 @@ func (e *Env) runWorkspace(ctx context.Context, run unitRun, opts roundOptions) 
 	if w == nil {
 		return e.placedWorkspace(ctx, run.cfg, run.r.Unit, opts)
 	}
+	name, err := runRepo(run)
+	if err != nil || name == "" {
+		if err == nil {
+			return e.neutralWorkspace(ctx, run.cfg, run.r.Unit, opts)
+		}
+		return wsdomain.Workspace{}, false, err
+	}
+	owner, repo, _ := strings.Cut(name, "/")
+	run.cfg = run.cfg.For(owner, repo)
+	if run.manager != "" {
+		run.cfg.WorkspaceManagers = []string{run.manager}
+	}
+	return e.repoWorkspace(ctx, run, name, opts)
+}
+
+// keptRepo is inputs with the repository input d's newest turn on u kept,
+// when inputs leave it out: a later run on the unit works where the first did.
+func (e *Env) keptRepo(ctx context.Context, d dintent.Def, u unit.Unit, inputs map[string]any) (map[string]any, error) {
+	w := d.WorkspaceRepo
+	if w == nil || w.RepoInput == "" || inputSet(inputs[w.RepoInput]) || e.Turns == nil {
+		return inputs, nil
+	}
+	books, err := e.Turns.Store.Books(ctx, u)
+	if err != nil {
+		return inputs, err
+	}
+	ts := books[u].Turns
+	for i := len(ts) - 1; i >= 0; i-- {
+		if string(ts[i].Intent) != string(d.Name) {
+			continue
+		}
+		if repo, ok := ts[i].Inputs[w.RepoInput].(string); ok && repo != "" {
+			out := maps.Clone(inputs)
+			if out == nil {
+				out = map[string]any{}
+			}
+			out[w.RepoInput] = repo
+			return out, nil
+		}
+		break
+	}
+	return inputs, nil
+}
+
+// runRepo is the repository, owner/name, run's turn runs in: its
+// manifest's, else its input's; "" for an optional one the turn leaves out.
+func runRepo(run unitRun) (string, error) {
+	w := run.def.WorkspaceRepo
 	name := w.Repo
 	if w.RepoInput != "" {
 		name, _ = run.r.Inputs[w.RepoInput].(string)
-		if name == "" {
-			return wsdomain.Workspace{}, false, fmt.Errorf("%s runs in the repository its input %s names, and the turn has none", run.def.Name, w.RepoInput)
+		switch {
+		case name == "" && w.Optional:
+			return "", nil
+		case name == "":
+			return "", fmt.Errorf("%s runs in the repository its input %s names, and the turn has none", run.def.Name, w.RepoInput)
 		}
 	}
-	return e.repoWorkspace(ctx, run.cfg, run.r.Unit, run.def, name, opts)
+	if !intentload.ValidRepo(name) {
+		return "", fmt.Errorf("%q is not a repository: owner/name", name)
+	}
+	return name, nil
 }
 
 // repoWorkspace is a workspace of the repository name (owner/name) for u:
 // the main checkout for an intent that reuses its live session, else u's
 // own worktree, created and kept by the manager that creates it.
-func (e *Env) repoWorkspace(ctx context.Context, cfg config.Config, u unit.Unit, d dintent.Def, name string, opts roundOptions) (wsdomain.Workspace, bool, error) {
-	repos, err := e.WS.Repos(ctx)
+func (e *Env) repoWorkspace(ctx context.Context, run unitRun, name string, opts roundOptions) (wsdomain.Workspace, bool, error) {
+	cfg, u, d := run.cfg, run.r.Unit, run.def
+	repo, _, err := e.repoCheckout(ctx, cfg, name)
 	if err != nil {
 		return wsdomain.Workspace{}, false, err
-	}
-	repo, ok := placedRepo(repos, name)
-	if !ok {
-		return wsdomain.Workspace{}, false, fmt.Errorf("%s runs in the repository %q, which %s does not know", d.Name, name, e.managerDisplay())
 	}
 	all, err := e.WS.List(ctx)
 	if err != nil {
@@ -192,8 +258,29 @@ func (e *Env) repoWorkspace(ctx context.Context, cfg config.Config, u unit.Unit,
 	if err != nil {
 		return wsdomain.Workspace{}, false, err
 	}
-	ws, err := e.createUnitWorkspace(ctx, m, in, repo.Path, u)
+	wsName, err := e.loadedIntents().WorkspaceName(d.Name, e.nameFacts(ctx, u))
+	if err != nil {
+		return wsdomain.Workspace{}, false, err
+	}
+	req := workspace.CreateRequest{RepoID: in.ID, Name: cmp.Or(wsName, unitWorkspaceName(u)), Unit: u, DefaultBase: true, Parent: run.parent}
+	ws, err := e.createWorkspace(ctx, m, req, repo.Path)
+	if err == nil && ws.ParentDropped {
+		fmt.Fprintf(e.Out, "%s keeps %s under no parent: it lists no worktree at %s\n", e.displayOf([]string{m.Name()}), ws.DisplayName, run.parent)
+	}
 	return ws, false, err
+}
+
+// repoCheckout is the main checkout of the repository name (owner/name):
+// the one a manager knows, else the one in the project's projects_dir,
+// cloned there when absent; cloned says it was cloned now.
+func (e *Env) repoCheckout(ctx context.Context, cfg config.Config, name string) (wsdomain.Repo, bool, error) {
+	repos, err := e.WS.Repos(ctx)
+	if err != nil {
+		return wsdomain.Repo{}, false, err
+	}
+	owner, repo, _ := strings.Cut(name, "/")
+	ref := github.Ref{Owner: owner, Repo: repo}
+	return e.checkout(ctx, cfg, repos, ref.RemoteKey(), ref, "")
 }
 
 // placedWorkspace is the workspace u's placement names, and whether that
@@ -254,7 +341,14 @@ func (e *Env) placedWorkspace(ctx context.Context, cfg config.Config, u unit.Uni
 // createUnitWorkspace creates u's worktree of repo in m and records m's
 // custody of it.
 func (e *Env) createUnitWorkspace(ctx context.Context, m workspace.Manager, repo wsdomain.Repo, path string, u unit.Unit) (wsdomain.Workspace, error) {
-	ws, _, err := m.Create(ctx, workspace.CreateRequest{RepoID: repo.ID, Name: unitWorkspaceName(u), Unit: u})
+	return e.createWorkspace(ctx, m, workspace.CreateRequest{RepoID: repo.ID, Name: unitWorkspaceName(u), Unit: u}, path)
+}
+
+// createWorkspace creates req's worktree in m and records m's custody of
+// it for req's unit.
+func (e *Env) createWorkspace(ctx context.Context, m workspace.Manager, req workspace.CreateRequest, path string) (wsdomain.Workspace, error) {
+	u := req.Unit
+	ws, _, err := m.Create(ctx, req)
 	if err != nil {
 		return wsdomain.Workspace{}, err
 	}

@@ -27,7 +27,9 @@ type Slack struct {
 	Ingest     SlackIngest     `json:"ingest"`
 	Extraction SlackExtraction `json:"extraction"`
 	Turns      SlackTurns      `json:"turns"`
-	Drafts     PluginDrafts    `json:"drafts"`
+	// EndedAfter is how long a unit stays quiet before it has ended; zero is DefaultSlackEndedAfter.
+	EndedAfter Days         `json:"ended_after,omitempty"`
+	Drafts     PluginDrafts `json:"drafts"`
 }
 
 // SlackTurns sets what a turn on a Slack unit reads.
@@ -63,6 +65,14 @@ type SlackIngest struct {
 }
 
 func (i SlackIngest) SocketOn() bool { return i.Socket == nil || *i.Socket }
+
+// DefaultSlackEndedAfter is slack.ended_after's default.
+const DefaultSlackEndedAfter = 7 * 24 * time.Hour
+
+// EndedAfterFor is how long a Slack unit stays quiet before it has ended.
+func (s Slack) EndedAfterFor() time.Duration {
+	return cmp.Or(time.Duration(s.EndedAfter), DefaultSlackEndedAfter)
+}
 
 func (s Slack) Configured() bool { return s.ClientID != "" }
 

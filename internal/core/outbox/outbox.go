@@ -13,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -95,9 +96,19 @@ type ItemReader interface {
 	Items(ctx context.Context, u unit.Unit) ([]items.Item, error)
 }
 
+// Results attaches to an entry the unit of each post a turn on it makes.
+type Results interface {
+	// AttachesPosts says whether the turns of intent attach their posts.
+	AttachesPosts(intent string) bool
+	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
+}
+
 type Service struct {
-	Store    Store
-	Effects  Effects
+	Store   Store
+	Effects Effects
+	// Targets are the providers whose publishers PublisherOf asks to take a
+	// draft's target.
+	Targets  []unit.ProviderID
 	Policies Policies // nil resolves every proposal to wait
 	Facts    Facts    // nil: a policy whose rules read the unit's facts resolves to wait
 	// Broken names the workflows that failed to load; a delay draft of one
@@ -115,6 +126,8 @@ type Service struct {
 	RepeatAfter time.Duration
 	// Applier applies a sent draft's Effects; nil applies none.
 	Applier Applier
+	// Results attaches a sent post to its turn's entry; nil attaches none.
+	Results Results
 }
 
 var (
@@ -200,7 +213,7 @@ func shaped(d draft.Draft) draft.Draft {
 
 // delivered is d with the delivery its provider's publisher posts it as.
 func (s *Service) delivered(d draft.Draft) draft.Draft {
-	fx, err := s.effects(d.Unit.Provider)
+	fx, err := s.publisher(d)
 	if err != nil {
 		return d
 	}
@@ -372,7 +385,7 @@ func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision, 
 // publishable refuses d when its provider has no enabled publisher, its Placer cannot place d
 // proposed with no target, or its Validator refuses d. A placement is stored in d.Target.
 func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
-	fx, err := s.effects(d.Unit.Provider)
+	fx, err := s.publisher(*d)
 	if err != nil {
 		return err
 	}
@@ -389,6 +402,38 @@ func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
 		}
 	}
 	return nil
+}
+
+// PublisherOf is the provider that posts d: its unit's when that one
+// publishes, else the only provider of Targets whose publisher takes d's
+// target, else its unit's.
+func (s *Service) PublisherOf(d draft.Draft) unit.ProviderID {
+	own := d.Unit.Provider
+	target := strings.TrimSpace(d.Target)
+	if target == "" || s.Effects == nil {
+		return own
+	}
+	if _, err := s.Effects(own); err == nil {
+		return own
+	}
+	var taken []unit.ProviderID
+	for _, p := range s.Targets {
+		if p == own {
+			continue
+		}
+		fx, err := s.Effects(p)
+		if t, ok := fx.(port.Targeter); err == nil && ok && t.Takes(target) {
+			taken = append(taken, p)
+		}
+	}
+	if len(taken) == 1 {
+		return taken[0]
+	}
+	return own
+}
+
+func (s *Service) publisher(d draft.Draft) (port.Effects, error) {
+	return s.effects(s.PublisherOf(d))
 }
 
 func (s *Service) effects(p unit.ProviderID) (port.Effects, error) {
@@ -558,6 +603,10 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 			errs = append(errs, fmt.Errorf("effects of draft %d: %w", d.ID, err))
 		}
 	}
+	if err := s.attachPost(ctx, d); err != nil {
+		s.logf("draft %d: its unit was not attached to its entry", d.ID)
+		errs = append(errs, fmt.Errorf("attaching draft %d: %w", d.ID, err))
+	}
 	for _, hook := range s.OnSent {
 		if err := hook(ctx, d); err != nil {
 			s.logf("draft %d: an after-send hook failed", d.ID)
@@ -566,6 +615,22 @@ func (s *Service) afterSent(ctx context.Context, d draft.Draft) error {
 	}
 	return errors.Join(errs...)
 }
+
+// attachPost attaches the unit of d, a post, to the entry its turn is on
+// when the turn's intent attaches its posts.
+func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
+	if s.Results == nil || !slices.Contains(posts, d.Delivery) || d.Origin.Intent == "" {
+		return nil
+	}
+	id, ok := gtd.IDOf(d.Origin.Unit)
+	if !ok || !s.Results.AttachesPosts(d.Origin.Intent) {
+		return nil
+	}
+	return s.Results.Attach(ctx, id, d.Unit)
+}
+
+// posts are the deliveries that post a message; a reaction or an edit is none.
+var posts = []draft.Delivery{draft.Message, draft.CommentDelivery}
 
 // Send is the sender pass: the effects of the sent drafts not applied yet,
 // then every approved draft -> sending -> sent | failed, one Publish each, no retry.
@@ -599,7 +664,7 @@ var errClaimLost = errors.New("another pass or decision took the draft")
 
 // sendOne reports whether d was sent; a nil error with false means d is now failed.
 func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
-	fx, fxErr := s.effects(d.Unit.Provider)
+	fx, fxErr := s.publisher(d)
 	d.State, d.SendingAt = draft.Sending, s.Clock.Now()
 	d, err := s.save(ctx, d, draft.Approved)
 	if errors.Is(err, ErrConflict) {
@@ -650,9 +715,9 @@ func (s *Service) Recover(ctx context.Context) error {
 	}
 	var errs []error
 	for _, d := range slices.Backward(stuck) {
-		fx, err := s.effects(d.Unit.Provider)
+		fx, err := s.publisher(d)
 		if err != nil {
-			s.logf("draft %d stays sending: its provider %s is off", d.ID, d.Unit.Provider)
+			s.logf("draft %d stays sending: its provider %s is off", d.ID, s.PublisherOf(d))
 			continue
 		}
 		ev, found, verr := fx.Verify(ctx, d, d.SendingAt)

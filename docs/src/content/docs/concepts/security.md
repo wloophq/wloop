@@ -39,6 +39,15 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 - **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `github.address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
 - **Review rounds open the pull request's checkout.** An automated review round starts Claude Code in a worktree at the pull request's head. Claude Code loads that checkout's project settings, so a pull request that changes `.claude/settings.json` (hooks, permissions), `.mcp.json`, `CLAUDE.md` or `AGENTS.md` can run code or steer the agent as you. Claude Code's folder trust is recorded for the repository and covers every pull request worktree of it; where project settings are off, trusting a blocked round from the cockpit trusts that worktree alone. Automated review rounds skip forks and authors outside the members, collaborators, owners and `trusted_authors`, so the author needs push access to the repository; a round you start by hand has no such filter, but its session never loads the checkout's project settings for such a pull request.
 
+## Starting new work
+
+`{{command}} start` gives an agent the brief of an entry you captured and, with `--repo`, a fresh worktree of that repository. It adds two powers:
+
+- **An agent chooses which repository to clone.** A repository no workspace manager knows is cloned into the project's `projects_dir`. That stays harmless until the clone is trusted: Claude Code loads an untrusted folder's settings and hooks only after you accept its trust dialog, so the start blocks on trust as any round does.
+- **`trust_clones` trusts a clone as it is made.** With `trust_clones = true` on a `projects[]` entry, a repository of that project is trusted in the agent home in the same call that clones it, so its hooks and settings run as you. The `match` must name an owner (`acme/*`, never `*`); a folder that already existed, or one cloned earlier, is never trusted this way.
+
+The residual risk is accepted: an injected brief can make an agent clone and trust a repository of an owner you listed. Two limits remain. Start runs only on entries you captured (`entry.captured_by_user`); an entry derived from a Slack thread carries other people's text and is refused. And the trusted owners are the ones you list, your own organization.
+
 ## What agents read from Slack
 
 Every agent session the MCP server serves reads Slack as you, within what your user token can read:

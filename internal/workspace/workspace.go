@@ -23,6 +23,12 @@ type CreateRequest struct {
 	RepoID  string
 	Name    string
 	BaseRef string
+	// DefaultBase creates the worktree from the repository's default base, as
+	// the manager knows it, in place of BaseRef.
+	DefaultBase bool
+	// Parent is the path of the caller's worktree, which a manager with
+	// worktree lineage records as the new one's parent when it lists it.
+	Parent string
 	// Unit is the unit the workspace is created for; a pull request is linked as the manager links one.
 	Unit   unit.Unit
 	Agent  string

@@ -1,0 +1,245 @@
+package cli
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/adapter/agent/claude"
+	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/config"
+	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/workspace/fake"
+)
+
+// cloneAs has gh repo clone create a local repository whose origin is
+// github.com/<origin>, recording each clone in clones.
+func cloneAs(t *testing.T, origin string, clones *[]string) func(repo, path string) error {
+	return func(repo, path string) error {
+		*clones = append(*clones, repo+" "+path)
+		for _, args := range [][]string{{"init", "-q", path}, {"-C", path, "remote", "add", "origin", "git@github.com:" + origin + ".git"},
+			{"-C", path, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"}} {
+			if out, err := exec.Command(gitx.Binary(), args...).CombinedOutput(); err != nil {
+				t.Errorf("git %v: %v\n%s", args, err, out)
+			}
+		}
+		return nil
+	}
+}
+
+var capturedEntry = regexp.MustCompile(`captured (entry:e-[0-9a-f]+)`)
+
+// startEnv serves a daemon whose manager knows no repository, cloning into
+// a projects_dir whose acme project trusts its clones in an agent home.
+func startEnv(t *testing.T) (*testEnv, *fake.Manager, string, string) {
+	t.Helper()
+	m := &fake.Manager{WorkspaceList: []wsdomain.Workspace{{ID: "ws-caller", Path: "/worktrees/caller", DisplayName: "caller", HostID: wsdomain.LocalHost}}}
+	te := newTestEnv(t, m)
+	te.Agents["claude"] = claude.Agent{UserHome: te.Home}
+	home, file := untrustedHome(t)
+	projects, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.cfg.ProjectsDir = projects
+	te.cfg.AgentHome = home
+	te.cfg.Projects = []config.Project{{Match: "acme/*", TrustClones: true}}
+	te.git.toplevel = "/worktrees/caller"
+	te.serveEntries(t)
+	return te, m, projects, file
+}
+
+func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
+	te, m, projects, file := startEnv(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	if code := te.run("start", "--repo", "acme/api", "Add retries to the webhook sender", "done when a failed delivery is retried"); code != 0 {
+		t.Fatalf("exit %d: %s\n%s", code, te.err, te.out)
+	}
+	entry := capturedEntry.FindStringSubmatch(te.out.String())
+	if entry == nil {
+		t.Fatalf("no entry captured:\n%s", te.out)
+	}
+	path := filepath.Join(projects, "api")
+	if len(clones) != 1 || clones[0] != "acme/api "+path {
+		t.Fatalf("clones %q", clones)
+	}
+	for _, c := range te.gh.underLock {
+		if strings.HasPrefix(c, "repo clone") {
+			t.Errorf("cloned under the loop mutex: %s", c)
+		}
+	}
+	if raw, _ := os.ReadFile(file); !strings.Contains(string(raw), `"`+path+`": {`) {
+		t.Fatalf("the clone is not trusted:\n%s", raw)
+	}
+	if len(m.Creates) != 1 {
+		t.Fatalf("creates %+v", m.Creates)
+	}
+	short := strings.TrimPrefix(entry[1], "entry:e-")[:6]
+	c := m.Creates[0]
+	if c.Name != "add-retries-to-the-webhook-sender-done-when-a-"+short || !c.DefaultBase || c.Parent != "/worktrees/caller" {
+		t.Fatalf("create %+v", c)
+	}
+	if !strings.HasSuffix(c.Name, "-"+short) {
+		t.Fatalf("worktree %q, want it to end in the entry's short id %s", c.Name, short)
+	}
+	if len(m.Commands) != 1 || !strings.Contains(m.Commands[0], " --name '"+c.Name+"'") {
+		t.Fatalf("commands %q", m.Commands)
+	}
+	if len(m.Prompts) != 1 {
+		t.Fatalf("prompts %+v", m.Prompts)
+	}
+	round := regexp.MustCompile(`--turn ([0-9a-f]{12})`).FindStringSubmatch(m.Prompts[0].Text)
+	if round == nil {
+		t.Fatalf("prompt %q", m.Prompts[0].Text)
+	}
+	text := storedText(t, te, round[1])
+	for _, want := range []string{"Add retries to the webhook sender done when a failed delivery is retried", "fresh worktree of `acme/api`", "turn end " + entry[1]} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the instructions lack %q:\n%s", want, text)
+		}
+	}
+
+	id := gtd.ID(strings.TrimPrefix(entry[1], "entry:"))
+	books, err := te.Turns.Store.Books(context.Background(), gtd.UnitOf(id))
+	if err != nil || len(books[gtd.UnitOf(id)].Turns) != 1 {
+		t.Fatalf("books %+v, %v", books, err)
+	}
+	sent := books[gtd.UnitOf(id)].Turns[0]
+	rec := record.Record{State: record.Done, Summary: "opened the pull request", Outcome: &record.Outcome{URL: "https://github.com/acme/api/pull/9"}}
+	if _, err := te.Turns.RecordTurnEnd(context.Background(), turns.RecordRequest{Session: sent.SentTo, Turn: sent.ID, Unit: gtd.UnitOf(id), Record: rec}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := te.Env.gtd.Entry(context.Background(), id)
+	if err != nil || !slices.Contains(got.Units, unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}) {
+		t.Fatalf("the entry's units %v, %v", got.Units, err)
+	}
+}
+
+func TestStartRefusesWhatItCannotWorkIn(t *testing.T) {
+	t.Run("a repository that leaves its folder", func(t *testing.T) {
+		te, m, _, _ := startEnv(t)
+		var clones []string
+		te.gh.clone = cloneAs(t, "acme/api", &clones)
+		if code := te.run("start", "--repo", "acme/..", "fix it"); code == 0 || !strings.Contains(te.err.String(), `"acme/.." is not a repository`) {
+			t.Fatalf("exit %d: %s", code, te.err)
+		}
+		if len(clones) != 0 || len(m.Creates) != 0 {
+			t.Fatalf("clones %q, creates %+v", clones, m.Creates)
+		}
+	})
+	t.Run("a folder that holds another repository", func(t *testing.T) {
+		te, m, projects, file := startEnv(t)
+		var clones []string
+		cloneAs(t, "globex/api", &clones)("globex/api", filepath.Join(projects, "api"))
+		if code := te.run("start", "--repo", "acme/api", "fix it"); code == 0 || !strings.Contains(te.err.String(), "is not a checkout of acme/api") {
+			t.Fatalf("exit %d: %s", code, te.err)
+		}
+		if len(m.Creates) != 0 {
+			t.Fatalf("creates %+v", m.Creates)
+		}
+		unchanged(t, file)
+	})
+	t.Run("a manager that cannot host", func(t *testing.T) {
+		te, m, _, _ := startEnv(t)
+		var clones []string
+		te.gh.clone = cloneAs(t, "acme/api", &clones)
+		if code := te.run("start", "--repo", "acme/api", "--manager", "nowhere", "fix it"); code == 0 || !strings.Contains(te.err.String(), "nowhere") {
+			t.Fatalf("exit %d: %s", code, te.err)
+		}
+		if len(m.Creates) != 0 || len(m.Prompts) != 0 {
+			t.Fatalf("creates %+v, prompts %+v", m.Creates, m.Prompts)
+		}
+	})
+	t.Run("an existing clone is not trusted", func(t *testing.T) {
+		te, m, projects, file := startEnv(t)
+		var clones []string
+		cloneAs(t, "acme/api", &clones)("acme/api", filepath.Join(projects, "api"))
+		te.run("start", "--repo", "acme/api", "fix it")
+		unchanged(t, file)
+		if len(m.Creates) != 1 {
+			t.Fatalf("creates %+v: %s", m.Creates, te.err)
+		}
+	})
+}
+
+func TestStartWithoutARepositoryRunsInTheNeutralRepository(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	if code := te.run("start", "tell the team the export ships Friday"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	writes := strings.Join(m.Writes, "\n")
+	if !strings.Contains(writes, "repo add "+te.Env.neutralDir()) || len(m.Prompts) != 1 {
+		t.Fatalf("writes:\n%s\nprompts %+v", writes, m.Prompts)
+	}
+	if len(m.Commands) != 1 || !strings.Contains(m.Commands[0], " --name 'tell the team the export ships Friday'") {
+		t.Fatalf("commands %q", m.Commands)
+	}
+}
+
+func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	ctx := context.Background()
+	derived, err := te.Env.gtd.Open(ctx, coregtd.OpenRequest{Kind: gtd.KindMessage, Title: "ship the export", Origin: gtd.OriginMessage})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || !strings.Contains(te.err.String(), "Start runs only on an entry you captured") {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if len(m.Prompts) != 0 {
+		t.Fatalf("prompts %+v", m.Prompts)
+	}
+	captured, err := te.Env.gtd.Capture(ctx, "ship the export", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := client.New(te.Socket).Entry(ctx, string(captured.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || !v.Actions[i].Enabled {
+		t.Fatalf("the captured entry's actions %+v", v.Actions)
+	}
+	v, err = client.New(te.Socket).Entry(ctx, string(derived.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || v.Actions[i].Enabled {
+		t.Fatalf("the derived entry's actions %+v", v.Actions)
+	}
+}
+
+func TestAStartAgainOnTheEntryReusesItsRepositoryAndWorktree(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	if code := te.run("start", "--repo", "acme/api", "add retries"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	entry := capturedEntry.FindStringSubmatch(te.out.String())
+	if entry == nil {
+		t.Fatalf("no entry captured:\n%s", te.out)
+	}
+	if code := te.run("start", entry[1]); code != 0 {
+		t.Fatalf("again: exit %d: %s", code, te.err)
+	}
+	if len(clones) != 1 || len(m.Creates) != 1 || len(m.Prompts) != 2 {
+		t.Fatalf("clones %q, creates %+v, prompts %d", clones, m.Creates, len(m.Prompts))
+	}
+	if m.Prompts[1].Handle != m.Prompts[0].Handle {
+		t.Fatalf("the second start ran in %s, the first in %s", m.Prompts[1].Handle, m.Prompts[0].Handle)
+	}
+}
