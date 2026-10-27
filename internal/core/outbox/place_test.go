@@ -140,3 +140,40 @@ func TestAnApprovedDraftThePluginCannotPlaceFailsUnpublished(t *testing.T) {
 		t.Fatalf("%+v published %v", got, e.fx.published)
 	}
 }
+
+// recordingSaves records every draft the Outbox stores over an existing one.
+func recordingSaves(e *env) *[]draft.Draft {
+	var saved []draft.Draft
+	e.store.beforeUpdate = func(d draft.Draft) { saved = append(saved, d) }
+	return &saved
+}
+
+func TestTheClaimStoresThePlacedTarget(t *testing.T) {
+	e := newEnv()
+	approvedUnplaced(e)
+	withPlacer(e, "msg:D000AAA/1700000000.000100")
+	s := recordingSaves(e)
+	e.svc.Send(ctx)
+	if len(*s) == 0 || (*s)[0].State != draft.Sending || (*s)[0].Target != "msg:D000AAA/1700000000.000100" {
+		t.Fatalf("saved %+v", *s)
+	}
+}
+
+func TestARefusedPlacementNeverClaimsTheDraft(t *testing.T) {
+	e := newEnv()
+	d := approvedUnplaced(e)
+	pl := withPlacer(e, "")
+	pl.refuse = errors.New("none of the items names a message")
+	s := recordingSaves(e)
+	if _, failed, _ := e.svc.Send(ctx); failed != 1 {
+		t.Fatalf("failed %d", failed)
+	}
+	for _, saved := range *s {
+		if saved.State == draft.Sending {
+			t.Fatalf("claimed %+v", saved)
+		}
+	}
+	if got := e.get(d.ID); got.State != draft.Failed || got.Target != "" || !strings.Contains(got.Error, "none of the items") {
+		t.Fatalf("%+v", got)
+	}
+}
