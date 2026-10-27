@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/situation"
 )
@@ -78,7 +77,7 @@ func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Ro
 	}
 	f.Intakes = d.openIntakes(pr.Ref)
 	f.NudgeWho, f.NudgeWhy = NudgeTargets(unmuted, pr.Author, d.Viewer, d.Ignore)
-	f.NudgeRefusal = NudgeRefusal(pr.Ref, f.NudgeWho, f.NudgeWhy, unmuted.Summary.Since, evs, d.Now)
+	f.NudgeRefusal = NudgeRefusal(pr.Ref, f.NudgeWho, f.NudgeWhy, unmuted.Summary.Since, evs, d.Turns[pr.Ref].Unstarted, d.Now)
 	return f
 }
 
@@ -114,47 +113,19 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 }
 
 // NudgeRefusal is the text a nudge is refused with now, "" when it would
-// go.
-func NudgeRefusal(ref github.Ref, who []string, why string, since time.Time, evs []dinv.Event, now time.Time) string {
+// go; unstarted are the turns that ended before their agent started them,
+// whose nudged events do not count.
+func NudgeRefusal(ref github.Ref, who []string, why string, since time.Time, evs []dinv.Event, unstarted map[string]bool, now time.Time) string {
 	if len(who) == 0 {
 		return fmt.Sprintf("%s %s; a nudge asks someone else for the next step", ref, why)
 	}
 	for _, e := range slices.Backward(evs) {
-		if again := e.At.Add(RenudgeAfter); e.Kind == dinv.KindNudged && !e.At.Before(since) && now.Before(again) && !postedNothing(evs, e.Key) {
+		if again := e.At.Add(RenudgeAfter); e.Kind == dinv.KindNudged && !e.At.Before(since) && now.Before(again) && !unstarted[e.Key] {
 			const stamp = "2006-01-02 15:04"
 			return fmt.Sprintf("%s: already nudged %s at %s; again after %s", ref, e.Data, e.At.Local().Format(stamp), again.Local().Format(stamp))
 		}
 	}
 	return ""
-}
-
-// postedNothing says whether turn, the turn a nudged event was recorded
-// for, ended without posting: it failed, or it ended or was withdrawn
-// before its agent started it.
-func postedNothing(evs []dinv.Event, turn string) bool {
-	if turn == "" {
-		return false
-	}
-	started, stopped := false, false
-	for _, e := range evs {
-		if id, _, _ := strings.Cut(e.Key, ":"); id != turn {
-			continue
-		}
-		switch e.Kind {
-		case turns.KindTurnStarted:
-			started = true
-		case turns.KindTurnWithdrawn:
-			stopped = true
-		case turns.KindTurnEnded:
-			switch record.EventState(e.Data) {
-			case record.Failed:
-				return true
-			case record.UnrecordedState:
-				stopped = true
-			}
-		}
-	}
-	return stopped && !started
 }
 
 // NudgeTargets is who a nudge mentions, or why it mentions nobody: r's

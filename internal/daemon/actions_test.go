@@ -48,9 +48,6 @@ type fakeActions struct {
 	inputs      []map[string]any
 	// bound are the items and entry of each intent call, as "i1,i2@entry".
 	bound []string
-	// recorder, when set, records the nudged event of a sent nudge, keyed by
-	// its turn, as the command line does.
-	recorder *Server
 }
 
 func (f *fakeActions) record(ctx context.Context, call string, c Call) error {
@@ -84,11 +81,7 @@ func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Ca
 	case "nudge":
 		f.maintainers = append(f.maintainers, inputFlag(c.Inputs, "waits_on_maintainers"))
 		situation, _ := c.Inputs["situation"].(string)
-		if err := f.record(ctx, "nudge "+r.String()+" "+situation+"|"+c.Guidance, c); err != nil || f.recorder == nil {
-			return err
-		}
-		who, _ := c.Inputs["who"].([]string)
-		return f.recorder.deps.Events.RecordEvent(ctx, dinv.Event{PR: r, Kind: dinv.KindNudged, Key: fmt.Sprintf("turn-%d", len(f.calls)), At: f.recorder.deps.Now(), Data: strings.Join(who, ", ")})
+		return f.record(ctx, "nudge "+r.String()+" "+situation+"|"+c.Guidance, c)
 	}
 	return f.record(ctx, name+" "+r.String()+" "+c.Guidance, c)
 }
@@ -595,7 +588,7 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{recorder: s}
+	fa := &fakeActions{}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"be brief"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -606,10 +599,17 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	if since := s.deps.Now().Add(-72 * time.Hour).Local().Format(time.RFC3339); !strings.Contains(fa.calls[0], " since "+since+", ") {
 		t.Fatalf("the wait is not dated to the second: %v, want %s", fa.calls, since)
 	}
-	evs, _ := s.store().Events(context.Background(), r9)
-	last := evs[len(evs)-1]
-	if last.Kind != dinv.KindNudged || last.Data != "@ana" {
-		t.Fatalf("last event %+v", last)
+	if who, _ := fa.inputs[0]["who"].([]string); !slices.Equal(who, []string{"@ana"}) {
+		t.Fatalf("who %v", fa.inputs[0]["who"])
+	}
+}
+
+// sentNudge records the nudged event the command line records once the
+// nudge turn id goes out.
+func sentNudge(t *testing.T, s *Server, id, who string) {
+	t.Helper()
+	if err := s.store().RecordEvent(context.Background(), dinv.Event{PR: r9, Kind: dinv.KindNudged, Key: id, At: s.deps.Now(), Data: who}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -623,7 +623,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 	if err := s.store().UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
-	fa := &fakeActions{recorder: s}
+	fa := &fakeActions{}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -632,6 +632,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 		!strings.Contains(fa.calls[0], ", no reviewer.") || strings.Contains(fa.calls[0], "@") || !fa.maintainers[0] {
 		t.Fatalf("calls %v, maintainers %v", fa.calls, fa.maintainers)
 	}
+	sentNudge(t, s, "t1", "the maintainers (no reviewer requested)")
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "already nudged the maintainers") {
 		t.Fatalf("a second nudge within a day: %d %s", rec.Code, rec.Body)
 	}
@@ -702,11 +703,12 @@ func TestNudgeOncePerWait(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{recorder: s}
+	fa := &fakeActions{}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
+	sentNudge(t, s, "t1", "@ana")
 	start := s.deps.Now()
 	s.deps.Now = func() time.Time { return start.Add(23 * time.Hour) }
 	rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`)

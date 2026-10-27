@@ -140,6 +140,7 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 	defer func() { cancel(); <-te.served.done }()
 	te.Rounds = sqlite.NewRounds(db)
 	deps := serveDeps(ctx, te.Env, db, te.cfg, logf, &sync.Mutex{}, &daemon.AppState{})
+	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -352,6 +353,7 @@ func TestEchoAgentRunsAThreadTurn(t *testing.T) {
 	defer func() { cancel(); <-te.served.done }()
 	te.Rounds = sqlite.NewRounds(db)
 	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
 	}

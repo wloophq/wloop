@@ -330,6 +330,7 @@ func saveReviewAt(t *testing.T, te *testEnv, ref github.Ref, trigger dturn.Trigg
 	if _, err := te.repo.Save(context.Background(), b, port.Event{Unit: pr.Ref(ref).Unit(), Kind: turns.KindTurnSent, Key: round, At: at}); err != nil {
 		t.Fatal(err)
 	}
+	te.Rec = storeRecorder{te.Store}
 }
 
 // setReviewer answers the reviewer read with one pull request per ref, in

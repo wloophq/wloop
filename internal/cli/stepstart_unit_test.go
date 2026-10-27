@@ -76,6 +76,7 @@ func newUnitStartRig(t *testing.T, intentToml string) *unitStartRig {
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-main", RepoID: "r1", Path: "/src/api", DisplayName: "api", HostID: wsdomain.LocalHost, IsMain: true}},
 	}
 	te := newTestEnv(t, m)
+	te.Rec = storeRecorder{te.Store}
 	saved := plugins
 	plugins = append(slices.Clone(plugins), threadModule(thread1))
 	t.Cleanup(func() { plugins = saved })

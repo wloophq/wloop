@@ -349,6 +349,9 @@ func (e *Env) recordEvent(ctx context.Context, ref github.Ref, kind, data string
 
 // recordTurnEvent records an event of turn, keyed by its id.
 func (e *Env) recordTurnEvent(ctx context.Context, ref github.Ref, kind, turn, data string) {
+	if e.Rec == nil {
+		return
+	}
 	ev := dinv.Event{PR: ref, Kind: kind, Key: turn, At: e.Now(), Data: data}
 	if err := e.Rec.Record(context.WithoutCancel(ctx), ev); err != nil {
 		fmt.Fprintf(e.Err, "warning: %s: recording %s: %v\n", ref, kind, err)

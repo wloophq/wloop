@@ -78,6 +78,7 @@ func threadTurnEnv(t *testing.T) (*testEnv, *fake.Manager) {
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-main", RepoID: "r1", Path: "/src/api", DisplayName: "api", HostID: wsdomain.LocalHost, IsMain: true}},
 	}
 	te := newTestEnv(t, m)
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	withThreads(t, te)
 	te.serve(t)
@@ -142,6 +143,7 @@ func TestAThreadWithoutPlacementRunsInTheNeutralRepository(t *testing.T) {
 		Sessions:      map[string]string{"ws-main": "term-recent"},
 	}
 	te := newTestEnv(t, m)
+	te.Rec = storeRecorder{te.Store}
 	withThreads(t, te)
 	te.serve(t)
 	ctx := context.Background()
@@ -293,6 +295,7 @@ func TestThreadsSharingAWorkspaceKeepTheirOwnSessions(t *testing.T) {
 	ws := &numberedSessions{Manager: m, sessions: sessions}
 	te := newTestEnv(t, ws)
 	te.Turns.Sessions = turns.NewRouter(te.reg, handleSessions{m.Name(), sessions})
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	withThreads(t, te)
 	userProfile(t, te, map[string]string{"intents/discuss/intent.toml": strings.Replace(discussIntent, `strategy = "new"`, `strategy = "reuse_live"`, 1), "intents/discuss/instructions.md.tmpl": discussBody})
@@ -324,6 +327,7 @@ func TestAThreadRefusesPullRequestOnlyIntents(t *testing.T) {
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-main", RepoID: "r1", Path: "/src/api", DisplayName: "api", HostID: wsdomain.LocalHost, IsMain: true}},
 	}
 	te := newTestEnv(t, m)
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	withThreads(t, te)
 	unoffered := strings.Replace(discussIntent, "[action]\nsurfaces = [\"row\", \"cli\"]\n", "", 1)
@@ -362,6 +366,7 @@ func TestASharedWorkspaceWaitingOnAPromptGetsANewSession(t *testing.T) {
 	ws := &numberedSessions{Manager: m, sessions: sessions}
 	te := newTestEnv(t, ws)
 	te.Turns.Sessions = turns.NewRouter(te.reg, handleSessions{m.Name(), sessions})
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	withThreads(t, te)
 	userProfile(t, te, map[string]string{"intents/discuss/intent.toml": strings.Replace(discussIntent, `strategy = "new"`, `strategy = "reuse_live"`, 1), "intents/discuss/instructions.md.tmpl": discussBody})
@@ -389,6 +394,7 @@ func TestADisabledThreadPluginRunsNoTurn(t *testing.T) {
 		WorkspaceList: []wsdomain.Workspace{{ID: "ws-main", RepoID: "r1", Path: "/src/api", DisplayName: "api", HostID: wsdomain.LocalHost, IsMain: true}},
 	}
 	te := newTestEnv(t, m)
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = []config.PlacementRule{{Match: "thread:*", Repo: "acme/api", Checkout: "main"}}
 	off := false
 	te.cfg.Plugins = map[string]config.Plugin{string(ingesttest.Provider): {Enabled: &off}}

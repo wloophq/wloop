@@ -129,6 +129,7 @@ func TestSharedWorkspaceKeepsSlackSessionsApart(t *testing.T) {
 	ws := &numberedSessions{Manager: m, sessions: sessions}
 	te := newTestEnv(t, ws)
 	te.Turns.Sessions = turns.NewRouter(te.reg, handleSessions{m.Name(), sessions})
+	te.Rec = storeRecorder{te.Store}
 	te.cfg.Placement = slackContexts
 	withSlackTurns(t, te)
 	userProfile(t, te, map[string]string{"intents/discuss/intent.toml": strings.Replace(slackDiscussIntent, `strategy = "new"`, `strategy = "reuse_live"`, 1),
@@ -214,6 +215,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	defer func() { cancel(); <-te.served.done }()
 	te.Rounds = sqlite.NewRounds(db)
 	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
 	}

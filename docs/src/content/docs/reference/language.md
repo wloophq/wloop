@@ -160,12 +160,12 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `pr.round_sent`: Records the round-sent event on the pull request.
   - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
-  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that failed or never started does not count, or as the GitHub publisher posts its draft.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts` (table): The drafts its turns' agents propose.
 - `drafts.allowed_effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): The effects its agents may declare on their drafts.
   - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
   - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
-  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that failed or never started does not count, or as the GitHub publisher posts its draft.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
 - `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
@@ -265,7 +265,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `effects` (list of `entry.nudged`, `unit.closed`, `pr.nudged`): What sending the draft applies.
   - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
   - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
-  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that failed or never started does not count, or as the GitHub publisher posts its draft.
+  - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
   - `repeat_after` (string): The least time after a settled draft of the same person before another: a duration, or a config.* duration fact such as config.drafts.repeat_after.
   - `repeat_after_sent` (string): The same after a sent draft, by default repeat_after: a duration, a config.* duration fact, or forever.
 - `classify`:

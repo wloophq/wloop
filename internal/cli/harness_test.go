@@ -650,7 +650,6 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.db = db
 	te.Rounds = sqlite.NewRounds(db)
 	te.Store = inventory.New(db)
-	te.Rec = storeRecorder{te.Store}
 	te.repo, te.sink = sqlite.New(db), testsink.New("test")
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
 	clock := clockFunc(func() time.Time { return te.Env.Now() })

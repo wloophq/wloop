@@ -215,6 +215,7 @@ func TestANudgeRecordsTheTurnItSent(t *testing.T) {
 			m.Sessions = map[string]string{"ws-rev": "term-live"}
 			te := newTestEnv(t, m)
 			te.gh.basics = openBasics
+			te.Rec = storeRecorder{te.Store}
 			if err := send(t, te); err != nil {
 				t.Fatalf("%v\n%s", err, te.err)
 			}

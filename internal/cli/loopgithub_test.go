@@ -170,6 +170,7 @@ func askedAuthorTurn(t *testing.T) (*fake.Manager, *testEnv) {
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
+	te.Rec = storeRecorder{te.Store}
 	userProfile(t, te, map[string]string{"intent=review.md": "Review well."})
 	if code := te.run("ask-author", r7.URL(), "--topic", "the retry cap"); code != 0 {
 		t.Fatalf("ask-author: exit %d: %s", code, te.err)
