@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -114,8 +116,8 @@ func fakeServer(t *testing.T, p *fakeRows) (*Server, *change.Log, *readmodel.Mod
 	return s, log, m
 }
 
-// runFeeds runs both feeds until the test ends and returns once the rows
-// feed knows where the rows are.
+// runFeeds runs both feeds until the test ends and returns once they wait
+// for changes. It runs in a synctest bubble.
 func runFeeds(t *testing.T, s *Server) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -126,14 +128,10 @@ func runFeeds(t *testing.T, s *Server) {
 	})
 	wg.Go(func() { s.feedRows(ctx) })
 	wg.Go(func() { s.feedHealth(ctx) })
-	deadline := time.Now().Add(2 * time.Second)
-	for s.hub.position() == (api.Since{}) {
-		if time.Now().After(deadline) {
-			t.Fatal("the rows feed never started")
-		}
-		time.Sleep(5 * time.Millisecond)
+	synctest.Wait()
+	if s.hub.position() == (api.Since{}) {
+		t.Fatal("the rows feed never started")
 	}
-	time.Sleep(50 * time.Millisecond)
 }
 
 type message struct {
@@ -141,33 +139,48 @@ type message struct {
 	c  api.Change
 }
 
+// pipeWriter is a streaming ResponseWriter whose body a reader takes from a
+// pipe, so a stream runs inside a synctest bubble.
+type pipeWriter struct {
+	header http.Header
+	body   *io.PipeWriter
+}
+
+func (w *pipeWriter) Header() http.Header         { return w.header }
+func (w *pipeWriter) Write(b []byte) (int, error) { return w.body.Write(b) }
+func (w *pipeWriter) WriteHeader(int)             {}
+func (w *pipeWriter) Flush()                      {}
+
 // listen connects to the stream with the request changed by prepare and
-// delivers each data message, once the stream said it is connected.
+// delivers each data message, once the stream said it is connected, until
+// the test ends.
 func listen(t *testing.T, s *Server, prepare func(*http.Request)) <-chan message {
 	t.Helper()
-	srv := httptest.NewServer(s.Handler())
-	t.Cleanup(srv.Close)
-	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/events?api="+api.Version, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/events?api="+api.Version, nil)
 	if prepare != nil {
 		prepare(req)
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := bufio.NewReader(resp.Body)
-	if line, _ := r.ReadString('\n'); !strings.HasPrefix(line, ": connected") {
-		t.Fatalf("first line %q", line)
-	}
+	body, pw := io.Pipe()
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		s.Handler().ServeHTTP(&pipeWriter{header: http.Header{}, body: pw}, req)
+		pw.Close()
+	}()
 	out, stop, exited := make(chan message, 64), make(chan struct{}), make(chan struct{})
 	t.Cleanup(func() {
+		cancel()
 		close(stop)
-		resp.Body.Close()
+		body.Close()
+		<-served
 		<-exited
 	})
+	r := bufio.NewReader(body)
+	if line, _ := r.ReadString('\n'); !strings.HasPrefix(line, ": connected") {
+		close(exited)
+		t.Fatalf("first line %q", line)
+	}
 	go func() {
 		defer close(exited)
 		defer close(out)
@@ -218,155 +231,164 @@ func collectFor(msgs <-chan message, d time.Duration) []message {
 
 func TestIdleCyclePublishesNoRowChange(t *testing.T) {
 	t.Parallel()
-	s, _, _ := feedServer(t)
-	runFeeds(t, s)
-	msgs := listen(t, s, nil)
-	fast := newJob("fast", time.Hour, time.Minute, func(ctx context.Context) (string, string, error) {
-		return ghsource.Outcome(ghsource.Report{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
+	synctest.Test(t, func(t *testing.T) {
+		s, _, _ := feedServer(t)
+		runFeeds(t, s)
+		msgs := listen(t, s, nil)
+		fast := newJob("fast", time.Hour, time.Minute, func(ctx context.Context) (string, string, error) {
+			return ghsource.Outcome(ghsource.Report{Queries: 1}, s.store().UpsertPR(ctx, feedPR()))
+		})
+		fast.onEnd = s.jobEnded
+		fast.once(context.Background(), func(string, ...any) {}, s.jobDone)
+		got := collectFor(msgs, healthQuiet+time.Second)
+		health := 0
+		for _, m := range got {
+			if len(m.c.Units) > 0 || m.c.All {
+				t.Fatalf("an idle cycle published a row change: %+v", m.c)
+			}
+			if m.c.Health {
+				health++
+			}
+		}
+		if health != 1 {
+			t.Fatalf("%d health messages: %+v", health, got)
+		}
 	})
-	fast.onEnd = s.jobEnded
-	fast.once(context.Background(), func(string, ...any) {}, s.jobDone)
-	got := collectFor(msgs, healthQuiet+time.Second)
-	health := 0
-	for _, m := range got {
-		if len(m.c.Units) > 0 || m.c.All {
-			t.Fatalf("an idle cycle published a row change: %+v", m.c)
-		}
-		if m.c.Health {
-			health++
-		}
-	}
-	if health > 1 {
-		t.Fatalf("%d health messages: %+v", health, got)
-	}
 }
 
+// rowsQuiet is how long the read model waits after a row note before it
+// refreshes.
+const rowsQuiet = 250 * time.Millisecond
+
 func TestTurnEndPublishesItsUnit(t *testing.T) {
-	s, _, svc := feedServer(t)
-	sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
-	h := s.Handler()
-	if rec := agentCall(t, h, "POST", api.AgentTurnsStart, "term_1", `{"turn":"abc123abc123","intent":"review"}`); rec.Code != 200 {
-		t.Fatalf("start: %d %s", rec.Code, rec.Body)
-	}
-	runFeeds(t, s)
-	msgs := listen(t, s, nil)
-	ended := time.Now()
-	if rec := agentCall(t, h, "POST", api.AgentTurnsEnd, "term_1", `{"turn":"abc123abc123","pr":"`+agentRef.URL()+`","record":`+doneReview+`}`); rec.Code != 200 {
-		t.Fatalf("end: %d %s", rec.Code, rec.Body)
-	}
-	for {
-		select {
-		case m, ok := <-msgs:
-			if !ok {
-				t.Fatal("the stream ended")
-			}
+	synctest.Test(t, func(t *testing.T) {
+		s, _, svc := feedServer(t)
+		sendTurn(t, s, svc, agentRef, turn.Intent(dintent.Review), "abc123abc123")
+		h := s.Handler()
+		if rec := agentCall(t, h, "POST", api.AgentTurnsStart, "term_1", `{"turn":"abc123abc123","intent":"review"}`); rec.Code != 200 {
+			t.Fatalf("start: %d %s", rec.Code, rec.Body)
+		}
+		runFeeds(t, s)
+		msgs := listen(t, s, nil)
+		ended := time.Now()
+		if rec := agentCall(t, h, "POST", api.AgentTurnsEnd, "term_1", `{"turn":"abc123abc123","pr":"`+agentRef.URL()+`","record":`+doneReview+`}`); rec.Code != 200 {
+			t.Fatalf("end: %d %s", rec.Code, rec.Body)
+		}
+		for m := range msgs {
 			if slices.Contains(m.c.Units, agentRef.Unit()) {
-				if took := time.Since(ended); took > 1500*time.Millisecond {
-					t.Fatalf("the turn end reached the stream after %v", took)
+				if took := time.Since(ended); took != rowsQuiet {
+					t.Fatalf("the turn end reached the stream after %v, want the read model's quiet period, %v", took, rowsQuiet)
 				}
 				return
 			}
-		case <-time.After(time.Until(ended.Add(1500 * time.Millisecond))):
-			t.Fatal("no message named the unit within 1.5 s")
 		}
-	}
+		t.Fatal("the stream ended")
+	})
 }
 
 func TestBurstCoalesces(t *testing.T) {
 	t.Parallel()
-	u := agentRef.Unit()
-	p := &fakeRows{units: []unit.Unit{u}}
-	s, log, _ := fakeServer(t, p)
-	runFeeds(t, s)
-	msgs := listen(t, s, nil)
-	for i := 1; i <= 100; i++ {
-		p.set([]unit.Unit{u}, i)
-		log.Note(port.TopicPRs, u)
-	}
-	got := collectFor(msgs, 1500*time.Millisecond)
-	if len(got) != 1 || !slices.Equal(got[0].c.Units, []unit.Unit{u}) || got[0].c.All {
-		t.Fatalf("%d messages: %+v", len(got), got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		u := agentRef.Unit()
+		p := &fakeRows{units: []unit.Unit{u}}
+		s, log, _ := fakeServer(t, p)
+		runFeeds(t, s)
+		msgs := listen(t, s, nil)
+		for i := 1; i <= 100; i++ {
+			p.set([]unit.Unit{u}, i)
+			log.Note(port.TopicPRs, u)
+		}
+		got := collectFor(msgs, 1500*time.Millisecond)
+		if len(got) != 1 || !slices.Equal(got[0].c.Units, []unit.Unit{u}) || got[0].c.All {
+			t.Fatalf("%d messages: %+v", len(got), got)
+		}
+	})
 }
 
 func TestResumeFromLastEventID(t *testing.T) {
 	t.Parallel()
-	u := agentRef.Unit()
-	p := &fakeRows{units: []unit.Unit{u}}
-	s, log, m := fakeServer(t, p)
-	ctx := context.Background()
-	before, err := m.Since(ctx, api.Since{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.set([]unit.Unit{u}, 1)
-	log.Note(port.TopicPRs, u)
-	id := func(c api.Change) string { return c.Epoch + ":" + strconv.FormatUint(c.Rev, 10) }
-	msgs := listen(t, s, func(r *http.Request) { r.Header.Set("Last-Event-ID", id(before)) })
-	got := collectFor(msgs, 300*time.Millisecond)
-	want := before.Epoch + ":" + strconv.FormatUint(before.Rev+1, 10)
-	if len(got) != 1 || got[0].id != want || !slices.Equal(got[0].c.Units, []unit.Unit{u}) || got[0].c.All {
-		t.Fatalf("resume from %s: %+v, want one message with id %s naming %v", id(before), got, want, u)
-	}
-	current := got[0].id
-	if again := collectFor(listen(t, s, func(r *http.Request) { r.Header.Set("Last-Event-ID", current) }), 300*time.Millisecond); len(again) != 0 {
-		t.Fatalf("a client at the current revision got %+v", again)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		u := agentRef.Unit()
+		p := &fakeRows{units: []unit.Unit{u}}
+		s, log, m := fakeServer(t, p)
+		ctx := context.Background()
+		before, err := m.Since(ctx, api.Since{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.set([]unit.Unit{u}, 1)
+		log.Note(port.TopicPRs, u)
+		id := func(c api.Change) string { return c.Epoch + ":" + strconv.FormatUint(c.Rev, 10) }
+		msgs := listen(t, s, func(r *http.Request) { r.Header.Set("Last-Event-ID", id(before)) })
+		got := collectFor(msgs, 300*time.Millisecond)
+		want := before.Epoch + ":" + strconv.FormatUint(before.Rev+1, 10)
+		if len(got) != 1 || got[0].id != want || !slices.Equal(got[0].c.Units, []unit.Unit{u}) || got[0].c.All {
+			t.Fatalf("resume from %s: %+v, want one message with id %s naming %v", id(before), got, want, u)
+		}
+		current := got[0].id
+		if again := collectFor(listen(t, s, func(r *http.Request) { r.Header.Set("Last-Event-ID", current) }), 300*time.Millisecond); len(again) != 0 {
+			t.Fatalf("a client at the current revision got %+v", again)
+		}
+	})
 }
 
 func TestResumePastWindowIsAll(t *testing.T) {
 	t.Parallel()
-	units := make([]unit.Unit, 1100)
-	for i := range units {
-		units[i] = github.Ref{Owner: "acme", Repo: "api", Number: i + 1}.Unit()
-	}
-	p := &fakeRows{units: units}
-	s, log, m := fakeServer(t, p)
-	before, err := m.Since(context.Background(), api.Since{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.set(nil, 0)
-	log.Note(port.TopicPRs)
-	for _, c := range []struct {
-		name    string
-		prepare func(*http.Request)
-	}{
-		{"past the tombstones", func(r *http.Request) {
-			r.URL.RawQuery += "&since=" + before.Epoch + ":" + strconv.FormatUint(before.Rev, 10)
-		}},
-		{"ahead of Rev", func(r *http.Request) {
-			r.Header.Set("Last-Event-ID", before.Epoch+":"+strconv.FormatUint(before.Rev+1000, 10))
-		}},
-		{"another epoch", func(r *http.Request) { r.Header.Set("Last-Event-ID", "gone:1") }},
-		{"an unreadable id", func(r *http.Request) { r.Header.Set("Last-Event-ID", "garbage") }},
-	} {
-		got := collectFor(listen(t, s, c.prepare), 300*time.Millisecond)
-		if len(got) != 1 || !got[0].c.All || len(got[0].c.Units) != 0 {
-			t.Fatalf("%s: %+v", c.name, got)
+	synctest.Test(t, func(t *testing.T) {
+		units := make([]unit.Unit, 1100)
+		for i := range units {
+			units[i] = github.Ref{Owner: "acme", Repo: "api", Number: i + 1}.Unit()
 		}
-	}
+		p := &fakeRows{units: units}
+		s, log, m := fakeServer(t, p)
+		before, err := m.Since(context.Background(), api.Since{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.set(nil, 0)
+		log.Note(port.TopicPRs)
+		for _, c := range []struct {
+			name    string
+			prepare func(*http.Request)
+		}{
+			{"past the tombstones", func(r *http.Request) {
+				r.URL.RawQuery += "&since=" + before.Epoch + ":" + strconv.FormatUint(before.Rev, 10)
+			}},
+			{"ahead of Rev", func(r *http.Request) {
+				r.Header.Set("Last-Event-ID", before.Epoch+":"+strconv.FormatUint(before.Rev+1000, 10))
+			}},
+			{"another epoch", func(r *http.Request) { r.Header.Set("Last-Event-ID", "gone:1") }},
+			{"an unreadable id", func(r *http.Request) { r.Header.Set("Last-Event-ID", "garbage") }},
+		} {
+			got := collectFor(listen(t, s, c.prepare), 300*time.Millisecond)
+			if len(got) != 1 || !got[0].c.All || len(got[0].c.Units) != 0 {
+				t.Fatalf("%s: %+v", c.name, got)
+			}
+		}
+	})
 }
 
 func TestFailedResumeReadIsAll(t *testing.T) {
 	t.Parallel()
-	u := agentRef.Unit()
-	p := &fakeRows{units: []unit.Unit{u}}
-	s, log, m := fakeServer(t, p)
-	before, err := m.Since(context.Background(), api.Since{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p.mu.Lock()
-	p.fail = errors.New("store gone")
-	p.mu.Unlock()
-	log.Note(port.TopicPRs, u)
-	got := collectFor(listen(t, s, func(r *http.Request) {
-		r.Header.Set("Last-Event-ID", before.Epoch+":"+strconv.FormatUint(before.Rev, 10))
-	}), 300*time.Millisecond)
-	if len(got) != 1 || !got[0].c.All {
-		t.Fatalf("%+v", got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		u := agentRef.Unit()
+		p := &fakeRows{units: []unit.Unit{u}}
+		s, log, m := fakeServer(t, p)
+		before, err := m.Since(context.Background(), api.Since{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.mu.Lock()
+		p.fail = errors.New("store gone")
+		p.mu.Unlock()
+		log.Note(port.TopicPRs, u)
+		got := collectFor(listen(t, s, func(r *http.Request) {
+			r.Header.Set("Last-Event-ID", before.Epoch+":"+strconv.FormatUint(before.Rev, 10))
+		}), 300*time.Millisecond)
+		if len(got) != 1 || !got[0].c.All {
+			t.Fatalf("%+v", got)
+		}
+	})
 }
 
 func TestNoChangedCallSitesLeft(t *testing.T) {
