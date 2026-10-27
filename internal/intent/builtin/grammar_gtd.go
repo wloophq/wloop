@@ -11,6 +11,12 @@ var GTDVerbs = []string{
 	string(gtd.VerbRetry), string(gtd.VerbReviewed), string(gtd.VerbSequential), string(gtd.VerbReply),
 }
 
+// GTDVerbInputs are the verbs that ask for a value before they run.
+var GTDVerbInputs = []string{
+	string(gtd.VerbWaiting), string(gtd.VerbSchedule), string(gtd.VerbProject), string(gtd.VerbContext),
+	string(gtd.VerbArea), string(gtd.VerbDelegate), string(gtd.VerbReply),
+}
+
 // GTDViews are the views gtd.toml words, in the order clients list them;
 // review is served only when its source is.
 var GTDViews = []string{
@@ -25,6 +31,7 @@ var gtdGrammar = []Key{
 	{Path: "verbs.*", In: SurfaceGTD, Kind: KindTable, Doc: "A verb, by its name."},
 	{Path: "verbs.*.label", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "The name people read on its button. Required."},
 	{Path: "verbs.*.summary", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip. Required."},
+	{Path: "verbs.*.input", In: SurfaceGTD, Kind: KindText, Doc: "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those."},
 	{Path: "views", In: SurfaceGTD, Kind: KindTable, Doc: "The lists of entries, by view."},
 	{Path: "views.*", In: SurfaceGTD, Kind: KindTable, Doc: "A view, by its name."},
 	{Path: "views.*.label", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "The name people read in the list of views. Required."},

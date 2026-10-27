@@ -221,7 +221,7 @@ function verbButton(e, verb, label, run, extra = {}) {
 function askedArgs(verb) {
   const ask = typeof VERB_ASKS === "object" ? VERB_ASKS[verb] : null;
   if (!ask) return {};
-  const v = detailEnv.ask(ask.label);
+  const v = detailEnv.ask(verbQuestion(verb));
   if (v === null || v === undefined) return null;
   return ask.args(String(v).trim());
 }

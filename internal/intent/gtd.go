@@ -24,7 +24,9 @@ type GTDTexts struct {
 	Views map[string]string
 }
 
-type VerbText struct{ Label, Summary string }
+// VerbText is a verb's words: Input is the question a verb that asks for
+// a value puts first.
+type VerbText struct{ Label, Summary, Input string }
 
 type mGTD struct {
 	Verbs map[string]mVerbText `toml:"verbs"`
@@ -34,6 +36,7 @@ type mGTD struct {
 type mVerbText struct {
 	Label   *string `toml:"label"`
 	Summary *string `toml:"summary"`
+	Input   *string `toml:"input"`
 }
 
 type mViewText struct {
@@ -82,6 +85,11 @@ func loadGTD(layers []profile.Layer, bundled fs.FS) (GTDTexts, Problems) {
 			problems = append(problems, Problem{File: GTDFile, Field: "verbs." + v, Msg: "is missing: every verb has a table"})
 		}
 	}
+	for _, v := range builtin.GTDVerbInputs {
+		if w, ok := out.Verbs[v]; ok && w.Input == "" {
+			problems = append(problems, Problem{File: GTDFile, Field: "verbs." + v + ".input", Msg: "is required: the verb asks for a value first"})
+		}
+	}
 	for _, v := range builtin.GTDViews {
 		if _, ok := out.Views[v]; !ok {
 			problems = append(problems, Problem{File: GTDFile, Field: "views." + v, Msg: "is missing: every view has a table"})
@@ -114,6 +122,7 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		w, t := out.Verbs[id], m.Verbs[id]
 		text("verbs."+id+".label", t.Label, &w.Label)
 		text("verbs."+id+".summary", t.Summary, &w.Summary)
+		text("verbs."+id+".input", t.Input, &w.Input)
 		if w.Label == "" && t.Label == nil {
 			s.add("verbs."+id+".label", "is required")
 		}

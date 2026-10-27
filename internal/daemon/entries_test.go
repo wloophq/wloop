@@ -354,7 +354,7 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	t.Parallel()
 	texts := intentload.GTDTexts{
-		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}},
+		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}},
 		Views: map[string]string{"next": "Now"},
 	}
 	r := newEntriesRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts} } })
@@ -368,6 +368,9 @@ func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 	}
 	if got := verbs["done"]; got.Label != "Finish" || got.Summary != "Close it" {
 		t.Errorf("done: %+v", got)
+	}
+	if got := verbs["waiting"]; got.Input != "On whom?" {
+		t.Errorf("waiting: %+v", got)
 	}
 	if got := verbs["someday"]; got.Label != "Someday" || got.Summary == "" {
 		t.Errorf("a verb the profile leaves out takes the bundled words: %+v", got)

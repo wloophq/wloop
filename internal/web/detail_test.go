@@ -292,3 +292,20 @@ process.stdout.write(JSON.stringify({
 		t.Errorf("titles %q and %q", got.On, got.Off)
 	}
 }
+
+func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
+	var got struct{ Asked []string }
+	e := entry("e-3", "next", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
+	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
+	nodeRun(t, gtdPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
+gtdState.catalog = input.cat;
+detailEnv.ask = (label) => { asked.push(label); return "ana"; };
+const pane = h("div", {}, ...verbButtons(input.entry));
+(async () => {
+  await byFocus(pane, "detail:waiting:e-3").attrs.onclick();
+  process.stdout.write(JSON.stringify({ Asked: asked }));
+})();`, map[string]any{"cat": cat, "entry": e}, &got)
+	if len(got.Asked) != 1 || got.Asked[0] != "On whom?" {
+		t.Errorf("asked %v", got.Asked)
+	}
+}

@@ -43,6 +43,11 @@ func TestEveryVerbAndViewIsWorded(t *testing.T) {
 			t.Errorf("verb %s: label %q, summary %q", v, w.Label, w.Summary)
 		}
 	}
+	for _, v := range builtin.GTDVerbInputs {
+		if texts.Verbs[v].Input == "" {
+			t.Errorf("verb %s asks for a value and says nothing", v)
+		}
+	}
 	for _, v := range builtin.GTDViews {
 		if texts.Views[v] == "" {
 			t.Errorf("view %s: no label", v)
@@ -55,7 +60,7 @@ func TestGTDTextsComeFromTheProfile(t *testing.T) {
 	if problems != "" {
 		t.Fatal(problems)
 	}
-	if got := texts.Verbs["done"]; got != (VerbText{Label: "Done", Summary: "Close it"}) {
+	if got := texts.Verbs["done"]; got.Label != "Done" || got.Summary != "Close it" {
 		t.Errorf("done: %+v", got)
 	}
 	if got := texts.Views["next"]; got != "Now" {
@@ -95,5 +100,17 @@ func TestABundledGTDFileMissingAVerbFails(t *testing.T) {
 	_, problems := loadGTDWith(t, src, "")
 	if !strings.Contains(problems, "verbs.someday: is missing: every verb has a table") {
 		t.Errorf("%s", problems)
+	}
+}
+
+func TestAVerbThatAsksNeedsItsQuestion(t *testing.T) {
+	src := strings.Replace(string(defaultGTD()), "input   = \"Waiting on whom (optional)\"\n", "", 1)
+	_, problems := loadGTDWith(t, src, "")
+	if !strings.Contains(problems, "verbs.waiting.input: is required: the verb asks for a value first") {
+		t.Errorf("%s", problems)
+	}
+	texts, problems := loadGTDWith(t, string(defaultGTD()), "[verbs.waiting]\ninput = \"On whom?\"\n")
+	if problems != "" || texts.Verbs["waiting"].Input != "On whom?" {
+		t.Errorf("%q %s", texts.Verbs["waiting"].Input, problems)
 	}
 }

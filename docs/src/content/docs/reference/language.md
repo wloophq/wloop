@@ -187,6 +187,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `verbs.<name>` (table): A verb, by its name.
 - `verbs.<name>.label` (string): The name people read on its button. Required.
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
+- `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
 - `views` (table): The lists of entries, by view.
 - `views.<name>` (table): A view, by its name.
 - `views.<name>.label` (string): The name people read in the list of views. Required.

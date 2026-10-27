@@ -115,7 +115,8 @@ func (s *Server) handleGTD(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, v := range builtin.GTDVerbs {
 		t, b := texts.Verbs[v], bundled.Verbs[v]
-		cat.Verbs = append(cat.Verbs, api.GTDVerb{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary), Key: verbKey(gtd.Verb(v))})
+		cat.Verbs = append(cat.Verbs, api.GTDVerb{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
+			Input: cmp.Or(t.Input, b.Input), Key: verbKey(gtd.Verb(v))})
 	}
 	writeJSON(w, cat)
 }

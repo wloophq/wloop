@@ -1,6 +1,7 @@
 # The words of the GTD verbs an entry offers and of the lists of entries.
 # A verb's label is its button; its summary, one line on what pressing it
-# does, is the button's tooltip. A user profile's gtd.toml replaces the keys
+# does, is the button's tooltip; input is the question a verb that asks for
+# a value puts first. A user profile's gtd.toml replaces the keys
 # it sets.
 
 [verbs.next]
@@ -10,10 +11,12 @@ summary = "Move it to Next: something you will do as soon as you can."
 [verbs.waiting]
 label   = "Waiting"
 summary = "Move it to Waiting on the people you name; it resurfaces on the date you set."
+input   = "Waiting on whom (optional)"
 
 [verbs.schedule]
 label   = "Schedule"
 summary = "Hide it until a date or until its unit moves, then bring it back where it was."
+input   = "Until when: YYYY-MM-DD, an RFC 3339 time, or activity"
 
 [verbs.someday]
 label   = "Someday"
@@ -30,6 +33,7 @@ summary = "Star it in Focus, or take the star off."
 [verbs.project]
 label   = "Project"
 summary = "Attach it to a project, or start a new project with it."
+input   = "Project title"
 
 [verbs.approve]
 label   = "Approve"
@@ -38,6 +42,7 @@ summary = "Approve what it proposes: its draft, its recommended answer or its un
 [verbs.delegate]
 label   = "Delegate"
 summary = "Hand it to an agent, which runs its unit's action."
+input   = "Guidance for the agent (optional)"
 
 [verbs.done]
 label   = "Done"
@@ -54,10 +59,12 @@ summary = "Mark what changed on it as read."
 [verbs.context]
 label   = "Context"
 summary = "Set the contexts it is listed under."
+input   = "Contexts, comma separated (empty clears)"
 
 [verbs.area]
 label   = "Area"
 summary = "Set the area it belongs to."
+input   = "Area (empty clears)"
 
 [verbs.answer]
 label   = "Answer"
@@ -82,6 +89,7 @@ summary = "Take the project's actions one at a time, or all at once again."
 [verbs.reply]
 label   = "Reply"
 summary = "Write a reply on its unit; it waits in the Outbox for your approval."
+input   = "Reply, saved to the Outbox for your approval"
 
 [views.focus]
 label = "Focus"
