@@ -67,8 +67,11 @@ type Server struct {
 	// Texts are the tools' descriptions, the profile's tools.toml; nil
 	// describes none.
 	Texts func() map[string]ToolText
-	mu    sync.Mutex
-	ids   map[string]string // Mcp-Session-Id to handle ("" when none), in memory only
+	// Bundled are the bundled profile's texts, which an answer falls back
+	// to when the profile's text fails; nil falls back to none.
+	Bundled func() map[string]ToolText
+	mu      sync.Mutex
+	ids     map[string]string // Mcp-Session-Id to handle ("" when none), in memory only
 	// byHandle keeps one id per handle: initialize replaces the old one.
 	byHandle map[string]string
 	logged   map[string]bool // what logOnce logged
@@ -345,13 +348,13 @@ func (s *Server) callTool(ctx context.Context, handle string, params json.RawMes
 			continue
 		}
 		if r.needsHandle && handle == "" {
-			return s.answer(p.Name, "refused", fields{"Error": api.ErrSessionHandle.Error()}, true), nil
+			return s.answer(ctx, p.Name, "refused", fields{"Error": api.ErrSessionHandle.Error()}, true), nil
 		}
 		session, err := s.session(ctx, handle)
 		if err != nil && (r.needsHandle || !errors.Is(err, api.ErrUnknownSession)) {
-			return s.answer(p.Name, "refused", fields{"Error": err.Error()}, true), nil
+			return s.answer(ctx, p.Name, "refused", fields{"Error": err.Error()}, true), nil
 		}
-		return r.call(ctx, session, p.Arguments), nil
+		return r.call(s.withTexts(ctx), session, p.Arguments), nil
 	}
 	return nil, &rpcError{codeInvalidParams, fmt.Sprintf("unknown tool %q; "+brand.Name+" has %s", p.Name, strings.Join(names, ", "))}
 }

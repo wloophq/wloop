@@ -76,34 +76,34 @@ func (s *Server) slackSend(ctx context.Context, session string, arguments json.R
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		return s.badArguments(slackSendName, err)
+		return s.badArguments(ctx, slackSendName, err)
 	}
 	var problems []string
 	if a.Target == nil || strings.TrimSpace(*a.Target) == "" {
-		problems = append(problems, s.say(slackSendName, "problem_target_required", nil))
+		problems = append(problems, s.say(ctx, slackSendName, "problem_target_required", nil))
 	}
 	if a.Text == nil || strings.TrimSpace(*a.Text) == "" {
-		problems = append(problems, s.say(slackSendName, "problem_text_required", nil))
+		problems = append(problems, s.say(ctx, slackSendName, "problem_text_required", nil))
 	}
 	if len(problems) > 0 {
-		return s.fixThese(slackSendName, problems)
+		return s.fixThese(ctx, slackSendName, problems)
 	}
 	if broadcastToken.MatchString(*a.Text) {
-		return s.answer(slackSendName, "broadcast", nil, true)
+		return s.answer(ctx, slackSendName, "broadcast", nil, true)
 	}
 	if !s.Slack.LoggedIn() {
-		return s.notLoggedIn(slackSendName)
+		return s.notLoggedIn(ctx, slackSendName)
 	}
 	sent, err := s.Slack.Send(ctx, session, send.Request{
 		Target: strings.TrimSpace(*a.Target), Text: *a.Text, Thread: a.Thread, Broadcast: a.Broadcast, Source: "session",
 	})
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return s.notLoggedIn(slackSendName)
+		return s.notLoggedIn(ctx, slackSendName)
 	}
 	if err != nil {
-		return s.failed(slackSendName, err)
+		return s.failed(ctx, slackSendName, err)
 	}
-	return s.answer(slackSendName, "posted", fields{"Conversation": sent.Conversation, "Parent": sent.Parent, "Permalink": sent.Permalink,
+	return s.answer(ctx, slackSendName, "posted", fields{"Conversation": sent.Conversation, "Parent": sent.Parent, "Permalink": sent.Permalink,
 		"Channel": sent.Channel, "TS": sent.TS, "Text": sent.Text}, false)
 }
 

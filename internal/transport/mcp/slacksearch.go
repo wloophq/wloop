@@ -55,7 +55,7 @@ func (s *Server) slackSearch(ctx context.Context, _ string, arguments json.RawMe
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		return s.badArguments(slackSearchName, err)
+		return s.badArguments(ctx, slackSearchName, err)
 	}
 	args := SearchArgs{Channel: strings.TrimSpace(a.Channel), From: strings.TrimSpace(a.From), After: strings.TrimSpace(a.After),
 		Before: strings.TrimSpace(a.Before), Limit: searchLimit}
@@ -64,38 +64,38 @@ func (s *Server) slackSearch(ctx context.Context, _ string, arguments json.RawMe
 		args.Query = strings.TrimSpace(*a.Query)
 	}
 	if args.Query == "" {
-		problems = append(problems, s.say(slackSearchName, "problem_query_required", nil))
+		problems = append(problems, s.say(ctx, slackSearchName, "problem_query_required", nil))
 	}
 	after, afterOK := searchDate(args.After)
 	before, beforeOK := searchDate(args.Before)
 	if !afterOK {
-		problems = append(problems, s.say(slackSearchName, "problem_after", nil))
+		problems = append(problems, s.say(ctx, slackSearchName, "problem_after", nil))
 	}
 	if !beforeOK {
-		problems = append(problems, s.say(slackSearchName, "problem_before", nil))
+		problems = append(problems, s.say(ctx, slackSearchName, "problem_before", nil))
 	}
 	if afterOK && beforeOK && !after.IsZero() && !before.IsZero() && !before.After(after) {
-		problems = append(problems, s.say(slackSearchName, "problem_before_after", nil))
+		problems = append(problems, s.say(ctx, slackSearchName, "problem_before_after", nil))
 	}
 	if a.Limit != nil {
 		var n int
 		if err := json.Unmarshal(a.Limit, &n); err != nil || n < 1 || n > searchLimitMax {
-			problems = append(problems, s.say(slackSearchName, "problem_limit", fields{"Max": searchLimitMax}))
+			problems = append(problems, s.say(ctx, slackSearchName, "problem_limit", fields{"Max": searchLimitMax}))
 		}
 		args.Limit = n
 	}
 	if len(problems) > 0 {
-		return s.fixThese(slackSearchName, problems)
+		return s.fixThese(ctx, slackSearchName, problems)
 	}
 	if s.Slack != nil && !s.Slack.LoggedIn() {
-		return s.notLoggedIn(slackSearchName)
+		return s.notLoggedIn(ctx, slackSearchName)
 	}
 	out, err := s.SlackSearch.Search(ctx, args)
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return s.notLoggedIn(slackSearchName)
+		return s.notLoggedIn(ctx, slackSearchName)
 	}
 	if err != nil {
-		return s.failed(slackSearchName, err)
+		return s.failed(ctx, slackSearchName, err)
 	}
 	return text(redactTokens(out), false)
 }

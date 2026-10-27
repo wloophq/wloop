@@ -35,20 +35,30 @@ func (d ToolData) Map() map[string]any {
 // reads besides the ToolData's.
 type ToolAnswer struct {
 	Tool, Name, Doc string
-	Fields          []string
+	Fields          []AnswerField
 }
 
+// AnswerField is a field an answer reads: a string, or a number when Number.
+type AnswerField struct {
+	Name   string
+	Number bool
+}
+
+func str(name string) AnswerField { return AnswerField{Name: name} }
+
+func num(name string) AnswerField { return AnswerField{Name: name, Number: true} }
+
 // answersOf are the answers every tool of names shares.
-func answersOf(names []string, extra ...ToolAnswer) []ToolAnswer {
+func answersOf(names []string) []ToolAnswer {
 	var out []ToolAnswer
 	for _, n := range names {
 		out = append(out,
-			ToolAnswer{Tool: n, Name: "refused", Doc: "The call is refused before the tool runs, such as with no session.", Fields: []string{"Error"}},
-			ToolAnswer{Tool: n, Name: "bad_arguments", Doc: "The arguments do not decode; Error is the decoder's, \"\" when there is none.", Fields: []string{"Error"}},
-			ToolAnswer{Tool: n, Name: "fix_these", Doc: "The arguments have problems, one per line.", Fields: []string{"Problems"}},
+			ToolAnswer{Tool: n, Name: "refused", Doc: "The call is refused before the tool runs, such as with no session.", Fields: []AnswerField{str("Error")}},
+			ToolAnswer{Tool: n, Name: "bad_arguments", Doc: "The arguments do not decode; Error is the decoder's, \"\" when there is none.", Fields: []AnswerField{str("Error")}},
+			ToolAnswer{Tool: n, Name: "fix_these", Doc: "The arguments have problems, one per line.", Fields: []AnswerField{str("Problems")}},
 		)
 	}
-	return append(out, extra...)
+	return out
 }
 
 func slackAnswers(names ...string) []ToolAnswer {
@@ -56,13 +66,13 @@ func slackAnswers(names ...string) []ToolAnswer {
 	for _, n := range names {
 		out = append(out,
 			ToolAnswer{Tool: n, Name: "not_logged_in", Doc: "Slack is logged out."},
-			ToolAnswer{Tool: n, Name: "failed", Doc: "Slack or the daemon failed the call.", Fields: []string{"Error"}},
+			ToolAnswer{Tool: n, Name: "failed", Doc: "Slack or the daemon failed the call.", Fields: []AnswerField{str("Error")}},
 		)
 	}
 	return out
 }
 
-func answer(tool, name, doc string, fields ...string) ToolAnswer {
+func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 	return ToolAnswer{Tool: tool, Name: name, Doc: doc, Fields: fields}
 }
 
@@ -73,61 +83,60 @@ var ToolAnswers = func() []ToolAnswer {
 	out := answersOf(append([]string{"turn_end", "inbox_post"}, slackTools...))
 	out = append(out, slackAnswers(slackTools...)...)
 	return append(out,
-		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", "Keys"),
+		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", str("Keys")),
 		answer("turn_end", "problem_turn_type", "A problem: turn is not a string."),
 		answer("turn_end", "problem_turn_required", "A problem: turn is missing or empty."),
 		answer("turn_end", "problem_record_required", "A problem: record is missing."),
-		answer("turn_end", "problem_record", "A problem: record does not decode.", "Error"),
-		answer("turn_end", "refused_record", "The turn refused the record.", "Reason"),
-		answer("turn_end", "store_failed", "The record could not be stored.", "Error"),
+		answer("turn_end", "problem_record", "A problem: record does not decode.", str("Error")),
+		answer("turn_end", "refused_record", "The turn refused the record.", str("Reason")),
+		answer("turn_end", "store_failed", "The record could not be stored.", str("Error")),
 		answer("turn_end", "recorded", "The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, \"\" when none.",
-			"State", "Unit", "Note", "Dropped", "Ledger"),
-		answer("turn_end", "ledger_applied", "A part of the ledger's outcome: ops applied.", "Count"),
-		answer("turn_end", "ledger_unchanged", "A part of the ledger's outcome: ops that changed nothing.", "Count"),
-		answer("turn_end", "ledger_proposed", "A part of the ledger's outcome: ops proposed to the user.", "Count"),
-		answer("turn_end", "ledger_refused", "A part of the ledger's outcome: ops refused, and why.", "Count", "Why"),
-		answer("turn_end", "ledger_refusal", "Why one op was refused.", "Index", "Reason"),
+			str("State"), str("Unit"), str("Note"), str("Dropped"), str("Ledger")),
+		answer("turn_end", "ledger_applied", "A part of the ledger's outcome: ops applied.", num("Count")),
+		answer("turn_end", "ledger_unchanged", "A part of the ledger's outcome: ops that changed nothing.", num("Count")),
+		answer("turn_end", "ledger_proposed", "A part of the ledger's outcome: ops proposed to the user.", num("Count")),
+		answer("turn_end", "ledger_refused", "A part of the ledger's outcome: ops refused, and why.", num("Count"), str("Why")),
+		answer("turn_end", "ledger_refusal", "Why one op was refused.", num("Index"), str("Reason")),
 
 		answer("inbox_post", "text_required", "The text is missing."),
-		answer("inbox_post", "capped", "The turn has too many messages waiting.", "Error"),
-		answer("inbox_post", "not_in_turn", "The session has no started turn.", "Error"),
-		answer("inbox_post", "post_failed", "The message could not be posted.", "Error"),
-		answer("inbox_post", "posted", "The message is in the Inbox.", "ID"),
+		answer("inbox_post", "capped", "The turn has too many messages waiting.", str("Error")),
+		answer("inbox_post", "not_in_turn", "The session has no started turn.", str("Error")),
+		answer("inbox_post", "post_failed", "The message could not be posted.", str("Error")),
+		answer("inbox_post", "posted", "The message is in the Inbox.", num("ID")),
 
 		answer("slack_send_message", "problem_target_required", "A problem: target is missing."),
 		answer("slack_send_message", "problem_text_required", "A problem: text is missing or empty."),
 		answer("slack_send_message", "broadcast", "The text notifies a whole channel or group."),
 		answer("slack_send_message", "posted", "The message is posted: where, its permalink, \"\" when Slack gave none, and its text as posted.",
-			"Conversation", "Parent", "Permalink", "Channel", "TS", "Text"),
+			str("Conversation"), str("Parent"), str("Permalink"), str("Channel"), str("TS"), str("Text")),
 
 		answer("slack_read", "problem_target_required", "A problem: target is missing."),
-		answer("slack_read", "problem_limit", "A problem: limit is out of range.", "Max"),
+		answer("slack_read", "problem_limit", "A problem: limit is out of range.", num("Max")),
 
 		answer("slack_search", "problem_query_required", "A problem: query is missing or empty."),
 		answer("slack_search", "problem_after", "A problem: after is not a date."),
 		answer("slack_search", "problem_before", "A problem: before is not a date."),
 		answer("slack_search", "problem_before_after", "A problem: before is not after after."),
-		answer("slack_search", "problem_limit", "A problem: limit is out of range.", "Max"),
+		answer("slack_search", "problem_limit", "A problem: limit is out of range.", num("Max")),
 
-		answer("slack_draft", "problem_kind", "A problem: kind is none of the kinds.", "Kinds"),
+		answer("slack_draft", "problem_kind", "A problem: kind is none of the kinds.", str("Kinds")),
 		answer("slack_draft", "problem_reaction_required", "A problem: a react draft has no reaction."),
 		answer("slack_draft", "problem_text_required", "A problem: text is missing or empty."),
-		answer("slack_draft", "proposed", "The draft waits for the user.", "ID", "Unit", "Where"),
-		answer("slack_draft", "approved", "The draft's policy approved it.", "ID", "Unit", "Where"),
-		answer("slack_draft", "dry_run", "The draft's policy only stores it.", "ID", "Unit", "Where"),
+		answer("slack_draft", "proposed", "The draft waits for the user.", num("ID"), str("Unit"), str("Where")),
+		answer("slack_draft", "approved", "The draft's policy approved it.", num("ID"), str("Unit"), str("Where")),
+		answer("slack_draft", "dry_run", "The draft's policy only stores it.", num("ID"), str("Unit"), str("Where")),
 
 		answer("slack_react", "problem_permalink", "A problem: permalink is not a message permalink."),
 		answer("slack_react", "problem_emoji_required", "A problem: emoji is missing or empty."),
-		answer("slack_react", "reacted", "The reaction is added.", "Emoji", "Conversation", "Permalink"),
-		answer("slack_react", "removed", "The reaction is removed.", "Emoji", "Conversation", "Permalink"),
-		answer("slack_react", "already", "The message already had the user's reaction.", "Emoji", "Conversation", "Permalink"),
-		answer("slack_react", "absent", "The message had no such reaction of the user.", "Emoji", "Conversation", "Permalink"),
+		answer("slack_react", "reacted", "The reaction is added.", str("Emoji"), str("Conversation"), str("Permalink")),
+		answer("slack_react", "removed", "The reaction is removed.", str("Emoji"), str("Conversation"), str("Permalink")),
+		answer("slack_react", "already", "The message already had the user's reaction.", str("Emoji"), str("Conversation"), str("Permalink")),
+		answer("slack_react", "absent", "The message had no such reaction of the user.", str("Emoji"), str("Conversation"), str("Permalink")),
 
 		answer("slack_edit", "problem_permalink", "A problem: permalink is not a message permalink."),
 		answer("slack_edit", "problem_text_required", "A problem: text is missing or empty."),
 		answer("slack_edit", "broadcast", "The text notifies a whole channel or group."),
-		answer("slack_edit", "edited", "The message is edited: where, its new text as posted and the text it replaced.",
-			"Conversation", "Permalink", "Text", "Replaced"),
+		answer("slack_edit", "edited", "The message is edited: where, its new text as posted and the text it replaced.", str("Conversation"), str("Permalink"), str("Text"), str("Replaced")),
 	)
 }()
 
@@ -149,6 +158,21 @@ var toolsGrammar = []Key{
 	{Path: "*.params.*", In: SurfaceTools, Kind: KindTemplate, Doc: "The parameter's description, over the tool data."},
 	{Path: "*.answers", In: SurfaceTools, Kind: KindMap, Doc: "What the tool answers the agent, by answer name; the reference lists each tool's answers and the fields they read."},
 	{Path: "*.answers.*", In: SurfaceTools, Kind: KindTemplate, Doc: "The answer, over the tool data and its fields."},
+}
+
+// AnswerSamples are the data a check renders an answer over, the tool
+// data's included: every field set, then every field empty, so that both
+// branches of a condition on a field run.
+func AnswerSamples(fields []AnswerField) []map[string]any {
+	full, empty := ToolData{Name: "x", Command: "x", PostsPerTurn: 1}.Map(), ToolData{}.Map()
+	for _, f := range fields {
+		if f.Number {
+			full[f.Name], empty[f.Name] = 1, 0
+		} else {
+			full[f.Name], empty[f.Name] = "x", ""
+		}
+	}
+	return []map[string]any{full, empty}
 }
 
 // RenderToolText writes the tools.toml text src, named name, over data.

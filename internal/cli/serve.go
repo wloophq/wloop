@@ -7,8 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/turn"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -42,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
@@ -49,6 +48,7 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/transport/mcp"
+	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -278,7 +278,7 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if texts == nil {
 		texts = bundledToolTexts
 	}
-	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: texts}
+	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: texts, Bundled: bundledToolTexts}
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}

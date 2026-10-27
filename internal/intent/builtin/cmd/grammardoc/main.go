@@ -621,15 +621,17 @@ func toolAnswers() []string {
 			if a.Tool != tool.Name {
 				continue
 			}
+			var names []string
+			for _, x := range a.Fields {
+				n := "`" + x.Name + "`"
+				if x.Number {
+					n += ": number"
+				}
+				names = append(names, n)
+			}
 			f := ""
-			if len(a.Fields) > 0 {
-				f = " (" + strings.Join(func() []string {
-					q := make([]string, len(a.Fields))
-					for i, x := range a.Fields {
-						q[i] = "`" + x + "`"
-					}
-					return q
-				}(), ", ") + ")"
+			if len(names) > 0 {
+				f = " (" + strings.Join(names, ", ") + ")"
 			}
 			out = append(out, fmt.Sprintf("  - `%s`%s: %s", a.Name, f, cell(a.Doc)))
 		}

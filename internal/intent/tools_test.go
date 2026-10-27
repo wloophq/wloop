@@ -108,3 +108,21 @@ func TestAnAnswerReadsItsFields(t *testing.T) {
 		t.Fatalf("a missing answer: %s", got)
 	}
 }
+
+func TestAnAnswerIsCheckedWithItsFieldsTypesAndBothBranches(t *testing.T) {
+	for name, c := range map[string]struct {
+		user string
+		ok   bool
+	}{
+		"a number compared":    {"[turn_end.answers]\nledger_applied = \"{{.Count}} op{{if ne .Count 1}}s{{end}}\"\n", true},
+		"a typo in an else":    {"[slack_send_message.answers]\nposted = \"{{if .Permalink}}{{.Permalink}}{{else}}{{.Chanel}}{{end}}\"\n", false},
+		"a len of a number":    {"[turn_end.answers]\nledger_applied = \"{{len .Count}}\"\n", false},
+		"an empty-text branch": {"[slack_send_message.answers]\nposted = \"{{with .Parent}}in {{.}}{{else}}top level{{end}}\"\n", true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, got := toolsProblems(t, everyTool(""), c.user); (got == "") != c.ok {
+				t.Fatalf("problems %q, want ok %v", got, c.ok)
+			}
+		})
+	}
+}

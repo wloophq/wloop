@@ -52,7 +52,7 @@ func (s *Server) slackDraft(ctx context.Context, handle string, arguments json.R
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		return s.badArguments(slackDraftName, err)
+		return s.badArguments(ctx, slackDraftName, err)
 	}
 	args := DraftArgs{Kind: strings.TrimSpace(a.Kind), Target: strings.TrimSpace(a.Target), Items: a.Items, Reaction: strings.TrimSpace(a.Reaction),
 		Effects: a.Effects}
@@ -65,28 +65,28 @@ func (s *Server) slackDraft(ctx context.Context, handle string, arguments json.R
 	var problems []string
 	switch {
 	case !slices.Contains(draftKinds, args.Kind):
-		problems = append(problems, s.say(slackDraftName, "problem_kind", fields{"Kinds": strings.Join(draftKinds, ", ")}))
+		problems = append(problems, s.say(ctx, slackDraftName, "problem_kind", fields{"Kinds": strings.Join(draftKinds, ", ")}))
 	case draft.Kind(args.Kind).Emoji() && args.Reaction == "":
-		problems = append(problems, s.say(slackDraftName, "problem_reaction_required", nil))
+		problems = append(problems, s.say(ctx, slackDraftName, "problem_reaction_required", nil))
 	case !draft.Kind(args.Kind).Emoji() && strings.TrimSpace(args.Text) == "":
-		problems = append(problems, s.say(slackDraftName, "problem_text_required", nil))
+		problems = append(problems, s.say(ctx, slackDraftName, "problem_text_required", nil))
 	}
 	if len(problems) > 0 {
-		return s.fixThese(slackDraftName, problems)
+		return s.fixThese(ctx, slackDraftName, problems)
 	}
 	return s.draft(ctx, handle, args)
 }
 
 func (s *Server) draft(ctx context.Context, handle string, args DraftArgs) any {
 	if s.Slack != nil && !s.Slack.LoggedIn() {
-		return s.notLoggedIn(slackDraftName)
+		return s.notLoggedIn(ctx, slackDraftName)
 	}
 	r, err := s.SlackDraft.Draft(ctx, handle, args)
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return s.notLoggedIn(slackDraftName)
+		return s.notLoggedIn(ctx, slackDraftName)
 	}
 	if err != nil {
-		return s.failed(slackDraftName, err)
+		return s.failed(ctx, slackDraftName, err)
 	}
 	name := "proposed"
 	switch draft.State(r.State) {
@@ -95,5 +95,5 @@ func (s *Server) draft(ctx context.Context, handle string, args DraftArgs) any {
 	case draft.Discarded:
 		name = "dry_run"
 	}
-	return s.answer(slackDraftName, name, fields{"ID": r.ID, "Unit": r.Unit, "Where": r.Conversation}, false)
+	return s.answer(ctx, slackDraftName, name, fields{"ID": r.ID, "Unit": r.Unit, "Where": r.Conversation}, false)
 }

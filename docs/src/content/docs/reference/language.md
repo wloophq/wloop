@@ -325,11 +325,11 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `refused_record` (`Reason`): The turn refused the record.
   - `store_failed` (`Error`): The record could not be stored.
   - `recorded` (`State`, `Unit`, `Note`, `Dropped`, `Ledger`): The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, "" when none.
-  - `ledger_applied` (`Count`): A part of the ledger's outcome: ops applied.
-  - `ledger_unchanged` (`Count`): A part of the ledger's outcome: ops that changed nothing.
-  - `ledger_proposed` (`Count`): A part of the ledger's outcome: ops proposed to the user.
-  - `ledger_refused` (`Count`, `Why`): A part of the ledger's outcome: ops refused, and why.
-  - `ledger_refusal` (`Index`, `Reason`): Why one op was refused.
+  - `ledger_applied` (`Count`: number): A part of the ledger's outcome: ops applied.
+  - `ledger_unchanged` (`Count`: number): A part of the ledger's outcome: ops that changed nothing.
+  - `ledger_proposed` (`Count`: number): A part of the ledger's outcome: ops proposed to the user.
+  - `ledger_refused` (`Count`: number, `Why`): A part of the ledger's outcome: ops refused, and why.
+  - `ledger_refusal` (`Index`: number, `Reason`): Why one op was refused.
 - `inbox_post`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -338,7 +338,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `capped` (`Error`): The turn has too many messages waiting.
   - `not_in_turn` (`Error`): The session has no started turn.
   - `post_failed` (`Error`): The message could not be posted.
-  - `posted` (`ID`): The message is in the Inbox.
+  - `posted` (`ID`: number): The message is in the Inbox.
 - `slack_send_message`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -356,7 +356,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
   - `problem_target_required`: A problem: target is missing.
-  - `problem_limit` (`Max`): A problem: limit is out of range.
+  - `problem_limit` (`Max`: number): A problem: limit is out of range.
 - `slack_search`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -367,7 +367,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_after`: A problem: after is not a date.
   - `problem_before`: A problem: before is not a date.
   - `problem_before_after`: A problem: before is not after after.
-  - `problem_limit` (`Max`): A problem: limit is out of range.
+  - `problem_limit` (`Max`: number): A problem: limit is out of range.
 - `slack_draft`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -377,9 +377,9 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
   - `problem_reaction_required`: A problem: a react draft has no reaction.
   - `problem_text_required`: A problem: text is missing or empty.
-  - `proposed` (`ID`, `Unit`, `Where`): The draft waits for the user.
-  - `approved` (`ID`, `Unit`, `Where`): The draft's policy approved it.
-  - `dry_run` (`ID`, `Unit`, `Where`): The draft's policy only stores it.
+  - `proposed` (`ID`: number, `Unit`, `Where`): The draft waits for the user.
+  - `approved` (`ID`: number, `Unit`, `Where`): The draft's policy approved it.
+  - `dry_run` (`ID`: number, `Unit`, `Where`): The draft's policy only stores it.
 - `slack_react`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.

@@ -88,4 +88,9 @@ func TestAnswersComeFromTheProfile(t *testing.T) {
 	}) {
 		t.Fatalf("logged %q", logged)
 	}
+	s.Bundled = bundledTexts
+	res = decodeResult(t, call(t, s, sid, "term_1", toolCallBody(slackSendName, `{"target":"#releases","text":" "}`)))
+	if got := res.Result.Content[0].Text; !strings.HasPrefix(got, "Nothing was sent; fix these and call slack_send_message again:") {
+		t.Fatalf("the bundled answer: %q", got)
+	}
 }

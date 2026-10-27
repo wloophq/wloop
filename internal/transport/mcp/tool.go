@@ -166,7 +166,7 @@ func ledgerOp() *schema {
 
 // ledgerText is what the items ledger made of the record's ops, "" when
 // none were applied.
-func (s *Server) ledgerText(r turns.Recorded) string {
+func (s *Server) ledgerText(ctx context.Context, r turns.Recorded) string {
 	l := r.Ledger
 	if l == nil {
 		return ""
@@ -181,20 +181,20 @@ func (s *Server) ledgerText(r turns.Recorded) string {
 	}
 	var parts []string
 	if applied > 0 || len(l.Applied)+len(l.Proposed)+len(l.Refused) == 0 {
-		parts = append(parts, s.say(toolName, "ledger_applied", fields{"Count": applied}))
+		parts = append(parts, s.say(ctx, toolName, "ledger_applied", fields{"Count": applied}))
 	}
 	if unchanged > 0 {
-		parts = append(parts, s.say(toolName, "ledger_unchanged", fields{"Count": unchanged}))
+		parts = append(parts, s.say(ctx, toolName, "ledger_unchanged", fields{"Count": unchanged}))
 	}
 	if len(l.Proposed) > 0 {
-		parts = append(parts, s.say(toolName, "ledger_proposed", fields{"Count": len(l.Proposed)}))
+		parts = append(parts, s.say(ctx, toolName, "ledger_proposed", fields{"Count": len(l.Proposed)}))
 	}
 	if len(l.Refused) > 0 {
 		why := make([]string, len(l.Refused))
 		for i, f := range l.Refused {
-			why[i] = s.say(toolName, "ledger_refusal", fields{"Index": f.Index, "Reason": f.Reason})
+			why[i] = s.say(ctx, toolName, "ledger_refusal", fields{"Index": f.Index, "Reason": f.Reason})
 		}
-		parts = append(parts, s.say(toolName, "ledger_refused", fields{"Count": len(l.Refused), "Why": strings.Join(why, "; ")}))
+		parts = append(parts, s.say(ctx, toolName, "ledger_refused", fields{"Count": len(l.Refused), "Why": strings.Join(why, "; ")}))
 	}
 	return strings.Join(parts, ", ")
 }
@@ -209,7 +209,7 @@ func text(msg string, isError bool) map[string]any {
 func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawMessage) any {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(arguments, &raw); err != nil || raw == nil {
-		return s.badArguments(toolName, err)
+		return s.badArguments(ctx, toolName, err)
 	}
 	var problems record.Problems
 	var extra []string
@@ -220,20 +220,20 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 	}
 	if len(extra) > 0 {
 		slices.Sort(extra)
-		problems = append(problems, s.say(toolName, "problem_extra_arguments", fields{"Keys": strings.Join(extra, ", ")}))
+		problems = append(problems, s.say(ctx, toolName, "problem_extra_arguments", fields{"Keys": strings.Join(extra, ", ")}))
 	}
 	var id string
 	if v, ok := raw["turn"]; ok && json.Unmarshal(v, &id) != nil {
-		problems = append(problems, s.say(toolName, "problem_turn_type", nil))
+		problems = append(problems, s.say(ctx, toolName, "problem_turn_type", nil))
 	} else if id = strings.TrimSpace(id); id == "" {
-		problems = append(problems, s.say(toolName, "problem_turn_required", nil))
+		problems = append(problems, s.say(ctx, toolName, "problem_turn_required", nil))
 	}
 	rawRecord := raw["record"]
 	var rec record.Record
 	if len(rawRecord) == 0 || string(rawRecord) == "null" {
-		problems = append(problems, s.say(toolName, "problem_record_required", nil))
+		problems = append(problems, s.say(ctx, toolName, "problem_record_required", nil))
 	} else if r, err := record.Parse(rawRecord); err != nil {
-		problems = append(problems, s.say(toolName, "problem_record", fields{"Error": err.Error()}))
+		problems = append(problems, s.say(ctx, toolName, "problem_record", fields{"Error": err.Error()}))
 	} else {
 		rec = r
 		var bad record.Problems
@@ -242,20 +242,20 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 		}
 	}
 	if len(problems) > 0 {
-		return s.fixThese(toolName, problems)
+		return s.fixThese(ctx, toolName, problems)
 	}
 	got, err := s.Turns.RecordTurnEnd(ctx, turns.RecordRequest{Session: handle, Turn: id, Via: "mcp", Record: rec})
 	var bad record.Problems
 	if errors.As(err, &bad) {
-		return s.fixThese(toolName, bad)
+		return s.fixThese(ctx, toolName, bad)
 	}
 	var refusal turns.Refusal
 	if errors.As(err, &refusal) {
-		return s.answer(toolName, "refused_record", fields{"Reason": refusal.Reason}, true)
+		return s.answer(ctx, toolName, "refused_record", fields{"Reason": refusal.Reason}, true)
 	}
 	if err != nil {
-		return s.answer(toolName, "store_failed", fields{"Error": err.Error()}, true)
+		return s.answer(ctx, toolName, "store_failed", fields{"Error": err.Error()}, true)
 	}
-	return s.answer(toolName, "recorded", fields{"State": string(got.State), "Unit": got.Unit.Label(), "Note": got.Note, "Dropped": got.DroppedNote(),
-		"Ledger": s.ledgerText(got)}, false)
+	return s.answer(ctx, toolName, "recorded", fields{"State": string(got.State), "Unit": got.Unit.Label(), "Note": got.Note, "Dropped": got.DroppedNote(),
+		"Ledger": s.ledgerText(ctx, got)}, false)
 }

@@ -143,19 +143,17 @@ func (s *sheet) overTool(name string, t ToolText, m mToolText) ToolText {
 	return t
 }
 
-// toolText says whether src renders over builtin.ToolData and fields,
+// toolText says whether src renders over builtin.AnswerSamples of fields,
 // adding the problem when it does not.
-func (s *sheet) toolText(path, src string, fields []string) bool {
-	data := builtin.ToolData{}.Map()
-	for _, f := range fields {
-		data[f] = "x"
+func (s *sheet) toolText(path, src string, fields []builtin.AnswerField) bool {
+	for _, data := range builtin.AnswerSamples(fields) {
+		if err := builtin.RenderToolText(io.Discard, path, src, data); err != nil {
+			_, msg := templateMsg(path, err)
+			s.add(path, "%s", msg)
+			return false
+		}
 	}
-	err := builtin.RenderToolText(io.Discard, path, src, data)
-	if err != nil {
-		_, msg := templateMsg(path, err)
-		s.add(path, "%s", msg)
-	}
-	return err == nil
+	return true
 }
 
 // BundledTools are the tools' texts of bundled alone.

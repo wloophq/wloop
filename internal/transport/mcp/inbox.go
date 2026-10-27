@@ -55,10 +55,10 @@ func (s *Server) inboxPost(ctx context.Context, handle string, arguments json.Ra
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		return s.badArguments(inboxPostName, err)
+		return s.badArguments(ctx, inboxPostName, err)
 	}
 	if a.Text == nil || strings.TrimSpace(*a.Text) == "" {
-		return s.answer(inboxPostName, "text_required", nil, true)
+		return s.answer(ctx, inboxPostName, "text_required", nil, true)
 	}
 	req := messages.PostRequest{Session: handle, Text: *a.Text, Recommend: a.Recommend, Confirm: a.Confirm}
 	for _, o := range a.Options {
@@ -69,13 +69,13 @@ func (s *Server) inboxPost(ctx context.Context, handle string, arguments json.Ra
 	var capped messages.Capped
 	switch {
 	case errors.As(err, &problems):
-		return s.fixThese(inboxPostName, problems)
+		return s.fixThese(ctx, inboxPostName, problems)
 	case errors.As(err, &capped):
-		return s.answer(inboxPostName, "capped", fields{"Error": capped.Error()}, true)
+		return s.answer(ctx, inboxPostName, "capped", fields{"Error": capped.Error()}, true)
 	case errors.Is(err, messages.ErrNoStartedTurn):
-		return s.answer(inboxPostName, "not_in_turn", fields{"Error": err.Error()}, true)
+		return s.answer(ctx, inboxPostName, "not_in_turn", fields{"Error": err.Error()}, true)
 	case err != nil:
-		return s.answer(inboxPostName, "post_failed", fields{"Error": err.Error()}, true)
+		return s.answer(ctx, inboxPostName, "post_failed", fields{"Error": err.Error()}, true)
 	}
-	return s.answer(inboxPostName, "posted", fields{"ID": int64(m.ID)}, false)
+	return s.answer(ctx, inboxPostName, "posted", fields{"ID": int64(m.ID)}, false)
 }
