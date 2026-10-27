@@ -2,12 +2,13 @@ package cli
 
 import (
 	"context"
-	"github.com/wloophq/wloop/internal/config"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wloophq/wloop/internal/config"
 
 	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"

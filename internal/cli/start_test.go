@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/shell"
@@ -300,5 +302,55 @@ func TestAHiddenStartActionStillRefusesADerivedEntry(t *testing.T) {
 	}
 	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || len(m.Prompts) != 0 {
 		t.Fatalf("exit %d, prompts %+v: %s", code, m.Prompts, te.err)
+	}
+}
+
+func TestAFailedTrustLeavesNoCloneAndTheRetryTrustsANewOne(t *testing.T) {
+	te, _, projects, file := startEnv(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	writeFile(t, file, "{not json")
+	if code := te.run("start", "--repo", "acme/api", "fix it"); code == 0 {
+		t.Fatalf("exit 0 with an unreadable agent home: %s", te.out)
+	}
+	entry := capturedEntry.FindStringSubmatch(te.out.String())
+	if entry == nil {
+		t.Fatalf("no entry captured:\n%s", te.out)
+	}
+	path := filepath.Join(projects, "api")
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("the clone whose trust failed is still at %s: %v", path, err)
+	}
+	writeFile(t, file, untrustedJSON)
+	if code := te.run("start", entry[1], "--repo", "acme/api"); code != 0 {
+		t.Fatalf("retry: exit %d: %s", code, te.err)
+	}
+	if len(clones) != 2 {
+		t.Fatalf("clones %q, want the retry to clone again", clones)
+	}
+	if raw, _ := os.ReadFile(file); !strings.Contains(string(raw), `"`+path+`": {`) {
+		t.Fatalf("the retry's clone is not trusted:\n%s", raw)
+	}
+}
+
+func TestARoundTheDaemonDidNotPrepareClonesAndTrusts(t *testing.T) {
+	te, m, projects, file := startEnv(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	ctx := context.Background()
+	e, err := te.Env.gtd.Capture(ctx, "add retries", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := daemon.Call{Inputs: map[string]any{"repo": "acme/api"}, Out: io.Discard}
+	if err := (envActions{te.Env, nil}).Intent(ctx, "start", gtd.UnitOf(e.ID), c); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(projects, "api")
+	if len(clones) != 1 || len(m.Prompts) != 1 {
+		t.Fatalf("clones %q, prompts %d", clones, len(m.Prompts))
+	}
+	if raw, _ := os.ReadFile(file); !strings.Contains(string(raw), `"`+path+`": {`) {
+		t.Fatalf("the round's clone is not trusted:\n%s", raw)
 	}
 }

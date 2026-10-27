@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -70,10 +69,10 @@ func (r entryPayloads) Payload(ctx context.Context, req turn.Request) (turn.Payl
 	return entryPayload{entry}, nil
 }
 
-// PrepareAhead clones, before the round takes the loop mutex, the
-// repository an intent's turn runs in when no manager knows it, and trusts
-// it in the agent home when its project's trust_clones says so: only a
-// clone made in this call is trusted.
+// PrepareAhead readies, before the round takes the loop mutex, the
+// repository an intent's turn runs in when no manager knows it: cloned
+// and, when its project's trust_clones says so, trusted, as the round
+// would otherwise do under the mutex.
 func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, c daemon.Call) error {
 	e := a.call(c)
 	d, err := e.intentDef(name)
@@ -92,19 +91,10 @@ func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, 
 	if err != nil || repo == "" {
 		return err
 	}
-	owner, repoName, _ := strings.Cut(repo, "/")
 	cfg = scoped(run)
 	if _, err := e.chooseManager(ctx, cfg, intentOptions(d, roundOptions{unit: u})); err != nil {
 		return err
 	}
-	checkout, cloned, err := e.repoCheckout(ctx, cfg, repo)
-	if err != nil || !cloned || !cfg.TrustsClones(owner, repoName) {
-		return err
-	}
-	return e.trustClone(ctx, cfg, checkout.Path)
-}
-
-// trustClone trusts the repository just cloned at path in cfg's agent home.
-func (e *Env) trustClone(ctx context.Context, cfg config.Config, path string) error {
-	return e.trustIn(ctx, cfg.Agent, path, []string{config.ExpandHome(e.agentHome(cfg))}, false)
+	_, err = e.repoCheckout(ctx, cfg, repo)
+	return err
 }

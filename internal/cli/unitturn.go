@@ -242,7 +242,7 @@ func runRepo(run unitRun) (string, error) {
 // own worktree, created and kept by the manager that creates it.
 func (e *Env) repoWorkspace(ctx context.Context, run unitRun, name string, opts roundOptions) (wsdomain.Workspace, bool, error) {
 	cfg, u, d := run.cfg, run.r.Unit, run.def
-	repo, _, err := e.repoCheckout(ctx, cfg, name)
+	repo, err := e.repoCheckout(ctx, cfg, name)
 	if err != nil {
 		return wsdomain.Workspace{}, false, err
 	}
@@ -284,15 +284,23 @@ func (e *Env) repoWorkspace(ctx context.Context, run unitRun, name string, opts 
 
 // repoCheckout is the main checkout of the repository name (owner/name):
 // the one a manager knows, else the one in the project's projects_dir,
-// cloned there when absent; cloned says it was cloned now.
-func (e *Env) repoCheckout(ctx context.Context, cfg config.Config, name string) (wsdomain.Repo, bool, error) {
+// cloned there when absent and, when cfg trusts its clones, trusted in its
+// agent home before anyone takes it. Only a clone made in this call is
+// trusted; one whose trust fails is removed, so a retry clones again.
+func (e *Env) repoCheckout(ctx context.Context, cfg config.Config, name string) (wsdomain.Repo, error) {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
-		return wsdomain.Repo{}, false, err
+		return wsdomain.Repo{}, err
 	}
 	owner, repo, _ := strings.Cut(name, "/")
 	ref := github.Ref{Owner: owner, Repo: repo}
-	return e.checkout(ctx, cfg, repos, ref.RemoteKey(), ref, "")
+	var trust func(string) error
+	if cfg.TrustsClones(owner, repo) {
+		trust = func(path string) error {
+			return e.trustIn(ctx, cfg.Agent, path, []string{config.ExpandHome(e.agentHome(cfg))}, false)
+		}
+	}
+	return e.checkout(ctx, cfg, repos, ref.RemoteKey(), ref, "", trust)
 }
 
 // placedWorkspace is the workspace u's placement names, and whether that
