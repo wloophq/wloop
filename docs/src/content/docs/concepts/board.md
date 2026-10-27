@@ -61,18 +61,13 @@ The pull request merged or closed moves the card to `completed`. An approved car
 
 `views.orca.columns` maps each state to a column of your board. A state left out keeps its default:
 
-```json
-"views": {
-  "orca": {
-    "columns": {
-      "working": "reviewing",
-      "working-fallback": "in-review",
-      "needs-me": "needs-me",
-      "reviewed": "reviewed",
-      "ready": "ready-to-merge"
-    }
-  }
-}
+```toml
+[views.orca.columns]
+working = "reviewing"
+working-fallback = "in-review"
+needs-me = "needs-me"
+reviewed = "reviewed"
+ready = "ready-to-merge"
 ```
 
 Orca has no read-only way to list a board's columns, so a missing column shows up only when a write fails; the daemon's log names it when a turn starts.

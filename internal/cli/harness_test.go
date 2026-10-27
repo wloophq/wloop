@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/lock"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -75,7 +76,7 @@ type fakeGH struct {
 	viewerErr error
 	// loop, when set, is a daemon's loop mutex: underLock lists the calls
 	// made while it is held.
-	loop      *sync.Mutex
+	loop      *lock.Mutex
 	underLock []string
 	prView    string // answers gh pr view; empty fails it
 	prViewDir string // the directory gh pr view ran in
@@ -563,7 +564,7 @@ type testEnv struct {
 	sink *testsink.Sink
 	reg  *testRegistry
 	// loop is the loop mutex of the daemon serve started.
-	loop *sync.Mutex
+	loop *lock.Mutex
 	// served ends every context serving gave.
 	served     context.Context
 	stopServed context.CancelFunc
@@ -629,7 +630,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath: t.TempDir() + "/config.json",
+		ConfigPath: t.TempDir() + "/config.toml",
 		StateDir:   t.TempDir(),
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
@@ -699,7 +700,7 @@ func (te *testEnv) stopServing() {
 }
 
 // serveDeps is serveDeps on te's Env, on a context serving binds to the test.
-func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
 	return serveDeps(te.serving(ctx), te.Env, db, cfg, logf, loopMu, app)
 }
 
@@ -827,7 +828,7 @@ func (te *testEnv) serveEntries(t *testing.T) {
 // serveWith serves te's daemon, its deps passed through with when set.
 func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	t.Helper()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	te.loop = mu
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState, Explorer: derivedRows{te.gh},

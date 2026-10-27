@@ -3,7 +3,6 @@ package e2e
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +15,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/cli"
@@ -49,8 +50,8 @@ case "$1" in
 serve) exec sleep 300 ;;
 pause) exit 0 ;;
 config)
-	f="$XDG_CONFIG_HOME/%s/config.json"
-	if [ -f "$f" ]; then sed -n 's/.*"http": {"port": \([0-9]*\)}.*/\1/p' "$f"; else echo 0; fi
+	f="$XDG_CONFIG_HOME/%s/config.toml"
+	if [ -f "$f" ]; then sed -n '/^\[http\]/,/^\[/s/^port = \([0-9]*\)$/\1/p' "$f"; else echo 0; fi
 	exit 0 ;;
 esac
 exit 3
@@ -142,7 +143,7 @@ func waitGone(t *testing.T, pid int) {
 
 func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	dir := setupIsolated(t, shortDir(t), "acceptance", 2)
-	file := filepath.Join(dir, "config", brand.StateDir(), "config.json")
+	file := filepath.Join(dir, "config", brand.StateDir(), "config.toml")
 	c, err := config.LoadFile(file, cli.Defaults())
 	if err != nil {
 		t.Fatal(err)
@@ -179,12 +180,12 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 	}
 	var doc struct {
 		Slack struct {
-			KeychainService string   `json:"keychain_service"`
-			PostAllowlist   []string `json:"post_allowlist"`
-			RequestLog      bool     `json:"request_log"`
-		} `json:"slack"`
+			KeychainService string   `toml:"keychain_service"`
+			PostAllowlist   []string `toml:"post_allowlist"`
+			RequestLog      bool     `toml:"request_log"`
+		} `toml:"slack"`
 	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
+	if err := toml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
 	if doc.Slack.KeychainService != "wloop-e2e-slack" || !slices.Equal(doc.Slack.PostAllowlist, []string{isolatedDM}) || !doc.Slack.RequestLog {
@@ -199,7 +200,7 @@ func TestIsolatedConfigDisablesAutomation(t *testing.T) {
 		t.Errorf("a second setup on the same directory: %s", out)
 	}
 	withSlack := setupIsolated(t, shortDir(t), "s", 3, "--slack")
-	if c, err := config.LoadFile(filepath.Join(withSlack, "config", brand.StateDir(), "config.json"), cli.Defaults()); err != nil || !c.PluginEnabled("slack") || c.PluginEnabled("github") {
+	if c, err := config.LoadFile(filepath.Join(withSlack, "config", brand.StateDir(), "config.toml"), cli.Defaults()); err != nil || !c.PluginEnabled("slack") || c.PluginEnabled("github") {
 		t.Errorf("--slack: %v", err)
 	}
 }
@@ -439,7 +440,7 @@ func TestIsolatedRunRefusesTheRealStore(t *testing.T) {
 	for _, args := range [][]string{
 		{"run", dir, "sh", "-c", "true", real},
 		{"run", dir, brand.StateDir(), "serve", "--store=" + real},
-		{"run", dir, "cat", filepath.Join(home, "config", brand.StateDir(), "config.json")},
+		{"run", dir, "cat", filepath.Join(home, "config", brand.StateDir(), "config.toml")},
 		{"snapshot", dir, "/nonexistent"},
 	} {
 		out, err := isolatedEnv(t, xdg, args...)

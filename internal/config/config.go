@@ -463,7 +463,22 @@ func Dir() string {
 	return xdgDir("XDG_CONFIG_HOME", ".config")
 }
 
-func Path() string { return filepath.Join(Dir(), "config.json") }
+func Path() string { return filepath.Join(Dir(), "config.toml") }
+
+// legacyFile is the configuration's former name, which is no longer read.
+const legacyFile = "config.json"
+
+// MigrationURL explains the move from config.json to config.toml and holds
+// the script that converts one.
+var MigrationURL = "https://github.com/" + brand.Org + "/" + brand.Name + "/issues/76"
+
+// LegacyFileError is a configuration directory that holds config.json and
+// no config.toml.
+type LegacyFileError struct{ Legacy, File string }
+
+func (e *LegacyFileError) Error() string {
+	return fmt.Sprintf("%s is no longer read; convert it to %s with the script in %s", e.Legacy, e.File, MigrationURL)
+}
 
 // StateDir holds the inventory database, the state lock and the logs.
 func StateDir() string {
@@ -506,6 +521,10 @@ func LoadFile(file string, base Config) (Config, error) {
 	c := base
 	raw, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
+		legacy := filepath.Join(filepath.Dir(file), legacyFile)
+		if _, statErr := os.Stat(legacy); statErr == nil {
+			return c, &LegacyFileError{Legacy: legacy, File: file}
+		}
 		return c, nil
 	}
 	if err != nil {

@@ -35,15 +35,12 @@ The daemon's **inventory** is the set of pull requests it follows:
 - those that one of your workspaces stands for;
 - those you add with `{{command}} track <url>`.
 
-```json
-"github": {
-  "scope": {
-    "people": ["ana", "bruno"],
-    "teams": ["acme/backend"],
-    "repos": ["acme/api"],
-    "watch": ["carla"]
-  }
-}
+```toml
+[github.scope]
+people = ["ana", "bruno"]
+teams = ["acme/backend"]
+repos = ["acme/api"]
+watch = ["carla"]
 ```
 
 The loop acts only where a local workspace exists or a rule creates one; a pull request without one stays in the inventory, visible in the cockpit.

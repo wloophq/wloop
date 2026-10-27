@@ -1,15 +1,15 @@
 ---
 title: Configuration
-description: Every key of config.json, with its default.
+description: Every key of config.toml, with its default.
 ---
 
-The configuration is `$XDG_CONFIG_HOME/{{name}}/config.json`, by default `~/.config/{{name}}/config.json`. Every key is optional; a key the loop does not read is an error that names it, and a close key when one exists, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way; `null` leaves a key unset. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key).
+The configuration is `$XDG_CONFIG_HOME/{{name}}/config.toml`, by default `~/.config/{{name}}/config.toml`, a [TOML](https://toml.io) file like the profile's manifests; `#` starts a comment. Every key is optional; a key the loop does not read is an error that names it, and a close key when one exists, and `{{command}} doctor` reports it. A value of the wrong kind, or outside its set, is refused the same way: a duration or a date written without quotes, a number where a string goes, `inf` or `nan`. A key left out keeps its default. A former `config.json` is not read; when it is the only file, every command that loads the configuration fails, naming `config.toml`. `{{command}} config get <key>` prints the effective value of one, defaults included (`sweep.fast` for a nested key).
 
-The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are written `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON schema, for editors.
+The daemon reads the file when it starts. It follows a change of `profile` live; any other change takes effect after a restart, and until then the daemon reports its configuration as stale. Durations are strings: `"2d"`, `"36h"`, `"90m"` or `"60s"`. `{{command}} profile schema --config` prints the file's JSON Schema, for an editor whose TOML support reads one.
 
 ## Settings
 
-A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `approval` and `drafts.approval` take `mode`, `window` and `rule`, a list of `{"when", "mode", "window"}`: a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
+A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` switches it, read at start. `workflows.<name>` overlays a workflow's manifest field by field, as [Tune workflows](/guides/workflows/) shows; its `approval` and `drafts.approval` take `mode`, `window` and `rule`, a list of tables with `when`, `mode` and `window` (`[[workflows.<name>.approval.rule]]`): a `rule` list replaces the manifest's rules and `[]` clears them, a key left out keeps the manifest's, and a block that does not merge with the manifest's is named by `doctor`. `intents.<name>.project_settings.when` is a predicate over the pull request's [facts](/reference/facts/#intent-facts) where the intent's sessions load the checkout's own agent settings (`.claude/`, `.mcp.json`, `CLAUDE.md`); elsewhere they start with your settings alone, and an intent it does not name loads them; see [Review](/guides/review/#the-checkouts-own-agent-settings). Unless the table says otherwise, `workspace_managers` is `["claude-desktop", "orca"]` and `agent` is `"claude"`.
 
 ### Agent and workspaces
 
@@ -259,20 +259,27 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 
 ### `projects`
 
-```json
-"projects": [
-  { "match": "me/*", "agent_home": "~/.claude-personal", "projects_dir": "~/projects/oss" },
-  { "match": "acme/api", "github": { "address_without_workspace": true } }
-]
+```toml
+[[projects]]
+match = "me/*"
+agent_home = "~/.claude-personal"
+projects_dir = "~/projects/oss"
+
+[[projects]]
+match = "acme/api"
+github.address_without_workspace = true
 ```
 
 `match` is `owner/repo` or a glob such as `owner/*`, case-insensitive; the first match wins. An entry may set `projects_dir`, `workspace_managers` (replaces the top-level list), `agent`, `agent_home`, and under `github` the project's `trusted_authors` (replaces the top-level list), `followups_without_workspace` and `address_without_workspace`. Empty fields keep the top-level value. What your profile says for those repositories goes in its `organization=` and `repo=` blocks.
 
 ### `workspace_managers`
 
-```json
-"workspace_managers": ["claude-desktop", "orca"],
-"projects": [{ "match": "acme/*", "workspace_managers": ["orca"] }]
+```toml
+workspace_managers = ["claude-desktop", "orca"]
+
+[[projects]]
+match = "acme/*"
+workspace_managers = ["orca"] # replaces the top-level list
 ```
 
 {{name}} serves every listed manager at once: it reads their worktrees and sessions and acts on each worktree through its owner. The order matters only for a new worktree, which goes to the first manager that is
@@ -294,31 +301,38 @@ Only Orca has a board. A workspace Claude Desktop owns has no card; its state sh
 
 ### `placement`
 
-```json
-"placement": [
-  { "match": "slack:T000/C000/*", "repo": "acme/api", "checkout": "main", "role": "work" }
-]
+```toml
+[[placement]]
+match = "slack:T000/C000/*"
+repo = "acme/api"
+checkout = "main"
+role = "work"
 ```
 
 The first rule whose `match`, a glob over `<provider>:<key>`, matches gives the repository, the checkout (`""` for a new worktree, `main`, or a path), the role and whether the workspace is `shared` by several units. A unit no rule, hint or provider default places, such as a Slack DM, runs its sessions in `<state>/neutral`, an empty repository with no project checked out.
 
 ## Example
 
-```json
-{
-  "projects_dir": "~/projects",
-  "profile": "mine",
-  "github": {
-    "scope": { "teams": ["acme/backend"], "repos": ["acme/api"] },
-    "trusted_authors": ["github-actions[bot]"]
-  },
-  "brief": { "enabled": true },
-  "workflows": {
-    "workspace-review-finished": { "observe": false },
-    "workspace-author-finished": { "observe": false }
-  },
-  "projects": [
-    { "match": "me/*", "agent_home": "~/.claude-personal" }
-  ]
-}
+```toml
+projects_dir = "~/projects"
+profile = "mine"
+
+[github]
+trusted_authors = ["github-actions[bot]"]
+
+[github.scope]
+teams = ["acme/backend"]
+repos = ["acme/api"]
+
+[brief]
+enabled = true
+
+# cleanup removes these workspaces once their plans read right
+[workflows]
+workspace-review-finished.observe = false
+workspace-author-finished.observe = false
+
+[[projects]]
+match = "me/*"
+agent_home = "~/.claude-personal"
 ```

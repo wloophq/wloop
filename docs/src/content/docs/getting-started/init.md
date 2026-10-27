@@ -17,7 +17,7 @@ description: The guided setup that checks the requirements, writes the configura
 4. **Scope.** What the daemon follows besides your own pull requests and your review requests: repositories (`github.scope.repos`), people (`github.scope.people`) and teams (`github.scope.teams`). It suggests them from what `gh` knows about you. See [the daemon](/concepts/daemon/#scope).
 5. **Profile.** Either the bundled default profile alone, or a personal profile directory. A new directory is created with a commented example block for each intent, ready to edit. See [Write your review profile](/guides/review-profile/).
 6. **Slack (optional).** Guided or skipped. The guided step walks you through creating the Slack app from the manifest, asks for the client id and the app-level token, and runs the OAuth login. See [Connect Slack](/guides/slack/).
-7. **Configuration file.** It shows the diff against your current `config.json` and asks before overwriting it.
+7. **Configuration file.** It shows the diff against your current `config.toml` and asks before overwriting it.
 8. **Install.** It offers `{{command}} install` (the agent homes) and, on macOS, `{{command}} app install` (the menu bar app and the LaunchAgents), each after a confirmation.
 9. **Doctor.** It runs `{{command}} doctor` and prints the next step: usually [your first review](/getting-started/first-review/).
 
@@ -49,7 +49,7 @@ The flag set may grow; see `{{command}} init --help` for the current one.
 
 ## What it writes
 
-- `~/.config/{{name}}/config.json` (or under `$XDG_CONFIG_HOME`), only after you confirm the diff;
+- `~/.config/{{name}}/config.toml` (or under `$XDG_CONFIG_HOME`), only after you confirm the diff;
 - the profile directory you chose, when it does not exist yet;
 - what `{{command}} install` and `{{command}} app install` write, when you accept them (see [Install](/getting-started/install/)).
 

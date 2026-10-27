@@ -4,12 +4,12 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -90,7 +90,7 @@ func TestServeWiresTheEntryResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if te.Turns.Results == nil || te.outbox == nil || te.outbox.Results == nil {
 		t.Fatal("the turns' and the Outbox's results are not wired")
 	}

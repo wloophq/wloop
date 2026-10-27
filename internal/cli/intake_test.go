@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -239,7 +239,7 @@ func TestInstructionsPrintsTheNotReadyText(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(waitBriefing), ByHandRef: te.byHandRef, SessionWait: 50 * time.Millisecond,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store))
@@ -264,7 +264,7 @@ func TestATurnByHandStartsUnderTheHeldLoopMutex(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu,
 		Intakes: db.Intakes(), IntakeBriefs: intaketest.NewBriefs(intake.Readiness{Go: true}), ByHandRef: te.byHandRef,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store))

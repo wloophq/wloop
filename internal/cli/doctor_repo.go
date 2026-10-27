@@ -392,7 +392,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 	cfg, err := e.loadConfig()
 	if err != nil {
 		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflows config",
-			Info: "not read, so the modes below are the profile's modes and workflows.<name> entries go unchecked: " + err.Error(), Fix: "fix the JSON in " + e.ConfigPath})
+			Info: "not read, so the modes below are the profile's modes and workflows.<name> entries go unchecked: " + err.Error(), Fix: e.configFix(err)})
 	}
 	now := e.Now()
 	activity, err := db.WorkflowActivity(ctx, now.Add(-24*time.Hour))
@@ -460,7 +460,7 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		}
 		mark = api.DoctorInfo
 		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"observe": false`), e.ConfigPath)
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, "observe", "false"), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
@@ -470,14 +470,14 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 	}
 	if w.Approval.Mode == workflow.ApprovalWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, `"approval": {"mode": "run"}`), e.ConfigPath)
+			workflowEntry(w.Name, "approval.mode", `"run"`), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }
 
-// workflowEntry is the config.json entry that sets field of workflow name.
-func workflowEntry(name, field string) string {
-	return fmt.Sprintf(`"workflows": {%q: {%s}}`, name, field)
+// workflowEntry is the config.toml line that sets field of workflow name to value.
+func workflowEntry(name, field, value string) string {
+	return config.Key("workflows", name) + "." + field + " = " + value
 }
 
 // stuckCursor is a check when an event w handles has waited past

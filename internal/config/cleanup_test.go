@@ -12,7 +12,7 @@ import (
 )
 
 func TestCleanupDefaults(t *testing.T) {
-	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"), tools())
+	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.toml"), tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,11 +32,11 @@ func TestCleanupDefaults(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`{"workflows":{"x":{"approval":{"mode":"never"}}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
-		`{"workflows":{"x":{"approval":{"window":"0s"}}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
+		`workflows = {x = {approval = {mode = "never"}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
+		`workflows = {x = {approval = {window = "0s"}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {
-		path := filepath.Join(t.TempDir(), "config.json")
+		path := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -48,14 +48,14 @@ func TestCleanupDefaults(t *testing.T) {
 }
 
 func TestLoadRefusesAnOnlyWhenThatDoesNotCompile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"workflows":{"address":{"only_when":"pr.nope == 1"}}}`), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`workflows = {address = {only_when = "pr.nope == 1"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": workflows.address.only_when: ") {
 		t.Errorf("err = %v", err)
 	}
-	if err := os.WriteFile(path, []byte(`{"workflows":{"address":{"only_when":"pr.visibility == \"private\""}}}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`workflows = {address = {only_when = "pr.visibility == \"private\""}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if c, err := LoadFile(path, tools()); err != nil || c.Workflows["address"].OnlyWhen == "" {
@@ -68,8 +68,8 @@ type prFacts map[string]any
 func (f prFacts) Get(field string) any { return f[field] }
 
 func TestProjectSettingsFollowTheirPredicate(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"intents": {"review": {"project_settings": {"when": "pr.nope"}}}}`), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`intents = {review = {project_settings = {when = "pr.nope"}}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadFile(path, tools()); err == nil || !strings.HasPrefix(err.Error(), path+": intents.review.project_settings.when: ") {
@@ -97,33 +97,25 @@ func TestProjectSettingsFollowTheirPredicate(t *testing.T) {
 }
 
 func TestLoadWorkflowConfig(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	body := `{
-		"cleanup": {
-				"idle": "3h",
-				"disposable": [
-						"tmp"
-				]
-		},
-		"github": {
-				"nudge": {
-						"silent_days": 10
-				}
-		},
-		"classify": {
-				"per_day": 5
-		},
-		"workflows": {
-				"x": {
-						"observe": true,
-						"enabled": false,
-						"approval": {
-								"mode": "delay",
-								"window": "10m"
-						}
-				}
-		}
-}`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	body := `[cleanup]
+idle = "3h"
+disposable = ["tmp"]
+
+[github.nudge]
+silent_days = 10
+
+[classify]
+per_day = 5
+
+[workflows.x]
+observe = true
+enabled = false
+
+[workflows.x.approval]
+mode = "delay"
+window = "10m"
+`
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -15,8 +15,12 @@ func Closest(s string, options []string) string {
 			return o
 		}
 	}
-	best, bestD, tie := "", max(1, len(s)/4)+1, false
+	limit := max(1, len(s)/4)
+	best, bestD, tie := "", limit+1, false
 	for _, o := range options {
+		if abs(len(s)-len(o)) > limit {
+			continue // the distance is at least the difference in length
+		}
 		switch d := distance(s, o); {
 		case o == "" || o == s:
 		case d < bestD:
@@ -39,9 +43,17 @@ func DidYouMean(s string, options []string) string {
 	return ""
 }
 
+// maxCompared is the longest string distance compares, far longer than any
+// word Closest suggests.
+const maxCompared = 256
+
 // distance is the optimal string alignment distance of a and b: inserts,
-// deletes, substitutions and swaps of two neighbors.
+// deletes, substitutions and swaps of two neighbors. Past maxCompared it is
+// the longer length, the most it can be.
 func distance(a, b string) int {
+	if len(a) > maxCompared || len(b) > maxCompared {
+		return max(len(a), len(b))
+	}
 	d := make([][]int, len(a)+1)
 	for i := range d {
 		d[i] = make([]int, len(b)+1)
@@ -63,4 +75,11 @@ func distance(a, b string) int {
 		}
 	}
 	return d[len(a)][len(b)]
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }

@@ -66,11 +66,12 @@ Two settings control what reaches an agent from other people:
 
 Both are on by default. The instruction is always on. The two switches are configuration keys whose value is a predicate over the pull request's facts; where the predicate does not hold, the behavior is off. They read the owner, the repository, the author and the visibility, and `intents.<intent>.project_settings.when` also reads the author association and the labels. For public repositories, keep both to private ones:
 
-```json
-{
-  "workflows": { "address": { "only_when": "pr.visibility == \"private\"" } },
-  "intents": { "review": { "project_settings": { "when": "pr.visibility == \"private\"" } } }
-}
+```toml
+[workflows.address]
+only_when = 'pr.visibility == "private"'
+
+[intents.review.project_settings]
+when = 'pr.visibility == "private"'
 ```
 
 `pr.visibility` is empty until a pull request has been read in full, so these plan nothing for one not read yet. Narrow by owner, repository or author the same way (`pr.owner != "acme"`, `pr.author != "renovate[bot]"`). Where project settings are off, review sessions start with `--setting-sources user`: your settings, hooks and MCP servers load, the checkout's `.claude/`, `.mcp.json` and `CLAUDE.md` do not, and the agent reads `CLAUDE.md` and `AGENTS.md` as text. Claude Desktop cannot start such a session, so it runs in the next manager of `workspace_managers` that can (Orca), and fails closed when none can. In Claude Desktop, the allows and denies {{name}} adds for a round are written into the worktree's `.claude/settings.local.json`, so they apply only where the checkout's project settings load. See the [configuration reference](/reference/configuration/).

@@ -4,9 +4,9 @@ import (
 	"context"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -32,8 +32,8 @@ func cliGoroutines() map[string]string {
 func TestStopServingWaitsForServesJobs(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	before := cliGoroutines()
-	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &sync.Mutex{}, nil)
-	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)
+	te.serveDeps(context.Background(), te.db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	started := 0
 	for header, g := range cliGoroutines() {
 		if _, ok := before[header]; ok {

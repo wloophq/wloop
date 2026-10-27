@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -139,7 +140,7 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := te.serveDeps(ctx, db, te.cfg, logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, logf, &lock.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
@@ -352,7 +353,7 @@ func TestEchoAgentRunsAThreadTurn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
