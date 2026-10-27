@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -142,5 +143,86 @@ func TestAnUnplacedSegmentDraftIsNotPublished(t *testing.T) {
 	}
 	if n := len(ps.calls("chat.postMessage")); n != 0 {
 		t.Fatalf("posted %d", n)
+	}
+}
+
+func segmentDraft(seg unit.Unit, kind draft.Kind, origin draft.OriginKind, itemIDs ...string) draft.Draft {
+	purpose, delivery := draft.ShapeOf(kind)
+	d := draft.Draft{ID: 1, Unit: seg, Items: itemIDs, Kind: kind, Purpose: purpose, Delivery: delivery, Origin: draft.Origin{Kind: origin}}
+	if delivery == draft.Reaction {
+		d.Reaction = "eyes"
+	} else {
+		d.Text = "sounds good"
+	}
+	return d
+}
+
+func TestAMessageTheUserWritesOnASegmentGoesToItsConversation(t *testing.T) {
+	ps := newPubSlack(t)
+	seg := ps.segmentUnit(t)
+	d := placeAndPublish(t, ps.placing(), segmentDraft(seg, draft.Reply, draft.OriginUser))
+	if d.Target != pubDM {
+		t.Fatalf("target %q", d.Target)
+	}
+	if post := ps.posted(t); post.Get("channel") != pubDM || post.Has("thread_ts") {
+		t.Fatalf("post %v", post)
+	}
+}
+
+func TestAReactionTheUserWritesOnASegmentWithNoItemsIsRefused(t *testing.T) {
+	ps := newPubSlack(t)
+	d := segmentDraft(ps.segmentUnit(t), draft.React, draft.OriginUser)
+	if _, err := ps.placing().Place(context.Background(), d); err == nil || !strings.Contains(err.Error(), "reaction") {
+		t.Fatalf("Place = %v", err)
+	}
+}
+
+func TestAnAgentsOrAWorkflowsSegmentDraftWithNoItemsIsRefused(t *testing.T) {
+	ps := newPubSlack(t)
+	seg := ps.segmentUnit(t)
+	for _, origin := range []draft.OriginKind{draft.OriginTurn, draft.OriginSession, draft.OriginAuto} {
+		if _, err := ps.placing().Place(context.Background(), segmentDraft(seg, draft.Reply, origin)); err == nil ||
+			!strings.Contains(err.Error(), "neither a target nor items") {
+			t.Fatalf("%s: Place = %v", origin, err)
+		}
+	}
+}
+
+func TestAReactionLandsOnTheNewestRequestNotTheNewestAnchor(t *testing.T) {
+	ps := newPubSlack(t)
+	seg := ps.segmentUnit(t)
+	asked := anchored(seg, "i1", pubDM+"/"+dmTop, pubDM+"/"+dmLater)
+	asked.AssignedAt = unit.Anchor{Unit: seg, Ref: pubDM + "/" + dmOtherTop}
+	later := anchored(seg, "i2", pubDM+"/"+dmRoot)
+	d := placeAndPublish(t, ps.placing(asked, later), segmentDraft(seg, draft.React, draft.OriginAuto, "i1", "i2"))
+	if d.Target != conversationLink(pubDM, dmRoot) {
+		t.Fatalf("target %q", d.Target)
+	}
+	if adds := ps.calls("reactions.add"); len(adds) != 1 || adds[0].Get("channel") != pubDM || adds[0].Get("timestamp") != dmRoot {
+		t.Fatalf("reactions.add %v", adds)
+	}
+}
+
+func TestAReactionWhoseItemsStartedNowhereInTheConversationIsRefused(t *testing.T) {
+	ps := newPubSlack(t)
+	seg := ps.segmentUnit(t)
+	it := anchored(seg, "i1", "draft:3", pubDM+"/"+dmLater)
+	if _, err := ps.placing(it).Place(context.Background(), segmentDraft(seg, draft.React, draft.OriginAuto, "i1")); err == nil ||
+		!strings.Contains(err.Error(), "none of the items") {
+		t.Fatalf("Place = %v", err)
+	}
+}
+
+func TestVerifyLooksForAnUnplacedSegmentMessageAtTheTopOfItsConversation(t *testing.T) {
+	ps := newPubSlack(t)
+	seg := ps.segmentUnit(t)
+	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": "sounds good"})
+	d := segmentDraft(seg, draft.Reply, draft.OriginAuto, "i1")
+	ev, ok, err := ps.publisher().Verify(context.Background(), d, time.Unix(1700000300, 0))
+	if err != nil || !ok || ev.Ref != pubPosted {
+		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
+	}
+	if h := ps.calls("conversations.history"); len(h) == 0 || h[len(h)-1].Get("channel") != pubDM {
+		t.Fatalf("history %v", h)
 	}
 }
