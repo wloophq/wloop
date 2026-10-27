@@ -131,6 +131,16 @@ func TestCommandAddsTheModel(t *testing.T) {
 	}
 }
 
+func TestCommandNamesTheSession(t *testing.T) {
+	got, err := Agent{}.Command(turns.AgentSession{SessionID: "s1", Name: "review acme/api#7 26/10 14:00"})
+	if err != nil || got != "claude --session-id 's1' --name 'review acme/api#7 26/10 14:00'" {
+		t.Fatalf("%q %v", got, err)
+	}
+	if got, _ := (Agent{}).Command(turns.AgentSession{}); strings.Contains(got, "--name") {
+		t.Fatalf("a session without a name named one: %s", got)
+	}
+}
+
 func TestHeadlessPassesTheSessionModel(t *testing.T) {
 	var gotArgs []string
 	sh := func(_ context.Context, _ string, _ []string, _, _ string, args ...string) ([]byte, error) {

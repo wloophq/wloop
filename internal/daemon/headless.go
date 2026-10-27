@@ -72,6 +72,13 @@ func (s *Server) runHeadless(w http.ResponseWriter, r *http.Request, d dintent.D
 		writeActionError(w, err)
 		return
 	}
+	if why, err := s.entryRefusal(r.Context(), s.loaded(), name, u); err != nil || why != "" {
+		if err == nil {
+			err = Refusal{Reason: why}
+		}
+		writeActionError(w, err)
+		return
+	}
 	if isPullRequest(u) {
 		row, _, err := s.offered(context.WithoutCancel(r.Context()), u, catalog.Asked{Name: name}, api.ActionRequest{Guidance: req.Guidance})
 		if err != nil {

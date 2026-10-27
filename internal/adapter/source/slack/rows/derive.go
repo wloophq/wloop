@@ -135,7 +135,7 @@ func payload(in *input) Payload {
 	}
 	pl.LastActivity = in.object.LastActivityAt
 	if n := len(in.msgs); n > 0 {
-		pl.LastActivity = tsTime(in.msgs[n-1].TS)
+		pl.LastActivity = dslack.TSTime(in.msgs[n-1].TS)
 	}
 	for i := len(in.msgs) - 1; i >= 0; i-- {
 		m := in.msgs[i]
@@ -143,7 +143,7 @@ func payload(in *input) Payload {
 			continue
 		}
 		pl.LastHuman = &LastHuman{Who: person(m.User, in.users), What: firstLine(plain(m.Text, in.users), TitleRunes),
-			At: tsTime(m.TS), Link: messageLink(in, m)}
+			At: dslack.TSTime(m.TS), Link: messageLink(in, m)}
 		break
 	}
 	for _, it := range openItems(in.items) {
@@ -414,18 +414,6 @@ func displayName(id string, users map[string]sqlite.UserRow) string {
 		return n
 	}
 	return id
-}
-
-// tsTime is the instant a Slack ts names.
-func tsTime(ts string) time.Time {
-	sec, frac, _ := strings.Cut(ts, ".")
-	s, err := strconv.ParseInt(sec, 10, 64)
-	if err != nil {
-		return time.Time{}
-	}
-	frac = (frac + "000000")[:6]
-	us, _ := strconv.ParseInt(frac, 10, 64)
-	return time.Unix(s, us*1000).UTC()
 }
 
 func (p *Provider) Views() []api.ViewSpec {

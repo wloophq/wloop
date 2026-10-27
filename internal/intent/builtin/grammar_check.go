@@ -190,10 +190,13 @@ func (w *walker) anyOf(r Key, path string, v any) {
 	}
 }
 
+// number refuses TOML's inf and nan, which no setting means.
 func number(v any) bool {
-	switch v.(type) {
-	case int, int64, float64:
+	switch x := v.(type) {
+	case int, int64:
 		return true
+	case float64:
+		return !math.IsInf(x, 0) && !math.IsNaN(x)
 	}
 	return false
 }
@@ -203,7 +206,7 @@ func integer(v any) bool {
 	case int, int64:
 		return true
 	case float64:
-		return x == math.Trunc(x)
+		return number(x) && x == math.Trunc(x)
 	}
 	return false
 }

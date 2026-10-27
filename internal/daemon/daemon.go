@@ -35,6 +35,7 @@ import (
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -223,7 +224,7 @@ type Deps struct {
 	SessionWait time.Duration
 	// LoopMu serializes every loop write: sweep, review, take over, address, run.
 	// Shared across restarts of the server in one process; nil makes one.
-	LoopMu *sync.Mutex
+	LoopMu *lock.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
 	App    *AppState
@@ -244,7 +245,7 @@ type Deps struct {
 	Restart string
 	// Store is the open store's version and last backup, for the health.
 	Store *api.StoreStatus
-	// ConfigWarning is the health warning about config.json drifting from the
+	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
 	ConfigWarning func() string
 	// WorkspaceManager names the workspace managers in messages, such as
@@ -411,7 +412,7 @@ func New(d Deps) *Server {
 		d.Restart = "restart " + brand.Command + " serve"
 	}
 	if d.LoopMu == nil {
-		d.LoopMu = &sync.Mutex{}
+		d.LoopMu = &lock.Mutex{}
 	}
 	if d.App == nil {
 		d.App = &AppState{}
@@ -591,6 +592,20 @@ func (s *Server) reconcileTurns(ctx context.Context) {
 		if _, err := v.Reconcile(ctx); err != nil {
 			s.logf("views reconcile: %v", err)
 		}
+	}
+}
+
+// startJobs starts every job's loop on wg once the start-up reconcile ends.
+func (s *Server) startJobs(ctx context.Context, wg *sync.WaitGroup) {
+	for _, j := range s.jobs {
+		j.onEnd = s.jobEnded
+		wg.Go(func() {
+			select {
+			case <-s.reconcile.done:
+				j.loop(ctx, s.logf, s.jobDone)
+			case <-ctx.Done():
+			}
+		})
 	}
 }
 
@@ -850,16 +865,7 @@ func (s *Server) Run(ctx context.Context) error {
 		})
 	}
 	s.startStreams(jctx, &wg)
-	for _, j := range s.jobs {
-		j.onEnd = s.jobEnded
-		wg.Go(func() {
-			select {
-			case <-s.reconcile.done:
-				j.loop(jctx, s.logf, s.jobDone)
-			case <-jctx.Done():
-			}
-		})
-	}
+	s.startJobs(jctx, &wg)
 	s.logf("serving on %s and 127.0.0.1:%d", d.Socket, tcpLn.Addr().(*net.TCPAddr).Port)
 
 	var serveErr error

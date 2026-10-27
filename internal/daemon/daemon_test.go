@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -212,26 +213,32 @@ func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
 
 func TestSweepWaitsForTheServerMutex(t *testing.T) {
 	t.Parallel()
-	d := testDeps(t)
-	var runs atomic.Int32
-	d.Sweep = SweepFunc(func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
-	s := New(d)
-	s.deps.LoopMu.Lock()
-	finished := make(chan struct{})
-	go func() {
-		s.jobs["sweep"].once(context.Background(), t.Logf, func(string, string) {})
-		close(finished)
-	}()
-	time.Sleep(50 * time.Millisecond)
-	if runs.Load() != 0 {
-		s.deps.LoopMu.Unlock()
-		t.Fatal("sweep ran while the server mutex was held")
-	}
-	s.deps.LoopMu.Unlock()
-	<-finished
-	if runs.Load() != 1 {
-		t.Fatalf("runs %d after unlock", runs.Load())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		d := testDeps(t)
+		var runs atomic.Int32
+		d.Sweep = SweepFunc(func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
+		s := New(d)
+		s.deps.LoopMu.Lock()
+		unlock := sync.OnceFunc(s.deps.LoopMu.Unlock)
+		finished := make(chan struct{})
+		t.Cleanup(func() {
+			unlock()
+			<-finished
+		})
+		go func() {
+			s.jobs["sweep"].once(context.Background(), t.Logf, func(string, string) {})
+			close(finished)
+		}()
+		synctest.Wait()
+		if runs.Load() != 0 {
+			t.Fatal("sweep ran while the server mutex was held")
+		}
+		unlock()
+		<-finished
+		if runs.Load() != 1 {
+			t.Fatalf("runs %d after unlock", runs.Load())
+		}
+	})
 }
 
 func TestZeroIntervalsFallBackToDefaults(t *testing.T) {
@@ -718,7 +725,7 @@ func TestUserAPIWaitsForTheReconcile(t *testing.T) {
 	}
 }
 
-func TestUserAPIServesWhenTheReconcileRunsLongButTheJobsWait(t *testing.T) {
+func TestUserAPIServesWhenTheReconcileRunsLong(t *testing.T) {
 	t.Parallel()
 	release := make(chan struct{})
 	var sweeps atomic.Int32
@@ -755,14 +762,47 @@ func TestUserAPIServesWhenTheReconcileRunsLongButTheJobsWait(t *testing.T) {
 	if h := socketHealth(t, d.Socket); !slices.Contains(h.Warnings, "reconcile still running") {
 		t.Fatalf("warnings %q", h.Warnings)
 	}
-	s.RunJob("sweep")
-	time.Sleep(100 * time.Millisecond)
-	if n := sweeps.Load(); n != 0 {
-		t.Fatalf("%d sweeps ran beside the start-up reconcile", n)
-	}
 	close(release)
 	released = true
 	waitFor(t, func() bool { return sweeps.Load() > 0 })
+}
+
+func TestJobsWaitForTheStartupReconcile(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		var sweeps atomic.Int32
+		d := testDeps(t)
+		d.Startup = func(context.Context) (api.ReconcileReport, error) {
+			<-release
+			return api.ReconcileReport{}, nil
+		}
+		d.Sweep = SweepFunc(func(context.Context) (string, string, error) {
+			sweeps.Add(1)
+			return "", "", nil
+		})
+		s := New(d)
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		t.Cleanup(func() {
+			cancel()
+			wg.Wait()
+		})
+		free := sync.OnceFunc(func() { close(release) })
+		t.Cleanup(free)
+		wg.Go(func() { s.runStartup(ctx) })
+		s.startJobs(ctx, &wg)
+		s.RunJob("sweep")
+		synctest.Wait()
+		if n := sweeps.Load(); n != 0 {
+			t.Fatalf("%d sweeps ran beside the start-up reconcile", n)
+		}
+		free()
+		synctest.Wait()
+		if sweeps.Load() == 0 {
+			t.Fatal("no sweep after the reconcile")
+		}
+	})
 }
 
 func TestRowFeedStartsWhenTheUserAPIOpens(t *testing.T) {

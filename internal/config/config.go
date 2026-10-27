@@ -327,6 +327,9 @@ type Project struct {
 	AgentHome string `json:"agent_home"`
 	// WorkspaceManagers orders the managers a new worktree of the project picks from.
 	WorkspaceManagers []string `json:"workspace_managers"`
+	// TrustClones trusts, in the agent home, a repository of the project at
+	// the moment the loop clones it; its match must name an owner.
+	TrustClones bool `json:"trust_clones"`
 
 	GitHub ProjectGitHub `json:"github"`
 }
@@ -369,6 +372,23 @@ func (c Config) For(owner, repo string) Config {
 		break
 	}
 	return c
+}
+
+// TrustsClones says whether the project of owner/repo, the first that
+// matches, trusts the repository when the loop clones it.
+func (c Config) TrustsClones(owner, repo string) bool {
+	for _, p := range c.Projects {
+		if p.Matches(owner, repo) {
+			return p.TrustClones
+		}
+	}
+	return false
+}
+
+// namesOwner says whether the match's owner is a name, not a pattern.
+func (p Project) namesOwner() bool {
+	owner, _, ok := strings.Cut(p.Match, "/")
+	return ok && owner != "" && !strings.ContainsAny(owner, `*?[\`)
 }
 
 func (p Project) Matches(owner, repo string) bool {
@@ -435,6 +455,7 @@ func Defaults() Config {
 		Drafts:   Drafts{RepeatAfter: Days(24 * time.Hour)},
 		Headless: Headless{Tier: turns.TierBalanced, PerCallUSD: 0.5, PerDayUSD: 5},
 		Turns:    Turns{PerDay: 20, PerUnitPerDay: DefaultPRDailyCap},
+		Slack:    Slack{EndedAfter: Days(DefaultSlackEndedAfter)},
 	}
 }
 
@@ -442,7 +463,22 @@ func Dir() string {
 	return xdgDir("XDG_CONFIG_HOME", ".config")
 }
 
-func Path() string { return filepath.Join(Dir(), "config.json") }
+func Path() string { return filepath.Join(Dir(), "config.toml") }
+
+// legacyFile is the configuration's former name, which is no longer read.
+const legacyFile = "config.json"
+
+// MigrationURL explains the move from config.json to config.toml and holds
+// the script that converts one.
+var MigrationURL = "https://github.com/" + brand.Org + "/" + brand.Name + "/issues/76"
+
+// LegacyFileError is a configuration directory that holds config.json and
+// no config.toml.
+type LegacyFileError struct{ Legacy, File string }
+
+func (e *LegacyFileError) Error() string {
+	return fmt.Sprintf("%s is no longer read; convert it to %s with the script in %s", e.Legacy, e.File, MigrationURL)
+}
 
 // StateDir holds the inventory database, the state lock and the logs.
 func StateDir() string {
@@ -485,6 +521,10 @@ func LoadFile(file string, base Config) (Config, error) {
 	c := base
 	raw, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
+		legacy := filepath.Join(filepath.Dir(file), legacyFile)
+		if _, statErr := os.Stat(legacy); statErr == nil {
+			return c, &LegacyFileError{Legacy: legacy, File: file}
+		}
 		return c, nil
 	}
 	if err != nil {
@@ -502,6 +542,9 @@ func LoadFile(file string, base Config) (Config, error) {
 	for i, p := range c.Projects {
 		if _, err := path.Match(p.Match, ""); p.Match == "" || err != nil {
 			return base, fmt.Errorf("%s: projects[%d]: invalid match %q; use owner/repo, owner/*", file, i, p.Match)
+		}
+		if p.TrustClones && !p.namesOwner() {
+			return base, fmt.Errorf("%s: projects[%d]: trust_clones needs a match that names its owner, such as acme/*, not %q", file, i, p.Match)
 		}
 		c.Projects[i].ProjectsDir = ExpandHome(p.ProjectsDir)
 		c.Projects[i].AgentHome = ExpandHome(p.AgentHome)

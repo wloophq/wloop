@@ -902,7 +902,7 @@ func TestHealthWarnsWhenTheConfigChanged(t *testing.T) {
 	stale := false
 	s.deps.ConfigWarning = func() string {
 		if stale {
-			return "config.json does not load"
+			return "config.toml does not load"
 		}
 		return ""
 	}

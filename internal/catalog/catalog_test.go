@@ -152,6 +152,7 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"row.author_workspace":          func(f *Facts) { f.Workspace.ID = "w" },
 		"row.yours":                     func(f *Facts) { f.Mine = true },
 		"row.review_workspace":          func(f *Facts) { f.Workspace = api.Workspace{ID: "w", IsReview: true} },
+		"entry.captured_by_user":        func(f *Facts) { f.CapturedByUser = true },
 		"pr.nudge.who":                  func(f *Facts) { f.NudgeWho = []string{"@ana"} },
 		"pr.nudge.why":                  func(f *Facts) { f.NudgeWhy = "waits on a bot" },
 		"pr.nudge.refusal":              func(f *Facts) { f.NudgeRefusal = "no" },

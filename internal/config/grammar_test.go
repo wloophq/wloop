@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -181,7 +183,7 @@ func lookup(tree map[string]any, path []string) (any, bool) {
 func TestTheGrammarRefusesTheOldUserConfig(t *testing.T) {
 	t.Parallel()
 	var tree map[string]any
-	if err := json.Unmarshal([]byte(userConfig), &tree); err != nil {
+	if err := toml.Unmarshal([]byte(userConfig), &tree); err != nil {
 		t.Fatal(err)
 	}
 	var got []string

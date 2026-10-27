@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -188,7 +189,7 @@ func headBranch(gitDir string) string {
 
 // Create adds a worktree of the repository at <Root>/<repo name>/<name>, on
 // HeadBranch when it is set, else on a branch named after the workspace. A
-// branch that exists is checked out; a new one starts at BaseRef, or HEAD.
+// branch that exists is checked out; a new one starts where base says.
 func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdomain.Workspace, string, error) {
 	repo, err := canonical(req.RepoID)
 	if err != nil {
@@ -209,13 +210,23 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdo
 	}
 	renamed := false
 	args := []string{"worktree", "add"}
-	if tip, exists := m.branchTip(ctx, repo, branch); exists && (req.CrossRepository || req.HeadOid != "" && tip != req.HeadOid) {
+	tip, exists := m.branchTip(ctx, repo, branch)
+	switch {
+	case exists && (req.CrossRepository || req.HeadOid != "" && tip != req.HeadOid):
 		branch, renamed = m.freeBranch(ctx, repo, branch), true
-		args = append(args, "--no-track", "-b", branch, path, cmp.Or(req.BaseRef, req.HeadOid, "HEAD"))
-	} else if exists {
+		base, err := m.base(ctx, repo, req, req.HeadOid)
+		if err != nil {
+			return wsdomain.Workspace{}, "", err
+		}
+		args = append(args, "--no-track", "-b", branch, path, base)
+	case exists:
 		args = append(args, path, branch)
-	} else {
-		args = append(args, "--no-track", "-b", branch, path, cmp.Or(req.BaseRef, "HEAD"))
+	default:
+		base, err := m.base(ctx, repo, req, "")
+		if err != nil {
+			return wsdomain.Workspace{}, "", err
+		}
+		args = append(args, "--no-track", "-b", branch, path, base)
 	}
 	if _, err := m.git(ctx, repo, args...); err != nil {
 		return wsdomain.Workspace{}, "", fmt.Errorf("creating the workspace %s: %w", name, err)
@@ -230,7 +241,27 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (wsdo
 		return wsdomain.Workspace{}, "", fmt.Errorf("git created no worktree at %s", path)
 	}
 	ws.BranchRenamed = renamed
+	ws.ParentDropped = req.Parent != ""
 	return ws, "", nil
+}
+
+// base is where a new branch starts: the default branch of origin once
+// fetched when the request asks for the default base, else BaseRef, else
+// fallback, else HEAD. Without origin/HEAD, or in a reftable repository, the
+// default base is HEAD.
+func (m *Manager) base(ctx context.Context, repo string, req workspace.CreateRequest, fallback string) (string, error) {
+	if !req.DefaultBase {
+		return cmp.Or(req.BaseRef, fallback, "HEAD"), nil
+	}
+	def := gitx.DefaultBranch(repo)
+	if def == "" {
+		return "HEAD", nil
+	}
+	remote := "refs/remotes/origin/" + def
+	if _, err := m.git(ctx, repo, "fetch", "--quiet", "origin", "+refs/heads/"+def+":"+remote); err != nil {
+		return "", fmt.Errorf("fetching the default branch %s: %w", def, err)
+	}
+	return remote, nil
 }
 
 // branchTip is the commit of the local branch, false when there is none.

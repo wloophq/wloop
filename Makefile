@@ -6,7 +6,7 @@ GOLANGCI_LINT_VERSION := v2.15.0
 GOLANGCI_LINT := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 BRAND_TEST_LDFLAGS := -X $(MODULE)/internal/brand.Name=zzbrand -X "$(MODULE)/internal/brand.Command=gh zzbrand" -X $(MODULE)/internal/brand.App=Zzbrand -X $(MODULE)/internal/brand.Org=zzbrandhq
 
-.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand scan-real-data print-brand-ldflags docs-ref docs
+.PHONY: build build-targets vet-darwin vet-tags dev-install test lint fmt-check fmt fuzz clean eval-instructions test-brand scan-brand print-brand-ldflags docs-ref docs
 
 build: ## Build the binary into ./bin
 	@mkdir -p bin
@@ -46,10 +46,6 @@ scan-brand: ## Check that a build with the test brand writes nothing that names 
 print-brand-ldflags: ## Print the test brand's ldflags, to update goldens
 	@echo '$(BRAND_TEST_LDFLAGS)'
 
-scan-real-data: ## Check that no commit since SCAN_BASE adds a term of the deny list at LOOP_DENY_LIST
-	@test -n "$(SCAN_BASE)" || (echo "SCAN_BASE is not set"; exit 2)
-	scripts/scan-real-data.sh $(SCAN_BASE)
-
 lint: fmt-check $(GOLANGCI_LINT) ## gofmt and golangci-lint, for linux and darwin
 	GOOS=linux $(GOLANGCI_LINT) run ./...
 	GOOS=darwin $(GOLANGCI_LINT) run ./...
@@ -72,12 +68,13 @@ fmt: ## Format the code
 eval-instructions: ## Judge the rendered instructions of every eval scenario
 	CGO_ENABLED=0 go run ./cmd/$(BINARY) eval-instructions
 
-docs-ref: ## Regenerate the reference pages of the documentation site and the profile's JSON schemas
+docs-ref: ## Regenerate the reference pages of the documentation site, the profile's JSON schemas and the decision log's index
 	@d=$$(mktemp -d) && trap 'rm -rf "$$d"' EXIT && go build -o "$$d/$(BINARY)" ./cmd/$(BINARY) && \
 	node docs/scripts/commands.mjs "$$d/$(BINARY)" "$$d" > docs/src/content/docs/reference/commands.md
 	@f=$$(go run ./internal/intent/builtin/cmd/factsdoc) && printf '%s\n' "$$f" > docs/src/content/docs/reference/facts.md
 	@p=$$(go run ./internal/archtest/cmd/rulesdoc) && printf '%s\n' "$$p" > docs/src/content/docs/reference/architecture-rules.md
 	@go run ./internal/intent/builtin/cmd/grammardoc
+	@go run ./internal/archtest/cmd/decisionsdoc
 
 docs: ## Build the documentation site into docs/dist
 	cd docs && npm ci && npm run build

@@ -94,9 +94,14 @@ type Def struct {
 	// turn runs in, named outright or by an input; nil for a workspace
 	// builtin.
 	WorkspaceRepo *WorkspaceRepo
+	// Target is what a run with no unit does.
+	Target Target
 	// AllowedEffects are the effects the intent's agents may declare on the
 	// drafts they propose, names of builtin.Effects.
 	AllowedEffects []string
+	// AttachPosts says the unit of each post its turns make on an entry is
+	// attached to that entry.
+	AttachPosts bool
 	// RoundKind is the sweep round the intent's turns are, from its role:
 	// "review" (first or follow-up, by the step's stage) or "address"; ""
 	// none.
@@ -132,6 +137,24 @@ type Help struct {
 // Repo (owner/name) outright, or the input RepoInput holds.
 type WorkspaceRepo struct {
 	Repo, RepoInput string
+	// Optional lets a turn whose input names no repository run without
+	// one, in the neutral repository.
+	Optional bool
+	// Name is the created worktree's name over the name facts; empty for
+	// the loop's own.
+	Name Text
+}
+
+// TargetCapture is the target.missing that captures the run's guidance as
+// a new entry, the turn's unit.
+const TargetCapture = "capture"
+
+// Target is what a run of the intent with no unit does: Missing is "" to
+// refuse it, or TargetCapture; Title names the captured entry over the
+// guidance.
+type Target struct {
+	Missing string
+	Title   Text
 }
 
 // Runs says whether the intent's turns may run under runner, a turn.Runner
@@ -144,8 +167,11 @@ func (d Def) Runs(runner string) bool {
 }
 
 type Session struct {
-	Strategy      string // reuse_live | new
-	Title         string
+	Strategy string // reuse_live | new
+	Title    string
+	// Name is what the manager and the agent show the session as, over the
+	// name facts; empty renders as Title.
+	Name          Text
 	CloseWhenDone bool
 }
 
@@ -226,6 +252,9 @@ type RecordRules struct {
 	OutcomeDoc      string
 	HistoryArtifact string
 	Require         []Require
+	// AttachURL says a done record's outcome url, when it names a unit, is
+	// attached to the turn's entry.
+	AttachURL bool
 }
 
 type Require struct {

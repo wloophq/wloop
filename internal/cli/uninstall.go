@@ -330,7 +330,7 @@ func (e *Env) purgeSteps(cfg config.Config) (steps []uninstallStep, kept []strin
 	configDir := filepath.Dir(e.ConfigPath)
 	for _, d := range []struct{ dir, holds string }{
 		{e.StateDir, "the store and its backups, MCP key, dossiers and logs"},
-		{configDir, "config.json and the review profiles in it"},
+		{configDir, "config.toml and the review profiles in it"},
 	} {
 		dir := filepath.Clean(d.dir)
 		if _, err := os.Lstat(dir); err != nil {

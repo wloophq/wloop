@@ -60,6 +60,10 @@ type Deps struct {
 	// Enabled says whether a provider's plugin is enabled; nil: every one is.
 	Enabled  func(unit.ProviderID) bool
 	Settings func() Settings
+	// Ended says whether a unit has ended, as its plugin says; nil: none has.
+	Ended func(ctx context.Context, u unit.Unit) (bool, error)
+	// Turns counts the turns run on a unit; nil: none.
+	Turns func(ctx context.Context, u unit.Unit) (int, error)
 	// Clock's location is where working days are counted.
 	Clock port.Clock
 }
@@ -98,8 +102,8 @@ func (p *Provider) settings() Settings {
 // listed says whether e is a subject: a live entry of no unit, or of a unit
 // whose plugin is enabled.
 func (p *Provider) listed(e gtd.Entry) bool {
-	u, ok := unitOf(e)
-	return e.Live() && (!ok || p.enabled(u.Provider))
+	us := unitsOf(e)
+	return e.Live() && (len(us) == 0 || p.enabled(us[0].Provider))
 }
 
 // List is every listed entry, by id, and keeps the earliest nudge-due or
@@ -172,6 +176,11 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"entry.muted":               e.Snooze.Mute,
 		"entry.unit":                "",
 		"entry.unit_provider":       "",
+		"entry.units":               []string{},
+		"entry.unit_providers":      []string{},
+		"entry.units_ended":         false,
+		"entry.captured_by_user":    e.CapturedByUser(),
+		"entry.turns":               0,
 		"entry.unit_started_by_me":  false,
 		"entry.unit_closure_posted": false,
 		"entry.items_open":          0,
@@ -196,11 +205,32 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	if due := nudgeDue(e, s, loc); !due.IsZero() && !due.After(now) {
 		f["entry.nudge_due_at"] = due
 	}
-	eu, ok := unitOf(e)
-	if !ok {
+	if p.d.Turns != nil {
+		n, err := p.d.Turns(ctx, gtd.UnitOf(e.ID))
+		if err != nil {
+			return nil, err
+		}
+		f["entry.turns"] = n
+	}
+	us := unitsOf(e)
+	if len(us) == 0 {
 		return f, nil
 	}
+	eu := us[0]
 	f["entry.unit"], f["entry.unit_provider"] = eu.String(), string(eu.Provider)
+	names, providers := make([]string, len(us)), []string{}
+	for i, u := range us {
+		names[i] = u.String()
+		if !slices.Contains(providers, string(u.Provider)) {
+			providers = append(providers, string(u.Provider))
+		}
+	}
+	f["entry.units"], f["entry.unit_providers"] = names, providers
+	ended, err := p.ended(ctx, e, us)
+	if err != nil {
+		return nil, err
+	}
+	f["entry.units_ended"] = ended
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {
@@ -210,21 +240,44 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 			f["entry.unit_started_by_me"], f["entry.unit_closure_posted"] = uf.StartedByMe, uf.ClosurePosted
 		}
 	}
-	got, err := p.d.Items.Load(ctx, []unit.Unit{eu})
+	got, err := p.d.Items.Load(ctx, us)
 	if err != nil {
 		return nil, err
 	}
-	var open, resolved int
-	for _, it := range got[eu] {
-		switch it.State {
-		case items.Open:
-			open++
-		case items.Resolved:
-			resolved++
+	var open, resolved, owed int
+	for _, u := range us {
+		for _, it := range got[u] {
+			switch it.State {
+			case items.Open:
+				open++
+			case items.Resolved:
+				resolved++
+			}
 		}
+		owed += len(held(e, got[u]))
 	}
-	f["entry.items_open"], f["entry.items_resolved"], f["entry.items_owed"] = open, resolved, len(held(e, got[eu]))
+	f["entry.items_open"], f["entry.items_resolved"], f["entry.items_owed"] = open, resolved, owed
 	return f, nil
+}
+
+// ended says whether every unit of us but the entry's own has ended, with
+// at least one such unit.
+func (p *Provider) ended(ctx context.Context, e gtd.Entry, us []unit.Unit) (bool, error) {
+	if p.d.Ended == nil {
+		return false, nil
+	}
+	n := 0
+	for _, u := range us {
+		if u == gtd.UnitOf(e.ID) {
+			continue
+		}
+		done, err := p.d.Ended(ctx, u)
+		if err != nil || !done {
+			return false, err
+		}
+		n++
+	}
+	return n > 0, nil
 }
 
 // Scope sets entry.settled_at to the newest settled draft workflow wf
@@ -242,7 +295,7 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 	return out, nil
 }
 
-// Owners is the entry's unit, whose timeline shows the steps run on it.
+// Owners are the entry's units, whose timelines show the steps run on it.
 func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
 	e, err := p.entry(ctx, u)
 	if errors.Is(err, automation.ErrUnitGone) {
@@ -251,22 +304,19 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 	if err != nil {
 		return nil, err
 	}
-	if eu, ok := unitOf(e); ok {
-		return []unit.Unit{eu}, nil
-	}
-	return nil, nil
+	return unitsOf(e), nil
 }
 
-// unitOf is the unit an entry belongs to: its first attached unit, else its
-// first item's.
-func unitOf(e gtd.Entry) (unit.Unit, bool) {
-	if len(e.Units) > 0 {
-		return e.Units[0], true
+// unitsOf are an entry's units in order: those attached to it, the unit it
+// was captured or derived on first, then those only its items name.
+func unitsOf(e gtd.Entry) []unit.Unit {
+	out := slices.Clone(e.Units)
+	for _, r := range e.Items {
+		if !slices.Contains(out, r.Unit) {
+			out = append(out, r.Unit)
+		}
 	}
-	if len(e.Items) > 0 {
-		return e.Items[0].Unit, true
-	}
-	return unit.Unit{}, false
+	return out
 }
 
 // held are the open items of its that entry e holds.

@@ -13,6 +13,7 @@ PULL REQUESTS
   address                Triage the reviews and failing checks of yours
   nudge                  Ask whoever it waits on for the next step
   review                 Review someone else's pull request in its own worktree
+  start                  Start new work from a brief
   take-over              Make a pull request someone else opened yours
   remove                 Delete the workspace of a merged or closed one
 

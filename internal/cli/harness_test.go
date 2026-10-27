@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/lock"
 	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -44,6 +45,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -74,10 +76,12 @@ type fakeGH struct {
 	viewerErr error
 	// loop, when set, is a daemon's loop mutex: underLock lists the calls
 	// made while it is held.
-	loop      *sync.Mutex
+	loop      *lock.Mutex
 	underLock []string
 	prView    string // answers gh pr view; empty fails it
 	prViewDir string // the directory gh pr view ran in
+	// clone answers gh repo clone <owner/name> <path>; nil fails it.
+	clone func(repo, path string) error
 }
 
 func (f *fakeGH) RunIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
@@ -113,6 +117,9 @@ func (f *fakeGH) Run(_ context.Context, args ...string) ([]byte, error) {
 	}
 	if len(args) >= 2 && args[0] == "auth" && args[1] == "status" {
 		return nil, nil
+	}
+	if len(args) == 4 && args[0] == "repo" && args[1] == "clone" && f.clone != nil {
+		return nil, f.clone(args[2], args[3])
 	}
 	if len(args) >= 2 && args[0] == "pr" && args[1] == "view" {
 		if f.prView == "" {
@@ -424,7 +431,9 @@ type fakeGit struct {
 	worktrees map[string]string
 	objects   map[string]bool
 	writes    []string
-	onRun     func(cmd string)
+	// toplevel answers rev-parse --show-toplevel; "" fails it, as outside a worktree.
+	toplevel string
+	onRun    func(cmd string)
 	// readOnly fails the test on any write.
 	readOnly *testing.T
 }
@@ -492,6 +501,12 @@ func (f *fakeGit) Run(ctx context.Context, dir string, _ []string, args ...strin
 	case "update-ref":
 		f.tips[strings.TrimPrefix(args[1], "refs/heads/")] = args[2]
 	case "rev-parse":
+		if args[len(args)-1] == "--show-toplevel" {
+			if f.toplevel == "" {
+				return nil, &gitx.Error{Args: args, Code: 128, Msg: "not a git repository"}
+			}
+			return []byte(f.toplevel + "\n"), nil
+		}
 		if args[len(args)-1] == "refs/stash" {
 			return nil, &gitx.Error{Args: args, Code: 1}
 		}
@@ -549,7 +564,7 @@ type testEnv struct {
 	sink *testsink.Sink
 	reg  *testRegistry
 	// loop is the loop mutex of the daemon serve started.
-	loop *sync.Mutex
+	loop *lock.Mutex
 	// served ends every context serving gave.
 	served     context.Context
 	stopServed context.CancelFunc
@@ -615,7 +630,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		Sh:         func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		Stdout:     func(context.Context, string, ...string) ([]byte, error) { return nil, fmt.Errorf("no shell in tests") },
 		LoadConfig: func() (config.Config, error) { return te.cfg, nil },
-		ConfigPath: t.TempDir() + "/config.json",
+		ConfigPath: t.TempDir() + "/config.toml",
 		StateDir:   t.TempDir(),
 		Home:       t.TempDir(),
 		Now:        func() time.Time { return testNow },
@@ -685,7 +700,7 @@ func (te *testEnv) stopServing() {
 }
 
 // serveDeps is serveDeps on te's Env, on a context serving binds to the test.
-func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
 	return serveDeps(te.serving(ctx), te.Env, db, cfg, logf, loopMu, app)
 }
 
@@ -799,15 +814,30 @@ func (derivedRows) IsUser(context.Context, string) (bool, error) { return true, 
 
 // serve runs te's daemon over a socket, with the actions, the turns by hand
 // and AdminAPI wired as serve wires them, and points te's command line at it.
-func (te *testEnv) serve(t *testing.T) {
+func (te *testEnv) serve(t *testing.T) { te.serveWith(t, nil) }
+
+// serveEntries serves te's daemon with the GTD entries on te's store.
+func (te *testEnv) serveEntries(t *testing.T) {
+	mods, err := buildSources(plugins, te.cfg, source.Deps{Inventory: te.Store, Turns: te.Turns, Clock: clockFunc(te.Now)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	te.serveWith(t, func(d daemon.Deps) daemon.Deps { return te.serveGTD(d, te.db, te.cfg, mods, t.Logf) })
+}
+
+// serveWith serves te's daemon, its deps passed through with when set.
+func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	t.Helper()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	te.loop = mu
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState, Explorer: derivedRows{te.gh},
 		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store)
-	srv := daemon.New(te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf))
-	te.Socket = serveSocket(t, srv.Handler())
+	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
+	if with != nil {
+		d = with(d)
+	}
+	te.Socket = serveSocket(t, daemon.New(d).Handler())
 }
 
 // checkoutFiles reads the file system, except that every workspace the

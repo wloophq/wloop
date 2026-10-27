@@ -67,7 +67,7 @@ func TestOpsCreate(t *testing.T) {
 	}
 	c := creates[0]
 	wantAnchor := unit.Anchor{Unit: threadUnit, Ref: "C0001/1700007200.000400",
-		Permalink: "https://example.com/archives/C0001/p1700007200000400?thread_ts=1700000000.000100", At: tsTime("1700007200.000400")}
+		Permalink: "https://example.com/archives/C0001/p1700007200000400?thread_ts=1700000000.000100", At: slack.TSTime("1700007200.000400")}
 	if c.Unit != threadUnit || c.Item == "" || c.Anchor != wantAnchor {
 		t.Errorf("create = %+v", c)
 	}
@@ -126,7 +126,7 @@ func TestOpsAssignAndResolve(t *testing.T) {
 	}
 	res := ops[1]
 	ev := unit.Anchor{Unit: threadUnit, Ref: "C0001/1700003600.000300",
-		Permalink: "https://example.com/archives/C0001/p1700003600000300?thread_ts=1700000000.000100", At: tsTime("1700003600.000300")}
+		Permalink: "https://example.com/archives/C0001/p1700003600000300?thread_ts=1700000000.000100", At: slack.TSTime("1700003600.000300")}
 	if res.Item != "i2" || res.Resolution != "done" || res.Anchor != ev || res.Evidence == nil || *res.Evidence != (items.Evidence{Kind: "reaction", Anchor: ev}) {
 		t.Errorf("resolve = %+v", res)
 	}

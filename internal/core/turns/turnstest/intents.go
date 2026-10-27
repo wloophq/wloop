@@ -28,6 +28,9 @@ func Intents() *dintent.Registry {
 		{Name: dintent.Probe, Role: "probe", Answerable: true, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 		{Name: dintent.Act, Role: "headless", UserFacing: true, Answerable: true, Provider: dintent.AnyProvider, Runners: []string{"headless", "session"}, Verb: "delegate",
 			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
+		{Name: "start", UserFacing: true, Answerable: true, Provider: "entry", Session: dintent.Session{Title: "start"},
+			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Outcome: []string{"url"},
+				OutcomeDoc: "`outcome` (done): `url`, the pull request you opened or the message you posted.", AttachURL: true}},
 		{Name: "brief", Builds: "brief", Prompt: "prompts/brief.md", Provider: "github", Providers: []unit.ProviderID{"github", "slack"}},
 	})
 }

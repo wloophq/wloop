@@ -31,6 +31,8 @@ type Provider struct {
 	db *sqlite.DB
 	// clock's location is where working days are counted.
 	clock port.Clock
+	// endedAfter is how long a unit stays quiet before it has ended.
+	endedAfter time.Duration
 
 	mu  sync.Mutex
 	due time.Time
@@ -42,7 +44,9 @@ var (
 	_ automation.Scoper = (*Provider)(nil)
 )
 
-func New(db *sqlite.DB, clock port.Clock) *Provider { return &Provider{db: db, clock: clock} }
+func New(db *sqlite.DB, clock port.Clock, endedAfter time.Duration) *Provider {
+	return &Provider{db: db, clock: clock, endedAfter: endedAfter}
+}
 
 // List is every Slack unit a live entry is attached to, in unit order.
 func (p *Provider) List(ctx context.Context, _ unit.ProviderID) ([]unit.Unit, error) {
@@ -150,6 +154,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"slack.conversation":           kind,
 		"slack.started_by_me":          st.StartedByViewer,
 		"slack.closure_posted":         st.ClosurePosted || st.ClosureMarked,
+		"slack.ended":                  st.ClosurePosted || st.ClosureMarked || p.quiet(newest, now),
 		"slack.live_entry":             slices.ContainsFunc(es, func(e gtd.Entry) bool { return liveOn(e, u) }),
 		"slack.items_open":             open,
 		"slack.items_unowned":          orphans,
@@ -157,6 +162,13 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"slack.settled_at":             time.Time{},
 		"slack.fingerprint":            u.String() + "|" + newest + "|" + updated.UTC().Format(time.RFC3339Nano),
 	}, nil
+}
+
+// quiet says whether the unit whose newest stored message is newest has
+// been quiet for endedAfter at now; false with no message stored.
+func (p *Provider) quiet(newest string, now time.Time) bool {
+	at := dslack.TSTime(newest)
+	return !at.IsZero() && now.Sub(at) >= p.endedAfter
 }
 
 // liveOn says whether e is a live, unmuted entry attached to u.

@@ -16,7 +16,7 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Units and their changes | `Ingest` (an `ingest.Job` over its `port.Source` and `port.SourceStore`), `Slow`, `Run` (a long-running stream, restarted after 30 s), `Jobs` | runs them as daemon jobs; a source never writes, ingest saves through the source's store |
 | Rows | `Rows`, a read model provider | serves them to every surface with the rest of the read model |
 | Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into GTD entries; renders the card on every surface; resolves linked items from unit events |
-| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records |
+| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records; `<slot>.ended` (`builtin.EndedFact`), such as `pr.ended` or `slack.ended`, is the plugin's word that a unit has ended, which the entries it is attached to read as `entry.units_ended` |
 | Marks | its planner's own mark names, written through the store | stores them per unit, retains them with the unit, and lets `handled()` read them |
 | What a turn reads about a unit | `Payload`, a `turn.PayloadReader` | renders it into the turn's instructions |
 | Where its work runs | `PlacementDefaults`, `PlacementHints` | the placement service decides the repository and checkout |

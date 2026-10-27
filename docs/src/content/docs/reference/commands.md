@@ -158,6 +158,31 @@ Examples:
 
 See [Review someone else's pull request](/guides/review/).
 
+### start
+
+Start new work from a brief.
+
+```sh
+{{command}} start [entry:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+```
+
+Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new entry; words after it are guidance for the turn.
+
+| Flag | Description |
+| --- | --- |
+| `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
+| `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
+
+Examples:
+
+```sh
+{{command}} start --repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times
+{{command}} start entry:e-3f9a2c4b5d6e7f80 --repo acme/api
+```
+
+See [Inbox, entries and work units](/concepts/gtd/).
+
 ### take-over
 
 Make a pull request someone else opened yours.
@@ -570,13 +595,13 @@ The JSON Schemas of the profile files, for editors.
 {{command}} profile schema [--workflow|--actions|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
 | `--workflow` | The schema of workflow.toml |
 | `--actions` | The schema of actions.toml |
-| `--config` | The schema of config.json |
+| `--config` | The schema of config.toml |
 
 Examples:
 
@@ -734,7 +759,7 @@ Trust a repository in an agent home.
 {{command}} trust [--home <dir>] [--exact] <folder|workspace>
 ```
 
-Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. {{name}} never trusts a folder unless you run this.
+Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. {{name}} never trusts a folder unless you run this, or the folder is a repository it just cloned for a project whose trust_clones is on.
 
 | Flag | Description |
 | --- | --- |

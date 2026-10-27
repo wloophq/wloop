@@ -299,8 +299,8 @@ func helpGroups(manager string) []helpGroup {
 				Names:    []string{"profile schema"},
 				Summary:  "The JSON Schemas of the profile files, for editors",
 				Usage:    []string{"profile schema [--workflow|--actions|--config]"},
-				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.",
-				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--config", "The schema of config.json"}},
+				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.",
+				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--config", "The schema of config.toml"}},
 				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
 				Docs:     "reference/language",
 			},
@@ -382,7 +382,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Trust a repository in an agent home",
 				Usage:   []string{"trust [--home <dir>] [--exact] <folder|workspace>"},
 				About: "Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. " +
-					name + " never trusts a folder unless you run this.",
+					name + " never trusts a folder unless you run this, or the folder is a repository it just cloned for a project whose trust_clones is on.",
 				Flags: []helpFlag{
 					{"--home <dir>", "The agent home that trusts it"},
 					{"--exact", "Trust the folder alone rather than its repository's main checkout"},

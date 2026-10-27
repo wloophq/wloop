@@ -2,9 +2,11 @@ package intent
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/pelletier/go-toml/v2"
 
@@ -23,6 +25,19 @@ type manifestDefaults struct {
 	Provider dunit.ProviderID `toml:"provider"`
 	// Refusal is what a [[refuse]] case whose why renders empty says.
 	Refusal string `toml:"refusal"`
+	// SessionName is an intent's session.name when its manifest has none.
+	SessionName string `toml:"session_name"`
+}
+
+// checkSessionName renders src over every name fact, so a session_name
+// that cannot render is reported in defaults.toml rather than in every
+// manifest that takes it.
+func checkSessionName(src string) error {
+	t, err := template.New("session_name").Option("missingkey=error").Parse(src)
+	if err == nil {
+		err = t.Execute(io.Discard, sample(builtin.Env(builtin.NameSlot, nil)))
+	}
+	return err
 }
 
 func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Problems) {
@@ -45,6 +60,13 @@ func readDefaults(layers []profile.Layer, bundled fs.FS) (manifestDefaults, Prob
 		}
 		if d.Refusal != "" {
 			out.Refusal = d.Refusal
+		}
+		if d.SessionName != "" {
+			if err := checkSessionName(d.SessionName); err != nil {
+				problems = append(problems, Problem{File: file, Line: 1, Col: 1, Field: "session_name", Msg: err.Error()})
+				return
+			}
+			out.SessionName = d.SessionName
 		}
 	}
 	if bundled != nil {

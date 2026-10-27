@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -376,20 +377,28 @@ func TestUnwantDropsTheWant(t *testing.T) {
 }
 
 func TestForgetWaitsForARunToSettle(t *testing.T) {
-	r := newRig(t, 1)
-	r.q.state.Lock()
-	done := make(chan struct{})
-	go func() {
-		r.q.Forget(context.Background(), refN(1))
-		close(done)
-	}()
-	select {
-	case <-done:
-		t.Fatal("Forget ran while a run was settling")
-	case <-time.After(50 * time.Millisecond):
-	}
-	r.q.state.Unlock()
-	<-done
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig(t, 1)
+		r.q.state.Lock()
+		unlock := sync.OnceFunc(r.q.state.Unlock)
+		done := make(chan struct{})
+		t.Cleanup(func() {
+			unlock()
+			<-done
+		})
+		go func() {
+			r.q.Forget(context.Background(), refN(1))
+			close(done)
+		}()
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatal("Forget ran while a run was settling")
+		default:
+		}
+		unlock()
+		<-done
+	})
 }
 
 func TestWantedRunsAreBounded(t *testing.T) {

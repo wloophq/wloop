@@ -70,7 +70,9 @@ type AgentSession struct {
 	Home string
 	// Model is a model name of the agent's own that the user pinned, "" for
 	// its default; the core passes it on unread.
-	Model  string
+	Model string
+	// Name is what the agent shows the session as, "" for its default.
+	Name   string
 	Policy Policy
 	// Trusted says the pull request passes the trust check of automated
 	// rounds, so the session may run unattended. The loop never trusts the

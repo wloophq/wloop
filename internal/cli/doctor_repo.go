@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
@@ -81,7 +82,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	intents := doctorIntents(e.loadedIntents().Registry, *show)
+	intents := doctorIntents(e.loadedIntents().Registry, *show, ref.Unit().Provider)
 	if *kind != "" {
 		d, err := e.intentDef(*kind)
 		if err != nil {
@@ -206,11 +207,11 @@ func placeholderTurn(d dintent.Def, ref github.Ref) turn.Request {
 
 // doctorIntents are the intents a round on a pull request can run, in name
 // order: the ones that read judgment blocks, and with --show every
-// user-facing one whose context is a pull request.
-func doctorIntents(r *dintent.Registry, show bool) []dintent.Def {
+// user-facing one whose context is a pull request and that serves units of p.
+func doctorIntents(r *dintent.Registry, show bool, p unit.ProviderID) []dintent.Def {
 	var out []dintent.Def
 	for _, d := range r.All() {
-		if d.Profile != "" || (show && d.UserFacing && d.Context == contextPR) {
+		if d.Profile != "" || (show && d.UserFacing && d.Context == contextPR && d.Serves(p)) {
 			out = append(out, d)
 		}
 	}
@@ -343,7 +344,7 @@ func (e *Env) doctorState(ctx context.Context, q api.DoctorQuery) (api.DoctorRep
 	if err != nil {
 		return rep, err
 	}
-	for _, d := range doctorIntents(e.loadedIntents().Registry, false) {
+	for _, d := range doctorIntents(e.loadedIntents().Registry, false, "") {
 		last, ok, err := store.LastBundledSHA(ctx, string(d.Name), q.Repo)
 		if err != nil {
 			return rep, err
@@ -391,7 +392,7 @@ func (e *Env) workflowChecks(ctx context.Context, db workflowReads) ([]api.Docto
 	cfg, err := e.loadConfig()
 	if err != nil {
 		out = append(out, api.DoctorCheck{Mark: api.DoctorMissing, Name: "workflows config",
-			Info: "not read, so the modes below are the profile's modes and workflows.<name> entries go unchecked: " + err.Error(), Fix: "fix the JSON in " + e.ConfigPath})
+			Info: "not read, so the modes below are the profile's modes and workflows.<name> entries go unchecked: " + err.Error(), Fix: e.configFix(err)})
 	}
 	now := e.Now()
 	activity, err := db.WorkflowActivity(ctx, now.Add(-24*time.Hour))
@@ -459,7 +460,7 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		}
 		mark = api.DoctorInfo
 		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, `"observe": false`), e.ConfigPath)
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, "observe", "false"), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
@@ -469,14 +470,14 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 	}
 	if w.Approval.Mode == workflow.ApprovalWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, `"approval": {"mode": "run"}`), e.ConfigPath)
+			workflowEntry(w.Name, "approval.mode", `"run"`), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }
 
-// workflowEntry is the config.json entry that sets field of workflow name.
-func workflowEntry(name, field string) string {
-	return fmt.Sprintf(`"workflows": {%q: {%s}}`, name, field)
+// workflowEntry is the config.toml line that sets field of workflow name to value.
+func workflowEntry(name, field, value string) string {
+	return config.Key("workflows", name) + "." + field + " = " + value
 }
 
 // stuckCursor is a check when an event w handles has waited past

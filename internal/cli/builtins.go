@@ -11,6 +11,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
@@ -240,14 +241,24 @@ func intentOptions(d dintent.Def, opts roundOptions) roundOptions {
 // sessionNew is the session strategy that never reuses the live session.
 const sessionNew = "new"
 
-// sessionTime is the time in the title of the sessions the loop starts.
-const sessionTime = "02/01 15:04"
+// roundName is the session name of a round's turn on u; the round's session
+// title when it has no intent.
+func (e *Env) roundName(opts roundOptions, u unit.Unit) (string, error) {
+	if opts.intent == "" {
+		return opts.title, nil
+	}
+	return e.sessionName(opts.intent, u, opts.names)
+}
 
-// sessionTitle is the title of a session the loop starts for a turn of intent:
-// its manifest's session title and the time.
-func (e *Env) sessionTitle(intent turn.Intent) string {
-	d, _ := e.loadedIntents().Registry.Get(dintent.Name(intent))
-	return d.Session.Title + " " + e.Now().Format(sessionTime)
+// sessionName is what the manager and the agent show a session the loop
+// starts for a turn of intent on u as: its manifest's session.name.
+func (e *Env) sessionName(intent dintent.Name, u unit.Unit, names map[string]any) (string, error) {
+	facts := maps.Clone(names)
+	if facts == nil {
+		facts = map[string]any{}
+	}
+	facts["unit.label"], facts["session.started"] = u.Label(), e.Now()
+	return e.loadedIntents().SessionName(intent, facts)
 }
 
 // beforeSet is whether a set input of the request runs the before builtin.

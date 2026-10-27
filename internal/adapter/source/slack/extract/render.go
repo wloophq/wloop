@@ -3,7 +3,6 @@ package extract
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -103,7 +102,7 @@ func renderMessage(in Input, m slack.Message, label string, isNew bool, index ma
 
 func renderRaw(in Input, m slack.Message, label string, isNew bool, index map[string]string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "[%s ts=%s %s] ", label, m.TS, tsTime(m.TS).In(zone(in)).Format("2006-01-02 15:04 MST"))
+	fmt.Fprintf(&b, "[%s ts=%s %s] ", label, m.TS, slack.TSTime(m.TS).In(zone(in)).Format("2006-01-02 15:04 MST"))
 	if in.Focus != "" && m.TS == in.Focus {
 		b.WriteString("focus ")
 	}
@@ -237,17 +236,6 @@ func tsLess(a, b string) bool {
 		return as < bs
 	}
 	return af < bf
-}
-
-func tsTime(ts string) time.Time {
-	sec, frac, _ := strings.Cut(ts, ".")
-	s, err := strconv.ParseInt(sec, 10, 64)
-	if err != nil {
-		return time.Time{}
-	}
-	frac = (frac + "000000")[:6]
-	us, _ := strconv.ParseInt(frac, 10, 64)
-	return time.Unix(s, us*1000).UTC()
 }
 
 // ContextBefore is the newest of msgs, ascending, within n messages and chars of text.

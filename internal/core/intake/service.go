@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 )
 
@@ -31,7 +32,7 @@ type Service struct {
 	Clock    port.Clock
 	Pub      port.Publisher
 	// Lock is the daemon's loop mutex, held only while the turn starts.
-	Lock sync.Locker
+	Lock *lock.Mutex
 	// After is time.After when nil.
 	After func(time.Duration) <-chan time.Time
 	// Log reports what fails after an intake's change is saved; nil drops
@@ -329,36 +330,13 @@ func (s *Service) run(ctx context.Context, i Intake, out *logWriter) (StartedTur
 		ctx = a.ReadAhead(ctx, i)
 	}
 	if s.Lock != nil {
-		if err := lock(ctx, s.Lock); err != nil {
+		if err := s.Lock.LockContext(ctx); err != nil {
 			return StartedTurn{}, false, err
 		}
 		defer s.Lock.Unlock()
 	}
 	st, err := s.Starter.Start(ctx, i, out)
 	return st, true, err
-}
-
-// lockPoll is how often a start that waits for the loop mutex tries it.
-const lockPoll = 10 * time.Millisecond
-
-// lock takes l, giving up when ctx is done first; a Locker without
-// TryLock is waited for whatever ctx does.
-func lock(ctx context.Context, l sync.Locker) error {
-	t, ok := l.(interface{ TryLock() bool })
-	if !ok {
-		l.Lock()
-		return nil
-	}
-	tick := time.NewTicker(lockPoll)
-	defer tick.Stop()
-	for !t.TryLock() {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-tick.C:
-		}
-	}
-	return nil
 }
 
 func (s *Service) fail(ctx context.Context, seq int64, reason string) (Intake, error) {

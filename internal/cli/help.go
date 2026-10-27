@@ -100,6 +100,11 @@ func intentTopic(d dintent.Def) helpTopic {
 			helpFlag{flagNoWait, "Print the intake's number instead of following it"},
 			helpFlag{flagNoBrief, "Start the round without its brief"})
 	}
+	if d.WorkspaceRepo != nil {
+		tp.Flags = append(tp.Flags,
+			helpFlag{flagManager + " <name>", "The workspace manager that creates the worktree, instead of the configured ones"},
+			helpFlag{flagParent + " <worktree>", "The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default"})
+	}
 	return tp
 }
 

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -16,6 +17,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -149,19 +151,16 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github
 	if !req.CrossRepository && ws.BranchRenamed {
 		return ws, false, e.discard(ctx, ws, fmt.Errorf("%s created %s on branch %s instead of %s, which is taken", e.displayOf([]string{m.Name()}), ws.DisplayName, ws.Branch, req.HeadBranch))
 	}
-	title := cfg.Agent
-	if sent.Prompt != "" {
-		title = opts.title + " " + e.Now().Format(sessionTime)
-	}
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
 		return ws, false, e.discard(ctx, ws, err)
 	}
 	if sent.Prompt == "" {
-		start, err := e.startRequest(cfg, ws, s, title)
+		start, err := e.startRequest(cfg, ws, s, "")
 		if err != nil {
 			return ws, false, e.discard(ctx, ws, err)
 		}
+		start.Title = cfg.Agent
 		p := proc{id: start.Session, m: m}
 		if p.handle, err = m.StartAgentSession(ctx, start); err != nil {
 			return ws, false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, e.explainStart(ctx, cfg, ws, err, opts.trusted))
@@ -171,7 +170,11 @@ func (e *Env) createWithAgent(ctx context.Context, cfg config.Config, ref github
 		}
 		return ws, true, nil
 	}
-	p, err := e.startSession(ctx, cfg, ws, ref.Unit(), s, title, opts.keepBlocked, opts.trusted)
+	name, err := e.roundName(opts, ref.Unit())
+	if err != nil {
+		return ws, false, e.discard(ctx, ws, err)
+	}
+	p, err := e.startSession(ctx, cfg, ws, ref.Unit(), s, name, opts.keepBlocked, opts.trusted)
 	if blocked := (*workspace.BlockedError)(nil); errors.As(err, &blocked) && opts.keepBlocked(blocked.Reason) {
 		return ws, false, fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}
@@ -258,6 +261,26 @@ func findReviewWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 }
 
 func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string) (wsdomain.Repo, error) {
+	repo, err := e.checkout(ctx, cfg, repos, remoteKey, ref, preferRepoID, nil)
+	return repo, err
+}
+
+// clones serializes the clones into one folder: a start racing another
+// waits for its clone instead of taking a half-written one for a checkout.
+var clones sync.Map
+
+func lockClone(path string) func() {
+	mu, _ := clones.LoadOrStore(path, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
+}
+
+// checkout is the main checkout of ref's repository: one of repos, else
+// the folder of projects_dir named after it, cloned there when absent and
+// refused when it holds another repository. A clone made now is handed to
+// cloned, when set, before another caller can take it; when cloned fails,
+// the clone is removed.
+func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string, cloned func(path string) error) (wsdomain.Repo, error) {
 	if found := wsdomain.FindRepos(repos, remoteKey, preferRepoID); len(found) > 0 {
 		return found[0], nil
 	}
@@ -265,13 +288,26 @@ func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []ws
 		return wsdomain.Repo{}, fmt.Errorf("%s/%s is not registered in %s and projects_dir is not set in %s; set it to the directory where repositories should be cloned", ref.Owner, ref.Repo, e.managerDisplay(), e.ConfigPath)
 	}
 	path := filepath.Join(cfg.ProjectsDir, ref.Repo)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	unlock := lockClone(path)
+	defer unlock()
+	_, err := os.Stat(path)
+	switch {
+	case os.IsNotExist(err):
 		fmt.Fprintf(e.Out, "cloning %s/%s into %s\n", ref.Owner, ref.Repo, path)
 		if _, err := e.GH.Run(ctx, "repo", "clone", ref.Owner+"/"+ref.Repo, path); err != nil {
 			return wsdomain.Repo{}, err
 		}
-	} else if err != nil {
+		if cloned != nil {
+			if err := cloned(path); err != nil {
+				return wsdomain.Repo{}, errors.Join(err, os.RemoveAll(path))
+			}
+		}
+		return wsdomain.Repo{Path: path, RemoteKey: remoteKey}, nil
+	case err != nil:
 		return wsdomain.Repo{}, err
+	}
+	if _, name := gitx.ParseRemote(gitx.RemoteURL(path, "origin")); !strings.EqualFold(name, ref.Owner+"/"+ref.Repo) {
+		return wsdomain.Repo{}, fmt.Errorf("%s exists and is not a checkout of %s/%s; move it, or clone %s/%s yourself and add it to %s", path, ref.Owner, ref.Repo, ref.Owner, ref.Repo, e.managerDisplay())
 	}
 	return wsdomain.Repo{Path: path, RemoteKey: remoteKey}, nil
 }

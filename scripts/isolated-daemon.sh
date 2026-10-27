@@ -165,7 +165,7 @@ needs_no_jobs() {
 	die "$dir holds a copy of a store; serve it only with --no-jobs"
 }
 
-json_list() {
+toml_list() {
 	local first=1 item
 	printf '['
 	for item in "$@"; do
@@ -222,29 +222,35 @@ cmd_setup() {
 	[[ ${#workflows[@]} -gt 0 ]] || die "no workflow under $repo/profiles/default/workflows"
 	local wf="" w
 	for w in "${workflows[@]}"; do
-		wf+="${wf:+,}"$'\n'"    \"$w\": {\"enabled\": false}"
+		wf+=$'\n'"[workflows.$w]"$'\n'"enabled = false"$'\n'
 	done
 	local slack_on=false
 	((slack)) && slack_on=true
 
-	cat >"$dir/config/$name/config.json" <<-EOF
-		{
-		  "http": {"port": $((47910 + index))},
-		  "mcp": {"port": $((47810 + index))},
-		  "turns": {"per_unit_per_day": 1},
-		  "brief": {"enabled": false},
-		  "workflows": {$wf
-		  },
-		  "github": {"enabled": false},
-		  "slack": {
-		    "enabled": $slack_on,
-		    "keychain_service": "wloop-e2e-slack",
-		    "post_allowlist": $(json_list "$dm"),
-		    "request_log": true
-		  }
-		}
+	cat >"$dir/config/$name/config.toml" <<-EOF
+		[http]
+		port = $((47910 + index))
+
+		[mcp]
+		port = $((47810 + index))
+
+		[turns]
+		per_unit_per_day = 1
+
+		[brief]
+		enabled = false
+
+		[github]
+		enabled = false
+
+		[slack]
+		enabled = $slack_on
+		keychain_service = "wloop-e2e-slack"
+		post_allowlist = $(toml_list "$dm")
+		request_log = true
+		$wf
 	EOF
-	chmod 600 "$dir/config/$name/config.json"
+	chmod 600 "$dir/config/$name/config.toml"
 	mkdir -m 700 "$dir/state/$name"
 	(umask 077 && od -An -tx1 -N24 /dev/urandom | tr -d ' \n' >"$dir/state/$name/mcp.key")
 	printf 'binary=%q\nname=%q\nslack=%d\nagent=%d\n' "$bin" "$name" "$slack" "$agent" >"$dir/isolated.env"
@@ -253,7 +259,7 @@ cmd_setup() {
 	got=$(with_env "$bin" config get http.port 2>/dev/null || true)
 	if [[ $got != "$((47910 + index))" ]]; then
 		rm -rf "$dir"
-		die "$(basename "$binary") does not read $dir/config/$name/config.json; set ISOLATED_STATE_NAME to its brand.StateDir()"
+		die "$(basename "$binary") does not read $dir/config/$name/config.toml; set ISOLATED_STATE_NAME to its brand.StateDir()"
 	fi
 	echo "$dir"
 }

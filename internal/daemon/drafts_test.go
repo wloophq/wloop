@@ -781,3 +781,32 @@ func TestADraftNamesItsUnitTheMentionsAndTheItems(t *testing.T) {
 		t.Fatalf("list: %d %+v", code, list)
 	}
 }
+
+type takingFx struct{ *fakeFx }
+
+func (takingFx) Takes(target string) bool { return strings.HasPrefix(target, "#") }
+
+func TestADraftOnAnEntryActsThroughThePublisherOfItsTarget(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.o.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == unit.GitHub {
+			return takingFx{r.fx}, nil
+		}
+		return nil, fmt.Errorf("%w: %s", outbox.ErrDisabled, p)
+	}
+	r.o.Targets = []unit.ProviderID{unit.GitHub}
+	d := r.stored(t, draft.Draft{Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Target: "#general", Text: "hi", State: draft.Proposed})
+	var got api.Draft
+	if code := get(t, r.s, api.DraftPath(int64(d.ID)), &got); code != 200 {
+		t.Fatalf("GET: %d", code)
+	}
+	for _, st := range got.Actions {
+		if st.ID == "draft.approve" && !st.Enabled {
+			t.Errorf("state %+v", st)
+		}
+	}
+	if code, _, body := r.act(t, d.ID, "approve", fmt.Sprintf(`{"rev":%d}`, got.Rev)); code != 200 {
+		t.Fatalf("approve: %d %s", code, body)
+	}
+}

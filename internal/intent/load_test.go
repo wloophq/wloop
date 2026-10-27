@@ -911,3 +911,143 @@ func TestThreadIntentCannotReadPRFacts(t *testing.T) {
 		}
 	}
 }
+
+func TestASessionNameRendersOverItsFacts(t *testing.T) {
+	dir := t.TempDir()
+	m := strings.Replace(minimal, `session = { strategy = "new", title = "ask" }`, `session = { strategy = "new", title = "ask", name = '{{.session.title}} on {{.unit.label}}' }`, 1)
+	writeIntent(t, dir, "ask", m, "Ask.")
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got, err := l.SessionName("ask", map[string]any{"unit.label": "acme/api#7"}); err != nil || got != "ask on acme/api#7" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}
+
+func TestASessionNameWithoutTemplateIsTheTitle(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "ask", minimal, "Ask.")
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got, err := l.SessionName("ask", map[string]any{"unit.label": "acme/api#7"}); err != nil || got != "ask" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}
+
+func TestASessionNameReadingAnUnknownFactFailsToLoad(t *testing.T) {
+	dir := t.TempDir()
+	m := strings.Replace(minimal, `session = { strategy = "new", title = "ask" }`, `session = { strategy = "new", title = "ask", name = '{{.pr.slug}}' }`, 1)
+	writeIntent(t, dir, "ask", m, "Ask.")
+	_, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if e := problems.Error(); !strings.Contains(e, "session.name") {
+		t.Fatalf("problems = %s", e)
+	}
+}
+
+func TestAUserDefaultsSessionNameNamesEveryIntentWithoutOne(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "ask", minimal, "Ask.")
+	if err := os.WriteFile(filepath.Join(dir, DefaultsFile), []byte(testDefaults+"session_name = '{{.unit.label}} {{.session.title}}'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got, err := l.SessionName("ask", map[string]any{"unit.label": "acme/api#7"}); err != nil || got != "acme/api#7 ask" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}
+
+func TestABrokenDefaultsSessionNameIsReportedInDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "ask", minimal, "Ask.")
+	file := filepath.Join(dir, DefaultsFile)
+	if err := os.WriteFile(file, []byte(testDefaults+"session_name = '{{.nothing.here}}'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) != 1 || problems[0].File != file || !strings.Contains(problems.Error(), "session_name") {
+		t.Fatalf("problems = %s", problems.Error())
+	}
+	if got, err := l.SessionName("ask", nil); err != nil || got != "ask" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}
+
+const startLike = `label = "Start"
+summary = "Start new work from a brief"
+provider = "entry"
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .entry.title}}-{{.entry.short_id}}' }
+session = { strategy = "new", title = "start", name = '{{or .workspace.name .entry.title}}' }
+
+[target]
+missing = "capture"
+title = '{{firstLine .guidance}}'
+
+[inputs.repo]
+type = "text"
+flag = "--repo"
+help = "owner/name"
+
+[headline]
+resumed = "start"
+[[headline.new]]
+line = "Start."
+
+[record]
+states = ["done"]
+`
+
+func TestAStartIntentNamesItsWorkspaceSessionAndEntry(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "begin", startLike, "Begin.")
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, _ := l.Registry.Get("begin")
+	if w := d.WorkspaceRepo; w == nil || w.RepoInput != "repo" || !w.Optional || w.Name.Src == "" {
+		t.Fatalf("workspace = %+v", d.WorkspaceRepo)
+	}
+	if d.Target.Missing != dintent.TargetCapture {
+		t.Fatalf("target = %+v", d.Target)
+	}
+	facts := map[string]any{"entry.title": "Add retries to the Webhook sender!", "entry.short_id": "3f9a2c"}
+	ws, err := l.WorkspaceName("begin", facts)
+	if err != nil || ws != "add-retries-to-the-webhook-sender-3f9a2c" {
+		t.Fatalf("WorkspaceName = %q, %v", ws, err)
+	}
+	facts["workspace.name"] = ws
+	if got, err := l.SessionName("begin", facts); err != nil || got != ws {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+	facts["workspace.name"] = ""
+	if got, err := l.SessionName("begin", facts); err != nil || got != "Add retries to the Webhook sender!" {
+		t.Fatalf("SessionName without a workspace = %q, %v", got, err)
+	}
+	if got, err := l.TargetTitle("begin", "  Add retries\nto the sender, with backoff"); err != nil || got != "Add retries" {
+		t.Fatalf("TargetTitle = %q, %v", got, err)
+	}
+}
+
+func TestStartKeysAreChecked(t *testing.T) {
+	for name, c := range map[string]struct{ from, to, want string }{
+		"repo_optional needs repo_input": {`workspace = { repo_input = "repo", repo_optional = true,`, `workspace = { repo = "acme/api", repo_optional = true,`, "workspace.repo_optional"},
+		"target.missing names capture":   {`missing = "capture"`, `missing = "skip"`, "target.missing"},
+		"workspace.name reads its facts": {`{{slug .entry.title}}`, `{{.pr.slug}}`, "workspace.name"},
+		"capture needs an entry intent":  {`provider = "entry"`, `provider = "github"`, "target.missing"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeIntent(t, dir, "begin", strings.Replace(startLike, c.from, c.to, 1), "Begin.")
+			_, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+			if e := problems.Error(); !strings.Contains(e, c.want) {
+				t.Fatalf("problems = %s", e)
+			}
+		})
+	}
+}

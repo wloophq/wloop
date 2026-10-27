@@ -37,12 +37,12 @@ The tests build a store from each frozen schema, migrate it and compare it with 
 The site lives in `docs/`, built with Starlight. The product name is written once, in `docs/site.config.mjs`; pages write placeholders (the product's name, command and app between double braces) that `docs/src/plugins/remark-product.mjs` fills in text, code blocks and links at build time.
 
 ```sh
-make docs-ref     # regenerate the commands and facts reference pages from the binary
+make docs-ref     # regenerate the reference pages, the profile's schemas and the decision log's index
 make docs         # npm ci and build into docs/dist
 cd docs && npm run dev
 ```
 
-`make docs-ref` must run after changing a command's help or a fact; `go test` fails when the facts page drifts from the binary.
+`make docs-ref` must run after changing a command's help, a fact, an architecture rule, a reserved key or a decision-log entry; `go test` fails when a generated page drifts from its source.
 
 ## Working on the procedures
 
@@ -58,7 +58,7 @@ To try a local build, replace the installed binary with a new file (copy it next
 
 1. `{{command}} app install`. Expect `~/Applications/{{app}}.app`, the LaunchAgents reloaded, and the menu bar item `PR <n>` within a few seconds.
 2. On the first install macOS asks to allow notifications. Allow. `{{command}} doctor` shows notifications as authorized.
-3. Set `"workflows": {"review-follow-up": {"approval": {"window": "5m"}}}` (and the same for `review-first-round`), restart the daemon (`launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`) and make a review round due. Expect a notification "Round in ... · owner/repo #n".
+3. Set `workflows.review-follow-up.approval.window = "5m"` (and the same for `review-first-round`), restart the daemon (`launchctl kickstart -k gui/$(id -u)/io.github.{{org}}.{{name}}`) and make a review round due. Expect a notification "Round in ... · owner/repo #n".
 4. Choose Skip on it. Expect the row to leave "round soon" in the cockpit, a `round_skipped` event in its timeline, and no new notification for that round.
 5. On the next pending round, choose Guide, type a sentence and send. Expect the round to start at once, carrying the sentence.
 6. On the next one, choose Pause. Expect the row paused and no round sent.

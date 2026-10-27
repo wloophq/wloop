@@ -28,6 +28,7 @@ const (
 	StepAnswerRefuse = "answer.refuse"
 	StepClassify     = "classify"
 	StepNotifySelf   = "notify.self"
+	StepEntryClose   = "entry.close"
 )
 
 // The values of draft.propose's arguments.
@@ -61,6 +62,8 @@ var Steps = []StepDef{
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil,
 		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
+	{StepEntryClose, providers(unit.Entry), workflow.ReachLocal, nil,
+		"Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash."},
 	{StepTurnStart, nil, "", nil,
 		"Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`."},
 	{StepDraftPropose, nil, workflow.ReachLocal, nil,

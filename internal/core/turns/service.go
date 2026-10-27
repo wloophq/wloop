@@ -46,6 +46,9 @@ type Service struct {
 	Prompts Prompts
 	// Items is nil when records' ledger ops are not applied.
 	Items Ledger
+	// Results attaches a done record's outcome url to the turn's entry when
+	// its intent's record.attach_url says so; nil attaches nothing.
+	Results Results
 	// Usage is where EndHeadless writes a headless turn's usage; nil writes none.
 	Usage UsageWriter
 	// NewID mints session ids; nil mints random UUIDs.

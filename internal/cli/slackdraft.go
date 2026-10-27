@@ -78,8 +78,9 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	case onSlack:
 	case !ok:
 		return mcp.DraftResult{}, errNoDraftTurn
-	default:
-		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message ref or permalink target", b.Unit.Label())
+	case s.outbox.PublisherOf(draft.Draft{Unit: b.Unit, Target: a.Target}) != slackPlugin:
+		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message ref or permalink target, "+
+			"or on a channel or person target from a unit whose own plugin posts nothing", b.Unit.Label())
 	}
 	its := a.Items
 	if len(its) == 0 {

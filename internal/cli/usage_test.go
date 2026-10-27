@@ -173,7 +173,7 @@ func TestGuidanceAndTextAreNotAskingForHelp(t *testing.T) {
 func TestAnUnknownCommandSuggestsTheClosest(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	for name, want := range map[string]string{"stauts": "did you mean 'status'?", "outbx": "did you mean 'outbox'?", "prof": "did you mean 'profile'?", "zzzzzz": ""} {
+	for name, want := range map[string]string{"statuss": "did you mean 'status'?", "outbx": "did you mean 'outbox'?", "prof": "did you mean 'profile'?", "zzzzzz": ""} {
 		te.out.Reset()
 		te.err.Reset()
 		if code := te.run(name); code != 2 {
@@ -191,8 +191,8 @@ func TestAnUnknownCommandSuggestsTheClosest(t *testing.T) {
 		}
 	}
 	te.err.Reset()
-	if code := te.run("help", "stauts"); code != 2 || !strings.Contains(te.err.String(), "did you mean 'status'?") {
-		t.Errorf("help stauts: exit %d: %s", code, te.err)
+	if code := te.run("help", "statuss"); code != 2 || !strings.Contains(te.err.String(), "did you mean 'status'?") {
+		t.Errorf("help statuss: exit %d: %s", code, te.err)
 	}
 }
 
@@ -279,7 +279,7 @@ func TestTheBundledIntentsLeadTheGroupTheirManifestsName(t *testing.T) {
 			}
 		}
 	}
-	if want := []string{"act", "address", "nudge", "review", "take-over", "remove"}; !slices.Equal(prs, want) {
+	if want := []string{"act", "address", "nudge", "review", "start", "take-over", "remove"}; !slices.Equal(prs, want) {
 		t.Errorf("PULL REQUESTS lists %q, want %q", prs, want)
 	}
 }

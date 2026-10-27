@@ -9,7 +9,7 @@ description: Where the configuration, the state, the logs and the installed piec
 
 | Path | Holds |
 |---|---|
-| `config.json` | the [configuration](/reference/configuration/) |
+| `config.toml` | the [configuration](/reference/configuration/) |
 | `profiles/<name>/` | review profiles named by `profile` |
 
 ## State

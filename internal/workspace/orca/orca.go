@@ -366,11 +366,18 @@ func renamedBranch(got, want string) bool {
 func (m *Manager) create(ctx context.Context, req workspace.CreateRequest) (wsdomain.Workspace, string, error) {
 	if req.HeadBranch != "" && m.RPC != nil {
 		if ws, handle, err := m.createFromPR(ctx, req); err == nil {
+			ws.ParentDropped = req.Parent != ""
 			return ws, handle, nil
 		}
 	}
-	args := []string{"worktree", "create", "--repo", "id:" + req.RepoID, "--name", req.Name, "--no-parent"}
-	if req.BaseRef != "" {
+	args := []string{"worktree", "create", "--repo", "id:" + req.RepoID, "--name", req.Name}
+	parent, listed := m.listedWorktree(ctx, req.Parent)
+	if listed {
+		args = append(args, "--parent-worktree", "path:"+parent)
+	} else {
+		args = append(args, "--no-parent")
+	}
+	if req.BaseRef != "" && !req.DefaultBase {
 		args = append(args, "--base-branch", req.BaseRef)
 	}
 	if n := workspace.LinkedPR(req.Unit); n != 0 {
@@ -389,7 +396,28 @@ func (m *Manager) create(ctx context.Context, req workspace.CreateRequest) (wsdo
 	if err := m.do(ctx, &res, cliOp(args...)); err != nil {
 		return wsdomain.Workspace{}, "", err
 	}
-	return res.Worktree.workspace(), res.AgentTerminalHandle, nil
+	ws := res.Worktree.workspace()
+	ws.ParentDropped = req.Parent != "" && !listed
+	return ws, res.AgentTerminalHandle, nil
+}
+
+// listedWorktree is the path of the worktree Orca lists at path; Orca refuses
+// a parent selector it cannot resolve.
+func (m *Manager) listedWorktree(ctx context.Context, path string) (string, bool) {
+	if path == "" {
+		return "", false
+	}
+	path = filepath.Clean(path)
+	list, _, err := m.Workspaces(ctx)
+	if err != nil {
+		return "", false
+	}
+	for _, w := range list {
+		if w.Path != "" && filepath.Clean(w.Path) == path {
+			return w.Path, true
+		}
+	}
+	return "", false
 }
 
 func (m *Manager) SetStatus(ctx context.Context, id, status string) error {

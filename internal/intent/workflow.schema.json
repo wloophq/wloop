@@ -340,6 +340,26 @@
             "if": {
               "properties": {
                 "use": {
+                  "const": "entry.close"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "use": {
+                  "const": "entry.close"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
                   "const": "turn.start"
                 }
               },
@@ -541,6 +561,7 @@
               "turn.dismiss",
               "answer.refuse",
               "session.mark_dormant",
+              "entry.close",
               "turn.start",
               "draft.propose",
               "classify",

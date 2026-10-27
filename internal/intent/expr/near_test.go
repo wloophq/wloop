@@ -1,6 +1,9 @@
 package expr
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClosestSuggestsATypo(t *testing.T) {
 	t.Parallel()
@@ -45,5 +48,19 @@ func TestClosestGuessesNothingOnATie(t *testing.T) {
 	}
 	if got := Closest("sesion", []string{"session", "session"}); got != "session" {
 		t.Errorf("a repeated option is one option: %q", got)
+	}
+}
+
+func TestClosestAllocatesNothingForAHugeValue(t *testing.T) {
+	huge := strings.Repeat("a", 1<<22)
+	for name, options := range map[string][]string{
+		"short options":       {"fast", "balanced", "frontier"},
+		"an option as long":   {huge[1:] + "b"},
+		"an option one apart": {huge + "a"},
+	} {
+		var got string
+		if allocs := testing.AllocsPerRun(1, func() { got = Closest(huge, options) }); allocs > 0 || got != "" {
+			t.Errorf("%s: %v allocations, suggested %.10q", name, allocs, got)
+		}
 	}
 }

@@ -32,7 +32,9 @@ type group struct {
 var intentGroups = []group{
 	{"The pull request (`pr.*`)", []string{"pr"}},
 	{"The row (`row.*`)", []string{"row"}},
+	{"The entry (`entry.*`)", []string{"entry"}},
 	{"The turn (`turn.*`, `unit.*`)", []string{"turn", "unit"}},
+	{"A name (`session.*`, `workspace.*`; slot `name`)", []string{"session", "workspace"}},
 	{"A draft's actions (`draft.*`)", []string{"draft"}},
 	{"The configuration (`config.*`)", []string{"config"}},
 }
