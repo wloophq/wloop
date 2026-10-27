@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/slack"
@@ -22,6 +22,12 @@ const fakeToken = "xoxp-0000-fake-user-token"
 type staticToken string
 
 func (s staticToken) Token(context.Context) (string, error) { return string(s), nil }
+
+// newBubbleClient is a client of a fake Slack it reaches in memory, for a synctest bubble.
+func newBubbleClient() (*slack.Client, *slacktest.Server) {
+	fake := slacktest.NewInMemory()
+	return &slack.Client{BaseURL: fake.URL, HTTP: fake.HTTP, Tokens: staticToken(fakeToken)}, fake
+}
 
 func newClient(t *testing.T) (*slack.Client, *slacktest.Server) {
 	t.Helper()
@@ -137,28 +143,27 @@ func assertClean(t *testing.T, msg string, args url.Values) {
 
 func TestRetryAfterIsHonored(t *testing.T) {
 	t.Parallel()
-	c, fake := newClient(t)
-	var mu sync.Mutex
-	var limited []string
-	c.OnRateLimited = func(m string) { mu.Lock(); limited = append(limited, m); mu.Unlock() }
-	fake.Handle("conversations.replies", func(url.Values) any { return map[string]any{"messages": []any{}} })
-	fake.RateLimit("conversations.replies", 1, 1)
+	synctest.Test(t, func(t *testing.T) {
+		c, fake := newBubbleClient()
+		var limited []string
+		c.OnRateLimited = func(m string) { limited = append(limited, m) }
+		fake.Handle("conversations.replies", func(url.Values) any { return map[string]any{"messages": []any{}} })
+		fake.RateLimit("conversations.replies", 1, 1)
 
-	start := time.Now()
-	if err := c.Call(context.Background(), "conversations.replies", url.Values{"channel": {"C000"}}, nil); err != nil {
-		t.Fatal(err)
-	}
-	if took := time.Since(start); took < 900*time.Millisecond || took > 3*time.Second {
-		t.Fatalf("took %s, want about 1s", took)
-	}
-	if n := len(fake.Calls("conversations.replies")); n != 2 {
-		t.Fatalf("requests = %d, want 2", n)
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	if len(limited) != 1 || limited[0] != "conversations.replies" {
-		t.Fatalf("OnRateLimited got %v", limited)
-	}
+		start := time.Now()
+		if err := c.Call(context.Background(), "conversations.replies", url.Values{"channel": {"C000"}}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if took := time.Since(start); took != time.Second {
+			t.Fatalf("took %s, want 1s", took)
+		}
+		if n := len(fake.Calls("conversations.replies")); n != 2 {
+			t.Fatalf("requests = %d, want 2", n)
+		}
+		if len(limited) != 1 || limited[0] != "conversations.replies" {
+			t.Fatalf("OnRateLimited got %v", limited)
+		}
+	})
 }
 
 func TestSecondRateLimitIsReturned(t *testing.T) {
@@ -184,39 +189,44 @@ func TestSecondRateLimitIsReturned(t *testing.T) {
 
 func TestRetryWaitStopsWithTheContext(t *testing.T) {
 	t.Parallel()
-	c, fake := newClient(t)
-	fake.RateLimit("search.messages", 30, 1)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	start := time.Now()
-	err := c.Call(ctx, "search.messages", nil, nil)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want deadline exceeded", err)
-	}
-	if time.Since(start) > 2*time.Second {
-		t.Fatal("wait ignored the context")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		c, fake := newBubbleClient()
+		fake.RateLimit("search.messages", 30, 1)
+		const budget = 100 * time.Millisecond
+		ctx, cancel := context.WithTimeout(context.Background(), budget)
+		defer cancel()
+		start := time.Now()
+		err := c.Call(ctx, "search.messages", nil, nil)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("err = %v, want deadline exceeded", err)
+		}
+		if took := time.Since(start); took != budget {
+			t.Fatalf("the wait took %s, want the context's %s", took, budget)
+		}
+	})
 }
 
 func TestLimiterLowDuringRetryAfter(t *testing.T) {
 	t.Parallel()
-	c, fake := newClient(t)
-	c.Limits = &slack.Limiter{}
-	fake.RateLimit("conversations.replies", 1, 2)
-	if c.Limits.Low("conversations.replies") {
-		t.Fatal("Low before any call")
-	}
-	_ = c.Call(context.Background(), "conversations.replies", nil, nil)
-	if !c.Limits.Low("conversations.replies") {
-		t.Fatal("Low = false inside the Retry-After window")
-	}
-	if c.Limits.Low("conversations.history") {
-		t.Fatal("the window leaked to another method")
-	}
-	time.Sleep(1100 * time.Millisecond)
-	if c.Limits.Low("conversations.replies") {
-		t.Fatal("Low = true after the window")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		c, fake := newBubbleClient()
+		c.Limits = &slack.Limiter{}
+		fake.RateLimit("conversations.replies", 1, 2)
+		if c.Limits.Low("conversations.replies") {
+			t.Fatal("Low before any call")
+		}
+		_ = c.Call(context.Background(), "conversations.replies", nil, nil)
+		if !c.Limits.Low("conversations.replies") {
+			t.Fatal("Low = false inside the Retry-After window")
+		}
+		if c.Limits.Low("conversations.history") {
+			t.Fatal("the window leaked to another method")
+		}
+		time.Sleep(time.Second)
+		if c.Limits.Low("conversations.replies") {
+			t.Fatal("Low = true after the window")
+		}
+	})
 }
 
 func TestLimiterPacesByTier(t *testing.T) {
@@ -301,30 +311,32 @@ func TestRedirectsAreNeverFollowed(t *testing.T) {
 
 func TestOKFalseRatelimitedIsARateLimit(t *testing.T) {
 	t.Parallel()
-	c, fake := newClient(t)
-	c.Limits = &slack.Limiter{}
-	var limited atomic.Int32
-	c.OnRateLimited = func(string) { limited.Add(1) }
-	var n atomic.Int32
-	fake.Handle("conversations.replies", func(url.Values) any {
-		if n.Add(1) == 1 {
-			return slacktest.Response{Header: http.Header{"Retry-After": {"1"}}, Body: map[string]any{"ok": false, "error": "ratelimited"}}
-		}
-		return map[string]any{"messages": []any{}}
-	})
-	go func() {
-		time.Sleep(300 * time.Millisecond)
+	synctest.Test(t, func(t *testing.T) {
+		c, fake := newBubbleClient()
+		c.Limits = &slack.Limiter{}
+		limited := 0
+		c.OnRateLimited = func(string) { limited++ }
+		n := 0
+		fake.Handle("conversations.replies", func(url.Values) any {
+			if n++; n == 1 {
+				return slacktest.Response{Header: http.Header{"Retry-After": {"1"}}, Body: map[string]any{"ok": false, "error": "ratelimited"}}
+			}
+			return map[string]any{"messages": []any{}}
+		})
+		done := make(chan error, 1)
+		go func() { done <- c.Call(context.Background(), "conversations.replies", nil, nil) }()
+		synctest.Wait()
 		if !c.Limits.Low("conversations.replies") {
 			t.Error("Low = false inside the window of an ok:false ratelimited answer")
 		}
-	}()
-	if err := c.Call(context.Background(), "conversations.replies", nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	if got := len(fake.Calls("conversations.replies")); got != 2 {
-		t.Fatalf("requests = %d, want 2", got)
-	}
-	if limited.Load() != 1 {
-		t.Fatalf("OnRateLimited calls = %d, want 1", limited.Load())
-	}
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		if got := len(fake.Calls("conversations.replies")); got != 2 {
+			t.Fatalf("requests = %d, want 2", got)
+		}
+		if limited != 1 {
+			t.Fatalf("OnRateLimited calls = %d, want 1", limited)
+		}
+	})
 }

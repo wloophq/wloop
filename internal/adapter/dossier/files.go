@@ -38,6 +38,8 @@ type Files struct {
 	Home    string
 	MaxFile int64
 	Now     func() time.Time
+
+	waitIndexLock func() // nil: indexLockWait
 }
 
 var _ dossiers.Files = Files{}
@@ -284,11 +286,18 @@ func (f Files) Commit(ctx context.Context, dir, message string, paths ...string)
 	return tighten(dir)
 }
 
+// indexLockWait is how long a commit waits for another git process to release the dossier's index lock.
+const indexLockWait = 200 * time.Millisecond
+
 // retryLocked runs fn again once when another git process held the dossier's index lock.
 func (f Files) retryLocked(fn func() error) error {
 	err := fn()
 	if err != nil && strings.Contains(err.Error(), "index.lock") {
-		time.Sleep(200 * time.Millisecond)
+		if f.waitIndexLock != nil {
+			f.waitIndexLock()
+		} else {
+			time.Sleep(indexLockWait)
+		}
 		err = fn()
 	}
 	return err

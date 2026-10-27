@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/view/testsink"
@@ -28,53 +29,46 @@ func addressed(u unit.Unit) turn.Book {
 }
 
 func TestAuthorFactsDriveTheRealViewsService(t *testing.T) {
-	w := newWorld()
-	ready := w.add(5, me, func(row *dinv.PR, _ *pr.Facts) {
-		row.HeadBranch, row.ReviewDecision, row.ChecksState, row.Mergeable = "ready", "APPROVED", "SUCCESS", "MERGEABLE"
-	})
-	changes := w.add(6, me, func(row *dinv.PR, f *pr.Facts) {
-		row.HeadBranch, row.ReviewDecision = "changes", "CHANGES_REQUESTED"
-		f.NewestChangesRequestOid = "head"
-	})
-	w.workspace(wsdomain.Workspace{ID: "dev5", Path: "/w/ready", DisplayName: "ready", Branch: "ready", LinkedPR: 5})
-	w.workspace(wsdomain.Workspace{ID: "dev6", Path: "/w/changes", DisplayName: "changes", Branch: "changes", LinkedPR: 6})
-	w.git.heads["/w/ready"] = "head"
+	synctest.Test(t, func(t *testing.T) {
+		w := newWorld()
+		ready := w.add(5, me, func(row *dinv.PR, _ *pr.Facts) {
+			row.HeadBranch, row.ReviewDecision, row.ChecksState, row.Mergeable = "ready", "APPROVED", "SUCCESS", "MERGEABLE"
+		})
+		changes := w.add(6, me, func(row *dinv.PR, f *pr.Facts) {
+			row.HeadBranch, row.ReviewDecision = "changes", "CHANGES_REQUESTED"
+			f.NewestChangesRequestOid = "head"
+		})
+		w.workspace(wsdomain.Workspace{ID: "dev5", Path: "/w/ready", DisplayName: "ready", Branch: "ready", LinkedPR: 5})
+		w.workspace(wsdomain.Workspace{ID: "dev6", Path: "/w/changes", DisplayName: "changes", Branch: "changes", LinkedPR: 6})
+		w.git.heads["/w/ready"] = "head"
 
-	books := turnstest.NewStore()
-	sink := testsink.New("board").WithAuthorColumns()
-	svc := &views.Service{Books: books, Intents: turnstest.Intents(), State: viewstest.NewState(), Sinks: []views.Sink{{ViewSink: sink, Placements: sink}},
-		Clock: clock{w}, Log: t.Logf, Backoff: func(int) time.Duration { return 5 * time.Millisecond }, Facts: w.provider()}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		svc.Run(ctx)
-	}()
-	t.Cleanup(func() {
-		cancel()
-		<-done
-	})
-	for _, r := range []pr.Ref{ready, changes} {
-		books.Put(addressed(r.Unit()))
-		sink.Place(r.Unit(), string(view.InReview))
-	}
-	svc.Changed(ctx, ready.Unit(), changes.Unit())
+		books := turnstest.NewStore()
+		sink := testsink.New("board").WithAuthorColumns()
+		svc := &views.Service{Books: books, Intents: turnstest.Intents(), State: viewstest.NewState(), Sinks: []views.Sink{{ViewSink: sink, Placements: sink}},
+			Clock: clock{w}, Log: t.Logf, Backoff: func(int) time.Duration { return 5 * time.Millisecond }, Facts: w.provider()}
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			svc.Run(ctx)
+		}()
+		t.Cleanup(func() {
+			cancel()
+			<-done
+		})
+		for _, r := range []pr.Ref{ready, changes} {
+			books.Put(addressed(r.Unit()))
+			sink.Place(r.Unit(), string(view.InReview))
+		}
+		svc.Changed(ctx, ready.Unit(), changes.Unit())
 
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+		synctest.Wait()
 		c5, m5, _ := sink.Card(ready.Unit())
 		c6, m6, unread := sink.Card(changes.Unit())
-		if c5 == string(view.Ready) && c6 == string(view.InProgress) {
-			if m5 != "approved and checks pass" || m6 != "changes requested" || !unread {
-				t.Fatalf("cards = (%q, %q), (%q, %q, unread %v)", c5, m5, c6, m6, unread)
-			}
-			return
+		if c5 != string(view.Ready) || m5 != "approved and checks pass" || c6 != string(view.InProgress) || m6 != "changes requested" || !unread {
+			t.Fatalf("cards = (%q, %q), (%q, %q, unread %v)", c5, m5, c6, m6, unread)
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("cards = %q (%q), %q (%q)", c5, m5, c6, m6)
-		}
-		time.Sleep(time.Millisecond)
-	}
+	})
 }
 
 func TestAuthorFactsSayWhichWorkspaceTheBoardHas(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
@@ -722,6 +723,12 @@ func (te *testEnv) run(args ...string) int {
 }
 
 // noDaemon points te's command line at a socket nothing listens on.
+// bubbled runs a test in a synctest bubble, where time passes only on a
+// timer: a command that returns after 0 waited for nothing.
+func bubbled(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) { synctest.Test(t, f) }
+}
+
 func (te *testEnv) noDaemon(t *testing.T) {
 	te.Socket = filepath.Join(t.TempDir(), "none.sock")
 }

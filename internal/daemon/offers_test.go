@@ -119,7 +119,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	d.Plan, d.Pending = plan, plan
 	s := New(d)
 	s.token = ""
-	t.Cleanup(s.stopLife)
+	stopOnCleanup(t, s)
 	return catalogRig{s: s, db: db, st: st, repo: repo, plan: plan}
 }
 

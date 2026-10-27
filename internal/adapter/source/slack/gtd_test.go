@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -54,7 +55,11 @@ type flow struct {
 func newFlow(t *testing.T, f *fixture, clock segClock) *flow {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	var wg sync.WaitGroup
+	t.Cleanup(func() {
+		cancel()
+		wg.Wait()
+	})
 	who, err := f.p.identity(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -66,8 +71,8 @@ func newFlow(t *testing.T, f *fixture, clock segClock) *flow {
 		Facts: coregtd.CardFacts{Cards: f.db.Cards(), Me: func() gtd.Me { return me }}})
 	job := &cardsjob.Job{Store: f.db.Cards(), Ledger: f.ledger(), Providers: map[unit.ProviderID]cardsjob.Provider{dslack.Provider: {Card: Card}},
 		Clock: clock, Log: t.Logf}
-	go fl.model.Run(ctx, job.Changed)
-	go job.Run(ctx, fl.model)
+	wg.Go(func() { fl.model.Run(ctx, job.Changed) })
+	wg.Go(func() { job.Run(ctx, fl.model) })
 	return fl
 }
 
@@ -117,7 +122,7 @@ func scriptedItem(ref, origin, requester string, waiting []string, state string)
 func TestSlackItemsBecomeEntries(t *testing.T) {
 	f := newFixture(t)
 	clock := segClock{tsAt(4)}
-	f.deps.Clock = segClock{time.Now()}
+	f.deps.Clock = segClock{t0}
 	f.deps.Turns = &turns.Service{Items: ledgerWithLog{f.ledger()}}
 	answer, err := json.Marshal(map[string]any{"brief": json.RawMessage(`{"unchanged": false, "goal": "b", "context": "", "kind": "request", "risk": "low", "risk_why": "", "open_questions": [], "tags": {"domain": [], "audience": [], "concern": []}}`), "viewer_role": "assignee", "started_by_viewer": false,
 		"items": []any{
@@ -133,7 +138,7 @@ func TestSlackItemsBecomeEntries(t *testing.T) {
 	f.build(t)
 	f.login(t)
 	f.people(t)
-	f.now = time.Now().Add(-time.Hour)
+	f.now = t0.Add(-time.Hour)
 	u := f.thread(t)
 	if _, _, err := f.p.extraction(f.cfg)[0].Run(context.Background()); err != nil {
 		t.Fatal(err)

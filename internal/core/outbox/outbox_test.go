@@ -21,13 +21,17 @@ func TestConcurrentDecisionsConflict(t *testing.T) {
 	e := newEnv()
 	d := e.propose(reply("hi"))
 	var wg sync.WaitGroup
-	start := make(chan struct{})
-	e.store.beforeUpdate = func(draft.Draft) { <-start }
+	arrived, start := make(chan struct{}), make(chan struct{})
+	e.store.beforeUpdate = func(draft.Draft) {
+		arrived <- struct{}{}
+		<-start
+	}
 	errs := make([]error, 2)
 	wg.Add(2)
 	go func() { defer wg.Done(); _, errs[0] = e.svc.Approve(ctx, d.ID, nil) }()
 	go func() { defer wg.Done(); _, errs[1] = e.svc.Discard(ctx, d.ID, "user") }()
-	time.Sleep(20 * time.Millisecond)
+	<-arrived
+	<-arrived
 	close(start)
 	wg.Wait()
 	ok, conflicts := 0, 0

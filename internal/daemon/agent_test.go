@@ -61,6 +61,7 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 			}
 			return fmt.Sprintf("message %d: %s", id, strings.Join(texts, ","))
 		}}, inventory.New(db)))
+	stopOnCleanup(t, s)
 	return s, svc
 }
 

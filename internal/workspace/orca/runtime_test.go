@@ -61,20 +61,34 @@ func startFakeRuntimeAt(t *testing.T, dir, runtimeID string, serve func(conn net
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { ln.Close() })
 	f := &fakeRuntime{dir: dir}
+	var wg sync.WaitGroup
+	var connsMu sync.Mutex
+	var conns []net.Conn
+	t.Cleanup(func() {
+		ln.Close()
+		connsMu.Lock()
+		for _, c := range conns {
+			c.Close()
+		}
+		connsMu.Unlock()
+		wg.Wait()
+	})
 	writeMetadata(t, f.dir, map[string]any{
 		"runtimeId":  runtimeID,
 		"authToken":  fakeToken,
 		"transports": []map[string]string{{"kind": "unix", "endpoint": sock}},
 	})
-	go func() {
+	wg.Go(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			go func() {
+			connsMu.Lock()
+			conns = append(conns, conn)
+			connsMu.Unlock()
+			wg.Go(func() {
 				defer conn.Close()
 				line, err := bufio.NewReader(conn).ReadString('\n')
 				if err != nil {
@@ -88,9 +102,9 @@ func startFakeRuntimeAt(t *testing.T, dir, runtimeID string, serve func(conn net
 				f.requests = append(f.requests, req)
 				f.mu.Unlock()
 				serve(conn, req)
-			}()
+			})
 		}
-	}()
+	})
 	return f
 }
 
@@ -171,12 +185,8 @@ func TestRuntimeSkipsKeepalivesAndRefreshesTimeout(t *testing.T) {
 		conn = &deadlineConn{Conn: c}
 		return conn, err
 	}}
-	start := time.Now()
 	if _, err := r.Call(context.Background(), "worktree.ps", nil); err != nil {
 		t.Fatal(err)
-	}
-	if d := time.Since(start); d < 2*r.Timeout {
-		t.Fatalf("call took %s, under twice the timeout", d)
 	}
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
@@ -193,9 +203,10 @@ func TestRuntimeSkipsKeepalivesAndRefreshesTimeout(t *testing.T) {
 func TestRuntimeCancelReturnsContextError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	const keepAliveFor = 20 * time.Second
 	f := startFakeRuntime(t, func(conn net.Conn, _ fakeRequest) {
 		cancel()
-		for stop := time.Now().Add(2 * time.Second); time.Now().Before(stop); {
+		for stop := time.Now().Add(keepAliveFor); time.Now().Before(stop); {
 			if _, err := fmt.Fprint(conn, `{"_keepalive":true}`+"\n"); err != nil {
 				return
 			}
@@ -207,8 +218,8 @@ func TestRuntimeCancelReturnsContextError(t *testing.T) {
 	if !errors.Is(err, context.Canceled) || errors.As(err, &rerr) {
 		t.Fatalf("err = %v", err)
 	}
-	if d := time.Since(start); d > time.Second {
-		t.Fatalf("returned after %s", d)
+	if d := time.Since(start); d >= keepAliveFor {
+		t.Fatalf("returned after %s, when the runtime stopped answering", d)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/intake"
@@ -106,6 +107,12 @@ func TestAFailedActionKeepsEveryLineItWrote(t *testing.T) {
 	if c := countPrefix(w.row.Log, "line "); c != 7 || w.row.Log[len(w.row.Log)-1] != "tail" {
 		t.Fatalf("the failed row's log is %q", w.row.Log)
 	}
+}
+
+func TestADriveLeavesNoTrailingSaveRunning(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		writeLines(t, 100, 5*time.Millisecond, "", nil)
+	})
 }
 
 func countPrefix(log []string, p string) int {
