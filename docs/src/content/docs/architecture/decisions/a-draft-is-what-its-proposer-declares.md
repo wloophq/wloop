@@ -1,0 +1,9 @@
+---
+title: A draft is what its proposer declares
+description: A draft carries its purpose, delivery and effects; nothing follows from its kind, and a comment waits for a person.
+---
+
+- **Context**: what sending a draft did, and whether it was held, followed its kind, so a closing message posted by a session closed its unit and a renamed purpose lost its behavior.
+- **Decision**: a draft carries a purpose, a delivery and its effects, and nothing follows from its purpose. The Outbox applies the declared effects once each draft is sent, by name, and an agent declares only the effects its intent's `[drafts] allowed_effects` lists. A draft's approval is its proposer's `[drafts.approval]`, whose rules never read a fact the facts table marks untrusted. A plugin declares how it posts each delivery (GitHub posts every draft but a reaction or an edit as a comment), the Outbox reads that delivery, and a comment draft waits for a person unless a rule whose `when` has `draft.delivery == "comment"` as a term of its top-level `&&` releases it. A post an agent makes at once, without a draft, is recorded as a sent draft.
+- **Consequence**: no catch-all mode and no thread or agent text posts a comment under the user's name; the kind survives only as the input word of agents and the API, mapped once; the Outbox holds everything posted in the user's name through the daemon.
+- **Enforced by**: `TestNoDraftKindComparisons`, `TestApprovalRulesReadTrustedFacts`, `TestASentDraftAppliesItsEffectsOnce`, `TestEffectsAreAppliedOnceAcrossARestart`, `TestACommentDraftWaitsForAPersonWhateverItsMode`, `TestARuleThatNamesCommentDeliveryReleasesAComment`, `TestAnAgentsPurposeNeverMatchesAPurposeRule`, `TestRequiresIsATermEveryMatchHolds`, `TestSessionSendsToUntrackedPlacesAreRecorded`. See [The Outbox](/concepts/approval/#the-outbox).

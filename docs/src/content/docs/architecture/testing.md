@@ -41,7 +41,7 @@ Every user-visible name comes from `internal/brand`. `make test-brand` runs the 
 
 A rule test is a test that does not call the `flagged` helper, which every self-test calls. Its doc comment states its rule as `// TestX checks that <rule>.`, and `TestEveryRuleTestStatesItsRule` fails on a rule test without one. [Architecture rules](/reference/architecture-rules/) lists every rule with its sentence, and each allowlist with its entries, their reasons and their triage; `make docs-ref` generates it from the sources of `internal/archtest`, and `TestRulesDocIsCurrent` fails when it drifts.
 
-Outside `internal/archtest`, `TestEveryBuiltinNameHasAnImplementation` (`internal/cli`) checks that every name the vocabulary lists is wired, and `TestFactsDocIsCurrent` that the facts reference matches the binary (`make docs-ref` regenerates it).
+Outside `internal/archtest`, `TestEveryBuiltinNameHasAnImplementation` (`internal/cli`) checks that every name the vocabulary lists is wired, and `TestFactsDocIsCurrent` that the facts reference matches the binary (`make docs-ref` regenerates it). `TestEveryDecisionNamesATestThatExists` checks that every entry of the [decision log](/architecture/decisions/) names a test that exists, and `TestDecisionsDocIsCurrent` (`internal/archtest/cmd/decisionsdoc`) that the log's index lists its entries.
 
 A reason that starts with `fix: ` marks an exception that does not hold and whose fix is mechanical, and `debt: ` one whose fix is a refactor; the page shows them as 🔧 and 🧾, the rest as ✅.
 
