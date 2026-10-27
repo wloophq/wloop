@@ -15,6 +15,8 @@ Test-only adapters prove that each seam holds a second implementation: the `echo
 
 Tests never read the wall clock. Code with timers, deadlines or goroutines runs in `synctest.Test` and asserts after `synctest.Wait`, on exact durations; real processes, sockets and files stay outside the bubble, behind a condition poll whose deadline only guards a hang. A test waits on the state it asserts, and a fake answers by state rather than by call count.
 
+Every goroutine a test starts, or makes the code under test start, is cancelled and awaited before the test's stores and directories go away. The code that starts one gives its owner a way to wait for it: the daemon's `Run` waits for the work it drives, and `serve` waits for its jobs, which run on the `Env`'s `background`, before it closes the store. The tests of `internal/cli` start those jobs through the harness's `testEnv.serveDeps`, whose cleanup cancels and waits for them; `TestServeRunsThroughTheHarness` keeps them there, and `TestStopServingWaitsForServesJobs` fails on a job `serve` starts without tracking it.
+
 ## Goldens
 
 - The wire goldens in `internal/daemon/testdata/wire` (rows, actions, specs, detail, health) are read by the daemon's tests and by each client's, so server and clients agree on the bytes.

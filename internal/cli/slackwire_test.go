@@ -142,7 +142,7 @@ func TestServeWiresSlackRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 	const conv, ts = "C0000000001", "1700000000.000100"
 	facts := dslack.Facts{Team: "T000", Threads: []dslack.Thread{{Conversation: conv, TS: ts, Messages: []dslack.Message{
@@ -151,7 +151,7 @@ func TestServeWiresSlackRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	srv := (mcpEndpoint{slack: te.Env.slack}).wire(serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
+	srv := (mcpEndpoint{slack: te.Env.slack}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
 	if srv.SlackRead == nil || !strings.Contains(toolNames(t, srv), "slack_read") {
 		t.Fatal("slack_read is not wired")
 	}
@@ -161,7 +161,7 @@ func TestServeWiresSlackRead(t *testing.T) {
 	}
 
 	st.saveToken(t, fakeToken())
-	srv = (mcpEndpoint{slack: te.Env.slack}).wire(serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
+	srv = (mcpEndpoint{slack: te.Env.slack}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
 	got, err := srv.SlackRead.Read(ctx, target, 50)
 	if err != nil || !strings.Contains(got, "stored thread text") {
 		t.Fatalf("Read = %q, %v", got, err)
@@ -172,7 +172,7 @@ func TestServeWiresSlackRead(t *testing.T) {
 
 	off := false
 	te.cfg.Slack.Enabled = &off
-	srv = (mcpEndpoint{slack: te.Env.slack}).wire(serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
+	srv = (mcpEndpoint{slack: te.Env.slack}).wire(te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil), te.cfg).MCP.(*mcp.Server)
 	if srv.SlackRead != nil {
 		t.Fatal("slack_read wired with the plugin disabled")
 	}

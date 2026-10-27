@@ -32,11 +32,11 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 	if len(job.Sources) == 0 {
 		return
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("proposals"))
 		defer scope.End()
 		job.Watch(lctx, e.changes, proposalsDebounce, proposalsEvery)
-	}()
+	})
 }
 
 // proposalsJob proposes the built modules' own drafts through an outbox

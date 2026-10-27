@@ -88,11 +88,11 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 			return err
 		}
 	}
-	submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
+	id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, resumeOf: l.ResumeOf})
 	if err != nil {
 		return err
 	}
-	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, submitted: submitted, guidance: r.Guidance}
+	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance}
 	runPhase(routeLaunch, d, sr, sentPhase)
 	if !writesRounds(routeLaunch, d, sr) {
 		return nil
@@ -150,36 +150,36 @@ func turnOf(b dturn.Book, seq int64) (dturn.Turn, bool) {
 
 // runInReview sends the round in the pull request's review workspace,
 // created when it has none.
-func (e *Env) runInReview(ctx context.Context, run roundRun) (bool, error) {
+func (e *Env) runInReview(ctx context.Context, run roundRun) (string, bool, error) {
 	ref, err := githubRef(run.r.Unit)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	if err := e.roundReady(); err != nil {
-		return false, err
+		return "", false, err
 	}
 	if run.st != nil && run.rememberHome != "" {
 		run.st.SetAgentHome(ref.String(), run.rememberHome)
 	}
 	sent, err := e.sendTurn(ctx, run.cfg, run.r)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	sent.resume(run.resumeOf)
 	submitted, err := e.openReview(ctx, run.cfg, ref, run.pr, sent, run.options(roundOptions{allowUserActive: true, pr: run.pr}))
 	if run.resumeOf == 0 {
 		e.recordGuidance(ctx, ref, run.r.Guidance)
 	}
-	return submitted, err
+	return sent.ID, submitted, err
 }
 
 // runInAuthor sends the round in the pull request's author workspace. A
 // resume creates it again when it is gone; a new round creates it only on a
 // pull request that is the user's.
-func (e *Env) runInAuthor(ctx context.Context, run roundRun) (bool, error) {
+func (e *Env) runInAuthor(ctx context.Context, run roundRun) (string, bool, error) {
 	cfg, r, pr := run.cfg, run.r, run.pr
 	if err := e.roundReady(); err != nil {
-		return false, err
+		return "", false, err
 	}
 	var ws wsdomain.Workspace
 	var action string
@@ -188,24 +188,24 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (bool, error) {
 		var repos []wsdomain.Repo
 		var all []wsdomain.Workspace
 		if repos, err = e.WS.Repos(ctx); err != nil {
-			return false, err
+			return "", false, err
 		}
 		if all, err = e.WS.List(ctx); err != nil {
-			return false, err
+			return "", false, err
 		}
 		ws, action, err = e.authorWorkspace(ctx, cfg, prOf(r.Unit), pr, e.prOf(ctx, pr), repos, all)
 	} else {
 		ws, action, err = e.addressWorkspace(ctx, cfg, prOf(r.Unit), pr, e.prOf(ctx, pr))
 	}
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	if action != "" && run.resumeOf == 0 {
 		fmt.Fprintf(e.Out, "%s\n", action)
 	}
-	submitted, verb, _, err := e.startAddress(ctx, cfg, ws, r, run.options(roundOptions{allowUserActive: true, resumeOf: run.resumeOf, trusted: trusts(cfg, pr), pr: pr}))
+	submitted, verb, id, err := e.startAddress(ctx, cfg, ws, r, run.options(roundOptions{allowUserActive: true, resumeOf: run.resumeOf, trusted: trusts(cfg, pr), pr: pr}))
 	if err != nil {
-		return submitted, fmt.Errorf("%s: %w", ws.DisplayName, err)
+		return id, submitted, fmt.Errorf("%s: %w", ws.DisplayName, err)
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
@@ -215,14 +215,15 @@ func (e *Env) runInAuthor(ctx context.Context, run roundRun) (bool, error) {
 	} else {
 		fmt.Fprintf(e.Out, "triage in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
 	}
-	return submitted, nil
+	return id, submitted, nil
 }
 
 // runInPRElseMain sends the round in a new session of the pull request's
 // workspace, else of the repository's main checkout, or in the caller's own
 // session.
-func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (bool, error) {
-	return true, e.nudge(ctx, run.cfg, run.r, run.pr, run.resumeOf)
+func (e *Env) runInPRElseMain(ctx context.Context, run roundRun) (string, bool, error) {
+	id, err := e.nudge(ctx, run.cfg, run.r, run.pr, run.resumeOf)
+	return id, true, err
 }
 
 // askedRound runs a round of d the user asked for through the daemon's
@@ -245,8 +246,8 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 		}
 		r := turn.Request{Intent: turn.Intent(d.Name), Trigger: turn.ByHand, Unit: ref.Unit(), Payload: turnPR(pr), Guidance: sr.guidance, Inputs: inputs}
 		e.withAddressReason(ctx, cfg, d, &r)
-		submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
-		sr.pr, sr.cfg, sr.inputs, sr.submitted = pr, cfg, inputs, submitted
+		id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
+		sr.pr, sr.cfg, sr.inputs, sr.id, sr.submitted = pr, cfg, inputs, id, submitted
 		if err == nil {
 			runPhase(routeAsked, d, sr, sentPhase)
 		}

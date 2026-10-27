@@ -256,7 +256,7 @@ func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, 
 		return req, fmt.Errorf("%s: the daemon has no prepare %s", d.Name, d.Prepare)
 	}
 	c := Call{Guidance: req.Guidance, Inputs: maps.Clone(req.Inputs)}
-	if _, err := prepare(s, ctx, u, &c); err != nil {
+	if err := prepare(s, ctx, u, &c); err != nil {
 		return req, err
 	}
 	req.Guidance, req.Inputs = c.Guidance, c.Inputs

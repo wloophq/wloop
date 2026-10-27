@@ -107,7 +107,7 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 		p, _ := prrow.PayloadOf(unmuted)
 		ref, _ := pr.ParseKey(r.Unit.Key)
 		who, why := prrow.NudgeTargets(unmuted, p.Author, seededViewer, prrow.IgnoreOf(config.Defaults()))
-		refusal := prrow.NudgeRefusal(ref, who, why, unmuted.Summary.Since, prrow.EventsOf(rd.In), rd.At)
+		refusal := prrow.NudgeRefusal(ref, who, why, unmuted.Summary.Since, prrow.EventsOf(rd.In), unstartedOf(rd.In), rd.At)
 		if st := actionState(r, "nudge"); st == nil || st.Enabled != (refusal == "") {
 			t.Errorf("%s: the row's nudge action %+v disagrees with refusal %q", r.Unit.Label(), st, refusal)
 		}
@@ -184,7 +184,7 @@ func propose(s ghsourcetest.Situation) (outbox.Proposal, bool) {
 		return outbox.Proposal{}, false
 	}
 	s.Override = dinv.Override{}
-	return nudgeProposal(row, ghsourcetest.Derive(s), s.Events, ghsourcetest.Viewer, nil, nowOf(s))
+	return nudgeProposal(row, ghsourcetest.Derive(s), s.Events, nil, ghsourcetest.Viewer, nil, nowOf(s))
 }
 
 func nowOf(s ghsourcetest.Situation) time.Time {
@@ -275,7 +275,7 @@ func TestIntentNudgeAndDraftNudgeShareTheWindow(t *testing.T) {
 		t.Fatalf("proposed %q again after a draft nudge was sent", p.Text)
 	}
 	row := ghsourcetest.Derive(sent)
-	refusal := prrow.NudgeRefusal(s.PR.Ref, []string{"@" + ghsourcetest.Other}, "", row.Summary.Since, sent.Events, ghsourcetest.Now)
+	refusal := prrow.NudgeRefusal(s.PR.Ref, []string{"@" + ghsourcetest.Other}, "", row.Summary.Since, sent.Events, nil, ghsourcetest.Now)
 	if !strings.Contains(refusal, "already nudged @"+ghsourcetest.Other) {
 		t.Fatalf("intent refusal %q", refusal)
 	}
