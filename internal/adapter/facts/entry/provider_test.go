@@ -315,3 +315,19 @@ func TestEntrySettledAtIsTheWorkflowsOwn(t *testing.T) {
 		t.Errorf("a workflow with no drafts: %v", fresh["entry.settled_at"])
 	}
 }
+
+func TestAnEntryThatLeftItsListStillHasEventFacts(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.entry(gtd.Entry{ID: "e-05", Kind: gtd.KindAction, State: gtd.Done, Title: "d", Units: []unit.Unit{chatA}})
+	e.entry(gtd.Entry{ID: "e-04", Kind: gtd.KindAction, State: gtd.Someday, Title: "m", Units: []unit.Unit{mailX}})
+	f, err := e.p.EventFacts(context.Background(), gtd.UnitOf("e-05"))
+	if err != nil || f["entry.state"] != "done" || f["entry.unit"] != chatA.String() {
+		t.Fatalf("event facts of a done entry: %v %v", f, err)
+	}
+	for _, id := range []gtd.ID{"e-04", "e-99"} {
+		if _, err := e.p.EventFacts(context.Background(), gtd.UnitOf(id)); err != automation.ErrUnitGone {
+			t.Errorf("event facts of %s: %v, want ErrUnitGone", id, err)
+		}
+	}
+}

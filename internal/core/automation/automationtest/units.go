@@ -22,6 +22,7 @@ type Units struct {
 
 	mu        sync.Mutex
 	facts     map[unit.Unit]workflow.Facts
+	ended     map[unit.Unit]workflow.Facts
 	errs      map[unit.Unit]error
 	listErr   map[unit.ProviderID]error
 	gains     map[unit.Unit]workflow.Gain
@@ -36,7 +37,7 @@ type Units struct {
 }
 
 func NewUnits(opts ...Option) *Units {
-	return &Units{o: build(opts), facts: map[unit.Unit]workflow.Facts{}, errs: map[unit.Unit]error{},
+	return &Units{o: build(opts), facts: map[unit.Unit]workflow.Facts{}, ended: map[unit.Unit]workflow.Facts{}, errs: map[unit.Unit]error{},
 		listErr: map[unit.ProviderID]error{}, gains: map[unit.Unit]workflow.Gain{},
 		owners: map[unit.Unit][]unit.Unit{}, ownerErrs: map[unit.Unit]error{}, moved: map[unit.Unit]bool{}}
 }
@@ -56,6 +57,14 @@ func (f *Units) Set(u unit.Unit, name string, v any) {
 		f.facts[u] = workflow.Facts{}
 	}
 	f.facts[u][name] = v
+}
+
+// PutEnded sets the facts of u, which left its list: only EventFacts serves them.
+func (f *Units) PutEnded(u unit.Unit, facts workflow.Facts) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.facts, u)
+	f.ended[u] = maps.Clone(facts)
 }
 
 // Remove stops listing u.
@@ -175,6 +184,18 @@ func (f *Units) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) 
 		return nil, fmt.Errorf("%s: %w", u, automation.ErrUnitGone)
 	}
 	return maps.Clone(facts), nil
+}
+
+// EventFacts are u's facts, listed or ended.
+func (f *Units) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	f.mu.Lock()
+	ended, ok := f.ended[u]
+	f.mu.Unlock()
+	if !ok {
+		return f.Facts(ctx, u)
+	}
+	f.o.read("units.facts")
+	return maps.Clone(ended), nil
 }
 
 func (f *Units) Refresh(ctx context.Context) error {

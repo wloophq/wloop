@@ -129,6 +129,7 @@ func triggerFacts(why workflow.Why) workflow.Facts {
 	if ev := why.Event; ev != nil {
 		f["trigger.event.kind"] = ev.Kind
 		f["trigger.event.key"] = ev.Key
+		f["trigger.event.id"] = ev.ID
 		f["trigger.event.data"] = ev.Data
 	}
 	if !why.FiredAt.IsZero() {

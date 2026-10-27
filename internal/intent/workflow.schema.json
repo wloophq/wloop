@@ -129,7 +129,7 @@
       "type": "object"
     },
     "key": {
-      "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again.",
+      "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run.",
       "items": {
         "type": "string"
       },
@@ -565,7 +565,7 @@
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
         "on": {
-          "description": "The source event kinds the workflow reacts to.",
+          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on an entry, with provider entry.",
           "items": {
             "enum": [
               "opened",
@@ -598,7 +598,24 @@
               "status",
               "would_review",
               "would_address",
-              "review_ended"
+              "review_ended",
+              "verb_next",
+              "verb_waiting",
+              "verb_schedule",
+              "verb_someday",
+              "verb_reference",
+              "verb_focus",
+              "verb_project",
+              "verb_approve",
+              "verb_delegate",
+              "verb_done",
+              "verb_dismiss",
+              "verb_context",
+              "verb_area",
+              "verb_answer",
+              "verb_reviewed",
+              "verb_sequential",
+              "verb_reply"
             ],
             "type": "string"
           },

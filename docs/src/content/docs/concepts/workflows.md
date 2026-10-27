@@ -36,6 +36,12 @@ An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{
 
 **Without a workspace.** A review workspace you deleted by hand frees its checkout and the pull request stays followed; the follow-up is only recorded (`would_review`) unless `github.followups_without_workspace` is on. Likewise, your pull request with no workspace gets its address round recorded (`would_address`) and shown in Needs me as "review to address, no workspace", unless `github.address_without_workspace` is on.
 
+## React to a verb
+
+A verb you run on an entry, such as Done, Someday or Delegate, records a `verb_<verb>` event on the entry (`verb_done`, `verb_someday`). A workflow with `provider = "entry"` reacts to it with `trigger.on = ["verb_done"]`; its `trigger.event.data` is the state the entry left, and the entry's facts are read even once it is done or dismissed. Its default key is the entry's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
+
+The core's own moves record the event with the change, in one write. A verb another part runs, a project's, a question's, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing: clients send it when you open an entry.
+
 ## The plan
 
 Evaluating the workflows yields **plan items**, each with a decision:

@@ -188,6 +188,16 @@ var RoundProviders = []unit.ProviderID{unit.GitHub}
 // which only an intent of that provider may read.
 var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 
+// EventProviders are the event kinds only one provider's units record, by
+// kind: a workflow reacting to one needs that provider.
+var EventProviders = func() map[string]unit.ProviderID {
+	out := map[string]unit.ProviderID{}
+	for _, k := range gtd.VerbEventKinds {
+		out[k] = unit.Entry
+	}
+	return out
+}()
+
 // Slots name each provider's fact slot.
 var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
 	unit.Entry: "entry", dslack.Provider: "slack"}

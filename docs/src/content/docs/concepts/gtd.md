@@ -50,6 +50,8 @@ Beside its state, an entry has a **focus** star, **contexts** (labels such as `@
 
 The views are Focus (starred entries, the landing view), Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook (reference and done) and Review.
 
+The words of the verbs and the views come from the profile's `gtd.toml`: each verb's label is its button and its summary the button's tooltip. Every verb you run on an entry, but `seen`, is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to.
+
 - **Changed since you saw it.** New activity on a unit by someone else, after you last opened the entry, brings a scheduled or waiting entry back to the Inbox with the changed mark. Opening or moving the entry clears it.
 - **Snooze.** `s` schedules an entry until a date, until activity, or both. When the date passes it returns to the state it had. Muting the unit snoozes its entries.
 - **Waiting.** `w` moves an entry to Waiting, optionally naming whom it waits on. A waiting entry with no nudge for `gtd.stale_waiting_days` (2 working days) gets the focus star, and so does any entry past its deadline.

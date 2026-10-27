@@ -15,13 +15,28 @@ type Scoper interface {
 	Scope(ctx context.Context, workflow string, u unit.Unit, f workflow.Facts) (workflow.Facts, error)
 }
 
+// EventFacts is an optional capability of Units: the facts of a unit an
+// event names, served after the unit left its list (an entry done or
+// dismissed), so an event workflow reacts to what took it out.
+type EventFacts interface {
+	EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error)
+}
+
 // factsFor are u's facts as workflow w reads them.
-func (e *Engine) factsFor(ctx context.Context, w string, u unit.Unit) (workflow.Facts, error) {
-	f, err := e.Units.Facts(ctx, u)
+func (e *Engine) factsFor(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	f, err := e.unitFacts(ctx, w, u)
 	if err != nil {
 		return nil, err
 	}
-	return e.scoped(ctx, w, u, f)
+	return e.scoped(ctx, w.Name, u, f)
+}
+
+// unitFacts are u's facts, through EventFacts for an event workflow.
+func (e *Engine) unitFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	if ef, ok := e.Units.(EventFacts); ok && w.Trigger.Kind == workflow.TriggerEvent {
+		return ef.EventFacts(ctx, u)
+	}
+	return e.Units.Facts(ctx, u)
 }
 
 func (e *Engine) scoped(ctx context.Context, w string, u unit.Unit, f workflow.Facts) (workflow.Facts, error) {

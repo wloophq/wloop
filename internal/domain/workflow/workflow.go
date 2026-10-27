@@ -264,7 +264,11 @@ type Key struct {
 	Value    string // sha256 hex of the sorted key values, first 16 chars
 }
 
-func NewKey(w Workflow, u unit.Unit, f Facts, fired time.Time) Key {
+// EventIDFact is the trigger fact an event workflow's key may name, so
+// each event plans its own run.
+const EventIDFact = "trigger.event.id"
+
+func NewKey(w Workflow, u unit.Unit, f Facts, why Why) Key {
 	names := slices.Clone(w.Key)
 	if len(names) == 0 {
 		names = []string{w.Slot + ".fingerprint"}
@@ -272,10 +276,14 @@ func NewKey(w Workflow, u unit.Unit, f Facts, fired time.Time) Key {
 	slices.Sort(names)
 	h := sha256.New()
 	for _, n := range names {
-		fmt.Fprintf(h, "%s=%s\n", n, formatValue(f[n]))
+		v := f[n]
+		if n == EventIDFact && why.Event != nil {
+			v = why.Event.ID
+		}
+		fmt.Fprintf(h, "%s=%s\n", n, formatValue(v))
 	}
 	if w.Trigger.Kind == TriggerSchedule {
-		fmt.Fprintf(h, "trigger.fired_at=%s\n", formatValue(fired))
+		fmt.Fprintf(h, "trigger.fired_at=%s\n", formatValue(why.FiredAt))
 	}
 	return Key{Workflow: w.Name, Unit: u, Value: hex.EncodeToString(h.Sum(nil))[:16]}
 }

@@ -262,6 +262,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `trigger.kind` | string | sweep, event or schedule. |
 | `trigger.event.kind` | string | The event's kind; empty unless kind is event. |
 | `trigger.event.key` | string | The event's key. |
+| `trigger.event.id` | int | The event's id, unique and growing; 0 unless kind is event. |
 | `trigger.event.data` | string | The event's data: a person's or an agent's text, such as an intake's note, an answer or the mentions of a sent nudge. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `trigger.fired_at` | timestamp | When the schedule fired; zero unless kind is schedule. |
 

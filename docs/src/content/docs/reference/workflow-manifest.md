@@ -40,7 +40,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | `provider` | one of `entry`, `github`, `session`, `slack`, `workspace` |  | The provider of the units it matches. Required. |
 | `when` | predicate |  | The match condition, over the unit's facts, the trigger's and config.*. Required. |
 | `order` | integer | `100` | Evaluation order, lowest first. |
-| `key` | list of facts |  | The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. |
+| `key` | list of facts |  | The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run. |
 | `marks` | table by name |  | Mark name to fact, stored when a run is done or dismissed, which handled() reads. |
 | `marks.&lt;name&gt;` | fact |  | The fact whose value the mark stores. |
 
@@ -49,7 +49,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `trigger` | table |  | What plans the workflow: on or schedule; absent, every sweep. |
-| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended` |  | The source event kinds the workflow reacts to. |
+| `trigger.on` | list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply` |  | The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on an entry, with provider entry. |
 | `trigger.schedule` | string |  | A cron schedule, in local time. |
 | `observe` | bool | `false` | Plans items pending and never runs them by itself; a person applies an item by hand. |
 | `limits` | table |  | How many runs the workflow may take. |

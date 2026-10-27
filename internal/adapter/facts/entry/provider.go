@@ -97,9 +97,11 @@ func (p *Provider) settings() Settings {
 
 // listed says whether e is a subject: a live entry of no unit, or of a unit
 // whose plugin is enabled.
-func (p *Provider) listed(e gtd.Entry) bool {
+func (p *Provider) listed(e gtd.Entry) bool { return e.Live() && p.enabledFor(e) }
+
+func (p *Provider) enabledFor(e gtd.Entry) bool {
 	u, ok := unitOf(e)
-	return e.Live() && (!ok || p.enabled(u.Provider))
+	return !ok || p.enabled(u.Provider)
 }
 
 // List is every listed entry, by id, and keeps the earliest nudge-due or
@@ -137,15 +139,16 @@ func (p *Provider) Due() time.Time {
 	return p.due
 }
 
-// entry is u's entry; ErrUnitGone when it is gone or no longer listed.
-func (p *Provider) entry(ctx context.Context, u unit.Unit) (gtd.Entry, error) {
+// entry is u's entry; ErrUnitGone when it is gone, or no longer listed
+// unless ended is true, or its plugin is disabled.
+func (p *Provider) entry(ctx context.Context, u unit.Unit, ended bool) (gtd.Entry, error) {
 	e, err := p.d.Entries.Entry(ctx, gtd.ID(u.Key))
 	switch {
 	case errors.Is(err, coregtd.ErrNoEntry):
 		return gtd.Entry{}, automation.ErrUnitGone
 	case err != nil:
 		return gtd.Entry{}, err
-	case !p.listed(e):
+	case ended && !p.enabledFor(e), !ended && !p.listed(e):
 		return gtd.Entry{}, automation.ErrUnitGone
 	}
 	return e, nil
@@ -154,7 +157,17 @@ func (p *Provider) entry(ctx context.Context, u unit.Unit) (gtd.Entry, error) {
 // Facts are the entry's facts in slot entry; entry.settled_at is zero until
 // Scope reads the workflow's drafts.
 func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
-	e, err := p.entry(ctx, u)
+	return p.facts(ctx, u, false)
+}
+
+// EventFacts are the facts of an entry an event names, also once done or
+// dismissed.
+func (p *Provider) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	return p.facts(ctx, u, true)
+}
+
+func (p *Provider) facts(ctx context.Context, u unit.Unit, ended bool) (workflow.Facts, error) {
+	e, err := p.entry(ctx, u, ended)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +257,7 @@ func (p *Provider) Scope(ctx context.Context, wf string, u unit.Unit, f workflow
 
 // Owners is the entry's unit, whose timeline shows the steps run on it.
 func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
-	e, err := p.entry(ctx, u)
+	e, err := p.entry(ctx, u, true)
 	if errors.Is(err, automation.ErrUnitGone) {
 		return nil, nil
 	}

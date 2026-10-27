@@ -249,7 +249,7 @@ func TestEvaluateWritesNothing(t *testing.T) {
 	r.put(p1, "h1")
 	r.guidance.Set(p1, "look at the tests")
 	r.steps.Refuse("notify.self", s1, "not today")
-	done := workflow.NewKey(capped, s2, workflow.Facts{"session.fingerprint": "old"}, time.Time{})
+	done := workflow.NewKey(capped, s2, workflow.Facts{"session.fingerprint": "old"}, workflow.Why{})
 	if err := r.ledger.Record(ctx, workflow.Run{Key: done, Status: workflow.RunDone, At: t0.Add(-time.Hour)}, workflow.Item{ID: done.ID()}); err != nil {
 		t.Fatal(err)
 	}
@@ -1441,7 +1441,7 @@ func TestADueRunDropsAnItemWhoseSourceMoved(t *testing.T) {
 	if it, ok := r.item("close", s1); ok {
 		t.Fatalf("the moved item stayed: %+v", it)
 	}
-	if run, ok, _ := r.ledger.Run(context.Background(), workflow.NewKey(r.wfs[0], s1, workflow.Facts{"session.fingerprint": "a"}, time.Time{})); ok {
+	if run, ok, _ := r.ledger.Run(context.Background(), workflow.NewKey(r.wfs[0], s1, workflow.Facts{"session.fingerprint": "a"}, workflow.Why{})); ok {
 		t.Fatalf("the drop marked the key: %+v", run)
 	}
 	r.units.SetMoved()
@@ -1698,5 +1698,34 @@ func TestOnlyAWorkflowThatReadsMarksLoadsThem(t *testing.T) {
 	r.evaluate()
 	if !slices.ContainsFunc(r.trace, func(c string) bool { return strings.HasSuffix(c, "ledger.marks") }) {
 		t.Fatalf("a workflow with handled() read no marks: %v", r.trace)
+	}
+}
+
+func TestEventsPlanOnAnEndedUnitOncePerEvent(t *testing.T) {
+	ctx := context.Background()
+	w := eventWF("on-done", unit.Entry, "entry", always, "verb_done")
+	w.Key = []string{workflow.EventIDFact}
+	byFacts := eventWF("by-facts", unit.Entry, "entry", always, "verb_done")
+	r := newRig(t, w, byFacts)
+	e1 := unit.Unit{Provider: unit.Entry, Key: "e-1"}
+	r.units.PutEnded(e1, workflow.Facts{"entry.fingerprint": "done"})
+	for _, name := range []string{"on-done", "by-facts"} {
+		if err := r.events.Advance(ctx, name, 0, time.Time{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r.events.Append(workflow.Event{Unit: e1, Kind: "verb_done", At: t0})
+	r.events.Append(workflow.Event{Unit: e1, Kind: "verb_done", At: t0})
+
+	p := r.evaluate()
+
+	count := map[string]int{}
+	for _, it := range p.Items {
+		if it.Unit == e1 {
+			count[it.Why.Workflow]++
+		}
+	}
+	if count["on-done"] != 2 || count["by-facts"] != 1 {
+		t.Errorf("items per workflow %v, want 2 keyed by event and 1 keyed by facts", count)
 	}
 }
