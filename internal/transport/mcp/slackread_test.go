@@ -34,7 +34,7 @@ func readCallBody(args string) string {
 
 func readSession(t *testing.T, f *fakeSlack, r *fakeReader) (*Server, string) {
 	t.Helper()
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Slack: f, SlackRead: r}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Slack: f, SlackRead: r}
 	sid := call(t, s, "", unexpanded, initialize).Header().Get("Mcp-Session-Id")
 	if sid == "" {
 		t.Fatal("no session id")

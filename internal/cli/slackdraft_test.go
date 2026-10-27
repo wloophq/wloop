@@ -626,6 +626,11 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	if want := builtin.ValueNames(builtin.Tools); !slices.Equal(slices.Sorted(slices.Values(names)), slices.Sorted(slices.Values(want))) {
 		t.Errorf("listed %v, tools.toml describes %v", names, want)
 	}
+	for _, call := range []struct{ tool, args string }{{"slack_send_message", `{}`}, {"slack_draft", `{"kind":"nope"}`}, {"turn_end", `[]`}} {
+		if got, isErr := w.callTool(t, "", draftHandle, call.tool, call.args); !isErr || strings.Contains(got, "map[") {
+			t.Errorf("%s answered %q", call.tool, got)
+		}
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for _, l := range w.logs {

@@ -18,16 +18,19 @@ import (
 // ToolsFile is the profile file that describes the MCP tools.
 const ToolsFile = "tools.toml"
 
-// ToolText is an MCP tool's description and its parameters', by parameter
-// path, as templates over builtin.ToolData.
+// ToolText is an MCP tool's description, its parameters', by parameter
+// path, and its answers, by name, as templates over builtin.ToolData and,
+// for an answer, the fields of its builtin.ToolAnswers row.
 type ToolText struct {
 	Description string
 	Params      map[string]string
+	Answers     map[string]string
 }
 
 type mToolText struct {
 	Description *string           `toml:"description"`
 	Params      map[string]string `toml:"params"`
+	Answers     map[string]string `toml:"answers"`
 }
 
 // loadTools reads tools.toml from bundled and the user's layers, by tool
@@ -66,6 +69,11 @@ func loadTools(layers []profile.Layer, bundled fs.FS) (map[string]ToolText, Prob
 			problems = append(problems, Problem{File: ToolsFile, Field: v.Name, Msg: "is missing: every tool has a table"})
 		}
 	}
+	for _, a := range builtin.ToolAnswers {
+		if _, ok := out[a.Tool].Answers[a.Name]; !ok {
+			problems = append(problems, Problem{File: ToolsFile, Field: a.Tool + ".answers." + a.Name, Msg: "is missing: every answer of a tool has a text"})
+		}
+	}
 	return out, problems
 }
 
@@ -88,35 +96,67 @@ func mergeTools(out map[string]ToolText, file string, src []byte) Problems {
 }
 
 func (s *sheet) overTool(name string, t ToolText, m mToolText) ToolText {
-	t.Params = maps.Clone(t.Params)
+	t.Params, t.Answers = maps.Clone(t.Params), maps.Clone(t.Answers)
 	if t.Params == nil {
 		t.Params = map[string]string{}
+	}
+	if t.Answers == nil {
+		t.Answers = map[string]string{}
 	}
 	if m.Description != nil {
 		path := name + ".description"
 		switch v := strings.TrimSpace(*m.Description); {
 		case v == "":
 			s.add(path, "is required")
-		case s.toolText(path, v):
+		case s.toolText(path, v, nil):
 			t.Description = v
 		}
 	}
 	for _, p := range slices.Sorted(maps.Keys(m.Params)) {
 		v := strings.TrimSpace(m.Params[p])
-		if s.toolText(name+".params."+p, v) {
+		if s.toolText(name+".params."+p, v, nil) {
 			t.Params[p] = v
+		}
+	}
+	for _, a := range slices.Sorted(maps.Keys(m.Answers)) {
+		path := name + ".answers." + a
+		row, ok := builtin.AnswerOf(name, a)
+		if !ok {
+			var names []string
+			for _, r := range builtin.ToolAnswers {
+				if r.Tool == name {
+					names = append(names, r.Name)
+				}
+			}
+			s.add(path, "names no answer of %s%s", name, expr.DidYouMean(a, names))
+			continue
+		}
+		v := strings.TrimSpace(m.Answers[a])
+		if v == "" {
+			s.add(path, "may not be empty")
+			continue
+		}
+		if s.toolText(path, v, row.Fields) {
+			t.Answers[a] = v
 		}
 	}
 	return t
 }
 
-// toolText says whether src renders over builtin.ToolData, adding the
-// problem when it does not.
-func (s *sheet) toolText(path, src string) bool {
-	err := builtin.RenderToolText(io.Discard, path, src, builtin.ToolData{})
-	if err != nil {
-		_, msg := templateMsg(path, err)
-		s.add(path, "%s", msg)
+// toolText says whether src renders over builtin.AnswerSamples of fields,
+// adding the problem when it does not.
+func (s *sheet) toolText(path, src string, fields []builtin.AnswerField) bool {
+	for _, data := range builtin.AnswerSamples(fields) {
+		if err := builtin.RenderToolText(io.Discard, path, src, data); err != nil {
+			_, msg := templateMsg(path, err)
+			s.add(path, "%s", msg)
+			return false
+		}
 	}
-	return err == nil
+	return true
+}
+
+// BundledTools are the tools' texts of bundled alone.
+func BundledTools(bundled fs.FS) (map[string]ToolText, Problems) {
+	return loadTools(nil, bundled)
 }

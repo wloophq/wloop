@@ -73,7 +73,7 @@ func sendCall(args string) string {
 
 func slackSession(t *testing.T, f *fakeSlack) (*Server, string) {
 	t.Helper()
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Slack: f}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Slack: f}
 	sid := call(t, s, "", unexpanded, initialize).Header().Get("Mcp-Session-Id")
 	if sid == "" {
 		t.Fatal("no session id")
@@ -83,7 +83,7 @@ func slackSession(t *testing.T, f *fakeSlack) (*Server, string) {
 
 func TestSlackToolListedWhenConfigured(t *testing.T) {
 	list := `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`
-	bare := &Server{Turns: &fakeTurns{}, Port: 47800}
+	bare := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	sid := call(t, bare, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	if got := listedTools(t, call(t, bare, sid, "term_1", list)); !slices.Equal(got, []string{"turn_end"}) {
 		t.Fatalf("without Slack: %v", got)

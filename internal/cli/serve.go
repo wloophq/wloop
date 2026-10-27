@@ -40,6 +40,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/procgroup"
@@ -47,6 +48,7 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/termfmt"
 	"github.com/wloophq/wloop/internal/transport/mcp"
+	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -272,7 +274,11 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if m.port != 0 {
 		d.MCPPort = m.port
 	}
-	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: m.texts}
+	texts := m.texts
+	if texts == nil {
+		texts = bundledToolTexts
+	}
+	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: texts, Bundled: bundledToolTexts}
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
@@ -1336,15 +1342,26 @@ func fallbacksOf(set *workspace.Set) func() int64 {
 	}
 }
 
-// toolTexts are the MCP tools' texts of the loaded profile.
+// toolTexts are the MCP tools' texts of the loaded profile, the bundled
+// ones before a profile loads.
 func (e *Env) toolTexts() map[string]mcp.ToolText {
 	l := e.loadedIntents()
 	if l == nil {
-		return nil
+		return bundledToolTexts()
 	}
-	out := make(map[string]mcp.ToolText, len(l.Tools))
-	for name, t := range l.Tools {
-		out[name] = mcp.ToolText{Description: t.Description, Params: t.Params}
+	return mcpTexts(l.Tools)
+}
+
+// bundledToolTexts are the MCP tools' texts of the bundled profile.
+var bundledToolTexts = sync.OnceValue(func() map[string]mcp.ToolText {
+	tools, _ := intentload.BundledTools(turn.BundledFS())
+	return mcpTexts(tools)
+})
+
+func mcpTexts(tools map[string]intentload.ToolText) map[string]mcp.ToolText {
+	out := make(map[string]mcp.ToolText, len(tools))
+	for name, t := range tools {
+		out[name] = mcp.ToolText{Description: t.Description, Params: t.Params, Answers: t.Answers}
 	}
 	return out
 }

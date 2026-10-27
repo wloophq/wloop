@@ -35,7 +35,7 @@ func draftCallBody(args string) string {
 
 func draftSession(t *testing.T, f *fakeSlack, d *fakeDrafts, handle string) (*Server, string) {
 	t.Helper()
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Slack: f}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Slack: f}
 	if d != nil {
 		s.SlackDraft = d
 	}

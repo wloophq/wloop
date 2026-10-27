@@ -21,7 +21,7 @@ func (f *fakeSearcher) Search(_ context.Context, a SearchArgs) (string, error) {
 
 func TestSlackSearchPassesTheFilters(t *testing.T) {
 	f := &fakeSearcher{answer: "1 of 1 match for release"}
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Slack: &fakeSlack{loggedIn: true}, SlackSearch: f}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Slack: &fakeSlack{loggedIn: true}, SlackSearch: f}
 	sid := call(t, s, "", unexpanded, initialize).Header().Get("Mcp-Session-Id")
 	if got := listedTools(t, call(t, s, sid, unexpanded, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)); !slices.Contains(got, slackSearchName) {
 		t.Fatalf("tools %v", got)

@@ -5,11 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
@@ -57,14 +55,10 @@ func (s *Server) inboxPost(ctx context.Context, handle string, arguments json.Ra
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		reason := "an object with text, and options, recommend and confirm when needed; " + inboxPostName + " posts a message and cannot move, list or close entries"
-		if err != nil {
-			reason += " (" + err.Error() + ")"
-		}
-		return text("Nothing was posted: the arguments are not "+reason+".", true)
+		return s.badArguments(ctx, inboxPostName, err)
 	}
 	if a.Text == nil || strings.TrimSpace(*a.Text) == "" {
-		return text("Nothing was posted: text is required.", true)
+		return s.answer(ctx, inboxPostName, "text_required", nil, true)
 	}
 	req := messages.PostRequest{Session: handle, Text: *a.Text, Recommend: a.Recommend, Confirm: a.Confirm}
 	for _, o := range a.Options {
@@ -75,13 +69,13 @@ func (s *Server) inboxPost(ctx context.Context, handle string, arguments json.Ra
 	var capped messages.Capped
 	switch {
 	case errors.As(err, &problems):
-		return text("Nothing was posted; fix these and call "+inboxPostName+" again:\n"+problems.Error(), true)
+		return s.fixThese(ctx, inboxPostName, problems)
 	case errors.As(err, &capped):
-		return text("Nothing was posted: "+capped.Error()+".", true)
+		return s.answer(ctx, inboxPostName, "capped", fields{"Error": capped.Error()}, true)
 	case errors.Is(err, messages.ErrNoStartedTurn):
-		return text("Nothing was posted: "+err.Error()+"; "+inboxPostName+" works only during a started "+brand.Name+" turn.", true)
+		return s.answer(ctx, inboxPostName, "not_in_turn", fields{"Error": err.Error()}, true)
 	case err != nil:
-		return text(brand.Name+" could not post the message: "+err.Error(), true)
+		return s.answer(ctx, inboxPostName, "post_failed", fields{"Error": err.Error()}, true)
 	}
-	return text(fmt.Sprintf("Posted to the Inbox as message %d; the user's answer is typed into this session when it is idle.", m.ID), false)
+	return s.answer(ctx, inboxPostName, "posted", fields{"ID": int64(m.ID)}, false)
 }
