@@ -283,6 +283,18 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	}
 }
 
+func TestAReactionOnAnItemWithNoPermalinkTargetsItsMessageRef(t *testing.T) {
+	t.Parallel()
+	r := newDraftRig(t, draftWF("acks", "purpose", "close", "delivery", "reaction", "reaction", "white_check_mark", "items", "resolved", "target", "item"), "")
+	done := openItem("i1", "Done", r.now)
+	done.State, done.Origin.Permalink, done.Origin.Ref = items.Resolved, "", "C000AAA/1700000000.000200"
+	r.items.set(draftThread, done)
+	r.run(draftThread)
+	if ds := r.drafts(); len(ds) != 1 || ds[0].Target != "C000AAA/1700000000.000200" {
+		t.Fatalf("drafts %+v", ds)
+	}
+}
+
 func TestAReactionWithNoPermalinkIsRefusedAtPropose(t *testing.T) {
 	t.Parallel()
 	r := newDraftRig(t, draftWF("acks", "purpose", "close", "delivery", "reaction", "reaction", "white_check_mark", "items", "resolved", "target", "item"), "")

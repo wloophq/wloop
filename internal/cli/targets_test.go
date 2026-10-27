@@ -85,7 +85,7 @@ func TestTheDaemonResolvesASlackRefWithoutAskingItself(t *testing.T) {
 	if u, err := te.unitTarget(context.Background(), "C000/1700000050.000200"); err != nil || u != seg {
 		t.Fatalf("unitTarget = %+v, %v", u, err)
 	}
-	if _, err := te.unitTarget(context.Background(), "C000/1700000060.000200"); err == nil || !strings.Contains(err.Error(), "runs no Slack plugin") {
+	if _, err := te.unitTarget(context.Background(), "C000/1700000060.000200"); err == nil || !strings.Contains(err.Error(), "resolves no Slack unit") {
 		t.Fatalf("an address the daemon does not resolve: %v", err)
 	}
 }
