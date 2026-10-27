@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -154,7 +153,7 @@ func TestServeStartsTheWantedBriefs(t *testing.T) {
 	seedPR(t, te, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL()})
 	te.cfg.Brief.Enabled = true
 	te.Agents = map[string]turns.Agent{"claude": claude.Agent{AskSh: func(context.Context, string, []string, string, string, ...string) ([]byte, error) {
-		return nil, errors.New("claude: API Error: 529 Overloaded")
+		return nil, nil
 	}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
