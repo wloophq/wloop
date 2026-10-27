@@ -299,6 +299,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `<name>` (table): An MCP tool, by its name.
   - `turn_end`: Records how the session's turn ended.
   - `inbox_post`: Posts a question or a note to the user's Inbox during a turn.
+  - `inbox_read`: Reads the user's answers to the session's Inbox messages, and marks them read.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
@@ -339,6 +340,19 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `not_in_turn` (`Error`): The session has no started turn.
   - `post_failed` (`Error`): The message could not be posted.
   - `posted` (`ID`: number): The message is in the Inbox.
+- `inbox_read`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `no_turn` (`Error`): The session has no turn.
+  - `no_message` (`ID`: number): The message is not one of the session's.
+  - `read_failed` (`Error`): The Inbox could not be read.
+  - `nothing` (`ID`: number): No answer to read: of message ID, or of any message when ID is 0.
+  - `read` (`Conversations`): The answers read: the conversations, one after another.
+  - `conversation` (`ID`: number, `Kind`, `Text`, `Options`, `Answers`): A part of read: a message, its kind (question or agent_post), its text and options, and its answers.
+  - `turn_answers` (`Answers`): A part of read: answers to the session's turns stored before each answer named its message.
+  - `option` (`ID`, `Label`): A part of conversation: one option of the message.
+  - `answer` (`Option`, `Label`, `Choice`, `Text`, `At`): A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.
 - `slack_send_message`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
@@ -402,6 +416,17 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `problem_text_required`: A problem: text is missing or empty.
   - `broadcast`: The text notifies a whole channel or group.
   - `edited` (`Conversation`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its new text as posted and the text it replaced.
+
+## What the loop tells a session (`notices.toml`)
+
+- `<name>` (template): A notice, by its name: a template over its fields, `Name` and `Command`.
+  - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered an Inbox message, Message, 0 for an answer stored before answers named their message, of the unit named as the loop's commands read it.
+  - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
+
+The fields each notice reads besides `Name` and `Command`:
+
+  - `answered` (`Message`: number, `Unit`)
+  - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

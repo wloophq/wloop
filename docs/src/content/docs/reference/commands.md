@@ -1005,7 +1005,7 @@ Record how a turn ended; read your answer.
 
 ```sh
 {{command}} turn end <url> --turn <id> --file <path>
-{{command}} turn answer <url>
+{{command}} turn answer <url> [--message <id>]
 ```
 
 end records how this session's turn ended, from a JSON file, when the session has no {{name}} MCP tool; the file is deleted once stored. answer prints the user's newest answer to this session's turn.
