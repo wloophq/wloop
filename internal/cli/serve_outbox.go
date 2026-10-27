@@ -111,6 +111,13 @@ func (p pinnedEffects) Validate(ctx context.Context, d draft.Draft) error {
 	return nil
 }
 
+func (p pinnedEffects) Place(ctx context.Context, d draft.Draft) (string, error) {
+	if pl, ok := p.Effects.(port.Placer); ok {
+		return pl.Place(ctx, d)
+	}
+	return "", nil
+}
+
 func (p pinnedEffects) Where(ctx context.Context, d draft.Draft) (string, error) {
 	l, ok := p.Effects.(port.Locator)
 	if !ok {

@@ -172,17 +172,6 @@ func TestPublishDefaultsToTheUnitThread(t *testing.T) {
 	}
 }
 
-func TestPublishOnASegmentPostsToTheDM(t *testing.T) {
-	ps := newPubSlack(t)
-	d := draft.Draft{ID: 1, Unit: ps.segmentUnit(t), Kind: draft.Reply, Text: "done"}
-	if _, err := ps.publisher().Publish(context.Background(), d); err != nil {
-		t.Fatal(err)
-	}
-	if post := ps.posted(t); post.Get("channel") != pubDM || post.Has("thread_ts") {
-		t.Fatalf("post %v", post)
-	}
-}
-
 func TestNudgeOpensTheDM(t *testing.T) {
 	for _, target := range []string{other, "@" + other, "slack:" + other, "@{slack:" + other + "}"} {
 		t.Run(target, func(t *testing.T) {
@@ -407,7 +396,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"two users":  {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@sam"}, want: []string{"U0000000011", "U0000000012"}, is: send.ErrAmbiguous},
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
 		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"slack units"}},
-		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"permalink"}},
+		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"needs a target"}},
 		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -466,12 +455,14 @@ func TestVerifyFindsThePost(t *testing.T) {
 	}
 
 	seg := ps.segmentUnit(t)
-	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": "done"})
-	if _, ok, err := ps.publisher().Verify(context.Background(), draft.Draft{Unit: seg, Kind: draft.Reply, Text: "done"}, started); err != nil || !ok {
+	ps.stored(map[string]any{"ts": pubPosted, "thread_ts": pubParent, "user": me, "text": "done"})
+	placed := draft.Draft{Unit: seg, Kind: draft.Reply, Text: "done", Target: conversationLink(pubDM, pubParent)}
+	if _, ok, err := ps.publisher().Verify(context.Background(), placed, started); err != nil || !ok {
 		t.Fatalf("DM Verify = %v %v", ok, err)
 	}
-	if hist := ps.calls("conversations.history"); len(hist) != 1 || hist[0].Get("channel") != pubDM || hist[0].Get("oldest") == "" {
-		t.Fatalf("history %v", hist)
+	replies = ps.calls("conversations.replies")
+	if last := replies[len(replies)-1]; last.Get("channel") != pubDM || last.Get("ts") != pubParent || last.Get("oldest") == "" {
+		t.Fatalf("DM replies %v", last)
 	}
 }
 
