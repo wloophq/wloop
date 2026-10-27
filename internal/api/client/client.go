@@ -446,3 +446,10 @@ func (e *daemonError) Hint() string {
 	}
 	return ""
 }
+
+// ResolveUnit is the unit address lands in; ok is false when no plugin reads it.
+func (c *Client) ResolveUnit(ctx context.Context, address string) (u unit.Unit, ok bool, err error) {
+	var res api.Resolved
+	err = c.do(ctx, ReadTimeout, http.MethodGet, api.Resolve+"?"+url.Values{"address": {address}}.Encode(), nil, &res)
+	return res.Unit, res.Found, err
+}

@@ -22,7 +22,7 @@ import (
 
 // startSlackDaemon serves a daemon wired as serve wires it, with the Slack
 // module over te's fake Keychain and fake Slack and a store of its own.
-func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
+func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", brand.Name)
 	if err != nil {
@@ -53,13 +53,13 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
 	hs.Start()
 	t.Cleanup(hs.Close)
 	te.Socket = sock
-	return db.Slack()
+	return db
 }
 
 func TestFollowSendsTrackForTheThread(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
-	slack := startSlackDaemon(t, te)
+	slack := startSlackDaemon(t, te).Slack()
 	te.saveToken(t, fakeToken())
 	te.srv.Handle("conversations.replies", func(v url.Values) any {
 		return map[string]any{"messages": []any{map[string]any{"type": "message", "ts": v.Get("ts"), "thread_ts": "1700000000.000100", "user": "U001"}}}

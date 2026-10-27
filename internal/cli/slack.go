@@ -174,7 +174,9 @@ func (e *Env) slackFollow(ctx context.Context, kit *slackKit, verb string, args 
 	return err
 }
 
-// slackMessageUnit is the thread unit a message ref or permalink names, with the Slack plugin enabled.
+// slackMessageUnit is the unit a message ref or permalink lands in, as the
+// daemon resolves it: the tracked direct message segment or thread it is in,
+// else its thread.
 func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, error) {
 	cfg, err := e.loadConfig()
 	if err != nil {
@@ -183,7 +185,21 @@ func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, 
 	if !cfg.PluginEnabled(string(slackPlugin)) {
 		return unit.Unit{}, fmt.Errorf("%s names a Slack message, and the Slack plugin is disabled (slack.enabled is false)", message)
 	}
-	return slackThreadOf(ctx, e.slack.kit(cfg.Slack, nil), message)
+	if _, err := e.slack.kit(cfg.Slack, nil).Store.Load(); errors.Is(err, auth.ErrNotLoggedIn) {
+		return unit.Unit{}, fmt.Errorf("%w; run %q", err, brand.Command+" slack login")
+	}
+	c, err := e.daemonClient(ctx)
+	if err != nil {
+		return unit.Unit{}, err
+	}
+	u, ok, err := c.ResolveUnit(ctx, message)
+	switch {
+	case err != nil:
+		return unit.Unit{}, err
+	case !ok || u.Provider != slackPlugin:
+		return unit.Unit{}, fmt.Errorf("the daemon resolves no Slack unit for %s", message)
+	}
+	return u, nil
 }
 
 // slackThreadOf is the thread unit a message ref or permalink names in the logged-in team.
@@ -439,7 +455,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, a
 // slackSendDraft posts req, a reply in the thread of a message ref or permalink, through the Outbox: a draft of the user's
 // on the thread's unit, approved once they say yes, or at once with yes.
 func (e *Env) slackSendDraft(ctx context.Context, kit *slackKit, req send.Request, yes bool) error {
-	u, err := slackThreadOf(ctx, kit, req.Target)
+	u, err := e.slackMessageUnit(ctx, req.Target)
 	if err != nil {
 		return err
 	}

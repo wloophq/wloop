@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/url"
 	"testing"
+	"time"
 
+	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -38,6 +40,7 @@ func TestAnIntentsUsageNamesItsTargetThroughItsProvidersCodec(t *testing.T) {
 
 func TestASlackMessageRefTargetNamesItsThread(t *testing.T) {
 	te := newSlackTestEnv(t)
+	startSlackDaemon(t, te)
 	te.saveToken(t, fakeToken())
 	te.srv.Handle("conversations.replies", func(v url.Values) any {
 		return map[string]any{"messages": []any{map[string]any{"type": "message", "ts": v.Get("ts"), "thread_ts": "1700000000.000100", "user": "U001"}}}
@@ -45,5 +48,28 @@ func TestASlackMessageRefTargetNamesItsThread(t *testing.T) {
 	u, err := te.unitTarget(context.Background(), "C000/1700000050.000200")
 	if want := dslack.ThreadUnit("T000", "C000", "1700000000.000100"); err != nil || u != want {
 		t.Fatalf("unitTarget = %+v, %v; want %+v", u, err, want)
+	}
+}
+
+func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
+	te := newSlackTestEnv(t)
+	db := startSlackDaemon(t, te)
+	te.saveToken(t, fakeToken())
+	ctx := context.Background()
+	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: "D000", Kind: dslack.KindIM, DMUser: "U001"}}}
+	if err := (&slacksource.Store{DB: db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
+		t.Fatal(err)
+	}
+	segs, err := (slacksource.Segments{Store: db.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", "D000",
+		[]dslack.Span{{FromTS: "1700000000.000000"}})
+	if err != nil || len(segs) != 1 {
+		t.Fatalf("segments %v %v", segs, err)
+	}
+	u, err := te.unitTarget(ctx, "D000/1700000050.000200")
+	if err != nil || u != segs[0] {
+		t.Fatalf("unitTarget = %+v, %v; want the segment %+v", u, err, segs[0])
+	}
+	if n := len(te.srv.Calls("conversations.replies")); n != 0 {
+		t.Fatalf("conversations.replies calls %d, want none", n)
 	}
 }
