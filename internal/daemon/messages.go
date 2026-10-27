@@ -63,6 +63,7 @@ func (s *Server) entryVerb(verb gtd.Verb) coregtd.VerbHandler {
 		if err != nil {
 			return coregtd.Result{}, err
 		}
+		s.recordVerb(ctx, s.deps.GTD, e, verb, req.Source)
 		got, err := s.deps.GTD.Entry(ctx, e.ID)
 		if err != nil {
 			return coregtd.Result{}, err

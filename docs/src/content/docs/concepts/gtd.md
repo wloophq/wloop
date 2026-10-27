@@ -50,7 +50,7 @@ Beside its state, an entry has a **focus** star, **contexts** (labels such as `@
 
 The views are Focus (starred entries, the landing view), Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook (reference and done) and Review.
 
-The words of the verbs, the views and the Review's steps come from the profile's `gtd.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. Every verb you run on an entry, but `seen`, is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to.
+The words of the verbs, the views and the Review's steps come from the profile's `gtd.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. Every verb you run on an entry that changes it is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own.
 
 - **Changed since you saw it.** New activity on a unit by someone else, after you last opened the entry, brings a scheduled or waiting entry back to the Inbox with the changed mark. Opening or moving the entry clears it.
 - **Snooze.** `s` schedules an entry until a date, until activity, or both. When the date passes it returns to the state it had. Muting the unit snoozes its entries.

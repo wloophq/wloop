@@ -729,6 +729,9 @@ func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
+	if evs := r.entries.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
+		t.Fatalf("events %+v", evs)
+	}
 }
 
 func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {

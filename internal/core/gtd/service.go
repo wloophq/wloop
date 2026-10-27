@@ -94,11 +94,7 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 		return s.dismissOff(ctx, id, req, enabled)
 	}
 	if h := s.handler(e.Kind, req.Verb); h != nil {
-		res, err := h(ctx, e, req)
-		if err != nil {
-			return res, err
-		}
-		return res, s.RecordVerb(ctx, e, req)
+		return h(ctx, e, req)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

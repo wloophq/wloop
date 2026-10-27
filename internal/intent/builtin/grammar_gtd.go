@@ -3,13 +3,13 @@ package builtin
 import "github.com/wloophq/wloop/internal/domain/gtd"
 
 // GTDVerbs are the verbs gtd.toml words, in the order clients list them.
-var GTDVerbs = []string{
-	string(gtd.VerbNext), string(gtd.VerbWaiting), string(gtd.VerbSchedule), string(gtd.VerbSomeday),
-	string(gtd.VerbReference), string(gtd.VerbFocus), string(gtd.VerbProject), string(gtd.VerbApprove),
-	string(gtd.VerbDelegate), string(gtd.VerbDone), string(gtd.VerbDismiss), string(gtd.VerbSeen),
-	string(gtd.VerbContext), string(gtd.VerbArea), string(gtd.VerbAnswer), string(gtd.VerbEdit),
-	string(gtd.VerbRetry), string(gtd.VerbReviewed), string(gtd.VerbSequential), string(gtd.VerbReply),
-}
+var GTDVerbs = func() []string {
+	out := make([]string, len(gtd.Verbs))
+	for i, v := range gtd.Verbs {
+		out[i] = string(v)
+	}
+	return out
+}()
 
 // GTDVerbInputs are the verbs that ask for a value before they run.
 var GTDVerbInputs = []string{

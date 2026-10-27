@@ -26,6 +26,7 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Intent built-ins (`workspace`, `before`) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
 | Every reserved key of a manifest, `actions.toml` and the configuration | `builtin.Grammar` in `internal/intent/builtin/grammar*.go`; `make docs-ref` regenerates the schemas and the reference |
 | The words of the built-in actions | `profiles/default/actions.toml` |
+| The words of the GTD verbs, views and Review steps; the core keys' help | `profiles/default/gtd.toml`, `profiles/default/keys.toml` |
 | What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |
 | Visual tokens, brand book, components | `design/`, which the clients follow; `go generate ./internal/web` writes `app.css`'s token region from `design/tokens.json` |
 

@@ -65,17 +65,13 @@ func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 	}
 }
 
-func TestEveryVerbAStoredEntryTakesHasAnEventKind(t *testing.T) {
-	for _, v := range []gtd.Verb{gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference, gtd.VerbFocus,
-		gtd.VerbProject, gtd.VerbApprove, gtd.VerbDelegate, gtd.VerbDone, gtd.VerbDismiss, gtd.VerbContext, gtd.VerbArea,
-		gtd.VerbAnswer, gtd.VerbReviewed, gtd.VerbSequential, gtd.VerbReply} {
-		if !slices.Contains(gtd.VerbEventKinds, gtd.VerbEventKind(v)) {
-			t.Errorf("%s has no event kind", v)
-		}
+func TestAVerbThatChangesNothingRecordsNothing(t *testing.T) {
+	r := newRig()
+	e := r.put(t, gtd.Entry{ID: "e-x", Kind: gtd.KindCapture, State: gtd.Next, Origin: gtd.OriginUser, Area: "OSS"})
+	if _, err := r.svc.Do(context.Background(), e.ID, coregtd.Request{Verb: gtd.VerbArea, Args: map[string]string{"set": "OSS"}}); err != nil {
+		t.Fatal(err)
 	}
-	for _, v := range []gtd.Verb{gtd.VerbSeen, gtd.VerbEdit, gtd.VerbRetry} {
-		if slices.Contains(gtd.VerbEventKinds, gtd.VerbEventKind(v)) {
-			t.Errorf("%s records an event", v)
-		}
+	if got := verbEvents(r.store.Events); len(got) > 0 {
+		t.Errorf("events %+v", got)
 	}
 }

@@ -40,7 +40,9 @@ An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{
 
 A verb you run on an entry, such as Done, Someday or Delegate, records a `verb_<verb>` event on the entry (`verb_done`, `verb_someday`). A workflow with `provider = "entry"` reacts to it with `trigger.on = ["verb_done"]`; its `trigger.event.data` is the state the entry left, and the entry's facts are read even once it is done or dismissed. Its default key is the entry's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
 
-The core's own moves record the event with the change, in one write. A verb another part runs, a project's, a question's, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing: clients send it when you open an entry.
+The core's own moves and a project's verbs record the event with the change, in one write; a verb that changes nothing, such as the area the entry already has, records nothing. A verb another part runs, a question's answer, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing, since clients send it when you open an entry, and neither do the verbs on an Outbox draft.
+
+An event workflow reads its entry's facts even once the entry is done or in the trash, so it reacts to the verb that took it there. The same holds while its runs wait and when its drafts are judged for withdrawal: guard on `entry.state` in `when` and `[drafts.withdraw]` when a run should not go on after the entry left its list.
 
 ## The plan
 
