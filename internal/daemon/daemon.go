@@ -158,6 +158,9 @@ type Deps struct {
 	// request overrides. Nil follows none.
 	Follows func(unit.ProviderID) bool
 	Untrack func(ctx context.Context, u unit.Unit) error
+	// Resolve is the unit an address a person gives lands in, such as a
+	// Slack message ref; ok is false when no plugin reads it. Nil reads none.
+	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
 	Sweep   Sweeper // nil registers no sweep job
 	Actions Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every

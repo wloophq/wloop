@@ -185,7 +185,7 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		pl.res.ThreadTS, pl.at = k.TS, k.TS
 		return nil
 	}
-	if _, ts, _, err := parsePermalink(t); err == nil {
+	if _, ts, _, err := parseMessage(t); err == nil {
 		if react {
 			no := false
 			pl.at = ts
@@ -259,9 +259,9 @@ func (p *Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
 			anchors = []unit.Anchor{it.Origin}
 		}
 		for _, a := range anchors {
-			conv, ts, ok := strings.Cut(a.Ref, "/")
-			if ok && conv == k.Conversation && permalinkTS.MatchString(ts) && dslack.CompareTS(ts, newest) > 0 {
-				newest = ts
+			m, ok := send.ParseMessage(a.Ref)
+			if ok && m.Conversation == k.Conversation && dslack.CompareTS(m.TS, newest) > 0 {
+				newest = m.TS
 			}
 		}
 	}
@@ -422,7 +422,7 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 			return draft.Evidence{}, p.failed(pl, err)
 		}
 		p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, pl.res.Channel, pl.at)
-		return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, nil
+		return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), nil
 	}
 	posted, err := c.PostMessage(ctx, slackapi.PostArgs{Channel: pl.res.Channel, Text: pl.text, ThreadTS: pl.res.ThreadTS})
 	if err != nil {
@@ -433,7 +433,12 @@ func (p *Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence,
 	}
 	channel := cmp.Or(posted.Channel, pl.res.Channel)
 	p.logf("slack_draft_published draft=%d delivery=%s channel=%s ts=%s", d.ID, d.Delivery, channel, posted.TS)
-	return draft.Evidence{Ref: posted.TS, Permalink: p.permalink(ctx, channel, posted.TS), At: postedAt(posted.TS, p.now())}, nil
+	return p.evidence(ctx, channel, posted.TS, postedAt(posted.TS, p.now())), nil
+}
+
+// evidence names the message at ts in channel by its ref and permalink.
+func (p *Publisher) evidence(ctx context.Context, channel, ts string, at time.Time) draft.Evidence {
+	return draft.Evidence{Ref: send.Ref(channel, ts), Permalink: p.Send.Permalink(ctx, channel, ts), At: at}
 }
 
 func (p *Publisher) failed(pl plan, err error) error {
@@ -441,16 +446,6 @@ func (p *Publisher) failed(pl plan, err error) error {
 		return fmt.Errorf("%s to %s: %w", mayHaveBeenPosted, pl.where(), err)
 	}
 	return fmt.Errorf("posting to %s: %w", pl.where(), err)
-}
-
-// permalink is "" when Slack does not give it: the post stands without one.
-func (p *Publisher) permalink(ctx context.Context, channel, ts string) string {
-	link, err := p.Send.Client.Permalink(ctx, channel, ts)
-	if err != nil {
-		p.logf("slack_draft_permalink channel=%s ts=%s error=%v", channel, ts, err)
-		return ""
-	}
-	return link
 }
 
 // Verify looks for d posted by the user at or after startedAt, minus the
@@ -474,7 +469,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 		}
 		for _, r := range rs {
 			if r.Name == pl.reaction && slices.Contains(r.Users, tok.User) {
-				return draft.Evidence{Ref: pl.at, Permalink: p.permalink(ctx, pl.res.Channel, pl.at), At: p.now()}, true, nil
+				return p.evidence(ctx, pl.res.Channel, pl.at, p.now()), true, nil
 			}
 		}
 		return draft.Evidence{}, false, nil
@@ -498,7 +493,7 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 				continue
 			}
 			if m.User == tok.User && dslack.CompareTS(m.TS, oldest) >= 0 && normalized(m.Text) == want {
-				return draft.Evidence{Ref: m.TS, Permalink: p.permalink(ctx, pl.res.Channel, m.TS), At: postedAt(m.TS, p.now())}, true, nil
+				return p.evidence(ctx, pl.res.Channel, m.TS, postedAt(m.TS, p.now())), true, nil
 			}
 		}
 		if page.NextCursor == "" {
@@ -645,7 +640,7 @@ func (p *plugin) publisher() port.Effects {
 	if p.src == nil || p.slack.Client == nil || p.slack.Tokens == nil {
 		return nil
 	}
-	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist},
+	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.deps.DB, p.log)},
 		p.slack.Tokens.Load, p.now, p.log)
 }
 
@@ -674,12 +669,14 @@ func PublisherOver(db *sqlite.DB, s *send.Service, token func() (auth.Token, err
 type Landing struct {
 	Facts    dslack.FactsReader
 	Segments dslack.Segments
+	// Messages finds the thread of a stored message; nil asks Slack.
+	Messages send.Stored
 }
 
 // LandingOver reads the facts and segments the Slack module stores in db.
-func LandingOver(db *sqlite.DB) Landing {
+func LandingOver(db *sqlite.DB, log func(string, ...any)) Landing {
 	segs := Segments{Store: db.Segments()}
-	return Landing{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs}
+	return Landing{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Messages: StoredOver(db, log)}
 }
 
 // UnitOf is the unit of a post in team at ts in channel, in the thread
@@ -708,16 +705,4 @@ func (l Landing) UnitOf(ctx context.Context, team, channel, ts, threadTS string)
 		return unit.Unit{}, false, err
 	}
 	return u, true, nil
-}
-
-// ThreadOf is the thread_ts a message permalink carries, "" when none.
-func ThreadOf(permalink string) string {
-	u, err := url.Parse(permalink)
-	if err != nil {
-		return ""
-	}
-	if t := u.Query().Get("thread_ts"); permalinkTS.MatchString(t) {
-		return t
-	}
-	return ""
 }

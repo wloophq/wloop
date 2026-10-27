@@ -62,6 +62,10 @@ const Rows = "/api/rows"
 // parameters, POST a PlanActRequest.
 const Plan = "/api/plan"
 
+// Resolve is the unit an address lands in: GET takes the address as the
+// address query parameter and answers a Resolved.
+const Resolve = "/api/resolve"
+
 // UnitDetail is a unit's detail; its checks and actions are under it.
 const UnitDetail = "/api/units/{provider}/{key}"
 
@@ -86,6 +90,7 @@ var Operations = []Operation{
 	{"GET", "/api/health"},
 	{"GET", Rows},
 	{"GET", Catalog},
+	{"GET", Resolve},
 	{"GET", UnitDetail},
 	{"GET", UnitDetail + "/checks"},
 	{"POST", "/api/jobs/{name}"},

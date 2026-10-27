@@ -93,6 +93,10 @@ type Module struct {
 	Links LinkResolver
 	// Detail says the cockpit shows a detail of the plugin's units.
 	Detail bool
+	// Resolve is the unit an address a person gives lands in, such as a
+	// Slack message ref to its thread or direct message segment; ok is false
+	// for an address that is not one of the plugin's.
+	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
 }
 
 // Checkout is the repository a unit's work checks out.

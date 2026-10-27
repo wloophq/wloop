@@ -11,7 +11,7 @@ import (
 )
 
 // unitTarget is the unit arg names: <provider>:<key> of a compiled-in
-// provider, an address a provider looks up (a Slack message permalink, to
+// provider, an address a provider looks up (a Slack message ref or permalink, to
 // its thread), a web address a codec reads offline (a pull request URL), or
 // owner/repo#n.
 func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
@@ -43,7 +43,7 @@ func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID,
 	if ref, err := pr.ParseKey(arg); err == nil {
 		return ref.Unit(), nil
 	}
-	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
+	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message ref or permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
 // pluginCodecs are the codecs of the compiled-in plugins.

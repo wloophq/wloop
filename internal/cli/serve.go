@@ -428,6 +428,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		logf("sources: %v", err)
 	}
 	d = e.withCards(withoutGitHub(withSources(d, plugins, mods)), db, cfg, mods, logf)
+	e.resolve = d.Resolve
 	d = e.serveGTD(d, db, cfg, mods, logf)
 	e.serveProposals(ctx, db, cfg, mods, logf)
 	d = e.serveOutbox(d, db, cfg, mods, logf)

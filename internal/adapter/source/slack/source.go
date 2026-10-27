@@ -15,6 +15,7 @@ import (
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	slackapi "github.com/wloophq/wloop/internal/slack"
+	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // Page sizes of the reads the source makes when the inbox cannot answer.
@@ -609,7 +610,7 @@ func (s *Source) unitLinks(ctx context.Context, u unit.Unit, conv string, read [
 			seen[to] = true
 			at := tsTime(m.TS)
 			out = append(out, link.Link{From: u, To: to, Kind: link.Mention, Origin: link.Facts, At: at,
-				Evidence: unit.Anchor{Unit: u, Ref: conv + "/" + m.TS, Permalink: m.Permalink, At: at}})
+				Evidence: unit.Anchor{Unit: u, Ref: send.Ref(conv, m.TS), Permalink: m.Permalink, At: at}})
 		}
 	}
 	return out, nil

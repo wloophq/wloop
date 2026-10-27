@@ -76,7 +76,7 @@ Slack threads and DM topics now give entries in your Inbox. Their rows offer the
 
 **Delegate.** `d` on a Slack entry (an action, a waiting entry, a closure or a capture on a thread) runs `act`, or your own Slack intent of the same verb, which outranks it. It asks for optional guidance first. By default `act` runs headless: one read-only agent call that resolves what it can and proposes the replies as drafts for that entry. The entry detail in the cockpit has a Delegate box with two buttons: **Draft for me** (headless) and **Hand to an agent** (a session in the workspace the thread is placed in). A thread or a DM with no [placement](/reference/configuration/) runs its session in a neutral directory under the state directory, an empty repository with no project checked out; add a placement for a channel to work its threads in that repository instead. When no session can run at all, such as with no workspace manager enabled, Hand to an agent is off and says why before you click it; in the terminal the guidance prompt says it too. Tab in the guidance prompt switches to a session. The Inbox notification of a Slack entry has a **Draft for me** button. A session started this way knows the entry and its items, so what it drafts with `slack_draft` lands in the entry's detail like a headless draft.
 
-From a terminal, an intent that serves Slack takes a permalink or `slack:<key>` in place of a pull request URL:
+From a terminal, an intent that serves Slack takes a message ref (`<conversation>/<ts>`), a permalink or `slack:<key>` in place of a pull request URL. The daemon resolves a ref or a permalink to the unit the message is in, as `slack_draft` does: the tracked direct message segment or thread, else its thread:
 
 ```sh
 {{command}} act https://acme.slack.com/archives/C000/p1700000000000100 'say we ship Friday'
@@ -95,7 +95,7 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} outbox approve <id>
 ```
 
-`slack send` posts as you after a confirmation. To a permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook. To a channel, a person, or with `--thread=false` or `--broadcast`, it posts directly:
+`slack send` posts as you after a confirmation. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook. To a channel, a person, or with `--thread=false` or `--broadcast`, it posts directly:
 
 ```sh
 {{command}} slack send https://acme.slack.com/archives/C000/p1700000000000100 'On it.'

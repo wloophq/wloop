@@ -14,9 +14,9 @@ import (
 )
 
 type Request struct {
-	Target    string // permalink, #name, channel id, @handle, email or user id
+	Target    string // message ref or permalink, #name, channel id, @handle, email or user id
 	Text      string // Markdown
-	Thread    *bool  // nil: true for a permalink, false otherwise
+	Thread    *bool  // nil: true for a message, false otherwise
 	Broadcast bool
 	Source    string // "session", "cli" or "draft"; logged
 }
@@ -43,6 +43,8 @@ type Service struct {
 	// PostAllowlist, when not empty, is the only set of conversations Send may post to:
 	// channel ids, or user ids naming the DM with that user. Config slack.post_allowlist.
 	PostAllowlist []string
+	// Stored finds the thread of a message without asking Slack; nil asks Slack.
+	Stored Stored
 
 	dir directory
 }
@@ -66,11 +68,11 @@ func (s *Service) Resolve(ctx context.Context, r Request) (Resolved, error) {
 
 func (s *Service) resolve(ctx context.Context, r Request) (Resolved, error) {
 	target := strings.TrimSpace(r.Target)
-	if link, ok := parsePermalink(target); ok {
-		return s.permalink(ctx, link, r.Thread == nil || *r.Thread)
+	if m, ok := ParseMessage(target); ok {
+		return s.resolveMessage(ctx, m, r.Thread == nil || *r.Thread)
 	}
 	if r.Thread != nil && *r.Thread {
-		return Resolved{}, fmt.Errorf("a thread reply needs a permalink target, got %q", target)
+		return Resolved{}, fmt.Errorf("a thread reply needs a message ref or permalink target, got %q", target)
 	}
 	switch {
 	case strings.HasPrefix(target, "#"):
@@ -87,7 +89,7 @@ func (s *Service) resolve(ctx context.Context, r Request) (Resolved, error) {
 	case isConversationID(target):
 		return s.conversation(ctx, target)
 	}
-	return Resolved{}, fmt.Errorf("%w: %q is not a permalink, #channel, channel id, @handle, email or user id", ErrAmbiguous, target)
+	return Resolved{}, fmt.Errorf("%w: %q is not a message ref or permalink, #channel, channel id, @handle, email or user id", ErrAmbiguous, target)
 }
 
 // Allowed is nil when PostAllowlist is empty or holds res.Channel or res.DMUser.
@@ -143,29 +145,17 @@ func (s *Service) Send(ctx context.Context, r Request) (Sent, error) {
 	return sent, nil
 }
 
-func (s *Service) permalink(ctx context.Context, link permalink, thread bool) (Resolved, error) {
-	res, err := s.conversation(ctx, link.channel)
+// resolveMessage resolves m's conversation and, when thread, the thread m is in.
+func (s *Service) resolveMessage(ctx context.Context, m Message, thread bool) (Resolved, error) {
+	res, err := s.conversation(ctx, m.Conversation)
 	if err != nil || !thread {
 		return res, err
 	}
-	at := link.ts
-	if link.threadTS != "" {
-		at = link.threadTS
-	}
-	msg, err := s.firstMessage(ctx, link.channel, at)
+	parent, err := s.thread(ctx, m)
 	if err != nil {
 		return Resolved{}, err
 	}
-	res.ThreadTS = at
-	if msg.ThreadTS != "" {
-		res.ThreadTS = msg.ThreadTS
-	}
-	if msg.TS != res.ThreadTS {
-		if msg, err = s.firstMessage(ctx, link.channel, res.ThreadTS); err != nil {
-			return Resolved{}, err
-		}
-	}
-	res.Parent = firstLine(msg.Text)
+	res.ThreadTS, res.Parent = parent.TS, firstLine(parent.Text)
 	return res, nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -128,7 +129,7 @@ func oneLine(s string, n int) string {
 func renderCapped(c dslack.Conversation, anchor string, msgs []dslack.Message, users map[string]dslack.User, u unit.Unit, maxChars int) string {
 	link := msgs[0].Permalink
 	if link == "" {
-		link = fmt.Sprintf("no permalink (channel %s, ts %s)", c.ID, msgs[0].TS)
+		link = fmt.Sprintf("no permalink (%s)", send.Ref(c.ID, msgs[0].TS))
 	}
 	head := heading(c, anchor, users) + ": " + link + "\n"
 	index := map[string]int{}
@@ -138,7 +139,7 @@ func renderCapped(c dslack.Conversation, anchor string, msgs []dslack.Message, u
 	blocks := make([]string, len(msgs))
 	total := runes(head)
 	for i, m := range msgs {
-		blocks[i] = "\n" + renderRead(m, index, anchor, users)
+		blocks[i] = "\n" + renderRead(c.ID, m, index, anchor, users)
 		total += runes(blocks[i])
 	}
 	if total <= maxChars {

@@ -144,19 +144,19 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Drafts waiting for your approval, and yours",
 				Usage: []string{
 					"outbox [list] [--color <when>]", "outbox show <id> [--color <when>]",
-					"outbox new <unit|permalink> <markdown> [--send [--yes]]", "outbox new <unit|permalink> --react <emoji> [--send [--yes]]",
+					"outbox new <unit|message> <markdown> [--send [--yes]]", "outbox new <unit|message> --react <emoji> [--send [--yes]]",
 					"outbox approve <id> [--text <markdown>] [--yes]", "outbox retry <id> [--confirm] [--yes]",
 					"outbox edit <id> <markdown>", "outbox discard <id> [--reason <why>]",
 				},
 				About: "List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. " +
 					"Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. " +
-					"new writes a reply, or a reaction, on a unit: a Slack message permalink (its thread), a pull request URL or owner/repo#n, or <provider>:<key>. " +
+					"new writes a reply, or a reaction, on a unit: a Slack message ref (<conversation>/<ts>) or permalink (its thread, or with --react the message itself), a pull request URL or owner/repo#n, or <provider>:<key>. " +
 					"It waits in the Outbox for your approval; with --send it posts once you read it and say yes. " +
 					"approve shows a draft whole and posts it once you say yes, only from a terminal of your own, never an agent's shell; retry posts a failed one again. " +
 					"edit changes a draft's text and discard drops it.",
 				Flags: []helpFlag{
 					{"--color <when>", "list, show: auto, always or never"},
-					{"--react <emoji>", "new: react to the unit's message instead of replying"},
+					{"--react <emoji>", "new: react instead of replying: to the Slack message named, else to the unit's message"},
 					{"--send", "new: post it now, through the Outbox, instead of saving it there"},
 					{"--text <markdown>", "approve: post this text instead of the draft's"},
 					{"--confirm", "retry: post again a draft that may have been posted"},
@@ -331,11 +331,11 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"slack send"},
 				Summary: "Post as you to a thread, channel or person",
 				Usage:   []string{"slack send <target> <text> [--thread=false] [--broadcast] [--yes]"},
-				About: "Post as you to a permalink, #channel, channel id, @handle, email or user id. " +
-					"A permalink target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
+				About: "Post as you to a message, by its ref (<conversation>/<ts>) or permalink, a #channel, channel id, @handle, email or user id. " +
+					"A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
 					"It asks first unless --yes.",
 				Flags: []helpFlag{
-					{"--thread=false", "Post to a permalink's conversation instead of its thread"},
+					{"--thread=false", "Post to a message's conversation instead of its thread"},
 					{"--broadcast", "Also send a thread reply to the conversation"},
 					{"--yes", "Post without asking"},
 				},
@@ -345,8 +345,8 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:    []string{"slack follow", "slack unfollow"},
 				Summary:  "Admit every message of a thread, or stop",
-				Usage:    []string{"slack follow <permalink>", "slack unfollow <permalink>"},
-				About:    "Follow a Slack thread, so every message of it is admitted, or stop following it.",
+				Usage:    []string{"slack follow <message>", "slack unfollow <message>"},
+				About:    "Follow the Slack thread of a message, named by its ref (<conversation>/<ts>) or permalink, so every message of it is admitted, or stop following it.",
 				Examples: []string{"slack follow https://acme.slack.com/archives/C024BE91L/p1700000000000100"},
 				Docs:     "guides/slack",
 			},

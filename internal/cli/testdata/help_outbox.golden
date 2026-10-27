@@ -1,8 +1,8 @@
 USAGE
   {{command}} outbox [list] [--color <when>]
   {{command}} outbox show <id> [--color <when>]
-  {{command}} outbox new <unit|permalink> <markdown> [--send [--yes]]
-  {{command}} outbox new <unit|permalink> --react <emoji> [--send [--yes]]
+  {{command}} outbox new <unit|message> <markdown> [--send [--yes]]
+  {{command}} outbox new <unit|message> --react <emoji> [--send [--yes]]
   {{command}} outbox approve <id> [--text <markdown>] [--yes]
   {{command}} outbox retry <id> [--confirm] [--yes]
   {{command}} outbox edit <id> <markdown>
@@ -12,16 +12,18 @@ List the drafts waiting on you, proposed, failed or left sending, grouped by
 kind, or print one whole: its text as it reads, the items it is about and the
 commands it takes. Piped, the list is one tab-separated line per draft: id,
 kind, state, unit, label, mentions, creation time and first line. new writes a
-reply, or a reaction, on a unit: a Slack message permalink (its thread), a pull
-request URL or owner/repo#n, or <provider>:<key>. It waits in the Outbox for
-your approval; with --send it posts once you read it and say yes. approve shows
-a draft whole and posts it once you say yes, only from a terminal of your own,
-never an agent's shell; retry posts a failed one again. edit changes a draft's
-text and discard drops it.
+reply, or a reaction, on a unit: a Slack message ref (<conversation>/<ts>) or
+permalink (its thread, or with --react the message itself), a pull request URL
+or owner/repo#n, or <provider>:<key>. It waits in the Outbox for your approval;
+with --send it posts once you read it and say yes. approve shows a draft whole
+and posts it once you say yes, only from a terminal of your own, never an
+agent's shell; retry posts a failed one again. edit changes a draft's text and
+discard drops it.
 
 FLAGS
   --color <when>     list, show: auto, always or never
-  --react <emoji>    new: react to the unit's message instead of replying
+  --react <emoji>    new: react instead of replying: to the Slack message named,
+                     else to the unit's message
   --send             new: post it now, through the Outbox, instead of saving it
                      there
   --text <markdown>  approve: post this text instead of the draft's
