@@ -172,7 +172,7 @@ func userOf(target string) string {
 }
 
 // target resolves where d posts: its unit's thread when Target is "", else a
-// permalink, a conversation or a person. A person's DM is opened only once the
+// message ref or permalink, a conversation or a person. A person's DM is opened only once the
 // post allowlist holds them.
 func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl *plan) error {
 	t := strings.TrimSpace(d.Target)
@@ -196,7 +196,7 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		return p.resolve(ctx, send.Request{Target: t}, pl)
 	}
 	if react {
-		return fmt.Errorf("a reaction needs a message permalink target, not %q", t)
+		return fmt.Errorf("a reaction needs a message ref or permalink target, not %q", t)
 	}
 	if conversationR.MatchString(t) || strings.HasPrefix(t, "#") {
 		return p.resolve(ctx, send.Request{Target: t}, pl)

@@ -10,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // Ops diffs r against in.Ledger: create, update, assign, resolve, reopen, link. People are
@@ -92,7 +93,7 @@ func (b *opBuilder) anchor(ts string) unit.Anchor {
 	if ts == "" {
 		ts = b.newest()
 	}
-	a := unit.Anchor{Unit: b.in.Unit, Ref: b.in.Conversation.ID + "/" + ts, At: slack.TSTime(ts)}
+	a := unit.Anchor{Unit: b.in.Unit, Ref: send.Ref(b.in.Conversation.ID, ts), At: slack.TSTime(ts)}
 	for _, m := range b.in.Messages {
 		if m.TS == ts {
 			a.Permalink = m.Permalink

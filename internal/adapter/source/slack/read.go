@@ -91,12 +91,7 @@ func (r *Reader) Read(ctx context.Context, target string, limit int) (string, er
 		return "", err
 	}
 	if link == "" {
-		if link, err = r.Client.Permalink(ctx, conv, msgs[0].TS); err != nil {
-			link = ""
-			if r.Log != nil {
-				r.Log("slack_permalink channel=%s ts=%s error=%v", conv, msgs[0].TS, err)
-			}
-		}
+		link = (&send.Service{Client: r.Client, Log: r.Log, Stored: r.Messages}).Permalink(ctx, conv, msgs[0].TS)
 	}
 	out, err := r.render(ctx, c, msgs[0].Anchor(), msgs, link, limit)
 	if cutOff {

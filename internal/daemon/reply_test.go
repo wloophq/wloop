@@ -150,3 +150,30 @@ func TestDraftCreateRefusesADisabledPlugin(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestDraftCreateRefusesATargetOutsideItsUnit(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	r.s.deps.Resolve = func(_ context.Context, address string) (unit.Unit, bool, error) {
+		if address == "acme/api#7 review" {
+			return r7u, true, nil
+		}
+		return unit.Unit{}, false, nil
+	}
+	for _, c := range []struct {
+		name, target string
+		code         int
+	}{
+		{"a message of its unit", "acme/api#7 review", 200},
+		{"a message of another unit", "acme/api#9 review", 400},
+		{"an address no plugin reads", "#general", 400},
+	} {
+		body := `{"unit":{"provider":"github","key":"acme/api#7"},"text":"x","target":"` + c.target + `","source":"terminal"}`
+		if rec := post(t, r.s, api.Drafts, body); rec.Code != c.code {
+			t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body)
+		}
+	}
+	if ds := r.drafts(t); len(ds) != 1 || ds[0].Target != "acme/api#7 review" {
+		t.Fatalf("drafts %+v", ds)
+	}
+}

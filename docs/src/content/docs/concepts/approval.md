@@ -112,7 +112,7 @@ A workflow proposes drafts with its `draft.propose` step, its text rendered from
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose
 {{command}} outbox show <id>            # one draft as it reads, its items and the commands it takes
-{{command}} outbox new <unit> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
+{{command}} outbox new <unit|message> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
 {{command}} outbox approve <id>         # shows it and posts it once you say yes
 {{command}} outbox edit <id> <markdown>
 {{command}} outbox discard <id> --reason "not needed"

@@ -222,7 +222,8 @@ func (c OpaqueCodec) Valid(key string) error {
 }
 
 // Resolver is a codec whose provider must look an address up to find its
-// unit, such as a Slack message ref or permalink to its thread; ok is false for an address
+// unit, such as a Slack message ref or permalink to its direct message
+// segment or thread; ok is false for an address
 // that is not one of the provider's.
 type Resolver interface {
 	Resolve(ctx context.Context, address string) (key string, ok bool, err error)

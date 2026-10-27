@@ -41,6 +41,8 @@ Schema version 6 links each answer to the Inbox message it answers and records w
 
 A key or a value the new release does not know, in `config.toml` or in a manifest of your profile, fails at load with the key's path, and a close name when one exists; no old spelling is read, and a key that moved gets the same error as a typo. `{{command}} doctor` and `{{command}} profile check` list each one. The configuration is `config.toml`; a configuration directory that holds only the former `config.json` fails at load, naming `config.toml` and the page with the script that converts one. The [profile language](/reference/language/) lists every reserved word, and the [configuration](/reference/configuration/) every key.
 
+`slack_react` and `slack_edit` take the message as `message`, a ref (`<conversation>/<ts>`) or a permalink, where they took `permalink`: an agent's call with `permalink` is refused as a bad argument. Their answer for a missing or unreadable message is `problem_message`, where it was `problem_permalink`, so a profile whose `tools.toml` words `problem_permalink` fails at load until it is renamed.
+
 ## Going back to an earlier release
 
 A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync.
