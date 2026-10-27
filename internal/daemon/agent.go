@@ -9,7 +9,10 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
+
+	"github.com/wloophq/wloop/internal/core/messages"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -253,7 +256,7 @@ func (s *Server) prepareByHand(ctx context.Context, d dintent.Def, u unit.Unit, 
 		return req, fmt.Errorf("%s: the daemon has no prepare %s", d.Name, d.Prepare)
 	}
 	c := Call{Guidance: req.Guidance, Inputs: maps.Clone(req.Inputs)}
-	if _, err := prepare(s, ctx, u, &c); err != nil {
+	if err := prepare(s, ctx, u, &c); err != nil {
 		return req, err
 	}
 	req.Guidance, req.Inputs = c.Guidance, c.Inputs
@@ -455,13 +458,26 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "pr: "+err.Error())
 		return
 	}
-	text, found, err := s.deps.Turns.NewestAnswer(r.Context(), u, handle)
+	var id int64
+	if raw := r.URL.Query().Get("message"); raw != "" {
+		if id, err = strconv.ParseInt(raw, 10, 64); err != nil || id <= 0 {
+			writeError(w, http.StatusBadRequest, "message: not a message id: "+raw)
+			return
+		}
+	}
+	if s.deps.Messages == nil {
+		writeError(w, http.StatusServiceUnavailable, "the Inbox is not wired")
+		return
+	}
+	convs, err := s.deps.Messages.Read(r.Context(), messages.ReadRequest{Session: handle, Unit: u, Message: id})
 	switch {
+	case errors.Is(err, messages.ErrNoMessage), errors.Is(err, messages.ErrNoTurn):
+		writeError(w, http.StatusNotFound, err.Error())
 	case err != nil:
 		writeAgentError(w, err)
-	case !found:
-		writeError(w, http.StatusNotFound, "no answer stored for "+u.Label())
+	case s.deps.ReadText != nil:
+		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), convs, id)})
 	default:
-		writeJSON(w, api.TurnText{Text: text})
+		writeJSON(w, api.TurnText{Text: fmt.Sprint(convs)})
 	}
 }

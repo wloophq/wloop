@@ -61,7 +61,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Book**: one unit's turns in order, each with its sequence number. A book has at most one open turn, and a turn's "Earlier turns" come from it.
 - **Instructions**: the stored text a turn's agent reads with `{{command}} instructions <intent> --turn <id>`: the procedure, the judgment, the brief, the guidance and the earlier turns. They are rendered once, when the turn is created. See [Instructions](/concepts/turns/#instructions).
 - **Guidance**: your free text for one round, carried verbatim in its instructions. Guidance for a round that does not go out is kept for the next one.
-- **Question** and **answer**: a turn that records `asked` stops on a question; your answer is stored with the turn, then typed into the session, queued, or sent as a resume turn. See [Answers](/concepts/turns/#answers).
+- **Question** and **answer**: a turn that records `asked` stops on a question, an Inbox message; your answer names that message, and the session gets a notice it reads the answer from with `inbox_read`, or a resume turn carries it. See [Answers](/concepts/turns/#answers).
 - **Resume turn**: a new turn of the same intent, in a new session, that carries the stopped turn's question, draft, notes and your answer. **Continue** sends one without an answer.
 - **Endorsement**: whether you stood behind the verdict a turn published, by publishing it by hand or approving it. An automatic follow-up approves only after an endorsed verdict.
 - **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that proposes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).

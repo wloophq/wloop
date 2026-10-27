@@ -64,6 +64,7 @@ var migrations = []migration{
 		`ALTER TABLE drafts ADD COLUMN origin_unit_key TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE drafts ADD COLUMN replaced TEXT NOT NULL DEFAULT ''`,
 	)},
+	{to: 6, name: "answer_message", compatible: 4, up: v6Answers},
 }
 
 // schemaSet is a schema and the migrations that reach it, so tests can run

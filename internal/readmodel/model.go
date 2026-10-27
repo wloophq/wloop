@@ -22,8 +22,11 @@ import (
 	"github.com/wloophq/wloop/internal/meter"
 )
 
+// PokeQuiet is how long the model waits after a row note before it
+// refreshes, so a burst of notes costs one refresh.
+const PokeQuiet = 250 * time.Millisecond
+
 const (
-	pokeQuiet    = 250 * time.Millisecond
 	pokeMaxDelay = time.Second
 	clockTick    = time.Minute
 	tombstoneMax = 1024
@@ -466,7 +469,7 @@ func (m *Model) Run(ctx context.Context, publish func(api.Change)) {
 		case <-ctx.Done():
 			return
 		case <-poke:
-			quiet = time.After(pokeQuiet)
+			quiet = time.After(PokeQuiet)
 			if late == nil {
 				late = time.After(pokeMaxDelay)
 			}

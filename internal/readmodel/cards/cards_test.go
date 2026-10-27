@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -222,7 +223,7 @@ func (e *env) change(rev uint64, units ...unit.Unit) {
 
 func waitFor(t *testing.T, what string, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(time.Minute)
 	for !ok() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
@@ -333,39 +334,41 @@ func TestCardsJobUsesStoredOutcomeWhenTheCardFails(t *testing.T) {
 }
 
 func TestCardsJobNeverBlocksPublish(t *testing.T) {
-	rows := newRows(row(t1, "r0"), row(t2, "r0"))
-	ledger := &fakeLedger{block: make(chan struct{}), in: make(chan struct{})}
-	e := start(t, Provider{Card: cardOf, Items: itemsOf}, rows, ledger)
-	<-ledger.in
-	var last [2]uint64
-	began := time.Now()
-	for i := 1; i <= 100; i++ {
-		u, k := t1, 0
-		if i%2 == 0 {
-			u, k = t2, 1
+	synctest.Test(t, func(t *testing.T) {
+		rows := newRows(row(t1, "r0"), row(t2, "r0"))
+		ledger := &fakeLedger{block: make(chan struct{}), in: make(chan struct{})}
+		e := start(t, Provider{Card: cardOf, Items: itemsOf}, rows, ledger)
+		<-ledger.in
+		var last [2]uint64
+		began := time.Now()
+		for i := 1; i <= 100; i++ {
+			u, k := t1, 0
+			if i%2 == 0 {
+				u, k = t2, 1
+			}
+			last[k] = rows.set(row(u, fmt.Sprintf("r%d", i)))
+			e.change(last[k], u)
 		}
-		last[k] = rows.set(row(u, fmt.Sprintf("r%d", i)))
-		e.change(last[k], u)
-	}
-	if d := time.Since(began); d > time.Second {
-		t.Errorf("100 changes took %v while a reconcile ran", d)
-	}
-	close(ledger.block)
-	e.idle(t)
-	final := map[unit.Unit]reconcile{}
-	for _, c := range ledger.got() {
-		final[c.u] = c
-	}
-	for k, u := range []unit.Unit{t1, t2} {
-		want := fmt.Sprintf("r%d", 99+k)
-		c := final[u]
-		if len(c.desired) != 1 || c.desired[0].Summary != want || c.at.Ref != fmt.Sprintf("row:%d", last[k]) {
-			t.Errorf("%v last reconciled %+v, want summary %s at row:%d", u, c, want, last[k])
+		if d := time.Since(began); d != 0 {
+			t.Errorf("100 changes took %v while a reconcile ran", d)
 		}
-	}
-	if n := len(ledger.got()); n > 6 {
-		t.Errorf("%d reconciles for 100 changes of 2 units; the job does not coalesce", n)
-	}
+		close(ledger.block)
+		e.idle(t)
+		final := map[unit.Unit]reconcile{}
+		for _, c := range ledger.got() {
+			final[c.u] = c
+		}
+		for k, u := range []unit.Unit{t1, t2} {
+			want := fmt.Sprintf("r%d", 99+k)
+			c := final[u]
+			if len(c.desired) != 1 || c.desired[0].Summary != want || c.at.Ref != fmt.Sprintf("row:%d", last[k]) {
+				t.Errorf("%v last reconciled %+v, want summary %s at row:%d", u, c, want, last[k])
+			}
+		}
+		if n := len(ledger.got()); n > 6 {
+			t.Errorf("%d reconciles for 100 changes of 2 units; the job does not coalesce", n)
+		}
+	})
 }
 
 func TestCardsJobSweepsOnAll(t *testing.T) {

@@ -306,7 +306,7 @@ func (pl *poller) catchUpDMs(ctx context.Context, rows map[string]sqlite.Convers
 			if c := rows[id]; c.Admitted {
 				anchor := m.ThreadTS
 				if anchor == "" && m.Permalink != "" {
-					if _, _, threadTS, err := parsePermalink(m.Permalink); err == nil {
+					if _, _, threadTS, err := parseMessage(m.Permalink); err == nil {
 						anchor = threadTS
 					}
 				}

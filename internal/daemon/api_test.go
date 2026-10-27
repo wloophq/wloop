@@ -130,7 +130,18 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	change(&d)
 	s := New(d)
 	s.token = ""
+	stopOnCleanup(t, s)
 	return s
+}
+
+// stopOnCleanup stops s's lifetime when t ends and waits for the drives it
+// started. Call it after the store's and the temporary directory's cleanups
+// are registered, so the drives end before those run.
+func stopOnCleanup(t testing.TB, s *Server) {
+	t.Cleanup(func() {
+		s.stopLife()
+		s.driving.Wait()
+	})
 }
 
 // openOnGitHub reads every pull request the inventory lacks as an open one

@@ -138,6 +138,7 @@ func TestAProfileEditReachesTheCatalogWithoutARestart(t *testing.T) {
 	r := newTurnRig(t)
 	r.s.deps.Intents = cache.Get
 	r.s.deps.Turns.Intents = cachePort{cache.Get}
+	r.s.deps.Messages.Intents = cachePort{cache.Get}
 	var got api.ActionsResponse
 	get(t, r.s, api.Actions, &got)
 	if _, ok := specOf(got.Specs, "ask-author"); ok {
@@ -525,7 +526,7 @@ func TestActionRouteRunsTodaysEffects(t *testing.T) {
 	}{
 		{"review", r7, true, dinv.KindRoundSent, askedByYou},
 		{"address", r7, true, dinv.KindRoundSent, askedByYou},
-		{"nudge", r9, false, dinv.KindNudged, "@ana"},
+		{"nudge", r9, false, "", ""},
 	} {
 		t.Run(c.intent, func(t *testing.T) {
 			t.Parallel()
@@ -544,8 +545,11 @@ func TestActionRouteRunsTodaysEffects(t *testing.T) {
 				t.Errorf("pending round after the %s: %v", c.intent, pending)
 			}
 			evs, _ := rig.st.Events(context.Background(), c.ref)
-			if !slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == c.event && e.Data == c.eventData }) {
+			if c.event != "" && !slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == c.event && e.Data == c.eventData }) {
 				t.Errorf("no %s %q: %+v", c.event, c.eventData, evs)
+			}
+			if c.event == "" && slices.ContainsFunc(evs, func(e dinv.Event) bool { return e.Kind == dinv.KindNudged }) {
+				t.Errorf("the daemon recorded a nudge the command line records with its turn: %+v", evs)
 			}
 			if len(fa.calls) != 1 {
 				t.Errorf("calls %v", fa.calls)

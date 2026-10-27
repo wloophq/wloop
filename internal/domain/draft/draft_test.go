@@ -9,7 +9,7 @@ import (
 func TestDraftTransitionsTable(t *testing.T) {
 	allowed := map[State][]State{
 		Proposed: {Approved, Discarded},
-		Approved: {Sending, Discarded},
+		Approved: {Sending, Failed, Discarded},
 		Sending:  {Sent, Failed},
 		Failed:   {Approved, Discarded},
 	}

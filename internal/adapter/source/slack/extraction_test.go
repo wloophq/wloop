@@ -71,7 +71,7 @@ func TestExtractionJobOverTheStore(t *testing.T) {
 	f := newFixture(t)
 	ledger := &coreitems.Ledger{Store: f.db.Items(), Links: f.db.Links()}
 	f.deps.Turns = &turns.Service{Items: ledgerWithLog{ledger}}
-	f.deps.Clock = segClock{time.Now()}
+	f.deps.Clock = segClock{t0}
 	var prompts []string
 	f.deps.Agents = map[string]turns.Agent{f.cfg.Agent: askerAgent{asker: answerFunc(func(a turns.Ask) ([]byte, error) {
 		prompts = append(prompts, a.Prompt)
@@ -82,7 +82,7 @@ func TestExtractionJobOverTheStore(t *testing.T) {
 	})}}
 	f.build(t)
 	f.login(t)
-	f.now = time.Now().Add(-time.Hour)
+	f.now = t0.Add(-time.Hour)
 	f.seed(t, dslack.Facts{
 		Conversations: []dslack.Conversation{{ID: chan1, Name: "general", Kind: dslack.KindChannel, IsMember: true},
 			{ID: dm1, Kind: dslack.KindIM, IsMember: true, DMUser: other}},
@@ -199,10 +199,10 @@ func threadAnswer(t *testing.T, ref, origin, evidence string) []byte {
 func TestUnwatchKeepsUserFollow(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
-	base := time.Now()
+	base := t0
 	clock := &mutClock{now: base}
 	f.deps.Clock = clock
-	f.deps.Turns = &turns.Service{Items: ledgerWithLog{&coreitems.Ledger{Store: f.db.Items(), Links: f.db.Links()}}}
+	f.deps.Turns = &turns.Service{Items: ledgerWithLog{&coreitems.Ledger{Store: f.db.Items(), Links: f.db.Links(), Clock: clock}}}
 	settled := false
 	f.deps.Agents = map[string]turns.Agent{f.cfg.Agent: askerAgent{asker: answerFunc(func(a turns.Ask) ([]byte, error) {
 		origin, reply := ts(1), ts(2)

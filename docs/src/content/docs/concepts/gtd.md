@@ -56,11 +56,11 @@ The views are Focus (starred entries, the landing view), Inbox, Outbox, Next, Wa
 
 Approve (`a`) and delegate (`d`) move nothing themselves: on an action entry with units they run that unit's action, such as Run now, a review or address round, or Act. Delegate also runs on a waiting, closure or captured entry that has a unit, and takes optional guidance and a mode: `headless` (Draft for me, which proposes drafts for the entry) or `session` (Hand to an agent). Without a mode the action picks its own, headless when it can. The entry says upfront whether a session can run on its unit, and why not when it cannot; a unit with no placement runs its session in a neutral directory with no checkout. A session started from an entry keeps the entry and its items, so the drafts it proposes serve that entry.
 
-Reply (`r`) writes a draft of your own on the entry's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the entry and its items. It waits in the Outbox, or goes out at once with Send now. From a terminal, `{{command}} outbox new <unit|permalink> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
+Reply (`r`) writes a draft of your own on the entry's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the entry and its items. It waits in the Outbox, or goes out at once with Send now. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
 
 ## Messages
 
-An Inbox message needs you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `inbox_post` tool, or a proposal to change a confirmed item. Answers route as for any turn (see [Turns](/concepts/turns/#answers)).
+An Inbox message needs you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `inbox_post` tool, or a proposal to change a confirmed item. Your answer is stored with the message it answers, the agent is told which message you answered and reads the answer with `inbox_read`, and the message's card shows whether it did (see [Turns](/concepts/turns/#answers)).
 
 ## The Outbox
 

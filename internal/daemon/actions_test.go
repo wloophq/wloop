@@ -19,6 +19,10 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
+	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
+	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -599,10 +603,17 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	if since := s.deps.Now().Add(-72 * time.Hour).Local().Format(time.RFC3339); !strings.Contains(fa.calls[0], " since "+since+", ") {
 		t.Fatalf("the wait is not dated to the second: %v, want %s", fa.calls, since)
 	}
-	evs, _ := s.store().Events(context.Background(), r9)
-	last := evs[len(evs)-1]
-	if last.Kind != dinv.KindNudged || last.Data != "@ana" {
-		t.Fatalf("last event %+v", last)
+	if who, _ := fa.inputs[0]["who"].([]string); !slices.Equal(who, []string{"@ana"}) {
+		t.Fatalf("who %v", fa.inputs[0]["who"])
+	}
+}
+
+// sentNudge records the nudged event the command line records once the
+// nudge turn id goes out.
+func sentNudge(t *testing.T, s *Server, id, who string) {
+	t.Helper()
+	if err := s.store().RecordEvent(context.Background(), dinv.Event{PR: r9, Kind: dinv.KindNudged, Key: id, At: s.deps.Now(), Data: who}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -625,6 +636,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 		!strings.Contains(fa.calls[0], ", no reviewer.") || strings.Contains(fa.calls[0], "@") || !fa.maintainers[0] {
 		t.Fatalf("calls %v, maintainers %v", fa.calls, fa.maintainers)
 	}
+	sentNudge(t, s, "t1", "the maintainers (no reviewer requested)")
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "already nudged the maintainers") {
 		t.Fatalf("a second nudge within a day: %d %s", rec.Code, rec.Body)
 	}
@@ -700,6 +712,7 @@ func TestNudgeOncePerWait(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
+	sentNudge(t, s, "t1", "@ana")
 	start := s.deps.Now()
 	s.deps.Now = func() time.Time { return start.Add(23 * time.Hour) }
 	rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`)
@@ -1143,6 +1156,9 @@ type turnRig struct {
 	sessions *turnstest.Sessions
 	reg      *turnstest.Registry
 	launcher *fakeLauncher
+	msgs     *messagestest.Store
+	entries  *gtdtest.Store
+	facts    enabledUnits
 }
 
 // newTurnRig is a server whose turns live in strict fakes; nothing of the
@@ -1154,6 +1170,10 @@ func newTurnRig(t *testing.T) *turnRig {
 		reg: turnstest.NewRegistry(turnstest.Strict(t)), launcher: &fakeLauncher{loopMu: s.deps.LoopMu}}
 	s.deps.Turns = &turns.Service{Intents: turnstest.Intents(), Store: r.store, Registry: r.reg, Sessions: r.sessions, Launcher: r.launcher,
 		Clock: fixedClock(s.deps.Now()), Command: brand.Command}
+	r.msgs, r.entries, r.facts = messagestest.New(), gtdtest.New(), enabledUnits{map[unit.ProviderID]bool{}}
+	clock := fixedClock(s.deps.Now())
+	s.deps.GTD = coregtd.New(coregtd.Deps{Store: r.entries, Items: itemsNone{}, Facts: r.facts, Clock: clock})
+	s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: s.deps.Turns, Entries: s.deps.GTD, Intents: turnstest.Intents(), Clock: clock}
 	return r
 }
 
@@ -1217,7 +1237,7 @@ func TestAnswerTypesIntoAWarmCapableSession(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "The user answered: publish it, but say thanks" {
+	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
 		t.Fatalf("typed %+v", typed)
 	}
 	var res api.ActionResult
@@ -1246,7 +1266,7 @@ func (r *turnRig) routes(ref pr.Ref) []turn.Route {
 	return out
 }
 
-func TestAnAnswerToABusyAgentIsQueuedAndTypedAtItsStop(t *testing.T) {
+func TestAnAnswerToABusyAgentIsQueuedAndBlocksItsStopWithTheNotice(t *testing.T) {
 	t.Parallel()
 	r := newTurnRig(t)
 	r8 := r.busyAsked(publishQuestion)
@@ -1258,14 +1278,16 @@ func TestAnAnswerToABusyAgentIsQueuedAndTypedAtItsStop(t *testing.T) {
 	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Queued}) || len(r.sessions.Typed()) != 0 {
 		t.Fatalf("routes %v, typed %+v", got, r.sessions.Typed())
 	}
-	if rec := agentCall(t, r.s.Handler(), "POST", api.AgentSessionsStop, "term-1", `{"prompt_id":"p1"}`); rec.Code != 200 {
-		t.Fatalf("stop: %d %s", rec.Code, rec.Body)
+	stop := agentCall(t, r.s.Handler(), "POST", api.AgentSessionsStop, "term-1", `{"prompt_id":"p1"}`)
+	var ans api.StopAnswer
+	if stop.Code != 200 || json.Unmarshal(stop.Body.Bytes(), &ans) != nil || !ans.Block || ans.Reason != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
+		t.Fatalf("stop: %d %s", stop.Code, stop.Body)
 	}
 	r.s.driving.Wait()
-	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0] != (turnstest.Typed{Handle: "term-1", Line: "The user answered: publish it"}) {
+	if typed := r.sessions.Typed(); len(typed) != 0 {
 		t.Fatalf("typed %+v", typed)
 	}
-	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Typed}) {
+	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Hooked}) {
 		t.Fatalf("routes %v", got)
 	}
 }
@@ -1285,7 +1307,7 @@ func TestTheFastJobDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 		t.Fatalf("delivered while the loop was held: %+v", r.sessions.Typed())
 	}
 	r.s.reconcileTurns(context.Background())
-	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "The user answered: no. the draft misreads the diff" {
+	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
 		t.Fatalf("typed %+v", typed)
 	}
 	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Typed}) {
@@ -1412,5 +1434,37 @@ func TestLoopActionsReadAheadBeforeTheLoopMutex(t *testing.T) {
 	want := []string{"acme/api#7 full=false free=true", "acme/api#7 full=true free=true"}
 	if !slices.Equal(a.ahead, want) || len(a.calls) != 3 {
 		t.Fatalf("read ahead %q, calls %v", a.ahead, a.calls)
+	}
+}
+
+func TestANewerAnswerByTheUnitActionReplacesTheQueuedOne(t *testing.T) {
+	t.Parallel()
+	r := newTurnRig(t)
+	r8 := r.busyAsked(publishQuestion)
+	for _, body := range []string{`{"option_id":"hold"}`, `{"option_id":"publish","guidance":"after CI"}`} {
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", body); rec.Code != 200 {
+			t.Fatalf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Refused, turn.Queued}) {
+		t.Fatalf("routes %v", got)
+	}
+}
+
+func TestAnAnswerAfterATypedOneStillReachesTheAskingTurn(t *testing.T) {
+	t.Parallel()
+	r := newTurnRig(t)
+	now := r.s.deps.Now()
+	r8 := pr.Ref{Owner: "acme", Repo: "api", Number: 8}
+	r.asked(r8, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
+	r.reg.Put(turn.Session{ID: "term-1", WorkspaceID: "ws-1", StartedAt: now.Add(-time.Hour), MCPAt: now.Add(-time.Hour)})
+	r.sessions.Put("ws-1", turns.Terminal{Session: "term-1", LastOutput: now.Add(-time.Minute)})
+	for _, body := range []string{`{"option_id":"hold"}`, `{"guidance":"one more thing"}`} {
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", body); rec.Code != 200 {
+			t.Fatalf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Typed, turn.Typed}) {
+		t.Fatalf("routes %v", got)
 	}
 }

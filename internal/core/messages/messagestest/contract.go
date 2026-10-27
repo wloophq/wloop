@@ -51,6 +51,12 @@ func questionsKeyByTurn(t *testing.T, s message.Store) {
 	if err != nil || !ok || got.State != message.Answered || got.Answer != "yes" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
 		t.Fatalf("closed %+v %v %v", got, ok, err)
 	}
+	if err := s.Close(ctx, first.ID, message.Answered, "no, wait", at.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, _ := s.Message(ctx, first.ID); got.State != message.Answered || got.Answer != "no, wait" || !got.ClosedAt.Equal(at.Add(time.Minute)) {
+		t.Fatalf("a newer answer did not reword the answered message: %+v", got)
+	}
 	if again, _ := s.Upsert(ctx, q); again.ID == first.ID || again.State != message.Open {
 		t.Fatalf("a question asked after its answer reused the closed message: %+v", again)
 	}

@@ -72,16 +72,16 @@ func (e *Env) serveDossierTurns(ctx context.Context, svc *dossiers.Service, db *
 	if e.Turns != nil {
 		q := make(chan port.Event, dossierChecks)
 		e.Turns.Pub = turnEnds{ctx: ctx, next: e.Turns.Pub, q: q, log: logf}
-		go e.checkTurnEnds(ctx, t, q, res, logf)
+		e.background.Go(func() { e.checkTurnEnds(ctx, t, q, res, logf) })
 	}
 	if e.noJobs || e.changes == nil {
 		return
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("dossier-resolution"))
 		defer scope.End()
 		res.Watch(lctx, e.changes, dossierRetryEvery)
-	}()
+	})
 }
 
 // turnEnds hands each turn_ended event to the dossier checks, never blocking the publisher.

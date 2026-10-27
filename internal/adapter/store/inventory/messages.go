@@ -39,7 +39,8 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateMessageSQL = `UPDATE messages SET entry_id = ?, text = ?, options = ?, recommend = ?, confirm = ?, session = ?
 		WHERE id = ?`
-	closeMessageSQL = `UPDATE messages SET state = ?, answer = ?, closed_at = ? WHERE id = ? AND state = 'open'`
+	closeMessageSQL = `UPDATE messages SET state = ?1, answer = ?2, closed_at = CASE state WHEN 'open' THEN ?3 ELSE closed_at END
+		WHERE id = ?4 AND (state = 'open' OR (state = 'answered' AND ?1 = 'answered' AND answer != ?2))`
 )
 
 // keyQuery is the statement and arguments that find the message m replaces when it has no ID, or "" when
