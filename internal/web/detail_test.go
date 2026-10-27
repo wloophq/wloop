@@ -274,6 +274,43 @@ process.stdout.write(JSON.stringify(out));`, []map[string]any{
 	}
 }
 
+func TestAVerbButtonSaysWhatItDoes(t *testing.T) {
+	var got struct {
+		On, Off string
+	}
+	e := entry("e-2", "next", func(e *api.EntryView) {
+		e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}, {Verb: "someday", Reason: "not on a someday entry"}}
+	})
+	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}}}
+	nodeRun(t, gtdPrelude(t), nil, `
+gtdState.catalog = input.cat;
+const pane = h("div", {}, ...verbButtons(input.entry));
+process.stdout.write(JSON.stringify({
+  On: byFocus(pane, "detail:done:e-2").attrs.title,
+  Off: byFocus(pane, "detail:someday:e-2").attrs.title,
+}));`, map[string]any{"cat": cat, "entry": e}, &got)
+	if got.On != "Close it" || got.Off != "Not now\nnot on a someday entry" {
+		t.Errorf("titles %q and %q", got.On, got.Off)
+	}
+}
+
+func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
+	var got struct{ Asked []string }
+	e := entry("e-3", "next", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
+	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
+	nodeRun(t, gtdPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
+gtdState.catalog = input.cat;
+detailEnv.ask = (label) => { asked.push(label); return "ana"; };
+const pane = h("div", {}, ...verbButtons(input.entry));
+(async () => {
+  await byFocus(pane, "detail:waiting:e-3").attrs.onclick();
+  process.stdout.write(JSON.stringify({ Asked: asked }));
+})();`, map[string]any{"cat": cat, "entry": e}, &got)
+	if len(got.Asked) != 1 || got.Asked[0] != "On whom?" {
+		t.Errorf("asked %v", got.Asked)
+	}
+}
+
 func TestAQuestionCardShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	q := questionEntry()
 	read := time.Date(2026, 10, 22, 12, 5, 0, 0, time.UTC)
@@ -294,6 +331,18 @@ process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("answers\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestAVerbTheEntryDoesNotOfferHasNoButton(t *testing.T) {
+	var got struct{ Approve, Dismiss, Done int }
+	e := entry("e-4", "inbox", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
+	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+const pane = h("div", {}, ...entryPane(input.entry));
+const n = (verb) => byFocus(pane, "detail:" + verb + ":e-4") ? 1 : 0;
+process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss"), Done: n("done") }));`, map[string]any{"entry": e, "answers": map[string]any{}}, &got)
+	if got.Approve != 0 || got.Dismiss != 0 || got.Done != 1 {
+		t.Errorf("buttons %+v", got)
 	}
 }
 

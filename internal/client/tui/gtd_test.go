@@ -20,11 +20,11 @@ func gtdCatalog() api.GTDCatalog {
 	views := []api.GTDView{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"},
 		{ID: "next", Label: "Next"}, {ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"},
 		{ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
-	verbs := []api.GTDVerb{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Label: "Waiting", Key: "w"},
-		{Verb: "schedule", Label: "Schedule", Key: "s"}, {Verb: "someday", Label: "Someday", Key: "y"},
+	verbs := []api.GTDVerb{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
+		{Verb: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
 		{Verb: "reference", Label: "Reference", Key: "l"}, {Verb: "focus", Label: "Focus", Key: "f"},
 		{Verb: "project", Label: "Project", Key: "p"}, {Verb: "approve", Label: "Approve", Key: "a"},
-		{Verb: "delegate", Label: "Delegate", Key: "d"}, {Verb: "done", Label: "Done", Key: "e"},
+		{Verb: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"}, {Verb: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Label: "Done", Key: "e"},
 		{Verb: "dismiss", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
 	return api.GTDCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs}
 }
@@ -782,4 +782,17 @@ func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
 		term.press(Key{Name: KeyEsc})
 		quit(t, term, done)
 	})
+}
+
+func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
+	m := gtdModel(t)
+	press(m, Key{Rune: 'w'})
+	if m.prompt == nil || !strings.HasPrefix(m.prompt.label, "Waiting on whom") {
+		t.Fatalf("prompt %+v", m.prompt)
+	}
+	m = gtdModel(t)
+	press(m, Key{Rune: 'd'})
+	if m.prompt == nil || !strings.Contains(m.prompt.label, "what should the agent look at") {
+		t.Fatalf("delegate prompt %+v", m.prompt)
+	}
 }

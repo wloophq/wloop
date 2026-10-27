@@ -44,9 +44,11 @@ type GTDView struct {
 }
 
 type GTDVerb struct {
-	Verb  string `json:"verb"`
-	Label string `json:"label"`
-	Key   string `json:"key"`
+	Verb    string `json:"verb"`
+	Label   string `json:"label"`
+	Summary string `json:"summary,omitempty"`
+	Input   string `json:"input,omitempty"` // the question a verb that asks for a value puts first
+	Key     string `json:"key"`
 }
 
 type EntryView struct {

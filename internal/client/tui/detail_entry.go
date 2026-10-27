@@ -354,6 +354,16 @@ func (m *Model) verbHelp(e api.EntryView) (on []helpItem, off []string) {
 	return on, off
 }
 
+// verbQuestion is what a verb that asks puts first: the catalog's input.
+func (m *Model) verbQuestion(verb string) string {
+	for _, v := range m.gtdCat.Verbs {
+		if v.Verb == verb {
+			return cmp.Or(v.Input, v.Label, verb)
+		}
+	}
+	return verb
+}
+
 func (m *Model) verbLabel(verb string) string {
 	for _, v := range m.gtdCat.Verbs {
 		if v.Verb == verb {

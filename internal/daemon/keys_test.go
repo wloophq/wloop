@@ -74,8 +74,8 @@ func TestKeysEndpoint(t *testing.T) {
 			t.Errorf("%s has no summary", k)
 		}
 	}
-	if summary["list next"] != "" {
-		t.Errorf("the core key x has the summary %q", summary["list next"])
+	if summary["list next"] == "" || summary["global nav:inbox"] != "" {
+		t.Errorf("a verb's key says what the verb does, another core key nothing: %q, %q", summary["list next"], summary["global nav:inbox"])
 	}
 	has := func(v api.KeyView) bool {
 		return slices.ContainsFunc(got.Bindings, func(b api.KeyView) bool {

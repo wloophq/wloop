@@ -161,3 +161,31 @@ func entryIDs(es []gtd.Entry) []gtd.ID {
 	}
 	return out
 }
+
+func TestVerbEventsWriteWithOrWithoutAChange(t *testing.T) {
+	t.Parallel()
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "entries.db"), change.NewLog(change.DefaultWindow, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ctx := context.Background()
+	e := capture("e-1", gtd.Next, 0)
+	applyEntries(t, db.Entries(), e)
+	done := e
+	done.State = gtd.Done
+	ev := port.Event{Unit: gtd.UnitOf(e.ID), Kind: gtd.VerbEventKind(gtd.VerbDone), Data: "next", At: entryAt}
+	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: done}}, ev); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Entries().Apply(ctx, nil, ev); err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.Events().Since(ctx, 0, gtd.VerbEventKinds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Unit != gtd.UnitOf(e.ID) || got[0].Data != "next" || got[1].Kind != "verb_done" {
+		t.Fatalf("events %+v", got)
+	}
+}

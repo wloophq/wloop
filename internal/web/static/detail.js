@@ -6,6 +6,12 @@ const MESSAGE_HEAD = { question: "Question", agent_post: "Message from the agent
 const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "edit", "retry", "approve", "dismiss", "delegate", "reply"]);
 // DRAFT_VERBS are the entry verbs of a draft's actions.
 const DRAFT_VERBS = { "draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry" };
+
+// draftWord is the label of a draft's action id, from the served specs, else its verb's.
+function draftWord(id) {
+  const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
+  return (sp && sp.label) || verbLabel(DRAFT_VERBS[id]);
+}
 const ENTRY_DRAFT_STATES = "proposed,approved,sending,sent,failed";
 
 const detailState = {
@@ -225,19 +231,19 @@ async function openAgentLog() {
   detailEnv.render();
 }
 
+// verbState is how verb stands on e; null when e does not offer it.
 function verbState(e, verb) {
-  const vs = e.verbs || [];
-  const st = vs.find((v) => v.verb === verb);
-  return st ? st : { verb, enabled: !vs.length };
+  return (e.verbs || []).find((v) => v.verb === verb) || null;
 }
 
 function verbButton(e, verb, label, run, extra = {}) {
   const st = verbState(e, verb);
+  if (!st) return null;
   return h("button", {
     type: "button",
     class: "act" + (st.enabled ? "" : " off") + (extra.primary ? " primary" : ""),
     disabled: !st.enabled,
-    title: st.enabled ? undefined : st.reason,
+    title: [verbEntry(verb).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n") || undefined,
     "data-focus": `${extra.scope || "detail"}:${verb}:${e.id}`,
     onclick: run,
   }, label);
@@ -247,14 +253,24 @@ function verbButton(e, verb, label, run, extra = {}) {
 function askedArgs(verb) {
   const ask = typeof VERB_ASKS === "object" ? VERB_ASKS[verb] : null;
   if (!ask) return {};
-  const v = detailEnv.ask(ask.label);
+  const v = detailEnv.ask(verbQuestion(verb));
   if (v === null || v === undefined) return null;
   return ask.args(String(v).trim());
 }
 
+// verbEntry is the catalog's word for verb: its label and summary.
+function verbEntry(verb) {
+  return ((typeof gtdState === "object" && gtdState.catalog && gtdState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
+}
+
+// verbQuestion is what a verb that asks puts first: the catalog's input.
+function verbQuestion(verb) {
+  const v = verbEntry(verb);
+  return v.input || v.label || verb;
+}
+
 function verbLabel(verb) {
-  const v = ((typeof gtdState === "object" && gtdState.catalog && gtdState.catalog.verbs) || []).find((x) => x.verb === verb);
-  return (v && v.label) || verb;
+  return verbEntry(verb).label || verb;
 }
 
 function verbButtons(e) {
@@ -277,13 +293,13 @@ function draftCard(e, scope) {
   const editing = detailState.editing.has(e.id);
   const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "proposed" ? ` (${d.state})` : "");
   const buttons = editing ? [
-    verbButton(e, "approve", "Approve edited", () => approveEdited(e), { scope, primary: true }),
+    verbButton(e, "approve", draftWord("draft.approve"), () => approveEdited(e), { scope, primary: true }),
     h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),
   ] : [
-    d.state === "failed" ? verbButton(e, "retry", "Retry", () => entryAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, "approve", "Approve", () => entryAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
-    verbButton(e, (e.verbs || []).some((v) => v.verb === "edit") ? "edit" : "approve", "Edit", () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, "dismiss", "Discard", () => entryAct(e, "dismiss", {}), { scope }),
+    d.state === "failed" ? verbButton(e, "retry", draftWord("draft.retry"), () => entryAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
+      : verbButton(e, "approve", draftWord("draft.approve"), () => entryAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
+    verbButton(e, (e.verbs || []).some((v) => v.verb === "edit") ? "edit" : "approve", draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
+    verbButton(e, "dismiss", draftWord("draft.discard"), () => entryAct(e, "dismiss", {}), { scope }),
   ];
   return h("section", { class: "d-draft", "aria-label": "Draft" },
     h("div", { class: "d-sub" }, head),
@@ -335,10 +351,10 @@ function delegateBox(e) {
       detailEnv.render();
     }
   };
-  return h("section", { class: "d-delegate", "aria-label": "Delegate" },
-    h("h2", { class: "d-sub" }, "Delegate"),
+  return h("section", { class: "d-delegate", "aria-label": verbLabel("delegate") },
+    h("h2", { class: "d-sub" }, verbLabel("delegate")),
     st.enabled ? null : h("p", { class: "empty" }, st.reason || "Not offered here"),
-    h("textarea", { rows: 2, "aria-label": "Guidance", placeholder: "Guidance for the agent (optional)", disabled: !st.enabled, "data-focus": "detail:guidance",
+    h("textarea", { rows: 2, "aria-label": "Guidance", placeholder: verbQuestion("delegate"), disabled: !st.enabled, "data-focus": "detail:guidance",
       oninput: (ev) => { detailState.guidance = ev.target.value; } }, detailState.guidance),
     h("div", { class: "d-actions" },
       modeButton(e, st, "headless", "Draft for me", () => run("headless"), true),
@@ -407,7 +423,7 @@ function entryComposer(e) {
   if (!(e.verbs || []).some((v) => v.verb === "reply")) return null;
   const st = verbState(e, "reply");
   const u = (e.units || [])[0];
-  return composer("entry:" + e.id, { scope: "detail:reply", reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
+  return composer("entry:" + e.id, { scope: "detail:reply", placeholder: verbQuestion("reply"), reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
     post: (args) => entryAct(e, "reply", args) });
 }
 
@@ -537,8 +553,8 @@ function entryPane(e) {
     waiting.length ? h("div", {}, "Waiting on ", h("strong", {}, waiting.join(", ")), e.waiting.since ? ` since ${stamp(e.waiting.since)}` : "") : null,
     e.deadline ? h("div", {}, "Due ", stamp(e.deadline)) : null,
     h("div", { class: "d-actions" }, ...verbButtons(e), ...entryIntentButtons(e),
-      e.message || e.draft ? null : verbButton(e, "approve", "Approve", () => entryAct(e, "approve", {})),
-      e.draft ? null : verbButton(e, "dismiss", "Dismiss", () => entryAct(e, "dismiss", {}))),
+      e.message || e.draft ? null : verbButton(e, "approve", verbLabel("approve"), () => entryAct(e, "approve", {})),
+      e.draft ? null : verbButton(e, "dismiss", verbLabel("dismiss"), () => entryAct(e, "dismiss", {}))),
     itemsBlock(e.items),
     e.message ? questionCard(e) : null,
     e.draft ? draftCard(e, "detail") : null,

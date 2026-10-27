@@ -311,6 +311,7 @@ var otherFacts = []Fact{
 	enum(wf("trigger", "kind", expr.String, "sweep, event or schedule."), enumOf("sweep", "event", "schedule")),
 	wf("trigger", "event.kind", expr.String, "The event's kind; empty unless kind is event."),
 	wf("trigger", "event.key", expr.String, "The event's key."),
+	wf("trigger", "event.id", expr.Int, "The event's id, unique and growing; 0 unless kind is event."),
 	untrusted(wf("trigger", "event.data", expr.String, "The event's data: a person's or an agent's text, such as an intake's note, an answer or the mentions of a sent nudge.")),
 	wf("trigger", "fired_at", expr.Time, "When the schedule fired; zero unless kind is schedule."),
 	wf("config", "cleanup.idle", expr.Duration, "The cleanup.idle setting."),
@@ -571,4 +572,20 @@ func FactProvider(name string) unit.ProviderID {
 		}
 	}
 	return ""
+}
+
+// OfferFacts are the facts a verb's offer reads: an entry's own, which a
+// list of entries reads without a store.
+var OfferFacts = []string{"entry.id", "entry.kind", "entry.state", "entry.muted", "entry.unit", "entry.unit_provider"}
+
+// OfferEnv is the env of a verb's offer in gtd.toml.
+func OfferEnv() expr.Env {
+	env := expr.Env{}
+	for _, f := range Facts {
+		if slices.Contains(OfferFacts, f.Name) {
+			put(env, f)
+		}
+	}
+	Narrow(env, providersOfSlot("entry"))
+	return env
 }

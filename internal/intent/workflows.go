@@ -377,8 +377,11 @@ func (s *sheet) defineTrigger(w *workflow.Workflow, t *wTrigger) {
 			s.add("trigger.on", "must name at least one event kind")
 		}
 		for i, k := range t.On {
-			if slices.Contains(workflow.EngineKinds, k) {
+			switch {
+			case slices.Contains(workflow.EngineKinds, k):
 				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an engine event; a workflow reacts to source events", k)
+			case builtin.EventProviders[k] != "" && w.Provider != builtin.EventProviders[k]:
+				s.add(fmt.Sprintf("trigger.on[%d]", i), "%s is an event of %s units; it needs provider = %q", k, builtin.EventProviders[k], builtin.EventProviders[k])
 			}
 		}
 	default:
@@ -472,6 +475,9 @@ func (s *sheet) defineSteps(w *workflow.Workflow, steps []map[string]any, turnPr
 		if use == builtin.StepDraftPropose {
 			s.draftPropose(p, st.Args, w.Provider)
 		}
+		if use == builtin.StepEntryVerb {
+			s.entryVerb(p, st.Args)
+		}
 		args := maps.Clone(raw)
 		delete(args, "use")
 		ps := builtin.CheckStep(use, args)
@@ -538,6 +544,28 @@ func (s *sheet) stepFiles(steps []workflow.Step, read func(string) ([]byte, erro
 	}
 }
 
+// entryVerb checks entry.verb's arguments: a verb, only the arguments it
+// takes, and a date or on_activity for schedule.
+func (s *sheet) entryVerb(p string, args map[string]any) {
+	verb, _ := args["verb"].(string)
+	if verb == "" {
+		s.add(p+".verb", "is required: the verb run on the entry")
+		return
+	}
+	if !slices.Contains(builtin.EntryStepVerbs, verb) {
+		return
+	}
+	takes := builtin.EntryVerbArgs[verb]
+	for _, k := range slices.Sorted(maps.Keys(args)) {
+		if k != "verb" && !slices.Contains(takes, k) {
+			s.add(p+"."+k, "is not an argument of %s", verb)
+		}
+	}
+	if verb == "schedule" && args["until"] == nil && args["on_activity"] != "true" {
+		s.add(p+".verb", "schedule needs until or on_activity = \"true\"")
+	}
+}
+
 // draftPropose checks draft.propose's arguments.
 func (s *sheet) draftPropose(p string, args map[string]any, provider dunit.ProviderID) {
 	arg := func(k string) (string, bool) {
@@ -580,6 +608,12 @@ func (s *sheet) repeatAfter(path, v string) {
 func (s *sheet) defineKey(w *workflow.Workflow, key []string, slot string) {
 	for i, k := range key {
 		p := fmt.Sprintf("key[%d]", i)
+		if k == workflow.EventIDFact {
+			if w.Trigger.Kind != workflow.TriggerEvent {
+				s.add(p, "%s needs [trigger] on: only an event has an id", k)
+			}
+			continue
+		}
 		t, known := builtin.FactType(k)
 		if !known || slot == "" || !strings.HasPrefix(k, slot+".") {
 			s.add(p, "%s is not a fact of the %s slot", k, slot)

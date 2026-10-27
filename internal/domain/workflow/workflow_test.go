@@ -16,32 +16,32 @@ func TestKeyValueIgnoresFactOrderAndChangesWithAValue(t *testing.T) {
 	reordered := w
 	reordered.Key = []string{"pr.fingerprint", "pr.state"}
 
-	k := workflow.NewKey(w, u, facts, time.Time{})
-	if got := workflow.NewKey(reordered, u, facts, time.Time{}); got != k {
+	k := workflow.NewKey(w, u, facts, workflow.Why{})
+	if got := workflow.NewKey(reordered, u, facts, workflow.Why{}); got != k {
 		t.Errorf("reordered key facts: %v, want %v", got, k)
 	}
 	if len(k.Value) != 16 || k.Workflow != "review" || k.Unit != u {
 		t.Errorf("key = %+v", k)
 	}
 	changed := workflow.Facts{"pr.fingerprint": "abd", "pr.state": "open"}
-	if workflow.NewKey(w, u, changed, time.Time{}).Value == k.Value {
+	if workflow.NewKey(w, u, changed, workflow.Why{}).Value == k.Value {
 		t.Error("a changed key fact kept the value")
 	}
-	if workflow.NewKey(w, u, workflow.Facts{"pr.fingerprint": "abc", "pr.state": "open", "pr.age": time.Hour}, time.Time{}) != k {
+	if workflow.NewKey(w, u, workflow.Facts{"pr.fingerprint": "abc", "pr.state": "open", "pr.age": time.Hour}, workflow.Why{}) != k {
 		t.Error("a fact outside the key changed the value")
 	}
 
 	byDefault := workflow.Workflow{Name: "review", Slot: "pr"}
-	if workflow.NewKey(byDefault, u, facts, time.Time{}).Value == workflow.NewKey(byDefault, u, changed, time.Time{}).Value {
+	if workflow.NewKey(byDefault, u, facts, workflow.Why{}).Value == workflow.NewKey(byDefault, u, changed, workflow.Why{}).Value {
 		t.Error("an empty key does not read the slot's fingerprint")
 	}
 
 	sched := workflow.Workflow{Name: "daily", Slot: "pr", Trigger: workflow.Trigger{Kind: workflow.TriggerSchedule}}
 	monday := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
-	if workflow.NewKey(sched, u, facts, monday) == workflow.NewKey(sched, u, facts, monday.AddDate(0, 0, 1)) {
+	if workflow.NewKey(sched, u, facts, workflow.Why{FiredAt: monday}) == workflow.NewKey(sched, u, facts, workflow.Why{FiredAt: monday.AddDate(0, 0, 1)}) {
 		t.Error("a schedule key ignores the firing time")
 	}
-	if workflow.NewKey(w, u, facts, monday) != k {
+	if workflow.NewKey(w, u, facts, workflow.Why{FiredAt: monday}) != k {
 		t.Error("a sweep key reads the firing time")
 	}
 

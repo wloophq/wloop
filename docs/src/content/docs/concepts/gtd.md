@@ -71,6 +71,8 @@ Beside its state, an entry has a **focus** star, **contexts** (labels such as `@
 
 The views are Focus (starred entries, the landing view), Inbox, Outbox, Next, Waiting, Projects, Someday, Logbook (reference and done) and Review.
 
+The words of the verbs, the views and the Review's steps come from the profile's `gtd.toml`: each verb's label is its button, its summary the button's tooltip and its input the question it asks first. A verb's `offer`, a condition over the entry's own facts (`entry.kind`, `entry.state`, `entry.unit_provider`), says where an entry offers it: `offer = 'entry.kind != "capture"'` on `delegate` leaves Delegate off captured entries, and the daemon refuses it there too. A workflow's `entry.verb` step is not bound by it. Every verb you run on an entry that changes it is a `verb_<verb>` event a [workflow](/concepts/workflows/#react-to-a-verb) can react to, but `seen` and the verbs on an Outbox draft (approve, edit, retry, dismiss), which are the draft's own.
+
 - **Changed since you saw it.** New activity on a unit by someone else, after you last opened the entry, brings a scheduled or waiting entry back to the Inbox with the changed mark. Opening or moving the entry clears it.
 - **Snooze.** `s` schedules an entry until a date, until activity, or both. When the date passes it returns to the state it had. Muting the unit snoozes its entries.
 - **Waiting.** `w` moves an entry to Waiting, optionally naming whom it waits on. A waiting entry with no nudge for `gtd.stale_waiting_days` (2 working days) gets the focus star, and so does any entry past its deadline.

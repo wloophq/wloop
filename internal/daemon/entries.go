@@ -25,6 +25,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/readmodel"
@@ -44,30 +47,6 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
 
 // entryInputs are the notes after which a change carries the counters.
 const entryInputs = port.TopicEntries | port.TopicDrafts
-
-var gtdViews = []api.GTDView{
-	{ID: string(gtd.ViewFocus), Label: "Focus"},
-	{ID: string(gtd.ViewInbox), Label: "Inbox"},
-	{ID: string(gtd.ViewOutbox), Label: "Outbox"},
-	{ID: string(gtd.ViewNext), Label: "Next"},
-	{ID: string(gtd.ViewWaiting), Label: "Waiting"},
-	{ID: string(gtd.ViewProjects), Label: "Projects"},
-	{ID: string(gtd.ViewSomeday), Label: "Someday"},
-	{ID: string(gtd.ViewLogbook), Label: "Logbook"},
-}
-
-var reviewView = api.GTDView{ID: string(gtd.ViewReview), Label: "Review"}
-
-var gtdVerbs = []struct {
-	verb  gtd.Verb
-	label string
-}{
-	{gtd.VerbNext, "Next"}, {gtd.VerbWaiting, "Waiting"}, {gtd.VerbSchedule, "Schedule"}, {gtd.VerbSomeday, "Someday"},
-	{gtd.VerbReference, "Reference"}, {gtd.VerbFocus, "Focus"}, {gtd.VerbProject, "Project"}, {gtd.VerbApprove, "Approve"},
-	{gtd.VerbDelegate, "Delegate"}, {gtd.VerbDone, "Done"}, {gtd.VerbDismiss, "Dismiss"}, {gtd.VerbSeen, "Seen"},
-	{gtd.VerbContext, "Context"}, {gtd.VerbArea, "Area"}, {gtd.VerbAnswer, "Answer"}, {gtd.VerbEdit, "Edit"},
-	{gtd.VerbRetry, "Retry"}, {gtd.VerbReviewed, "Reviewed"}, {gtd.VerbSequential, "Sequential"}, {gtd.VerbReply, "Reply"},
-}
 
 // bridged are the verbs an entry with units runs as its unit's action when no handler takes them.
 var bridged = []gtd.Verb{gtd.VerbApprove, gtd.VerbDelegate, gtd.VerbDismiss}
@@ -95,22 +74,9 @@ func verbKey(v gtd.Verb) string {
 	return ""
 }
 
-func knownVerb(v string) bool {
-	return slices.ContainsFunc(gtdVerbs, func(x struct {
-		verb  gtd.Verb
-		label string
-	}) bool {
-		return string(x.verb) == v
-	})
-}
+func knownVerb(v string) bool { return slices.Contains(builtin.GTDVerbs, v) }
 
-func verbNames() string {
-	names := make([]string, len(gtdVerbs))
-	for i, v := range gtdVerbs {
-		names[i] = string(v.verb)
-	}
-	return strings.Join(names, ", ")
-}
+func verbNames() string { return strings.Join(builtin.GTDVerbs, ", ") }
 
 func (s *Server) gtd(w http.ResponseWriter) (*coregtd.Service, bool) {
 	if s.deps.GTD == nil {
@@ -142,13 +108,17 @@ func (s *Server) handleGTD(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cat := api.GTDCatalog{Views: slices.Clone(gtdViews), Areas: slices.Clone(s.deps.Cfg.GTD.Areas), Contexts: slices.Clone(s.deps.Cfg.GTD.Contexts)}
-	if g.Serves(gtd.ViewReview) {
-		cat.Views = append(cat.Views, reviewView)
+	texts, bundled := s.loaded().GTD, bundledWords().gtd
+	cat := api.GTDCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.GTD.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.GTD.Contexts))}
+	for _, v := range builtin.GTDViews {
+		if v != string(gtd.ViewReview) || g.Serves(gtd.ViewReview) {
+			cat.Views = append(cat.Views, api.GTDView{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v)})
+		}
 	}
-	cat.Areas, cat.Contexts = nonNil(cat.Areas), nonNil(cat.Contexts)
-	for _, v := range gtdVerbs {
-		cat.Verbs = append(cat.Verbs, api.GTDVerb{Verb: string(v.verb), Label: v.label, Key: verbKey(v.verb)})
+	for _, v := range builtin.GTDVerbs {
+		t, b := texts.Verbs[v], bundled.Verbs[v]
+		cat.Verbs = append(cat.Verbs, api.GTDVerb{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
+			Input: cmp.Or(t.Input, b.Input), Key: verbKey(gtd.Verb(v))})
 	}
 	writeJSON(w, cat)
 }
@@ -160,7 +130,7 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	view := gtd.View(q.Get("view"))
-	if !slices.ContainsFunc(append(slices.Clone(gtdViews), reviewView), func(v api.GTDView) bool { return v.ID == string(view) }) {
+	if !slices.Contains(builtin.GTDViews, string(view)) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown view %q", view))
 		return
 	}
@@ -263,6 +233,10 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	v := gtd.Verb(verb)
+	if !offers(s.loaded().GTD, e, v) {
+		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this entry: the profile's gtd.toml says where it is", v))
+		return
+	}
 	for _, u := range e.Units {
 		if v != gtd.VerbDismiss && s.refusePlugin(w, u) {
 			return
@@ -278,11 +252,30 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 			writeError(w, http.StatusConflict, b.reason())
 			return
 		}
-		s.runBridge(w, r, g, e, b.unit, st, req)
+		s.runBridge(w, r, g, e, v, b.unit, st, req)
 		return
 	}
 	res, err := g.Do(ctx, e.ID, coregtd.Request{Verb: v, Args: req.Args, Source: req.Source})
 	s.writeEntryResult(ctx, w, g, res, err)
+}
+
+// offers says whether the profile offers verb on e; a verb with no offer is
+// offered everywhere.
+func offers(words intentload.GTDTexts, e gtd.Entry, verb gtd.Verb) bool {
+	p := words.Verbs[string(verb)].Offer
+	if p == nil {
+		return true
+	}
+	ok, err := p.Match(workflow.Vars{Facts: catalog.OfferFacts(e)})
+	return err == nil && ok
+}
+
+// recordVerb records a verb another service ran on e; the verb already
+// happened, so a failure is logged and the answer stands.
+func (s *Server) recordVerb(ctx context.Context, g *coregtd.Service, e gtd.Entry, req coregtd.Request) {
+	if err := g.RecordVerb(ctx, e, req); err != nil {
+		s.logf("%s on %s: recording the verb: %v", req.Verb, e.ID, err)
+	}
 }
 
 func (s *Server) writeEntryResult(ctx context.Context, w http.ResponseWriter, g *coregtd.Service, res coregtd.Result, err error) {
@@ -388,7 +381,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb gtd.Verb) bridgeActi
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
 // entry's items on u, and the guidance and mode of the entry's args.
-func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Service, e gtd.Entry, u unit.Unit, st api.ActionState, req api.EntryRequest) {
+func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Service, e gtd.Entry, verb gtd.Verb, u unit.Unit, st api.ActionState, req api.EntryRequest) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -446,6 +439,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
+	s.recordVerb(ctx, g, e, coregtd.Request{Verb: verb, Source: req.Source})
 	now, err := g.Entry(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -708,7 +702,8 @@ func (ev *entryViewer) cards(ctx context.Context, e gtd.Entry, v *api.EntryView)
 // verbs are the verbs of the catalog as they stand on e: refused all over on a disabled plugin's unit, taken by
 // a handler, run as the unit's action, or the state change.
 func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
-	out := make([]api.VerbState, 0, len(gtdVerbs))
+	out := make([]api.VerbState, 0, len(builtin.GTDVerbs))
+	words := ev.s.loaded().GTD
 	off := ""
 	for _, u := range e.Units {
 		if !ev.s.pluginEnabled(u.Provider) {
@@ -728,28 +723,32 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 		}
 		return ev.s.offeredFor(*row, verb)
 	}
-	for _, x := range gtdVerbs {
-		st := api.VerbState{Verb: string(x.verb)}
+	for _, name := range builtin.GTDVerbs {
+		verb := gtd.Verb(name)
+		if !offers(words, e, verb) {
+			continue
+		}
+		st := api.VerbState{Verb: name}
 		switch {
-		case off != "" && x.verb != gtd.VerbDismiss:
+		case off != "" && verb != gtd.VerbDismiss:
 			st.Reason = off
-		case ev.g.Handles(e.Kind, x.verb):
+		case ev.g.Handles(e.Kind, verb):
 			st.Enabled = true
-		case x.verb == gtd.VerbReply:
+		case verb == gtd.VerbReply:
 			st.Reason = ev.s.replyRefusal(e)
 			st.Enabled = st.Reason == ""
-		case bridges(e, x.verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (x.verb != gtd.VerbDismiss || len(offered(row, x.verb).top) > 0):
-			b := offered(row, x.verb)
+		case bridges(e, verb) && ev.s.pluginEnabled(e.Units[0].Provider) && (verb != gtd.VerbDismiss || len(offered(row, verb).top) > 0):
+			b := offered(row, verb)
 			b.unit = e.Units[0]
 			var runs api.ActionState
 			runs, st.Enabled = b.runs()
 			if !st.Enabled {
 				st.Reason = b.reason()
-			} else if x.verb == gtd.VerbDelegate {
+			} else if verb == gtd.VerbDelegate {
 				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:
-			if err := coregtd.Accepts(e, x.verb); err != nil {
+			if err := coregtd.Accepts(e, verb); err != nil {
 				st.Reason = err.Error()
 			} else {
 				st.Enabled = true

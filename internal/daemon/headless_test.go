@@ -160,11 +160,14 @@ func TestTheBridgeDelegatesActHeadlessWithTheEntrysItems(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
+	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, gtd.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Entry != "e-t" {
 		t.Fatalf("started %+v", h.got)
+	}
+	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "cockpit" {
+		t.Fatalf("events %+v", store.Events)
 	}
 }

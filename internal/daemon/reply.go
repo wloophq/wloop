@@ -59,6 +59,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coregtd
 		writeGTDError(w, entryDraftError(err))
 		return
 	}
+	s.recordVerb(ctx, g, e, coregtd.Request{Verb: gtd.VerbReply, Source: req.Source})
 	now, err := g.Entry(ctx, e.ID)
 	if err != nil {
 		now = e

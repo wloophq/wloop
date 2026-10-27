@@ -68,8 +68,8 @@ type planner struct {
 	now     time.Time
 	pause   Pause
 	config  workflow.Facts
-	facts   map[unit.Unit]workflow.Facts
-	factErr map[unit.Unit]error
+	facts   map[factsRead]workflow.Facts
+	factErr map[factsRead]error
 	marks   map[unit.Unit]map[string]string
 	lists   map[unit.ProviderID][]unit.Unit
 	seen    map[string]bool
@@ -104,8 +104,8 @@ func (e *Engine) evaluate(ctx context.Context, t workflow.TriggerKind, apply boo
 		return cmp.Or(cmp.Compare(a.Order, b.Order), cmp.Compare(a.Name, b.Name))
 	})
 	batches, errs := e.batches(ctx, ws, now, apply)
-	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[unit.Unit]workflow.Facts{},
-		factErr: map[unit.Unit]error{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
+	p := &planner{e: e, ctx: ctx, now: now, pause: pause, facts: map[factsRead]workflow.Facts{},
+		factErr: map[factsRead]error{}, marks: map[unit.Unit]map[string]string{}, lists: map[unit.ProviderID][]unit.Unit{}, seen: map[string]bool{},
 		perRun: map[string]int{}, perUnit: map[unitOf]int{}, errs: errs, apply: apply}
 	if e.Config != nil {
 		p.config = e.Config()
@@ -236,19 +236,26 @@ func (p *planner) list(w workflow.Workflow) ([]unit.Unit, bool) {
 	return us, true
 }
 
-func (p *planner) unitFacts(u unit.Unit) (workflow.Facts, error) {
-	if f, ok := p.facts[u]; ok {
+// factsRead is a unit's facts as a sweep workflow or an event workflow reads them.
+type factsRead struct {
+	u     unit.Unit
+	event bool
+}
+
+func (p *planner) unitFacts(w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	r := factsRead{u, w.Trigger.Kind == workflow.TriggerEvent}
+	if f, ok := p.facts[r]; ok {
 		return f, nil
 	}
-	if err, ok := p.factErr[u]; ok {
+	if err, ok := p.factErr[r]; ok {
 		return nil, err
 	}
-	f, err := p.e.Units.Facts(p.ctx, u)
+	f, err := p.e.unitFacts(p.ctx, w, u)
 	if err != nil {
-		p.factErr[u] = err
+		p.factErr[r] = err
 		return nil, err
 	}
-	p.facts[u] = f
+	p.facts[r] = f
 	return f, nil
 }
 
@@ -279,7 +286,7 @@ func (p *planner) vars(w workflow.Workflow, u unit.Unit, facts workflow.Facts, w
 // error says the candidate could not be decided: its facts, its match or
 // its run could not be read.
 func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]workflow.Item) error {
-	facts, err := p.unitFacts(c.u)
+	facts, err := p.unitFacts(w, c.u)
 	if err == nil {
 		facts, err = p.e.scoped(p.ctx, w.Name, c.u, facts)
 	}
@@ -300,7 +307,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 	}
 	why := c.why
 	why.Matched = matched(w.When, vars)
-	key := workflow.NewKey(w, c.u, facts, why.FiredAt)
+	key := workflow.NewKey(w, c.u, facts, why)
 	id := key.ID()
 	if p.seen[id] {
 		return nil

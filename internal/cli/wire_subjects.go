@@ -11,8 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 )
 
-// wireSubjects wires the entry subject's facts provider over the store and
-// the entries entry.close closes, and
+// wireSubjects wires the entry subject's facts provider over the store, and
 // a provider that lists nothing for every plugin built without workflow
 // facts, a disabled one included, so a workflow on its subject plans
 // nothing instead of failing.
@@ -22,9 +21,6 @@ func (e *Env) wireSubjects(w *serveWiring) {
 	}
 	if w.DB != nil {
 		w.Engine.Subjects[gtd.Codec{}.Provider()] = e.entryFacts(w.DB, unitsEnded(w.Modules))
-	}
-	if e.gtd != nil {
-		w.Engine.Entries = e.gtd
 	}
 	for _, p := range e.sourcePlugins() {
 		if !slices.ContainsFunc(w.Modules, func(m source.Module) bool { return m.ID == p.ID && m.Facts != nil }) {

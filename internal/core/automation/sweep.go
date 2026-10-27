@@ -254,7 +254,7 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if !ch.All && !slices.Contains(ch.Units, pl.item.Unit) {
 			return ""
 		}
-		facts, err := e.factsFor(ctx, pl.w.Name, pl.item.Unit)
+		facts, err := e.factsFor(ctx, pl.w, pl.item.Unit)
 		if err != nil {
 			return "its facts cannot be read: " + err.Error()
 		}
@@ -267,7 +267,7 @@ func (e *Engine) revalidate(ctx context.Context, ev *evaluation, runs []*planned
 		if ok, err := match(pl.w.When, vars); err != nil || !ok {
 			return "it no longer matches since it was planned"
 		}
-		if workflow.NewKey(pl.w, pl.item.Unit, facts, pl.item.Why.FiredAt) != pl.item.Key {
+		if workflow.NewKey(pl.w, pl.item.Unit, facts, pl.item.Why) != pl.item.Key {
 			return "its unit changed since it was planned"
 		}
 		return ""

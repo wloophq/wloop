@@ -177,6 +177,21 @@ key = ["entry.nudge_due_at"]
 use = "notify.self"
 ```
 
+A workflow can react to a verb you run on an entry. This one tells you whenever you mark an entry done that came from the Inbox:
+
+```toml
+summary = "Tell me when I finish something straight from the Inbox"
+provider = "entry"
+when = 'trigger.event.kind == "verb_done" && trigger.event.data == "inbox"'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["verb_done"]
+
+[[step]]
+use = "notify.self"
+```
+
 `<slot>.settled_at` is the newest draft the workflow itself proposed on the unit that was sent or discarded, so a key of `["entry.settled_at"]` opens a new run after each settlement.
 
 The [workflow manifest](/reference/workflow-manifest/) lists every field and the [facts](/reference/facts/) every condition can read. `{{command}} profile check` loads it; a broken workflow disables only itself.

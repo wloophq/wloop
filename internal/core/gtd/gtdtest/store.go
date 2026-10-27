@@ -102,13 +102,16 @@ func (s *Store) Apply(ctx context.Context, cs []gtd.Change, evs ...port.Event) e
 		changed = append(changed, c.Entry)
 	}
 	if len(changed) == 0 {
+		if len(cs) == 0 {
+			s.Events = append(s.Events, evs...)
+		}
 		return nil
 	}
+	s.Events = append(s.Events, evs...)
 	s.rev++
 	for _, e := range changed {
 		s.entries[e.ID], s.revs[e.ID] = e, s.rev
 	}
 	s.Notes++
-	s.Events = append(s.Events, evs...)
 	return nil
 }

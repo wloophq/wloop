@@ -90,6 +90,8 @@ func TestManifestStructsAreTheGrammar(t *testing.T) {
 		builtin.SurfaceIntent:   reflect.TypeFor[manifest](),
 		builtin.SurfaceWorkflow: reflect.TypeFor[wManifest](),
 		builtin.SurfaceActions:  reflect.TypeFor[map[string]mBuiltinAction](),
+		builtin.SurfaceGTD:      reflect.TypeFor[mGTD](),
+		builtin.SurfaceKeys:     reflect.TypeFor[mKeys](),
 		builtin.SurfaceDefaults: reflect.TypeFor[manifestDefaults](),
 	} {
 		decoded := map[string]builtin.Kind{}

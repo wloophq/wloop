@@ -1,0 +1,51 @@
+# The help line each core key shows in the help and the palette, by the
+# context it works in, then the action it runs. A numbered action reads
+# {n}, its number. A user profile's keys.toml replaces the lines it sets.
+
+[help.list]
+"move:down" = "move down"
+"move:up" = "move up"
+"detail:open" = "open the detail"
+"detail:close" = "close the detail"
+next = "to Next"
+waiting = "to Waiting"
+schedule = "schedule or snooze"
+someday = "to Someday"
+reference = "to Reference"
+focus = "toggle Focus"
+project = "make a project or attach to one"
+approve = "approve the draft or proposal"
+delegate = "delegate to an agent"
+done = "done"
+dismiss = "dismiss"
+reply = "reply in the conversation"
+edit = "edit the draft's text"
+open-source = "open the source"
+
+[help.global]
+capture = "capture"
+"nav:focus" = "Focus"
+"nav:inbox" = "Inbox"
+"nav:outbox" = "Outbox"
+"nav:next" = "Next"
+"nav:waiting" = "Waiting"
+"nav:projects" = "Projects"
+"nav:review" = "Review"
+"nav:github" = "the GitHub views"
+filter = "filter"
+palette = "every action and its key"
+help = "help"
+quit = "quit"
+"nav:cycle" = "next view in the group"
+"area:{n}" = "area {n}"
+
+[help.review]
+"step:done" = "mark the step done"
+"step:next" = "next step"
+"step:prev" = "previous step"
+
+[help.plan]
+approve = "apply the selected plan step"
+
+[help.question]
+"answer:{n}" = "answer option {n}"

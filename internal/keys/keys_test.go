@@ -75,9 +75,6 @@ func TestCoreMatchesTheSpec(t *testing.T) {
 	var got []row
 	for _, b := range Core {
 		got = append(got, row{b.Key, b.Action, b.Context, b.Surfaces})
-		if b.Help == "" {
-			t.Errorf("%s has no help", b.Key)
-		}
 	}
 	id := func(r row) string { return fmt.Sprintf("%s|%s|%s|%v", r.key, r.action, r.context, r.surfaces) }
 	g, w := map[string]bool{}, map[string]bool{}

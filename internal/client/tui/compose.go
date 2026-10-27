@@ -130,14 +130,14 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 // (headless when it can); Tab hands it to an agent in a session instead, unless the entry has nowhere
 // to run one, which the label says.
 func (m *Model) delegatePrompt(e api.EntryView, c Command, confirm string, read uint64) (Command, bool) {
-	name := entryLabel(e)
+	name, q := entryLabel(e), m.verbQuestion("delegate")
 	labels := map[string]string{
-		"":        "delegate " + name + ": guidance (optional; Tab: hand to an agent)",
-		"session": "hand " + name + " to an agent: guidance (optional; Tab: draft for me)",
+		"":        "delegate " + name + ": " + q + " (Tab: hand to an agent)",
+		"session": "hand " + name + " to an agent: " + q + " (Tab: draft for me)",
 	}
 	off := sessionOff(e)
 	if off != "" {
-		labels[""] = "delegate " + name + ": guidance (optional; no agent session: " + off + ")"
+		labels[""] = "delegate " + name + ": " + q + " (no agent session: " + off + ")"
 	}
 	p := &prompt{action: "delegate", label: labels[""], read: read, editor: true}
 	mode := ""
@@ -193,7 +193,7 @@ func sessionOff(e api.EntryView) string {
 func (m *Model) replyPrompt(e api.EntryView, c Command, read uint64) (Command, bool) {
 	name := entryLabel(e)
 	labels := map[bool]string{
-		false: "reply on " + name + ", saved to the Outbox (Tab: send now; Ctrl+E: editor)",
+		false: m.verbQuestion("reply") + ", on " + name + " (Tab: send now; Ctrl+E: editor)",
 		true:  "reply on " + name + ", sent now (Tab: save to the Outbox; Ctrl+E: editor)",
 	}
 	send := false

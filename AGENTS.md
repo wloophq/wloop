@@ -24,8 +24,9 @@ Before adding an `if` on an intent name, a draft kind or a provider, or a string
 | Roles, and what each implies (round kind, reconcile, prepare, policy, row driving) | `builtin.Roles` in `internal/intent/builtin/roles.go` |
 | Effects a sent turn or draft applies | `builtin.Effects` in `internal/intent/builtin/effects.go` |
 | Intent built-ins (`workspace`, `before`) | `builtin.Names` in `internal/intent/builtin/builtin.go`, wired in `internal/cli/builtins.go` |
-| Every reserved key of a manifest, `actions.toml` and the configuration | `builtin.Grammar` in `internal/intent/builtin/grammar*.go`; `make docs-ref` regenerates the schemas and the reference |
+| Every reserved key of a manifest, `actions.toml`, `gtd.toml`, `keys.toml` and the configuration | `builtin.Grammar` in `internal/intent/builtin/grammar*.go`; `make docs-ref` regenerates the schemas and the reference |
 | The words of the built-in actions | `profiles/default/actions.toml` |
+| The words of the GTD verbs, views and Review steps; the core keys' help | `profiles/default/gtd.toml`, `profiles/default/keys.toml` |
 | What a trigger handled (marks) | `[marks]` and `handled()` in a workflow; encoding and comparison in `internal/domain/mark`; a plugin's own mark names beside its planner (`internal/domain/round` for GitHub rounds) |
 | Visual tokens, brand book, components | `design/`, which the clients follow; `go generate ./internal/web` writes `app.css`'s token region from `design/tokens.json` |
 
@@ -41,7 +42,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - injection markers, JSON schemas and limits;
 - the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for approval unless a user rule that names comment delivery releases it, and no agent or thread text sets an approval (no rule reads an untrusted fact).
 
-Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, and the Slack renderings `slack_read` and `slack_search` return.
+Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, the cockpit's and the terminal's chrome (prompt hints, pane titles, empty states), and the Slack renderings `slack_read` and `slack_search` return.
 
 ## Conventions
 

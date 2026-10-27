@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -29,6 +30,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
 // entriesNow is newServerOn's now.
@@ -349,6 +353,41 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 	r.g.RegisterView(gtd.ViewReview, "review:", reviewSource{})
 	if get(t, r.s, api.GTDPath, &cat); cat.Views[len(cat.Views)-1].ID != "review" {
 		t.Fatalf("a registered review: %v", cat.Views)
+	}
+}
+
+func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
+	t.Parallel()
+	texts := intentload.GTDTexts{
+		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}},
+		Views: map[string]string{"next": "Now"},
+	}
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
+	var cat api.GTDCatalog
+	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	verbs := map[string]api.GTDVerb{}
+	for _, v := range cat.Verbs {
+		verbs[v.Verb] = v
+	}
+	if got := verbs["done"]; got.Label != "Finish" || got.Summary != "Close it" {
+		t.Errorf("done: %+v", got)
+	}
+	if got := verbs["waiting"]; got.Input != "On whom?" {
+		t.Errorf("waiting: %+v", got)
+	}
+	if got := verbs["someday"]; got.Label != "Someday" || got.Summary == "" {
+		t.Errorf("a verb the profile leaves out takes the bundled words: %+v", got)
+	}
+	labels := map[string]string{}
+	for _, v := range cat.Views {
+		labels[v.ID] = v.Label
+	}
+	if labels["next"] != "Now" || labels["inbox"] != "Inbox" {
+		t.Errorf("views %v", labels)
 	}
 }
 
@@ -703,6 +742,9 @@ func TestEntryAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
+	if evs := r.entries.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
+		t.Fatalf("events %+v", evs)
+	}
 }
 
 func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
@@ -752,6 +794,29 @@ func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
 	}
 }
 
+func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
+	t.Parallel()
+	offer, err := expr.CompileWorkflow(`entry.kind != "capture"`, builtin.OfferEnv())
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts := intentload.GTDTexts{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
+	r.put(t, gtd.Entry{ID: "e-c", Kind: gtd.KindCapture, State: gtd.Inbox, Title: "c", Origin: gtd.OriginUser})
+	var v api.EntryView
+	if code := get(t, r.s, api.EntryPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
+		t.Fatalf("%d %+v", code, v.Verbs)
+	}
+	if rec := post(t, r.s, api.EntryPath("e-c", "someday"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "not offered") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if rec := post(t, r.s, api.EntryPath("e-c", "next"), `{}`); rec.Code != 200 {
+		t.Fatalf("a verb the profile leaves alone: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
@@ -770,5 +835,17 @@ func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) 
 	}
 	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
 		t.Fatalf("%d %+v", code, v.Message.Answers)
+	}
+}
+
+func TestAVerbAWorkflowRunsOnAMessageRecordsNothing(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
+		t.Fatal(err)
+	}
+	if evs := r.entries.Events; len(evs) != 0 {
+		t.Fatalf("events %+v", evs)
 	}
 }

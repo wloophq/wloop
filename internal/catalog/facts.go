@@ -4,6 +4,8 @@
 package catalog
 
 import (
+	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"slices"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -193,4 +195,14 @@ func (f Facts) Get(field string) any {
 		return f.Config.AddressWithoutWorkspace
 	}
 	return nil
+}
+
+// OfferFacts are the facts of e a verb's offer reads.
+func OfferFacts(e gtd.Entry) workflow.Facts {
+	f := workflow.Facts{"entry.id": string(e.ID), "entry.kind": string(e.Kind), "entry.state": string(e.State),
+		"entry.muted": e.Snooze.Mute, "entry.unit": "", "entry.unit_provider": ""}
+	if u, ok := e.FirstUnit(); ok {
+		f["entry.unit"], f["entry.unit_provider"] = u.String(), string(u.Provider)
+	}
+	return f
 }

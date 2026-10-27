@@ -63,8 +63,6 @@ type engineDeps struct {
 	TurnStart turnStartDeps
 	// Drafts are what draft.propose reads; nil refuses it.
 	Drafts *draftDeps
-	// Entries are what entry.close closes; nil refuses it.
-	Entries entryCloser
 }
 
 // newEngine assembles the engine over the store, the facts providers and
@@ -104,7 +102,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Candidates == nil {
 		d.Candidates = candidatesOf(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Entries: d.Entries, Pub: d.Pub, Log: d.Log,
+	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
 		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
@@ -487,13 +485,14 @@ type unitSet struct {
 }
 
 var (
-	_ automation.Refresher = (*unitSet)(nil)
-	_ automation.Settler   = (*unitSet)(nil)
-	_ automation.Gainer    = (*unitSet)(nil)
-	_ automation.Owner     = (*unitSet)(nil)
-	_ automation.Freshener = (*unitSet)(nil)
-	_ automation.Seener    = (*unitSet)(nil)
-	_ automation.Dueer     = (*unitSet)(nil)
+	_ automation.Refresher  = (*unitSet)(nil)
+	_ automation.Settler    = (*unitSet)(nil)
+	_ automation.Gainer     = (*unitSet)(nil)
+	_ automation.Owner      = (*unitSet)(nil)
+	_ automation.Freshener  = (*unitSet)(nil)
+	_ automation.Seener     = (*unitSet)(nil)
+	_ automation.Dueer      = (*unitSet)(nil)
+	_ automation.EventFacts = (*unitSet)(nil)
 )
 
 func newUnitSet(providers map[unit.ProviderID]automation.Units) *unitSet {
@@ -524,11 +523,26 @@ func (s *unitSet) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, er
 }
 
 func (s *unitSet) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	return s.facts(ctx, u, false)
+}
+
+// EventFacts reads u through its provider's EventFacts, or its Facts when
+// it has none.
+func (s *unitSet) EventFacts(ctx context.Context, u unit.Unit) (workflow.Facts, error) {
+	return s.facts(ctx, u, true)
+}
+
+func (s *unitSet) facts(ctx context.Context, u unit.Unit, event bool) (workflow.Facts, error) {
 	p, err := s.provider(u.Provider)
 	if err != nil {
 		return nil, err
 	}
-	f, err := p.Facts(ctx, u)
+	var f workflow.Facts
+	if ef, ok := p.(automation.EventFacts); ok && event {
+		f, err = ef.EventFacts(ctx, u)
+	} else {
+		f, err = p.Facts(ctx, u)
+	}
 	if err == nil && s.briefed != nil {
 		f, err = s.briefed.add(ctx, u, f)
 	}

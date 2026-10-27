@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -26,6 +27,16 @@ func (s *Server) loaded() *intentload.Loaded {
 	}
 	return l
 }
+
+// bundledWords are the bundled profile's words for the verbs, views, Review
+// steps and core keys, which a profile that leaves one out falls back to.
+var bundledWords = sync.OnceValue(func() coreWords {
+	l, err := turn.Bundled()
+	if err != nil {
+		panic(err)
+	}
+	return coreWords{l.Keys, l.GTD}
+})
 
 // isIntent tells an intent the registry offers or a user intent that failed
 // to load.

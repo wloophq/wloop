@@ -254,6 +254,8 @@ var sections = []struct {
 }{
 	{builtin.SurfaceIntent, "Intent manifest (`intents/<name>/intent.toml`)"},
 	{builtin.SurfaceActions, "Built-in actions (`actions.toml`)"},
+	{builtin.SurfaceGTD, "GTD verbs and views (`gtd.toml`)"},
+	{builtin.SurfaceKeys, "Key help (`keys.toml`)"},
 	{builtin.SurfaceWorkflow, "Workflow manifest (`workflows/<name>/workflow.toml`)"},
 	{builtin.SurfaceStep, "Steps and their arguments"},
 	{builtin.SurfaceDefaults, "Defaults (`defaults.toml`)"},
@@ -434,6 +436,8 @@ var schemas = []struct {
 	{"intent.schema.json", "Intent manifest (intent.toml)", builtin.SurfaceIntent},
 	{"workflow.schema.json", "Workflow manifest (workflow.toml)", builtin.SurfaceWorkflow},
 	{"actions.schema.json", "Built-in actions (actions.toml)", builtin.SurfaceActions},
+	{"gtd.schema.json", "GTD verbs and views (gtd.toml)", builtin.SurfaceGTD},
+	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
 	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 

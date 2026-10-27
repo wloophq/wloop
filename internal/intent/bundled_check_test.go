@@ -44,7 +44,7 @@ func TestBundledProfileLoadsClean(t *testing.T) {
 	for _, f := range []struct {
 		file    string
 		surface builtin.Surface
-	}{{ActionsFile, builtin.SurfaceActions}, {DefaultsFile, builtin.SurfaceDefaults}, {"labels.toml", builtin.SurfaceLabels}} {
+	}{{ActionsFile, builtin.SurfaceActions}, {DefaultsFile, builtin.SurfaceDefaults}, {"labels.toml", builtin.SurfaceLabels}, {GTDFile, builtin.SurfaceGTD}, {KeysFile, builtin.SurfaceKeys}} {
 		check(f.file, f.surface)
 	}
 	for dir, surface := range map[string]builtin.Surface{"intents": builtin.SurfaceIntent, "workflows": builtin.SurfaceWorkflow} {

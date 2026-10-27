@@ -39,6 +39,18 @@ func (e Entry) Open() bool {
 	return e.State != Done && e.State != Trash && e.State != Reference
 }
 
+// FirstUnit is the unit the entry is about: its first unit, else its
+// first item's.
+func (e Entry) FirstUnit() (unit.Unit, bool) {
+	if len(e.Units) > 0 {
+		return e.Units[0], true
+	}
+	if len(e.Items) > 0 {
+		return e.Items[0].Unit, true
+	}
+	return unit.Unit{}, false
+}
+
 // CapturedByUser says whether the user captured the entry, rather than the
 // loop deriving it from a third party's message or draft.
 func (e Entry) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }

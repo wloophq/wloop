@@ -8,19 +8,17 @@ const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|palette$|help$|fi
 const servedAction = (b) => !!b.served || /^[A-Z]$/.test(b.key) || (b.context === "plan" && !CORE_ACTIONS.test(b.action) && !ENTRY_VERBS.has(b.action));
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
-// VERB_ASKS are the verbs that ask for a value first; args turns the answer
-// into the verb's arguments, null when the answer is not usable.
+// VERB_ASKS are the verbs that ask for a value first, the question from
+// the catalog; args turns the answer into the verb's arguments, null when
+// the answer is not usable.
 const VERB_ASKS = {
-  waiting: { label: "Waiting on whom? (optional)", args: (v) => (v ? { on: v } : {}) },
-  schedule: {
-    label: "Until when? YYYY-MM-DD, an RFC 3339 time, or \"activity\"",
-    args: (v) => (!v ? null : v.toLowerCase() === "activity" ? { on_activity: "true" } : { until: v }),
-  },
-  project: { label: "Project title", args: (v) => (v ? { title: v } : null) },
-  context: { label: "Contexts, comma separated (empty clears)", args: (v) => ({ set: v }) },
-  area: { label: "Area (empty clears)", args: (v) => ({ set: v }) },
-  delegate: { label: "Guidance for the agent (optional)", args: (v) => (v ? { guidance: v } : {}) },
-  reply: { label: "Reply, saved to the Outbox for your approval", args: (v) => (v ? { text: v } : null) },
+  waiting: { args: (v) => (v ? { on: v } : {}) },
+  schedule: { args: (v) => (!v ? null : v.toLowerCase() === "activity" ? { on_activity: "true" } : { until: v }) },
+  project: { args: (v) => (v ? { title: v } : null) },
+  context: { args: (v) => ({ set: v }) },
+  area: { args: (v) => ({ set: v }) },
+  delegate: { args: (v) => (v ? { guidance: v } : {}) },
+  reply: { args: (v) => (v ? { text: v } : null) },
 };
 const keyVerb = (name) => ENTRY_VERBS.has(name) || !!VERB_ASKS[name];
 
@@ -134,14 +132,14 @@ function createKeys(env) {
     const entry = isEntry(env.selected()) ? env.selected() : null;
     if (!entry) return false;
     const st = (entry.verbs || []).find((v) => v.verb === name);
-    if (st && !st.enabled) {
-      say(`${name}: ${st.reason || "not offered here"}`, true);
+    if (!st || !st.enabled) {
+      say(`${name}: ${(st && st.reason) || "not offered here"}`, true);
       return true;
     }
     let args = {};
     const ask = VERB_ASKS[name];
     if (ask) {
-      const v = await env.ask({ label: ask.label });
+      const v = await env.ask({ label: typeof verbQuestion === "function" ? verbQuestion(name) : name });
       if (v === null || v === undefined) return true;
       args = ask.args(String(v).trim());
       if (!args) return true;

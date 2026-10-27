@@ -1,0 +1,1 @@
+testdata/workflows/bad/entry-verb-missing/workflows/case-workflow/workflow.toml:5:3: step[0].verb: is required: the verb run on the entry

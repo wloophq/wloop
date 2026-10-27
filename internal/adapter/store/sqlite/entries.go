@@ -372,8 +372,11 @@ func (s entryStore) Apply(ctx context.Context, cs []gtd.Change, evs ...port.Even
 			}
 			changed[e.ID] = e
 		}
-		if len(changed) == 0 {
+		if len(changed) == 0 && len(cs) > 0 {
 			return nil
+		}
+		if len(changed) == 0 {
+			return writeEvents(ctx, tx, evs)
 		}
 		epoch, rev, err := readPosition(ctx, tx)
 		if err != nil {

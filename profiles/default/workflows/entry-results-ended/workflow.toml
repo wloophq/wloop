@@ -4,4 +4,5 @@ when = 'entry.captured_by_user && entry.turns > 0 && entry.units_ended'
 order = 53
 
 [[step]]
-use = "entry.close"
+use = "entry.verb"
+verb = "done"

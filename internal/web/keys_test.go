@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -40,10 +41,16 @@ func webBindings(t *testing.T) []api.KeyView {
 }
 
 func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
+	help, _ := intentload.BundledKeys(os.DirFS("../../profiles/default"))
+	words, _ := intentload.BundledGTD(os.DirFS("../../profiles/default"))
 	var want, got []api.KeyView
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, keys.Web) {
-			want = append(want, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: b.Help})
+			v := api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)}
+			if b.Context == keys.List {
+				v.Summary = words.Verbs[b.Action].Summary
+			}
+			want = append(want, v)
 		}
 	}
 	got = webBindings(t)[:len(want)]

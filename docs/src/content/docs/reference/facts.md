@@ -289,6 +289,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `trigger.kind` | string | sweep, event or schedule. |
 | `trigger.event.kind` | string | The event's kind; empty unless kind is event. |
 | `trigger.event.key` | string | The event's key. |
+| `trigger.event.id` | int | The event's id, unique and growing; 0 unless kind is event. |
 | `trigger.event.data` | string | The event's data: a person's or an agent's text, such as an intake's note, an answer or the mentions of a sent nudge. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `trigger.fired_at` | timestamp | When the schedule fired; zero unless kind is schedule. |
 
@@ -329,11 +330,11 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `turn.dismiss` | session, github | Dismisses the open turn, recording the reason. |
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
-| `entry.close` | entry | Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash. |
 | `turn.start` | any | Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`. |
 | `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`. |
 | `notify.self` | any | A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone). |
+| `entry.verb` | entry | Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it. |
 
 ## Draft effects
 

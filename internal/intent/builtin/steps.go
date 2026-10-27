@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -28,8 +29,31 @@ const (
 	StepAnswerRefuse = "answer.refuse"
 	StepClassify     = "classify"
 	StepNotifySelf   = "notify.self"
-	StepEntryClose   = "entry.close"
+	StepEntryVerb    = "entry.verb"
 )
+
+// EntryStepVerbs are the verbs entry.verb runs: the moves of an entry
+// between lists and its focus, context and area. Approving, delegating and
+// answering never come from automation.
+var EntryStepVerbs = verbNames(gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference,
+	gtd.VerbFocus, gtd.VerbContext, gtd.VerbArea, gtd.VerbDone, gtd.VerbDismiss)
+
+// EntryVerbArgs are the arguments each verb takes; the loader refuses any
+// other.
+var EntryVerbArgs = map[string][]string{
+	string(gtd.VerbSchedule): {"until", "on_activity"},
+	string(gtd.VerbWaiting):  {"on", "resurface"},
+	string(gtd.VerbContext):  {"set"},
+	string(gtd.VerbArea):     {"set"},
+}
+
+func verbNames(vs ...gtd.Verb) []string {
+	out := make([]string, len(vs))
+	for i, v := range vs {
+		out[i] = string(v)
+	}
+	return out
+}
 
 // The values of draft.propose's arguments.
 var (
@@ -62,8 +86,6 @@ var Steps = []StepDef{
 		"Refuses a queued answer whose route is gone."},
 	{"session.mark_dormant", providers(unit.Session), workflow.ReachLocal, nil,
 		"Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it."},
-	{StepEntryClose, providers(unit.Entry), workflow.ReachLocal, nil,
-		"Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash."},
 	{StepTurnStart, nil, "", nil,
 		"Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`."},
 	{StepDraftPropose, nil, workflow.ReachLocal, nil,
@@ -72,6 +94,8 @@ var Steps = []StepDef{
 		"A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`."},
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,
 		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
+	{StepEntryVerb, providers(unit.Entry), workflow.ReachLocal, nil,
+		"Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
 }
 
 // StepArg is the grammar row of step use's argument k.

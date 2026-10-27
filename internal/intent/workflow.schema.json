@@ -129,7 +129,7 @@
       "type": "object"
     },
     "key": {
-      "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again.",
+      "description": "The facts forming the idempotency key, by default <slot>.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run.",
       "items": {
         "type": "string"
       },
@@ -340,26 +340,6 @@
             "if": {
               "properties": {
                 "use": {
-                  "const": "entry.close"
-                }
-              },
-              "required": [
-                "use"
-              ]
-            },
-            "then": {
-              "additionalProperties": false,
-              "properties": {
-                "use": {
-                  "const": "entry.close"
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "use": {
                   "const": "turn.start"
                 }
               },
@@ -549,6 +529,65 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "entry.verb"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "on": {
+                  "description": "With waiting, the people the entry waits on, comma-separated.",
+                  "type": "string"
+                },
+                "on_activity": {
+                  "description": "With schedule, `true` returns the entry on new activity on its unit.",
+                  "type": "string"
+                },
+                "resurface": {
+                  "description": "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.",
+                  "type": "string"
+                },
+                "set": {
+                  "description": "With context, the contexts, comma-separated; with area, the area.",
+                  "type": "string"
+                },
+                "until": {
+                  "description": "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "entry.verb"
+                },
+                "verb": {
+                  "description": "The verb run on the entry. Required.",
+                  "enum": [
+                    "next",
+                    "waiting",
+                    "schedule",
+                    "someday",
+                    "reference",
+                    "focus",
+                    "context",
+                    "area",
+                    "done",
+                    "dismiss"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "verb"
+              ]
+            }
           }
         ],
         "properties": {
@@ -561,11 +600,11 @@
               "turn.dismiss",
               "answer.refuse",
               "session.mark_dormant",
-              "entry.close",
               "turn.start",
               "draft.propose",
               "classify",
-              "notify.self"
+              "notify.self",
+              "entry.verb"
             ],
             "type": "string"
           }
@@ -586,7 +625,7 @@
       "description": "What plans the workflow: on or schedule; absent, every sweep.",
       "properties": {
         "on": {
-          "description": "The source event kinds the workflow reacts to.",
+          "description": "The source event kinds the workflow reacts to; verb_<verb>, a verb a person ran on an entry, with provider entry.",
           "items": {
             "enum": [
               "opened",
@@ -619,7 +658,24 @@
               "status",
               "would_review",
               "would_address",
-              "review_ended"
+              "review_ended",
+              "verb_next",
+              "verb_waiting",
+              "verb_schedule",
+              "verb_someday",
+              "verb_reference",
+              "verb_focus",
+              "verb_project",
+              "verb_approve",
+              "verb_delegate",
+              "verb_done",
+              "verb_dismiss",
+              "verb_context",
+              "verb_area",
+              "verb_answer",
+              "verb_reviewed",
+              "verb_sequential",
+              "verb_reply"
             ],
             "type": "string"
           },

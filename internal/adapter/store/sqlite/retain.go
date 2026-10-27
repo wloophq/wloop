@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/domain/event"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -41,6 +42,7 @@ type Retention struct {
 	WorkflowRuns   time.Duration
 	PlanItems      time.Duration // plan items not pending, last saved that long ago
 	WorkflowEvents time.Duration // the engine's events, workflow.EngineKinds
+	VerbEvents     time.Duration // the verbs people ran on entries, gtd.VerbEventKinds
 	// UnitlessLoopRows drops the turns, records, answers, intakes, events,
 	// workflow runs and plan items of a github unit with no pull_requests
 	// row, no overrides row and nothing newer.
@@ -77,6 +79,7 @@ var DefaultRetention = Retention{
 	WorkflowRuns:     retentionWindow,
 	PlanItems:        7 * 24 * time.Hour,
 	WorkflowEvents:   retentionWindow,
+	VerbEvents:       retentionWindow,
 	UnitlessLoopRows: retentionWindow,
 	Classifications:  retentionWindow,
 	Fetches:          retentionWindow,
@@ -99,6 +102,7 @@ const (
 // and PlanItems count under their tables.
 const (
 	WorkflowEventsKey   = "workflow_events"
+	VerbEventsKey       = "verb_events"
 	UnitlessLoopRowsKey = "unitless_loop_rows"
 )
 
@@ -163,6 +167,8 @@ const (
 // A step that ran on a unit of work lives as long as that unit's events.
 var retainWorkflowEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(workflow.EngineKinds)), ", ") + `) AND at < ?
 	AND NOT (kind = '` + workflow.KindStepRan + `' AND provider NOT IN ('', '` + string(unit.Session) + `', '` + string(unit.Workspace) + `'))`
+
+var retainVerbEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(gtd.VerbEventKinds)), ", ") + `) AND at < ?`
 
 // unitlessTables are the endedTables UnitlessLoopRows deletes from.
 var unitlessTables = []string{"turn_usage", "turns", "turn_records", "turn_answers", "intakes", "events", "workflow_runs", "plan_items", "unit_marks", "round_state"}
@@ -263,6 +269,13 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 				args = append(args, k)
 			}
 			r.exec(WorkflowEventsKey, port.TopicLoopEvents, retainWorkflowEventsSQL, append(args, cutoff(now, p.WorkflowEvents))...)
+		}
+		if p.VerbEvents > 0 {
+			args := make([]any, 0, len(gtd.VerbEventKinds)+1)
+			for _, k := range gtd.VerbEventKinds {
+				args = append(args, k)
+			}
+			r.exec(VerbEventsKey, port.TopicLoopEvents, retainVerbEventsSQL, append(args, cutoff(now, p.VerbEvents))...)
 		}
 		if p.UnitlessLoopRows > 0 {
 			r.unitless(cutoff(now, p.UnitlessLoopRows))

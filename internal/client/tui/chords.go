@@ -25,20 +25,19 @@ const shiftDigits = "!@#$%^&*("
 // coreActions are the served core actions that are not GTD verbs.
 var coreActions = []string{"move:", "detail:", "nav:", "area:", "answer:", "step:", "palette", "help", "filter", "open-source", "capture", "quit"}
 
-// verbAsks are the verbs that ask for a value on the bottom line first;
-// args turns the answer into the verb's arguments, ok false when the
-// answer is not usable.
+// verbAsks are the verbs that ask for a value on the bottom line first,
+// the question from the catalog; args turns the answer into the verb's
+// arguments, ok false when the answer is not usable.
 var verbAsks = map[string]struct {
-	label string
-	args  func(string) (map[string]string, bool)
+	args func(string) (map[string]string, bool)
 }{
-	"waiting": {"waiting on whom (optional)", func(v string) (map[string]string, bool) {
+	"waiting": {func(v string) (map[string]string, bool) {
 		if v == "" {
 			return nil, true
 		}
 		return map[string]string{"on": v}, true
 	}},
-	"schedule": {"until when (YYYY-MM-DD, an RFC 3339 time or activity)", func(v string) (map[string]string, bool) {
+	"schedule": {func(v string) (map[string]string, bool) {
 		switch {
 		case v == "":
 			return nil, false
@@ -47,7 +46,7 @@ var verbAsks = map[string]struct {
 		}
 		return map[string]string{"until": v}, true
 	}},
-	"project": {"project title", func(v string) (map[string]string, bool) {
+	"project": {func(v string) (map[string]string, bool) {
 		if v == "" {
 			return nil, false
 		}
@@ -347,7 +346,7 @@ func (m *Model) entryVerb(verb string, read uint64) (Command, bool) {
 	if !asks {
 		return m.send(c)
 	}
-	m.prompt = &prompt{action: verb, label: ask.label + " for " + entryLabel(e), read: read, submit: func(text string) (Command, bool) {
+	m.prompt = &prompt{action: verb, label: m.verbQuestion(verb) + " for " + entryLabel(e), read: read, submit: func(text string) (Command, bool) {
 		args, ok := ask.args(text)
 		if !ok {
 			m.status = verb + " " + c.Label + " cancelled: nothing usable typed"

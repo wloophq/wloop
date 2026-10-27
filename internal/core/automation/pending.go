@@ -48,7 +48,7 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 		if !ok || w.Observe || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
 			continue
 		}
-		facts, err := e.factsFor(ctx, w.Name, it.Unit)
+		facts, err := e.factsFor(ctx, w, it.Unit)
 		if err != nil {
 			e.logf("%s: not run, its facts cannot be read: %v", it.ID, err)
 			continue
@@ -102,7 +102,7 @@ func (e *Engine) sourceMoved(ctx context.Context, u unit.Unit) (bool, error) {
 // item stands for facts that no longer hold, and the next evaluation plans
 // the current ones with a window of their own.
 func keyMoved(w workflow.Workflow, it workflow.Item, facts workflow.Facts) bool {
-	return workflow.NewKey(w, it.Unit, facts, it.Why.FiredAt).Value != it.Key.Value
+	return workflow.NewKey(w, it.Unit, facts, it.Why).Value != it.Key.Value
 }
 
 // dropMoved discards a pending item without marking its key.

@@ -189,6 +189,27 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `<name>.input.label` (string): The input's name.
 - `<name>.input.help` (string): What to write, shown in the empty input.
 
+## GTD verbs and views (`gtd.toml`)
+
+- `verbs` (table): The verbs an entry offers, by verb.
+- `verbs.<name>` (table): A verb, by its name.
+- `verbs.<name>.label` (string): The name people read on its button. Required.
+- `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
+- `verbs.<name>.offer` (predicate, default `true`): When an entry offers the verb, over the entry's own facts (entry.id, entry.kind, entry.state, entry.muted, entry.unit, entry.unit_provider); where it holds not, the verb is neither listed nor run.
+- `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
+- `views` (table): The lists of entries, by view.
+- `views.<name>` (table): A view, by its name.
+- `views.<name>.label` (string): The name people read in the list of views. Required.
+- `review` (table): The weekly Review's steps, by step.
+- `review.<name>` (table): A step of the Review: inbox, outbox, waiting, projects, someday or focus.
+- `review.<name>.label` (string): What the step asks of you, as the Review lists it. Required.
+
+## Key help (`keys.toml`)
+
+- `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`nav:inbox`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
+- `help.<name>` (table): The keys of one context, by action.
+- `help.<name>.<name>` (string): What the key does, as the help and the palette list it. Required.
+
 ## Workflow manifest (`workflows/<name>/workflow.toml`)
 
 ### What it matches
@@ -202,14 +223,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `workspace`: Facts under workspace.*.
 - `when` (predicate): The match condition, over the unit's facts, the trigger's and config.*. Required.
 - `order` (integer, default `100`): Evaluation order, lowest first.
-- `key` (list of facts): The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again.
+- `key` (list of facts): The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run.
 - `marks` (table by name): Mark name to fact, stored when a run is done or dismissed, which handled() reads.
 - `marks.<name>` (fact): The fact whose value the mark stores.
 
 ### When it is planned
 
 - `trigger` (table): What plans the workflow: on or schedule; absent, every sweep.
-- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`): The source event kinds the workflow reacts to.
+- `trigger.on` (list of `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged`, `closed`, `round_sent`, `round_held`, `round_pending`, `round_skipped`, `guidance`, `round_blocked`, `round_unblocked`, `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `would_review`, `would_address`, `review_ended`, `verb_next`, `verb_waiting`, `verb_schedule`, `verb_someday`, `verb_reference`, `verb_focus`, `verb_project`, `verb_approve`, `verb_delegate`, `verb_done`, `verb_dismiss`, `verb_context`, `verb_area`, `verb_answer`, `verb_reviewed`, `verb_sequential`, `verb_reply`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on an entry, with provider entry.
 - `trigger.schedule` (string): A cron schedule, in local time.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
 - `limits` (table): How many runs the workflow may take.
@@ -221,18 +242,18 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `entry.close`, `turn.start`, `draft.propose`, `classify`, `notify.self`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `entry.verb`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
   - `turn.dismiss`: Dismisses the open turn, recording the reason.
   - `answer.refuse`: Refuses a queued answer whose route is gone.
   - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
-  - `entry.close`: Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash.
   - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
+  - `entry.verb`: Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
 - `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
@@ -259,7 +280,6 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `answer.refuse`:
   - `reason` (string): The reason the refused answer records.
 - `session.mark_dormant`: no arguments.
-- `entry.close`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
   - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.
@@ -283,6 +303,13 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `schema` (file, default `schema.json`): The JSON schema of its answer, beside the manifest.
 - `notify.self`:
   - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
+- `entry.verb`:
+  - `verb` (one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss`): The verb run on the entry. Required.
+  - `until` (string): With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.
+  - `on_activity` (string): With schedule, `true` returns the entry on new activity on its unit.
+  - `on` (string): With waiting, the people the entry waits on, comma-separated.
+  - `resurface` (string): With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.
+  - `set` (string): With context, the contexts, comma-separated; with area, the area.
 
 ## Defaults (`defaults.toml`)
 

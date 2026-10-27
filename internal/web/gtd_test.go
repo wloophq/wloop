@@ -33,6 +33,8 @@ func gtdCatalog() api.GTDCatalog {
 			{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}},
 		Areas:    []string{"OSS", "Hiring"},
 		Contexts: []string{"@decide", "@reply"},
+		Verbs: []api.GTDVerb{{Verb: "approve", Label: "Approve"}, {Verb: "edit", Label: "Edit"}, {Verb: "dismiss", Label: "Discard"},
+			{Verb: "retry", Label: "Retry"}},
 	}
 }
 
@@ -324,7 +326,7 @@ const buttons = cards.map(buttonLabels);
 	if want := [][]string{{"Approve", "Edit", "Discard"}, {"Retry", "Edit", "Discard"}}; len(got.Buttons) != 2 || !slices.Equal(got.Buttons[0], want[0]) || !slices.Equal(got.Buttons[1], want[1]) {
 		t.Errorf("buttons %v, want %v", got.Buttons, want)
 	}
-	if !slices.Equal(got.Editing, []string{"Approve edited", "Cancel"}) {
+	if !slices.Equal(got.Editing, []string{"Approve", "Cancel"}) {
 		t.Errorf("editing buttons %v", got.Editing)
 	}
 	type post struct{ path, body string }

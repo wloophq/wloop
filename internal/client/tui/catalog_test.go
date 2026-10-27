@@ -3,6 +3,7 @@ package tui
 import (
 	"cmp"
 	"encoding/json"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"os"
 	"path/filepath"
 	"slices"
@@ -109,10 +110,11 @@ func setPR(r *api.Row, change func(p *prView)) {
 // servedKeys are the bindings GET /api/keys serves the terminal for specs:
 // the core keys, then the actions' keys.
 func servedKeys(specs api.ActionsResponse) []api.KeyView {
+	help, _ := intentload.BundledKeys(os.DirFS("../../../profiles/default"))
 	var out []api.KeyView
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, keys.TUI) {
-			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: b.Help})
+			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help.Help(string(b.Context), b.Action)})
 		}
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {

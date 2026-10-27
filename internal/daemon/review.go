@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -26,7 +27,7 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 		writeGTDError(w, err)
 		return
 	}
-	writeJSON(w, wireReview(rv))
+	writeJSON(w, s.wireReview(rv))
 }
 
 func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
@@ -43,13 +44,15 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 		writeGTDError(w, err)
 		return
 	}
-	writeJSON(w, wireReview(rv))
+	writeJSON(w, s.wireReview(rv))
 }
 
-func wireReview(rv coregtd.Review) api.Review {
+func (s *Server) wireReview(rv coregtd.Review) api.Review {
+	texts, bundled := s.loaded().GTD, bundledWords().gtd
 	out := api.Review{ID: rv.ID, StartedAt: rv.StartedAt, Done: rv.Done, Steps: []api.ReviewStep{}}
 	for _, st := range rv.Steps {
-		out.Steps = append(out.Steps, api.ReviewStep{ID: st.ID, Label: st.Label, View: string(st.View),
+		label := cmp.Or(texts.Review[st.ID], bundled.Review[st.ID], st.ID)
+		out.Steps = append(out.Steps, api.ReviewStep{ID: st.ID, Label: label, View: string(st.View),
 			Query: map[string]string{"view": string(st.View)}, Count: st.Count, Done: st.Done})
 	}
 	return out

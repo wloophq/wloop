@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,6 +30,7 @@ import (
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // notifyRig is the catalog rig with the entries, the items ledger and the Inbox messages over its store, so a
@@ -85,17 +88,17 @@ func (r *notifyRig) settle(t *testing.T, u unit.Unit) api.Row {
 func (r *notifyRig) notified(t *testing.T) map[string]api.EntryView {
 	t.Helper()
 	out := map[string]api.EntryView{}
-	for _, v := range gtdViews {
+	for _, v := range storedViews() {
 		var p api.EntriesPage
-		if code := get(t, r.s, api.EntriesPath+"?view="+v.ID, &p); code != 200 {
-			t.Fatalf("view %s: %d", v.ID, code)
+		if code := get(t, r.s, api.EntriesPath+"?view="+v, &p); code != 200 {
+			t.Fatalf("view %s: %d", v, code)
 		}
 		for _, e := range p.Entries {
 			if e.Attention == nil {
 				continue
 			}
-			if v.ID != string(gtd.ViewInbox) && v.ID != string(gtd.ViewOutbox) && v.ID != string(gtd.ViewFocus) {
-				t.Errorf("%s entry %s (%s) notifies %+v", v.ID, e.ID, e.State, e.Attention)
+			if v != string(gtd.ViewInbox) && v != string(gtd.ViewOutbox) && v != string(gtd.ViewFocus) {
+				t.Errorf("%s entry %s (%s) notifies %+v", v, e.ID, e.State, e.Attention)
 			}
 			out[e.ID] = e
 		}
@@ -270,11 +273,11 @@ func proposed(id int64, entry string) draft.Draft {
 func attentions(t *testing.T, r *entriesRig) map[string]*api.Attention {
 	t.Helper()
 	out := map[string]*api.Attention{}
-	for _, v := range gtdViews {
-		for _, e := range r.page(t, "view="+v.ID).Entries {
+	for _, v := range storedViews() {
+		for _, e := range r.page(t, "view="+v).Entries {
 			if e.Attention != nil {
-				if v.ID != "inbox" && v.ID != "outbox" && v.ID != "focus" {
-					t.Errorf("%s entry %s notifies %+v", v.ID, e.ID, e.Attention)
+				if v != "inbox" && v != "outbox" && v != "focus" {
+					t.Errorf("%s entry %s notifies %+v", v, e.ID, e.Attention)
 				}
 				out[e.ID] = e.Attention
 			}
@@ -473,14 +476,14 @@ func TestLiveEntriesNotifyAsTheRows(t *testing.T) {
 	start := time.Now()
 	got := map[unit.Unit][]*api.Attention{}
 	entries := 0
-	for _, v := range gtdViews {
+	for _, v := range storedViews() {
 		var p api.EntriesPage
-		if code := get(t, s, api.EntriesPath+"?view="+v.ID, &p); code != 200 {
-			t.Fatalf("%s: %d", v.ID, code)
+		if code := get(t, s, api.EntriesPath+"?view="+v, &p); code != 200 {
+			t.Fatalf("%s: %d", v, code)
 		}
 		entries += len(p.Entries)
 		for _, e := range p.Entries {
-			if e.Attention == nil || v.ID == string(gtd.ViewFocus) {
+			if e.Attention == nil || v == string(gtd.ViewFocus) {
 				continue
 			}
 			if len(e.Units) == 0 {
@@ -588,5 +591,24 @@ func TestAnotherDerivedEntryOfANotifyingRowStaysSilent(t *testing.T) {
 		if cat, _, _ := api.ParseNotificationID(e.Attention.ID); cat != api.CategoryHeld {
 			t.Fatalf("%+v", e.Attention)
 		}
+	}
+}
+
+// storedViews are the views the entries store serves; review needs its source.
+func storedViews() []string {
+	return slices.DeleteFunc(slices.Clone(builtin.GTDViews), func(v string) bool { return v == string(gtd.ViewReview) })
+}
+
+func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gtd.toml"), []byte("[verbs.dismiss]\noffer = 'entry.kind != \"draft\"'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cache := cacheOver(t, dir)
+	r := newEntriesRig(t, func(d *Deps) { d.Intents = cache.Get })
+	withOutbox(r, proposed(1, ""))
+	if a := attentions(t, r)["draft:1"]; a == nil || !slices.Equal(actionIDs(a), []string{"open"}) {
+		t.Errorf("%+v", a)
 	}
 }

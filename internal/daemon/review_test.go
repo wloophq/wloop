@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/json"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"slices"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/domain/gtd"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 func (r *entriesRig) serveProjects() {
@@ -145,5 +147,25 @@ func TestProjectEntryViews(t *testing.T) {
 	var res api.EntryResult
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &res) != nil || res.Entry.ReviewDue || res.Entry.ReviewEvery != "72h0m0s" {
 		t.Errorf("reviewed: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
+	t.Parallel()
+	texts := intentload.GTDTexts{Review: map[string]string{"waiting": "Chase what waits"}}
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
+	r.serveProjects()
+	var rv api.Review
+	if code := get(t, r.s, api.ReviewPath, &rv); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	labels := map[string]string{}
+	for _, st := range rv.Steps {
+		labels[st.ID] = st.Label
+	}
+	if labels["waiting"] != "Chase what waits" || labels["inbox"] != "Inbox to zero" {
+		t.Errorf("labels %v", labels)
 	}
 }

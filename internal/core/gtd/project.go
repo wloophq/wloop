@@ -99,8 +99,9 @@ func (s *Service) ProjectsStatus(ctx context.Context) (map[gtd.ID]ProjectState, 
 	return out, nil
 }
 
-// locked reads e again under the service's lock and runs f on it, applying the changes it returns.
-func (p *projects) locked(ctx context.Context, id gtd.ID, f func(e gtd.Entry, now time.Time) ([]gtd.Change, error)) (gtd.Entry, error) {
+// locked reads e again under the service's lock and runs f on it, applying the changes it returns with the
+// event of req's verb.
+func (p *projects) locked(ctx context.Context, id gtd.ID, req Request, f func(e gtd.Entry, now time.Time) ([]gtd.Change, error)) (gtd.Entry, error) {
 	s := p.s
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -108,11 +109,12 @@ func (p *projects) locked(ctx context.Context, id gtd.ID, f func(e gtd.Entry, no
 	if err != nil {
 		return gtd.Entry{}, err
 	}
-	cs, err := f(e, s.now())
+	now := s.now()
+	cs, err := f(e, now)
 	if err != nil {
 		return gtd.Entry{}, err
 	}
-	if err := s.d.Store.Apply(ctx, cs); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
 		return gtd.Entry{}, err
 	}
 	for _, c := range cs {
@@ -127,7 +129,7 @@ func (p *projects) locked(ctx context.Context, id gtd.ID, f func(e gtd.Entry, no
 // at args["position"], shifting the later ones.
 func (p *projects) attach(ctx context.Context, e gtd.Entry, req Request) (Result, error) {
 	var created gtd.Entry
-	got, err := p.locked(ctx, e.ID, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
 		if err := accepts(e, gtd.VerbProject); err != nil {
 			return nil, err
 		}
@@ -222,7 +224,7 @@ func liveProject(e gtd.Entry, v gtd.Verb) error {
 
 // sequential sets args["set"] ("true" or "false"), or toggles.
 func (p *projects) sequential(ctx context.Context, e gtd.Entry, req Request) (Result, error) {
-	got, err := p.locked(ctx, e.ID, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
 		if err := liveProject(e, req.Verb); err != nil {
 			return nil, err
 		}
@@ -242,7 +244,7 @@ func (p *projects) sequential(ctx context.Context, e gtd.Entry, req Request) (Re
 
 // reviewed marks the project reviewed now; args["every"] ("14d" or a Go duration) sets its interval.
 func (p *projects) reviewed(ctx context.Context, e gtd.Entry, req Request) (Result, error) {
-	got, err := p.locked(ctx, e.ID, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
 		if err := liveProject(e, req.Verb); err != nil {
 			return nil, err
 		}
@@ -278,7 +280,7 @@ func interval(raw string) (time.Duration, error) {
 // end runs a verb that ends the project as the state change, then starts its dossier's lifecycle.
 func (p *projects) end(ctx context.Context, e gtd.Entry, req Request) (Result, error) {
 	var was gtd.Entry
-	got, err := p.locked(ctx, e.ID, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
+	got, err := p.locked(ctx, e.ID, req, func(e gtd.Entry, now time.Time) ([]gtd.Change, error) {
 		was = e
 		next, err := transition(e, req, now)
 		if err != nil {

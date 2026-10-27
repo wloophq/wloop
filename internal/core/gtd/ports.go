@@ -25,8 +25,8 @@ type Reader interface {
 
 type Store interface {
 	Reader
-	// Apply writes cs in one transaction, bumps Rev and notes port.TopicEntries; with no effective change
-	// it writes and notes nothing.
+	// Apply writes cs and evs in one transaction, bumps Rev and notes port.TopicEntries; when cs change
+	// nothing it writes and notes nothing, and with no cs it writes evs alone.
 	Apply(ctx context.Context, cs []gtd.Change, evs ...port.Event) error
 }
 
@@ -62,13 +62,17 @@ type ViewSource interface {
 	Count(ctx context.Context, area string) (int, error)
 }
 
-// VerbHandler runs a verb another service owns (answer/approve/dismiss on messages, approve/dismiss on drafts).
+// VerbHandler runs a verb another service owns (answer/approve/dismiss on messages, approve/dismiss on drafts);
+// one on a stored entry records the verb with Service.RecordVerb once it succeeded.
 type VerbHandler func(ctx context.Context, e gtd.Entry, req Request) (Result, error)
 
 type Request struct {
 	Verb   gtd.Verb
 	Args   map[string]string
 	Source string
+	// Automated is a verb a workflow ran: it records no verb event, which
+	// says a person ran it and could start another workflow in turn.
+	Automated bool
 }
 
 type Result struct {
