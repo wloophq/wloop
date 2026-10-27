@@ -252,7 +252,7 @@ post_allowlist = ["C1"]
 	}
 	want := `# acme's loop
 agent = "claude" # the default
-projects_dir = "/src"
+projects_dir = '/src'
 
 [sweep]
 fast = "5m" # a shared rate limit
@@ -260,11 +260,11 @@ fast = "5m" # a shared rate limit
 [github.scope]
 # people I follow
 watch = ["boss"]
-repos = ["acme/api"]
+repos = ['acme/api']
 
 [slack]
 post_allowlist = ["C1"]
-client_id = "1.2"
+client_id = '1.2'
 `
 	if string(got) != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
@@ -282,17 +282,17 @@ func TestMergeInitConfigWritesAFreshFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `projects_dir = "/src"
-profile = "/profiles/mine"
-agent = "claude"
+	want := `projects_dir = '/src'
+profile = '/profiles/mine'
+agent = 'claude'
 
 [github.scope]
-repos = ["acme/api"]
-teams = ["acme/core"]
-people = ["ana"]
+repos = ['acme/api']
+teams = ['acme/core']
+people = ['ana']
 
 [slack]
-client_id = "1.2"
+client_id = '1.2'
 `
 	if string(got) != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
@@ -312,15 +312,15 @@ func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
 	for name, c := range map[string]struct{ raw, want string }{
 		"a parent table": {
 			"[github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
-			"agent = \"claude\"\n\n[github]\nowners = [\"acme\"]\nscope.repos = [\"acme/api\"]\n\n[[projects]]\nmatch = \"acme/*\"\n\n[slack]\nclient_id = \"1.2\"\n",
+			"agent = 'claude'\n\n[github]\nowners = [\"acme\"]\nscope.repos = ['acme/api']\n\n[[projects]]\nmatch = \"acme/*\"\n\n[slack]\nclient_id = '1.2'\n",
 		},
 		"dotted keys at the top": {
 			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"old\"",
-			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"1.2\"\ngithub.scope.repos = [\"acme/api\"]",
+			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = '1.2'\ngithub.scope.repos = ['acme/api']",
 		},
 		"a header with no keys": {
 			"agent = \"claude\"\n\n[github.scope] # mine\n",
-			"agent = \"claude\"\n\n[github.scope] # mine\nrepos = [\"acme/api\"]\n\n[slack]\nclient_id = \"1.2\"\n",
+			"agent = \"claude\"\n\n[github.scope] # mine\nrepos = ['acme/api']\n\n[slack]\nclient_id = '1.2'\n",
 		},
 	} {
 		got, err := mergeInitConfig([]byte(c.raw), a)
@@ -343,6 +343,10 @@ func TestMergeInitConfigRefusesToEditAnInlineTable(t *testing.T) {
 	if got, err := mergeInitConfig([]byte(raw), initAnswers{}); err != nil || string(got) != raw {
 		t.Fatalf("an empty answer touched the inline table (%v):\n%s", err, got)
 	}
+	followed := "[github]\nscope = { repos = [\"acme/api\"] }\n"
+	if _, err := mergeInitConfig([]byte(followed), initAnswers{}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+		t.Fatalf("clearing a list in an inline table: %v", err)
+	}
 }
 
 func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
@@ -352,7 +356,7 @@ func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := raw + "agent = \"claude\"\n"; string(got) != want {
+	if want := raw + "agent = 'claude'\n"; string(got) != want {
 		t.Fatalf("got:\n%s", got)
 	}
 }
@@ -363,7 +367,7 @@ func TestMergeInitConfigAddsNoEmptyKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "projects_dir = \"/src\"\nagent = \"claude\"\n"; string(got) != want {
+	if want := "projects_dir = '/src'\nagent = 'claude'\n"; string(got) != want {
 		t.Fatalf("got:\n%s", got)
 	}
 	if _, err := mergeInitConfig([]byte("agent = "), initAnswers{}); err == nil {

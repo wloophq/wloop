@@ -630,6 +630,8 @@ func TestLoadRefusesWrongKindsInTOML(t *testing.T) {
 		"[turns]\nper_day = 1.5":                 "turns.per_day",
 		"[github]\nowners = \"acme\"":            "github.owners",
 		"[views.orca.columns]\nready = 07:00:00": "views.orca.columns.ready",
+		"[headless]\nper_call_usd = inf":         "headless.per_call_usd",
+		"[turns]\nper_day = nan":                 "turns.per_day",
 		"[brief]\nenabled = \"yes\"":             "brief.enabled",
 	} {
 		file := filepath.Join(t.TempDir(), "config.toml")
@@ -660,14 +662,5 @@ func TestALoneConfigJSONIsRefused(t *testing.T) {
 	}
 	if c, err := LoadFile(file, tools()); err != nil || c.Agent != "echo" {
 		t.Fatalf("with both files: agent %q, %v", c.Agent, err)
-	}
-}
-
-func TestTOMLStringEscapes(t *testing.T) {
-	t.Parallel()
-	in := "a \"b\" \\ c\td\x7f\x01é"
-	var doc struct{ V string }
-	if err := toml.Unmarshal([]byte("V = "+tomlString(in)), &doc); err != nil || doc.V != in {
-		t.Fatalf("%q read back as %q: %v", tomlString(in), doc.V, err)
 	}
 }

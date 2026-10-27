@@ -3,17 +3,22 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pelletier/go-toml/v2/unstable"
+
+	"github.com/wloophq/wloop/internal/frontmatter"
 )
 
 // Doc is a config file edited in place: what Set does not touch, comments
 // and blank lines included, stays as written.
 type Doc struct {
-	src []byte
+	src    []byte
+	idx    *tomlIndex // of src, nil after an edit
+	parses int
 }
 
 // ParseDoc is raw as a Doc; raw that is not TOML is an error.
@@ -41,6 +46,7 @@ func (d *Doc) Get(path ...string) any {
 type tomlTable struct {
 	path  []string
 	array bool
+	start int // where its header's line, or the comments right above it, start
 	end   int // where a key added to it goes: the end of the line of its last key, or of its header
 	keys  int
 }
@@ -60,6 +66,10 @@ type tomlIndex struct {
 }
 
 func (d *Doc) index() (*tomlIndex, error) {
+	if d.idx != nil {
+		return d.idx, nil
+	}
+	d.parses++
 	x := &tomlIndex{tables: []tomlTable{{}}}
 	if err := toml.Unmarshal(d.src, &x.tree); err != nil {
 		return nil, err
@@ -72,7 +82,10 @@ func (d *Doc) index() (*tomlIndex, error) {
 		switch n.Kind {
 		case unstable.Table, unstable.ArrayTable:
 			path, end := keyPath(n)
-			x.tables = append(x.tables, tomlTable{path: path, array: n.Kind == unstable.ArrayTable, end: d.lineEnd(end)})
+			first := n.Key()
+			first.Next()
+			x.tables = append(x.tables, tomlTable{path: path, array: n.Kind == unstable.ArrayTable,
+				start: d.commentsAbove(d.lineStart(int(first.Node().Raw.Offset))), end: d.lineEnd(end)})
 			cur = len(x.tables) - 1
 		case unstable.KeyValue:
 			path, keyEnd := keyPath(n)
@@ -82,7 +95,11 @@ func (d *Doc) index() (*tomlIndex, error) {
 			x.tables[cur].keys++
 		}
 	}
-	return x, p.Error()
+	if err := p.Error(); err != nil {
+		return nil, err
+	}
+	d.idx = x
+	return x, nil
 }
 
 // keyPath is n's key, as parts, and where its last part ends.
@@ -104,8 +121,26 @@ func (d *Doc) lineEnd(at int) int {
 	return len(d.src)
 }
 
+func (d *Doc) lineStart(at int) int {
+	return bytes.LastIndexByte(d.src[:at], '\n') + 1
+}
+
+// commentsAbove is where the comment lines right above the line at start
+// begin, with no blank line between them.
+func (d *Doc) commentsAbove(start int) int {
+	for start > 0 {
+		prev := d.lineStart(start - 1)
+		if !bytes.HasPrefix(bytes.TrimLeft(d.src[prev:start], " \t"), []byte("#")) {
+			break
+		}
+		start = prev
+	}
+	return start
+}
+
 func (d *Doc) splice(from, to int, text string) {
 	d.src = slices.Concat(d.src[:from], []byte(text), d.src[to:])
+	d.idx = nil
 }
 
 // get is the value at path, nil when the document has none.
@@ -121,76 +156,102 @@ func (x *tomlIndex) get(path []string) any {
 	return v
 }
 
-// Set writes v, a string or a list of strings, at path. A value equal to
-// the document's is left as written; an empty one is not added where the
-// document has no key.
+// Set writes v, any TOML value but a table, at path. A value equal to the
+// document's is left as written; an empty string or list is not added where
+// the document has no key. An edit that would leave the document invalid
+// is refused and changes nothing.
 func (d *Doc) Set(path []string, v any) error {
+	enc, err := frontmatter.Value(v)
+	if err != nil {
+		return fmt.Errorf("%s: %w", Key(path...), err)
+	}
 	x, err := d.index()
 	if err != nil {
 		return err
 	}
-	enc, empty := tomlValue(v)
+	old := x.get(path)
+	if old != nil {
+		if was, err := frontmatter.Value(old); err == nil && was == enc {
+			return nil
+		}
+	} else if empty(v) {
+		return nil
+	}
+	before := d.src
+	if err := d.edit(x, path, enc); err != nil {
+		return err
+	}
+	if _, err := d.index(); err != nil {
+		d.src, d.idx = before, nil
+		return fmt.Errorf("setting %s would leave the file invalid: %w", Key(path...), err)
+	}
+	return nil
+}
+
+func empty(v any) bool {
+	r := reflect.ValueOf(v)
+	return (r.Kind() == reflect.String || r.Kind() == reflect.Slice) && r.Len() == 0
+}
+
+func (d *Doc) edit(x *tomlIndex, path []string, enc string) error {
 	for _, k := range x.keys {
 		switch {
 		case slices.Equal(k.path, path):
-			if sameValue(x.get(path), v) {
-				return nil
-			}
 			d.splice(k.keyEnd, k.end, " = "+enc)
 			return nil
-		case isPrefix(k.path, path) && !empty:
-			return fmt.Errorf("%s is written inline; set %s in it by hand", strings.Join(k.path, "."), strings.Join(path, "."))
+		case isPrefix(k.path, path):
+			return fmt.Errorf("%s is written inline; set %s in it by hand", Key(k.path...), Key(path...))
 		}
-	}
-	if empty {
-		return nil
 	}
 	t, ok := x.tableFor(path)
 	if !ok {
 		parent := path[:len(path)-1]
-		if !bytes.HasSuffix(d.src, []byte("\n")) && len(d.src) > 0 {
+		if len(d.src) > 0 && !bytes.HasSuffix(d.src, []byte("\n")) {
 			d.src = append(d.src, '\n')
 		}
 		if len(d.src) > 0 {
 			d.src = append(d.src, '\n')
 		}
-		d.src = fmt.Appendf(d.src, "[%s]\n%s = %s\n", Key(parent...), Key(path[len(parent):]...), enc)
+		d.splice(len(d.src), len(d.src), fmt.Sprintf("[%s]\n%s = %s\n", Key(parent...), Key(path[len(parent):]...), enc))
 		return nil
 	}
 	line := Key(path[len(t.path):]...) + " = " + enc
 	switch {
-	case len(t.path) == 0 && t.keys == 0 && len(d.src) > 0:
-		d.splice(0, 0, line+"\n\n")
-	case len(t.path) == 0 && t.keys == 0:
-		d.src = []byte(line + "\n")
-	default:
+	case len(t.path) > 0 || t.keys > 0:
 		d.splice(t.end, t.end, "\n"+line)
+	case len(x.tables) > 1:
+		at := x.tables[1].start
+		d.splice(at, at, line+"\n\n")
+	case len(d.src) == 0 || bytes.HasSuffix(d.src, []byte("\n")):
+		d.splice(len(d.src), len(d.src), line+"\n")
+	default:
+		d.splice(len(d.src), len(d.src), "\n"+line+"\n")
 	}
 	return nil
 }
 
 // tableFor is the table a new key at path goes in: the longest header over
 // it, or the root when path has one part or the root already spells its
-// first part as a dotted key. ok is false when a new header has to hold it.
+// first part as a dotted key. ok is false when a new header has to hold it,
+// which is also when a dotted key would extend a table a header defines.
 func (x *tomlIndex) tableFor(path []string) (tomlTable, bool) {
-	best := -1
-	for i, t := range x.tables[1:] {
-		if !t.array && isPrefix(t.path, path) && (best < 0 || len(t.path) > len(x.tables[best+1].path)) {
-			best = i
+	t, found := x.tables[0], false
+	for _, h := range x.tables[1:] {
+		if !h.array && isPrefix(h.path, path) && (!found || len(h.path) > len(t.path)) {
+			t, found = h, true
 		}
 	}
-	if best >= 0 {
-		return x.tables[best+1], true
+	if !found && len(path) > 1 && !slices.ContainsFunc(x.keys, func(k tomlKey) bool {
+		return k.table == 0 && len(k.path) > 1 && k.path[0] == path[0]
+	}) {
+		return tomlTable{}, false
 	}
-	if len(path) == 1 {
-		return x.tables[0], true
+	if route := path[:len(t.path)+1]; len(route) < len(path) && slices.ContainsFunc(x.tables, func(h tomlTable) bool {
+		return len(h.path) >= len(route) && slices.Equal(h.path[:len(route)], route)
+	}) {
+		return tomlTable{}, false
 	}
-	for _, k := range x.keys {
-		if k.table == 0 && len(k.path) > 1 && k.path[0] == path[0] {
-			return x.tables[0], true
-		}
-	}
-	return tomlTable{}, false
+	return t, true
 }
 
 // isPrefix says whether p is a proper prefix of path.
@@ -202,82 +263,7 @@ func isPrefix(p, path []string) bool {
 func Key(path ...string) string {
 	parts := make([]string, len(path))
 	for i, k := range path {
-		parts[i] = tomlKeyName(k)
+		parts[i] = frontmatter.Key(k)
 	}
 	return strings.Join(parts, ".")
-}
-
-func tomlKeyName(k string) string {
-	for _, r := range k {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
-			return tomlString(k)
-		}
-	}
-	if k == "" {
-		return `""`
-	}
-	return k
-}
-
-// tomlValue is v written as TOML, and whether it is empty.
-func tomlValue(v any) (string, bool) {
-	switch x := v.(type) {
-	case string:
-		return tomlString(x), x == ""
-	case []string:
-		parts := make([]string, len(x))
-		for i, s := range x {
-			parts[i] = tomlString(s)
-		}
-		return "[" + strings.Join(parts, ", ") + "]", len(x) == 0
-	}
-	panic(fmt.Sprintf("tomlValue: %T", v))
-}
-
-func sameValue(old any, v any) bool {
-	switch x := v.(type) {
-	case string:
-		s, ok := old.(string)
-		return ok && s == x
-	case []string:
-		list, ok := old.([]any)
-		if !ok || len(list) != len(x) {
-			return false
-		}
-		for i, e := range list {
-			if s, ok := e.(string); !ok || s != x[i] {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-
-// tomlString is s as a TOML basic string.
-func tomlString(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch r {
-		case '"':
-			b.WriteString(`\"`)
-		case '\\':
-			b.WriteString(`\\`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\t':
-			b.WriteString(`\t`)
-		case '\r':
-			b.WriteString(`\r`)
-		default:
-			if r < 0x20 || r == 0x7f {
-				fmt.Fprintf(&b, `\u%04X`, r)
-			} else {
-				b.WriteRune(r)
-			}
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
 }
