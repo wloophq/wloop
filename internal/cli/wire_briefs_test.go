@@ -4,12 +4,12 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
@@ -64,7 +64,7 @@ func TestASlackOnlyDaemonBriefsSlackUnitsOnDemand(t *testing.T) {
 	seedSlack(t, db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	steps, ok := te.Env.engine.Steps.(*stepSet)
 	if !ok || steps.d.Briefs == nil {
 		t.Fatalf("the engine's steps have no briefs: %T", te.Env.engine.Steps)

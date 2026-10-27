@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/ingest/ingesttest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -103,7 +103,7 @@ func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
 		saved := plugins
 		plugins = ps
 		defer func() { plugins = saved }()
-		d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+		d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 		d.Startup = nil
 		return daemon.New(d)
 	}

@@ -4,13 +4,13 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/headless"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
@@ -36,7 +36,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if _, err := sqlite.New(db).Save(ctx, left); err != nil {
 		t.Fatal(err)
 	}
-	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if d.Headless == nil || te.Turns.Headless == nil || te.Turns.Usage == nil {
 		t.Fatal("headless turns are not wired")
 	}
@@ -55,7 +55,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if _, err := te.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: unit.Unit{Provider: "thread", Key: "C1/2"}, Intent: dturn.Intent(dintent.Act), Turn: "live", Trigger: dturn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
-	te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if got := state("live"); got != dturn.Started {
 		t.Fatalf("a later serve ended a live run: %s", got)
 	}

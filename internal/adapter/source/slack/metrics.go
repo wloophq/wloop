@@ -82,6 +82,9 @@ type backfillSnapshot struct {
 	Conversations int  `json:"conversations"`
 	Threads       int  `json:"threads"`
 	Deltas        int  `json:"deltas"`
+	// Draining is how many objects the backfill waits for the inbox to
+	// save before it sets its cursor.
+	Draining int `json:"draining,omitempty"`
 }
 
 // snapshot is what health reads: the detail's counters, the time the
@@ -180,6 +183,12 @@ func (m *Metrics) Backfill(conversations, threads, deltas int, done bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.backfill = backfillSnapshot{Done: done, Conversations: conversations, Threads: threads, Deltas: deltas}
+}
+
+func (m *Metrics) BackfillDraining(objects int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.backfill.Draining = objects
 }
 
 // Warn registers fn as the warnings of source, e.g. the extraction breaker; a second call replaces it.

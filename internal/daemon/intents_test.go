@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -317,7 +318,7 @@ func TestASessionAskWithADifferentInputDoesNotJoin(t *testing.T) {
 func TestASweepTurnWithoutTheInputFailsTheIntake(t *testing.T) {
 	t.Parallel()
 	books := turnstest.NewStore()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) {
 		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books}
 		d.LoopMu = mu

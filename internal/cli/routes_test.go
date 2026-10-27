@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
@@ -71,7 +71,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 		return func(t *testing.T) (*testEnv, github.Ref) {
 			_, te := handScenario(t, ws)
 			cwd := te.Harness.Cwd()
-			_, err := te.byHand(&sync.Mutex{})(ctx, api.ByHandRequest{Intent: string(intent), URL: r7.URL(), Cwd: cwd, Inputs: inputs}, "term_1")
+			_, err := te.byHand(&lock.Mutex{})(ctx, api.ByHandRequest{Intent: string(intent), URL: r7.URL(), Cwd: cwd, Inputs: inputs}, "term_1")
 			if err != nil {
 				t.Fatalf("%v\n%s", err, te.err)
 			}

@@ -15,6 +15,8 @@ Test-only adapters prove that each seam holds a second implementation: the `echo
 
 Tests never read the wall clock. Code with timers, deadlines or goroutines runs in `synctest.Test` and asserts after `synctest.Wait`, on exact durations; real processes, sockets and files stay outside the bubble, behind a condition poll whose deadline only guards a hang. A test waits on the state it asserts, and a fake answers by state rather than by call count.
 
+A test that asserts something did not happen while a caller waits checks it once the caller is parked, never after a sleep. The loop mutex and the brief queue's state lock are `internal/core/lock` mutexes, whose waiters block on a channel, so `synctest.Wait` returns only once the caller is parked on them. A wait no bubble can see shows itself instead: a Slack token refresh waiting on another process's file lock logs `waiting for another refresh`, and a backfill waiting for the inbox reports the objects it waits on in the Slack health's `backfill.draining`.
+
 Every goroutine a test starts, or makes the code under test start, is cancelled and awaited before the test's stores and directories go away. The code that starts one gives its owner a way to wait for it: the daemon's `Run` waits for the work it drives, and `serve` waits for its jobs, which run on the `Env`'s `background`, before it closes the store. The tests of `internal/cli` start those jobs through the harness's `testEnv.serveDeps`, whose cleanup cancels and waits for them; `TestServeRunsThroughTheHarness` keeps them there, and `TestStopServingWaitsForServesJobs` fails on a job `serve` starts without tracking it.
 
 ## Goldens
@@ -41,7 +43,7 @@ Every user-visible name comes from `internal/brand`. `make test-brand` runs the 
 
 A rule test is a test that does not call the `flagged` helper, which every self-test calls. Its doc comment states its rule as `// TestX checks that <rule>.`, and `TestEveryRuleTestStatesItsRule` fails on a rule test without one. [Architecture rules](/reference/architecture-rules/) lists every rule with its sentence, and each allowlist with its entries, their reasons and their triage; `make docs-ref` generates it from the sources of `internal/archtest`, and `TestRulesDocIsCurrent` fails when it drifts.
 
-Outside `internal/archtest`, `TestEveryBuiltinNameHasAnImplementation` (`internal/cli`) checks that every name the vocabulary lists is wired, and `TestFactsDocIsCurrent` that the facts reference matches the binary (`make docs-ref` regenerates it).
+Outside `internal/archtest`, `TestEveryBuiltinNameHasAnImplementation` (`internal/cli`) checks that every name the vocabulary lists is wired, and `TestFactsDocIsCurrent` that the facts reference matches the binary (`make docs-ref` regenerates it). `TestEveryDecisionNamesATestThatExists` checks that every entry of the [decision log](/architecture/decisions/) names a test that exists, and `TestDecisionsDocIsCurrent` (`internal/archtest/cmd/decisionsdoc`) that the log's index lists its entries.
 
 A reason that starts with `fix: ` marks an exception that does not hold and whose fix is mechanical, and `debt: ` one whose fix is a refactor; the page shows them as 🔧 and 🧾, the rest as ✅.
 

@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
+	"github.com/wloophq/wloop/internal/core/lock"
 )
 
 var inBundle = "/Users/me/Applications/" + brand.App + ".app/Contents/MacOS/" + brand.Name
@@ -174,7 +175,7 @@ func TestNotifierStartKickstartsTheAppAgent(t *testing.T) {
 	}
 	te := newTestEnv(t, nil)
 	te.cfg = withoutWindows(te.cfg)
-	if d := te.serveDeps(context.Background(), nil, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.NotifierStart != want {
+	if d := te.serveDeps(context.Background(), nil, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil); d.NotifierStart != want {
 		t.Fatalf("serve deps NotifierStart = %q", d.NotifierStart)
 	}
 	goos = "linux"
