@@ -60,11 +60,11 @@ func TestASlackOnlyDaemonBriefsSlackUnitsOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seedSlack(t, db)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
 	steps, ok := te.Env.engine.Steps.(*stepSet)
 	if !ok || steps.d.Briefs == nil {
 		t.Fatalf("the engine's steps have no briefs: %T", te.Env.engine.Steps)

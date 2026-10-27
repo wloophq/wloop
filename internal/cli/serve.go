@@ -169,6 +169,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	}
 	defer unlockStore()
 	defer db.Close()
+	defer e.background.Wait()
 	e.WS.UseCustody(db.Worktrees())
 	store := inventory.New(db)
 	store.UseClock(e.Now)
@@ -194,10 +195,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	}
 	vctx, stopViews := context.WithCancel(ctx)
 	e.serveTurns(vctx, db, store, startCfg, logf)
-	defer func() {
-		stopViews()
-		<-e.served.done
-	}()
+	defer stopViews()
 	if e.noJobs {
 		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage or retain")
 	}
@@ -476,11 +474,11 @@ func (e *Env) startBriefs(ctx context.Context, q *brief.Queue, logf func(string,
 	} else {
 		e.interruptedFlag().Store(true)
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("brief"))
 		defer scope.End()
 		q.Start(lctx)
-	}()
+	})
 }
 
 // withEngine is d with the workflows' engine as the sweep, its pending
@@ -846,7 +844,6 @@ type servedTurns struct {
 	db       *sqlite.DB
 	// sinks are the views' sinks, in the order the ports returned them.
 	sinks []*viewSink
-	done  chan struct{}
 
 	mu  sync.Mutex
 	cfg config.Config
@@ -901,7 +898,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 		}
 		return s.sessions
 	}
-	served := &servedTurns{sessions: sessions, db: db, done: make(chan struct{}), cfg: cfg}
+	served := &servedTurns{sessions: sessions, db: db, cfg: cfg}
 	var viewSinks []views.Sink
 	if !e.noJobs {
 		for _, sink := range sinks {
@@ -928,12 +925,11 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 		AgentFor:      e.agentFor(served),
 		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
-	go func() {
-		defer close(served.done)
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("views"))
 		defer scope.End()
 		v.Run(lctx)
-	}()
+	})
 	return sessions
 }
 
@@ -1184,7 +1180,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 			return "", "", nil
 		})
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(dctx, meter.Loop("config"))
 		defer scope.End()
 		t := time.NewTicker(configRetry)
@@ -1205,7 +1201,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 				}
 			}
 		}
-	}()
+	})
 	return daemon.New(deps).Run(dctx)
 }
 

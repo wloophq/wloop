@@ -24,8 +24,8 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 	}
 	d.GTD, d.Messages = entries, e.messages
 	if e.changes != nil {
-		go e.messages.Run(ctx, e.changes)
-		go reconcileEnded(ctx, e.messages, e.changes, logf)
+		e.background.Go(func() { e.messages.Run(ctx, e.changes) })
+		e.background.Go(func() { reconcileEnded(ctx, e.messages, e.changes, logf) })
 	}
 	return d
 }

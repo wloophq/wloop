@@ -98,12 +98,12 @@ func TestAModuleRegistersItsCodecJobAndRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	serve := func(ps []source.Plugin) *daemon.Server {
 		saved := plugins
 		plugins = ps
 		defer func() { plugins = saved }()
-		d := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+		d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 		d.Startup = nil
 		return daemon.New(d)
 	}

@@ -189,6 +189,9 @@ type Env struct {
 	ports func(store *inventory.Store, cfg config.Config) (turns.Sessions, []views.Sink)
 	// served is the daemon's turns and views, built once per daemon.
 	served *servedTurns
+	// background is the work serve starts on its contexts, which it waits for
+	// before it closes the store.
+	background *sync.WaitGroup
 	// items is the daemon's one items ledger; every writer of items shares it.
 	items *coreitems.Ledger
 	// gtd and messages are the daemon's entries and Inbox messages, built once per daemon; gtdMe is the
@@ -239,6 +242,7 @@ func NewEnv() *Env {
 	agents, homes, protocols := agentRegistries(defaultAgents())
 	home := config.Home()
 	e := &Env{
+		background:    &sync.WaitGroup{},
 		Out:           os.Stdout,
 		Err:           os.Stderr,
 		In:            os.Stdin,

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -28,14 +29,11 @@ func (p *homeProbe) check(context.Context) ([]api.HomeFinding, error) {
 	return nil, nil
 }
 
-func waitCalls(t *testing.T, p *homeProbe, want int32) {
+func wantCalls(t *testing.T, p *homeProbe, want int32, what string) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for p.calls.Load() != want {
-		if time.Now().After(deadline) {
-			t.Fatalf("homes checks: %d, want %d", p.calls.Load(), want)
-		}
-		time.Sleep(time.Millisecond)
+	synctest.Wait()
+	if n := p.calls.Load(); n != want {
+		t.Fatalf("%s ran %d home checks, want %d", what, n, want)
 	}
 }
 
@@ -62,73 +60,69 @@ func TestFastCycleRunsNoHomeCheck(t *testing.T) {
 
 func TestSessionStartNewHomeRechecks(t *testing.T) {
 	t.Parallel()
-	s, _ := agentServer(t)
-	p := &homeProbe{}
-	s.deps.Homes = p.check
-	start := func(home string) {
-		t.Helper()
-		body := `{"agent_session":"sess-1","cwd":"/wt/rev","home":"` + home + `"}`
-		if rec := agentCall(t, s.Handler(), "POST", api.AgentSessionsStart, "term_1", body); rec.Code != http.StatusNoContent {
-			t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	synctest.Test(t, func(t *testing.T) {
+		s, _ := agentServer(t)
+		p := &homeProbe{}
+		s.deps.Homes = p.check
+		start := func(home string) {
+			t.Helper()
+			body := `{"agent_session":"sess-1","cwd":"/wt/rev","home":"` + home + `"}`
+			if rec := agentCall(t, s.Handler(), "POST", api.AgentSessionsStart, "term_1", body); rec.Code != http.StatusNoContent {
+				t.Fatalf("start: %d %s", rec.Code, rec.Body)
+			}
 		}
-	}
-	start("/h")
-	waitCalls(t, p, 1)
-	start("/h")
-	start("")
-	time.Sleep(20 * time.Millisecond)
-	if n := p.calls.Load(); n != 1 {
-		t.Fatalf("a covered home or none ran %d checks in all, want 1", n)
-	}
+		start("/h")
+		wantCalls(t, p, 1, "a new home")
+		start("/h")
+		start("")
+		wantCalls(t, p, 1, "a covered home or none")
+	})
 }
 
 func TestSessionStartBurstOfNewHomesSharesOneRecheck(t *testing.T) {
 	t.Parallel()
-	s, _ := agentServer(t)
-	p := &homeProbe{release: make(chan struct{})}
-	s.deps.Homes = p.check
-	s.noteSessionHome("/h0")
-	waitCalls(t, p, 1)
-	for _, h := range []string{"/h1", "/h2", "/h3", "/h4"} {
-		s.noteSessionHome(h)
-	}
-	close(p.release)
-	waitCalls(t, p, 2)
-	time.Sleep(30 * time.Millisecond)
-	if n := p.calls.Load(); n != 2 {
-		t.Fatalf("a burst of 4 new homes ran %d checks in all, want 2", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s, _ := agentServer(t)
+		p := &homeProbe{release: make(chan struct{})}
+		s.deps.Homes = p.check
+		s.noteSessionHome("/h0")
+		wantCalls(t, p, 1, "a new home")
+		for _, h := range []string{"/h1", "/h2", "/h3", "/h4"} {
+			s.noteSessionHome(h)
+		}
+		wantCalls(t, p, 1, "a burst during a check")
+		close(p.release)
+		wantCalls(t, p, 2, "a burst of 4 new homes")
+	})
 }
 
+// A stale read races the background check it started: each round's reads
+// must share one check however they interleave with it.
 func TestStaleHomesRecheckOnRead(t *testing.T) {
 	t.Parallel()
-	d := testDeps(t)
-	now := time.Now()
-	var mu sync.Mutex
-	d.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
-	p := &homeProbe{}
-	d.Homes = p.check
-	s := New(d)
-	s.refreshHomes(context.Background())
-	s.homeWarnings()
-	time.Sleep(20 * time.Millisecond)
-	if n := p.calls.Load(); n != 1 {
-		t.Fatalf("a fresh result was rechecked: %d checks", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		d := testDeps(t)
+		var mu sync.Mutex
+		now := time.Now()
+		d.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+		p := &homeProbe{}
+		d.Homes = p.check
+		s := New(d)
+		s.refreshHomes(context.Background())
+		s.homeWarnings()
+		wantCalls(t, p, 1, "a read of a fresh result")
 
-	mu.Lock()
-	now = now.Add(HomesMaxAge + time.Minute)
-	mu.Unlock()
-	p.release = make(chan struct{})
-	var wg sync.WaitGroup
-	for range 5 {
-		wg.Go(func() { s.homeWarnings() })
-	}
-	wg.Wait()
-	waitCalls(t, p, 2)
-	close(p.release)
-	time.Sleep(20 * time.Millisecond)
-	if n := p.calls.Load(); n != 2 {
-		t.Fatalf("5 concurrent reads ran %d checks in all, want 2 (the first plus 1 shared)", n)
-	}
+		const rounds = 200
+		for round := range int32(rounds) {
+			mu.Lock()
+			now = now.Add(HomesMaxAge + time.Minute)
+			mu.Unlock()
+			var wg sync.WaitGroup
+			for range 5 {
+				wg.Go(func() { s.homeWarnings() })
+			}
+			wg.Wait()
+			wantCalls(t, p, round+2, "5 concurrent stale reads")
+		}
+	})
 }

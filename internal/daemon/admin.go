@@ -171,8 +171,10 @@ func (s *Server) RecheckHomes(ctx context.Context) {
 	s.note(port.TopicJobs)
 }
 
-// recheckHomesInBackground starts at most one waiting goroutine at a time,
-// which checks only while a reason is left once it runs.
+// recheckHomesInBackground starts at most one goroutine at a time, which
+// checks until no session home is pending and the result is fresh, or the
+// daemon stops. It stays queued while it checks, so a read in between starts
+// no second one.
 func (s *Server) recheckHomesInBackground() {
 	s.homes.mu.Lock()
 	if s.homes.queued {
@@ -181,15 +183,18 @@ func (s *Server) recheckHomesInBackground() {
 	}
 	s.homes.queued = true
 	s.homes.mu.Unlock()
-	go func() {
-		s.homes.mu.Lock()
-		s.homes.queued = false
-		reason := len(s.homes.pending) > 0 || s.homesStaleLocked()
-		s.homes.mu.Unlock()
-		if reason {
+	s.driving.Go(func() {
+		for {
+			s.homes.mu.Lock()
+			if s.life.Err() != nil || len(s.homes.pending) == 0 && !s.homesStaleLocked() {
+				s.homes.queued = false
+				s.homes.mu.Unlock()
+				return
+			}
+			s.homes.mu.Unlock()
 			s.RecheckHomes(s.life)
 		}
-	}()
+	})
 }
 
 // noteSessionHome rechecks the homes in the background when home is one no
