@@ -946,3 +946,34 @@ func TestASessionNameReadingAnUnknownFactFailsToLoad(t *testing.T) {
 		t.Fatalf("problems = %s", e)
 	}
 }
+
+func TestAUserDefaultsSessionNameNamesEveryIntentWithoutOne(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "ask", minimal, "Ask.")
+	if err := os.WriteFile(filepath.Join(dir, DefaultsFile), []byte(testDefaults+"session_name = '{{.unit.label}} {{.session.title}}'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	if got, err := l.SessionName("ask", map[string]any{"unit.label": "acme/api#7"}); err != nil || got != "acme/api#7 ask" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}
+
+func TestABrokenDefaultsSessionNameIsReportedInDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "ask", minimal, "Ask.")
+	file := filepath.Join(dir, DefaultsFile)
+	if err := os.WriteFile(file, []byte(testDefaults+"session_name = '{{.nothing.here}}'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) != 1 || problems[0].File != file || !strings.Contains(problems.Error(), "session_name") {
+		t.Fatalf("problems = %s", problems.Error())
+	}
+	if got, err := l.SessionName("ask", nil); err != nil || got != "ask" {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+}

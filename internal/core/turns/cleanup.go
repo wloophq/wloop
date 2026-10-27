@@ -14,13 +14,14 @@ import (
 )
 
 // loopTitle matches the titles the loop gives the agent terminals it
-// starts: a session name that a user-facing intent's session title leads.
+// starts: a session name that a user-facing intent's session title leads
+// and the start time, as dd/mm hh:mm, ends.
 func loopTitle(titles []string) *regexp.Regexp {
 	quoted := make([]string, len(titles))
 	for i, t := range titles {
 		quoted[i] = regexp.QuoteMeta(t)
 	}
-	return regexp.MustCompile(`^(` + strings.Join(quoted, "|") + `)( .+)?$`)
+	return regexp.MustCompile(`^(` + strings.Join(quoted, "|") + `)( .+)? \d\d/\d\d \d\d:\d\d$`)
 }
 
 type sessionFacts struct {
