@@ -28,6 +28,7 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Its briefs | `Briefs`, a `brief.BriefSource` | the brief queue reads the unit's input, revision and staleness through it; an `IntentUser` gets its provider's brief intent |
 | Links to other plugins' units | `Links`, a `LinkResolver` | resolves a link of its units to the unit another plugin names |
 | A detail page | `Detail` | a client opens the unit's detail in the cockpit, in place of its link |
+| Addresses a person types | `Resolve` | the daemon answers `GET /api/resolve` with the unit an address lands in, such as a Slack message ref or permalink in its direct message segment or thread; a command line's target asks it |
 
 `Module.Capabilities()` names what a plugin can do (`checkouts`, `briefs`, `publishes`, `reacts`, `items`, `detail`), served in `api.Plugin.Capabilities`. The daemon and the clients ask a plugin what it can do, never which one it is (`api.PluginCan`). A unit's codec says the rest: `Equal` compares two keys of its provider, such as GitHub's without case, for units and person keys alike (`unit.Registry.Same`, `items.Identity.Codecs`); `URL` and `KeyOf` name a unit by its web address, so a unit with one is typed by its address (`unit.Registry.ParseURL`); `Target` is how a command line names one of its units, such as `<url>`, in an intent's usage line (`unit.Registry.Target`).
 

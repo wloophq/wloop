@@ -12,53 +12,53 @@ import (
 )
 
 // nudge sends r in a new agent session, so it never types into a
-// conversation the user or an earlier round is having; resumeOf is the turn
-// it resumes, 0 for none.
-func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *github.PullRequest, resumeOf int64) error {
+// conversation the user or an earlier round is having, and returns the id
+// of the turn sent; resumeOf is the turn it resumes, 0 for none.
+func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *github.PullRequest, resumeOf int64) (string, error) {
 	ref := prOf(r.Unit)
 	sent, err := e.sendTurn(ctx, cfg, r)
 	if err != nil {
-		return err
+		return "", err
 	}
 	sent.resume(resumeOf)
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	all, err := e.WS.List(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	ws, where, err := nudgeWorkspace(cfg, e.managerDisplay(), repos, all, ref, pr, e.prOf(ctx, pr))
 	if err != nil {
-		return err
+		return "", err
 	}
 	d, _ := e.loadedIntents().Registry.Get(dintent.Name(r.Intent))
 	opts := intentOptions(d, roundOptions{allowUserActive: r.Trigger == turn.ByHand, trusted: trusts(cfg, pr), pr: pr})
 	opts.unit = r.Unit
 	s, err := e.agentSession(ctx, cfg, ws, opts)
 	if err != nil {
-		return err
+		return "", err
 	}
 	name, err := e.roundName(opts, r.Unit)
 	if err != nil {
-		return err
+		return "", err
 	}
 	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, opts.keepBlocked, opts.trusted)
 	if err != nil {
-		return fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
+		return "", fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}
 	submitted, err := e.deliver(ctx, ref.Unit(), &sent, p, false)
 	e.recordGuidance(ctx, ref, r.Guidance)
 	if err != nil {
-		return fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
+		return "", fmt.Errorf("%s: sending the prompt: %w", ws.DisplayName, err)
 	}
 	note := ""
 	if !submitted {
 		note = " (submission not observed; check the session)"
 	}
 	fmt.Fprintf(e.Out, "%s in %s, the %s%s: %s\n", r.Intent, ws.DisplayName, where, note, pr.Title)
-	return nil
+	return sent.ID, nil
 }
 
 // nudgeWorkspace prefers the pull request's own workspace, where the agent

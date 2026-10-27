@@ -671,24 +671,25 @@ func TestACommitWaitsOnceForAnIndexLock(t *testing.T) {
 	lock := filepath.Join(d.Path, ".git", "index.lock")
 	writeText(t, lock, "")
 	writeText(t, filepath.Join(d.Path, "sources", "a.md"), "a\n")
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		time.Sleep(50 * time.Millisecond)
-		os.Remove(lock)
-	}()
-	err := te.files.Commit(context.Background(), d.Path, "turn 1", "sources/a.md")
-	<-done
-	if err != nil {
-		t.Fatalf("a commit behind a released index lock failed: %v", err)
+	waits := 0
+	released := te.files.WaitingForIndexLock(func() {
+		waits++
+		if err := os.Remove(lock); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := released.Commit(context.Background(), d.Path, "turn 1", "sources/a.md"); err != nil || waits != 1 {
+		t.Fatalf("a commit behind a released index lock: %v after %d waits", err, waits)
 	}
 	if got := git(t, d.Path, "log", "-1", "--format=%s"); got != "turn 1" {
 		t.Fatalf("last commit %q", got)
 	}
 	writeText(t, lock, "")
 	writeText(t, filepath.Join(d.Path, "sources", "b.md"), "b\n")
-	if err := te.files.Commit(context.Background(), d.Path, "turn 2", "sources/b.md"); err == nil || !strings.Contains(err.Error(), "index.lock") {
-		t.Fatalf("a held lock: %v", err)
+	waits = 0
+	held := te.files.WaitingForIndexLock(func() { waits++ })
+	if err := held.Commit(context.Background(), d.Path, "turn 2", "sources/b.md"); err == nil || !strings.Contains(err.Error(), "index.lock") || waits != 1 {
+		t.Fatalf("a held lock: %v after %d waits", err, waits)
 	}
 }
 

@@ -389,12 +389,8 @@ func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
 	if err != nil {
 		return err
 	}
-	if pl, ok := fx.(port.Placer); ok && strings.TrimSpace(d.Target) == "" {
-		target, err := pl.Place(ctx, *d)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrInvalid, err)
-		}
-		d.Target = target
+	if err := place(ctx, fx, d); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if v, ok := fx.(port.Validator); ok {
 		if err := v.Validate(ctx, *d); err != nil {
@@ -434,6 +430,20 @@ func (s *Service) PublisherOf(d draft.Draft) unit.ProviderID {
 
 func (s *Service) publisher(d draft.Draft) (port.Effects, error) {
 	return s.effects(s.PublisherOf(d))
+}
+
+// place stores in d.Target where fx's Placer puts d when d has no target.
+func place(ctx context.Context, fx port.Effects, d *draft.Draft) error {
+	pl, ok := fx.(port.Placer)
+	if !ok || strings.TrimSpace(d.Target) != "" {
+		return nil
+	}
+	target, err := pl.Place(ctx, *d)
+	if err != nil {
+		return err
+	}
+	d.Target = target
+	return nil
 }
 
 func (s *Service) effects(p unit.ProviderID) (port.Effects, error) {
@@ -663,18 +673,28 @@ func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
 var errClaimLost = errors.New("another pass or decision took the draft")
 
 // sendOne reports whether d was sent; a nil error with false means d is now failed.
+// A draft approved before it was placed is placed here, and its target stored with the claim.
+// A draft that cannot be published fails unclaimed: Recover verifies only what was claimed.
 func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
-	fx, fxErr := s.publisher(d)
+	fx, err := s.publisher(d)
+	if err == nil {
+		err = place(ctx, fx, &d)
+	}
+	if err != nil {
+		d.State, d.Error = draft.Failed, err.Error()
+		_, err := s.save(ctx, d, draft.Approved)
+		if errors.Is(err, ErrConflict) {
+			return false, errClaimLost
+		}
+		return false, err
+	}
 	d.State, d.SendingAt = draft.Sending, s.Clock.Now()
-	d, err := s.save(ctx, d, draft.Approved)
+	d, err = s.save(ctx, d, draft.Approved)
 	if errors.Is(err, ErrConflict) {
 		return false, errClaimLost
 	}
 	if err != nil {
 		return false, err
-	}
-	if fxErr != nil {
-		return false, s.fail(ctx, d, fxErr.Error())
 	}
 	ev, pubErr := fx.Publish(ctx, d)
 	if pubErr != nil {

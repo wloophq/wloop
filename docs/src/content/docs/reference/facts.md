@@ -181,6 +181,9 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
 | `session.idle_since` | timestamp | When the current idle period started. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.unread_answers` | int | Answers the user gave to the session's turns whose notice reached the session and that its agent has not read with inbox_read. |
+| `session.unread_since` | timestamp | When the notice of the oldest of unread_answers reached the session; zero when none. |
+| `session.unread_for` | duration | Time since unread_since; 0 when none. |
 | `session.pr_state` | string | The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none. |
 | `session.duplicate` | bool | Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates. |
 | `session.worktree_gone` | bool | The session's worktree path no longer exists. |
@@ -344,6 +347,6 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `entry.nudged` | any | Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none. |
 | `unit.closed` | any | Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin. |
-| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft. |
+| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.

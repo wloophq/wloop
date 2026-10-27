@@ -294,33 +294,19 @@ var turnActions = map[string]func(s *Server, ctx context.Context, u unit.Unit, r
 
 var answerSources = []turn.Source{turn.Cockpit, turn.Notification, turn.TUI, turn.Terminal}
 
-// answer hands the answer to the turn service, which refuses what the
-// question does not take before anything is stored.
+// answer answers the unit's open question message, as the Inbox answers it.
 func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest, out io.Writer) error {
-	text := strings.TrimSpace(req.Guidance)
-	source := turn.Source(req.Source)
-	if source == "" {
-		source = turn.Cockpit
+	if s.deps.Messages == nil {
+		return errors.New("the Inbox is not wired")
 	}
-	if !slices.Contains(answerSources, source) {
-		return badRequest{fmt.Sprintf("source %q is not one of cockpit, notification, tui, terminal", req.Source)}
-	}
-	ctx = s.readAhead(ctx, u, false)
-	s.deps.LoopMu.Lock()
-	defer s.deps.LoopMu.Unlock()
-	res, err := s.deps.Turns.Answer(ctx, turns.AnswerRequest{Unit: u, Text: text, OptionID: req.OptionID, Yes: req.Yes, No: req.No, Source: source})
+	m, ok, err := s.deps.Messages.Question(ctx, u)
 	if err != nil {
 		return err
 	}
-	switch res.Route {
-	case turn.Typed:
-		fmt.Fprintln(out, "answer sent to the agent session")
-	case turn.Resumed:
-		fmt.Fprintln(out, "answer stored; a new session resumes the turn with it")
-	case turn.Queued:
-		fmt.Fprintln(out, api.AnswerQueued)
+	if !ok {
+		return fmt.Errorf("%w on %s", turn.ErrNoQuestion, u.Label())
 	}
-	return nil
+	return s.answerMessage(ctx, m, req, out)
 }
 
 func clearMute(o *dinv.Override) {
@@ -728,13 +714,12 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 			}
 		}
 	}
-	data := ""
 	if d.Prepare != "" {
 		prepare, ok := prepares[d.Prepare]
 		if !ok {
 			return fmt.Errorf("%s: the daemon has no prepare %s", name, d.Prepare)
 		}
-		if data, err = prepare(s, ctx, u, &call); err != nil {
+		if err := prepare(s, ctx, u, &call); err != nil {
 			return err
 		}
 	}
@@ -743,7 +728,7 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	}
 	for _, e := range effects {
 		if e.after != nil {
-			if err := e.after(s, ctx, u, data); err != nil {
+			if err := e.after(s, ctx, u); err != nil {
 				return err
 			}
 		}
@@ -919,34 +904,48 @@ func (s *Server) untrackFinished(ctx context.Context) {
 }
 
 func (s *Server) unmutedSituation(ctx context.Context, u unit.Unit) (api.Kind, string, error) {
-	r, _, _, err := s.unmutedRow(ctx, u)
-	return r.Kind, r.Summary.WaitsOn, err
+	um, err := s.unmutedRow(ctx, u)
+	return um.row.Kind, um.row.Summary.WaitsOn, err
 }
 
 // unmutedRow derives the row as it stands without the user's override and
 // pending round, with the events and the deriver it came from.
-func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (api.Row, []dinv.Event, prrow.Deriver, error) {
+func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (unmuted, error) {
 	rd, ok, err := s.readRow(ctx, u)
 	if err != nil {
-		return api.Row{}, nil, prrow.Deriver{}, err
+		return unmuted{}, err
 	}
 	if !ok {
 		st, found, err := s.storedRead(ctx, u, catalog.Asked{}, true)
 		if err != nil {
-			return api.Row{}, nil, prrow.Deriver{}, err
+			return unmuted{}, err
 		}
 		if !found {
-			return api.Row{}, nil, prrow.Deriver{}, notFound{u.Label() + " is not in the inventory"}
+			return unmuted{}, notFound{u.Label() + " is not in the inventory"}
 		}
-		return st.row, st.evs, st.d, nil
+		var b turn.Book
+		if st.book != nil {
+			b = *st.book
+		}
+		return unmuted{row: st.row, evs: st.evs, book: b, d: st.d}, nil
 	}
 	base := rd.Base
 	base.Pending, base.Asked = nil, catalog.Asked{}
 	row, err := rd.Derive(base, prrow.Unmuted(rd.In))
 	if err != nil {
-		return api.Row{}, nil, prrow.Deriver{}, err
+		return unmuted{}, err
 	}
-	return row, prrow.EventsOf(rd.In), s.deriverAt(base, rd.At), nil
+	b, _ := prrow.BookOf(rd.In)
+	return unmuted{row: row, evs: prrow.EventsOf(rd.In), book: b, d: s.deriverAt(base, rd.At)}, nil
+}
+
+// unmuted is a pull request's row without the user's mute, with what a
+// nudge reads beside it.
+type unmuted struct {
+	row  api.Row
+	evs  []dinv.Event
+	book turn.Book
+	d    prrow.Deriver
 }
 
 // updateOverride changes the stored override and reports whether it
@@ -991,15 +990,16 @@ func (s *Server) recordEvent(ctx context.Context, u unit.Unit, kind, data string
 // prepareNudge refuses when nobody but the user is to be asked, or the
 // same wait was already nudged, and fills who, the situation and whether
 // it asks the maintainers.
-func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string, error) {
-	r, evs, d, err := s.unmutedRow(ctx, u)
+func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) error {
+	um, err := s.unmutedRow(ctx, u)
 	if err != nil {
-		return "", err
+		return err
 	}
+	r, d := um.row, um.d
 	p, _ := prrow.PayloadOf(r)
 	who, why := prrow.NudgeTargets(r, p.Author, d.Viewer, d.Ignore)
-	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, evs, d.Now); refusal != "" {
-		return "", badRequest{refusal}
+	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, um.evs, prrow.Unstarted(um.book), d.Now); refusal != "" {
+		return badRequest{refusal}
 	}
 	if c.Inputs == nil {
 		c.Inputs = map[string]any{}
@@ -1007,7 +1007,7 @@ func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string
 	c.Inputs["situation"] = nudgeSituation(who, r)
 	c.Inputs["waits_on_maintainers"] = slices.Equal(who, []string{prrow.NudgeMaintainers})
 	c.Inputs["who"] = slices.Clone(who)
-	return strings.Join(who, ", "), nil
+	return nil
 }
 
 func nudgeSituation(who []string, r api.Row) string {

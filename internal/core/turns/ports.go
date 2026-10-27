@@ -38,6 +38,7 @@ const (
 	KindSessionPrompted     = "session_prompted" // Key = handle:seen-at, Data = "user" or "loop"
 	KindTurnDismissedByRule = "turn_dismissed"   // Key = seq:reason, Data = the reason
 	KindAnswerRefused       = "answer_refused"   // Key = answer id, Data = the reason
+	KindAnswerRead          = "answer_read"      // Key = answer id:read-at
 )
 
 // ErrWorkspaceGone is what a Launcher returns when the workspace a resume

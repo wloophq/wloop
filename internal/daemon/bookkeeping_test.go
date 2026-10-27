@@ -36,7 +36,7 @@ func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 		Sessions: sessions, Agents: snapshotOf(sessions), Items: &coreitems.Ledger{Store: f.DB.Items()}, Cards: f.DB.Cards()}, f.Inventory)
 	s := New(d)
 	s.token = ""
-	t.Cleanup(s.stopLife)
+	stopOnCleanup(t, s)
 	return s, f
 }
 

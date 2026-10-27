@@ -141,7 +141,7 @@ func TestACommandsHelpComesFromEitherSpelling(t *testing.T) {
 		{[]string{"plan", "--help"}, "  " + te.command() + " plan apply <id|url>..."},
 		{[]string{"plan", "apply", "-h"}, "  " + te.command() + " plan dismiss <id|url>..."},
 		{[]string{"profile", "show", "acme/api", "--help"}, "--intent <intent>"},
-		{[]string{"slack", "follow", "--help"}, te.command() + " slack unfollow <permalink>"},
+		{[]string{"slack", "follow", "--help"}, te.command() + " slack unfollow <message>"},
 		{[]string{"resume", "--help"}, te.command() + " pause [<url>|<owner/repo>]..."},
 		{[]string{"review", "https://github.com/acme/api/pull/7", "--help"}, "--no-brief"},
 		{[]string{"profile", "--help"}, "\nCOMMANDS\n  show "},

@@ -53,6 +53,7 @@ func (s *Server) routes() []route {
 		{"GET /api/health", s.handleHealth},
 		{"GET " + api.Rows, s.handleRows},
 		{"GET " + api.Catalog, s.handleCatalog},
+		{"GET " + api.Resolve, s.handleResolve},
 		{"GET " + api.UnitDetail, s.handleDetail},
 		{"GET " + api.UnitDetail + "/checks", s.handleChecks},
 		{"POST /api/jobs/{name}", s.handleJobs},

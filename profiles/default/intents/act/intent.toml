@@ -12,7 +12,7 @@ brief     = { render = true, wait = false }
 allowed_effects = ["entry.nudged", "unit.closed"]
 
 [help]
-target   = "a pull request URL, a Slack message permalink or <provider>:<key> of a unit the intent serves"
+target   = "a pull request URL, a Slack message ref (<conversation>/<ts>) or permalink, or <provider>:<key> of a unit the intent serves"
 summary  = "Resolve a unit's open items, replies as drafts"
 group    = "pull requests"
 examples = ["https://github.com/acme/api/pull/7", "https://acme.slack.com/archives/C0123/p1700000000000100 say we ship Friday"]

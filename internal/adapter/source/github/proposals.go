@@ -95,7 +95,7 @@ func (n *nudges) Proposals(ctx context.Context, now time.Time) ([]outbox.Proposa
 		if err != nil {
 			return nil, err
 		}
-		if prop, ok := nudgeProposal(row, unmuted, prrow.EventsOf(in), viewer, ignore, now); ok {
+		if prop, ok := nudgeProposal(row, unmuted, prrow.EventsOf(in), unstartedOf(in), viewer, ignore, now); ok {
 			out = append(out, prop)
 		}
 	}
@@ -116,16 +116,23 @@ func nudgeable(row api.Row) bool {
 	return !p.Approved && !p.Override.Hold && p.Mute == nil
 }
 
+// unstartedOf are the turns of in's book that ended before their agent
+// started them.
+func unstartedOf(in any) map[string]bool {
+	b, _ := prrow.BookOf(in)
+	return prrow.Unstarted(b)
+}
+
 // nudgeProposal is the nudge of row, whom the nudge intent would ask from
 // its unmuted row, when that intent would not refuse it now.
-func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, viewer string, ignore []string, now time.Time) (outbox.Proposal, bool) {
+func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, unstarted map[string]bool, viewer string, ignore []string, now time.Time) (outbox.Proposal, bool) {
 	ref, err := pr.ParseKey(row.Unit.Key)
 	if err != nil {
 		return outbox.Proposal{}, false
 	}
 	p, _ := prrow.PayloadOf(row)
 	who, why := prrow.NudgeTargets(unmuted, p.Author, viewer, ignore)
-	if prrow.NudgeRefusal(ref, who, why, unmuted.Summary.Since, evs, now) != "" {
+	if prrow.NudgeRefusal(ref, who, why, unmuted.Summary.Since, evs, unstarted, now) != "" {
 		return outbox.Proposal{}, false
 	}
 	return outbox.Proposal{

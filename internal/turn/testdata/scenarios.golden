@@ -1,10 +1,10 @@
 count: 24
 == review/first/by-hand/guidance
-id: 8013226dd890
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 8013226dd890 https://github.com/acme/api/pull/7` and follow what it prints.
+id: e758840af518
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn e758840af518 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 8013226dd890 for review in acme/api.
+Instructions e758840af518 for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -189,9 +189,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -210,11 +209,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first/automated
-id: dc0335fa0034
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn dc0335fa0034 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 2d50a4b1cf46
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 2d50a4b1cf46 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions dc0335fa0034 for review in acme/api.
+Instructions 2d50a4b1cf46 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -394,9 +393,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -415,11 +413,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/changes-requested
-id: 78959ca02a8b
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 78959ca02a8b https://github.com/acme/api/pull/7` and follow what it prints.
+id: 6721bf3e0958
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 6721bf3e0958 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 78959ca02a8b for review in acme/api.
+Instructions 6721bf3e0958 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -670,9 +668,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -691,11 +688,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/automated/no-review-read
-id: d6f1cf1d1de4
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn d6f1cf1d1de4 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 99bab14e7ff7
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 99bab14e7ff7 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions d6f1cf1d1de4 for review in acme/api.
+Instructions 99bab14e7ff7 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -946,9 +943,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -967,11 +963,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/first-planned/automated/reviewed-before
-id: 7761b19853f2
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 7761b19853f2 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 234e89ada8f4
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 234e89ada8f4 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 7761b19853f2 for review in acme/api.
+Instructions 234e89ada8f4 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -1195,9 +1191,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -1216,11 +1211,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/follow-up/by-hand/approved
-id: 43b031bf9651
-prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 43b031bf9651 https://github.com/acme/api/pull/7` and follow what it prints.
+id: ab5ff28ae81b
+prompt: Follow-up review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn ab5ff28ae81b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 43b031bf9651 for review in acme/api.
+Instructions ab5ff28ae81b for review in acme/api.
 
 # Follow-up review of acme/api#7, asked for by you.
 
@@ -1443,9 +1438,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -1629,11 +1623,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/oss-first-time
-id: 15c94f10dc96
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 15c94f10dc96 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 7355dafac937
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 7355dafac937 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/organization=acme/intent=review.md
-Instructions 15c94f10dc96 for review in acme/api.
+Instructions 7355dafac937 for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -1813,9 +1807,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -1840,11 +1833,11 @@ Welcome a first-time contributor by name before any finding.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/brief/tag-block
-id: f737d7bcaa45
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn f737d7bcaa45 https://github.com/acme/api/pull/7` and follow what it prints.
+id: e5f6afef3ede
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn e5f6afef3ede https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md; user: /home/me/prof/tags/lang=go/intent=review.md
-Instructions f737d7bcaa45 for review in acme/api.
+Instructions e5f6afef3ede for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2024,9 +2017,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -2056,11 +2048,11 @@ Every exported identifier needs a doc comment.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/no-brief
-id: 4919e30ea7a6
-prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 4919e30ea7a6 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 75418c4cb31f
+prompt: First review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 75418c4cb31f https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 4919e30ea7a6 for review in acme/api.
+Instructions 75418c4cb31f for review in acme/api.
 
 # First review of acme/api#7, started by {{name}}.
 
@@ -2240,9 +2232,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -2261,11 +2252,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/delegates
-id: 0048a73bfc85
-prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 0048a73bfc85 https://github.com/acme/api/pull/7` and follow what it prints.
+id: 4701a87be84d
+prompt: First review of acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions review --turn 4701a87be84d https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 0048a73bfc85 for review in acme/api.
+Instructions 4701a87be84d for review in acme/api.
 
 # First review of acme/api#7, asked for by you.
 
@@ -2444,9 +2435,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -2471,11 +2461,11 @@ In the finding step, also run each of these and verify what it returns like any 
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/by-hand/guidance
-id: 4dd2545fea7f
-prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 4dd2545fea7f https://github.com/acme/api/pull/7` and follow what it prints.
+id: b14871b3b718
+prompt: Address round on acme/api#7, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn b14871b3b718 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 4dd2545fea7f for address in acme/api.
+Instructions b14871b3b718 for address in acme/api.
 
 # Address round on acme/api#7, asked for by you.
 
@@ -2789,9 +2779,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -2810,11 +2799,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/automated/local-work/queued
-id: 58b4d86d468d
-prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 58b4d86d468d https://github.com/acme/api/pull/7` and follow what it prints.
+id: 84a35579c4d1
+prompt: Address round on acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions address --turn 84a35579c4d1 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions 58b4d86d468d for address in acme/api.
+Instructions 84a35579c4d1 for address in acme/api.
 
 # Address round on acme/api#7, started by {{name}}.
 
@@ -3126,9 +3115,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -3160,11 +3148,11 @@ Instructions 474542163708 for address in acme/api.
 https://github.com/acme/api/pull/7 was opened by @ana, not by the user. Addressing it means pushing to their branch under the user's name. Ask the user whether to take it over. If they say yes, run `'/opt/loop/bin/loop' instructions address https://github.com/acme/api/pull/7 --take-over`, with the user's guidance after `--` when they gave any, and follow what it prints. Change nothing before that: no commit, push, reply, resolve, re-request or board move.
 == end
 == address/take-over
-id: e41da2d2299e
-prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn e41da2d2299e https://github.com/acme/api/pull/7` and follow what it prints.
+id: 8f4870152f6c
+prompt: Take over acme/api#7 and address it, asked for by you. Run `'/opt/loop/bin/loop' instructions address --turn 8f4870152f6c https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions e41da2d2299e for address in acme/api.
+Instructions 8f4870152f6c for address in acme/api.
 
 # Take over acme/api#7 and address it, asked for by you.
 
@@ -3472,9 +3460,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -3493,11 +3480,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered
-id: 5385bed1ce71
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 5385bed1ce71 https://github.com/acme/api/pull/7` and follow what it prints.
+id: a58c43b64122
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn a58c43b64122 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 5385bed1ce71 for review in acme/api.
+Instructions a58c43b64122 for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -3716,9 +3703,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -3737,11 +3723,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/resume/answered-after-push
-id: 0f3ab04b8c45
-prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn 0f3ab04b8c45 https://github.com/acme/api/pull/7` and follow what it prints.
+id: d19a7209101b
+prompt: Continue the review of acme/api#7: the user answered. Run `'/opt/loop/bin/loop' instructions review --turn d19a7209101b https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 0f3ab04b8c45 for review in acme/api.
+Instructions d19a7209101b for review in acme/api.
 
 # Continue the review of acme/api#7: the user answered.
 
@@ -3960,9 +3946,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -3981,11 +3966,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == address/resume/continue
-id: a89f901e4f1a
-prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn a89f901e4f1a https://github.com/acme/api/pull/7` and follow what it prints.
+id: 2ae90239b271
+prompt: Continue the address round on acme/api#7 where the last session stopped. Run `'/opt/loop/bin/loop' instructions address --turn 2ae90239b271 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=address.md
-Instructions a89f901e4f1a for address in acme/api.
+Instructions 2ae90239b271 for address in acme/api.
 
 # Continue the address round on acme/api#7 where the last session stopped.
 
@@ -4308,9 +4293,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -4329,11 +4313,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == review/history/injected
-id: 8c5121a02999
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn 8c5121a02999 https://github.com/acme/api/pull/7` and follow what it prints.
+id: f0eddd4e3d73
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn f0eddd4e3d73 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions 8c5121a02999 for review in acme/api.
+Instructions f0eddd4e3d73 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -4603,9 +4587,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 
@@ -4624,11 +4607,11 @@ Parts are in order; where they disagree, the later part wins.
 For anything these instructions do not cover, run `'/opt/loop/bin/loop' help`.
 == end
 == probe/first
-id: fcc9db862869
-prompt: {{name}} probe loop-e2e/probe#1760000000, started by {{name}}. Run `'/opt/loop/bin/loop' instructions probe --turn fcc9db862869 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
+id: f846d60afe2d
+prompt: {{name}} probe loop-e2e/probe#1760000000, started by {{name}}. Run `'/opt/loop/bin/loop' instructions probe --turn f846d60afe2d https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
 sources: 
-Instructions fcc9db862869 for probe in loop-e2e/probe.
+Instructions f846d60afe2d for probe in loop-e2e/probe.
 
 # {{name}} probe loop-e2e/probe#1760000000, started by {{name}}.
 
@@ -4672,15 +4655,16 @@ session has no such tool, write `.loop/turn-<id>.json` with your file tool
 (make sure `.loop/.gitignore` contains `*`) and run
 `'/opt/loop/bin/loop' turn end https://github.com/loop-e2e/probe/pull/1760000000 --turn <id> --file .loop/turn-<id>.json`.
 Never pass the JSON on the command line. If the tool or the command lists
-problems, fix the record and call again. The answer arrives as your next
-prompt; a long one tells you to run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
+problems, fix the record and call again. The user's answer reaches you as a
+notice from {{name}} that names the Inbox message answered, without the answer;
+read it with the `inbox_read` tool, or run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
 == end
 == probe/resume
-id: 1856c191bee9
-prompt: Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered. Run `'/opt/loop/bin/loop' instructions probe --turn 1856c191bee9 https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
+id: a1b5339af54d
+prompt: Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered. Run `'/opt/loop/bin/loop' instructions probe --turn a1b5339af54d https://github.com/loop-e2e/probe/pull/1760000000` and follow what it prints.
 records: true
 sources: 
-Instructions 1856c191bee9 for probe in loop-e2e/probe.
+Instructions a1b5339af54d for probe in loop-e2e/probe.
 
 # Continue the {{name}} probe loop-e2e/probe#1760000000: the user answered.
 
@@ -4741,8 +4725,9 @@ session has no such tool, write `.loop/turn-<id>.json` with your file tool
 (make sure `.loop/.gitignore` contains `*`) and run
 `'/opt/loop/bin/loop' turn end https://github.com/loop-e2e/probe/pull/1760000000 --turn <id> --file .loop/turn-<id>.json`.
 Never pass the JSON on the command line. If the tool or the command lists
-problems, fix the record and call again. The answer arrives as your next
-prompt; a long one tells you to run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
+problems, fix the record and call again. The user's answer reaches you as a
+notice from {{name}} that names the Inbox message answered, without the answer;
+read it with the `inbox_read` tool, or run `'/opt/loop/bin/loop' turn answer https://github.com/loop-e2e/probe/pull/1760000000`.
 == end
 == nudge/one-reviewer/guidance
 id: 7fab53cfdf15
@@ -5076,11 +5061,11 @@ Parts are in order; where they disagree, the later part wins.
 - Two sentences at most.
 == end
 == review/follow-up/automated/re-requested-after-approval
-id: ab7bdfc4590a
-prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn ab7bdfc4590a https://github.com/acme/api/pull/7` and follow what it prints.
+id: b37fd6c17988
+prompt: Follow-up review of acme/api#7, started by {{name}}. Run `'/opt/loop/bin/loop' instructions review --turn b37fd6c17988 https://github.com/acme/api/pull/7` and follow what it prints.
 records: true
 sources: user: /home/me/prof/intent=review.md
-Instructions ab7bdfc4590a for review in acme/api.
+Instructions b37fd6c17988 for review in acme/api.
 
 # Follow-up review of acme/api#7, started by {{name}}.
 
@@ -5336,9 +5321,8 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn. The
-answer arrives as your next prompt; a long one tells you to run
-`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`. After you act on an answer, record
-again.
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`'/opt/loop/bin/loop' turn answer https://github.com/acme/api/pull/7`, act on it, then record again.
 
 ## Brief
 

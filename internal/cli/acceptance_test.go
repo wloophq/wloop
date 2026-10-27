@@ -737,7 +737,13 @@ func (f *fixtureEnv) saveBook(t *testing.T, fb fxBook) {
 			Hash: fmt.Sprintf("fixture-%d", i), Record: record.Record{State: record.State(r.State)}})
 	}
 	for _, a := range fb.Answers {
-		more.Answers = append(more.Answers, turn.Answer{TurnSeq: seq[a.TurnSeq], Route: turn.Route(a.Route), Source: turn.Cockpit, At: fxTime(t, a.At)})
+		at := fxTime(t, a.At)
+		// The fixture predates read answers: the store's migration reads every answer but a queued one.
+		read := at
+		if a.Route == string(turn.Queued) {
+			read = time.Time{}
+		}
+		more.Answers = append(more.Answers, turn.Answer{TurnSeq: seq[a.TurnSeq], Route: turn.Route(a.Route), Source: turn.Cockpit, At: at, ReadAt: read})
 	}
 	if len(more.Records)+len(more.Answers) > 0 {
 		if _, err := f.te.repo.Save(ctx, more); err != nil {

@@ -17,6 +17,7 @@ GitHub cannot call your laptop, and the events that matter (a push, a reply, an 
 | `nudge-silent-30d` | asks whoever someone else's pull request waits on, after `github.nudge.silent_days` (30) of silence | waits for you |
 | `session-pr-finished`, `session-duplicate`, `session-worktree-gone`, `session-finished-quiet`, `session-asked-quiet`, `session-close-when-done` | close agent sessions that are finished, duplicated or quiet, whose worktree or transcript is gone, or that their manager closed (a session you archived in Claude Desktop) | runs |
 | `session-manual-quiet` | offers to close a session you started that went quiet | waits for you |
+| `answer-unread` | notifies you when an agent session leaves an answer of yours unread for 15 minutes | runs |
 | `workspace-review-finished`, `workspace-author-finished`, `workspace-temporary`, `workspace-duplicate` | remove workspaces of finished pull requests, under temporary paths, or duplicated | **observe** |
 | `workspace-path-gone` | unregisters a workspace whose path no longer exists | runs |
 | `workspace-idle-no-pr` | offers to remove a workspace with no pull request and no open session, idle for `cleanup.stale_workspace` | waits for you |

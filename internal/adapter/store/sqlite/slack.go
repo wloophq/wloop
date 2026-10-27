@@ -126,7 +126,9 @@ type SaveResult struct {
 
 // MessageQuery selects a conversation's messages by anchor: Thread names one
 // thread, From and To an inclusive range (To "" open). After and Limit page.
+// TS alone selects the one message at it.
 type MessageQuery struct {
+	TS       string
 	Thread   string
 	From, To string
 	After    string
@@ -851,6 +853,9 @@ func slackMessagesQuery(conv string, q MessageQuery) (string, []any) {
 	}
 	if q.Thread == "" && q.Before != "" {
 		query, args = query+` AND `+slackAnchor+` < ?`, append(args, q.Before)
+	}
+	if q.TS != "" {
+		query, args = query+` AND ts = ?`, append(args, q.TS)
 	}
 	switch {
 	case q.After != "" && q.Thread != "":

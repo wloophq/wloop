@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -67,6 +68,20 @@ func waitFor(t *testing.T, cond func() bool) {
 	}
 }
 
+// runServer runs s until t ends; stop cancels the run and returns its error,
+// once however often it is called.
+func runServer(t *testing.T, s *Server) (stop func() error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- s.Run(ctx) }()
+	stop = sync.OnceValue(func() error {
+		cancel()
+		return <-done
+	})
+	t.Cleanup(func() { stop() })
+	return stop
+}
+
 func newTestServer(t *testing.T, h http.Handler) string {
 	t.Helper()
 	srv := httptest.NewServer(h)
@@ -86,9 +101,7 @@ func socketClient(path string) *http.Client {
 func TestRunServesSocketAndGuardsTCP(t *testing.T) {
 	t.Parallel()
 	d := testDeps(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- New(d).Run(ctx) }()
+	stop := runServer(t, New(d))
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
 
 	var info struct {
@@ -131,14 +144,8 @@ func TestRunServesSocketAndGuardsTCP(t *testing.T) {
 		t.Fatalf("second daemon: %v", err)
 	}
 
-	cancel()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("run: %v", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("daemon did not stop")
+	if err := stop(); err != nil {
+		t.Fatalf("run: %v", err)
 	}
 	if _, err := os.Stat(d.Socket); !os.IsNotExist(err) {
 		t.Fatalf("socket left behind: %v", err)
@@ -154,17 +161,14 @@ func TestStaleSocketIsReplaced(t *testing.T) {
 	}
 	stale.(*net.UnixListener).SetUnlinkOnClose(false)
 	stale.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- New(d).Run(ctx) }()
+	stop := runServer(t, New(d))
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
 	resp, err := socketClient(d.Socket).Get("http://daemon/api/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("socket health: %v %v", resp, err)
 	}
 	resp.Body.Close()
-	cancel()
-	if err := <-done; err != nil {
+	if err := stop(); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 }
@@ -192,13 +196,12 @@ func TestShutdownDoesNotWaitForeverOnAStuckJob(t *testing.T) {
 	})
 	s := New(d)
 	s.grace = 100 * time.Millisecond
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- s.Run(ctx) }()
+	stop := runServer(t, s)
 	<-started
-	cancel()
+	stopped := make(chan struct{})
+	go func() { stop(); close(stopped) }()
 	select {
-	case <-done:
+	case <-stopped:
 	case <-time.After(3 * time.Second):
 		t.Fatal("Run waited on a job that ignores its context")
 	}
@@ -440,10 +443,7 @@ func readInfoToken(t *testing.T, path string) string {
 
 func runUntilServing(t *testing.T, d Deps) (token string, stop func()) {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	s := New(d)
-	go func() { done <- s.Run(ctx) }()
+	run := runServer(t, New(d))
 	waitFor(t, func() bool {
 		resp, err := socketClient(d.Socket).Get("http://daemon/api/health")
 		if err != nil {
@@ -453,8 +453,7 @@ func runUntilServing(t *testing.T, d Deps) (token string, stop func()) {
 		return true
 	})
 	return readInfoToken(t, d.InfoPath), func() {
-		cancel()
-		if err := <-done; err != nil {
+		if err := run(); err != nil {
 			t.Fatalf("run: %v", err)
 		}
 	}
@@ -562,12 +561,9 @@ func socketHealth(t *testing.T, path string) api.Health {
 
 func runUntilInfo(t *testing.T, d Deps) {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- New(d).Run(ctx) }()
+	stop := runServer(t, New(d))
 	t.Cleanup(func() {
-		cancel()
-		if err := <-done; err != nil {
+		if err := stop(); err != nil {
 			t.Errorf("run: %v", err)
 		}
 	})

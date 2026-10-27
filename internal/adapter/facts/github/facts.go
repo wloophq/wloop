@@ -680,10 +680,12 @@ func calendarDays(from, to time.Time) int {
 // nudge would be refused with now.
 func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (situation.Result, string) {
 	in := situation.Input{PR: row, Events: evs, Override: o, Viewer: v.viewer, MyTeams: v.teams, Ignore: prrow.IgnoreOf(v.cfg), Now: now, Stalled: v.cfg.GitHub.Stalled}
+	var unstarted map[string]bool
 	if b, ok := v.books[row.Ref.Unit()]; ok {
 		if tf, ok := prrow.TurnFacts(map[unit.Unit]turn.Book{row.Ref.Unit(): b}, v.registry)[row.Ref]; ok {
 			in.Turn = &tf.Facts
 		}
+		unstarted = prrow.Unstarted(b)
 	}
 	res := situation.Derive(in)
 	unmuted := res
@@ -692,7 +694,7 @@ func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now tim
 		unmuted = situation.Derive(in)
 	}
 	who, why := prrow.NudgeTargets(apiRow(unmuted), row.Author, v.viewer, prrow.IgnoreOf(v.cfg))
-	return res, prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, now)
+	return res, prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)
 }
 
 // apiRow is the row situation.Derive's result gives, as nudge.targets reads it.

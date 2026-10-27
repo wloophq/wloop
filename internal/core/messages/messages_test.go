@@ -277,14 +277,15 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 			if err != nil || got.Route != c.route {
 				t.Fatalf("%+v %v", got, err)
 			}
-			if typed := r.sess.Typed(); len(typed) != c.typed || (c.typed == 1 && typed[0].Line != "The user answered your Inbox message: Old column (option old). and drop the index") {
+			if typed := r.sess.Typed(); len(typed) != c.typed || (c.typed == 1 && typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/7") {
 				t.Fatalf("typed %+v", typed)
 			}
 			if len(r.launch.launches) != 0 {
 				t.Fatalf("launched %+v", r.launch.launches)
 			}
 			b := r.book(t, r7)
-			if len(b.Answers) != 1 || b.Answers[0].Route != c.route || b.Answers[0].Source != turn.TUI || b.Turns[0].State != turn.Started {
+			if len(b.Answers) != 1 || b.Answers[0].Route != c.route || b.Answers[0].Source != turn.TUI || b.Turns[0].State != turn.Started ||
+				b.Answers[0].Message != m.ID || !b.Answers[0].Posted || b.Answers[0].OptionID != "old" || b.Answers[0].Text != "and drop the index" {
 				t.Fatalf("book %+v %+v", b.Answers, b.Turns)
 			}
 			closed := r.message(t, m.ID)
@@ -296,7 +297,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				if err := r.turns.DeliverStopped(context.Background(), "term_1"); err != nil {
 					t.Fatal(err)
 				}
-				if typed := r.sess.Typed(); len(typed) != 1 || !strings.HasPrefix(typed[0].Line, "The user answered your Inbox message: ") {
+				if typed := r.sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/7" {
 					t.Fatalf("delivered %+v", typed)
 				}
 			}

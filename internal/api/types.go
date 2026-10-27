@@ -241,6 +241,12 @@ type TurnAnswer struct {
 	Route    string    `json:"route"`
 	Session  string    `json:"session,omitempty"`
 	At       time.Time `json:"at"`
+	// Message is the Inbox message answered, 0 for none; Posted says the agent posted it.
+	Message int64 `json:"message_id,omitempty"`
+	Posted  bool  `json:"posted,omitempty"`
+	// NoticedAt is when the session was told of the answer, ReadAt when the agent read it; each absent until then.
+	NoticedAt *time.Time `json:"noticed_at,omitempty"`
+	ReadAt    *time.Time `json:"read_at,omitempty"`
 }
 
 type Detail struct {
@@ -518,7 +524,7 @@ type ActionRequest struct {
 // accepted it instead of the action's output.
 // AnswerQueued is the output line of an answer that waits for its busy
 // agent to stop.
-const AnswerQueued = "answer queued; it is typed into the agent session when the agent stops"
+const AnswerQueued = "answer queued; the agent session is told of it when the agent stops"
 
 type ActionResult struct {
 	OK     bool     `json:"ok"`
@@ -613,4 +619,11 @@ type CheckDetail struct {
 type Info struct {
 	Port  int    `json:"port"`
 	Token string `json:"token"`
+}
+
+// Resolved is the unit an address lands in; Found is false when no plugin
+// reads the address.
+type Resolved struct {
+	Unit  unit.Unit `json:"unit"`
+	Found bool      `json:"found"`
 }

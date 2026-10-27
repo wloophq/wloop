@@ -29,6 +29,8 @@ type Service struct {
 	Clock   port.Clock
 	// Command is how messages name the binary.
 	Command string
+	// Notices words what the loop tells a session; nil names each notice and its data.
+	Notices Notices
 	// FastJob is the configured interval of the fast job Reconcile runs on.
 	FastJob time.Duration
 	// AgentFor is the agent the sessions of the unit's project run, the
@@ -167,10 +169,11 @@ func short(hash string) string {
 	return hash
 }
 
-// urlOf is the URL a user opens for a unit, its key when the provider has none.
-func urlOf(u unit.Unit) string {
+// unitArg names a unit as the loop's commands read it: a pull request by its URL, any other unit as
+// <provider>:<key>.
+func unitArg(u unit.Unit) string {
 	if ref, ok := port.PROf(port.Event{Unit: u}); ok {
 		return ref.URL()
 	}
-	return u.Key
+	return u.String()
 }

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -73,7 +72,7 @@ func TestAQueuedAnswerIsTypedWhenItsSessionStops(t *testing.T) {
 	if err := s.DeliverStopped(ctx, "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0] != (turnstest.Typed{Handle: "term_1", Line: "The user answered: go ahead"}) {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0] != (turnstest.Typed{Handle: "term_1", Line: "answered Message=0 Unit=https://github.com/acme/api/pull/7"}) {
 		t.Fatalf("typed %+v", typed)
 	}
 	b := bookOf(t, store, r7)
@@ -116,7 +115,7 @@ func TestTheSweepDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 	if err := sweep(t, s); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "The user answered: go ahead" || routes(t, store)[0] != turn.Typed {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=0 Unit=https://github.com/acme/api/pull/7" || routes(t, store)[0] != turn.Typed {
 		t.Fatalf("typed %+v, routes %v", typed, routes(t, store))
 	}
 }
@@ -144,20 +143,8 @@ func TestANewerAnswerReplacesTheQueuedOne(t *testing.T) {
 	if err := s.DeliverStopped(context.Background(), "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	pointer := "The user answered. Run '/bin/" + brand.Name + "' turn answer https://github.com/acme/api/pull/7 to read the answer."
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != pointer {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=0 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
-	}
-	if text, err := s.AnswerText(context.Background(), "term_1"); err != nil || text != "no, wait\nfor CI" {
-		t.Fatalf("answer text %q %v", text, err)
-	}
-}
-
-func TestAQueuedAnswerIsNotReadBeforeItIsTyped(t *testing.T) {
-	s, _, _, _, _ := busyAsked(t)
-	queue(t, s, "go ahead")
-	if text, found, err := s.NewestAnswer(context.Background(), r7, "term_1"); err != nil || found {
-		t.Fatalf("%q %v %v", text, found, err)
 	}
 }
 

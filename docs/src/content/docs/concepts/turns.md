@@ -51,11 +51,24 @@ All three exit at once outside a session of an enabled workspace manager, give t
 
 ## Answers
 
-An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice. Every answer is stored with its turn, then routed:
+An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice.
 
-- **typed into the session that asked**, when that session is active, loaded {{name}}'s MCP server, is idle and was quiet for less than an hour. A multi-line answer becomes a one-line prompt that tells the agent to run `{{command}} turn answer <url>`;
-- **queued** while that session is working or waiting on a permission, and typed when the agent stops. A newer answer replaces a queued one;
-- otherwise **sent as a resume turn**: a new turn of the same intent, in a new session, for the pull request as it is now, with the question, the draft, the notes, the head it worked at and your answer. When the head moved since, it reviews the new commits before publishing an approval.
+The question is an Inbox message, as is every note an agent posts mid-turn with `inbox_post`, and every answer names the message it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that message N was answered, and the agent reads the answer with the `inbox_read` tool, or `{{command}} turn answer <unit> --message N` without the tool:
+
+```
+agent ──turn_end asked / inbox_post──▶ message N (Inbox) ◀── you answer N
+  ▲                                         │
+  │ notice: "message N answered"            │ answer stored with message N
+  └──── inbox_read ──▶ the answers of N, marked read
+```
+
+The notice goes:
+
+- **into the session that asked**, typed, when that session is active, loaded {{name}}'s MCP server, is idle and was quiet for less than an hour;
+- **through the Stop hook** while that session is working or waiting on a permission: the answer waits, and the agent's next stop is blocked with the notice as its reason. A newer answer to the question replaces one still waiting;
+- otherwise, for a question, as a **resume turn**: a new turn of the same intent, in a new session, for the pull request as it is now, with the question, the draft, the notes, the head it worked at and your answer. When the head moved since, it reviews the new commits before publishing an approval. An answer to a post whose session is gone stays stored.
+
+`inbox_read` with a message returns that message, its options and every answer to it; without one, every answer the agent has not read, oldest first. Reading marks an answer read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves an answer unread for 15 minutes. The texts of the notices live in the profile's `notices.toml`.
 
 **Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. An answer typed directly in the agent's session still works.
 

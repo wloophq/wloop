@@ -171,6 +171,10 @@ type state struct {
 	open      *turn.Turn
 	newest    *turn.Turn
 	idleSince time.Time
+	// unread counts the answers noticed to the session that its agent has not read; unreadSince is when the oldest
+	// notice reached it.
+	unread      int
+	unreadSince time.Time
 	// transcriptGone is a known transcript file of the session that no longer exists.
 	transcriptGone bool
 }
@@ -190,6 +194,7 @@ func (w *world) state(h string) *state {
 		b := w.books[u]
 		s.open = openTurn(&b, h)
 		s.newest, _ = b.OfSession(h)
+		s.unread, s.unreadSince = unreadOf(&b, h)
 	}
 	s.transcriptGone = sess.State() == turn.SessionDormant && w.transcripts[sess.ID] != "" && !w.p.d.Exists(w.transcripts[sess.ID])
 	s.idleSince = sess.IdleSince
@@ -197,6 +202,23 @@ func (w *world) state(h string) *state {
 		s.idleSince = s.agent.StateSince
 	}
 	return s
+}
+
+// unreadOf counts the answers to the handle's turns whose notice reached it and that its agent has not read,
+// and when the oldest notice reached it.
+func unreadOf(b *turn.Book, handle string) (int, time.Time) {
+	var n int
+	var since time.Time
+	for _, a := range b.Answers {
+		i := slices.IndexFunc(b.Turns, func(t turn.Turn) bool { return t.Seq == a.TurnSeq })
+		if i < 0 || b.Turns[i].Session != handle || !a.ReadAt.IsZero() || !a.Route.Noticed() {
+			continue
+		}
+		if n++; since.IsZero() || a.NoticedAt.Before(since) {
+			since = a.NoticedAt
+		}
+	}
+	return n, since
 }
 
 // openTurn is the handle's newest open turn: started on it, or sent to it
@@ -231,6 +253,9 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		"session.newest_intent":         "",
 		"session.closes_when_done":      false,
 		"session.idle_for":              time.Duration(0),
+		"session.unread_answers":        s.unread,
+		"session.unread_since":          time.Time{},
+		"session.unread_for":            time.Duration(0),
 		"session.pr_state":              w.prs[s.unit],
 		"session.duplicate":             s.duplicate(),
 		"session.worktree_gone":         s.worktreeGone(),
@@ -253,6 +278,9 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		if born := cmp.Or(t.SentAt, t.StartedAt); !born.IsZero() {
 			f["session.newest_age"] = max(0, now.Sub(born))
 		}
+	}
+	if s.unread > 0 {
+		f["session.unread_since"], f["session.unread_for"] = s.unreadSince, max(0, now.Sub(s.unreadSince))
 	}
 	if !s.idleSince.IsZero() {
 		f["session.idle_since"] = s.idleSince

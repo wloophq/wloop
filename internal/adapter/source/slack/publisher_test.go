@@ -167,7 +167,7 @@ func TestPublishDefaultsToTheUnitThread(t *testing.T) {
 	if post.Get("channel") != pubConv || post.Get("thread_ts") != pubParent || post.Get("text") != "on it" {
 		t.Fatalf("post %v", post)
 	}
-	if ev.Ref != pubPosted || !strings.Contains(ev.Permalink, "/p1700000300000300") || !ev.At.Equal(time.Unix(1700000300, 0).UTC()) {
+	if ev.Ref != pubConv+"/"+pubPosted || !strings.Contains(ev.Permalink, "/p1700000300000300") || !ev.At.Equal(time.Unix(1700000300, 0).UTC()) {
 		t.Fatalf("evidence %+v", ev)
 	}
 }
@@ -204,7 +204,7 @@ func TestReactAddsAReaction(t *testing.T) {
 	if len(adds) != 1 || adds[0].Get("channel") != pubConv || adds[0].Get("timestamp") != pubParent || adds[0].Get("name") != "white_check_mark" {
 		t.Fatalf("reactions.add %v", adds)
 	}
-	if n := len(ps.calls("chat.postMessage")); n != 0 || ev.Ref != pubParent {
+	if n := len(ps.calls("chat.postMessage")); n != 0 || ev.Ref != pubConv+"/"+pubParent {
 		t.Fatalf("posts %d, evidence %+v", n, ev)
 	}
 
@@ -446,7 +446,7 @@ func TestVerifyFindsThePost(t *testing.T) {
 	ps := newPubSlack(t)
 	ps.stored(map[string]any{"ts": pubPosted, "thread_ts": pubParent, "user": me, "text": "on it"})
 	ev, ok, err := ps.publisher().Verify(context.Background(), threadDraft(draft.Reply, "on it"), started)
-	if err != nil || !ok || ev.Ref != pubPosted || ev.Permalink == "" {
+	if err != nil || !ok || ev.Ref != pubConv+"/"+pubPosted || ev.Permalink == "" {
 		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
 	}
 	replies := ps.calls("conversations.replies")
@@ -648,7 +648,7 @@ func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
 		t.Fatalf("post %v", post)
 	}
 	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": d.Text})
-	if ev, ok, err := ps.publisher().Verify(context.Background(), d, started); err != nil || !ok || ev.Ref != pubPosted {
+	if ev, ok, err := ps.publisher().Verify(context.Background(), d, started); err != nil || !ok || ev.Ref != pubConv+"/"+pubPosted {
 		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
 	}
 }

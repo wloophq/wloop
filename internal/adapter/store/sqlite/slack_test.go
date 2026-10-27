@@ -85,12 +85,15 @@ func init() {
 	)
 	thread, _ := slackMessagesQuery("C0001", MessageQuery{Thread: "1700000000.000100", After: "1700000000.000100"})
 	segment, _ := slackMessagesQuery("C0001", MessageQuery{From: "1700000000.000100", To: "1700000009.000100"})
+	one, _ := slackMessagesQuery("C0001", MessageQuery{TS: "1700000000.000100"})
 	hotPlans = append(hotPlans,
 		hotPlan{name: "messages of a slack thread", query: thread, args: 3,
 			want: []string{"SEARCH slack_messages USING INDEX slack_messages_anchor (conversation=? AND <expr>=?)"}},
 		hotPlan{name: "messages of a slack segment", query: segment, args: 3,
 			want:     []string{"SEARCH slack_messages USING INDEX slack_messages_anchor (conversation=? AND <expr>>? AND <expr><?)"},
 			tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+		hotPlan{name: "a slack message by ts", query: one, args: 2,
+			want: []string{"SEARCH slack_messages USING PRIMARY KEY (conversation=? AND ts=?)"}},
 		hotPlan{name: "due slack objects", query: slackWatchedSQL, args: 1,
 			want: []string{"SEARCH slack_objects USING INDEX slack_objects_due (next_check_at<?)"}},
 		hotPlan{name: "a slack user by email", query: slackUserByEmail, args: 1,

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -58,16 +59,18 @@ func TestDigestOnceADay(t *testing.T) {
 }
 
 func TestDigestOff(t *testing.T) {
-	r, k := digestRig(t, "", "", digestDay.Add(time.Hour))
-	r.d.events = make(chan api.Change)
-	stop := run(t, r)
-	waitFor(t, func() bool { r.d.mu.Lock(); defer r.d.mu.Unlock(); return r.d.eventsN == 1 })
-	k.advance(48 * time.Hour)
-	time.Sleep(50 * time.Millisecond)
-	stop()
-	if len(digests(r.notes)) != 0 || len(r.d.digestDays) != 0 || len(k.waited()) != 0 {
-		t.Fatalf("digest off posted %+v, asked %q, waited %v", digests(r.notes), r.d.digestDays, k.waited())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r, k := digestRig(t, "", "", digestDay.Add(time.Hour))
+		r.d.events = make(chan api.Change)
+		stop := run(t, r)
+		synctest.Wait()
+		k.advance(48 * time.Hour)
+		synctest.Wait()
+		stop()
+		if len(digests(r.notes)) != 0 || len(r.d.digestDays) != 0 || len(k.waited()) != 0 {
+			t.Fatalf("digest off posted %+v, asked %q, waited %v", digests(r.notes), r.d.digestDays, k.waited())
+		}
+	})
 }
 
 func TestEmptyDigestIsSkipped(t *testing.T) {

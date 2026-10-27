@@ -11,19 +11,17 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
-// prepares fill an intent's call before it runs, or refuse it, and return
-// the data of its event.
-var prepares = map[string]func(s *Server, ctx context.Context, u unit.Unit, c *Call) (string, error){
+// prepares fill an intent's call before it runs, or refuse it.
+var prepares = map[string]func(s *Server, ctx context.Context, u unit.Unit, c *Call) error{
 	builtin.PrepareNudge: (*Server).prepareNudge,
 }
 
 // actionEffect is a turn effect of a round asked through the daemon's
-// action: before runs ahead of the prepare, after once the round went out
-// with the data its prepare returned.
+// action: before runs ahead of the prepare, after once the round went out.
 type actionEffect struct {
 	name   string
 	before func(s *Server, ctx context.Context, u unit.Unit) error
-	after  func(s *Server, ctx context.Context, u unit.Unit, data string) error
+	after  func(s *Server, ctx context.Context, u unit.Unit) error
 }
 
 // actionEffects run in this order within each phase.
@@ -31,11 +29,8 @@ var actionEffects = []actionEffect{
 	{name: builtin.EffectPlanCleared, before: func(s *Server, ctx context.Context, u unit.Unit) error {
 		return s.dropPending(ctx, u, askedByYou)
 	}},
-	{name: builtin.EffectPRRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit, _ string) error {
+	{name: builtin.EffectPRRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit) error {
 		return s.recordEvent(ctx, u, dinv.KindRoundSent, askedByYou)
-	}},
-	{name: builtin.EffectPRNudged, after: func(s *Server, ctx context.Context, u unit.Unit, data string) error {
-		return s.recordEvent(ctx, u, dinv.KindNudged, data)
 	}},
 }
 

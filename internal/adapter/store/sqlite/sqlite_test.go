@@ -61,7 +61,7 @@ var golden = []string{
 	"slack_objects: object, conversation, ts, kind, version, latest_reply, reply_count, watched, reasons, last_activity_at, next_check_at, seen_at, admitted_at",
 	"slack_reactions: conversation, ts, name, user",
 	"slack_users: id, name, display_name, email, is_bot, deleted, fetched_at",
-	"turn_answers: id, turn_seq, provider, unit_key, at, text, source, option_id, yes, no, route, session",
+	"turn_answers: id, turn_seq, provider, unit_key, at, text, source, option_id, yes, no, route, session, message_id, read_at, noticed_at",
 	"turn_instructions: sha, kind, repo, created_at, bundled_sha, sources, parts",
 	"turn_records: id, turn_seq, provider, unit_key, session, agent_session, head, hash, at, acked, record",
 	"turn_stops: session, prompt_id, agent_session, at, message, blocked, record_id",

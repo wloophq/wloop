@@ -56,7 +56,7 @@ func TestTheHelpTopicsOfIntentsComeFromTheirManifests(t *testing.T) {
 	}
 	triage := helpOut(t, te, "triage", "--help")
 	unwrapped := strings.Join(strings.Fields(triage), " ")
-	for _, want := range []string{te.command() + " triage <url|permalink|slack:key> [guidance...]",
+	for _, want := range []string{te.command() + " triage <url|ref|permalink|slack:key> [guidance...]",
 		"The target is a pull request or a Slack thread; words after it are guidance for the turn.",
 		te.command() + " triage acme/api#7 start with the oldest"} {
 		if !strings.Contains(unwrapped, want) {

@@ -89,10 +89,8 @@ func TestServeWiresTheEntryResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	t.Cleanup(func() { db.Close() })
+	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if te.Turns.Results == nil || te.outbox == nil || te.outbox.Results == nil {
 		t.Fatal("the turns' and the Outbox's results are not wired")
 	}

@@ -24,6 +24,8 @@ import (
 	"syscall"
 	"time"
 
+	dmessage "github.com/wloophq/wloop/internal/domain/message"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
@@ -156,6 +158,9 @@ type Deps struct {
 	// request overrides. Nil follows none.
 	Follows func(unit.ProviderID) bool
 	Untrack func(ctx context.Context, u unit.Unit) error
+	// Resolve is the unit an address a person gives lands in, such as a
+	// Slack message ref; ok is false when no plugin reads it. Nil reads none.
+	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
 	Sweep   Sweeper // nil registers no sweep job
 	Actions Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every
@@ -263,8 +268,11 @@ type Deps struct {
 
 	// MCP serves agents' MCP sessions on 127.0.0.1:MCPPort; nil listens on
 	// no MCP port.
-	MCP     http.Handler
-	MCPPort int
+	MCP http.Handler
+	// ReadText words the answers an agent's turn answer command reads, as inbox_read does, read of message
+	// id or of every unread answer when 0; nil prints them bare.
+	ReadText func(ctx context.Context, convs []dmessage.Conversation, id int64) string
+	MCPPort  int
 
 	// Startup reconciles the store and the views; Run holds
 	// UserAPI until it returns. nil serves at once with no report.
