@@ -29,7 +29,7 @@ The page listens on `127.0.0.1` only and asks for the token that `open` hands ov
 | Recent | the newest events of every unit the loop follows: pull requests and the units of the other sources with a card |
 | Explore | search other people's pull requests to help on |
 
-A row shows whom the pull request waits on (the colored strip on its left), why, since when, its brief's size and risk, and its failing checks. The detail panel holds the timeline, the brief, the agent's question with its answers, and the actions. The filter box (`/`) takes text and qualifiers such as `repo:`, `author:@me` or `is:stalled`; see [Cockpit filter](/reference/cockpit-filter/). Filters, grouping and order stay in the URL. **Copy list** copies what the view shows as YAML, to paste into an agent session with a prompt.
+A row shows whom the pull request waits on (the colored strip on its left), why, since when, its brief's size and risk, and its failing checks. The detail panel holds the timeline, the brief, the agent's question with its answers, and the actions. A unit's label opens it in the cockpit, in its plugin's view; the service's name beside it (GitHub, Slack) opens the unit there, in a new tab. The filter box (`/`) takes text and qualifiers such as `repo:`, `author:@me` or `is:stalled`; see [Cockpit filter](/reference/cockpit-filter/). Filters, grouping and order stay in the URL. **Copy list** copies what the view shows as YAML, to paste into an agent session with a prompt.
 
 ## The terminal client
 

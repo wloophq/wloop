@@ -173,7 +173,7 @@ function h(tag, attrs, ...children) {
     else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v === true ? "" : String(v));
   }
-  for (const c of children.flat()) {
+  for (const c of children.flat(Infinity)) {
     if (c === undefined || c === null || c === false) continue;
     node.append(c instanceof Node ? c : document.createTextNode(String(c)));
   }
@@ -1936,7 +1936,8 @@ function renderDetail() {
       h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: closeDetail }, "×"),
       h("h1", {}, r.title || labelOf(r)),
       h("div", { class: "meta" },
-        h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ref", "data-focus": "detail:ref" }, labelOf(r)),
+        h("span", { class: "ref" }, labelOf(r)),
+        " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext", "data-focus": "detail:link" }, providerName(unitOf(r).provider)),
         p.author ? [" by ", h("span", { class: "who" }, p.author)] : null)),
     h("div", { class: "d-sit " + waitClass(r) + (sm(r).stalled ? " late" : "") },
       h("div", { class: "d-clock" }, r.pending ? countdown(r) : h("span", { class: "age" }, age(sm(r).since)), h("span", { class: "pill" }, rowKindLabel(r))),
