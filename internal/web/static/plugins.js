@@ -185,7 +185,8 @@ function pluginDetail(el, unit) {
   }
   el.replaceChildren(h("div", { class: "plugin-detail" },
     h("h2", {}, r.title || labelOf(r)),
-    h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ref" }, labelOf(r)),
+    h("div", { class: "meta" }, h("span", { class: "ref" }, labelOf(r)),
+      " ", h("a", { href: safeURL(r.link), target: "_blank", rel: "noopener noreferrer", class: "ext" }, providerName(unitOf(r).provider))),
     h("div", {}, "Waiting on ", h("strong", {}, waitingLabel(r))),
     sm(r).reason ? h("div", { class: "why" }, sm(r).reason) : null,
     h("div", { class: "d-actions" }, actionButtons(r, "detail", { scope: "plugin-detail" }))));
