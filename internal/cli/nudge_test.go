@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -194,13 +196,17 @@ func TestNudgeStartsTheAgentInTheProjectsProfile(t *testing.T) {
 func TestANudgeRecordsTheTurnItSent(t *testing.T) {
 	t.Parallel()
 	inputs := map[string]any{"situation": nudgeLine, "waits_on_maintainers": false, "who": []string{"@ana"}}
-	for name, send := range map[string]func(te *testEnv) error{
-		"asked through the daemon": func(te *testEnv) error {
+	for name, send := range map[string]func(t *testing.T, te *testEnv) error{
+		"asked through the daemon": func(_ *testing.T, te *testEnv) error {
 			return askedIntent(te.Env, te.cfg, r7, dintent.Nudge, "", inputs, "")
 		},
-		"by hand in a session": func(te *testEnv) error {
+		"by hand in a session": func(_ *testing.T, te *testEnv) error {
 			_, err := te.byHand(&sync.Mutex{})(context.Background(), api.ByHandRequest{Intent: string(dintent.Nudge), URL: r7.URL(), Inputs: inputs}, "term_1")
 			return err
+		},
+		"resuming a turn that never started": func(t *testing.T, te *testEnv) error {
+			seq := storedTurn(t, te, r7, dintent.Nudge, inputs)
+			return (cliLauncher{te.Env}).Launch(context.Background(), turns.Launch{Unit: pr.Ref(r7).Unit(), Intent: dturn.Intent(dintent.Nudge), ResumeOf: seq, Answer: "go on"})
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -209,18 +215,16 @@ func TestANudgeRecordsTheTurnItSent(t *testing.T) {
 			m.Sessions = map[string]string{"ws-rev": "term-live"}
 			te := newTestEnv(t, m)
 			te.gh.basics = openBasics
-			if err := send(te); err != nil {
+			if err := send(t, te); err != nil {
 				t.Fatalf("%v\n%s", err, te.err)
 			}
 			b := te.bookOf(t, r7)
-			if len(b.Turns) != 1 {
-				t.Fatalf("turns %+v", b.Turns)
-			}
+			sent := b.Turns[len(b.Turns)-1]
 			evs, err := te.Store.Events(context.Background(), r7)
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := dinv.Event{Kind: dinv.KindNudged, Key: b.Turns[0].ID, Data: "@ana"}
+			want := dinv.Event{Kind: dinv.KindNudged, Key: sent.ID, Data: "@ana"}
 			if !slices.ContainsFunc(evs, func(ev dinv.Event) bool { return ev.Kind == want.Kind && ev.Key == want.Key && ev.Data == want.Data }) {
 				t.Fatalf("no %+v among %+v", want, evs)
 			}

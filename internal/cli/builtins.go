@@ -98,7 +98,7 @@ var onSent = []onSentEffect{
 	{name: builtin.EffectPRRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
 	}}}},
-	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: recordsNudge, routeAsked: recordsNudge}},
+	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: recordsNudge, routeAsked: recordsNudge, routeLaunch: recordsNudge}},
 	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
 		sent: func(r *sentRound) {
 			if r.submitted {

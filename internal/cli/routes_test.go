@@ -118,7 +118,7 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 		{"session route, nudge", byHand(dintent.Nudge, reviewWS, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
 		{"resume, review", resume(dintent.Review, warm, review, nil), effects{fingerprint: true}},
 		{"resume, address", resume(dintent.Address, own, mine, nil), effects{fingerprint: true, checksHead: "c21", conflictHead: "c21"}},
-		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{}},
+		{"resume, nudge", resume(dintent.Nudge, warm, review, nudgeInputs), effects{events: []string{dinv.KindNudged}}},
 		{"held Run now, review", func(t *testing.T) (*testEnv, github.Ref) {
 			sc := followupScenario(t)
 			exhaustCap(t, sc)
