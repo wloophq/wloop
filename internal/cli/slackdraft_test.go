@@ -534,13 +534,13 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	w.st.srv.Handle("reactions.remove", func(url.Values) any { return map[string]any{} })
 	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
 
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"permalink":"`+link+`","text":"release 1.2 **done**"}`); isErr || !strings.Contains(got, "#random") {
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"message":"`+link+`","text":"release 1.2 **done**"}`); isErr || !strings.Contains(got, "#random") {
 		t.Fatalf("slack_edit = %q", got)
 	}
 	if ups := w.st.srv.Calls("chat.update"); len(ups) != 1 || ups[0].Get("channel") != sessThreaded || ups[0].Get("ts") != sessReply || ups[0].Get("text") != "release 1.2 *done*" {
 		t.Fatalf("chat.update %v", ups)
 	}
-	for _, args := range []string{`{"permalink":"` + link + `","emoji":"white_check_mark"}`, `{"permalink":"` + link + `","emoji":"hourglass","remove":true}`} {
+	for _, args := range []string{`{"message":"` + link + `","emoji":"white_check_mark"}`, `{"message":"` + link + `","emoji":"hourglass","remove":true}`} {
 		if got, isErr := w.callTool(t, "", draftHandle, "slack_react", args); isErr || !strings.Contains(got, "#random") {
 			t.Fatalf("slack_react %s = %q", args, got)
 		}
@@ -566,7 +566,7 @@ func TestFromAPullRequestTurnEditsAndReactionsPostAtOnceAndAreRecorded(t *testin
 	}
 
 	author = "U0000000077"
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"permalink":"`+link+`","text":"hijacked"}`); !isErr || !strings.Contains(got, "only the user's own") {
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_edit", `{"message":"`+link+`","text":"hijacked"}`); !isErr || !strings.Contains(got, "only the user's own") {
 		t.Fatalf("another's message: %q", got)
 	}
 	if n := len(w.st.srv.Calls("chat.update")); n != 1 {
@@ -652,7 +652,7 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if got, isErr := w.callTool(t, "", handle, "slack_send_message", `{"target":"`+link+`","text":"release 1.2 is out"}`); isErr {
 				t.Fatalf("slack_send_message = %q", got)
 			}
-			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"permalink":"`+link+`","emoji":"white_check_mark"}`); isErr {
+			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"message":"`+link+`","emoji":"white_check_mark"}`); isErr {
 				t.Fatalf("slack_react = %q", got)
 			}
 			for _, d := range w.drafts(t) {
@@ -689,7 +689,7 @@ func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
 	w := newSessionWiring(t)
 	w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
 	reply := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "")
-	if got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"permalink":"`+reply+`","emoji":"eyes"}`); isErr {
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"message":"`+reply+`","emoji":"eyes"}`); isErr {
 		t.Fatalf("slack_react = %q", got)
 	}
 	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) {

@@ -73,15 +73,15 @@ func TestSlackReadStoredUnit(t *testing.T) {
 	r := f.reader()
 
 	unitTarget := "slack:" + dslack.ThreadUnit(team, readConv, readParent).Key
-	for _, target := range []string{unitTarget, readPermalink(readReply, readParent)} {
+	for _, target := range []string{unitTarget, readPermalink(readReply, readParent), readConv + "/" + readReply, readConv + "/" + readParent} {
 		got, err := r.Read(ctx, target, 50)
 		if err != nil {
 			t.Fatalf("%s: %v", target, err)
 		}
 		for _, want := range []string{
 			"Slack thread in #general: " + readPermalink(readParent, ""),
-			"[m1 ts=" + readParent + "] n (" + other + ")\ncan you review this?\nreactions: eyes by " + me,
-			"[m2 ts=" + readReply + "] " + me + "\non it\nlater today",
+			"[m1 " + readConv + "/" + readParent + "] n (" + other + ")\ncan you review this?\nreactions: eyes by " + me,
+			"[m2 " + readConv + "/" + readReply + "] " + me + "\non it\nlater today",
 		} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("%s: missing %q in\n%s", target, want, got)
@@ -93,7 +93,7 @@ func TestSlackReadStoredUnit(t *testing.T) {
 	}
 
 	got, err := r.Read(ctx, unitTarget, 1)
-	if err != nil || !strings.Contains(got, "[m1 ts="+readParent) || strings.Contains(got, "[m2") || !strings.Contains(got, "(1 message left out)") {
+	if err != nil || !strings.Contains(got, "[m1 "+readConv+"/"+readParent) || strings.Contains(got, "[m2") || !strings.Contains(got, "(1 message left out)") {
 		t.Fatalf("limit 1: %v\n%s", err, got)
 	}
 }
@@ -158,11 +158,38 @@ func TestSlackReadLiveStoresNothing(t *testing.T) {
 	}
 }
 
+func TestSlackReadRefToANonStoredReplyReadsItsThreadFromSlack(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.api.Handle("conversations.replies", func(v url.Values) any {
+		return map[string]any{"messages": []map[string]any{
+			{"ts": readParent, "thread_ts": readParent, "user": other, "text": "live parent", "reply_count": 1},
+			{"ts": readReply, "thread_ts": readParent, "user": me, "text": "live reply"},
+		}, "has_more": false}
+	})
+	f.api.Handle("conversations.info", func(v url.Values) any {
+		return map[string]any{"channel": map[string]any{"id": v.Get("channel"), "name": "general", "is_channel": true}}
+	})
+	got, err := f.reader().Read(context.Background(), readConv+"/"+readReply, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[m1 " + readConv + "/" + readParent + "] " + other, "[m2 " + readConv + "/" + readReply + "] " + me + "\nlive reply"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "reply to") {
+		t.Fatalf("the thread's replies are marked as replies to one of its messages:\n%s", got)
+	}
+}
+
 func TestSlackReadRefusesBadTargets(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
 	r := f.reader()
-	for _, target := range []string{"", "#general", "slack:T0001/nope", "github:o/r#1", "https://example.com/archives/C1/p1700000000000100"} {
+	for _, target := range []string{"", "#general", "slack:T0001/nope", "github:o/r#1", "https://example.com/archives/C1/p1700000000000100",
+		readConv + "/1700000000", "U0000000001/" + readParent} {
 		if _, err := r.Read(context.Background(), target, 50); err == nil {
 			t.Fatalf("%q: no error", target)
 		}

@@ -27,6 +27,7 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 	sender := &slackSender{kit: m.slack.kit(cfg.Slack, m.log)}
 	srv.Slack = sender
 	if db, ok := d.Snapshot.(*sqlite.DB); ok {
+		sender.kit.Send.Stored = slacksource.StoredOver(db)
 		reading := &slackReading{sender: sender, read: slacksource.ReaderOver(db, sender.kit.Client)}
 		srv.SlackRead, srv.SlackSearch = reading, reading
 		if d.Outbox == nil {
@@ -115,7 +116,7 @@ func (s *slackSender) Edit(ctx context.Context, session string, e send.Edit) (se
 	return got, err
 }
 
-func (s *slackSender) permalinkUnit(ctx context.Context, permalink string) (unit.Unit, error) {
+func (s *slackSender) messageUnit(ctx context.Context, message string) (unit.Unit, error) {
 	tok, err := s.kit.Store.Load()
 	if errors.Is(err, auth.ErrNotLoggedIn) {
 		return unit.Unit{}, send.ErrNotLoggedIn
@@ -123,7 +124,7 @@ func (s *slackSender) permalinkUnit(ctx context.Context, permalink string) (unit
 	if err != nil {
 		return unit.Unit{}, err
 	}
-	return s.landing.PermalinkUnit(ctx, s.kit.Client, tok.Team, permalink)
+	return s.landing.MessageUnit(ctx, s.kit.Client, tok.Team, message)
 }
 
 func (s *slackSender) loggedOut() {

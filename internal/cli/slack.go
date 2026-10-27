@@ -100,7 +100,7 @@ type fixedToken string
 
 func (t fixedToken) Token(context.Context) (string, error) { return string(t), nil }
 
-var slackUsage = "usage: " + brand.Command + " slack login [--no-browser] | login --app-token (reads standard input) | logout | status | send <target> <text> [--thread=false] [--broadcast] [--yes] | follow <permalink> | unfollow <permalink> | eval export|run|score|optimize ..."
+var slackUsage = "usage: " + brand.Command + " slack login [--no-browser] | login --app-token (reads standard input) | logout | status | send <target> <text> [--thread=false] [--broadcast] [--yes] | follow <message> | unfollow <message> | eval export|run|score|optimize ..."
 
 func runSlack(ctx context.Context, e *Env, args []string) error {
 	if len(args) == 0 {
@@ -423,7 +423,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, a
 	if strings.TrimSpace(req.Text) == "" {
 		return errors.New("the message is empty")
 	}
-	if slacksource.IsPermalink(req.Target) && (req.Thread == nil || *req.Thread) && !req.Broadcast {
+	if send.IsMessage(req.Target) && (req.Thread == nil || *req.Thread) && !req.Broadcast {
 		return e.slackSendDraft(ctx, kit, req, *yes)
 	}
 	if !*yes {

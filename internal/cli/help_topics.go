@@ -331,11 +331,11 @@ func helpGroups(manager string) []helpGroup {
 				Names:   []string{"slack send"},
 				Summary: "Post as you to a thread, channel or person",
 				Usage:   []string{"slack send <target> <text> [--thread=false] [--broadcast] [--yes]"},
-				About: "Post as you to a permalink, #channel, channel id, @handle, email or user id. " +
-					"A permalink target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
+				About: "Post as you to a message, by its ref (<conversation>/<ts>) or permalink, a #channel, channel id, @handle, email or user id. " +
+					"A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. " +
 					"It asks first unless --yes.",
 				Flags: []helpFlag{
-					{"--thread=false", "Post to a permalink's conversation instead of its thread"},
+					{"--thread=false", "Post to a message's conversation instead of its thread"},
 					{"--broadcast", "Also send a thread reply to the conversation"},
 					{"--yes", "Post without asking"},
 				},
@@ -345,8 +345,8 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:    []string{"slack follow", "slack unfollow"},
 				Summary:  "Admit every message of a thread, or stop",
-				Usage:    []string{"slack follow <permalink>", "slack unfollow <permalink>"},
-				About:    "Follow a Slack thread, so every message of it is admitted, or stop following it.",
+				Usage:    []string{"slack follow <message>", "slack unfollow <message>"},
+				About:    "Follow the Slack thread of a message, named by its ref (<conversation>/<ts>) or permalink, so every message of it is admitted, or stop following it.",
 				Examples: []string{"slack follow https://acme.slack.com/archives/C024BE91L/p1700000000000100"},
 				Docs:     "guides/slack",
 			},

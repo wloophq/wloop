@@ -138,7 +138,7 @@ func renderCapped(c dslack.Conversation, anchor string, msgs []dslack.Message, u
 	blocks := make([]string, len(msgs))
 	total := runes(head)
 	for i, m := range msgs {
-		blocks[i] = "\n" + renderRead(m, index, anchor, users)
+		blocks[i] = "\n" + renderRead(c.ID, m, index, anchor, users)
 		total += runes(blocks[i])
 	}
 	if total <= maxChars {

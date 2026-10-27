@@ -189,7 +189,7 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		pl.res.ThreadTS, pl.at = k.TS, k.TS
 		return nil
 	}
-	if _, ts, _, err := parsePermalink(t); err == nil {
+	if _, ts, _, err := parseMessage(t); err == nil {
 		if react {
 			no := false
 			pl.at = ts
@@ -576,7 +576,7 @@ func (p *plugin) publisher() port.Effects {
 	if p.src == nil || p.slack.Client == nil || p.slack.Tokens == nil {
 		return nil
 	}
-	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist},
+	return PublisherOver(p.deps.DB, &send.Service{Client: p.slack.Client, Log: p.log, PostAllowlist: p.cfg.PostAllowlist, Stored: StoredOver(p.deps.DB)},
 		p.slack.Tokens.Load, p.now, p.log)
 }
 
@@ -601,12 +601,15 @@ func PublisherOver(db *sqlite.DB, s *send.Service, token func() (auth.Token, err
 type Landing struct {
 	Facts    dslack.FactsReader
 	Segments dslack.Segments
+	// Messages finds the thread of a stored message; nil asks Slack.
+	Messages StoredMessages
 }
 
 // LandingOver reads the facts and segments the Slack module stores in db.
 func LandingOver(db *sqlite.DB) Landing {
 	segs := Segments{Store: db.Segments()}
-	return Landing{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs}
+	st := &Store{DB: db.Slack(), Segments: segs}
+	return Landing{Facts: st, Segments: segs, Messages: st}
 }
 
 // UnitOf is the unit of a post in team at ts in channel, in the thread
@@ -635,16 +638,4 @@ func (l Landing) UnitOf(ctx context.Context, team, channel, ts, threadTS string)
 		return unit.Unit{}, false, err
 	}
 	return u, true, nil
-}
-
-// ThreadOf is the thread_ts a message permalink carries, "" when none.
-func ThreadOf(permalink string) string {
-	u, err := url.Parse(permalink)
-	if err != nil {
-		return ""
-	}
-	if t := u.Query().Get("thread_ts"); permalinkTS.MatchString(t) {
-		return t
-	}
-	return ""
 }

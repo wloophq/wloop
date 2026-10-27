@@ -252,7 +252,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 		t.Fatalf("instructions: exit %d: %s%s", code, te.out, te.err)
 	}
 	instructions := te.out.String()
-	for _, want := range []string{"### The Slack thread", "[m1 ts=" + slackParent1 + "] asker (" + slackAsker + ")", "first question",
+	for _, want := range []string{"### The Slack thread", "[m1 " + slackChannel + "/" + slackParent1 + "] asker (" + slackAsker + ")", "first question",
 		"https://example.slack.com/archives/" + slackChannel, "this Slack thread"} {
 		if !strings.Contains(instructions, want) {
 			t.Fatalf("instructions lack %q:\n%s", want, instructions)
@@ -356,7 +356,7 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 	for _, want := range []string{
 		"You may read the checkout at " + checkout,
 		"### The Slack thread",
-		"[m1 ts=" + slackParent2 + "] asker (" + slackAsker + ")",
+		"[m1 " + slackChannel + "/" + slackParent2 + "] asker (" + slackAsker + ")",
 		"second question",
 		"https://example.slack.com/archives/" + slackChannel + "/p" + strings.ReplaceAll(slackParent2, ".", ""),
 		headless.Schema(),

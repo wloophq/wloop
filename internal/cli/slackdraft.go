@@ -65,8 +65,8 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		t, ok = b.OfSession(handle)
 	}
 	onSlack := ok && b.Unit.Provider == slackPlugin
-	if send.IsPermalink(a.Target) {
-		u, err := s.sender.permalinkUnit(ctx, a.Target)
+	if send.IsMessage(a.Target) {
+		u, err := s.sender.messageUnit(ctx, a.Target)
 		if err != nil {
 			return mcp.DraftResult{}, err
 		}
@@ -79,7 +79,7 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	case !ok:
 		return mcp.DraftResult{}, errNoDraftTurn
 	default:
-		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message permalink target", b.Unit.Label())
+		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message ref or permalink target", b.Unit.Label())
 	}
 	its := a.Items
 	if len(its) == 0 {
@@ -97,7 +97,7 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		Origin: sessionOrigin(b, t, b.Unit, draft.OriginTurn)})
 }
 
-// draftOutside proposes a on u, the unit of its permalink target, which is
+// draftOutside proposes a on u, the unit of its message target, which is
 // not the unit of the session's turn: it answers none of that unit's items
 // and declares no effect.
 func (s *slackDrafts) draftOutside(ctx context.Context, u unit.Unit, a mcp.DraftArgs, origin draft.Origin) (mcp.DraftResult, error) {
@@ -222,18 +222,18 @@ func (r sessionSends) reaction(ctx context.Context, session string, req send.Rea
 	if req.Remove {
 		purpose = unreactedPurpose
 	}
-	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction, Target: req.Permalink,
-		Reaction: got.Name}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+	r.record(ctx, session, r.messageUnit(req.Message), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction, Target: req.Message,
+		Reaction: got.Name}, draft.Evidence{Ref: got.TS, Permalink: got.Permalink})
 }
 
 func (r sessionSends) edit(ctx context.Context, session string, req send.Edit, got send.Edited) {
-	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: req.Permalink,
-		Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+	r.record(ctx, session, r.messageUnit(req.Message), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: req.Message,
+		Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: got.TS, Permalink: got.Permalink})
 }
 
-func (r sessionSends) permalinkUnit(permalink string) func(context.Context, string) (unit.Unit, error) {
+func (r sessionSends) messageUnit(message string) func(context.Context, string) (unit.Unit, error) {
 	return func(ctx context.Context, team string) (unit.Unit, error) {
-		return r.landing.PermalinkUnit(ctx, r.client, team, permalink)
+		return r.landing.MessageUnit(ctx, r.client, team, message)
 	}
 }
 

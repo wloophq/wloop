@@ -386,22 +386,22 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_message`: A problem: message is not a message ref or permalink.
   - `problem_emoji_required`: A problem: emoji is missing or empty.
-  - `reacted` (`Emoji`, `Conversation`, `Permalink`): The reaction is added.
-  - `removed` (`Emoji`, `Conversation`, `Permalink`): The reaction is removed.
-  - `already` (`Emoji`, `Conversation`, `Permalink`): The message already had the user's reaction.
-  - `absent` (`Emoji`, `Conversation`, `Permalink`): The message had no such reaction of the user.
+  - `reacted` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is added; Permalink is "" when Slack gave none.
+  - `removed` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is removed; Permalink is "" when Slack gave none.
+  - `already` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message already had the user's reaction; Permalink is "" when Slack gave none.
+  - `absent` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message had no such reaction of the user; Permalink is "" when Slack gave none.
 - `slack_edit`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_message`: A problem: message is not a message ref or permalink.
   - `problem_text_required`: A problem: text is missing or empty.
   - `broadcast`: The text notifies a whole channel or group.
-  - `edited` (`Conversation`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its new text as posted and the text it replaced.
+  - `edited` (`Conversation`, `Message`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its ref and its permalink, "" when Slack gave none, its new text as posted and the text it replaced.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

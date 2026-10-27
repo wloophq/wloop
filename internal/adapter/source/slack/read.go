@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -13,18 +14,21 @@ import (
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	slackapi "github.com/wloophq/wloop/internal/slack"
+	"github.com/wloophq/wloop/internal/slack/send"
 )
 
-// Reader renders a unit's or a permalink's messages for slack_read. It reads
-// the stored facts and calls Slack only for a channel thread that is not
-// stored; a direct message is read from its stored segments only. It never
-// stores or admits what it reads.
+// Reader renders the messages of a unit, or of the thread a message ref or
+// permalink names, for slack_read. It reads the stored facts and calls Slack
+// only for a channel thread that is not stored; a direct message is read from
+// its stored segments only. It never stores or admits what it reads.
 type Reader struct {
 	Facts    dslack.FactsReader
 	Segments interface {
 		UnitsFor(ctx context.Context, conv, ts string) ([]unit.Unit, error)
 	}
-	Client *slackapi.Client
+	// Messages finds the thread of a stored message a ref names; nil asks Slack.
+	Messages StoredMessages
+	Client   *slackapi.Client
 	// Location is the time zone Search shows times in; nil is the local one.
 	Location *time.Location
 }
@@ -32,25 +36,33 @@ type Reader struct {
 // ReaderOver reads the facts the Slack module stores in db.
 func ReaderOver(db *sqlite.DB, c *slackapi.Client) *Reader {
 	segs := Segments{Store: db.Segments()}
-	return &Reader{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Client: c}
+	st := &Store{DB: db.Slack(), Segments: segs}
+	return &Reader{Facts: st, Segments: segs, Messages: st, Client: c}
 }
 
 const unitPrefix = string(dslack.Provider) + ":"
 
-// Read renders target, a unit ("slack:<key>") or a message permalink, keeping
-// the first message and the newest up to limit in all.
+// Read renders target, a unit ("slack:<key>"), or the thread of a message
+// ref or permalink, keeping the first message and the newest up to limit in
+// all.
 func (r *Reader) Read(ctx context.Context, target string, limit int) (string, error) {
 	target = strings.TrimSpace(target)
 	if key, ok := strings.CutPrefix(target, unitPrefix); ok {
 		return r.readUnit(ctx, unit.Unit{Provider: dslack.Provider, Key: key}, limit)
 	}
-	conv, ts, threadTS, err := parsePermalink(target)
+	conv, ts, threadTS, err := parseMessage(target)
 	if err != nil {
-		return "", fmt.Errorf("%w; the target is a unit (slack:<key>) or a message permalink", err)
+		return "", fmt.Errorf("%w; the target is a unit (slack:<key>), a message ref or a message permalink", err)
 	}
-	anchor := ts
-	if threadTS != "" {
-		anchor = threadTS
+	if threadTS == "" {
+		if threadTS, err = storedThread(ctx, r.Messages, conv, ts); err != nil {
+			return "", err
+		}
+	}
+	anchor := cmp.Or(threadTS, ts)
+	link := ""
+	if IsPermalink(target) {
+		link = target
 	}
 	c, err := r.conversation(ctx, conv)
 	if err != nil {
@@ -72,14 +84,14 @@ func (r *Reader) Read(ctx context.Context, target string, limit int) (string, er
 			return "", err
 		}
 		if len(msgs) > 0 {
-			return r.render(ctx, c, anchor, msgs, target, limit)
+			return r.render(ctx, c, anchor, msgs, link, limit)
 		}
 	}
 	msgs, cutOff, err := r.replies(ctx, conv, anchor)
 	if err != nil {
 		return "", err
 	}
-	out, err := r.render(ctx, c, anchor, msgs, target, limit)
+	out, err := r.render(ctx, c, msgs[0].Anchor(), msgs, link, limit)
 	if cutOff {
 		out += fmt.Sprintf("\n\n(thread longer than %d messages; newer ones not read, open the permalink)", readPage*readMaxPages)
 	}
@@ -179,7 +191,7 @@ func (r *Reader) render(ctx context.Context, c dslack.Conversation, anchor strin
 			}
 			continue
 		}
-		b.WriteString("\n" + renderRead(m, index, anchor, users))
+		b.WriteString("\n" + renderRead(c.ID, m, index, anchor, users))
 	}
 	return strings.TrimRight(b.String(), "\n"), nil
 }
@@ -240,17 +252,17 @@ func mentioned(msgs []dslack.Message) []string {
 
 var readMention = regexp.MustCompile(`<@([UW][A-Z0-9]+)>`)
 
-// renderRead is one message as "[m<N> ts=<ts>] <author>[ reply to m<K>]",
-// its text, its files and its reactions; a reply is marked only when it
-// answers another message than the thread being read.
-func renderRead(m dslack.Message, index map[string]int, anchor string, users map[string]dslack.User) string {
+// renderRead is one message of conv as "[m<N> <ref>] <author>[ reply to
+// m<K>]", its text, its files and its reactions; a reply is marked only when
+// it answers another message than the thread being read.
+func renderRead(conv string, m dslack.Message, index map[string]int, anchor string, users map[string]dslack.User) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "[m%d ts=%s] %s", index[m.TS], m.TS, readAuthor(m, users))
+	fmt.Fprintf(&b, "[m%d %s] %s", index[m.TS], send.Ref(conv, m.TS), readAuthor(m, users))
 	if t := m.ThreadTS; t != "" && t != m.TS && t != anchor {
 		if k, ok := index[t]; ok {
 			fmt.Fprintf(&b, " reply to m%d", k)
 		} else {
-			fmt.Fprintf(&b, " reply to ts=%s", t)
+			fmt.Fprintf(&b, " reply to %s", send.Ref(conv, t))
 		}
 	}
 	text := m.Text

@@ -308,6 +308,15 @@ func (s *Store) Messages(ctx context.Context, u unit.Unit, after string, limit i
 	return out, nil
 }
 
+// Message is conv's stored message at ts; false when none is stored.
+func (s *Store) Message(ctx context.Context, conv, ts string) (dslack.Message, bool, error) {
+	rows, err := s.DB.Messages(ctx, conv, sqlite.MessageQuery{TS: ts})
+	if err != nil || len(rows) == 0 {
+		return dslack.Message{}, false, err
+	}
+	return message(rows[0]), true, nil
+}
+
 func message(r sqlite.MessageRow) dslack.Message {
 	m := dslack.Message{TS: r.TS, ThreadTS: r.ThreadTS, ParentUser: r.ParentUser, User: r.User, BotID: r.BotID, AppID: r.AppID,
 		Username: r.Username, Subtype: r.Subtype, Text: r.Text, EditedTS: r.EditedTS, Deleted: r.Deleted, Links: r.Links,

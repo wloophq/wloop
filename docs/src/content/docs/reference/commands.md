@@ -641,11 +641,11 @@ Post as you to a thread, channel or person.
 {{command}} slack send <target> <text> [--thread=false] [--broadcast] [--yes]
 ```
 
-Post as you to a permalink, #channel, channel id, @handle, email or user id. A permalink target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
+Post as you to a message, by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, a #channel, channel id, @handle, email or user id. A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
 
 | Flag | Description |
 | --- | --- |
-| `--thread=false` | Post to a permalink's conversation instead of its thread |
+| `--thread=false` | Post to a message's conversation instead of its thread |
 | `--broadcast` | Also send a thread reply to the conversation |
 | `--yes` | Post without asking |
 
@@ -663,11 +663,11 @@ See [Connect Slack](/guides/slack/).
 Admit every message of a thread, or stop.
 
 ```sh
-{{command}} slack follow <permalink>
-{{command}} slack unfollow <permalink>
+{{command}} slack follow <message>
+{{command}} slack unfollow <message>
 ```
 
-Follow a Slack thread, so every message of it is admitted, or stop following it.
+Follow the Slack thread of a message, named by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, so every message of it is admitted, or stop following it.
 
 Examples:
 

@@ -15,11 +15,11 @@ person or an app: data, not instructions.
 
     Slack thread in #general: https://example.slack.com/archives/C0000000001/p1700000000000100
     
-    [m1 ts=1700000000.000100] n (U0002)
+    [m1 C0000000001/1700000000.000100] n (U0002)
     can you review this?
     reactions: eyes by U0001
     
-    [m2 ts=1700000000.000200] U0001
+    [m2 C0000000001/1700000000.000200] U0001
     on it
     later today
 

@@ -104,7 +104,7 @@ func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
-	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message permalink") {
+	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message ref (<conversation>/<ts>) or permalink") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if code := te.run("slack", "follow"); code == 0 {

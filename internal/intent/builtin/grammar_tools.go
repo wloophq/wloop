@@ -126,17 +126,18 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("slack_draft", "approved", "The draft's policy approved it.", num("ID"), str("Unit"), str("Where")),
 		answer("slack_draft", "dry_run", "The draft's policy only stores it.", num("ID"), str("Unit"), str("Where")),
 
-		answer("slack_react", "problem_permalink", "A problem: permalink is not a message permalink."),
+		answer("slack_react", "problem_message", "A problem: message is not a message ref or permalink."),
 		answer("slack_react", "problem_emoji_required", "A problem: emoji is missing or empty."),
-		answer("slack_react", "reacted", "The reaction is added.", str("Emoji"), str("Conversation"), str("Permalink")),
-		answer("slack_react", "removed", "The reaction is removed.", str("Emoji"), str("Conversation"), str("Permalink")),
-		answer("slack_react", "already", "The message already had the user's reaction.", str("Emoji"), str("Conversation"), str("Permalink")),
-		answer("slack_react", "absent", "The message had no such reaction of the user.", str("Emoji"), str("Conversation"), str("Permalink")),
+		answer("slack_react", "reacted", "The reaction is added; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
+		answer("slack_react", "removed", "The reaction is removed; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
+		answer("slack_react", "already", "The message already had the user's reaction; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
+		answer("slack_react", "absent", "The message had no such reaction of the user; Permalink is \"\" when Slack gave none.", str("Emoji"), str("Conversation"), str("Message"), str("Permalink")),
 
-		answer("slack_edit", "problem_permalink", "A problem: permalink is not a message permalink."),
+		answer("slack_edit", "problem_message", "A problem: message is not a message ref or permalink."),
 		answer("slack_edit", "problem_text_required", "A problem: text is missing or empty."),
 		answer("slack_edit", "broadcast", "The text notifies a whole channel or group."),
-		answer("slack_edit", "edited", "The message is edited: where, its new text as posted and the text it replaced.", str("Conversation"), str("Permalink"), str("Text"), str("Replaced")),
+		answer("slack_edit", "edited", "The message is edited: where, its ref and its permalink, \"\" when Slack gave none, its new text as posted and the text it replaced.",
+			str("Conversation"), str("Message"), str("Permalink"), str("Text"), str("Replaced")),
 	)
 }()
 
