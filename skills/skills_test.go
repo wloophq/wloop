@@ -56,10 +56,10 @@ func TestATurnSkillGoesToTheIntentsWhoseManifestAsksForOne(t *testing.T) {
 
 func TestATurnSkillNamesItsTargetAsTheIntentsManifestAndProviderDo(t *testing.T) {
 	d := dintent.Def{Name: "triage", Summary: "Triage a thread", UserFacing: true, Provider: slack.Provider, Skill: true,
-		Help: dintent.Help{Target: "a Slack message permalink"}}
+		Help: dintent.Help{Target: "a Slack message ref or permalink"}}
 	body := string(Turn(d, target(d)).Render(brand.Command, version))
-	for _, want := range []string{"`" + brand.Command + " instructions triage <permalink|slack:key> -- '<guidance>'`",
-		"- `<permalink|slack:key>` is a Slack message permalink in the prompt", "`/" + brand.SkillName("triage") + " <permalink|slack:key>`"} {
+	for _, want := range []string{"`" + brand.Command + " instructions triage <ref|permalink|slack:key> -- '<guidance>'`",
+		"- `<ref|permalink|slack:key>` is a Slack message ref or permalink in the prompt", "`/" + brand.SkillName("triage") + " <ref|permalink|slack:key>`"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the skill lacks %q:\n%s", want, body)
 		}

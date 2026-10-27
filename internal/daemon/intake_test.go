@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -601,7 +602,7 @@ func TestAJoinIsNeverExpired(t *testing.T) {
 
 func TestAStopWhileWaitingForTheLoopLeavesTheIntakeStarting(t *testing.T) {
 	t.Parallel()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) { d.LoopMu = mu })
 	mu.Lock()
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
@@ -622,7 +623,7 @@ func TestAStopWhileWaitingForTheLoopLeavesTheIntakeStarting(t *testing.T) {
 
 func TestTheStartHoldsTheLoopMutex(t *testing.T) {
 	t.Parallel()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	held := make(chan bool, 1)
 	s, _ := newIntakeServer(t, nil, func(d *Deps) {
 		d.LoopMu = mu
@@ -641,7 +642,7 @@ func TestTheStartHoldsTheLoopMutex(t *testing.T) {
 // heldActions reports whether the loop mutex is held while a review runs.
 type heldActions struct {
 	lockedActions
-	mu   *sync.Mutex
+	mu   *lock.Mutex
 	held chan bool
 }
 

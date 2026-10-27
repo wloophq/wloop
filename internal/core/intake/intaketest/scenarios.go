@@ -13,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
@@ -107,7 +108,7 @@ type env struct {
 	pub     *Publisher
 	timers  *Timers
 	clock   *Clock
-	lock    *sync.Mutex
+	lock    *lock.Mutex
 }
 
 func newEnv(t *testing.T, mk MakeStore, first bool, answers ...intake.Readiness) *env {
@@ -118,7 +119,7 @@ func newEnv(t *testing.T, mk MakeStore, first bool, answers ...intake.Readiness)
 		pub:     &Publisher{},
 		timers:  &Timers{},
 		clock:   NewClock(t0),
-		lock:    &sync.Mutex{},
+		lock:    &lock.Mutex{},
 	}
 	e.s = &intake.Service{Store: e.store, Briefs: e.briefs, Firsts: Firsts(first), Starter: e.starter,
 		Payloads: Payloads{}, Clock: e.clock, Pub: e.pub, Lock: e.lock, After: e.timers.After}
@@ -1079,7 +1080,7 @@ type aheadKey struct{}
 // was free then.
 type aheadStarter struct {
 	*Starter
-	lock *sync.Mutex
+	lock *lock.Mutex
 	free []bool
 }
 

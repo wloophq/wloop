@@ -37,12 +37,12 @@ The tests build a store from each frozen schema, migrate it and compare it with 
 The site lives in `docs/`, built with Starlight. The product name is written once, in `docs/site.config.mjs`; pages write placeholders (the product's name, command and app between double braces) that `docs/src/plugins/remark-product.mjs` fills in text, code blocks and links at build time.
 
 ```sh
-make docs-ref     # regenerate the commands and facts reference pages from the binary
+make docs-ref     # regenerate the reference pages, the profile's schemas and the decision log's index
 make docs         # npm ci and build into docs/dist
 cd docs && npm run dev
 ```
 
-`make docs-ref` must run after changing a command's help or a fact; `go test` fails when the facts page drifts from the binary.
+`make docs-ref` must run after changing a command's help, a fact, an architecture rule, a reserved key or a decision-log entry; `go test` fails when a generated page drifts from its source.
 
 ## Working on the procedures
 

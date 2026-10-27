@@ -132,7 +132,7 @@ func (s *Store) Token(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	unlock, err := lockFile(ctx, path)
+	unlock, err := lockFile(ctx, path, s.waitingForRefresh)
 	if err != nil {
 		return s.keepOrFail(tok, fmt.Errorf("slack token %s: lock: %w", s.Service, err))
 	}
@@ -226,7 +226,7 @@ func (s *Store) retryUnsaved(ctx context.Context) {
 		s.logf("error: slack token %s: retrying the rotated token: %v", s.Service, err)
 		return
 	}
-	unlock, err := lockFile(ctx, path)
+	unlock, err := lockFile(ctx, path, s.waitingForRefresh)
 	if err != nil {
 		s.logf("error: slack token %s: retrying the rotated token: lock: %v", s.Service, err)
 		return
@@ -326,6 +326,10 @@ func (s *Store) now() time.Time {
 		return s.Now()
 	}
 	return time.Now()
+}
+
+func (s *Store) waitingForRefresh() {
+	s.logf("slack token %s: waiting for another refresh", s.Service)
 }
 
 func (s *Store) logf(format string, args ...any) {

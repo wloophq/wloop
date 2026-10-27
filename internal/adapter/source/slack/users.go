@@ -15,12 +15,11 @@ const UserTTL = 24 * time.Hour
 
 const slackbot = "USLACKBOT"
 
-// userCache resolves a user id from memory, then slack_users, then one
-// users.info call shared by every concurrent caller.
+// userCache resolves a user id from memory, then one load shared by every
+// concurrent caller.
 type userCache struct {
-	db     *sqlite.SlackStore
-	client *slackapi.Client
-	now    func() time.Time
+	load func(ctx context.Context, id string) (dslack.User, error)
+	now  func() time.Time
 
 	mu     sync.Mutex
 	mem    map[string]dslack.User
@@ -33,14 +32,14 @@ type userFlight struct {
 	err  error
 }
 
-func (c *userCache) fresh(u dslack.User) bool { return c.now().Sub(u.Fetched) < UserTTL }
+func fresh(now time.Time, u dslack.User) bool { return now.Sub(u.Fetched) < UserTTL }
 
 func (c *userCache) get(ctx context.Context, id string) (dslack.User, error) {
 	if id == slackbot {
 		return dslack.User{ID: id, IsBot: true}, nil
 	}
 	c.mu.Lock()
-	if u, ok := c.mem[id]; ok && c.fresh(u) {
+	if u, ok := c.mem[id]; ok && fresh(c.now(), u) {
 		c.mu.Unlock()
 		return u, nil
 	}
@@ -60,7 +59,7 @@ func (c *userCache) get(ctx context.Context, id string) (dslack.User, error) {
 	c.flight[id] = f
 	c.mu.Unlock()
 
-	f.u, f.err = c.fetch(ctx, id)
+	f.u, f.err = c.load(ctx, id)
 	c.mu.Lock()
 	delete(c.flight, id)
 	if f.err == nil {
@@ -71,13 +70,20 @@ func (c *userCache) get(ctx context.Context, id string) (dslack.User, error) {
 	return f.u, f.err
 }
 
-func (c *userCache) fetch(ctx context.Context, id string) (dslack.User, error) {
+// userSource reads a user from slack_users, then users.info.
+type userSource struct {
+	db     *sqlite.SlackStore
+	client *slackapi.Client
+	now    func() time.Time
+}
+
+func (c userSource) fetch(ctx context.Context, id string) (dslack.User, error) {
 	rows, err := c.db.Users(ctx, []string{id})
 	if err != nil {
 		return dslack.User{}, err
 	}
 	if len(rows) == 1 {
-		if u := user(rows[0]); c.fresh(u) {
+		if u := user(rows[0]); fresh(c.now(), u) {
 			return u, nil
 		}
 	}

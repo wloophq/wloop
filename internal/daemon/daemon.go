@@ -35,6 +35,7 @@ import (
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -158,6 +159,9 @@ type Deps struct {
 	// request overrides. Nil follows none.
 	Follows func(unit.ProviderID) bool
 	Untrack func(ctx context.Context, u unit.Unit) error
+	// Resolve is the unit an address a person gives lands in, such as a
+	// Slack message ref; ok is false when no plugin reads it. Nil reads none.
+	Resolve func(ctx context.Context, address string) (u unit.Unit, ok bool, err error)
 	Sweep   Sweeper // nil registers no sweep job
 	Actions Actions // nil answers 503 to delegated actions
 	// Intents is the registry as the profile defines it now, read on every
@@ -220,7 +224,7 @@ type Deps struct {
 	SessionWait time.Duration
 	// LoopMu serializes every loop write: sweep, review, take over, address, run.
 	// Shared across restarts of the server in one process; nil makes one.
-	LoopMu *sync.Mutex
+	LoopMu *lock.Mutex
 	// App is the menu bar's status, shared across restarts of the server
 	// like LoopMu; nil makes one.
 	App    *AppState
@@ -408,7 +412,7 @@ func New(d Deps) *Server {
 		d.Restart = "restart " + brand.Command + " serve"
 	}
 	if d.LoopMu == nil {
-		d.LoopMu = &sync.Mutex{}
+		d.LoopMu = &lock.Mutex{}
 	}
 	if d.App == nil {
 		d.App = &AppState{}
@@ -588,6 +592,20 @@ func (s *Server) reconcileTurns(ctx context.Context) {
 		if _, err := v.Reconcile(ctx); err != nil {
 			s.logf("views reconcile: %v", err)
 		}
+	}
+}
+
+// startJobs starts every job's loop on wg once the start-up reconcile ends.
+func (s *Server) startJobs(ctx context.Context, wg *sync.WaitGroup) {
+	for _, j := range s.jobs {
+		j.onEnd = s.jobEnded
+		wg.Go(func() {
+			select {
+			case <-s.reconcile.done:
+				j.loop(ctx, s.logf, s.jobDone)
+			case <-ctx.Done():
+			}
+		})
 	}
 }
 
@@ -847,16 +865,7 @@ func (s *Server) Run(ctx context.Context) error {
 		})
 	}
 	s.startStreams(jctx, &wg)
-	for _, j := range s.jobs {
-		j.onEnd = s.jobEnded
-		wg.Go(func() {
-			select {
-			case <-s.reconcile.done:
-				j.loop(jctx, s.logf, s.jobDone)
-			case <-jctx.Done():
-			}
-		})
-	}
+	s.startJobs(jctx, &wg)
 	s.logf("serving on %s and 127.0.0.1:%d", d.Socket, tcpLn.Addr().(*net.TCPAddr).Port)
 
 	var serveErr error

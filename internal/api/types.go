@@ -615,3 +615,10 @@ type Info struct {
 	Port  int    `json:"port"`
 	Token string `json:"token"`
 }
+
+// Resolved is the unit an address lands in; Found is false when no plugin
+// reads the address.
+type Resolved struct {
+	Unit  unit.Unit `json:"unit"`
+	Found bool      `json:"found"`
+}

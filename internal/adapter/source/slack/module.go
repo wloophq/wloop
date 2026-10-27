@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/readmodel"
 	slackapi "github.com/wloophq/wloop/internal/slack"
 	"github.com/wloophq/wloop/internal/slack/auth"
+	"github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/slack/socket"
 	sourcereg "github.com/wloophq/wloop/internal/source"
 )
@@ -106,6 +107,9 @@ func (p *plugin) module() sourcereg.Module {
 	if p.deps.DB != nil {
 		m.Facts = factslack.New(p.deps.DB, clockFunc(p.now))
 	}
+	if p.deps.DB != nil && p.slack.Client != nil && p.slack.Tokens != nil {
+		m.Resolve = p.resolve
+	}
 	return m
 }
 
@@ -145,7 +149,7 @@ func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	p.watches = Watches{DB: db}
 	a := newAdmitter(cfg.Ingest)
 	a.db, a.log = db, p.logf
-	a.users = &userCache{db: db, client: s.Client, now: p.now}
+	a.users = &userCache{load: userSource{db: db, client: s.Client, now: p.now}.fetch, now: p.now}
 	heat := HeatScheduler{DB: db, Heat: sqlite.HeatReader{DB: d.DB, Clock: clockFunc(p.now)}, Segments: segs, Log: p.logf}
 	src := &Source{db: db, store: &Store{DB: db, Segments: segs, Scheduler: heat, Now: p.now}, client: s.Client, admit: a, segments: segs,
 		links: d.Links != nil, units: d.Units, log: p.logf}
@@ -362,4 +366,18 @@ func (noRows) Load(context.Context, []unit.Unit) (map[unit.Unit]any, error) { re
 
 func (noRows) Derive(readmodel.Base, any, time.Time) (api.Row, error) {
 	return api.Row{}, errors.New("slack: no rows yet")
+}
+
+// resolve is the unit a message ref or permalink lands in: the tracked
+// direct message segment or thread it is in, else its thread.
+func (p *plugin) resolve(ctx context.Context, address string) (unit.Unit, bool, error) {
+	if !send.IsMessage(address) {
+		return unit.Unit{}, false, nil
+	}
+	tok, err := p.slack.Tokens.Load()
+	if err != nil {
+		return unit.Unit{}, false, err
+	}
+	u, err := LandingOver(p.deps.DB, p.log).MessageUnit(ctx, p.slack.Client, tok.Team, address)
+	return u, err == nil, err
 }

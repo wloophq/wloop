@@ -144,7 +144,7 @@ func TestSlackSendMessageCall(t *testing.T) {
 	if f.sent[1].Thread != nil {
 		t.Fatalf("an omitted thread was set: %+v", f.sent[1])
 	}
-	if got := r.Result.Content[0].Text; got != "Posted to @ana: no permalink (channel D000, ts 2.000)\n\nhi" {
+	if got := r.Result.Content[0].Text; got != "Posted to @ana: no permalink (D000/2.000)\n\nhi" {
 		t.Fatalf("empty permalink: %q", got)
 	}
 }
