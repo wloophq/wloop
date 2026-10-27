@@ -601,7 +601,7 @@ func TestAnswerRoutes(t *testing.T) {
 				t.Fatalf("answers %+v", b.Answers)
 			}
 			a := b.Answers[0]
-			if a.Route != c.route || a.TurnSeq != 1 || a.Message != 9 || (a.Route == turn.Resumed) != !a.ReadAt.IsZero() || a.Text != req.Text || a.OptionID != req.OptionID || a.Yes != req.Yes || a.No != req.No || a.Source != req.Source {
+			if a.Route != c.route || a.TurnSeq != 1 || a.Message != 9 || (a.Route == turn.Resumed) != !a.ReadAt.IsZero() || (a.Route == turn.Typed) != !a.NoticedAt.IsZero() || a.Text != req.Text || a.OptionID != req.OptionID || a.Yes != req.Yes || a.No != req.No || a.Source != req.Source {
 				t.Fatalf("answer %+v", a)
 			}
 			typed := sess.Typed()

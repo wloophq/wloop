@@ -16,6 +16,7 @@ func v6Answers(ctx context.Context, tx *sql.Tx) error {
 	for _, q := range []string{
 		`ALTER TABLE turn_answers ADD COLUMN message_id INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE turn_answers ADD COLUMN read_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE turn_answers ADD COLUMN noticed_at TEXT NOT NULL DEFAULT ''`,
 		`UPDATE turn_answers SET read_at = at WHERE route != 'queued'`,
 	} {
 		if _, err := tx.ExecContext(ctx, q); err != nil {

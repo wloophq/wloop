@@ -133,7 +133,8 @@ func (s *Service) Conversation(ctx context.Context, m message.Message) (message.
 	return c, nil
 }
 
-// Question is the unit's open question message, after reconciling it with the unit's book.
+// Question is the question message of the unit's turn while that turn asks: the open one, after reconciling
+// it with the unit's book, or the one already answered, which a newer answer replaces or adds to.
 func (s *Service) Question(ctx context.Context, u unit.Unit) (message.Message, bool, error) {
 	if err := s.Reconcile(ctx, u); err != nil {
 		return message.Message{}, false, err
@@ -147,5 +148,32 @@ func (s *Service) Question(ctx context.Context, u unit.Unit) (message.Message, b
 			return m, true, nil
 		}
 	}
+	books, err := s.Books.Books(ctx, u)
+	if err != nil {
+		return message.Message{}, false, err
+	}
+	b := books[u]
+	q, ok := asking(&b, s.Intents.Answerable())
+	if !ok {
+		return message.Message{}, false, nil
+	}
+	for i := len(b.Answers) - 1; i >= 0; i-- {
+		if a := b.Answers[i]; a.TurnSeq == q.Seq && a.Message != 0 && !a.Posted {
+			m, found, err := s.Store.Message(ctx, a.Message)
+			if err != nil || !found || m.State != message.Answered {
+				return message.Message{}, false, err
+			}
+			return m, true, nil
+		}
+	}
 	return message.Message{}, false, nil
+}
+
+// asking is the turn of the book an answer addresses while it waits on the user.
+func asking(b *turn.Book, answerable []string) (*turn.Turn, bool) {
+	q, ok := b.Question(answerable)
+	if !ok || (q.State != turn.Asked && !q.State.Stopped()) {
+		return nil, false
+	}
+	return q, true
 }

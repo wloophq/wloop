@@ -140,7 +140,7 @@ func TestAnAnswerKeepsItsMessageAndReadState(t *testing.T) {
 	}
 	read := noteAt.Add(time.Hour)
 	b.Answers = append(b.Answers,
-		turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "post", Source: turn.Cockpit, Route: turn.Typed, At: noteAt, Message: 41, Posted: true, ReadAt: read},
+		turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "post", Source: turn.Cockpit, Route: turn.Typed, At: noteAt, Message: 41, Posted: true, NoticedAt: noteAt.Add(time.Minute), ReadAt: read},
 		turn.Answer{TurnSeq: b.Turns[0].Seq, Text: "question", Source: turn.Cockpit, Route: turn.Queued, At: noteAt, Message: 42})
 	saved, err := s.Save(ctx, b)
 	if err != nil {

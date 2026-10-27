@@ -215,7 +215,7 @@ var otherFacts = []Fact{
 	untrusted(wf("session", "idle_since", expr.Time, "When the current idle period started.")),
 	untrusted(wf("session", "idle_for", expr.Duration, "Time since idle_since.")),
 	wf("session", "unread_answers", expr.Int, "Answers the user gave to the session's turns whose notice reached the session and that its agent has not read with inbox_read."),
-	wf("session", "unread_since", expr.Time, "When the oldest of unread_answers was given; zero when none."),
+	wf("session", "unread_since", expr.Time, "When the notice of the oldest of unread_answers reached the session; zero when none."),
 	wf("session", "unread_for", expr.Duration, "Time since unread_since; 0 when none."),
 	enum(wf("session", "pr_state", expr.String, "The state of the book's pull request: OPEN, CLOSED or MERGED; empty when none."), enumOf(append([]string{""}, PRStates...)...)),
 	wf("session", "duplicate", expr.Bool, "Another listed session resumes the same agent session; the focused one, one the user prompted, and else the oldest are never duplicates."),

@@ -209,7 +209,7 @@ func (b *Book) entry(t Turn) Entry {
 		}
 	}
 	for _, a := range b.Answers {
-		if a.TurnSeq == t.Seq && (a.Route == Typed || a.Route == Resumed || a.Route == Direct) {
+		if a.TurnSeq == t.Seq && (a.Route.Noticed() || a.Route == Resumed || a.Route == Direct) {
 			e.Said = append(e.Said, b.Said(a))
 		}
 	}

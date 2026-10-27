@@ -2,6 +2,7 @@ package turns_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +31,7 @@ func TestAnAnswerWhileTheSessionWorksBlocksItsStopWithTheNotice(t *testing.T) {
 		t.Fatalf("stop %+v %v", stop, err)
 	}
 	b := bookOf(t, store, r7)
-	if a := b.Answers[0]; a.Route != turn.Hooked || a.Session != "term_1" || !a.ReadAt.IsZero() {
+	if a := b.Answers[0]; a.Route != turn.Hooked || a.Session != "term_1" || !a.ReadAt.IsZero() || !a.NoticedAt.Equal(t0) {
 		t.Fatalf("answer %+v", a)
 	}
 	if last, ok, _ := turns.LastStop(ctx, s.Registry, "term_1"); !ok || last.Blocked {
@@ -40,8 +41,20 @@ func TestAnAnswerWhileTheSessionWorksBlocksItsStopWithTheNotice(t *testing.T) {
 	if err := s.DeliverStopped(ctx, "term_1"); err != nil || len(sess.Typed()) != 0 {
 		t.Fatalf("typed %+v %v", sess.Typed(), err)
 	}
-	if again, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"}); err != nil || again.Block {
-		t.Fatalf("second stop %+v %v", again, err)
+}
+
+func TestAStopLeavesAnAnswerADeliverIsRouting(t *testing.T) {
+	s, store, _, _, _ := busyAsked(t)
+	ctx := context.Background()
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	s.Routing(bookOf(t, store, r7).Answers[0].ID)
+	if got, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"}); err != nil || strings.HasPrefix(got.Reason, "answered") {
+		t.Fatalf("stop %+v %v", got, err)
+	}
+	if r := bookOf(t, store, r7).Answers[0].Route; r != turn.Queued {
+		t.Fatalf("route %s", r)
 	}
 }
 
@@ -95,5 +108,59 @@ func TestMarkReadKeepsTheFirstRead(t *testing.T) {
 	b := bookOf(t, store, r7)
 	if !b.Answers[0].ReadAt.Equal(t0.Add(time.Hour)) || !b.Answers[1].ReadAt.Equal(t0.Add(-time.Minute)) {
 		t.Fatalf("answers %+v", b.Answers)
+	}
+}
+
+func TestAfterTheNoticeTheTurnOwesARecordAgain(t *testing.T) {
+	s, _, _, _, _ := busyAsked(t)
+	ctx := context.Background()
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	stop := func(prompt string) turns.StopAnswer {
+		t.Helper()
+		got, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: prompt})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := stop("p1"); !got.Block || !strings.HasPrefix(got.Reason, "answered") {
+		t.Fatalf("first stop %+v", got)
+	}
+	if got := stop("p1"); !got.Block || !strings.HasPrefix(got.Reason, "record_owed") {
+		t.Fatalf("a stop after acting on the answer with no record: %+v", got)
+	}
+	if got := stop("p1"); got.Block {
+		t.Fatalf("the record was asked for twice in one prompt: %+v", got)
+	}
+}
+
+func TestTheRecordBlockOfAPromptSurvivesANoticeInBetween(t *testing.T) {
+	s, store, _, sess, _ := busyAsked(t)
+	ctx := context.Background()
+	b := bookOf(t, store, r7)
+	b.Answers = append(b.Answers, turn.Answer{ID: 1, TurnSeq: 1, Text: "go", Source: turn.Cockpit, Route: turn.Typed, Session: "term_1", At: t0})
+	store.Put(b)
+	stop := func() turns.StopAnswer {
+		t.Helper()
+		got, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: "p1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := stop(); !got.Block || !strings.HasPrefix(got.Reason, "record_owed") {
+		t.Fatalf("first stop %+v", got)
+	}
+	sess.SetAgents(working)
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "and this", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stop(); !got.Block || !strings.HasPrefix(got.Reason, "answered") {
+		t.Fatalf("the notice stop %+v", got)
+	}
+	if got := stop(); got.Block {
+		t.Fatalf("the record was asked for again in the same prompt: %+v", got)
 	}
 }

@@ -255,8 +255,9 @@ func (c *Client) Prompt(ctx context.Context, handle string, req api.PromptReques
 	return c.doAs(ctx, ReadTimeout, handle, http.MethodPost, api.AgentSessionsPrompt, req, nil)
 }
 
-// TurnAnswer reads the newest answer to the caller's turn on the unit arg
-// names: a pull request URL or "<provider>:<key>".
+// TurnAnswer reads the answers to the caller's Inbox messages on the unit arg
+// names (a pull request URL or "<provider>:<key>"): the unread ones, or every
+// answer to message when it is not 0.
 func (c *Client) TurnAnswer(ctx context.Context, handle, arg string, message int64) (api.TurnText, error) {
 	var res api.TurnText
 	q := url.Values{"pr": {arg}}

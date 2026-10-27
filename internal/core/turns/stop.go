@@ -75,7 +75,7 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	b := books[u]
 	t, found := sessionTurn(&b, r.Session)
 	facts := turn.StopFacts{HasTurn: found}
-	queued := queuedFor(&b, r.Session)
+	queued := s.queuedFor(&b, r.Session)
 	facts.Answered = len(queued) > 0
 	if found {
 		for _, rec := range b.Records {
@@ -109,11 +109,12 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		evs = append(evs, stopped)
 	case turn.LogAndAllow:
 	case turn.DeliverAnswers:
+		stop.Blocked = facts.BlockedThisPrompt
 		notices := make([]string, len(queued))
 		routed := []port.Event{stopped}
 		for n, i := range queued {
 			a := &b.Answers[i]
-			a.Route, a.Session = turn.Hooked, r.Session
+			a.Route, a.Session, a.NoticedAt = turn.Hooked, r.Session, now
 			notices[n] = s.answeredNotice(b.Unit, *a)
 			routed = append(routed, s.routed(b.Unit, a.ID, AnswerResult{Route: turn.Hooked, Handle: r.Session}))
 		}
@@ -150,11 +151,13 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	return ans, changed, evs, nil
 }
 
-// queuedFor are the indexes of the answers queued for the turns of handle's session, oldest first.
-func queuedFor(b *turn.Book, handle string) []int {
+// queuedFor are the indexes of the answers queued for the turns of handle's session, oldest first, but those a
+// Deliver is routing.
+func (s *Service) queuedFor(b *turn.Book, handle string) []int {
 	var out []int
 	for i, a := range b.Answers {
-		if t, ok := bySeq(b, a.TurnSeq); ok && a.Route == turn.Queued && t.Session == handle {
+		_, routing := s.delivering[a.ID]
+		if t, ok := bySeq(b, a.TurnSeq); ok && a.Route == turn.Queued && t.Session == handle && !routing {
 			out = append(out, i)
 		}
 	}

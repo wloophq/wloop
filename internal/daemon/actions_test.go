@@ -1427,3 +1427,35 @@ func TestLoopActionsReadAheadBeforeTheLoopMutex(t *testing.T) {
 		t.Fatalf("read ahead %q, calls %v", a.ahead, a.calls)
 	}
 }
+
+func TestANewerAnswerByTheUnitActionReplacesTheQueuedOne(t *testing.T) {
+	t.Parallel()
+	r := newTurnRig(t)
+	r8 := r.busyAsked(publishQuestion)
+	for _, body := range []string{`{"option_id":"hold"}`, `{"option_id":"publish","guidance":"after CI"}`} {
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", body); rec.Code != 200 {
+			t.Fatalf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Refused, turn.Queued}) {
+		t.Fatalf("routes %v", got)
+	}
+}
+
+func TestAnAnswerAfterATypedOneStillReachesTheAskingTurn(t *testing.T) {
+	t.Parallel()
+	r := newTurnRig(t)
+	now := r.s.deps.Now()
+	r8 := pr.Ref{Owner: "acme", Repo: "api", Number: 8}
+	r.asked(r8, turn.Intent(dintent.Review), turn.Asked, publishQuestion)
+	r.reg.Put(turn.Session{ID: "term-1", WorkspaceID: "ws-1", StartedAt: now.Add(-time.Hour), MCPAt: now.Add(-time.Hour)})
+	r.sessions.Put("ws-1", turns.Terminal{Session: "term-1", LastOutput: now.Add(-time.Minute)})
+	for _, body := range []string{`{"option_id":"hold"}`, `{"guidance":"one more thing"}`} {
+		if rec := post(t, r.s, "/api/units/github/acme%2Fapi%238/answer", body); rec.Code != 200 {
+			t.Fatalf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Typed, turn.Typed}) {
+		t.Fatalf("routes %v", got)
+	}
+}

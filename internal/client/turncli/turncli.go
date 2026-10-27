@@ -97,7 +97,7 @@ func End(ctx context.Context, env func(string) string, args []string, out, errw 
 	return 0
 }
 
-// Answer prints the newest answer the user gave to the caller's turn.
+// Answer prints the user's answers to the caller's Inbox messages, as inbox_read words them.
 func Answer(ctx context.Context, env func(string) string, args []string, out, errw io.Writer, c Agent, h harness.Set) int {
 	raw, args := positional(args)
 	fs := flag.NewFlagSet("turn answer", flag.ContinueOnError)

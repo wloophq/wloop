@@ -171,7 +171,8 @@ type state struct {
 	open      *turn.Turn
 	newest    *turn.Turn
 	idleSince time.Time
-	// unread counts the answers noticed to the session that its agent has not read; unreadSince is the oldest.
+	// unread counts the answers noticed to the session that its agent has not read; unreadSince is when the oldest
+	// notice reached it.
 	unread      int
 	unreadSince time.Time
 	// transcriptGone is a known transcript file of the session that no longer exists.
@@ -204,17 +205,17 @@ func (w *world) state(h string) *state {
 }
 
 // unreadOf counts the answers to the handle's turns whose notice reached it and that its agent has not read,
-// and when the oldest was given.
+// and when the oldest notice reached it.
 func unreadOf(b *turn.Book, handle string) (int, time.Time) {
 	var n int
 	var since time.Time
 	for _, a := range b.Answers {
 		i := slices.IndexFunc(b.Turns, func(t turn.Turn) bool { return t.Seq == a.TurnSeq })
-		if i < 0 || b.Turns[i].Session != handle || !a.ReadAt.IsZero() || (a.Route != turn.Typed && a.Route != turn.Hooked) {
+		if i < 0 || b.Turns[i].Session != handle || !a.ReadAt.IsZero() || !a.Route.Noticed() {
 			continue
 		}
-		if n++; since.IsZero() || a.At.Before(since) {
-			since = a.At
+		if n++; since.IsZero() || a.NoticedAt.Before(since) {
+			since = a.NoticedAt
 		}
 	}
 	return n, since

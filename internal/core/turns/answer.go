@@ -502,6 +502,9 @@ func (s *Service) saveRoute(ctx context.Context, ref unit.Unit, q turn.Turn, id 
 		return fmt.Errorf("%s has no answer %d", ref.Label(), id)
 	}
 	b.Answers[i].Route, b.Answers[i].Session = route.Route, route.Handle
+	if route.Route == turn.Typed {
+		b.Answers[i].NoticedAt = s.now()
+	}
 	evs := []port.Event{s.routed(ref, id, route)}
 	if route.Route == turn.Resumed {
 		b.Answers[i].ReadAt = s.now()

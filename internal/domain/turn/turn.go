@@ -102,6 +102,9 @@ const (
 	Direct  Route = "direct"
 )
 
+// Noticed says that the answer's session was told of it: typed into it, or noticed through its Stop hook.
+func (r Route) Noticed() bool { return r == Typed || r == Hooked }
+
 type Source string
 
 const (
@@ -125,6 +128,8 @@ type Answer struct {
 	// Posted says that Message is one the agent posted during its turn, not its turn's question; the store
 	// reads it from the message.
 	Posted bool
+	// NoticedAt is when the answer's session was told of it, zero until it is.
+	NoticedAt time.Time
 	// ReadAt is when the agent read the answer, zero until it does.
 	ReadAt time.Time
 }

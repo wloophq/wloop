@@ -508,16 +508,21 @@ func (s *Service) Propose(ctx context.Context, p ProposeRequest) (message.Messag
 // Answer answers an open message: a question through turns.Service.Answer unchanged, an agent post into the
 // session that posted it, a proposal by deciding it.
 func (s *Service) Answer(ctx context.Context, id int64, a Answer) (turns.AnswerResult, error) {
-	m, err := s.open(ctx, id)
+	m, err := s.answerable(ctx, id)
 	if err != nil {
 		return turns.AnswerResult{}, err
 	}
 	switch m.Kind {
 	case message.Question:
-		if err := s.current(ctx, m); err != nil {
-			return turns.AnswerResult{}, err
+		if m.State == message.Open {
+			if err := s.current(ctx, m); err != nil {
+				return turns.AnswerResult{}, err
+			}
 		}
 		res, err := s.Turns.Answer(ctx, turns.AnswerRequest{Unit: m.Unit, Message: m.ID, Text: a.Text, OptionID: a.OptionID, Yes: a.Yes, No: a.No, Source: a.Source})
+		if err == nil && m.State == message.Answered {
+			s.reanswered(ctx, m)
+		}
 		if rerr := s.Reconcile(ctx, m.Unit); rerr != nil {
 			s.logf("messages: reconciling %s after an answer: %v", m.Unit, rerr)
 		}
@@ -556,6 +561,41 @@ func (s *Service) Answer(ctx context.Context, id int64, a Answer) (turns.AnswerR
 		return turns.AnswerResult{}, s.decide(ctx, m, a)
 	}
 	return turns.AnswerResult{}, fmt.Errorf("message %d is of kind %q", m.ID, m.Kind)
+}
+
+// answerable is message id while it takes an answer: open, or a question already answered whose turn still
+// asks, which a newer answer replaces or adds to.
+func (s *Service) answerable(ctx context.Context, id int64) (message.Message, error) {
+	m, ok, err := s.Store.Message(ctx, id)
+	if err != nil || !ok || m.Kind != message.Question || m.State != message.Answered {
+		return s.open(ctx, id)
+	}
+	books, err := s.Books.Books(ctx, m.Unit)
+	if err != nil {
+		return message.Message{}, err
+	}
+	b := books[m.Unit]
+	if q, asks := asking(&b, s.Intents.Answerable()); asks && q.Seq == m.Origin.TurnSeq {
+		return m, nil
+	}
+	return message.Message{}, fmt.Errorf("%w: message %d is %s", ErrClosed, id, m.State)
+}
+
+// reanswered words a question message already answered with its newest answer.
+func (s *Service) reanswered(ctx context.Context, m message.Message) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	books, err := s.Books.Books(ctx, m.Unit)
+	if err != nil {
+		s.logf("messages: rewording message %d: %v", m.ID, err)
+		return
+	}
+	b := books[m.Unit]
+	if st, said := closing(&b, m.Origin.TurnSeq); st == message.Answered {
+		if err := s.Store.Close(ctx, m.ID, st, said, s.now()); err != nil {
+			s.logf("messages: rewording message %d: %v", m.ID, err)
+		}
+	}
 }
 
 func (s *Service) open(ctx context.Context, id int64) (message.Message, error) {

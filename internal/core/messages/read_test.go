@@ -127,3 +127,44 @@ func TestConversationListsTheAnswersOfAMessage(t *testing.T) {
 		t.Fatalf("%+v %v", got, err)
 	}
 }
+
+func TestANewerAnswerToTheQuestionReplacesTheQueuedOne(t *testing.T) {
+	r := newRig(t)
+	r.asked(t, r7)
+	r.live()
+	r.reconcile(t, r7)
+	q := r.only(t)
+	r.busy()
+	answerOf(t, r, q.ID, messages.Answer{OptionID: "hold"})
+	got, ok, err := r.svc.Question(context.Background(), r7)
+	if err != nil || !ok || got.ID != q.ID {
+		t.Fatalf("the answered question while its turn still asks: %+v %v %v", got, ok, err)
+	}
+	answerOf(t, r, q.ID, messages.Answer{OptionID: "publish"})
+	b := r.book(t, r7)
+	if len(b.Answers) != 2 || b.Answers[0].Route != turn.Refused || b.Answers[1].Route != turn.Queued || b.Answers[1].Message != q.ID {
+		t.Fatalf("answers %+v", b.Answers)
+	}
+	if m := r.message(t, q.ID); m.State != message.Answered || m.Answer != "Publish (option publish)" {
+		t.Fatalf("message %+v", m)
+	}
+}
+
+func TestAQuestionWhoseTurnMovedOnTakesNoAnswer(t *testing.T) {
+	r := newRig(t)
+	r.asked(t, r7)
+	r.live()
+	r.reconcile(t, r7)
+	q := r.only(t)
+	answerOf(t, r, q.ID, messages.Answer{OptionID: "hold"})
+	r.record(t, r7, 1, record.Record{State: record.Done, Summary: "held"})
+	b := r.book(t, r7)
+	b.Turns[0].State = turn.Done
+	r.books.Put(b)
+	if _, ok, err := r.svc.Question(context.Background(), r7); err != nil || ok {
+		t.Fatalf("a done turn's question: %v %v", ok, err)
+	}
+	if _, err := r.svc.Answer(context.Background(), q.ID, messages.Answer{OptionID: "publish", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
+		t.Fatalf("answer to a done turn's question: %v", err)
+	}
+}

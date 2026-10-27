@@ -155,7 +155,7 @@ CREATE TABLE turn_answers (
   at TEXT NOT NULL, text TEXT NOT NULL, source TEXT NOT NULL,
   option_id TEXT NOT NULL DEFAULT '', yes INTEGER NOT NULL DEFAULT 0, no INTEGER NOT NULL DEFAULT 0,
   route TEXT NOT NULL, session TEXT NOT NULL DEFAULT '',
-  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT ''
+  message_id INTEGER NOT NULL DEFAULT 0, read_at TEXT NOT NULL DEFAULT '', noticed_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX turn_answers_unit ON turn_answers(provider, unit_key);
 

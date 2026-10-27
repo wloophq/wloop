@@ -524,7 +524,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Record how a turn ended; read your answer",
 				Usage:   []string{"turn end <url> --turn <id> --file <path>", "turn answer <url> [--message <id>]"},
 				About: "end records how this session's turn ended, from a JSON file, when the session has no " + name + " MCP tool; the file is deleted once stored. " +
-					"answer prints the user's newest answer to this session's turn.",
+					"answer prints the user's answers to this session's Inbox messages that it has not read, or, with --message, every answer to that message, and marks them read.",
 				Flags: []helpFlag{
 					{"--turn <id>", "The id on the first line of the turn's instructions"},
 					{"--file <path>", "The JSON file that holds the record"},
