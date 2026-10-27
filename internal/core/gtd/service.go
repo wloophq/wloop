@@ -91,10 +91,14 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 		if req.Verb != gtd.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
-		return s.dismissOff(ctx, id, enabled)
+		return s.dismissOff(ctx, id, req, enabled)
 	}
 	if h := s.handler(e.Kind, req.Verb); h != nil {
-		return h(ctx, e, req)
+		res, err := h(ctx, e, req)
+		if err != nil {
+			return res, err
+		}
+		return res, s.RecordVerb(ctx, e, req)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -113,7 +117,7 @@ func (s *Service) Do(ctx context.Context, id gtd.ID, req Request) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
-	if err := s.d.Store.Apply(ctx, cs); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
 	return Result{Entry: cs[len(cs)-1].Entry}, nil
@@ -164,7 +168,7 @@ func (s *Service) project(ctx context.Context, e gtd.Entry, args map[string]stri
 // the disabled plugins' units and the items on them, and the entry keeps its state. A derived entry, whose id the
 // unit it came from names, or one with no unit of an enabled plugin moves to the Trash whole. enabled caches the
 // answers per unit.
-func (s *Service) dismissOff(ctx context.Context, id gtd.ID, enabled map[unit.Unit]bool) (Result, error) {
+func (s *Service) dismissOff(ctx context.Context, id gtd.ID, req Request, enabled map[unit.Unit]bool) (Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e, err := s.d.Store.Entry(ctx, id)
@@ -207,10 +211,30 @@ func (s *Service) dismissOff(ctx context.Context, id gtd.ID, enabled map[unit.Un
 			why += " " + string(p)
 		}
 	}
-	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: next, Why: why}}); err != nil {
+	if err := s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: next, Why: why}}, verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
 	return Result{Entry: next}, nil
+}
+
+// RecordVerb records that a person ran req's verb on e, once the handler or
+// the service that runs it succeeded.
+func (s *Service) RecordVerb(ctx context.Context, e gtd.Entry, req Request) error {
+	evs := verbEvents(e, req, s.now())
+	if len(evs) == 0 {
+		return nil
+	}
+	return s.d.Store.Apply(ctx, nil, evs...)
+}
+
+// verbEvents are the event of req's verb on e, which left e's state; none
+// for a verb that records nothing.
+func verbEvents(e gtd.Entry, req Request, now time.Time) []port.Event {
+	kind := gtd.VerbEventKind(req.Verb)
+	if !slices.Contains(gtd.VerbEventKinds, kind) {
+		return nil
+	}
+	return []port.Event{{Unit: gtd.UnitOf(e.ID), Kind: kind, Actor: req.Source, Data: string(e.State), At: now}}
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

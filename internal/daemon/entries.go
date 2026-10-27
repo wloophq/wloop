@@ -245,11 +245,19 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 			writeError(w, http.StatusConflict, b.reason())
 			return
 		}
-		s.runBridge(w, r, g, e, b.unit, st, req)
+		s.runBridge(w, r, g, e, v, b.unit, st, req)
 		return
 	}
 	res, err := g.Do(ctx, e.ID, coregtd.Request{Verb: v, Args: req.Args, Source: req.Source})
 	s.writeEntryResult(ctx, w, g, res, err)
+}
+
+// recordVerb records a verb another service ran on e; the verb already
+// happened, so a failure is logged and the answer stands.
+func (s *Server) recordVerb(ctx context.Context, g *coregtd.Service, e gtd.Entry, verb gtd.Verb, source string) {
+	if err := g.RecordVerb(ctx, e, coregtd.Request{Verb: verb, Source: source}); err != nil {
+		s.logf("%s on %s: recording the verb: %v", verb, e.ID, err)
+	}
 }
 
 func (s *Server) writeEntryResult(ctx context.Context, w http.ResponseWriter, g *coregtd.Service, res coregtd.Result, err error) {
@@ -355,7 +363,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb gtd.Verb) bridgeActi
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
 // entry's items on u, and the guidance and mode of the entry's args.
-func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Service, e gtd.Entry, u unit.Unit, st api.ActionState, req api.EntryRequest) {
+func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Service, e gtd.Entry, verb gtd.Verb, u unit.Unit, st api.ActionState, req api.EntryRequest) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -413,6 +421,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
+	s.recordVerb(ctx, g, e, verb, req.Source)
 	now, err := g.Entry(ctx, e.ID)
 	if err != nil {
 		now = e

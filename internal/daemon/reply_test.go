@@ -62,6 +62,10 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	if code := get(t, r.s, api.Drafts+"?entry=e-1", &listed); code != 200 || len(listed.Drafts) != 1 || listed.Drafts[0].Origin.Kind != "user" {
 		t.Fatalf("drafts of the entry: %d %+v", code, listed)
 	}
+	evs, err := r.db.Events().Since(context.Background(), 0, []string{gtd.VerbEventKind(gtd.VerbReply)})
+	if err != nil || len(evs) != 1 || evs[0].Unit != gtd.UnitOf("e-1") {
+		t.Fatalf("reply events %+v %v", evs, err)
+	}
 }
 
 func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {

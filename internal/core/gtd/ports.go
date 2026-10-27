@@ -25,8 +25,8 @@ type Reader interface {
 
 type Store interface {
 	Reader
-	// Apply writes cs in one transaction, bumps Rev and notes port.TopicEntries; with no effective change
-	// it writes and notes nothing.
+	// Apply writes cs and evs in one transaction, bumps Rev and notes port.TopicEntries; with no effective
+	// change it writes evs alone and bumps nothing.
 	Apply(ctx context.Context, cs []gtd.Change, evs ...port.Event) error
 }
 

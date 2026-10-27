@@ -101,6 +101,7 @@ func (s *Store) Apply(ctx context.Context, cs []gtd.Change, evs ...port.Event) e
 		}
 		changed = append(changed, c.Entry)
 	}
+	s.Events = append(s.Events, evs...)
 	if len(changed) == 0 {
 		return nil
 	}
@@ -109,6 +110,5 @@ func (s *Store) Apply(ctx context.Context, cs []gtd.Change, evs ...port.Event) e
 		s.entries[e.ID], s.revs[e.ID] = e, s.rev
 	}
 	s.Notes++
-	s.Events = append(s.Events, evs...)
 	return nil
 }
