@@ -397,6 +397,44 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 }
 
+func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T) {
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	d := w.deps
+	d.Startup = nil
+	w.te.Socket = serveSocket(t, daemon.New(d).Handler())
+	wait := postWait
+	postWait = 10 * time.Millisecond
+	t.Cleanup(func() { postWait = wait })
+	facts := dslack.Facts{Team: "T000", Conversations: []dslack.Conversation{{ID: sessDM, Kind: dslack.KindIM, DMUser: sessUser}}}
+	if err := (&slacksource.Store{DB: w.db.Slack()}).Save(ctx, nil, facts, "", testNow); err != nil {
+		t.Fatal(err)
+	}
+	segs, err := (slacksource.Segments{Store: w.db.Segments(), Clock: clockFunc(func() time.Time { return testNow })}).Apply(ctx, "T000", sessDM,
+		[]dslack.Span{{FromTS: "1700000000.000000"}})
+	if err != nil || len(segs) != 1 {
+		t.Fatalf("segments %v %v", segs, err)
+	}
+	ref := sessDM + "/" + sessReply
+	if code := w.te.run("slack", "send", ref, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 approved") {
+		t.Fatalf("slack send: exit %d: %s %s", code, w.te.out, w.te.err)
+	}
+	w.te.out.Reset()
+	if code := w.te.run("outbox", "new", ref, "later"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 saved") {
+		t.Fatalf("outbox new: exit %d: %s %s", code, w.te.out, w.te.err)
+	}
+	ds := w.drafts(t)
+	if len(ds) != 2 || ds[0].Unit != segs[0] || ds[1].Unit != segs[0] {
+		t.Fatalf("drafts %+v", ds)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v", sent, err)
+	}
+	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessDM || posts[0].Get("thread_ts") != sessParent {
+		t.Fatalf("posts %v", posts)
+	}
+}
+
 func TestSlackDraftRefusesAnEffectItsIntentDoesNotList(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)

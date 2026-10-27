@@ -304,11 +304,11 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		return err
 	}
 	cr := api.DraftCreate{Unit: u, Source: string(dturn.Terminal)}
+	if slacksend.IsMessage(pos[0]) {
+		cr.Target = pos[0]
+	}
 	if *react != "" {
 		cr.Kind, cr.Reaction = api.DraftReact, *react
-		if slacksend.IsMessage(pos[0]) {
-			cr.Target = pos[0]
-		}
 	} else {
 		cr.Kind, cr.Text = api.DraftReply, pos[1]
 	}

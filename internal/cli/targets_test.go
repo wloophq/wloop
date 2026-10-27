@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,5 +72,20 @@ func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
 	}
 	if n := len(te.srv.Calls("conversations.replies")); n != 0 {
 		t.Fatalf("conversations.replies calls %d, want none", n)
+	}
+}
+
+func TestTheDaemonResolvesASlackRefWithoutAskingItself(t *testing.T) {
+	te := newSlackTestEnv(t)
+	te.saveToken(t, fakeToken())
+	seg := dslack.ThreadUnit("T000", "C000", "1700000000.000100")
+	te.resolve = func(_ context.Context, address string) (unit.Unit, bool, error) {
+		return seg, address == "C000/1700000050.000200", nil
+	}
+	if u, err := te.unitTarget(context.Background(), "C000/1700000050.000200"); err != nil || u != seg {
+		t.Fatalf("unitTarget = %+v, %v", u, err)
+	}
+	if _, err := te.unitTarget(context.Background(), "C000/1700000060.000200"); err == nil || !strings.Contains(err.Error(), "runs no Slack plugin") {
+		t.Fatalf("an address the daemon does not resolve: %v", err)
 	}
 }

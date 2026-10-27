@@ -188,16 +188,20 @@ func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, 
 	if _, err := e.slack.kit(cfg.Slack, nil).Store.Load(); errors.Is(err, auth.ErrNotLoggedIn) {
 		return unit.Unit{}, fmt.Errorf("%w; run %q", err, brand.Command+" slack login")
 	}
-	c, err := e.daemonClient(ctx)
-	if err != nil {
-		return unit.Unit{}, err
+	resolve := e.resolve
+	if resolve == nil {
+		c, err := e.daemonClient(ctx)
+		if err != nil {
+			return unit.Unit{}, err
+		}
+		resolve = c.ResolveUnit
 	}
-	u, ok, err := c.ResolveUnit(ctx, message)
+	u, ok, err := resolve(ctx, message)
 	switch {
 	case err != nil:
 		return unit.Unit{}, err
 	case !ok || u.Provider != slackPlugin:
-		return unit.Unit{}, fmt.Errorf("the daemon resolves no Slack unit for %s", message)
+		return unit.Unit{}, fmt.Errorf("the daemon runs no Slack plugin to resolve %s; restart it after enabling Slack", message)
 	}
 	return u, nil
 }
@@ -469,7 +473,7 @@ func (e *Env) slackSendDraft(ctx context.Context, kit *slackKit, req send.Reques
 		}
 		return nil
 	}
-	cr := api.DraftCreate{Unit: u, Kind: api.DraftReply, Text: req.Text, Source: string(dturn.Terminal)}
+	cr := api.DraftCreate{Unit: u, Kind: api.DraftReply, Text: req.Text, Target: req.Target, Source: string(dturn.Terminal)}
 	return e.sendUserDraft(ctx, c, cr, yes, ready, false)
 }
 

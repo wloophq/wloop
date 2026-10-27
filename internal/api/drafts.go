@@ -117,7 +117,8 @@ type DraftCreate struct {
 	Kind     string    `json:"kind,omitempty"`
 	Text     string    `json:"text,omitempty"`
 	Reaction string    `json:"reaction,omitempty"`
-	// Target is the message a reaction goes on, when it is not the unit's own.
+	// Target is the message a reply answers or a reaction goes on, when it is
+	// not the unit's own.
 	Target string `json:"target,omitempty"`
 	Send   bool   `json:"send,omitempty"`
 	Source string `json:"source"`
