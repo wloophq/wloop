@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -141,172 +142,190 @@ var u7 = r7.Unit()
 
 func TestSweepAtMostOncePerChange(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	r.start(t)
-	noting := map[int]bool{2: true, 4: true, 10: true, 12: true, 22: true, 30: true, 44: true, 58: true}
-	last := time.Duration(0)
-	for m := 2; m <= 60; m += 2 {
-		r.clock.set(wakeStart.Add(time.Duration(m) * time.Minute))
-		r.log.Note(port.TopicJobs)
-		if noting[m] {
-			r.log.Note(port.TopicPRs, u7)
-			r.log.Note(port.TopicSourceEvents, u7)
-			last = time.Duration(m) * time.Minute
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		r.start(t)
+		noting := map[int]bool{2: true, 4: true, 10: true, 12: true, 22: true, 30: true, 44: true, 58: true}
+		last := time.Duration(0)
+		for m := 2; m <= 60; m += 2 {
+			r.clock.set(wakeStart.Add(time.Duration(m) * time.Minute))
+			r.log.Note(port.TopicJobs)
+			if noting[m] {
+				r.log.Note(port.TopicPRs, u7)
+				r.log.Note(port.TopicSourceEvents, u7)
+				last = time.Duration(m) * time.Minute
+			}
+			want := 0
+			if noting[m] {
+				want = 1
+			}
+			if n := r.due(t); n != want {
+				t.Fatalf("minute %d: %d sweeps, want %d", m, n, want)
+			}
 		}
-		want := 0
-		if noting[m] {
-			want = 1
+		if n := r.sw.runs.Load(); n != 1+8 {
+			t.Fatalf("%d sweeps in the hour, want the start plus 8", n)
 		}
-		if n := r.due(t); n != want {
-			t.Fatalf("minute %d: %d sweeps, want %d", m, n, want)
+		if n := r.at(t, last+time.Hour-time.Second); n != 0 {
+			t.Fatalf("%d sweeps before the watchdog", n)
 		}
-	}
-	if n := r.sw.runs.Load(); n != 1+8 {
-		t.Fatalf("%d sweeps in the hour, want the start plus 8", n)
-	}
-	if n := r.at(t, last+time.Hour-time.Second); n != 0 {
-		t.Fatalf("%d sweeps before the watchdog", n)
-	}
-	if n := r.at(t, last+time.Hour); n != 1 {
-		t.Fatalf("watchdog: %d sweeps, want 1", n)
-	}
+		if n := r.at(t, last+time.Hour); n != 1 {
+			t.Fatalf("watchdog: %d sweeps, want 1", n)
+		}
+	})
 }
 
 func TestIdleHourOneSweep(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	r.start(t)
-	r.sw.runs.Store(0)
-	for m := 2; m <= 60; m += 2 {
-		r.clock.set(wakeStart.Add(time.Duration(m) * time.Minute))
-		r.log.Note(port.TopicJobs)
-		r.log.Note(port.TopicMeta)
-		r.due(t)
-	}
-	if n := r.sw.runs.Load(); n != 1 {
-		t.Fatalf("an idle hour ran %d sweeps, want 1 (the watchdog)", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		r.start(t)
+		r.sw.runs.Store(0)
+		for m := 2; m <= 60; m += 2 {
+			r.clock.set(wakeStart.Add(time.Duration(m) * time.Minute))
+			r.log.Note(port.TopicJobs)
+			r.log.Note(port.TopicMeta)
+			r.due(t)
+		}
+		if n := r.sw.runs.Load(); n != 1 {
+			t.Fatalf("an idle hour ran %d sweeps, want 1 (the watchdog)", n)
+		}
+	})
 }
 
 func TestWatchdogRunsHourly(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	r.start(t)
-	for h := 1; h <= 3; h++ {
-		if n := r.at(t, time.Duration(h)*time.Hour-time.Second); n != 0 {
-			t.Fatalf("hour %d: %d sweeps before the watchdog", h, n)
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		r.start(t)
+		for h := 1; h <= 3; h++ {
+			if n := r.at(t, time.Duration(h)*time.Hour-time.Second); n != 0 {
+				t.Fatalf("hour %d: %d sweeps before the watchdog", h, n)
+			}
+			if n := r.at(t, time.Duration(h)*time.Hour); n != 1 {
+				t.Fatalf("hour %d: %d sweeps, want 1", h, n)
+			}
 		}
-		if n := r.at(t, time.Duration(h)*time.Hour); n != 1 {
-			t.Fatalf("hour %d: %d sweeps, want 1", h, n)
-		}
-	}
+	})
 }
 
 func TestKickDuringRunCoalesces(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	first := true
-	r.sw.during = func() {
-		if first {
-			first = false
-			for range 3 {
-				r.log.Note(port.TopicPRs, u7)
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		first := true
+		r.sw.during = func() {
+			if first {
+				first = false
+				for range 3 {
+					r.log.Note(port.TopicPRs, u7)
+				}
 			}
 		}
-	}
-	r.start(t)
-	if n := r.at(t, sweepSettle); n != 1 {
-		t.Fatalf("3 notes during a run started %d runs after it, want 1", n)
-	}
+		r.start(t)
+		if n := r.at(t, sweepSettle); n != 1 {
+			t.Fatalf("3 notes during a run started %d runs after it, want 1", n)
+		}
+	})
 }
 
 func TestOwnWritesDoNotWake(t *testing.T) {
 	t.Parallel()
 	t.Run("events and rounds", func(t *testing.T) {
-		r := newWakeRig(t, nil)
-		r.sw.during = func() {
-			r.log.Note(port.TopicLoopEvents, u7)
-			r.log.Note(port.TopicRounds)
-			r.log.Note(port.TopicJobs)
-		}
-		r.start(t)
-		if n := r.due(t); n != 0 {
-			t.Fatalf("the sweep's own writes woke %d runs", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newWakeRig(t, nil)
+			r.sw.during = func() {
+				r.log.Note(port.TopicLoopEvents, u7)
+				r.log.Note(port.TopicRounds)
+				r.log.Note(port.TopicJobs)
+			}
+			r.start(t)
+			if n := r.due(t); n != 0 {
+				t.Fatalf("the sweep's own writes woke %d runs", n)
+			}
+		})
 	})
 	t.Run("a snapshot read that moves the projection", func(t *testing.T) {
-		r := newWakeRig(t, nil)
-		r.sw.during = func() {
-			r.log.Note(port.TopicAgents)
-			r.sw.seen = r.log.Gen()
-		}
-		r.start(t)
-		if n := r.due(t); n != 0 {
-			t.Fatalf("the plan's own snapshot read woke %d runs", n)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			r := newWakeRig(t, nil)
+			r.sw.during = func() {
+				r.log.Note(port.TopicAgents)
+				r.sw.seen = r.log.Gen()
+			}
+			r.start(t)
+			if n := r.due(t); n != 0 {
+				t.Fatalf("the plan's own snapshot read woke %d runs", n)
+			}
+		})
 	})
 	t.Run("an agent change after the snapshot read", func(t *testing.T) {
-		r := newWakeRig(t, nil)
-		first := true
-		r.sw.during = func() {
-			r.sw.seen = r.log.Gen()
-			if first {
-				first = false
-				r.log.Note(port.TopicAgents)
+		synctest.Test(t, func(t *testing.T) {
+			r := newWakeRig(t, nil)
+			first := true
+			r.sw.during = func() {
+				r.sw.seen = r.log.Gen()
+				if first {
+					first = false
+					r.log.Note(port.TopicAgents)
+				}
 			}
-		}
-		r.start(t)
-		if n := r.at(t, sweepSettle); n != 1 {
-			t.Fatalf("an agent change the plan did not read woke %d runs, want 1", n)
-		}
+			r.start(t)
+			if n := r.at(t, sweepSettle); n != 1 {
+				t.Fatalf("an agent change the plan did not read woke %d runs, want 1", n)
+			}
+		})
 	})
 }
 
 func TestFailedIngestWakesNoSweep(t *testing.T) {
 	t.Parallel()
-	var r *wakeRig
-	r = newWakeRig(t, func(d *Deps) {
-		closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
-		if err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		var r *wakeRig
+		r = newWakeRig(t, func(d *Deps) {
+			closedDB, err := sqlitetest.Open(filepath.Join(d.StateDir, "closed.db"), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			closed := inventory.New(closedDB)
+			closedDB.Close()
+			c := &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
+			d.Collector, d.Ingest = c, []IngestJob{{ID: unit.GitHub, Job: c.IngestJob()}}
+		})
+		r.start(t)
+		in := r.s.jobs[ingestJobName(unit.GitHub)]
+		in.once(context.Background(), t.Logf, func(string, string) {})
+		if st := in.status(); st.LastErr == "" {
+			t.Fatalf("ingestion on a closed store should fail: %+v", st)
 		}
-		closed := inventory.New(closedDB)
-		closedDB.Close()
-		c := &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
-		d.Collector, d.Ingest = c, []IngestJob{{ID: unit.GitHub, Job: c.IngestJob()}}
+		if n := r.due(t); n != 0 {
+			t.Fatalf("a failed ingestion woke %d sweeps", n)
+		}
 	})
-	r.start(t)
-	in := r.s.jobs[ingestJobName(unit.GitHub)]
-	in.once(context.Background(), t.Logf, func(string, string) {})
-	if st := in.status(); st.LastErr == "" {
-		t.Fatalf("ingestion on a closed store should fail: %+v", st)
-	}
-	if n := r.due(t); n != 0 {
-		t.Fatalf("a failed ingestion woke %d sweeps", n)
-	}
 }
 
 func TestFirstRunAfterStartPlans(t *testing.T) {
 	t.Parallel()
-	for _, notes := range []int{0, 3} {
-		r := newWakeRig(t, nil)
-		for range notes {
-			r.log.Note(port.TopicJobs)
+	synctest.Test(t, func(t *testing.T) {
+		for _, notes := range []int{0, 3} {
+			r := newWakeRig(t, nil)
+			for range notes {
+				r.log.Note(port.TopicJobs)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan struct{})
+			go func() { r.job.loop(ctx, t.Logf, func(string, string) {}); close(done) }()
+			stop := sync.OnceFunc(func() {
+				cancel()
+				<-done
+			})
+			t.Cleanup(stop)
+			waitFor(t, func() bool { return r.sw.runs.Load() == 1 })
+			stop()
+			if n := r.sw.runs.Load(); n != 1 {
+				t.Fatalf("%d notes before start: %d runs, want 1", notes, n)
+			}
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan struct{})
-		go func() { r.job.loop(ctx, t.Logf, func(string, string) {}); close(done) }()
-		stop := sync.OnceFunc(func() {
-			cancel()
-			<-done
-		})
-		t.Cleanup(stop)
-		waitFor(t, func() bool { return r.sw.runs.Load() == 1 })
-		stop()
-		if n := r.sw.runs.Load(); n != 1 {
-			t.Fatalf("%d notes before start: %d runs, want 1", notes, n)
-		}
-	}
+	})
 }
 
 // deadlineRig sweeps with a deadline due after the start until it passes,
@@ -335,105 +354,119 @@ func deadlineRig(t *testing.T, due time.Duration) {
 
 func TestConflictWindowWakesSweep(t *testing.T) {
 	t.Parallel()
-	deadlineRig(t, 5*time.Minute)
+	synctest.Test(t, func(t *testing.T) {
+		deadlineRig(t, 5*time.Minute)
+	})
 }
 
 func TestCapRolloverWakesSweep(t *testing.T) {
 	t.Parallel()
-	deadlineRig(t, 15*time.Hour)
+	synctest.Test(t, func(t *testing.T) {
+		deadlineRig(t, 15*time.Hour)
+	})
 }
 
 func TestBlindBlockWakesAfterADay(t *testing.T) {
 	t.Parallel()
-	deadlineRig(t, 24*time.Hour)
+	synctest.Test(t, func(t *testing.T) {
+		deadlineRig(t, 24*time.Hour)
+	})
 }
 
 func TestALaterDeadlineReplacesAnEarlierOne(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	r.start(t)
-	r.job.at(wakeStart.Add(10 * time.Minute))
-	r.job.at(wakeStart.Add(20 * time.Minute))
-	if n := r.at(t, 10*time.Minute); n != 0 {
-		t.Fatalf("a replaced deadline ran %d sweeps", n)
-	}
-	if n := r.at(t, 20*time.Minute); n != 1 {
-		t.Fatalf("the deadline ran %d sweeps, want 1", n)
-	}
-	r.job.at(wakeStart.Add(30 * time.Minute))
-	r.job.at(time.Time{})
-	if n := r.at(t, 30*time.Minute); n != 0 {
-		t.Fatalf("a canceled deadline ran %d sweeps", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		r.start(t)
+		r.job.at(wakeStart.Add(10 * time.Minute))
+		r.job.at(wakeStart.Add(20 * time.Minute))
+		if n := r.at(t, 10*time.Minute); n != 0 {
+			t.Fatalf("a replaced deadline ran %d sweeps", n)
+		}
+		if n := r.at(t, 20*time.Minute); n != 1 {
+			t.Fatalf("the deadline ran %d sweeps, want 1", n)
+		}
+		r.job.at(wakeStart.Add(30 * time.Minute))
+		r.job.at(time.Time{})
+		if n := r.at(t, 30*time.Minute); n != 0 {
+			t.Fatalf("a canceled deadline ran %d sweeps", n)
+		}
+	})
 }
 
 func TestAChangeRightAfterARunSettlesFirst(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	r.start(t)
-	r.log.Note(port.TopicPRs, u7)
-	if n := r.at(t, sweepSettle-time.Second); n != 0 {
-		t.Fatalf("a change %v after a run ran %d sweeps", sweepSettle-time.Second, n)
-	}
-	if n := r.at(t, sweepSettle); n != 1 {
-		t.Fatalf("a settled change ran %d sweeps, want 1", n)
-	}
-	r.job.at(wakeStart.Add(sweepSettle + time.Second))
-	if n := r.at(t, sweepSettle+time.Second); n != 1 {
-		t.Fatalf("a deadline right after a run ran %d sweeps, want 1", n)
-	}
-	r.job.trigger()
-	if n := r.due(t); n != 1 {
-		t.Fatalf("a kick right after a run ran %d sweeps, want 1", n)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		r.start(t)
+		r.log.Note(port.TopicPRs, u7)
+		if n := r.at(t, sweepSettle-time.Second); n != 0 {
+			t.Fatalf("a change %v after a run ran %d sweeps", sweepSettle-time.Second, n)
+		}
+		if n := r.at(t, sweepSettle); n != 1 {
+			t.Fatalf("a settled change ran %d sweeps, want 1", n)
+		}
+		r.job.at(wakeStart.Add(sweepSettle + time.Second))
+		if n := r.at(t, sweepSettle+time.Second); n != 1 {
+			t.Fatalf("a deadline right after a run ran %d sweeps, want 1", n)
+		}
+		r.job.trigger()
+		if n := r.due(t); n != 1 {
+			t.Fatalf("a kick right after a run ran %d sweeps, want 1", n)
+		}
+	})
 }
 
 func TestFailedSweepRetriesWithBackoff(t *testing.T) {
 	t.Parallel()
 	t.Run("failed", func(t *testing.T) {
-		r := newWakeRig(t, nil)
-		r.sw.result = func(n int32) (string, error) {
-			if n <= 2 {
-				return "", errors.New("github: 502")
+		synctest.Test(t, func(t *testing.T) {
+			r := newWakeRig(t, nil)
+			r.sw.result = func(n int32) (string, error) {
+				if n <= 2 {
+					return "", errors.New("github: 502")
+				}
+				return "", nil
 			}
-			return "", nil
-		}
-		r.start(t)
-		for _, step := range []struct {
-			at   time.Duration
-			runs int
-		}{{2*time.Minute - time.Second, 0}, {2 * time.Minute, 1}, {6*time.Minute - time.Second, 0}, {6 * time.Minute, 1},
-			{6*time.Minute + time.Hour - time.Second, 0}, {6*time.Minute + time.Hour, 1}} {
-			if n := r.at(t, step.at); n != step.runs {
-				t.Fatalf("at +%v: %d sweeps, want %d", step.at, n, step.runs)
+			r.start(t)
+			for _, step := range []struct {
+				at   time.Duration
+				runs int
+			}{{2*time.Minute - time.Second, 0}, {2 * time.Minute, 1}, {6*time.Minute - time.Second, 0}, {6 * time.Minute, 1},
+				{6*time.Minute + time.Hour - time.Second, 0}, {6*time.Minute + time.Hour, 1}} {
+				if n := r.at(t, step.at); n != step.runs {
+					t.Fatalf("at +%v: %d sweeps, want %d", step.at, n, step.runs)
+				}
 			}
-		}
+		})
 	})
 	t.Run("skipped with a deadline", func(t *testing.T) {
-		r := newWakeRig(t, nil)
-		r.sw.due = func() time.Time {
-			if r.sw.runs.Load() == 1 {
-				return wakeStart.Add(time.Minute)
+		synctest.Test(t, func(t *testing.T) {
+			r := newWakeRig(t, nil)
+			r.sw.due = func() time.Time {
+				if r.sw.runs.Load() == 1 {
+					return wakeStart.Add(time.Minute)
+				}
+				return time.Time{}
 			}
-			return time.Time{}
-		}
-		r.sw.result = func(n int32) (string, error) {
-			if n <= 3 {
-				return "Orca not reachable", nil
+			r.sw.result = func(n int32) (string, error) {
+				if n <= 3 {
+					return "Orca not reachable", nil
+				}
+				return "", nil
 			}
-			return "", nil
-		}
-		r.start(t)
-		r.job.at(wakeStart.Add(time.Minute))
-		for _, step := range []struct {
-			at   time.Duration
-			runs int
-		}{{time.Minute, 1}, {5*time.Minute - time.Second, 0}, {5 * time.Minute, 1}, {13*time.Minute - time.Second, 0}, {13 * time.Minute, 1},
-			{13*time.Minute + time.Hour - time.Second, 0}, {13*time.Minute + time.Hour, 1}} {
-			if n := r.at(t, step.at); n != step.runs {
-				t.Fatalf("at +%v: %d sweeps, want %d", step.at, n, step.runs)
+			r.start(t)
+			r.job.at(wakeStart.Add(time.Minute))
+			for _, step := range []struct {
+				at   time.Duration
+				runs int
+			}{{time.Minute, 1}, {5*time.Minute - time.Second, 0}, {5 * time.Minute, 1}, {13*time.Minute - time.Second, 0}, {13 * time.Minute, 1},
+				{13*time.Minute + time.Hour - time.Second, 0}, {13*time.Minute + time.Hour, 1}} {
+				if n := r.at(t, step.at); n != step.runs {
+					t.Fatalf("at +%v: %d sweeps, want %d", step.at, n, step.runs)
+				}
 			}
-		}
+		})
 	})
 }
 
@@ -498,30 +531,32 @@ func (c *sleepClock) run(d time.Duration) {
 
 func TestADeadlineSurvivesAMachineSleep(t *testing.T) {
 	t.Parallel()
-	r := newWakeRig(t, nil)
-	clk := &sleepClock{wall: wakeStart}
-	r.job.clock = clk
-	r.start(t)
-	r.job.at(wakeStart.Add(30 * time.Minute))
-	ctx, cancel := context.WithCancel(context.Background())
-	done, exited := make(chan bool, 1), make(chan struct{})
-	go func() {
-		defer close(exited)
-		done <- r.job.wait(ctx)
-	}()
-	t.Cleanup(func() {
-		cancel()
-		<-exited
-	})
-	waitFor(t, func() bool { return clk.armed() > 0 })
-	clk.sleep(13 * time.Hour)
-	clk.run(waitSlice)
-	select {
-	case ok := <-done:
-		if !ok || r.job.deadline() != (time.Time{}) {
-			t.Fatalf("wait %v, deadline left %v", ok, r.job.deadline())
+	synctest.Test(t, func(t *testing.T) {
+		r := newWakeRig(t, nil)
+		clk := &sleepClock{wall: wakeStart}
+		r.job.clock = clk
+		r.start(t)
+		r.job.at(wakeStart.Add(30 * time.Minute))
+		ctx, cancel := context.WithCancel(context.Background())
+		done, exited := make(chan bool, 1), make(chan struct{})
+		go func() {
+			defer close(exited)
+			done <- r.job.wait(ctx)
+		}()
+		t.Cleanup(func() {
+			cancel()
+			<-exited
+		})
+		waitFor(t, func() bool { return clk.armed() > 0 })
+		clk.sleep(13 * time.Hour)
+		clk.run(waitSlice)
+		select {
+		case ok := <-done:
+			if !ok || r.job.deadline() != (time.Time{}) {
+				t.Fatalf("wait %v, deadline left %v", ok, r.job.deadline())
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("a deadline the machine slept through waited past one slice after the wake")
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("a deadline the machine slept through waited past one slice after the wake")
-	}
+	})
 }
