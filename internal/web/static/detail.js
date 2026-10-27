@@ -211,7 +211,7 @@ function verbButton(e, verb, label, run, extra = {}) {
     type: "button",
     class: "act" + (st.enabled ? "" : " off") + (extra.primary ? " primary" : ""),
     disabled: !st.enabled,
-    title: st.enabled ? undefined : st.reason,
+    title: [verbEntry(verb).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n") || undefined,
     "data-focus": `${extra.scope || "detail"}:${verb}:${e.id}`,
     onclick: run,
   }, label);
@@ -226,9 +226,13 @@ function askedArgs(verb) {
   return ask.args(String(v).trim());
 }
 
+// verbEntry is the catalog's word for verb: its label and summary.
+function verbEntry(verb) {
+  return ((typeof gtdState === "object" && gtdState.catalog && gtdState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
+}
+
 function verbLabel(verb) {
-  const v = ((typeof gtdState === "object" && gtdState.catalog && gtdState.catalog.verbs) || []).find((x) => x.verb === verb);
-  return (v && v.label) || verb;
+  return verbEntry(verb).label || verb;
 }
 
 function verbButtons(e) {

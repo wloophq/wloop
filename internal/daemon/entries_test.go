@@ -27,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 // entriesNow is newServerOn's now.
@@ -347,6 +348,36 @@ func TestCatalogServesViewsAndVerbs(t *testing.T) {
 	r.g.RegisterView(gtd.ViewReview, "review:", reviewSource{})
 	if get(t, r.s, api.GTDPath, &cat); cat.Views[len(cat.Views)-1].ID != "review" {
 		t.Fatalf("a registered review: %v", cat.Views)
+	}
+}
+
+func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
+	t.Parallel()
+	texts := intentload.GTDTexts{
+		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}},
+		Views: map[string]string{"next": "Now"},
+	}
+	r := newEntriesRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts} } })
+	var cat api.GTDCatalog
+	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
+		t.Fatalf("%d", code)
+	}
+	verbs := map[string]api.GTDVerb{}
+	for _, v := range cat.Verbs {
+		verbs[v.Verb] = v
+	}
+	if got := verbs["done"]; got.Label != "Finish" || got.Summary != "Close it" {
+		t.Errorf("done: %+v", got)
+	}
+	if got := verbs["someday"]; got.Label != "Someday" || got.Summary == "" {
+		t.Errorf("a verb the profile leaves out takes the bundled words: %+v", got)
+	}
+	labels := map[string]string{}
+	for _, v := range cat.Views {
+		labels[v.ID] = v.Label
+	}
+	if labels["next"] != "Now" || labels["inbox"] != "Inbox" {
+		t.Errorf("views %v", labels)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -26,6 +27,16 @@ func (s *Server) loaded() *intentload.Loaded {
 	}
 	return l
 }
+
+// bundledGTD are the bundled profile's words for the verbs and views, which
+// a profile that leaves one out falls back to.
+var bundledGTD = sync.OnceValue(func() intentload.GTDTexts {
+	l, err := turn.Bundled()
+	if err != nil {
+		panic(err)
+	}
+	return l.GTD
+})
 
 // isIntent tells an intent the registry offers or a user intent that failed
 // to load.

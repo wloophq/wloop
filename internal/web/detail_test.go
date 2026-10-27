@@ -272,3 +272,23 @@ process.stdout.write(JSON.stringify(out));`, []map[string]any{
 		}
 	}
 }
+
+func TestAVerbButtonSaysWhatItDoes(t *testing.T) {
+	var got struct {
+		On, Off string
+	}
+	e := entry("e-2", "next", func(e *api.EntryView) {
+		e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}, {Verb: "someday", Reason: "not on a someday entry"}}
+	})
+	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}}}
+	nodeRun(t, gtdPrelude(t), nil, `
+gtdState.catalog = input.cat;
+const pane = h("div", {}, ...verbButtons(input.entry));
+process.stdout.write(JSON.stringify({
+  On: byFocus(pane, "detail:done:e-2").attrs.title,
+  Off: byFocus(pane, "detail:someday:e-2").attrs.title,
+}));`, map[string]any{"cat": cat, "entry": e}, &got)
+	if got.On != "Close it" || got.Off != "Not now\nnot on a someday entry" {
+		t.Errorf("titles %q and %q", got.On, got.Off)
+	}
+}
