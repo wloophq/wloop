@@ -181,7 +181,7 @@ type Draft struct {
 var ErrTransition = errors.New("draft: transition not allowed")
 
 // Can says why d cannot move to s, nil when it can:
-// proposed->approved|discarded; approved->sending|discarded;
+// proposed->approved|discarded; approved->sending|failed|discarded;
 // sending->sent|failed; failed->approved (by hand only)|discarded.
 func (d Draft) Can(s State) error {
 	if !slices.Contains(transitions[d.State], s) {
@@ -192,7 +192,7 @@ func (d Draft) Can(s State) error {
 
 var transitions = map[State][]State{
 	Proposed: {Approved, Discarded},
-	Approved: {Sending, Discarded},
+	Approved: {Sending, Failed, Discarded},
 	Sending:  {Sent, Failed},
 	Failed:   {Approved, Discarded},
 }

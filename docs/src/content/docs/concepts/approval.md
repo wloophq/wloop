@@ -45,10 +45,12 @@ Every outbound post that an agent or a rule proposes (a reply, a nudge, a closin
 
 ```text
 proposed --> approved --> sending --> sent
-   |            |            |
-   v            v            v
-discarded    discarded     failed --> approved (retry, by hand)
+   |          |    |         |
+   v          v    |         v
+discarded  discarded +-----> failed --> approved (retry, by hand)
 ```
+
+An approved draft its publisher cannot take (the provider is off, or the draft cannot be placed) fails without ever being `sending`, so a restart never looks for a post that was never made.
 
 A draft goes out only once its approval policy lets it:
 

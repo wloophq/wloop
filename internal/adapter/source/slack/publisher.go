@@ -222,16 +222,25 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 }
 
 // Place names where a draft with no target posts. A thread unit's draft posts
-// in that thread (""). A DM segment has no thread of its own: its draft answers
-// the newest message its items anchor on, in that message's thread, which a
-// top-level message starts.
+// in that thread (""). A DM segment has no thread of its own: a message
+// answers the newest message its items anchor on, in that message's thread,
+// which a top-level message starts; a reaction goes on the newest message an
+// item started at, the counterpart's request. A message the user writes with
+// no items goes to the conversation, as typing in the DM does.
 func (p *Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
 	k, err := dslack.ParseUnit(d.Unit)
 	if err != nil || k.Segment == "" {
 		return "", nil
 	}
+	react := d.Delivery == draft.Reaction
 	if len(d.Items) == 0 {
-		return "", errors.New("a draft on a direct message segment names neither a target nor items whose messages place it")
+		switch {
+		case d.Origin.Kind != draft.OriginUser:
+			return "", errors.New("a draft on a direct message segment names neither a target nor items whose messages place it")
+		case react:
+			return "", errors.New("a reaction on a direct message needs the message it goes on, and the conversation alone names none")
+		}
+		return k.Conversation, nil
 	}
 	if p.Items == nil {
 		return "", errors.New("the items of a direct message segment cannot be read to place its draft")
@@ -245,7 +254,11 @@ func (p *Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
 		if !slices.Contains(d.Items, it.ID) {
 			continue
 		}
-		for _, a := range anchorsOf(it) {
+		anchors := anchorsOf(it)
+		if react {
+			anchors = []unit.Anchor{it.Origin}
+		}
+		for _, a := range anchors {
 			m, ok := send.ParseMessage(a.Ref)
 			if ok && m.Conversation == k.Conversation && dslack.CompareTS(m.TS, newest) > 0 {
 				newest = m.TS
@@ -438,7 +451,7 @@ func (p *Publisher) failed(pl plan, err error) error {
 // Verify looks for d posted by the user at or after startedAt, minus the
 // clock skew. A failed read says where to check.
 func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Time) (draft.Evidence, bool, error) {
-	pl, err := p.prepare(ctx, d)
+	pl, err := p.prepare(ctx, unplacedAsPosted(d))
 	if err != nil {
 		return draft.Evidence{}, false, p.unsure(ctx, d, pl, err)
 	}
@@ -489,6 +502,19 @@ func (p *Publisher) Verify(ctx context.Context, d draft.Draft, startedAt time.Ti
 		args.Cursor = page.NextCursor
 	}
 	return draft.Evidence{}, false, nil
+}
+
+// unplacedAsPosted is d with the conversation as its target when it is a
+// segment message sending with none: only a version that published such a
+// draft at the conversation's top level, before placement, left it so.
+func unplacedAsPosted(d draft.Draft) draft.Draft {
+	if strings.TrimSpace(d.Target) != "" || d.Delivery == draft.Reaction {
+		return d
+	}
+	if k, err := dslack.ParseUnit(d.Unit); err == nil && k.Segment != "" {
+		d.Target = k.Conversation
+	}
+	return d
 }
 
 // unsure is Verify's error when it cannot tell: it names where to look.
