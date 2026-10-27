@@ -96,7 +96,7 @@ func TestStartAgentSessionMintsImportsAndWaits(t *testing.T) {
 	}
 	settings := `{"permissions":{"allow":["mcp__acme__turn_end"],"deny":["Bash(open claude://*)"]}}`
 	handle, err := f.m.StartAgentSession(context.Background(), workspace.StartRequest{WorkspaceID: ws.ID, Session: testUUID,
-		Agent: "claude", Model: "claude-opus-4-5", Settings: settings})
+		Agent: "claude", Model: "claude-opus-4-5", Settings: settings, Title: "review acme/api#7 26/10 14:00"})
 	if err != nil || handle != HandleOf(testUUID) {
 		t.Fatalf("StartAgentSession = %q, %v", handle, err)
 	}
@@ -106,7 +106,7 @@ func TestStartAgentSessionMintsImportsAndWaits(t *testing.T) {
 		t.Fatalf("minted %d times", len(claude))
 	}
 	wantArgs := []string{"-p", mintBootstrap, "--session-id", testUUID, "--setting-sources", "user", "--strict-mcp-config",
-		"--max-turns", "1", "--output-format", "json", "--model", "claude-opus-4-5"}
+		"--max-turns", "1", "--output-format", "json", "--model", "claude-opus-4-5", "--name", "review acme/api#7 26/10 14:00"}
 	if c := claude[0]; !slices.Equal(c.Args, wantArgs) || c.Dir != ws.Path {
 		t.Fatalf("mint = %+v", c)
 	}
@@ -189,12 +189,13 @@ func TestWakeForksTheConversationAndRunsTheFork(t *testing.T) {
 		f.register(t, "registry_desktop.json", map[string]any{"cwd": ws.Path, "sessionId": next, "hostSessionId": HandleOf(next)})
 		return nil
 	}
-	handle, err := f.m.Wake(context.Background(), workspace.WakeRequest{WorkspaceID: ws.ID, Session: "loop-session", Handle: HandleOf(testUUID), Agent: "claude"})
+	handle, err := f.m.Wake(context.Background(), workspace.WakeRequest{WorkspaceID: ws.ID, Session: "loop-session", Handle: HandleOf(testUUID), Agent: "claude", Title: "triage acme/api#7 26/10 14:00"})
 	if err != nil || handle != HandleOf(next) {
 		t.Fatalf("Wake = %q, %v", handle, err)
 	}
 	mint := f.exec.ran("claude")
-	if len(mint) != 1 || !slices.Contains(mint[0].Args, "--fork-session") || !slices.Contains(mint[0].Args, testUUID) || !slices.Contains(mint[0].Args, next) {
+	if len(mint) != 1 || !slices.Contains(mint[0].Args, "--fork-session") || !slices.Contains(mint[0].Args, testUUID) || !slices.Contains(mint[0].Args, next) ||
+		!slices.Contains(mint[0].Args, "triage acme/api#7 26/10 14:00") {
 		t.Fatalf("mint = %+v", mint)
 	}
 	open := f.exec.ran("open")

@@ -76,6 +76,7 @@ type mHelp struct {
 type mSession struct {
 	Strategy      *string `toml:"strategy"`
 	Title         *string `toml:"title"`
+	Name          *string `toml:"name"`
 	CloseWhenDone bool    `toml:"close_when_done"`
 }
 

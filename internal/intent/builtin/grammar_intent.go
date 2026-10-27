@@ -67,6 +67,7 @@ var intentGrammar = []Key{
 	{Path: "session", In: SurfaceIntent, Kind: KindTable, Doc: "The agent session its turns run in."},
 	{Path: "session.strategy", In: SurfaceIntent, Kind: KindEnum, Values: named("reuse_live", "new"), Doc: "Whether a turn reuses the unit's live session or starts a new one."},
 	{Path: "session.title", In: SurfaceIntent, Kind: KindText, Doc: "The session's title: 1 to 12 lowercase letters."},
+	{Path: "session.name", In: SurfaceIntent, Kind: KindTemplate, Doc: "What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it."},
 	{Path: "session.close_when_done", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "The session closes when its turn is done."},
 	{Path: "intake", In: SurfaceIntent, Kind: KindBool, Default: "false", Doc: "Runs through numbered intake."},
 	{Path: "start_line", In: SurfaceIntent, Kind: KindText, Doc: "The intake's first line."},

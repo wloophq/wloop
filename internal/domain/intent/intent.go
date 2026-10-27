@@ -144,8 +144,11 @@ func (d Def) Runs(runner string) bool {
 }
 
 type Session struct {
-	Strategy      string // reuse_live | new
-	Title         string
+	Strategy string // reuse_live | new
+	Title    string
+	// Name is what the manager and the agent show the session as, over the
+	// name facts; empty renders as Title.
+	Name          Text
 	CloseWhenDone bool
 }
 

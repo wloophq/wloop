@@ -123,7 +123,11 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) e
 		return err
 	}
 	sent.resume(l.ResumeOf)
-	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, e.sessionTitle(r.Intent), func(string) bool { return true }, true)
+	name, err := e.sessionName(dintent.Name(r.Intent), r.Unit)
+	if err != nil {
+		return err
+	}
+	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, func(string) bool { return true }, true)
 	if err != nil {
 		return fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}

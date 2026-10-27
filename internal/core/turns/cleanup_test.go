@@ -65,7 +65,8 @@ func TestKeepSessions(t *testing.T) {
 		for _, c := range []struct {
 			title string
 			want  bool
-		}{{"triage 17/10 14:02", true}, {"nudge 17/10 14:02", true}, {"probe 17/10 14:02", false}, {"claude", false}} {
+		}{{"triage 17/10 14:02", true}, {"nudge 17/10 14:02", true}, {"triage acme/api#7 17/10 14:02", true},
+			{"probe 17/10 14:02", false}, {"claude", false}, {"triaged", false}, {"review", false}, {"review the plan", false}, {"nudge acme/api#7", false}} {
 			s, store, reg, sess, _ := newService(t)
 			cleanupCase{sess: turn.Session{ID: "term_1"}, unknown: true, title: c.title}.put(reg, store, sess)
 			keep(t, s)

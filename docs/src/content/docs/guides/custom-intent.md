@@ -42,6 +42,8 @@ states = ["done", "asked", "failed"]
 
 The directory name is the intent's name: a lower-case letter, then 1 to 23 lower-case letters, digits or `-`. It may not repeat a CLI command; a bundled intent's name overrides that intent, as [Change a bundled intent](#change-a-bundled-intent) shows.
 
+The session shows in Orca and Claude Desktop as its `session.name`, a template over the [name facts](/reference/facts/): `session = { ..., name = '{{.session.title}} {{.unit.label}} {{.session.started.Format "02/01 15:04"}}' }` names it `ask acme/api#7 26/10 14:05`. Without it, the session takes `session_name` from the profile's `defaults.toml`, which names it `ask acme/api#7`.
+
 ## 2. The instructions
 
 `<profile>/intents/ask-author/instructions.md.tmpl` is a Go template over the turn:

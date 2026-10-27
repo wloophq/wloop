@@ -140,7 +140,7 @@ func (m *Manager) StartAgentSession(ctx context.Context, req workspace.StartRequ
 	if err := mergeSettings(path, req.Settings); err != nil {
 		return "", fmt.Errorf("writing the session's settings: %w", err)
 	}
-	if err := m.mint(ctx, path, req.Session, "", req.Model); err != nil {
+	if err := m.mint(ctx, path, req.Session, "", req.Model, req.Title); err != nil {
 		return "", err
 	}
 	if _, err := m.Exec.Run(ctx, Cmd{Name: "open", Args: []string{"-g", "claude://resume?session=" + req.Session}}); err != nil {
@@ -154,7 +154,8 @@ var mintBootstrap = "This session was opened by " + brand.Name + ". Reply with t
 
 // mint has claude start the conversation uuid headlessly, so Desktop can
 // import it; with from, uuid continues the conversation from in a fork.
-func (m *Manager) mint(ctx context.Context, dir, uuid, from, model string) error {
+// Desktop titles the imported session with name.
+func (m *Manager) mint(ctx context.Context, dir, uuid, from, model, name string) error {
 	args := []string{"-p", mintBootstrap, "--session-id", uuid, "--setting-sources", "user",
 		"--strict-mcp-config", "--max-turns", "1", "--output-format", "json"}
 	if from != "" {
@@ -162,6 +163,9 @@ func (m *Manager) mint(ctx context.Context, dir, uuid, from, model string) error
 	}
 	if model != "" {
 		args = append(args, "--model", model)
+	}
+	if name != "" {
+		args = append(args, "--name", name)
 	}
 	out, err := m.Exec.Run(ctx, Cmd{Name: "claude", Args: args, Dir: dir, Env: mintEnv(m.environ())})
 	if err != nil {
@@ -227,7 +231,7 @@ func (m *Manager) Wake(ctx context.Context, req workspace.WakeRequest) (string, 
 		return "", fmt.Errorf("writing the session's settings: %w", err)
 	}
 	next := m.newUUID()
-	if err := m.mint(ctx, path, next, from, req.Model); err != nil {
+	if err := m.mint(ctx, path, next, from, req.Model, req.Title); err != nil {
 		return "", fmt.Errorf("waking the session %s: %w", req.Session, err)
 	}
 	if _, err := m.Exec.Run(ctx, Cmd{Name: "open", Args: []string{"-g", "claude://resume?session=" + next}}); err != nil {

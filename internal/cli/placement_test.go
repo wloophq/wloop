@@ -225,3 +225,25 @@ func TestAWakeThatFailsLateBindsTheProcessAndStartsANewSession(t *testing.T) {
 		t.Fatalf("stderr %q", te.err)
 	}
 }
+
+func TestAWakeNamesTheResumedSession(t *testing.T) {
+	t.Parallel()
+	te, m := sharedEnv(t, "")
+	m.Sessions = nil
+	te.registerSession(t, dturn.Session{ID: "old", WorkspaceID: sharedWS.ID, Unit: r7.Unit(), AgentSession: "conv-1", StartedAt: testNow.Add(-time.Hour)})
+	ctx := context.Background()
+	if err := te.repo.EndHandle(ctx, "old", testNow.Add(-30*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	d, err := te.intentDef("address")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, woke, err := te.wake(ctx, te.cfg, m, sharedWS, r7.Unit(), intentOptions(d, roundOptions{}), func(time.Time) bool { return true }); err != nil || !woke {
+		t.Fatalf("wake = %v, %v", woke, err)
+	}
+	const name = "triage acme/api#7 09/10 15:00"
+	if len(m.Wakes) != 1 || m.Wakes[0].Title != name || !strings.Contains(m.Wakes[0].Command, " --name '"+name+"'") {
+		t.Fatalf("wakes %+v", m.Wakes)
+	}
+}

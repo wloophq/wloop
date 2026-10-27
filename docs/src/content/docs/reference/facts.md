@@ -73,6 +73,14 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `turn.planned` | string | turn | The round the request planned: first, follow-up, or empty for none. |
 | `turn.stage` | string | turn | first or follow-up; only intents with dims = ["stage"] may read it. |
 | `unit.ref` | string | turn | The unit as the instructions name it, such as owner/repo#12. |
+| `unit.label` | string | name | The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key. |
+
+### A session's name (`session.*`; slot `name`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `session.title` | string | name | The manifest's session.title. |
+| `session.started` | timestamp | name | When the session starts; a template formats it with Go's layout, as {{.session.started.Format "02/01 15:04"}}. |
 
 ### A draft's actions (`draft.*`)
 

@@ -40,7 +40,11 @@ func (e *Env) nudge(ctx context.Context, cfg config.Config, r turn.Request, pr *
 	if err != nil {
 		return "", err
 	}
-	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, e.sessionTitle(r.Intent), opts.keepBlocked, opts.trusted)
+	name, err := e.roundName(opts, r.Unit)
+	if err != nil {
+		return "", err
+	}
+	p, err := e.startSession(ctx, cfg, ws, r.Unit, s, name, opts.keepBlocked, opts.trusted)
 	if err != nil {
 		return "", fmt.Errorf("%s: starting the agent: %w", ws.DisplayName, err)
 	}

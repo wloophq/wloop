@@ -18,6 +18,7 @@ var (
 	both = []FactSlot{ActionSlot, TurnSlot}
 	act  = []FactSlot{ActionSlot}
 	trn  = []FactSlot{TurnSlot}
+	nam  = []FactSlot{NameSlot}
 )
 
 func fact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
@@ -149,6 +150,9 @@ var otherFacts = []Fact{
 	enum(fact("turn.planned", expr.String, trn, "The round the request planned: first, follow-up, or empty for none."), enumOf("", "first", "follow-up")),
 	dim(enum(fact("turn.stage", expr.String, trn, "first or follow-up; only intents with dims = [\"stage\"] may read it."), enumOf(Stages...))),
 	fact("unit.ref", expr.String, trn, "The unit as the instructions name it, such as owner/repo#12."),
+	fact("unit.label", expr.String, nam, "The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key."),
+	fact("session.title", expr.String, nam, "The manifest's session.title."),
+	fact("session.started", expr.Time, nam, "When the session starts; a template formats it with Go's layout, as {{.session.started.Format \"02/01 15:04\"}}."),
 	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
 	enum(fact("pr.last_review.decision", expr.String, trn, "The viewer's newest non-comment verdict; empty when none."), enumOf(ReviewStates...)),
