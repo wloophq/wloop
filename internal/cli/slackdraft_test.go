@@ -633,3 +633,47 @@ func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 		}
 	}
 }
+
+func TestPostingOutsideATurn(t *testing.T) {
+	t.Parallel()
+	link := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessThreaded
+	thread := dslack.ThreadUnit("T000", sessThreaded, sessParent)
+	session := draft.Origin{Kind: draft.OriginSession}
+	for name, handle := range map[string]string{"a session with no turn": "term_other1", "no session": ""} {
+		t.Run(name, func(t *testing.T) {
+			w := newSessionWiring(t)
+			w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
+			if got, isErr := w.callTool(t, "", handle, "slack_send_message", `{"target":"`+link+`","text":"release 1.2 is out"}`); isErr {
+				t.Fatalf("slack_send_message = %q", got)
+			}
+			if got, isErr := w.callTool(t, "", handle, "slack_react", `{"permalink":"`+link+`","emoji":"white_check_mark"}`); isErr {
+				t.Fatalf("slack_react = %q", got)
+			}
+			for _, d := range w.drafts(t) {
+				if d.State != draft.Sent || d.Unit != thread || d.Origin != session {
+					t.Fatalf("record %+v", d)
+				}
+			}
+			if n := len(w.drafts(t)); n != 2 {
+				t.Fatalf("records %d", n)
+			}
+
+			got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?","target":"`+link+`"}`)
+			if handle == "" {
+				if !isErr || !strings.Contains(got, "slack_draft refused") {
+					t.Fatalf("slack_draft with no session = %q", got)
+				}
+				return
+			}
+			if isErr {
+				t.Fatalf("slack_draft = %q", got)
+			}
+			if d := w.drafts(t)[0]; d.State != draft.Proposed || d.Unit != thread || d.Origin != session || d.Approval.Mode != draft.Wait {
+				t.Fatalf("draft %+v", d)
+			}
+			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
+				t.Fatalf("slack_draft with no permalink = %q", got)
+			}
+		})
+	}
+}
