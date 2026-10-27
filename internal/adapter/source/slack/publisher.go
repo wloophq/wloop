@@ -306,9 +306,10 @@ func (p *Publisher) resolve(ctx context.Context, r send.Request, pl *plan) error
 
 var (
 	mentionRE = regexp.MustCompile(`@\{([^{}\s]+)\}`)
-	// typedTokenRE are the mention, channel and special tokens a draft's text spells out itself; only the
-	// mentions body converts from @{slack:U...} reach Slack as tokens.
+	// typedTokenRE are the mention, channel and special tokens a draft's text spells out itself; only
+	// user mentions, typed or written @{slack:U...}, reach Slack as tokens.
 	typedTokenRE     = regexp.MustCompile(`<[@#!][^<>]*>`)
+	typedUserRE      = regexp.MustCompile(`^<@([^<>|]+)(?:\|[^<>]*)?>$`)
 	broadcastRE      = regexp.MustCompile(`^<!(?:channel|here|everyone|subteam\^)`)
 	plainBroadcastRE = regexp.MustCompile(`(^|[^\w@])@(channel|here|everyone)\b`)
 )
@@ -326,7 +327,7 @@ var (
 	nameEscape = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "@", "@\u2060")
 )
 
-// body is d's text as Slack takes it: Mrkdwn, a slack mention as <@U...>,
+// body is d's text as Slack takes it: Mrkdwn, a slack mention or a typed <@U...> as <@U...>,
 // any other person by name, which pings nobody.
 func (p *Publisher) body(ctx context.Context, d draft.Draft) (string, error) {
 	var held []string
@@ -340,6 +341,9 @@ func (p *Publisher) body(ctx context.Context, d draft.Draft) (string, error) {
 		if broadcastRE.MatchString(m) {
 			errs = append(errs, fmt.Errorf("%s is a broadcast mention; drafts never ping a channel or a group", m))
 			return m
+		}
+		if u := typedUserRE.FindStringSubmatch(m); u != nil && userIDRE.MatchString(u[1]) {
+			return hold("<@" + u[1] + ">")
 		}
 		return hold(nameEscape.Replace(m))
 	})
