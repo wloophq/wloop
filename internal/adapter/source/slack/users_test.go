@@ -3,20 +3,18 @@ package slack
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 )
 
 func TestUserCacheFetchesOnce(t *testing.T) {
 	f := newFixture(t)
 	f.login(t)
-	release := make(chan struct{})
-	f.api.Handle("users.info", func(v url.Values) any {
-		<-release
-		return map[string]any{"user": map[string]any{"id": v.Get("user"), "name": "person"}}
-	})
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	for i := range 100 {
@@ -26,8 +24,6 @@ func TestUserCacheFetchesOnce(t *testing.T) {
 			f.p.deliver(ctx, delta(t, event(fmt.Sprintf("Ev%d", i), evMsg(dm1, "im", other, ts(1+i), "burst"))))
 		}()
 	}
-	time.Sleep(50 * time.Millisecond)
-	close(release)
 	wg.Wait()
 	if n := len(f.api.Calls("users.info")); n != 1 {
 		t.Fatalf("users.info calls %d", n)
@@ -47,4 +43,45 @@ func TestUserCacheFetchesOnce(t *testing.T) {
 	if n := len(f.api.Calls("users.info")); n != 2 {
 		t.Fatalf("a user older than a day was not fetched again: %d calls", n)
 	}
+}
+
+func TestUserCacheCallersShareOneLoad(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var loads atomic.Int32
+		release := make(chan struct{})
+		c := &userCache{now: func() time.Time { return t0 }, load: func(ctx context.Context, id string) (dslack.User, error) {
+			loads.Add(1)
+			<-release
+			return dslack.User{ID: id, Name: "person", Fetched: t0}, nil
+		}}
+		free := sync.OnceFunc(func() { close(release) })
+		var wg sync.WaitGroup
+		t.Cleanup(func() {
+			free()
+			wg.Wait()
+		})
+		got := make(chan dslack.User, 100)
+		for range 100 {
+			wg.Go(func() {
+				u, err := c.get(context.Background(), other)
+				if err != nil {
+					t.Error(err)
+				}
+				got <- u
+			})
+		}
+		synctest.Wait()
+		if n := loads.Load(); n != 1 {
+			t.Fatalf("%d loads while one was in flight", n)
+		}
+		free()
+		for range 100 {
+			if u := <-got; u.ID != other || u.Name != "person" {
+				t.Fatalf("user %+v", u)
+			}
+		}
+		if n := loads.Load(); n != 1 {
+			t.Fatalf("%d loads", n)
+		}
+	})
 }
