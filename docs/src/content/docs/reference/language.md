@@ -233,7 +233,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `entry.verb`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
@@ -244,6 +244,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
+  - `entry.verb`: Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
 - `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
@@ -293,6 +294,13 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `schema` (file, default `schema.json`): The JSON schema of its answer, beside the manifest.
 - `notify.self`:
   - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
+- `entry.verb`:
+  - `verb` (one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss`): The verb run on the entry. Required.
+  - `until` (string): With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.
+  - `on_activity` (string): With schedule, `true` returns the entry on new activity on its unit.
+  - `on` (string): With waiting, the people the entry waits on, comma-separated.
+  - `resurface` (string): With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.
+  - `set` (string): With context, the contexts, comma-separated; with area, the area.
 
 ## Defaults (`defaults.toml`)
 

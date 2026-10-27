@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -28,7 +29,31 @@ const (
 	StepAnswerRefuse = "answer.refuse"
 	StepClassify     = "classify"
 	StepNotifySelf   = "notify.self"
+	StepEntryVerb    = "entry.verb"
 )
+
+// EntryStepVerbs are the verbs entry.verb runs: the moves of an entry
+// between lists and its focus, context and area. Approving, delegating and
+// answering never come from automation.
+var EntryStepVerbs = verbNames(gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference,
+	gtd.VerbFocus, gtd.VerbContext, gtd.VerbArea, gtd.VerbDone, gtd.VerbDismiss)
+
+// EntryVerbArgs are the arguments entry.verb passes to each verb that
+// takes any; the verb ignores every other.
+var EntryVerbArgs = map[string][]string{
+	string(gtd.VerbSchedule): {"until", "on_activity"},
+	string(gtd.VerbWaiting):  {"on", "resurface"},
+	string(gtd.VerbContext):  {"set"},
+	string(gtd.VerbArea):     {"set"},
+}
+
+func verbNames(vs ...gtd.Verb) []string {
+	out := make([]string, len(vs))
+	for i, v := range vs {
+		out[i] = string(v)
+	}
+	return out
+}
 
 // The values of draft.propose's arguments.
 var (
@@ -69,6 +94,8 @@ var Steps = []StepDef{
 		"A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`."},
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,
 		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
+	{StepEntryVerb, providers(unit.Entry), workflow.ReachLocal, nil,
+		"Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
 }
 
 // StepArg is the grammar row of step use's argument k.

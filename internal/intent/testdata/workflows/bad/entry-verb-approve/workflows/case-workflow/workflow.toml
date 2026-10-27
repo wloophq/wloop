@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "entry"
+when = 'entry.state == "inbox"'
+
+[[step]]
+use = "entry.verb"
+verb = "approve"

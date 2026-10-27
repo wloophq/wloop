@@ -1,0 +1,7 @@
+summary = "Case"
+provider = "entry"
+when = 'entry.state == "next"'
+
+[[step]]
+use = "entry.verb"
+verb = "schedule"

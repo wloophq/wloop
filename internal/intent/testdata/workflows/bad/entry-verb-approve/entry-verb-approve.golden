@@ -1,0 +1,1 @@
+testdata/workflows/bad/entry-verb-approve/workflows/case-workflow/workflow.toml:7:8: step[0].verb: "approve" is not one of "next", "waiting", "schedule", "someday", "reference", "focus", "context", "area", "done" or "dismiss"

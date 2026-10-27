@@ -63,7 +63,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `step[]` | table |  | A step the run takes, in order. Required: at least one. |
-| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self` |  | The step. |
+| `step[].use` | one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`, `entry.verb` |  | The step. |
 | `step[].&lt;name&gt;` | string or list |  | The step's arguments. |
 
 ### Run approval
@@ -118,6 +118,12 @@ Steps run in order on each matching unit. The vocabulary is closed; the [facts](
 | `classify` | `prompt` | file | `prompt.md` | The classification's prompt, beside the manifest. |
 | `classify` | `schema` | file | `schema.json` | The JSON schema of its answer, beside the manifest. |
 | `notify.self` | `text` | file | `text.md.tmpl` | The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`. |
+| `entry.verb` | `verb` | one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss` |  | The verb run on the entry. Required. |
+| `entry.verb` | `until` | string |  | With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD. |
+| `entry.verb` | `on_activity` | string |  | With schedule, `true` returns the entry on new activity on its unit. |
+| `entry.verb` | `on` | string |  | With waiting, the people the entry waits on, comma-separated. |
+| `entry.verb` | `resurface` | string |  | With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD. |
+| `entry.verb` | `set` | string |  | With context, the contexts, comma-separated; with area, the area. |
 
 - A guard refuses a step instead of skipping it: the item stays in the plan with the reason, and runs when the guard passes.
 - A step that fails retries with backoff, three times per key, then stays `blocked` with its error.

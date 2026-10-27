@@ -529,6 +529,65 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "use": {
+                  "const": "entry.verb"
+                }
+              },
+              "required": [
+                "use"
+              ]
+            },
+            "then": {
+              "additionalProperties": false,
+              "properties": {
+                "on": {
+                  "description": "With waiting, the people the entry waits on, comma-separated.",
+                  "type": "string"
+                },
+                "on_activity": {
+                  "description": "With schedule, `true` returns the entry on new activity on its unit.",
+                  "type": "string"
+                },
+                "resurface": {
+                  "description": "With waiting, the date the entry resurfaces: RFC 3339 or YYYY-MM-DD.",
+                  "type": "string"
+                },
+                "set": {
+                  "description": "With context, the contexts, comma-separated; with area, the area.",
+                  "type": "string"
+                },
+                "until": {
+                  "description": "With schedule, the date the entry returns: RFC 3339 or YYYY-MM-DD.",
+                  "type": "string"
+                },
+                "use": {
+                  "const": "entry.verb"
+                },
+                "verb": {
+                  "description": "The verb run on the entry. Required.",
+                  "enum": [
+                    "next",
+                    "waiting",
+                    "schedule",
+                    "someday",
+                    "reference",
+                    "focus",
+                    "context",
+                    "area",
+                    "done",
+                    "dismiss"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "verb"
+              ]
+            }
           }
         ],
         "properties": {
@@ -544,7 +603,8 @@
               "turn.start",
               "draft.propose",
               "classify",
-              "notify.self"
+              "notify.self",
+              "entry.verb"
             ],
             "type": "string"
           }

@@ -44,6 +44,18 @@ The core's own moves and a project's verbs record the event with the change, in 
 
 An event workflow reads its entry's facts even once the entry is done or in the trash, so it reacts to the verb that took it there. The same holds while its runs wait and when its drafts are judged for withdrawal: guard on `entry.state` in `when` and `[drafts.withdraw]` when a run should not go on after the entry left its list.
 
+A workflow moves the entry itself with the `entry.verb` step: `verb = "someday"`, or `verb = "waiting"` with `on` and `resurface`, among the verbs that move an entry or set its focus, context or area. Approve, Delegate, Answer and Reply never come from a workflow. The plan blocks the step while the entry's state refuses the verb. A move a workflow makes records no verb event, so it never triggers another workflow.
+
+```toml
+summary = "Mark done a waiting entry whose unit has nothing open"
+provider = "entry"
+when = 'entry.state == "waiting" && entry.unit != "" && entry.items_open == 0'
+
+[[step]]
+use = "entry.verb"
+verb = "done"
+```
+
 ## The plan
 
 Evaluating the workflows yields **plan items**, each with a decision:
