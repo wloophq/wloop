@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -31,33 +30,30 @@ func (s *Server) slackReact(ctx context.Context, session string, arguments json.
 		Emoji     *string `json:"emoji"`
 		Remove    bool    `json:"remove"`
 	}
-	link, emoji, refusal := actArgs(slackReactName, "emoji", "Nothing was changed", arguments, &a, &a.Permalink, &a.Emoji)
+	link, emoji, refusal := s.actArgs(slackReactName, "problem_emoji_required", arguments, &a, &a.Permalink, &a.Emoji)
 	if refusal != nil {
 		return refusal
 	}
 	if !s.Slack.LoggedIn() {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackReactName)
 	}
 	got, err := s.Slack.React(ctx, session, send.Reaction{Permalink: link, Name: strings.Trim(strings.TrimSpace(emoji), ":"), Remove: a.Remove})
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackReactName)
 	}
 	if err != nil {
-		return text("Slack reaction failed: "+redactTokens(err.Error()), true)
+		return s.failed(slackReactName, err)
 	}
-	return text(reactedText(got, a.Remove, link), false)
-}
-
-func reactedText(r send.Reacted, remove bool, link string) string {
+	name := "reacted"
 	switch {
-	case remove && r.Unchanged:
-		return fmt.Sprintf("The message had no :%s: of the user; nothing changed: %s", r.Name, link)
-	case remove:
-		return fmt.Sprintf("Removed :%s: from the message in %s: %s", r.Name, r.Conversation, link)
-	case r.Unchanged:
-		return fmt.Sprintf("The message already had :%s: of the user; nothing changed: %s", r.Name, link)
+	case a.Remove && got.Unchanged:
+		name = "absent"
+	case a.Remove:
+		name = "removed"
+	case got.Unchanged:
+		name = "already"
 	}
-	return fmt.Sprintf("Reacted :%s: to the message in %s: %s", r.Name, r.Conversation, link)
+	return s.answer(slackReactName, name, fields{"Emoji": got.Name, "Conversation": got.Conversation, "Permalink": link}, false)
 }
 
 func (s *Server) slackEdit(ctx context.Context, session string, arguments json.RawMessage) any {
@@ -65,38 +61,35 @@ func (s *Server) slackEdit(ctx context.Context, session string, arguments json.R
 		Permalink *string `json:"permalink"`
 		Text      *string `json:"text"`
 	}
-	link, body, refusal := actArgs(slackEditName, "text", "Nothing was changed", arguments, &a, &a.Permalink, &a.Text)
+	link, body, refusal := s.actArgs(slackEditName, "problem_text_required", arguments, &a, &a.Permalink, &a.Text)
 	if refusal != nil {
 		return refusal
 	}
 	if broadcastToken.MatchString(body) {
-		return text("Nothing was changed: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to edit it themselves.", true)
+		return s.answer(slackEditName, "broadcast", nil, true)
 	}
 	if !s.Slack.LoggedIn() {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackEditName)
 	}
 	got, err := s.Slack.Edit(ctx, session, send.Edit{Permalink: link, Text: body})
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackEditName)
 	}
 	if err != nil {
-		return text("Slack edit failed: "+redactTokens(err.Error()), true)
+		return s.failed(slackEditName, err)
 	}
-	return text(fmt.Sprintf("Edited the message in %s: %s\n\n%s\n\nIt replaced:\n\n%s", got.Conversation, link, got.Text, got.Replaced), false)
+	return s.answer(slackEditName, "edited", fields{"Conversation": got.Conversation, "Permalink": link, "Text": got.Text, "Replaced": got.Replaced}, false)
 }
 
 // actArgs decodes the arguments of slack_react or slack_edit into a, whose
-// fields link and value point to: a message permalink and field. refusal is
-// the tool's answer when they are not, starting with nothing.
-func actArgs(name, field, nothing string, arguments json.RawMessage, a any, link, value **string) (string, string, map[string]any) {
+// fields link and value point to: a message permalink and the other
+// argument, whose absence is the answer missing. refusal is the tool's
+// answer when they are not.
+func (s *Server) actArgs(tool, missing string, arguments json.RawMessage, a any, link, value **string) (string, string, map[string]any) {
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		reason := "an object with permalink and " + field
-		if err != nil {
-			reason += " (" + err.Error() + ")"
-		}
-		return "", "", text(nothing+": the arguments are not "+reason+".", true)
+		return "", "", s.badArguments(tool, err)
 	}
 	var problems []string
 	l := ""
@@ -104,13 +97,13 @@ func actArgs(name, field, nothing string, arguments json.RawMessage, a any, link
 		l = strings.TrimSpace(**link)
 	}
 	if !send.IsPermalink(l) {
-		problems = append(problems, "permalink: required, a Slack message permalink")
+		problems = append(problems, s.say(tool, "problem_permalink", nil))
 	}
 	if *value == nil || strings.TrimSpace(**value) == "" {
-		problems = append(problems, field+": required, not empty")
+		problems = append(problems, s.say(tool, missing, nil))
 	}
 	if len(problems) > 0 {
-		return "", "", text(nothing+"; fix these and call "+name+" again:\n"+strings.Join(problems, "\n"), true)
+		return "", "", s.fixThese(tool, problems)
 	}
 	return l, **value, nil
 }

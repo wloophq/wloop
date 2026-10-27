@@ -9,7 +9,7 @@ import (
 
 func TestTheEndpointRefusesARequestWithoutTheInstallKey(t *testing.T) {
 	key := "k1"
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Key: func() string { return key }}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Key: func() string { return key }}
 	withKey := func(v string) func(*http.Request) {
 		return func(r *http.Request) { r.Header.Set(api.MCPKeyHeader, v) }
 	}

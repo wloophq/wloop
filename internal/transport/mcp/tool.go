@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/link"
@@ -168,7 +166,7 @@ func ledgerOp() *schema {
 
 // ledgerText is what the items ledger made of the record's ops, "" when
 // none were applied.
-func ledgerText(r turns.Recorded) string {
+func (s *Server) ledgerText(r turns.Recorded) string {
 	l := r.Ledger
 	if l == nil {
 		return ""
@@ -183,26 +181,22 @@ func ledgerText(r turns.Recorded) string {
 	}
 	var parts []string
 	if applied > 0 || len(l.Applied)+len(l.Proposed)+len(l.Refused) == 0 {
-		parts = append(parts, fmt.Sprintf("%d applied", applied))
+		parts = append(parts, s.say(toolName, "ledger_applied", fields{"Count": applied}))
 	}
 	if unchanged > 0 {
-		parts = append(parts, fmt.Sprintf("%d unchanged", unchanged))
+		parts = append(parts, s.say(toolName, "ledger_unchanged", fields{"Count": unchanged}))
 	}
 	if len(l.Proposed) > 0 {
-		parts = append(parts, fmt.Sprintf("%d proposed to the user", len(l.Proposed)))
+		parts = append(parts, s.say(toolName, "ledger_proposed", fields{"Count": len(l.Proposed)}))
 	}
-	msg := " Ledger: " + strings.Join(parts, ", ")
 	if len(l.Refused) > 0 {
-		if len(parts) > 0 {
-			msg += ", "
-		}
 		why := make([]string, len(l.Refused))
 		for i, f := range l.Refused {
-			why[i] = fmt.Sprintf("ledger[%d] %s", f.Index, f.Reason)
+			why[i] = s.say(toolName, "ledger_refusal", fields{"Index": f.Index, "Reason": f.Reason})
 		}
-		msg += fmt.Sprintf("%d refused: %s", len(l.Refused), strings.Join(why, "; "))
+		parts = append(parts, s.say(toolName, "ledger_refused", fields{"Count": len(l.Refused), "Why": strings.Join(why, "; ")}))
 	}
-	return msg + "."
+	return strings.Join(parts, ", ")
 }
 
 func text(msg string, isError bool) map[string]any {
@@ -215,7 +209,7 @@ func text(msg string, isError bool) map[string]any {
 func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawMessage) any {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(arguments, &raw); err != nil || raw == nil {
-		return text("The arguments are not an object with turn and record.", true)
+		return s.badArguments(toolName, err)
 	}
 	var problems record.Problems
 	var extra []string
@@ -226,20 +220,20 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 	}
 	if len(extra) > 0 {
 		slices.Sort(extra)
-		problems = append(problems, "arguments: only turn and record, not "+strings.Join(extra, ", "))
+		problems = append(problems, s.say(toolName, "problem_extra_arguments", fields{"Keys": strings.Join(extra, ", ")}))
 	}
 	var id string
 	if v, ok := raw["turn"]; ok && json.Unmarshal(v, &id) != nil {
-		problems = append(problems, "turn: a string, the id on the first line of the turn's instructions")
+		problems = append(problems, s.say(toolName, "problem_turn_type", nil))
 	} else if id = strings.TrimSpace(id); id == "" {
-		problems = append(problems, "turn: required; the id on the first line of the turn's instructions")
+		problems = append(problems, s.say(toolName, "problem_turn_required", nil))
 	}
 	rawRecord := raw["record"]
 	var rec record.Record
 	if len(rawRecord) == 0 || string(rawRecord) == "null" {
-		problems = append(problems, "record: required")
+		problems = append(problems, s.say(toolName, "problem_record_required", nil))
 	} else if r, err := record.Parse(rawRecord); err != nil {
-		problems = append(problems, "record: "+err.Error())
+		problems = append(problems, s.say(toolName, "problem_record", fields{"Error": err.Error()}))
 	} else {
 		rec = r
 		var bad record.Problems
@@ -248,30 +242,20 @@ func (s *Server) turnEnd(ctx context.Context, handle string, arguments json.RawM
 		}
 	}
 	if len(problems) > 0 {
-		return refused(problems)
+		return s.fixThese(toolName, problems)
 	}
 	got, err := s.Turns.RecordTurnEnd(ctx, turns.RecordRequest{Session: handle, Turn: id, Via: "mcp", Record: rec})
 	var bad record.Problems
 	if errors.As(err, &bad) {
-		return refused(bad)
+		return s.fixThese(toolName, bad)
 	}
 	var refusal turns.Refusal
 	if errors.As(err, &refusal) {
-		return text(brand.Name+" refused the record: "+refusal.Reason+".", true)
+		return s.answer(toolName, "refused_record", fields{"Reason": refusal.Reason}, true)
 	}
 	if err != nil {
-		return text(brand.Name+" could not store the record: "+err.Error()+"; call turn_end again.", true)
+		return s.answer(toolName, "store_failed", fields{"Error": err.Error()}, true)
 	}
-	msg := fmt.Sprintf("Recorded %s for %s.", got.State, got.Unit.Label())
-	if got.Note != "" {
-		msg = fmt.Sprintf("Recorded %s for %s, but %s.", got.State, got.Unit.Label(), got.Note)
-	}
-	if d := got.DroppedNote(); d != "" {
-		msg += " " + d
-	}
-	return text(msg+" End your turn."+ledgerText(got), false)
-}
-
-func refused(p record.Problems) map[string]any {
-	return text("The record was refused; fix these and call turn_end again:\n"+p.Error(), true)
+	return s.answer(toolName, "recorded", fields{"State": string(got.State), "Unit": got.Unit.Label(), "Note": got.Note, "Dropped": got.DroppedNote(),
+		"Ledger": s.ledgerText(got)}, false)
 }

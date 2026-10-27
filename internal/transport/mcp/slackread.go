@@ -39,36 +39,32 @@ func (s *Server) slackRead(ctx context.Context, _ string, arguments json.RawMess
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		reason := "an object with target and an optional limit"
-		if err != nil {
-			reason += "; " + err.Error()
-		}
-		return text("The arguments are not "+reason+".", true)
+		return s.badArguments(slackReadName, err)
 	}
 	var problems []string
 	if a.Target == nil || strings.TrimSpace(*a.Target) == "" {
-		problems = append(problems, "target: required")
+		problems = append(problems, s.say(slackReadName, "problem_target_required", nil))
 	}
 	limit := readLimit
 	if a.Limit != nil {
 		var n int
 		if err := json.Unmarshal(a.Limit, &n); err != nil || n < 1 || n > readLimitMax {
-			problems = append(problems, "limit: an integer from 1 to 200")
+			problems = append(problems, s.say(slackReadName, "problem_limit", fields{"Max": readLimitMax}))
 		}
 		limit = n
 	}
 	if len(problems) > 0 {
-		return text("Nothing was read; fix these and call "+slackReadName+" again:\n"+strings.Join(problems, "\n"), true)
+		return s.fixThese(slackReadName, problems)
 	}
 	if s.Slack != nil && !s.Slack.LoggedIn() {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackReadName)
 	}
 	out, err := s.SlackRead.Read(ctx, strings.TrimSpace(*a.Target), limit)
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackReadName)
 	}
 	if err != nil {
-		return text("Slack read failed: "+redactTokens(err.Error()), true)
+		return s.failed(slackReadName, err)
 	}
 	return text(redactTokens(out), false)
 }

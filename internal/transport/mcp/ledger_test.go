@@ -42,7 +42,7 @@ func ledgerServer(t *testing.T, l *turnstest.Ledger) (*Server, *turnstest.Store,
 	if _, err := svc.Start(ctx, "term_1", "abc"); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{Turns: svc, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: svc, Port: 47800}
 	return s, store, call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 }
 

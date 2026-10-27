@@ -65,7 +65,7 @@ const initialize = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"pro
 func TestSessionsOutsideTheWorkspaceManager(t *testing.T) {
 	for _, h := range []string{"", "${ORCA_TERMINAL_HANDLE}", "  ", "a b"} {
 		ft := &fakeTurns{seen: "untouched"}
-		s := &Server{Turns: ft, Port: 47800}
+		s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 		rec := call(t, s, "", h, initialize)
 		sid := rec.Header().Get("Mcp-Session-Id")
 		if rec.Code != http.StatusOK || sid == "" {
@@ -85,7 +85,7 @@ func TestSessionsOutsideTheWorkspaceManager(t *testing.T) {
 }
 
 func TestHandlelessSessionsDoNotReplaceEachOther(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	ping := `{"jsonrpc":"2.0","id":2,"method":"ping"}`
 	first := call(t, s, "", "", initialize).Header().Get("Mcp-Session-Id")
 	second := call(t, s, "", "${ORCA_TERMINAL_HANDLE}", initialize).Header().Get("Mcp-Session-Id")
@@ -107,7 +107,7 @@ func TestHandlelessSessionsDoNotReplaceEachOther(t *testing.T) {
 
 func TestTurnEndNeedsAHandle(t *testing.T) {
 	ft := &fakeTurns{}
-	s := &Server{Turns: ft, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "${ORCA_TERMINAL_HANDLE}", initialize).Header().Get("Mcp-Session-Id")
 	body := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","record":{"state":"settled","summary":"s"}}}}`
 	r := decodeResult(t, call(t, s, sid, "${ORCA_TERMINAL_HANDLE}", body))
@@ -120,7 +120,7 @@ func TestTurnEndNeedsAHandle(t *testing.T) {
 }
 
 func TestForeignHostAndOriginAreRefused(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	if rec := call(t, s, "", "term_1", initialize, func(r *http.Request) { r.Host = "evil.example:47800" }); rec.Code != http.StatusForbidden {
 		t.Errorf("host: %d", rec.Code)
 	}
@@ -134,7 +134,7 @@ func TestForeignHostAndOriginAreRefused(t *testing.T) {
 
 func TestUnknownSessionIDIsNotFound(t *testing.T) {
 	ft := &fakeTurns{}
-	s := &Server{Turns: ft, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	rec := call(t, s, "", "term_1", initialize)
 	sid := rec.Header().Get("Mcp-Session-Id")
 	if rec.Code != http.StatusOK || sid == "" || ft.seen != "term_1" {
@@ -144,14 +144,14 @@ func TestUnknownSessionIDIsNotFound(t *testing.T) {
 	if rec := call(t, s, sid, "term_1", list); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"turn_end"`) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	restarted := &Server{Turns: ft, Port: 47800}
+	restarted := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	if rec := call(t, restarted, sid, "term_1", list); rec.Code != http.StatusNotFound {
 		t.Fatalf("a restarted server knew an old session id: %d", rec.Code)
 	}
 }
 
 func TestDiscoverFallsBackToInitialize(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	rec := call(t, s, "", "term_1", `{"jsonrpc":"2.0","id":0,"method":"server/discover"}`)
 	if !strings.Contains(rec.Body.String(), "-32601") {
 		t.Fatalf("%s", rec.Body)
@@ -160,7 +160,7 @@ func TestDiscoverFallsBackToInitialize(t *testing.T) {
 
 func TestToolCallRefusesAMalformedRecord(t *testing.T) {
 	ft := &fakeTurns{}
-	s := &Server{Turns: ft, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	body := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"abc","record":{"state":"asked","summary":"two\nlines","question":{"kind":"choice","text":"q","options":[]}}}}}`
 	rec := call(t, s, sid, "term_1", body)
@@ -201,7 +201,7 @@ func decodeResult(t *testing.T, rec *httptest.ResponseRecorder) toolResult {
 
 func TestToolCallRecords(t *testing.T) {
 	ft := &fakeTurns{answer: turns.Recorded{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(), State: record.Settled, Added: true}}
-	s := &Server{Turns: ft, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	body := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","record":{"state":"settled","summary":"nothing new since my review"}}}}`
 
@@ -251,7 +251,7 @@ func TestToolCallRecords(t *testing.T) {
 }
 
 func TestNotificationsAndPing(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	if rec := call(t, s, sid, "term_1", `{"jsonrpc":"2.0","method":"notifications/initialized"}`); rec.Code != http.StatusAccepted || rec.Body.Len() != 0 {
 		t.Fatalf("notification: %d %q", rec.Code, rec.Body)
@@ -271,7 +271,7 @@ func TestNotificationsAndPing(t *testing.T) {
 }
 
 func TestInitializeNegotiatesTheVersion(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800, Version: "1.2.3"}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Version: "1.2.3"}
 	for client, want := range map[string]string{"2025-03-26": "2025-03-26", "2025-06-18": "2025-06-18", "2099-01-01": "2025-06-18"} {
 		body := strings.Replace(initialize, "2025-06-18", client, 1)
 		var got struct {
@@ -293,7 +293,7 @@ func TestInitializeNegotiatesTheVersion(t *testing.T) {
 }
 
 func TestOversizedBodyIsRefused(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	big := `{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":"` + strings.Repeat("a", maxBody) + `"}}`
 	if rec := call(t, s, "", "term_1", big); rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("%d", rec.Code)
@@ -355,7 +355,7 @@ func TestSchemaMatchesTheRecord(t *testing.T) {
 }
 
 func TestOneMCPSessionPerHandle(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	ping := `{"jsonrpc":"2.0","id":2,"method":"ping"}`
 	first := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	other := call(t, s, "", "term_2", initialize).Header().Get("Mcp-Session-Id")
@@ -374,7 +374,7 @@ func TestOneMCPSessionPerHandle(t *testing.T) {
 }
 
 func TestDeleteRefusesAnotherHandlesSession(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	del := func(r *http.Request) { r.Method = http.MethodDelete }
 	if rec := call(t, s, sid, "term_2", "", del); rec.Code != http.StatusBadRequest {
@@ -390,7 +390,7 @@ func TestDeleteRefusesAnotherHandlesSession(t *testing.T) {
 
 func TestToolCallRefusesExtraArgumentsAndTrimsTheRound(t *testing.T) {
 	ft := &fakeTurns{answer: turns.Recorded{Unit: pr.Ref{Owner: "acme", Repo: "api", Number: 7}.Unit(), State: record.Settled}}
-	s := &Server{Turns: ft, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: ft, Port: 47800}
 	sid := call(t, s, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	extra := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"turn_end","arguments":{"turn":"r-1","pr":"acme/api#7","state":"done","record":{"state":"settled","summary":"s"}}}}`
 	r := decodeResult(t, call(t, s, sid, "term_1", extra))
@@ -408,7 +408,7 @@ func TestToolCallRefusesExtraArgumentsAndTrimsTheRound(t *testing.T) {
 }
 
 func TestOnlyJSONRPC20IsServed(t *testing.T) {
-	s := &Server{Turns: &fakeTurns{}, Port: 47800}
+	s := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	for _, body := range []string{
 		`{"id":1,"method":"initialize","params":{}}`,
 		`{"jsonrpc":"1.0","id":1,"method":"initialize","params":{}}`,

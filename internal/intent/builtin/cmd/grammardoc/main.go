@@ -393,6 +393,11 @@ func languagePage() (string, error) {
 			out = out[:len(out)-1]
 			continue
 		}
+		if s.surface == builtin.SurfaceTools {
+			out = append(out, lines(rows(s.surface))...)
+			out = append(out, toolAnswers()...)
+			continue
+		}
 		if s.surface != builtin.SurfaceStep {
 			out = append(out, lines(rows(s.surface))...)
 			continue
@@ -602,6 +607,32 @@ func stepArgs() []any {
 			"if":   map[string]any{"properties": map[string]any{"use": map[string]any{"const": st.Name}}, "required": []string{"use"}},
 			"then": then,
 		})
+	}
+	return out
+}
+
+// toolAnswers lists each tool's answers and the fields they read besides
+// the tool data's.
+func toolAnswers() []string {
+	out := []string{"", "Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides `Name`, `Command` and `PostsPerTurn`:", ""}
+	for _, tool := range builtin.Tools {
+		out = append(out, fmt.Sprintf("- `%s`:", tool.Name))
+		for _, a := range builtin.ToolAnswers {
+			if a.Tool != tool.Name {
+				continue
+			}
+			f := ""
+			if len(a.Fields) > 0 {
+				f = " (" + strings.Join(func() []string {
+					q := make([]string, len(a.Fields))
+					for i, x := range a.Fields {
+						q[i] = "`" + x + "`"
+					}
+					return q
+				}(), ", ") + ")"
+			}
+			out = append(out, fmt.Sprintf("  - `%s`%s: %s", a.Name, f, cell(a.Doc)))
+		}
 	}
 	return out
 }

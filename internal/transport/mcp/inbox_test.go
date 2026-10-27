@@ -60,7 +60,7 @@ func inboxSession(t *testing.T, handle string) *inboxRig {
 		Session: "term_1", State: turn.Started, SentAt: inboxAt.Add(-time.Hour), StartedAt: inboxAt.Add(-time.Minute)}}})
 	r.gtd = coregtd.New(coregtd.Deps{Store: r.entries, Items: noItems{}, Facts: enabledFacts{}, Clock: fixedClock{}})
 	svc := &messages.Service{Store: r.msgs, Books: r.books, Entries: r.gtd, Intents: turnstest.Intents(), Clock: fixedClock{}}
-	r.srv = &Server{Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
+	r.srv = &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800, Inbox: svc}
 	r.sid = call(t, r.srv, "", handle, initialize).Header().Get("Mcp-Session-Id")
 	if r.sid == "" {
 		t.Fatal("no session id")
@@ -92,7 +92,7 @@ func TestInboxPostListedOnlyWhenWired(t *testing.T) {
 	if names := listedTools(t, call(t, r.srv, r.sid, "term_1", list)); !slices.Contains(names, "inbox_post") {
 		t.Fatalf("tools %v", names)
 	}
-	bare := &Server{Turns: &fakeTurns{}, Port: 47800}
+	bare := &Server{Texts: bundledTexts, Turns: &fakeTurns{}, Port: 47800}
 	sid := call(t, bare, "", "term_1", initialize).Header().Get("Mcp-Session-Id")
 	if names := listedTools(t, call(t, bare, sid, "term_1", list)); slices.Contains(names, "inbox_post") {
 		t.Fatalf("listed without an Inbox: %v", names)

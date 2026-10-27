@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"regexp"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/slack/send"
 )
 
@@ -78,57 +76,35 @@ func (s *Server) slackSend(ctx context.Context, session string, arguments json.R
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		reason := "an object with target and text"
-		if err != nil {
-			reason += "; " + err.Error()
-		}
-		return text("The arguments are not "+reason+".", true)
+		return s.badArguments(slackSendName, err)
 	}
 	var problems []string
 	if a.Target == nil || strings.TrimSpace(*a.Target) == "" {
-		problems = append(problems, "target: required")
+		problems = append(problems, s.say(slackSendName, "problem_target_required", nil))
 	}
 	if a.Text == nil || strings.TrimSpace(*a.Text) == "" {
-		problems = append(problems, "text: required, not empty")
+		problems = append(problems, s.say(slackSendName, "problem_text_required", nil))
 	}
 	if len(problems) > 0 {
-		return text("Nothing was sent; fix these and call "+slackSendName+" again:\n"+strings.Join(problems, "\n"), true)
+		return s.fixThese(slackSendName, problems)
 	}
 	if broadcastToken.MatchString(*a.Text) {
-		return text("Nothing was sent: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to post it themselves.", true)
+		return s.answer(slackSendName, "broadcast", nil, true)
 	}
 	if !s.Slack.LoggedIn() {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackSendName)
 	}
 	sent, err := s.Slack.Send(ctx, session, send.Request{
 		Target: strings.TrimSpace(*a.Target), Text: *a.Text, Thread: a.Thread, Broadcast: a.Broadcast, Source: "session",
 	})
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackSendName)
 	}
 	if err != nil {
-		return text("Slack send failed: "+redactTokens(err.Error()), true)
+		return s.failed(slackSendName, err)
 	}
-	return text(postedText(sent), false)
-}
-
-func notLoggedIn() string {
-	return fmt.Sprintf("not logged in to Slack; run %q", brand.Command+" slack login")
-}
-
-func postedText(s send.Sent) string {
-	var b strings.Builder
-	b.WriteString("Posted to " + s.Conversation)
-	if s.Parent != "" {
-		fmt.Fprintf(&b, " in the thread %q", s.Parent)
-	}
-	if s.Permalink != "" {
-		b.WriteString(": " + s.Permalink)
-	} else {
-		fmt.Fprintf(&b, ": no permalink (channel %s, ts %s)", s.Channel, s.TS)
-	}
-	b.WriteString("\n\n" + s.Text)
-	return b.String()
+	return s.answer(slackSendName, "posted", fields{"Conversation": sent.Conversation, "Parent": sent.Parent, "Permalink": sent.Permalink,
+		"Channel": sent.Channel, "TS": sent.TS, "Text": sent.Text}, false)
 }
 
 var slackToken = regexp.MustCompile(`(?:xox[a-z]\.)?(?:xox[a-z]|xapp)-[A-Za-z0-9-]+`)

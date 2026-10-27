@@ -40,7 +40,12 @@ func toolsProblems(t *testing.T, bundled, user string) (map[string]ToolText, str
 func everyTool(extra string) string {
 	var b strings.Builder
 	for _, v := range builtin.Tools {
-		b.WriteString("[" + v.Name + "]\ndescription = \"" + v.Name + " does it\"\n")
+		b.WriteString("[" + v.Name + "]\ndescription = \"" + v.Name + " does it\"\n[" + v.Name + ".answers]\n")
+		for _, a := range builtin.ToolAnswers {
+			if a.Tool == v.Name {
+				b.WriteString(a.Name + " = \"" + a.Name + "\"\n")
+			}
+		}
 	}
 	return b.String() + extra
 }
@@ -59,10 +64,12 @@ func TestAUserToolTextReplacesTheBundledKeyByKey(t *testing.T) {
 
 func TestAToolTextFailsAtLoad(t *testing.T) {
 	for name, c := range map[string]struct{ user, want string }{
-		"unknown tool": {"[slack_raed]\ndescription = \"x\"\n", `slack_raed: names no tool; did you mean "slack_read"?`},
-		"empty":        {"[slack_read]\ndescription = \"\"\n", "slack_read.description: is required"},
-		"bad template": {"[slack_read]\ndescription = \"{{.Nme}}\"\n", "slack_read.description"},
-		"bad param":    {"[slack_read.params]\nlimit = \"{{if}}\"\n", "slack_read.params.limit"},
+		"unknown tool":   {"[slack_raed]\ndescription = \"x\"\n", `slack_raed: names no tool; did you mean "slack_read"?`},
+		"empty":          {"[slack_read]\ndescription = \"\"\n", "slack_read.description: is required"},
+		"bad template":   {"[slack_read]\ndescription = \"{{.Nme}}\"\n", "slack_read.description"},
+		"bad param":      {"[slack_read.params]\nlimit = \"{{if}}\"\n", "slack_read.params.limit"},
+		"unknown answer": {"[slack_read.answers]\nfailled = \"x\"\n", `slack_read.answers.failled: names no answer of slack_read; did you mean "failed"?`},
+		"unknown field":  {"[slack_read.answers]\nfailed = \"{{.Eror}}\"\n", "slack_read.answers.failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tools, got := toolsProblems(t, everyTool(""), c.user)
@@ -77,7 +84,7 @@ func TestAToolTextFailsAtLoad(t *testing.T) {
 }
 
 func TestABundledFileMissingAToolFails(t *testing.T) {
-	_, got := toolsProblems(t, strings.Replace(everyTool(""), "[slack_edit]", "[slack_edit_x]", 1), "")
+	_, got := toolsProblems(t, strings.ReplaceAll(everyTool(""), "[slack_edit", "[slack_edit_x"), "")
 	if !strings.Contains(got, "slack_edit: is missing") {
 		t.Fatalf("got:\n%s", got)
 	}
@@ -88,5 +95,16 @@ func TestTheSlackSendToolTellsTheAgentToAskWhenUnsure(t *testing.T) {
 	d := tools["slack_send_message"].Description
 	if !strings.Contains(d, "without their approval") || !strings.Contains(d, "ask them first") {
 		t.Fatalf("description %q", d)
+	}
+}
+
+func TestAnAnswerReadsItsFields(t *testing.T) {
+	tools, got := toolsProblems(t, everyTool(""), "[slack_read.answers]\nfailed = \"read failed: {{.Error}} ({{.Name}})\"\n")
+	if got != "" || tools["slack_read"].Answers["failed"] != "read failed: {{.Error}} ({{.Name}})" {
+		t.Fatalf("%q %+v", got, tools["slack_read"].Answers)
+	}
+	_, got = toolsProblems(t, strings.Replace(everyTool(""), "posted = \"posted\"\n", "", 1), "")
+	if !strings.Contains(got, ".answers.posted: is missing") {
+		t.Fatalf("a missing answer: %s", got)
 	}
 }

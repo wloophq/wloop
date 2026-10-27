@@ -308,6 +308,100 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `<name>.description` (template): What the tool does and when to call it, over the tool data. Required.
 - `<name>.params` (table by name): A parameter's description, by its path: a nested one as "record.state", an array's element as "items[]".
 - `<name>.params.<name>` (template): The parameter's description, over the tool data.
+- `<name>.answers` (table by name): What the tool answers the agent, by answer name; the reference lists each tool's answers and the fields they read.
+- `<name>.answers.<name>` (template): The answer, over the tool data and its fields.
+
+Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides `Name`, `Command` and `PostsPerTurn`:
+
+- `turn_end`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `problem_extra_arguments` (`Keys`): A problem: arguments besides turn and record.
+  - `problem_turn_type`: A problem: turn is not a string.
+  - `problem_turn_required`: A problem: turn is missing or empty.
+  - `problem_record_required`: A problem: record is missing.
+  - `problem_record` (`Error`): A problem: record does not decode.
+  - `refused_record` (`Reason`): The turn refused the record.
+  - `store_failed` (`Error`): The record could not be stored.
+  - `recorded` (`State`, `Unit`, `Note`, `Dropped`, `Ledger`): The record is stored: its state and unit, a note and what was dropped when any, and the ledger's outcome, "" when none.
+  - `ledger_applied` (`Count`): A part of the ledger's outcome: ops applied.
+  - `ledger_unchanged` (`Count`): A part of the ledger's outcome: ops that changed nothing.
+  - `ledger_proposed` (`Count`): A part of the ledger's outcome: ops proposed to the user.
+  - `ledger_refused` (`Count`, `Why`): A part of the ledger's outcome: ops refused, and why.
+  - `ledger_refusal` (`Index`, `Reason`): Why one op was refused.
+- `inbox_post`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `text_required`: The text is missing.
+  - `capped` (`Error`): The turn has too many messages waiting.
+  - `not_in_turn` (`Error`): The session has no started turn.
+  - `post_failed` (`Error`): The message could not be posted.
+  - `posted` (`ID`): The message is in the Inbox.
+- `slack_send_message`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_target_required`: A problem: target is missing.
+  - `problem_text_required`: A problem: text is missing or empty.
+  - `broadcast`: The text notifies a whole channel or group.
+  - `posted` (`Conversation`, `Parent`, `Permalink`, `Channel`, `TS`, `Text`): The message is posted: where, its permalink, "" when Slack gave none, and its text as posted.
+- `slack_read`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_target_required`: A problem: target is missing.
+  - `problem_limit` (`Max`): A problem: limit is out of range.
+- `slack_search`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_query_required`: A problem: query is missing or empty.
+  - `problem_after`: A problem: after is not a date.
+  - `problem_before`: A problem: before is not a date.
+  - `problem_before_after`: A problem: before is not after after.
+  - `problem_limit` (`Max`): A problem: limit is out of range.
+- `slack_draft`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_kind` (`Kinds`): A problem: kind is none of the kinds.
+  - `problem_reaction_required`: A problem: a react draft has no reaction.
+  - `problem_text_required`: A problem: text is missing or empty.
+  - `proposed` (`ID`, `Unit`, `Where`): The draft waits for the user.
+  - `approved` (`ID`, `Unit`, `Where`): The draft's policy approved it.
+  - `dry_run` (`ID`, `Unit`, `Where`): The draft's policy only stores it.
+- `slack_react`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_emoji_required`: A problem: emoji is missing or empty.
+  - `reacted` (`Emoji`, `Conversation`, `Permalink`): The reaction is added.
+  - `removed` (`Emoji`, `Conversation`, `Permalink`): The reaction is removed.
+  - `already` (`Emoji`, `Conversation`, `Permalink`): The message already had the user's reaction.
+  - `absent` (`Emoji`, `Conversation`, `Permalink`): The message had no such reaction of the user.
+- `slack_edit`:
+  - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
+  - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
+  - `fix_these` (`Problems`): The arguments have problems, one per line.
+  - `not_logged_in`: Slack is logged out.
+  - `failed` (`Error`): Slack or the daemon failed the call.
+  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_text_required`: A problem: text is missing or empty.
+  - `broadcast`: The text notifies a whole channel or group.
+  - `edited` (`Conversation`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its new text as posted and the text it replaced.
 
 ## Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)
 

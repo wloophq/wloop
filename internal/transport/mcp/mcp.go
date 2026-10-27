@@ -345,11 +345,11 @@ func (s *Server) callTool(ctx context.Context, handle string, params json.RawMes
 			continue
 		}
 		if r.needsHandle && handle == "" {
-			return text(p.Name+" refused: "+api.ErrSessionHandle.Error()+".", true), nil
+			return s.answer(p.Name, "refused", fields{"Error": api.ErrSessionHandle.Error()}, true), nil
 		}
 		session, err := s.session(ctx, handle)
 		if err != nil && (r.needsHandle || !errors.Is(err, api.ErrUnknownSession)) {
-			return text(p.Name+" refused: "+err.Error()+".", true), nil
+			return s.answer(p.Name, "refused", fields{"Error": err.Error()}, true), nil
 		}
 		return r.call(ctx, session, p.Arguments), nil
 	}

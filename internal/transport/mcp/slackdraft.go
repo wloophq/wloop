@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"slices"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/slack/send"
 )
@@ -54,11 +52,7 @@ func (s *Server) slackDraft(ctx context.Context, handle string, arguments json.R
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil || dec.Decode(new(json.RawMessage)) != io.EOF {
-		reason := "an object with text, and kind, target, items, reaction and effects when needed"
-		if err != nil {
-			reason += " (" + err.Error() + ")"
-		}
-		return text("Nothing was drafted: the arguments are not "+reason+".", true)
+		return s.badArguments(slackDraftName, err)
 	}
 	args := DraftArgs{Kind: strings.TrimSpace(a.Kind), Target: strings.TrimSpace(a.Target), Items: a.Items, Reaction: strings.TrimSpace(a.Reaction),
 		Effects: a.Effects}
@@ -71,42 +65,35 @@ func (s *Server) slackDraft(ctx context.Context, handle string, arguments json.R
 	var problems []string
 	switch {
 	case !slices.Contains(draftKinds, args.Kind):
-		problems = append(problems, "kind: one of "+strings.Join(draftKinds, ", "))
+		problems = append(problems, s.say(slackDraftName, "problem_kind", fields{"Kinds": strings.Join(draftKinds, ", ")}))
 	case draft.Kind(args.Kind).Emoji() && args.Reaction == "":
-		problems = append(problems, "reaction: required for a react draft")
+		problems = append(problems, s.say(slackDraftName, "problem_reaction_required", nil))
 	case !draft.Kind(args.Kind).Emoji() && strings.TrimSpace(args.Text) == "":
-		problems = append(problems, "text: required, not empty")
+		problems = append(problems, s.say(slackDraftName, "problem_text_required", nil))
 	}
 	if len(problems) > 0 {
-		return text("Nothing was drafted; fix these and call "+slackDraftName+" again:\n"+strings.Join(problems, "\n"), true)
+		return s.fixThese(slackDraftName, problems)
 	}
 	return s.draft(ctx, handle, args)
 }
 
 func (s *Server) draft(ctx context.Context, handle string, args DraftArgs) any {
 	if s.Slack != nil && !s.Slack.LoggedIn() {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackDraftName)
 	}
 	r, err := s.SlackDraft.Draft(ctx, handle, args)
 	if errors.Is(err, send.ErrNotLoggedIn) {
-		return text(notLoggedIn(), true)
+		return s.notLoggedIn(slackDraftName)
 	}
 	if err != nil {
-		return text("Nothing was drafted: "+redactTokens(err.Error()), true)
+		return s.failed(slackDraftName, err)
 	}
-	return text(draftedText(r), false)
-}
-
-func draftedText(r DraftResult) string {
-	where := r.Conversation
-	if where == "" {
-		where = "its conversation"
-	}
+	name := "proposed"
 	switch draft.State(r.State) {
 	case draft.Approved:
-		return fmt.Sprintf("Draft %d on %s is approved by its policy and will be posted to %s; nothing was posted yet.", r.ID, r.Unit, where)
+		name = "approved"
 	case draft.Discarded:
-		return fmt.Sprintf("Draft %d on %s is a dry run: its approval stores drafts and never sends them, so it will not be posted to %s.", r.ID, r.Unit, where)
+		name = "dry_run"
 	}
-	return fmt.Sprintf("Proposed draft %d on %s: it will be posted to %s once the user approves it in the %s Outbox; nothing was posted.", r.ID, r.Unit, where, brand.Name)
+	return s.answer(slackDraftName, name, fields{"ID": r.ID, "Unit": r.Unit, "Where": r.Conversation}, false)
 }
