@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -17,63 +18,71 @@ import (
 
 func TestJobRunsOnIntervalAndRecordsErrors(t *testing.T) {
 	t.Parallel()
-	var runs atomic.Int32
-	j := newJob("t", 10*time.Millisecond, time.Second, func(ctx context.Context) (string, string, error) {
-		if runs.Add(1) == 2 {
-			return "", "", errors.New("boom")
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		j := newJob("t", 10*time.Millisecond, time.Second, func(ctx context.Context) (string, string, error) {
+			if runs.Add(1) == 2 {
+				return "", "", errors.New("boom")
+			}
+			return "ok", "", nil
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Millisecond)
+		defer cancel()
+		j.loop(ctx, func(string, ...any) {}, func(string, string) {})
+		st := j.status()
+		if runs.Load() != 3 || st.LastErr != "" {
+			t.Fatalf("runs %d status %+v, want runs at 0, 10ms and 30ms after a failure's backoff", runs.Load(), st)
 		}
-		return "ok", "", nil
+		if st.LastRun.IsZero() || st.LastOK.IsZero() {
+			t.Fatalf("status not recorded: %+v", st)
+		}
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
-	defer cancel()
-	j.loop(ctx, func(string, ...any) {}, func(string, string) {})
-	st := j.status()
-	if runs.Load() < 3 || st.LastErr != "" {
-		t.Fatalf("runs %d status %+v", runs.Load(), st)
-	}
-	if st.LastRun.IsZero() || st.LastOK.IsZero() {
-		t.Fatalf("status not recorded: %+v", st)
-	}
 }
 
 func TestJobBacksOffAfterFailure(t *testing.T) {
 	t.Parallel()
-	var runs atomic.Int32
-	j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
-		runs.Add(1)
-		return "", "", errors.New("down")
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
+			runs.Add(1)
+			return "", "", errors.New("down")
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		j.loop(ctx, func(string, ...any) {}, func(string, string) {})
+		if n := runs.Load(); n != 3 {
+			t.Fatalf("%d runs in 100ms at a 10ms interval, want 3: at 0, 20ms and 60ms", n)
+		}
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	j.loop(ctx, func(string, ...any) {}, func(string, string) {})
-	if n := runs.Load(); n > 5 {
-		t.Fatalf("no backoff: %d runs in 100ms at 10ms interval", n)
-	}
 }
 
 func TestJobTriggerBeforeLoopIsNotLost(t *testing.T) {
 	t.Parallel()
-	var runs atomic.Int32
-	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
-	j.trigger()
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	j.loop(ctx, func(string, ...any) {}, func(string, string) {})
-	if runs.Load() != 2 {
-		t.Fatalf("runs: %d (want the initial run plus the queued trigger)", runs.Load())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { runs.Add(1); return "", "", nil })
+		j.trigger()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		j.loop(ctx, func(string, ...any) {}, func(string, string) {})
+		if runs.Load() != 2 {
+			t.Fatalf("runs: %d (want the initial run plus the queued trigger)", runs.Load())
+		}
+	})
 }
 
 func TestJobSkipIsAWarningNotAFailure(t *testing.T) {
 	t.Parallel()
-	var warned string
-	j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { return "", "orca closed", nil })
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	j.loop(ctx, func(string, ...any) {}, func(name, text string) { warned = name + ": " + text })
-	if st := j.status(); st.LastErr != "" || st.LastOK.IsZero() || warned != "t: orca closed" {
-		t.Fatalf("%+v %q", st, warned)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		var warned string
+		j := newJob("t", time.Hour, time.Second, func(context.Context) (string, string, error) { return "", "orca closed", nil })
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		j.loop(ctx, func(string, ...any) {}, func(name, text string) { warned = name + ": " + text })
+		if st := j.status(); st.LastErr != "" || st.LastOK.IsZero() || warned != "t: orca closed" {
+			t.Fatalf("%+v %q", st, warned)
+		}
+	})
 }
 
 func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
@@ -83,9 +92,7 @@ func TestSkippedCollectorSweepIsRecordedAsAWarning(t *testing.T) {
 	}
 	w := &warnings{}
 	j := newJob("slow", time.Hour, time.Second, func(ctx context.Context) (string, string, error) { return ghsource.Outcome(sweep(ctx)) })
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	j.loop(ctx, func(string, ...any) {}, w.set)
+	j.once(context.Background(), func(string, ...any) {}, w.set)
 	got := w.list()
 	if len(got) != 1 || !strings.HasPrefix(got[0], "slow: rate limit at 100 of 5000") {
 		t.Fatalf("warnings: %q", got)
@@ -123,24 +130,26 @@ func TestWarningsClearAndSort(t *testing.T) {
 
 func TestJobPanicIsRecordedAndLoopContinues(t *testing.T) {
 	t.Parallel()
-	var runs atomic.Int32
-	j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
-		if runs.Add(1) == 1 {
-			var m map[string]int
-			m["x"] = 1
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		j := newJob("t", 10*time.Millisecond, time.Second, func(context.Context) (string, string, error) {
+			if runs.Add(1) == 1 {
+				var m map[string]int
+				m["x"] = 1
+			}
+			return "ok", "", nil
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+		defer cancel()
+		var logged []string
+		j.loop(ctx, func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }, func(string, string) {})
+		if runs.Load() != 2 {
+			t.Fatalf("%d runs, want the panic and one more after its backoff", runs.Load())
 		}
-		return "ok", "", nil
+		if len(logged) == 0 || !strings.Contains(logged[0], "panic") {
+			t.Fatalf("panic not logged: %q", logged)
+		}
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	var logged []string
-	j.loop(ctx, func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }, func(string, string) {})
-	if runs.Load() < 2 {
-		t.Fatalf("loop stopped after a panic: %d runs", runs.Load())
-	}
-	if len(logged) == 0 || !strings.Contains(logged[0], "panic") {
-		t.Fatalf("panic not logged: %q", logged)
-	}
 }
 
 func TestJobPanicSetsLastErr(t *testing.T) {
@@ -154,18 +163,19 @@ func TestJobPanicSetsLastErr(t *testing.T) {
 
 func TestJobRunGetsTheJobTimeout(t *testing.T) {
 	t.Parallel()
-	var left time.Duration
-	j := newJob("t", time.Hour, 3*time.Second, func(ctx context.Context) (string, string, error) {
-		dl, ok := ctx.Deadline()
-		if ok {
-			left = time.Until(dl)
+	synctest.Test(t, func(t *testing.T) {
+		var left time.Duration
+		j := newJob("t", time.Hour, 3*time.Second, func(ctx context.Context) (string, string, error) {
+			if dl, ok := ctx.Deadline(); ok {
+				left = time.Until(dl)
+			}
+			return "", "", nil
+		})
+		j.once(context.Background(), func(string, ...any) {}, func(string, string) {})
+		if left != 3*time.Second {
+			t.Fatalf("deadline in %v, want 3s", left)
 		}
-		return "", "", nil
 	})
-	j.once(context.Background(), func(string, ...any) {}, func(string, string) {})
-	if left <= 2*time.Second || left > 3*time.Second {
-		t.Fatalf("deadline in %v, want about 3s", left)
-	}
 }
 
 func TestJobSkipIsLogged(t *testing.T) {

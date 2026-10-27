@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -30,37 +31,60 @@ func writeBinary(t *testing.T, path, content string) {
 	}
 }
 
-func fired(ch <-chan struct{}, within time.Duration) bool {
+func closed(ch <-chan struct{}) bool {
 	select {
 	case <-ch:
 		return true
-	case <-time.After(within):
+	default:
 		return false
 	}
 }
 
+// ticks sleeps past n of the watcher's polls, never landing on one.
+func ticks(n int) {
+	time.Sleep(time.Duration(n)*upgradePoll + upgradePoll/2)
+	synctest.Wait()
+}
+
 func TestWatchBinaryFiresOnAReplacedBinary(t *testing.T) {
-	fastUpgradePoll(t)
-	path := filepath.Join(t.TempDir(), brand.Name)
-	writeBinary(t, path, "v1")
-	ch := watchBinary(t.Context(), path)
-	if fired(ch, 100*time.Millisecond) {
-		t.Fatal("fired on an unchanged binary")
-	}
-	writeBinary(t, path, "v2 build")
-	if !fired(ch, 2*time.Second) {
-		t.Fatal("did not fire on a replaced binary")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		path := filepath.Join(t.TempDir(), brand.Name)
+		writeBinary(t, path, "v1")
+		ch := watchBinary(ctx, path)
+		ticks(10)
+		if closed(ch) {
+			t.Fatal("fired on an unchanged binary")
+		}
+		writeBinary(t, path, "v2 build")
+		time.Sleep(upgradePoll)
+		synctest.Wait()
+		if closed(ch) {
+			t.Fatal("fired on the first check of a replaced binary")
+		}
+		time.Sleep(upgradePoll)
+		synctest.Wait()
+		if !closed(ch) {
+			t.Fatal("did not fire on the second check of a replaced binary")
+		}
+		cancel()
+		synctest.Wait()
+	})
 }
 
 func TestWatchBinaryIgnoresAMissingPath(t *testing.T) {
-	fastUpgradePoll(t)
-	path := filepath.Join(t.TempDir(), brand.Name)
-	ch := watchBinary(t.Context(), path)
-	writeBinary(t, path, "v1")
-	if fired(ch, 100*time.Millisecond) {
-		t.Fatal("fired for a path that did not exist at the start")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		path := filepath.Join(t.TempDir(), brand.Name)
+		ch := watchBinary(ctx, path)
+		writeBinary(t, path, "v1")
+		ticks(10)
+		if closed(ch) {
+			t.Fatal("fired for a path that did not exist at the start")
+		}
+		cancel()
+		synctest.Wait()
+	})
 }
 
 func TestServeRestartsInPlaceWhenTheBinaryIsReplaced(t *testing.T) {
@@ -81,7 +105,7 @@ func TestServeRestartsInPlaceWhenTheBinaryIsReplaced(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(time.Minute):
 		t.Fatal("serve kept running the replaced binary")
 	}
 	if n := reexecs.Load(); n != 1 {

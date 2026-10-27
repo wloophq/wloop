@@ -36,7 +36,7 @@ func servedUI(t *testing.T, cfg func(*config.Config)) ([]api.Plugin, api.Catalog
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	d := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 	d.Startup = nil
 	h := daemon.New(d).Handler()
 	read := func(path string, out any) {

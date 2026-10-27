@@ -128,28 +128,32 @@ func TestServeRecoversBeforeSending(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- srv.Run(ctx) }()
-	defer func() {
+	stop := sync.OnceFunc(func() {
 		cancel()
 		if err := <-done; err != nil {
 			t.Errorf("run: %v", err)
 		}
-	}()
-	want := []string{fmt.Sprintf("verify %d", stuck.ID), fmt.Sprintf("publish %d", ready.ID)}
-	deadline := time.Now().Add(10 * time.Second)
-	for !slices.Equal(pub.seen(), want) {
+	})
+	defer stop()
+	c := client.New(d.Socket)
+	sent := func() bool {
+		for _, id := range []int64{int64(stuck.ID), int64(ready.ID)} {
+			if got, err := c.Draft(ctx, id); err != nil || got.State != "sent" {
+				return false
+			}
+		}
+		return true
+	}
+	deadline := time.Now().Add(time.Minute)
+	for !sent() {
 		if time.Now().After(deadline) {
-			t.Fatalf("calls %v, want %v", pub.seen(), want)
+			t.Fatalf("drafts not sent; calls %v", pub.seen())
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	c := client.New(d.Socket)
-	got, err := c.Draft(ctx, int64(stuck.ID))
-	if err != nil || got.State != "sent" {
-		t.Fatalf("the recovered draft: %+v %v", got, err)
-	}
-	time.Sleep(50 * time.Millisecond)
-	if calls := pub.seen(); !slices.Equal(calls, want) {
-		t.Fatalf("published again: %v", calls)
+	stop()
+	if calls, want := pub.seen(), []string{fmt.Sprintf("verify %d", stuck.ID), fmt.Sprintf("publish %d", ready.ID)}; !slices.Equal(calls, want) {
+		t.Fatalf("calls %v, want %v", calls, want)
 	}
 }
 
@@ -236,5 +240,22 @@ func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 	}
 	if got := (pinnedEffects{Effects: &recordingPublisher{}}).Delivers(draft.Message); got != draft.Message {
 		t.Errorf("a publisher that declares nothing: %s", got)
+	}
+}
+
+type placingPublisher struct{ recordingPublisher }
+
+func (*placingPublisher) Place(context.Context, draft.Draft) (string, error) {
+	return "https://slack.com/archives/D0000000001/p1700000000000100", nil
+}
+
+func TestAPinnedPublisherPlacesAsItsPluginPlaces(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	if got, err := (pinnedEffects{Effects: &placingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "https://slack.com/archives/D0000000001/p1700000000000100" {
+		t.Errorf("a placing publisher: %q %v", got, err)
+	}
+	if got, err := (pinnedEffects{Effects: &recordingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "" {
+		t.Errorf("a publisher that places nothing: %q %v", got, err)
 	}
 }

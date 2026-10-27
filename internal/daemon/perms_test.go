@@ -1,11 +1,9 @@
 package daemon
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestRunTightensStateDir(t *testing.T) {
@@ -34,18 +32,10 @@ func TestRunTightensStateDir(t *testing.T) {
 	if err := os.Chmod(d.StateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- New(d).Run(ctx) }()
+	stop := runServer(t, New(d))
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
-	cancel()
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("run: %v", err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("daemon did not stop")
+	if err := stop(); err != nil {
+		t.Fatalf("run: %v", err)
 	}
 	fi, err := os.Stat(d.StateDir)
 	if err != nil {

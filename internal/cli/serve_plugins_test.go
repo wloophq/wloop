@@ -54,20 +54,20 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	var builds atomic.Int32
 	saved := plugins
 	plugins = []source.Plugin{countedGitHub(&builds)}
 	defer func() { plugins = saved }()
 
-	on := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+	on := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 	if builds.Load() != 1 || len(on.Ingest) != 1 || len(on.RowProviders) != 1 || on.Collector == nil || len(on.Runtimes) != 1 || on.PluginEnabled != nil ||
 		on.Intakes == nil || on.Explorer == nil || on.Budget == nil || on.Viewer == nil || te.Env.viewFacts().p.Load() == nil {
 		t.Fatalf("github enabled: builds %d, deps %+v", builds.Load(), on)
 	}
 
 	githubDisabled(&te.cfg)
-	d := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 	if builds.Load() != 1 {
 		t.Fatalf("a disabled plugin was built")
 	}
@@ -99,9 +99,9 @@ func TestPluginsRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	plugin := func() api.Plugin {
-		d := serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+		d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 		d.Startup = nil
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", api.Plugins, nil)

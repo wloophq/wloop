@@ -10,6 +10,7 @@ import (
 var Tools = []Value{
 	{Name: "turn_end", Doc: "Records how the session's turn ended."},
 	{Name: "inbox_post", Doc: "Posts a question or a note to the user's Inbox during a turn."},
+	{Name: "inbox_read", Doc: "Reads the user's answers to the session's Inbox messages, and marks them read."},
 	{Name: "slack_send_message", Doc: "Posts to Slack as the user, now."},
 	{Name: "slack_read", Doc: "Reads a Slack thread or conversation."},
 	{Name: "slack_search", Doc: "Searches the Slack messages the user can read."},
@@ -80,7 +81,7 @@ func answer(tool, name, doc string, fields ...AnswerField) ToolAnswer {
 // under [<tool>.answers].
 var ToolAnswers = func() []ToolAnswer {
 	slackTools := []string{"slack_send_message", "slack_read", "slack_search", "slack_draft", "slack_react", "slack_edit"}
-	out := answersOf(append([]string{"turn_end", "inbox_post"}, slackTools...))
+	out := answersOf(append([]string{"turn_end", "inbox_post", "inbox_read"}, slackTools...))
 	out = append(out, slackAnswers(slackTools...)...)
 	return append(out,
 		answer("turn_end", "problem_extra_arguments", "A problem: arguments besides turn and record.", str("Keys")),
@@ -103,6 +104,18 @@ var ToolAnswers = func() []ToolAnswer {
 		answer("inbox_post", "not_in_turn", "The session has no started turn.", str("Error")),
 		answer("inbox_post", "post_failed", "The message could not be posted.", str("Error")),
 		answer("inbox_post", "posted", "The message is in the Inbox.", num("ID")),
+
+		answer("inbox_read", "no_turn", "The session has no turn.", str("Error")),
+		answer("inbox_read", "no_message", "The message is not one of the session's.", num("ID")),
+		answer("inbox_read", "read_failed", "The Inbox could not be read.", str("Error")),
+		answer("inbox_read", "nothing", "No answer to read: of message ID, or of any message when ID is 0.", num("ID")),
+		answer("inbox_read", "read", "The answers read: the conversations, one after another.", str("Conversations")),
+		answer("inbox_read", "conversation", "A part of read: a message, its kind (question or agent_post), its text and options, and its answers.",
+			num("ID"), str("Kind"), str("Text"), str("Options"), str("Answers")),
+		answer("inbox_read", "turn_answers", "A part of read: answers to the session's turns stored before each answer named its message.", str("Answers")),
+		answer("inbox_read", "option", "A part of conversation: one option of the message.", str("ID"), str("Label")),
+		answer("inbox_read", "answer", "A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.",
+			str("Option"), str("Label"), str("Choice"), str("Text"), str("At")),
 
 		answer("slack_send_message", "problem_target_required", "A problem: target is missing."),
 		answer("slack_send_message", "problem_text_required", "A problem: text is missing or empty."),

@@ -61,7 +61,7 @@ Reply (`r`) writes a draft of your own on the entry's first unit, a reply in its
 
 ## Messages
 
-An Inbox message needs you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `inbox_post` tool, or a proposal to change a confirmed item. Answers route as for any turn (see [Turns](/concepts/turns/#answers)).
+An Inbox message needs you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `inbox_post` tool, or a proposal to change a confirmed item. Your answer is stored with the message it answers, the agent is told which message you answered and reads the answer with `inbox_read`, and the message's card shows whether it did (see [Turns](/concepts/turns/#answers)).
 
 ## The Outbox
 

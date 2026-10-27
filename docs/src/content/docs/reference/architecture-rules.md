@@ -42,6 +42,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
 | `TestProvidersStayInAdaptersAndTheRoot` | Only a provider and the composition root import a provider's packages, provider names appear only in adapters and the root's allowlist, and only adapters parse an agent's state. |
 | `TestReadModelImports` | The read model reaches its inputs only through ports. |
+| `TestServeRunsThroughTheHarness` | A test of internal/cli starts serve's jobs only through the harness, so none outlives the test's files. |
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
@@ -120,7 +121,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
 | `internal/core/port/port.go` `PROf` `pr.RefOf` `1` | 🧾 | the core's pull request event helper, tracked in pluginDebt |
-| `internal/core/turns/service.go` `urlOf` `port.PROf` `1` | 🧾 | a turn's URL is its pull request's |
+| `internal/core/turns/service.go` `unitArg` `port.PROf` `1` | 🧾 | a turn's URL is its pull request's |
 | `internal/daemon/actions.go` `Server.readAheadQueued` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/actions.go` `Server.runAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 | `internal/daemon/api.go` `Server.handleRemoveDone` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |

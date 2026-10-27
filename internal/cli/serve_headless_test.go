@@ -28,7 +28,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	left := dturn.Book{Unit: headlessThread, Turns: []dturn.Turn{{Intent: dturn.Intent(dintent.Act), ID: "left", Trigger: dturn.ByHand,
@@ -36,7 +36,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if _, err := sqlite.New(db).Save(ctx, left); err != nil {
 		t.Fatal(err)
 	}
-	d := serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if d.Headless == nil || te.Turns.Headless == nil || te.Turns.Usage == nil {
 		t.Fatal("headless turns are not wired")
 	}
@@ -55,7 +55,7 @@ func TestServeEndsTheHeadlessTurnsAStopCutShortOnce(t *testing.T) {
 	if _, err := te.Turns.BeginHeadless(ctx, turns.HeadlessStart{Unit: unit.Unit{Provider: "thread", Key: "C1/2"}, Intent: dturn.Intent(dintent.Act), Turn: "live", Trigger: dturn.ByHand}); err != nil {
 		t.Fatal(err)
 	}
-	serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if got := state("live"); got != dturn.Started {
 		t.Fatalf("a later serve ended a live run: %s", got)
 	}

@@ -77,7 +77,7 @@ func (d Deriver) FactsOf(pr dinv.PR, evs []dinv.Event, o dinv.Override, r api.Ro
 	}
 	f.Intakes = d.openIntakes(pr.Ref)
 	f.NudgeWho, f.NudgeWhy = NudgeTargets(unmuted, pr.Author, d.Viewer, d.Ignore)
-	f.NudgeRefusal = NudgeRefusal(pr.Ref, f.NudgeWho, f.NudgeWhy, unmuted.Summary.Since, evs, d.Now)
+	f.NudgeRefusal = NudgeRefusal(pr.Ref, f.NudgeWho, f.NudgeWhy, unmuted.Summary.Since, evs, d.Turns[pr.Ref].Unstarted, d.Now)
 	return f
 }
 
@@ -113,13 +113,14 @@ func (d Deriver) UntrackedRow(c dgh.Candidate, o dinv.Override) api.Row {
 }
 
 // NudgeRefusal is the text a nudge is refused with now, "" when it would
-// go.
-func NudgeRefusal(ref github.Ref, who []string, why string, since time.Time, evs []dinv.Event, now time.Time) string {
+// go; unstarted are the turns that ended before their agent started them,
+// whose nudged events do not count.
+func NudgeRefusal(ref github.Ref, who []string, why string, since time.Time, evs []dinv.Event, unstarted map[string]bool, now time.Time) string {
 	if len(who) == 0 {
 		return fmt.Sprintf("%s %s; a nudge asks someone else for the next step", ref, why)
 	}
 	for _, e := range slices.Backward(evs) {
-		if again := e.At.Add(RenudgeAfter); e.Kind == dinv.KindNudged && !e.At.Before(since) && now.Before(again) {
+		if again := e.At.Add(RenudgeAfter); e.Kind == dinv.KindNudged && !e.At.Before(since) && now.Before(again) && !unstarted[e.Key] {
 			const stamp = "2006-01-02 15:04"
 			return fmt.Sprintf("%s: already nudged %s at %s; again after %s", ref, e.Data, e.At.Local().Format(stamp), again.Local().Format(stamp))
 		}

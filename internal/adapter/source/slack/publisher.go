@@ -46,14 +46,17 @@ type Publisher struct {
 	}
 	// People are the persons the unit's items name, for mentions of other providers.
 	People func(ctx context.Context, u unit.Unit) ([]items.Person, error)
-	Now    func() time.Time
-	Log    func(format string, args ...any)
+	// Items are the unit's items, whose anchors place a draft on a DM segment.
+	Items func(ctx context.Context, u unit.Unit) ([]items.Item, error)
+	Now   func() time.Time
+	Log   func(format string, args ...any)
 }
 
 var (
 	_ port.Effects   = (*Publisher)(nil)
 	_ port.Validator = (*Publisher)(nil)
 	_ port.Locator   = (*Publisher)(nil)
+	_ port.Placer    = (*Publisher)(nil)
 )
 
 // plan is where and what a draft posts.
@@ -166,22 +169,15 @@ func userOf(target string) string {
 	return ""
 }
 
-// target resolves where d posts: its unit's thread or DM when Target is "",
-// else a permalink, a conversation or a person. A person's DM is opened only
-// once the post allowlist holds them.
+// target resolves where d posts: its unit's thread when Target is "", else a
+// permalink, a conversation or a person. A person's DM is opened only once the
+// post allowlist holds them.
 func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl *plan) error {
 	t := strings.TrimSpace(d.Target)
 	react := d.Delivery == draft.Reaction
 	switch {
 	case t == "" && k.Segment != "":
-		if react {
-			return errors.New("a reaction on a direct message segment needs a message permalink target")
-		}
-		conv, _, _, err := p.Segments.Range(ctx, d.Unit)
-		if err != nil {
-			return err
-		}
-		return p.resolve(ctx, send.Request{Target: conv}, pl)
+		return errors.New("a draft on a direct message segment needs a target; its placement is named when it is proposed")
 	case t == "":
 		if err := p.resolve(ctx, send.Request{Target: k.Conversation}, pl); err != nil {
 			return err
@@ -223,6 +219,53 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		t = user
 	}
 	return p.resolve(ctx, send.Request{Target: t}, pl)
+}
+
+// Place names where a draft with no target posts. A thread unit's draft posts
+// in that thread (""). A DM segment has no thread of its own: its draft answers
+// the newest message its items anchor on, in that message's thread, which a
+// top-level message starts.
+func (p *Publisher) Place(ctx context.Context, d draft.Draft) (string, error) {
+	k, err := dslack.ParseUnit(d.Unit)
+	if err != nil || k.Segment == "" {
+		return "", nil
+	}
+	if len(d.Items) == 0 {
+		return "", errors.New("a draft on a direct message segment names neither a target nor items whose messages place it")
+	}
+	if p.Items == nil {
+		return "", errors.New("the items of a direct message segment cannot be read to place its draft")
+	}
+	its, err := p.Items(ctx, d.Unit)
+	if err != nil {
+		return "", fmt.Errorf("reading the items of %s: %w", d.Unit.Label(), err)
+	}
+	newest := ""
+	for _, it := range its {
+		if !slices.Contains(d.Items, it.ID) {
+			continue
+		}
+		for _, a := range anchorsOf(it) {
+			conv, ts, ok := strings.Cut(a.Ref, "/")
+			if ok && conv == k.Conversation && permalinkTS.MatchString(ts) && dslack.CompareTS(ts, newest) > 0 {
+				newest = ts
+			}
+		}
+	}
+	if newest == "" {
+		return "", fmt.Errorf("none of the items %s names a message of the direct message to answer; give the draft a target", strings.Join(d.Items, ", "))
+	}
+	return conversationLink(k.Conversation, newest), nil
+}
+
+// anchorsOf are the anchors an item's evidence names: where it started, was
+// assigned and every message of its trail.
+func anchorsOf(it items.Item) []unit.Anchor {
+	out := []unit.Anchor{it.Origin, it.AssignedAt, it.Evidence.Anchor}
+	for _, e := range it.Trail {
+		out = append(out, e.Anchor)
+	}
+	return out
 }
 
 func (p *Publisher) resolve(ctx context.Context, r send.Request, pl *plan) error {
@@ -583,14 +626,18 @@ func (p *plugin) publisher() port.Effects {
 // PublisherOver publishes through s, with the segments and the items' persons db stores.
 func PublisherOver(db *sqlite.DB, s *send.Service, token func() (auth.Token, error), now func() time.Time, log func(string, ...any)) *Publisher {
 	st := db.Items()
-	return &Publisher{Send: s, Token: token, Segments: Segments{Store: db.Segments()}, Now: now, Log: log,
+	load := func(ctx context.Context, u unit.Unit) ([]items.Item, error) {
+		byUnit, err := st.Load(ctx, []unit.Unit{u})
+		return byUnit[u], err
+	}
+	return &Publisher{Send: s, Token: token, Segments: Segments{Store: db.Segments()}, Now: now, Log: log, Items: load,
 		People: func(ctx context.Context, u unit.Unit) ([]items.Person, error) {
-			byUnit, err := st.Load(ctx, []unit.Unit{u})
+			its, err := load(ctx, u)
 			if err != nil {
 				return nil, err
 			}
 			var out []items.Person
-			for _, it := range byUnit[u] {
+			for _, it := range its {
 				out = append(append(append(out, it.Requester), it.Assignees...), it.WaitingOn...)
 			}
 			return out, nil

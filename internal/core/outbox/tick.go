@@ -78,7 +78,7 @@ func (s *Service) windowDrafts(ctx context.Context) ([]draft.Draft, error) {
 // approveByPolicy moves proposed d to approved with Outcome auto when the gate
 // lets it; ok is false, with the reason logged, when the gate refuses.
 func (s *Service) approveByPolicy(ctx context.Context, d draft.Draft) (draft.Draft, bool, error) {
-	if err := s.publishable(ctx, d); err != nil {
+	if err := s.publishable(ctx, &d); err != nil {
 		s.logf("draft %d stays proposed: %v", d.ID, err)
 		return d, false, nil
 	}
