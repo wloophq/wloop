@@ -3,10 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/gtd"
@@ -108,17 +106,5 @@ func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, 
 
 // trustClone trusts the repository just cloned at path in cfg's agent home.
 func (e *Env) trustClone(ctx context.Context, cfg config.Config, path string) error {
-	a, err := e.agent(cfg.Agent)
-	if err != nil {
-		return err
-	}
-	t, ok := a.(truster)
-	if !ok {
-		return fmt.Errorf("trust_clones: agent %q has no folder trust %s can record", cfg.Agent, brand.Name)
-	}
-	lines, err := t.Trust(ctx, path, config.ExpandHome(e.agentHome(cfg)), false)
-	for _, l := range lines {
-		fmt.Fprintln(e.Out, l)
-	}
-	return err
+	return e.trustIn(ctx, cfg.Agent, path, []string{config.ExpandHome(e.agentHome(cfg))}, false)
 }
