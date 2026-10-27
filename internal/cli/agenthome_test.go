@@ -158,7 +158,6 @@ func TestHandNudgeNeverReentersTheAction(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.gh.basics = openBasics
-	te.Rec = storeRecorder{te.Store}
 	inputs := map[string]any{"situation": "Waiting on: bob.", "waits_on_maintainers": false, "who": []string{"bob"}}
 	res, err := te.byHand(&sync.Mutex{})(context.Background(), api.ByHandRequest{Intent: "nudge", URL: r7.URL(), Home: "/session/home", Inputs: inputs}, "term_1")
 	if err != nil {
@@ -319,7 +318,6 @@ func TestHandTakeOverRunsWithTheHomeItBrings(t *testing.T) {
 		te := newTestEnv(t, m)
 		te.gh.basics = adoptBasics
 		te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
-		te.Rec = storeRecorder{te.Store}
 		te.withCallerHome("/daemon/home")
 		req := api.ByHandRequest{Intent: "address", URL: "https://github.com/acme/api/pull/20", Home: brought, Cwd: t.TempDir(), Inputs: map[string]any{"take_over": true}}
 		if _, err := te.byHand(&sync.Mutex{})(context.Background(), req, "term_1"); err == nil || !strings.Contains(err.Error(), "run this command there") {

@@ -32,7 +32,6 @@ import (
 // loop's events, and points te's command line at it.
 func agentDaemon(t *testing.T, te *testEnv) {
 	t.Helper()
-	te.Rec = storeRecorder{te.Store}
 	te.serve(t)
 }
 

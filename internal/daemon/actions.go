@@ -705,13 +705,12 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 		}
 	}
 	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Entry: req.Entry}
-	data := ""
 	if d.Prepare != "" {
 		prepare, ok := prepares[d.Prepare]
 		if !ok {
 			return fmt.Errorf("%s: the daemon has no prepare %s", name, d.Prepare)
 		}
-		if data, err = prepare(s, ctx, u, &call); err != nil {
+		if err := prepare(s, ctx, u, &call); err != nil {
 			return err
 		}
 	}
@@ -720,7 +719,7 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	}
 	for _, e := range effects {
 		if e.after != nil {
-			if err := e.after(s, ctx, u, data); err != nil {
+			if err := e.after(s, ctx, u); err != nil {
 				return err
 			}
 		}
@@ -968,15 +967,15 @@ func (s *Server) recordEvent(ctx context.Context, u unit.Unit, kind, data string
 // prepareNudge refuses when nobody but the user is to be asked, or the
 // same wait was already nudged, and fills who, the situation and whether
 // it asks the maintainers.
-func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string, error) {
+func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) error {
 	r, evs, d, err := s.unmutedRow(ctx, u)
 	if err != nil {
-		return "", err
+		return err
 	}
 	p, _ := prrow.PayloadOf(r)
 	who, why := prrow.NudgeTargets(r, p.Author, d.Viewer, d.Ignore)
 	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, evs, d.Now); refusal != "" {
-		return "", badRequest{refusal}
+		return badRequest{refusal}
 	}
 	if c.Inputs == nil {
 		c.Inputs = map[string]any{}
@@ -984,7 +983,7 @@ func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string
 	c.Inputs["situation"] = nudgeSituation(who, r)
 	c.Inputs["waits_on_maintainers"] = slices.Equal(who, []string{prrow.NudgeMaintainers})
 	c.Inputs["who"] = slices.Clone(who)
-	return strings.Join(who, ", "), nil
+	return nil
 }
 
 func nudgeSituation(who []string, r api.Row) string {

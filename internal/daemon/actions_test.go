@@ -48,6 +48,9 @@ type fakeActions struct {
 	inputs      []map[string]any
 	// bound are the items and entry of each intent call, as "i1,i2@entry".
 	bound []string
+	// recorder, when set, records the nudged event of a sent nudge, keyed by
+	// its turn, as the command line does.
+	recorder *Server
 }
 
 func (f *fakeActions) record(ctx context.Context, call string, c Call) error {
@@ -81,7 +84,11 @@ func (f *fakeActions) Intent(ctx context.Context, name string, u unit.Unit, c Ca
 	case "nudge":
 		f.maintainers = append(f.maintainers, inputFlag(c.Inputs, "waits_on_maintainers"))
 		situation, _ := c.Inputs["situation"].(string)
-		return f.record(ctx, "nudge "+r.String()+" "+situation+"|"+c.Guidance, c)
+		if err := f.record(ctx, "nudge "+r.String()+" "+situation+"|"+c.Guidance, c); err != nil || f.recorder == nil {
+			return err
+		}
+		who, _ := c.Inputs["who"].([]string)
+		return f.recorder.deps.Events.RecordEvent(ctx, dinv.Event{PR: r, Kind: dinv.KindNudged, Key: fmt.Sprintf("turn-%d", len(f.calls)), At: f.recorder.deps.Now(), Data: strings.Join(who, ", ")})
 	}
 	return f.record(ctx, name+" "+r.String()+" "+c.Guidance, c)
 }
@@ -588,7 +595,7 @@ func TestNudgeAsksWhoItWaitsOn(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{}
+	fa := &fakeActions{recorder: s}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{"guidance":"be brief"}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -616,7 +623,7 @@ func TestNudgeAsksTheMaintainersOfMyPullRequestWithNoReviewer(t *testing.T) {
 	if err := s.store().UpsertPR(ctx, pr); err != nil {
 		t.Fatal(err)
 	}
-	fa := &fakeActions{}
+	fa := &fakeActions{recorder: s}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -695,7 +702,7 @@ func TestNudgeOncePerWait(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	seedWaitingOnAna(t, s)
-	fa := &fakeActions{}
+	fa := &fakeActions{recorder: s}
 	s.deps.Actions = fa
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%239/nudge", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)

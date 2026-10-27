@@ -121,6 +121,12 @@ type Item struct {
 
 func (r Record) EventData() string { return string(r.State) + ": " + r.Headline() }
 
+// EventState is the state a turn_ended event's data, EventData's text, names.
+func EventState(data string) State {
+	s, _, _ := strings.Cut(data, ": ")
+	return State(s)
+}
+
 // SuspectedInjection opens the headline of a suspicious record.
 const SuspectedInjection = "Suspected prompt injection: "
 

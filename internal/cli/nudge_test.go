@@ -4,9 +4,13 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/api"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
@@ -184,5 +188,42 @@ func TestNudgeStartsTheAgentInTheProjectsProfile(t *testing.T) {
 	}
 	if len(m.Commands) != 1 || launches(m.Commands)[0] != "CLAUDE_CONFIG_DIR='/home/me/.claude-work' claude" {
 		t.Fatalf("commands %v", m.Commands)
+	}
+}
+
+func TestANudgeRecordsTheTurnItSent(t *testing.T) {
+	t.Parallel()
+	inputs := map[string]any{"situation": nudgeLine, "waits_on_maintainers": false, "who": []string{"@ana"}}
+	for name, send := range map[string]func(te *testEnv) error{
+		"asked through the daemon": func(te *testEnv) error {
+			return askedIntent(te.Env, te.cfg, r7, dintent.Nudge, "", inputs, "")
+		},
+		"by hand in a session": func(te *testEnv) error {
+			_, err := te.byHand(&sync.Mutex{})(context.Background(), api.ByHandRequest{Intent: string(dintent.Nudge), URL: r7.URL(), Inputs: inputs}, "term_1")
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := nudgeManager(reviewWS)
+			m.Sessions = map[string]string{"ws-rev": "term-live"}
+			te := newTestEnv(t, m)
+			te.gh.basics = openBasics
+			if err := send(te); err != nil {
+				t.Fatalf("%v\n%s", err, te.err)
+			}
+			b := te.bookOf(t, r7)
+			if len(b.Turns) != 1 {
+				t.Fatalf("turns %+v", b.Turns)
+			}
+			evs, err := te.Store.Events(context.Background(), r7)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := dinv.Event{Kind: dinv.KindNudged, Key: b.Turns[0].ID, Data: "@ana"}
+			if !slices.ContainsFunc(evs, func(ev dinv.Event) bool { return ev.Kind == want.Kind && ev.Key == want.Key && ev.Data == want.Data }) {
+				t.Fatalf("no %+v among %+v", want, evs)
+			}
+		})
 	}
 }

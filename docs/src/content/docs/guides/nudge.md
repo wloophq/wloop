@@ -17,7 +17,7 @@ An agent writes one comment and posts it under your name. It mentions exactly th
 - on your own pull request with no reviewer requested, the repository's maintainers, mentioning nobody, or the one person CODEOWNERS names for the changed files, never a team;
 - a team only when no person is requested.
 
-The daemon refuses when the pull request waits on you, on the loop, on a bot or on nobody, and when the same wait was nudged in the last 24 hours. The cockpit shows Nudge (`N`) disabled with that reason.
+The daemon refuses when the pull request waits on you, on the loop, on a bot or on nobody, and when the same wait was nudged in the last 24 hours. A nudge turn that posted nothing does not count: one that failed, or that ended or was withdrawn before its agent started it. The cockpit shows Nudge (`N`) disabled with that reason.
 
 The agent starts in a new session of the pull request's review or author workspace, else of the repository's main checkout when it sits on the default branch, re-reads the pull request and posts nothing when the situation moved.
 

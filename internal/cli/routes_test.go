@@ -81,7 +81,6 @@ func TestEachRouteRunsTodaysEffects(t *testing.T) {
 	resume := func(intent dintent.Name, m func() workspace.Manager, setup func(*testEnv) github.Ref, inputs map[string]any) func(t *testing.T) (*testEnv, github.Ref) {
 		return func(t *testing.T) (*testEnv, github.Ref) {
 			te := newTestEnv(t, m())
-			te.Rec = storeRecorder{te.Store}
 			ref := setup(te)
 			if err := te.syncInventory(ctx); err != nil {
 				t.Fatal(err)
@@ -174,7 +173,6 @@ func TestHeldRunNowOnAnAdoptedPullRequestIsTheAuthors(t *testing.T) {
 	ctx := context.Background()
 	te := newTestEnv(t, myPRManager())
 	te.gh.basics = addressBasics(t, obj{"__typename": "User", "login": "jo"})
-	te.Rec = storeRecorder{te.Store}
 	gh, err := te.GitHub.Basics(ctx, r21)
 	if err != nil {
 		t.Fatal(err)

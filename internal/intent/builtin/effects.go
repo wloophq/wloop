@@ -50,7 +50,7 @@ var Effects = []Effect{
 	{EffectPRAddressed, unit.GitHub, AppliesTurn, "Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.", false},
 	{EffectEntryNudged, "", AppliesDraft, "Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.", false},
 	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.", true},
-	{EffectPRNudged, unit.GitHub, AppliesTurn | AppliesDraft, "Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft.", false},
+	{EffectPRNudged, unit.GitHub, AppliesTurn | AppliesDraft, "Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that failed or never started does not count, or as the GitHub publisher posts its draft.", false},
 }
 
 // EffectNames are the names of the draft effects: what a draft's effects, a

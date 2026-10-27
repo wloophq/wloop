@@ -23,7 +23,6 @@ func TestAUserIntentGoesThroughTheWholeTurn(t *testing.T) {
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
-	te.Rec = storeRecorder{te.Store}
 	userProfile(t, te, map[string]string{"intent=review.md": "Review well."})
 
 	if code := te.run("ask-author", r7.URL(), "--topic", "the retry cap", "be", "brief"); code != 0 {
@@ -131,7 +130,6 @@ func TestABrokenUserIntentsBlocksLeaveEveryOtherRoundAlone(t *testing.T) {
 	m := warmReviewWorkspace()
 	te := newTestEnv(t, m)
 	te.gh.basics = openBasics
-	te.Rec = storeRecorder{te.Store}
 	dir := userProfile(t, te, map[string]string{"intent=review.md": "Review well.", "intent=ask-author.md": "Ask kindly."})
 	manifest := filepath.Join(dir, "intents", "ask-author", "intent.toml")
 	raw, err := os.ReadFile(manifest)

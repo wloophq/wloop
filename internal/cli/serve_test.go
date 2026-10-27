@@ -1331,7 +1331,6 @@ func TestDaemonReadsSpawnNoGh(t *testing.T) {
 	dctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	d := serveDeps(dctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
-	te.Rec = storeRecorder{te.Store}
 
 	ctx, all := metertest.Start(t, context.Background())
 	phases := []struct {

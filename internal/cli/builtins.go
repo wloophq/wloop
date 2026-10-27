@@ -82,20 +82,23 @@ var (
 		guide:  func(r *sentRound) { r.guidance = r.env.handGuidance(r.ctx, r.ref, r.guidance) },
 		unsent: func(r *sentRound) { r.env.keepGuidance(r.ctx, r.ref, r.guidance) },
 	}
+	// recordsNudge keys the nudged event by its turn, so a turn that posted
+	// nothing does not hold the next nudge.
+	recordsNudge = effectRun{sent: func(r *sentRound) {
+		r.env.recordTurnEvent(r.ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
+	}}
 	markAddressed = effectRun{state: func(r *sentRound, st *round.Store) { r.env.recordAddressed(st, r.ref, r.pr.HeadRefOid) }}
 )
 
 // onSent is the turn effects the command line runs, in the order each
-// phase runs them. The daemon records the events of a round asked through
-// its action.
+// phase runs them. The daemon records the round-sent event of a round asked
+// through its action.
 var onSent = []onSentEffect{
 	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
 	{name: builtin.EffectPRRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
 		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
 	}}}},
-	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
-		r.env.recordEvent(r.ctx, r.ref, dinv.KindNudged, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
-	}}}},
+	{name: builtin.EffectPRNudged, on: map[route]effectRun{routeSession: recordsNudge, routeAsked: recordsNudge}},
 	{name: builtin.EffectPRReviewed, on: map[route]effectRun{routeLaunch: {
 		sent: func(r *sentRound) {
 			if r.submitted {
@@ -172,7 +175,7 @@ type roundRun struct {
 
 // workspaceRun sends the round in the workspace its builtin names and says
 // whether the agent was seen taking it.
-type workspaceRun func(e *Env, ctx context.Context, run roundRun) (submitted bool, err error)
+type workspaceRun func(e *Env, ctx context.Context, run roundRun) (turnID string, submitted bool, err error)
 
 // workspaceRuns are the workspace builtins the command line implements; a
 // given workspace is the one a launch names, and only the probe launch does.
