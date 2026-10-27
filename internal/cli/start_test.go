@@ -217,7 +217,7 @@ func TestStartRunsOnlyOnAnEntryTheUserCaptured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || !v.Actions[i].Enabled {
+	if i := slices.IndexFunc(v.Actions, func(a api.ActionState) bool { return a.ID == "start" }); i < 0 || !v.Actions[i].Enabled || v.Actions[i].Label != "Start" {
 		t.Fatalf("the captured entry's actions %+v", v.Actions)
 	}
 	v, err = client.New(te.Socket).Entry(ctx, string(derived.ID))

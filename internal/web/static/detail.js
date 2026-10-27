@@ -105,7 +105,7 @@ function entryIntentButtons(e) {
     title: a.enabled ? a.note || undefined : a.reason,
     "data-focus": `detail:${a.id}:${e.id}`,
     onclick: () => entryIntentAct(e, a.id),
-  }, a.id.charAt(0).toUpperCase() + a.id.slice(1)));
+  }, a.label || a.id));
 }
 
 // draftTarget is the Outbox entry of the draft e carries: e itself, or

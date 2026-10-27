@@ -50,10 +50,15 @@ func entryIntentActions(l *intentload.Loaded, e gtd.Entry) []api.ActionState {
 	}
 	u := gtd.UnitOf(e.ID)
 	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Live(), CapturedByUser: e.CapturedByUser()}
-	return slices.DeleteFunc(catalog.UnitStates(f), func(st api.ActionState) bool {
+	var out []api.ActionState
+	for _, st := range catalog.UnitStates(f) {
 		d, ok := l.Registry.Get(dintent.Name(st.ID))
-		return !ok || !(d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider))
-	})
+		if ok && (d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
+			st.Label = d.Label
+			out = append(out, st)
+		}
+	}
+	return out
 }
 
 // entryRefusal is why the entry u names refuses the intent name, "" when
