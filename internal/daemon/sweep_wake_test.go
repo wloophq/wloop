@@ -296,9 +296,13 @@ func TestFirstRunAfterStartPlans(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan struct{})
 		go func() { r.job.loop(ctx, t.Logf, func(string, string) {}); close(done) }()
+		stop := sync.OnceFunc(func() {
+			cancel()
+			<-done
+		})
+		t.Cleanup(stop)
 		waitFor(t, func() bool { return r.sw.runs.Load() == 1 })
-		cancel()
-		<-done
+		stop()
 		if n := r.sw.runs.Load(); n != 1 {
 			t.Fatalf("%d notes before start: %d runs, want 1", notes, n)
 		}
@@ -499,8 +503,16 @@ func TestADeadlineSurvivesAMachineSleep(t *testing.T) {
 	r.job.clock = clk
 	r.start(t)
 	r.job.at(wakeStart.Add(30 * time.Minute))
-	done := make(chan bool, 1)
-	go func() { done <- r.job.wait(context.Background()) }()
+	ctx, cancel := context.WithCancel(context.Background())
+	done, exited := make(chan bool, 1), make(chan struct{})
+	go func() {
+		defer close(exited)
+		done <- r.job.wait(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-exited
+	})
 	waitFor(t, func() bool { return clk.armed() > 0 })
 	clk.sleep(13 * time.Hour)
 	clk.run(waitSlice)

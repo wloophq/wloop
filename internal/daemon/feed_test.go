@@ -158,13 +158,18 @@ func listen(t *testing.T, s *Server, prepare func(*http.Request)) <-chan message
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { resp.Body.Close() })
 	r := bufio.NewReader(resp.Body)
 	if line, _ := r.ReadString('\n'); !strings.HasPrefix(line, ": connected") {
 		t.Fatalf("first line %q", line)
 	}
-	out := make(chan message, 64)
+	out, stop, exited := make(chan message, 64), make(chan struct{}), make(chan struct{})
+	t.Cleanup(func() {
+		close(stop)
+		resp.Body.Close()
+		<-exited
+	})
 	go func() {
+		defer close(exited)
 		defer close(out)
 		var id string
 		for {
@@ -182,7 +187,11 @@ func listen(t *testing.T, s *Server, prepare func(*http.Request)) <-chan message
 					t.Errorf("data %q: %v", line, err)
 					return
 				}
-				out <- message{id: id, c: c}
+				select {
+				case out <- message{id: id, c: c}:
+				case <-stop:
+					return
+				}
 				id = ""
 			}
 		}
