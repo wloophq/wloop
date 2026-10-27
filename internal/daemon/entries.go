@@ -25,6 +25,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/keys"
 	"github.com/wloophq/wloop/internal/meter"
@@ -231,6 +233,10 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	v := gtd.Verb(verb)
+	if !offers(s.loaded().GTD, e, v) {
+		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this entry: the profile's gtd.toml says where it is", v))
+		return
+	}
 	for _, u := range e.Units {
 		if v != gtd.VerbDismiss && s.refusePlugin(w, u) {
 			return
@@ -251,6 +257,17 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 	}
 	res, err := g.Do(ctx, e.ID, coregtd.Request{Verb: v, Args: req.Args, Source: req.Source})
 	s.writeEntryResult(ctx, w, g, res, err)
+}
+
+// offers says whether the profile offers verb on e; a verb with no offer is
+// offered everywhere.
+func offers(words intentload.GTDTexts, e gtd.Entry, verb gtd.Verb) bool {
+	p := words.Verbs[string(verb)].Offer
+	if p == nil {
+		return true
+	}
+	ok, err := p.Match(workflow.Vars{Facts: catalog.OfferFacts(e)})
+	return err == nil && ok
 }
 
 // recordVerb records a verb another service ran on e; the verb already
@@ -685,6 +702,7 @@ func (ev *entryViewer) cards(ctx context.Context, e gtd.Entry, v *api.EntryView)
 // a handler, run as the unit's action, or the state change.
 func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 	out := make([]api.VerbState, 0, len(builtin.GTDVerbs))
+	words := ev.s.loaded().GTD
 	off := ""
 	for _, u := range e.Units {
 		if !ev.s.pluginEnabled(u.Provider) {
@@ -706,6 +724,9 @@ func (ev *entryViewer) verbs(ctx context.Context, e gtd.Entry) []api.VerbState {
 	}
 	for _, name := range builtin.GTDVerbs {
 		verb := gtd.Verb(name)
+		if !offers(words, e, verb) {
+			continue
+		}
 		st := api.VerbState{Verb: name}
 		switch {
 		case off != "" && verb != gtd.VerbDismiss:

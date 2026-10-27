@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/profile"
@@ -26,8 +27,11 @@ type GTDTexts struct {
 }
 
 // VerbText is a verb's words: Input is the question a verb that asks for
-// a value puts first.
-type VerbText struct{ Label, Summary, Input string }
+// a value puts first. Offer, when set, is where an entry offers the verb.
+type VerbText struct {
+	Label, Summary, Input string
+	Offer                 workflow.Predicate
+}
 
 type mGTD struct {
 	Verbs  map[string]mVerbText `toml:"verbs"`
@@ -39,6 +43,7 @@ type mVerbText struct {
 	Label   *string `toml:"label"`
 	Summary *string `toml:"summary"`
 	Input   *string `toml:"input"`
+	Offer   *string `toml:"offer"`
 }
 
 type mViewText struct {
@@ -130,6 +135,11 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		text("verbs."+id+".label", t.Label, &w.Label)
 		text("verbs."+id+".summary", t.Summary, &w.Summary)
 		text("verbs."+id+".input", t.Input, &w.Input)
+		if t.Offer != nil {
+			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
+				w.Offer = p
+			}
+		}
 		if w.Label == "" && t.Label == nil {
 			s.add("verbs."+id+".label", "is required")
 		}

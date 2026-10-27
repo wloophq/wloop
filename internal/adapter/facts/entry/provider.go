@@ -100,7 +100,7 @@ func (p *Provider) settings() Settings {
 func (p *Provider) listed(e gtd.Entry) bool { return e.Live() && p.enabledFor(e) }
 
 func (p *Provider) enabledFor(e gtd.Entry) bool {
-	u, ok := unitOf(e)
+	u, ok := e.FirstUnit()
 	return !ok || p.enabled(u.Provider)
 }
 
@@ -209,7 +209,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, ended bool) (workflow
 	if due := nudgeDue(e, s, loc); !due.IsZero() && !due.After(now) {
 		f["entry.nudge_due_at"] = due
 	}
-	eu, ok := unitOf(e)
+	eu, ok := e.FirstUnit()
 	if !ok {
 		return f, nil
 	}
@@ -264,7 +264,7 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 	if err != nil {
 		return nil, err
 	}
-	if eu, ok := unitOf(e); ok {
+	if eu, ok := e.FirstUnit(); ok {
 		return []unit.Unit{eu}, nil
 	}
 	return nil, nil
@@ -272,16 +272,6 @@ func (p *Provider) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error)
 
 // unitOf is the unit an entry belongs to: its first attached unit, else its
 // first item's.
-func unitOf(e gtd.Entry) (unit.Unit, bool) {
-	if len(e.Units) > 0 {
-		return e.Units[0], true
-	}
-	if len(e.Items) > 0 {
-		return e.Items[0].Unit, true
-	}
-	return unit.Unit{}, false
-}
-
 // held are the open items of its that entry e holds.
 func held(e gtd.Entry, its []items.Item) []items.Item {
 	var out []items.Item

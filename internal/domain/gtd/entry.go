@@ -39,6 +39,18 @@ func (e Entry) Open() bool {
 	return e.State != Done && e.State != Trash && e.State != Reference
 }
 
+// FirstUnit is the unit the entry is about: its first unit, else its
+// first item's.
+func (e Entry) FirstUnit() (unit.Unit, bool) {
+	if len(e.Units) > 0 {
+		return e.Units[0], true
+	}
+	if len(e.Items) > 0 {
+		return e.Items[0].Unit, true
+	}
+	return unit.Unit{}, false
+}
+
 // Live says whether the entry is neither done nor trash.
 func (e Entry) Live() bool { return e.State != Done && e.State != Trash }
 

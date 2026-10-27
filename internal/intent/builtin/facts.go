@@ -531,3 +531,19 @@ func FactProvider(name string) unit.ProviderID {
 	}
 	return ""
 }
+
+// OfferFacts are the facts a verb's offer reads: an entry's own, which a
+// list of entries reads without a store.
+var OfferFacts = []string{"entry.id", "entry.kind", "entry.state", "entry.muted", "entry.unit", "entry.unit_provider"}
+
+// OfferEnv is the env of a verb's offer in gtd.toml.
+func OfferEnv() expr.Env {
+	env := expr.Env{}
+	for _, f := range Facts {
+		if slices.Contains(OfferFacts, f.Name) {
+			put(env, f)
+		}
+	}
+	Narrow(env, providersOfSlot("entry"))
+	return env
+}

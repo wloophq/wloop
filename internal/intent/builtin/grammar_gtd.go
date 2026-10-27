@@ -40,6 +40,7 @@ var gtdGrammar = []Key{
 	{Path: "verbs.*", In: SurfaceGTD, Kind: KindTable, Doc: "A verb, by its name."},
 	{Path: "verbs.*.label", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "The name people read on its button. Required."},
 	{Path: "verbs.*.summary", In: SurfaceGTD, Kind: KindText, Required: true, Doc: "One line, what pressing it does: its tooltip. Required."},
+	{Path: "verbs.*.offer", In: SurfaceGTD, Kind: KindPred, Default: "true", Doc: "When an entry offers the verb, over the entry's own facts (entry.id, entry.kind, entry.state, entry.muted, entry.unit, entry.unit_provider); where it holds not, the verb is neither listed nor run."},
 	{Path: "verbs.*.input", In: SurfaceGTD, Kind: KindText, Doc: "The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those."},
 	{Path: "views", In: SurfaceGTD, Kind: KindTable, Doc: "The lists of entries, by view."},
 	{Path: "views.*", In: SurfaceGTD, Kind: KindTable, Doc: "A view, by its name."},

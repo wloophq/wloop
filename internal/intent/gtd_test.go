@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,5 +128,25 @@ func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 		if bundled, _ := BundledGTD(os.DirFS("../../profiles/default")); bundled.Review[id] == "" {
 			t.Errorf("review step %s has no label", id)
 		}
+	}
+}
+
+func TestAVerbIsOfferedWhereTheProfileSays(t *testing.T) {
+	texts, problems := loadGTDWith(t, string(defaultGTD()), "[verbs.delegate]\noffer = 'entry.kind != \"capture\"'\n\n[verbs.done]\noffer = 'entry.items_open == 0'\n")
+	if !strings.Contains(problems, "verbs.done.offer:") {
+		t.Errorf("an offer reading a fact it cannot see loads: %s", problems)
+	}
+	offer := texts.Verbs["delegate"].Offer
+	if offer == nil {
+		t.Fatal("delegate has no offer")
+	}
+	for kind, want := range map[string]bool{"capture": false, "action": true} {
+		got, err := offer.Match(workflow.Vars{Facts: workflow.Facts{"entry.kind": kind}})
+		if err != nil || got != want {
+			t.Errorf("%s: offered %v, %v", kind, got, err)
+		}
+	}
+	if texts.Verbs["done"].Offer != nil || texts.Verbs["next"].Offer != nil {
+		t.Error("a verb whose offer failed, or that has none, is offered everywhere")
 	}
 }

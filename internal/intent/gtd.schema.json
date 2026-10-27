@@ -34,6 +34,11 @@
             "description": "The name people read on its button. Required.",
             "type": "string"
           },
+          "offer": {
+            "default": "true",
+            "description": "When an entry offers the verb, over the entry's own facts (entry.id, entry.kind, entry.state, entry.muted, entry.unit, entry.unit_provider); where it holds not, the verb is neither listed nor run.",
+            "type": "string"
+          },
           "summary": {
             "description": "One line, what pressing it does: its tooltip. Required.",
             "type": "string"
