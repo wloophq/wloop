@@ -74,10 +74,14 @@ func oldToken(expiresIn time.Duration) Token {
 	}
 }
 
-func refreshHandler(srv *slacktest.Server, delay time.Duration) {
+// refreshHandler answers each refresh with a new pair, numbered from 1, after
+// hold returns; a nil hold answers at once.
+func refreshHandler(srv *slacktest.Server, hold func()) {
 	var n atomic.Int32
 	srv.Handle("oauth.v2.access", func(url.Values) any {
-		time.Sleep(delay)
+		if hold != nil {
+			hold()
+		}
 		i := n.Add(1)
 		return map[string]any{
 			"token_type":    "user",
@@ -89,6 +93,45 @@ func refreshHandler(srv *slacktest.Server, delay time.Duration) {
 		}
 	})
 }
+
+// heldRefresh makes srv's refreshes signal arrived, then wait for release.
+func heldRefresh(srv *slacktest.Server) (arrived <-chan struct{}, release func()) {
+	in := make(chan struct{}, 4)
+	gate := make(chan struct{})
+	refreshHandler(srv, func() {
+		in <- struct{}{}
+		<-gate
+	})
+	return in, sync.OnceFunc(func() { close(gate) })
+}
+
+// waitForLine waits until log holds a line containing want, failing at once
+// when a refresh arrives meanwhile.
+func waitForLine(t *testing.T, log *logBuf, want string, arrived <-chan struct{}) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for !strings.Contains(log.String(), want) {
+		select {
+		case <-arrived:
+			t.Fatalf("a second refresh ran beside the first; log:\n%s", log)
+		case <-time.After(time.Millisecond):
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no %q in the log:\n%s", want, log)
+		}
+	}
+}
+
+func awaitRefresh(t *testing.T, arrived <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-arrived:
+	case <-time.After(20 * time.Second):
+		t.Fatal("no refresh arrived")
+	}
+}
+
+const waitingLine = "waiting for another refresh"
 
 func TestStoreRoundTrips(t *testing.T) {
 	srv := slacktest.New(t)
@@ -186,7 +229,7 @@ func TestAppTokenAccount(t *testing.T) {
 
 func TestTokenReturnsAFreshTokenWithoutRefresh(t *testing.T) {
 	srv := slacktest.New(t)
-	refreshHandler(srv, 0)
+	refreshHandler(srv, nil)
 	s := newStore(newMemKeychain(), filepath.Join(t.TempDir(), "l"), srv, nil)
 	if _, err := s.Token(context.Background()); !errors.Is(err, ErrNotLoggedIn) {
 		t.Fatalf("Token of an empty store = %v", err)
@@ -216,7 +259,7 @@ func (k *orderKeychain) Set(service, account string, secret []byte) error {
 
 func TestTokenRefreshesNearExpiry(t *testing.T) {
 	srv := slacktest.New(t)
-	refreshHandler(srv, 0)
+	refreshHandler(srv, nil)
 	kc := &orderKeychain{memKeychain: newMemKeychain()}
 	s := newStore(kc, filepath.Join(t.TempDir(), "l"), srv, nil)
 	if err := s.Save(oldToken(4 * time.Minute)); err != nil {
@@ -260,10 +303,12 @@ func TestTokenRefreshesNearExpiry(t *testing.T) {
 
 func TestConcurrentRefreshHappensOnce(t *testing.T) {
 	srv := slacktest.New(t)
-	refreshHandler(srv, 150*time.Millisecond)
+	arrived, release := heldRefresh(srv)
+	t.Cleanup(release)
 	kc := newMemKeychain()
 	lock := filepath.Join(t.TempDir(), "l")
-	a, b := newStore(kc, lock, srv, nil), newStore(kc, lock, srv, nil)
+	log := &logBuf{}
+	a, b := newStore(kc, lock, srv, log), newStore(kc, lock, srv, log)
 	if err := a.Save(oldToken(4 * time.Minute)); err != nil {
 		t.Fatal(err)
 	}
@@ -272,12 +317,11 @@ func TestConcurrentRefreshHappensOnce(t *testing.T) {
 	got := make([]string, 2)
 	errs := make([]error, 2)
 	for i, s := range []*Store{a, b} {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			got[i], errs[i] = s.Token(context.Background())
-		}()
+		wg.Go(func() { got[i], errs[i] = s.Token(context.Background()) })
 	}
+	awaitRefresh(t, arrived)
+	waitForLine(t, log, waitingLine, arrived)
+	release()
 	wg.Wait()
 	for i := range got {
 		if errs[i] != nil || got[i] != "xoxe.xoxp-1-fakeaccess-new1" {
@@ -287,6 +331,7 @@ func TestConcurrentRefreshHappensOnce(t *testing.T) {
 	if n := len(srv.Calls("oauth.v2.access")); n != 1 {
 		t.Fatalf("refreshes = %d, want 1", n)
 	}
+	assertNoToken(t, log.String())
 }
 
 const helperEnv = "LOOP_AUTH_REFRESH_HELPER"
@@ -314,22 +359,12 @@ func TestHelperProcessRefresh(t *testing.T) {
 
 func TestConcurrentRefreshAcrossProcesses(t *testing.T) {
 	srv := slacktest.New(t)
-	arrived := make(chan struct{}, 4)
-	release := make(chan struct{})
-	var n atomic.Int32
-	srv.Handle("oauth.v2.access", func(url.Values) any {
-		arrived <- struct{}{}
-		<-release
-		i := n.Add(1)
-		return map[string]any{
-			"access_token":  fmt.Sprintf("xoxe.xoxp-1-fakeaccess-new%d", i),
-			"refresh_token": fmt.Sprintf("xoxe-1-fakerefresh-new%d", i),
-			"expires_in":    43200,
-		}
-	})
+	arrived, release := heldRefresh(srv)
+	t.Cleanup(release)
 	kc := fileKeychain{dir: t.TempDir()}
 	lock := filepath.Join(t.TempDir(), "l")
-	s := newStore(kc, lock, srv, nil)
+	log := &logBuf{}
+	s := newStore(kc, lock, srv, log)
 	if err := s.Save(oldToken(4 * time.Minute)); err != nil {
 		t.Fatal(err)
 	}
@@ -341,13 +376,8 @@ func TestConcurrentRefreshAcrossProcesses(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case <-arrived:
-	case <-time.After(20 * time.Second):
-		close(release)
-		_ = cmd.Wait()
-		t.Fatalf("helper never refreshed: %s", out.String())
-	}
+	t.Cleanup(func() { _ = cmd.Process.Kill() })
+	awaitRefresh(t, arrived)
 
 	type result struct {
 		tok string
@@ -358,8 +388,8 @@ func TestConcurrentRefreshAcrossProcesses(t *testing.T) {
 		tok, err := s.Token(context.Background())
 		mine <- result{tok, err}
 	}()
-	time.Sleep(200 * time.Millisecond)
-	close(release)
+	waitForLine(t, log, waitingLine, arrived)
+	release()
 
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("helper: %v\n%s", err, out.String())
@@ -368,8 +398,8 @@ func TestConcurrentRefreshAcrossProcesses(t *testing.T) {
 	if r.err != nil || r.tok != "xoxe.xoxp-1-fakeaccess-new1" {
 		t.Fatalf("Token = %q, %v", r.tok, r.err)
 	}
-	if got := n.Load(); got != 1 {
-		t.Fatalf("refreshes = %d, want 1", got)
+	if n := len(srv.Calls("oauth.v2.access")); n != 1 {
+		t.Fatalf("refreshes = %d, want 1", n)
 	}
 }
 
@@ -431,7 +461,7 @@ func TestRotatedSaveRetries(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := slacktest.New(t)
-			refreshHandler(srv, 0)
+			refreshHandler(srv, nil)
 			kc := newMemKeychain()
 			log := &logBuf{}
 			s := newStore(kc, filepath.Join(t.TempDir(), "l"), srv, log)
@@ -532,7 +562,7 @@ func TestTokenReadsTheKeychainOncePerWindow(t *testing.T) {
 
 func TestUnsavedRotatedPairOutlivesTheCache(t *testing.T) {
 	srv := slacktest.New(t)
-	refreshHandler(srv, 0)
+	refreshHandler(srv, nil)
 	kc := newMemKeychain()
 	log := &logBuf{}
 	s := newStore(kc, filepath.Join(t.TempDir(), "l"), srv, log)
@@ -575,7 +605,7 @@ func TestUnsavedRotatedPairOutlivesTheCache(t *testing.T) {
 
 func TestUnsavedPairYieldsToANewerLogin(t *testing.T) {
 	srv := slacktest.New(t)
-	refreshHandler(srv, 0)
+	refreshHandler(srv, nil)
 	kc := newMemKeychain()
 	s := newStore(kc, filepath.Join(t.TempDir(), "l"), srv, nil)
 	if err := s.Save(oldToken(4 * time.Minute)); err != nil {
@@ -606,7 +636,7 @@ func TestUnsavedPairYieldsToANewerLogin(t *testing.T) {
 func unsavedStore(t *testing.T, kc *memKeychain, lock string) (*Store, *slacktest.Server) {
 	t.Helper()
 	srv := slacktest.New(t)
-	refreshHandler(srv, 0)
+	refreshHandler(srv, nil)
 	s := newStore(kc, lock, srv, nil)
 	if err := s.Save(oldToken(4 * time.Minute)); err != nil {
 		t.Fatal(err)
@@ -662,14 +692,22 @@ func TestUnsavedRetryWaitsForTheRefreshLock(t *testing.T) {
 	kc := newMemKeychain()
 	lock := filepath.Join(t.TempDir(), "l")
 	s, _ := unsavedStore(t, kc, lock)
-	unlock, err := lockFile(context.Background(), lock)
+	unlock, err := lockFile(context.Background(), lock, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
 	kc.setErrs = 0
 	ageRetry(s)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	s.Log = func(format string, args ...any) {
+		if strings.Contains(fmt.Sprintf(format, args...), waitingLine) {
+			cancel()
+		}
+	}
 	_, _ = s.Token(ctx)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		t.Fatal("the retry never logged its wait for the lock")
+	}
 	cancel()
 	if stored, _ := s.Load(); stored.Access != "xoxe.xoxp-1-fakeaccess-old" {
 		t.Fatalf("the retry wrote %q while another process held the lock", stored.Access)
