@@ -26,3 +26,8 @@ var ConfigSchema []byte
 //
 //go:embed gtd.schema.json
 var GTDSchema []byte
+
+// KeysSchema is the JSON Schema of keys.toml, for editors.
+//
+//go:embed keys.schema.json
+var KeysSchema []byte

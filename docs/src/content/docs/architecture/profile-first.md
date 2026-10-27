@@ -63,7 +63,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
 - the workflow providers, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
 - notification titles, the digest and the menu bar's copy;
-- the help line each key shows (`internal/keys/core.go`); the GTD verbs', views' and Review steps' words are the profile's `gtd.toml`;
+- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes; the GTD verbs', views' and Review steps' words are the profile's `gtd.toml`, and each key's help its `keys.toml`;
 - the renderings of Slack messages that `slack_read` and `slack_search` return (`internal/adapter/source/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction

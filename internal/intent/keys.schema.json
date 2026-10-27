@@ -1,0 +1,21 @@
+{
+  "$id": "https://github.com/wloophq/wloop/keys.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "help": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "description": "What the key does, as the help and the palette list it. Required.",
+          "type": "string"
+        },
+        "description": "The keys of one context, by action.",
+        "type": "object"
+      },
+      "description": "The help line of each core key, by context (list, global, question, review, plan), then action (`nav:inbox`, `done`); a numbered one as `answer:{n}`, `{n}` its number.",
+      "type": "object"
+    }
+  },
+  "title": "Key help (keys.toml)",
+  "type": "object"
+}

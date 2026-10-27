@@ -33,7 +33,6 @@ type Binding struct {
 	Action   string // gtd verb, "nav:<view>", "area:<n>", "answer:<n>", "move:down", "palette", "help", "filter", "open-source", "capture", ...
 	Context  Context
 	Surfaces []Surface
-	Help     string
 }
 
 var named = map[string]string{

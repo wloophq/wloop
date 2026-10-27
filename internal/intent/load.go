@@ -101,6 +101,8 @@ type Loaded struct {
 	Tools map[string]ToolText
 	// GTD are the GTD verbs' and views' texts from gtd.toml.
 	GTD GTDTexts
+	// Keys are the core keys' help from keys.toml.
+	Keys KeyTexts
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -182,8 +184,9 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
 			gtdTexts, gtdProblems := loadGTD(layers, bundled)
-			l.Actions, l.Tools, l.GTD = actions, tools, gtdTexts
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, gtdProblems)
+			keyTexts, keyProblems := loadKeys(layers, bundled)
+			l.Actions, l.Tools, l.GTD, l.Keys = actions, tools, gtdTexts, keyTexts
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, gtdProblems, keyProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems

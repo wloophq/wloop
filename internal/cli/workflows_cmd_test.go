@@ -88,7 +88,7 @@ func TestProfileSchemaPrintsTheWorkflowSchemaOnRequest(t *testing.T) {
 
 func TestProfileSchemaPrintsTheActionsGTDAndConfigSchemas(t *testing.T) {
 	t.Parallel()
-	for flag, want := range map[string][]byte{"--actions": intentload.ActionsSchema, "--gtd": intentload.GTDSchema, "--config": intentload.ConfigSchema} {
+	for flag, want := range map[string][]byte{"--actions": intentload.ActionsSchema, "--gtd": intentload.GTDSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema} {
 		te := newTestEnv(t, &fake.Manager{})
 		if code := te.run("profile", "schema", flag); code != 0 || !bytes.Equal(te.out.Bytes(), want) {
 			t.Errorf("%s: exit %d: %s", flag, code, te.err)

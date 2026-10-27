@@ -18,6 +18,7 @@ type KeyView struct {
 	Context string `json:"context"`
 	Owner   string `json:"owner"`
 	Help    string `json:"help"`
-	// Summary is what an action's key does, from its spec; "" for a core key.
+	// Summary is what an action's key does, from its spec or, for a core
+	// verb's key, the verb's summary; "" for any other core key.
 	Summary string `json:"summary,omitempty"`
 }

@@ -195,6 +195,12 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `review.<name>` (table): A step of the Review: inbox, outbox, waiting, projects, someday or focus.
 - `review.<name>.label` (string): What the step asks of you, as the Review lists it. Required.
 
+## Key help (`keys.toml`)
+
+- `help` (table): The help line of each core key, by context (list, global, question, review, plan), then action (`nav:inbox`, `done`); a numbered one as `answer:{n}`, `{n}` its number.
+- `help.<name>` (table): The keys of one context, by action.
+- `help.<name>.<name>` (string): What the key does, as the help and the palette list it. Required.
+
 ## Workflow manifest (`workflows/<name>/workflow.toml`)
 
 ### What it matches

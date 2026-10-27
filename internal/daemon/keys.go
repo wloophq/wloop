@@ -7,6 +7,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/keys"
 )
 
@@ -16,14 +17,28 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "surface is web, tui or menubar")
 		return
 	}
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(s.loaded()))})
+	l := s.loaded()
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.GTD})})
 }
 
-func keyViews(surface keys.Surface, specs, plan []api.ActionSpec) []api.KeyView {
+// coreWords are the profile's words for the core keys: their help, and a
+// verb's summary.
+type coreWords struct {
+	keys intentload.KeyTexts
+	gtd  intentload.GTDTexts
+}
+
+func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
+	bundled := bundledWords()
 	out := []api.KeyView{}
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, surface) {
-			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: b.Help})
+			help := cmp.Or(words.keys.Help(string(b.Context), b.Action), bundled.keys.Help(string(b.Context), b.Action), b.Action)
+			var summary string
+			if b.Context == keys.List {
+				summary = cmp.Or(words.gtd.Verbs[b.Action].Summary, bundled.gtd.Verbs[b.Action].Summary)
+			}
+			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help, Summary: summary})
 		}
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {

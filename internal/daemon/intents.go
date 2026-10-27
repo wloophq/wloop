@@ -28,6 +28,15 @@ func (s *Server) loaded() *intentload.Loaded {
 	return l
 }
 
+// bundledWords are the bundled profile's words for the core keys.
+var bundledWords = sync.OnceValue(func() coreWords {
+	l, err := turn.Bundled()
+	if err != nil {
+		panic(err)
+	}
+	return coreWords{l.Keys, l.GTD}
+})
+
 // bundledGTD are the bundled profile's words for the verbs and views, which
 // a profile that leaves one out falls back to.
 var bundledGTD = sync.OnceValue(func() intentload.GTDTexts {

@@ -30,7 +30,7 @@ type GTDTexts struct {
 type VerbText struct{ Label, Summary, Input string }
 
 type mGTD struct {
-	Verbs map[string]mVerbText `toml:"verbs"`
+	Verbs  map[string]mVerbText `toml:"verbs"`
 	Views  map[string]mViewText `toml:"views"`
 	Review map[string]mViewText `toml:"review"`
 }

@@ -33,84 +33,96 @@
       "action": "next",
       "context": "list",
       "owner": "core",
-      "help": "to Next"
+      "help": "to Next",
+      "summary": "Move it to Next: something you will do as soon as you can."
     },
     {
       "key": "w",
       "action": "waiting",
       "context": "list",
       "owner": "core",
-      "help": "to Waiting"
+      "help": "to Waiting",
+      "summary": "Move it to Waiting on the people you name; it resurfaces on the date you set."
     },
     {
       "key": "s",
       "action": "schedule",
       "context": "list",
       "owner": "core",
-      "help": "schedule or snooze"
+      "help": "schedule or snooze",
+      "summary": "Hide it until a date or until its unit moves, then bring it back where it was."
     },
     {
       "key": "y",
       "action": "someday",
       "context": "list",
       "owner": "core",
-      "help": "to Someday"
+      "help": "to Someday",
+      "summary": "Move it to Someday: not now, kept for a later look."
     },
     {
       "key": "l",
       "action": "reference",
       "context": "list",
       "owner": "core",
-      "help": "to Reference"
+      "help": "to Reference",
+      "summary": "Keep it as reference: nothing to do, worth finding again."
     },
     {
       "key": "f",
       "action": "focus",
       "context": "list",
       "owner": "core",
-      "help": "toggle Focus"
+      "help": "toggle Focus",
+      "summary": "Star it in Focus, or take the star off."
     },
     {
       "key": "p",
       "action": "project",
       "context": "list",
       "owner": "core",
-      "help": "make a project or attach to one"
+      "help": "make a project or attach to one",
+      "summary": "Attach it to a project, or start a new project with it."
     },
     {
       "key": "a",
       "action": "approve",
       "context": "list",
       "owner": "core",
-      "help": "approve the draft or proposal"
+      "help": "approve the draft or proposal",
+      "summary": "Approve what it proposes: its draft, its recommended answer or its unit's action."
     },
     {
       "key": "d",
       "action": "delegate",
       "context": "list",
       "owner": "core",
-      "help": "delegate to an agent"
+      "help": "delegate to an agent",
+      "summary": "Hand it to an agent, which runs its unit's action."
     },
     {
       "key": "e",
       "action": "done",
       "context": "list",
       "owner": "core",
-      "help": "done"
+      "help": "done",
+      "summary": "Mark it done: it leaves your lists for the Logbook."
     },
     {
       "key": "Backspace",
       "action": "dismiss",
       "context": "list",
       "owner": "core",
-      "help": "dismiss"
+      "help": "dismiss",
+      "summary": "Throw it away: it goes to the trash, and a draft it carries is discarded."
     },
     {
       "key": "r",
       "action": "reply",
       "context": "list",
       "owner": "core",
-      "help": "reply in the conversation"
+      "help": "reply in the conversation",
+      "summary": "Write a reply on its unit; it waits in the Outbox for your approval."
     },
     {
       "key": "o",
@@ -418,7 +430,8 @@
       "action": "answer",
       "context": "list",
       "owner": "core",
-      "help": "Answer"
+      "help": "Answer",
+      "summary": "Answer the question it asks."
     },
     {
       "key": "C",
@@ -432,7 +445,8 @@
       "action": "dismiss",
       "context": "list",
       "owner": "core",
-      "help": "Dismiss"
+      "help": "Dismiss",
+      "summary": "Throw it away: it goes to the trash, and a draft it carries is discarded."
     },
     {
       "key": "A",
