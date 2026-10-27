@@ -421,12 +421,17 @@ func TestViewerReadsNoGitHub(t *testing.T) {
 // GitHub read to offer its actions.
 func seedR7(t *testing.T, te *testEnv) {
 	t.Helper()
+	seedPR(t, te, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}})
+}
+
+func seedPR(t *testing.T, te *testEnv, p dinv.PR) {
+	t.Helper()
 	db, err := sqlitetest.Open(filepath.Join(te.StateDir, storeFile), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if err := inventory.New(db).UpsertPR(context.Background(), dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
+	if err := inventory.New(db).UpsertPR(context.Background(), p); err != nil {
 		t.Fatal(err)
 	}
 }
