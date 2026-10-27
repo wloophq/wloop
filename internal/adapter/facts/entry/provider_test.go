@@ -46,6 +46,7 @@ type env struct {
 	p     *factentry.Provider
 	s     factentry.Settings
 	ended map[unit.Unit]bool
+	turns map[unit.Unit]int
 }
 
 func newEnv(t *testing.T) *env {
@@ -55,13 +56,14 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{t: t, db: db, clock: &clock{now: monday}, s: factentry.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}}
+	e := &env{t: t, db: db, clock: &clock{now: monday}, s: factentry.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}}
 	e.p = factentry.New(factentry.Deps{
 		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coregtd.CardFacts{Cards: db.Cards()},
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() factentry.Settings { return e.s },
 		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
+		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
 		Clock:    e.clock,
 	})
 	return e
@@ -361,6 +363,20 @@ func TestEntryUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	e.ended[chatB] = true
 	if f := e.facts("e-02"); f["entry.units_ended"] != true {
 		t.Error("an entry whose every unit ended has not")
+	}
+}
+
+func TestEntryTurnsCountsTheTurnsOnTheEntryItself(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.entry(gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "tracked", Units: []unit.Unit{chatA}})
+	e.turns[chatA] = 3
+	if f := e.facts("e-01"); f["entry.turns"] != 0 {
+		t.Errorf("entry.turns %v, want the turns on its unit left out", f["entry.turns"])
+	}
+	e.turns[gtd.UnitOf("e-01")] = 2
+	if f := e.facts("e-01"); f["entry.turns"] != 2 {
+		t.Errorf("entry.turns %v, want 2", f["entry.turns"])
 	}
 }
 

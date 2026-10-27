@@ -62,6 +62,8 @@ type Deps struct {
 	Settings func() Settings
 	// Ended says whether a unit has ended, as its plugin says; nil: none has.
 	Ended func(ctx context.Context, u unit.Unit) (bool, error)
+	// Turns counts the turns run on a unit; nil: none.
+	Turns func(ctx context.Context, u unit.Unit) (int, error)
 	// Clock's location is where working days are counted.
 	Clock port.Clock
 }
@@ -178,6 +180,7 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 		"entry.unit_providers":      []string{},
 		"entry.units_ended":         false,
 		"entry.captured_by_user":    e.CapturedByUser(),
+		"entry.turns":               0,
 		"entry.unit_started_by_me":  false,
 		"entry.unit_closure_posted": false,
 		"entry.items_open":          0,
@@ -201,6 +204,13 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	}
 	if due := nudgeDue(e, s, loc); !due.IsZero() && !due.After(now) {
 		f["entry.nudge_due_at"] = due
+	}
+	if p.d.Turns != nil {
+		n, err := p.d.Turns(ctx, gtd.UnitOf(e.ID))
+		if err != nil {
+			return nil, err
+		}
+		f["entry.turns"] = n
 	}
 	us := unitsOf(e)
 	if len(us) == 0 {

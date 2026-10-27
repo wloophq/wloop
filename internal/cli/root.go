@@ -330,6 +330,10 @@ func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (
 			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
 		},
 		Ended: ended,
+		Turns: func(ctx context.Context, u unit.Unit) (int, error) {
+			books, err := sqlite.New(db).Books(ctx, u)
+			return len(books[u].Turns), err
+		},
 		Clock: clockFunc(func() time.Time { return e.Now() }),
 	})
 }

@@ -274,6 +274,7 @@ var otherFacts = []Fact{
 	wf("entry", "units", expr.List, "The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them."),
 	wf("entry", "unit_providers", expr.List, "The providers of entry.units, each once, in order."),
 	timeVarying(wf("entry", "units_ended", expr.Bool, "The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
+	wf("entry", "turns", expr.Int, "Turns run on the entry itself, such as a start; turns on its units are not counted."),
 	wf("entry", "captured_by_user", expr.Bool, "The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service."),
 	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started entry.unit, from the facts GTD receives.")),
 	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on entry.unit, from the facts GTD receives.")),

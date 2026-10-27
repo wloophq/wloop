@@ -236,6 +236,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `entry.units` | list | The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them. |
 | `entry.unit_providers` | list | The providers of entry.units, each once, in order. |
 | `entry.units_ended` | bool | The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
+| `entry.turns` | int | Turns run on the entry itself, such as a start; turns on its units are not counted. |
 | `entry.captured_by_user` | bool | The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service. |
 | `entry.unit_started_by_me` | bool | The viewer started entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `entry.unit_closure_posted` | bool | A closure was posted on entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |

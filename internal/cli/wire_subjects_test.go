@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -245,6 +246,13 @@ func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	}
 	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
 		subjectThread: {ClosurePosted: true, At: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := closes(); len(got) != 0 {
+		t.Fatalf("closes %v, an entry no turn ran on", got)
+	}
+	start := dturn.Book{Unit: gtd.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}
 	if got := closes(); !slices.Equal(got, []string{"entry:e-01"}) {

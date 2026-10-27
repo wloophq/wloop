@@ -42,7 +42,7 @@ What a turn on an entry produces is attached to it, when the turn's intent asks 
 - With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
 - With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the entry posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
 
-Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `entry-results-ended` closes an entry you captured, marking it done, once it has a unit and every one of them has ended (`entry.captured_by_user && entry.units_ended`). It never closes an entry derived from items, which its items close.
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `entry-results-ended` closes an entry you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`entry.captured_by_user && entry.turns > 0 && entry.units_ended`). An entry you captured on a pull request to keep track of it, with no turn on the entry itself, stays open. It never closes an entry derived from items, which its items close.
 
 ## Start new work
 
