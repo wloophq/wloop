@@ -259,3 +259,21 @@ func TestAPinnedPublisherPlacesAsItsPluginPlaces(t *testing.T) {
 		t.Errorf("a publisher that places nothing: %q %v", got, err)
 	}
 }
+
+// landingPublisher says its post landed in thread.
+type landingPublisher struct{ recordingPublisher }
+
+func (*landingPublisher) Landed(context.Context, draft.Draft) (unit.Unit, bool, error) {
+	return unit.Unit{Provider: "slack", Key: "T1/C1/1700000000.000100"}, true, nil
+}
+
+func TestThePinnedPublisherForwardsWhereAPostLanded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	if u, ok, err := (pinnedEffects{Effects: &landingPublisher{}}).Landed(ctx, draft.Draft{}); err != nil || !ok || u.Key != "T1/C1/1700000000.000100" {
+		t.Fatalf("Landed = %v %v %v", u, ok, err)
+	}
+	if _, ok, err := (pinnedEffects{Effects: &recordingPublisher{}}).Landed(ctx, draft.Draft{}); err != nil || ok {
+		t.Fatalf("a publisher that cannot say landed: %v %v", ok, err)
+	}
+}

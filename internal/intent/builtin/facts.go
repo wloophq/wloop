@@ -25,6 +25,13 @@ func fact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	return Fact{Name: name, Type: t, Slots: slots, Doc: doc}
 }
 
+// entryName is a name fact of a GTD entry, which only entry intents read.
+func entryName(name, doc string) Fact {
+	f := fact(name, expr.String, nam, doc)
+	f.Provider = unit.Entry
+	return f
+}
+
 // prFact is a fact of github's pull request, which only github intents read.
 func prFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	f := fact(name, t, slots, doc)
@@ -152,6 +159,9 @@ var otherFacts = []Fact{
 	fact("unit.ref", expr.String, trn, "The unit as the instructions name it, such as owner/repo#12."),
 	fact("unit.label", expr.String, nam, "The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key."),
 	fact("session.title", expr.String, nam, "The manifest's session.title."),
+	fact("workspace.name", expr.String, nam, "The name of the worktree created for the unit; empty when the turn creates none or before it is named."),
+	entryName("entry.title", "The entry's title."),
+	entryName("entry.short_id", "The entry's id, short: its first six hex digits."),
 	fact("session.started", expr.Time, nam, "When the session starts; a template formats it with Go's layout, as {{.session.started.Format \"02/01 15:04\"}}."),
 	fact("pr.last_review.exists", expr.Bool, trn, "The viewer reviewed the pull request before."),
 	enum(fact("pr.last_review.verdict", expr.String, trn, "The viewer's newest review state, any state; empty when none."), enumOf(ReviewStates...)),
@@ -164,6 +174,7 @@ var otherFacts = []Fact{
 	wf("pr", "merged_at", expr.Time, "When the pull request merged; zero when it did not."),
 	wf("pr", "closed_at", expr.Time, "When the pull request closed; zero when open."),
 	wf("pr", "finished_for", expr.Duration, "Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open."),
+	wf("pr", "ended", expr.Bool, "The pull request merged or closed: the GitHub plugin's word that the unit has ended."),
 	wf("pr", "draft", expr.Bool, "The pull request is a draft."),
 	wf("pr", "head", expr.String, "The head commit's oid."),
 	wf("pr", "conflicting_for", expr.Duration, "How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not."),
@@ -258,13 +269,18 @@ var otherFacts = []Fact{
 	wf("entry", "since_nudge", expr.Duration, "Time since the entry's last nudge; very large when it was never nudged."),
 	untrusted(wf("entry", "nudge_due_at", expr.Time, "When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled.")),
 	wf("entry", "muted", expr.Bool, "The entry is muted."),
-	wf("entry", "unit", expr.String, "The entry's unit as provider:key; empty for an entry with none."),
-	enum(wf("entry", "unit_provider", expr.String, "The provider of the entry's unit; empty for an entry with none."), enumOf(append([]string{""}, providerIDs()...)...)),
-	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started the entry's unit, from the facts GTD receives.")),
-	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on the entry's unit, from the facts GTD receives.")),
-	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's unit.")),
-	untrusted(wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's unit.")),
-	untrusted(wf("entry", "items_owed", expr.Int, "Open items of the entry's unit that the entry holds.")),
+	wf("entry", "unit", expr.String, "The entry's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for an entry with none."),
+	enum(wf("entry", "unit_provider", expr.String, "The provider of entry.unit; empty for an entry with none."), enumOf(append([]string{""}, providerIDs()...)...)),
+	wf("entry", "units", expr.List, "The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them."),
+	wf("entry", "unit_providers", expr.List, "The providers of entry.units, each once, in order."),
+	timeVarying(wf("entry", "units_ended", expr.Bool, "The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends.")),
+	wf("entry", "turns", expr.Int, "Turns run on the entry itself, such as a start; turns on its units are not counted."),
+	wf("entry", "captured_by_user", expr.Bool, "The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service."),
+	untrusted(wf("entry", "unit_started_by_me", expr.Bool, "The viewer started entry.unit, from the facts GTD receives.")),
+	untrusted(wf("entry", "unit_closure_posted", expr.Bool, "A closure was posted on entry.unit, from the facts GTD receives.")),
+	untrusted(wf("entry", "items_open", expr.Int, "Open items of the entry's units.")),
+	untrusted(wf("entry", "items_resolved", expr.Int, "Resolved items of the entry's units.")),
+	untrusted(wf("entry", "items_owed", expr.Int, "Open items of the entry's units that the entry holds.")),
 	wf("entry", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none."),
 	untrusted(wf("entry", "fingerprint", expr.String, "The entry's id, state and update time.")),
 	providerWF(dslack.Provider, "slack", "channel", expr.String, "The conversation's channel id."),
@@ -275,6 +291,7 @@ var otherFacts = []Fact{
 	untrusted(providerWF(dslack.Provider, "slack", "items_open", expr.Int, "Open items whose unit is this unit.")),
 	untrusted(providerWF(dslack.Provider, "slack", "items_unowned", expr.Int, "Open items of the unit with no assignee, nobody waited on and no basis.")),
 	timeVarying(untrusted(providerWF(dslack.Provider, "slack", "items_unowned_age_days", expr.Int, "Working days, in the configured location, since the oldest unowned item appeared."))),
+	timeVarying(providerWF(dslack.Provider, "slack", "ended", expr.Bool, "The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than slack.ended_after.")),
 	providerWF(dslack.Provider, "slack", "settled_at", expr.Time, "The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none."),
 	untrusted(providerWF(dslack.Provider, "slack", "fingerprint", expr.String, "The unit, its newest message and the update time of its items.")),
 	briefWF("goal", expr.String, "The brief's goal; empty when the unit has no brief."),
@@ -305,6 +322,24 @@ var otherFacts = []Fact{
 	wf("config", "gtd.stale_waiting_days", expr.Int, "The gtd.stale_waiting_days setting, in working days."),
 	wf("config", "drafts.repeat_after", expr.Duration, "The drafts.repeat_after setting."),
 	wf("config", "turns.per_day", expr.Int, "The turns.per_day setting: automated turns on units whose plugin keeps no per-unit count, all workflows together."),
+}
+
+// endedName is the name, under a provider's slot, of the fact its plugin
+// says a unit has ended with.
+const endedName = "ended"
+
+// EndedFact is the workflow fact provider p's plugin says one of its units
+// has ended with; false for a provider whose plugin says nothing.
+func EndedFact(p unit.ProviderID) (string, bool) {
+	slot, ok := Slots[p]
+	if !ok {
+		return "", false
+	}
+	name := slot + "." + endedName
+	if _, ok := FactType(name); !ok {
+		return "", false
+	}
+	return name, true
 }
 
 // put declares f in env with its closed values, when they hold for every

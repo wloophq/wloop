@@ -96,7 +96,7 @@ func TestReviewBetweenMessageAndRunResolves(t *testing.T) {
 	r := newRig(t)
 	u := thread(ts(1))
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/widget#527"}
-	msgAt := tsTime(ts(1))
+	msgAt := slack.TSTime(ts(1))
 	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please review PR 527", msgAt)
 	r.asker.reply = func(int, turns.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,
@@ -177,7 +177,7 @@ func TestOldReviewCannotResolveANewAsk(t *testing.T) {
 	r := newRig(t)
 	u := thread(ts(1))
 	pr := unit.Unit{Provider: unit.GitHub, Key: "acme/widget#527"}
-	msgAt := tsTime(ts(1))
+	msgAt := slack.TSTime(ts(1))
 	r.facts.post(jChan, ts(1), "", jOther, "<@U000AAA> please re-review PR 527", msgAt)
 	r.asker.reply = func(int, turns.Ask) ([]byte, error) {
 		return answerJSON(t, []obj{jItem("n1", ts(1))}, nil,

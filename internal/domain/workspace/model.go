@@ -59,6 +59,9 @@ type Workspace struct {
 	// BranchRenamed is set by Create when the manager put the workspace on
 	// another branch than the requested head, which is taken.
 	BranchRenamed bool
+	// ParentDropped is set by Create when the request named a parent the
+	// workspace was not recorded under.
+	ParentDropped bool
 	// Unread is the card's unread mark.
 	Unread bool
 	// Created is set when the manager made the worktree, rather than found

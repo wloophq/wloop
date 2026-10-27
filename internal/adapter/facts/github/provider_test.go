@@ -575,8 +575,11 @@ func TestListReachesMergedPRsWithOpenTurnsOrQueuedAnswers(t *testing.T) {
 		t.Fatal("a merged pull request without a turn is listed")
 	}
 	f := facts(t, p, withTurn.Unit())
-	if f["pr.open_turn"] != "sent" || f["pr.open_turn_seq"] != 2 || f["pr.state"] != "MERGED" {
+	if f["pr.open_turn"] != "sent" || f["pr.open_turn_seq"] != 2 || f["pr.state"] != "MERGED" || f["pr.ended"] != true {
 		t.Fatalf("open turn facts = %v", f)
+	}
+	if f := facts(t, p, open.Unit()); f["pr.ended"] != false {
+		t.Fatalf("an open pull request has ended: %v", f)
 	}
 	if f := facts(t, p, withAnswer.Unit()); f["pr.orphan_answer_id"] != 41 || f["pr.open_turn"] != "" {
 		t.Fatalf("orphan answer facts = %v", f)

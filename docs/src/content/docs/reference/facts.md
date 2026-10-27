@@ -61,6 +61,14 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `row.remove_refusal` | string | action | What refused removing the row's workspace, which a force remove overrides; empty when nothing did. |
 | `row.recommended` | string | action | The runner recommended for the row's items: session or headless; empty when none is. |
 
+### The entry (`entry.*`)
+
+| Fact | Type | Slots | Meaning |
+|---|---|---|---|
+| `entry.captured_by_user` | bool | action | The user captured the entry: origin user and kind capture; false for a derived entry, such as one from a Slack thread. |
+| `entry.title` | string | name | The entry's title. |
+| `entry.short_id` | string | name | The entry's id, short: its first six hex digits. |
+
 ### The turn (`turn.*`, `unit.*`)
 
 | Fact | Type | Slots | Meaning |
@@ -75,11 +83,12 @@ The predicates of an intent manifest read these. The **action** slot (`[action]`
 | `unit.ref` | string | turn | The unit as the instructions name it, such as owner/repo#12. |
 | `unit.label` | string | name | The unit as people read it: a pull request as owner/repo#12, any other unit as provider:key. |
 
-### A session's name (`session.*`; slot `name`)
+### A name (`session.*`, `workspace.*`; slot `name`)
 
 | Fact | Type | Slots | Meaning |
 |---|---|---|---|
 | `session.title` | string | name | The manifest's session.title. |
+| `workspace.name` | string | name | The name of the worktree created for the unit; empty when the turn creates none or before it is named. |
 | `session.started` | timestamp | name | When the session starts; a template formats it with Go's layout, as {{.session.started.Format "02/01 15:04"}}. |
 
 ### A draft's actions (`draft.*`)
@@ -112,6 +121,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.merged_at` | timestamp | When the pull request merged; zero when it did not. |
 | `pr.closed_at` | timestamp | When the pull request closed; zero when open. |
 | `pr.finished_for` | duration | Working time since it ended, max(merged_at, closed_at), the rule retention uses; zero while open. |
+| `pr.ended` | bool | The pull request merged or closed: the GitHub plugin's word that the unit has ended. |
 | `pr.draft` | bool | The pull request is a draft. |
 | `pr.head` | string | The head commit's oid. |
 | `pr.conflicting_for` | duration | How long the pull request has conflicted with its base, from when the inventory first saw it; zero when it does not. |
@@ -221,13 +231,18 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `entry.since_nudge` | duration | Time since the entry's last nudge; very large when it was never nudged. |
 | `entry.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else gtd.stale_waiting_days working days after the entry started waiting, then drafts.repeat_after after the last nudge; zero when the entry is not stalled. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `entry.muted` | bool | The entry is muted. |
-| `entry.unit` | string | The entry's unit as provider:key; empty for an entry with none. |
-| `entry.unit_provider` | string | The provider of the entry's unit; empty for an entry with none. |
-| `entry.unit_started_by_me` | bool | The viewer started the entry's unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.unit_closure_posted` | bool | A closure was posted on the entry's unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_open` | int | Open items of the entry's unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_resolved` | int | Resolved items of the entry's unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `entry.items_owed` | int | Open items of the entry's unit that the entry holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `entry.unit` | string | The entry's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for an entry with none. |
+| `entry.unit_provider` | string | The provider of entry.unit; empty for an entry with none. |
+| `entry.units` | list | The entry's units as provider:key, in order: the unit it was captured or derived on, then those attached to it in attach order, then any only its items name. The entry itself is not one of them. |
+| `entry.unit_providers` | list | The providers of entry.units, each once, in order. |
+| `entry.units_ended` | bool | The entry has a unit, and every one of entry.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
+| `entry.turns` | int | Turns run on the entry itself, such as a start; turns on its units are not counted. |
+| `entry.captured_by_user` | bool | The user captured the entry: origin user and kind capture. False for an entry derived from a unit's items, such as one from a Slack thread, or opened by another service. |
+| `entry.unit_started_by_me` | bool | The viewer started entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `entry.unit_closure_posted` | bool | A closure was posted on entry.unit, from the facts GTD receives. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `entry.items_open` | int | Open items of the entry's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `entry.items_resolved` | int | Resolved items of the entry's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `entry.items_owed` | int | Open items of the entry's units that the entry holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `entry.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the entry, withdrawn ones included; zero when none. |
 | `entry.fingerprint` | string | The entry's id, state and update time. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
@@ -243,6 +258,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 | `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than slack.ended_after. |
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. |
 | `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
 
@@ -313,6 +329,7 @@ The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints
 | `turn.dismiss` | session, github | Dismisses the open turn, recording the reason. |
 | `answer.refuse` | github | Refuses a queued answer whose route is gone. |
 | `session.mark_dormant` | session | Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it. |
+| `entry.close` | entry | Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash. |
 | `turn.start` | any | Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`. |
 | `draft.propose` | any | Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends. |
 | `classify` | any | A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`. |

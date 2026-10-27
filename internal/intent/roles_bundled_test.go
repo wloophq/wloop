@@ -26,6 +26,7 @@ func TestRolesImplyTheRemovedKeys(t *testing.T) {
 		"nudge":   {prepare: "nudge.prepare", context: "pr", policy: "round", board: "none"},
 		"probe":   {context: "synthetic", launch: "probe", policy: "probe", board: "none"},
 		"review":  {roundKind: "review", reconcile: "my_review", context: "pr", policy: "round", board: "review", drivesRow: true},
+		"start":   {context: "pr", policy: "round", board: "none"},
 	}
 	for _, d := range l.Registry.All() {
 		got := implied{d.RoundKind, d.Reconcile, d.Prepare, d.Context, d.Launch, d.Policy, d.Board, d.DrivesRow}

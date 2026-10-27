@@ -591,3 +591,56 @@ func TestSetCardFailureIsUnknownStatus(t *testing.T) {
 		t.Fatalf("a missing worktree: %v", err)
 	}
 }
+
+const createdWT = `{"ok":true,"result":{"worktree":{"id":"r1::/wt/fix-login","path":"/wt/fix-login","displayName":"fix-login"}}}`
+
+func TestCreateFromTheDefaultBaseOmitsTheBaseBranch(t *testing.T) {
+	r := &recorder{canned: canned{"worktree create": createdWT}}
+	if _, _, err := (&Manager{R: r}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "fix-login", BaseRef: "origin/pr/3", DefaultBase: true}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"worktree create --repo id:r1 --name fix-login --no-parent --json"}
+	if !slices.Equal(r.calls, want) {
+		t.Fatalf("calls = %q", r.calls)
+	}
+}
+
+func TestCreateUnderAListedParent(t *testing.T) {
+	r := &recorder{canned: canned{
+		"worktree list":   `{"ok":true,"result":{"worktrees":[{"id":"r0::/wt/lead","repoId":"r0","path":"/wt/lead"}]}}`,
+		"worktree create": createdWT,
+	}}
+	ws, _, err := (&Manager{R: r}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "fix-login", Parent: "/wt/lead/", DefaultBase: true})
+	if err != nil || ws.ParentDropped {
+		t.Fatalf("ws = %+v, err = %v", ws, err)
+	}
+	want := []string{"worktree list --limit 1000 --json", "worktree create --repo id:r1 --name fix-login --parent-worktree path:/wt/lead --json"}
+	if !slices.Equal(r.calls, want) {
+		t.Fatalf("calls = %q", r.calls)
+	}
+}
+
+func TestCreateDropsAParentOrcaDoesNotList(t *testing.T) {
+	r := &recorder{canned: canned{
+		"worktree list":   `{"ok":true,"result":{"worktrees":[{"id":"r0::/wt/lead","repoId":"r0","path":"/wt/lead"}]}}`,
+		"worktree create": createdWT,
+	}}
+	ws, _, err := (&Manager{R: r}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "fix-login", Parent: "/elsewhere/ana"})
+	if err != nil || !ws.ParentDropped {
+		t.Fatalf("ws = %+v, err = %v", ws, err)
+	}
+	if got := r.calls[len(r.calls)-1]; got != "worktree create --repo id:r1 --name fix-login --no-parent --json" {
+		t.Fatalf("create = %q", got)
+	}
+}
+
+func TestCreateFromPRDropsTheParent(t *testing.T) {
+	rpc := &fakeRPC{replies: map[string]string{
+		"worktree.resolvePrBase": `{"ok":true,"result":{"baseBranch":"abc","branchNameOverride":"feat/x"}}`,
+		"worktree.create":        `{"ok":true,"result":{"worktree":{"id":"r1::/wt/x","path":"/wt/x","branch":"refs/heads/feat/x"}}}`,
+	}}
+	ws, _, err := (&Manager{R: canned{}, RPC: rpc}).Create(context.Background(), workspace.CreateRequest{RepoID: "r1", Name: "x", Unit: prUnit(7), HeadBranch: "feat/x", Parent: "/wt/lead"})
+	if err != nil || !ws.ParentDropped || rpc.params["worktree.create"]["noParent"] != true {
+		t.Fatalf("ws = %+v, err = %v, params = %v", ws, err, rpc.params["worktree.create"])
+	}
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
@@ -81,7 +82,7 @@ func runProfileShow(ctx context.Context, e *Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	intents := doctorIntents(e.loadedIntents().Registry, *show)
+	intents := doctorIntents(e.loadedIntents().Registry, *show, ref.Unit().Provider)
 	if *kind != "" {
 		d, err := e.intentDef(*kind)
 		if err != nil {
@@ -206,11 +207,11 @@ func placeholderTurn(d dintent.Def, ref github.Ref) turn.Request {
 
 // doctorIntents are the intents a round on a pull request can run, in name
 // order: the ones that read judgment blocks, and with --show every
-// user-facing one whose context is a pull request.
-func doctorIntents(r *dintent.Registry, show bool) []dintent.Def {
+// user-facing one whose context is a pull request and that serves units of p.
+func doctorIntents(r *dintent.Registry, show bool, p unit.ProviderID) []dintent.Def {
 	var out []dintent.Def
 	for _, d := range r.All() {
-		if d.Profile != "" || (show && d.UserFacing && d.Context == contextPR) {
+		if d.Profile != "" || (show && d.UserFacing && d.Context == contextPR && d.Serves(p)) {
 			out = append(out, d)
 		}
 	}
@@ -343,7 +344,7 @@ func (e *Env) doctorState(ctx context.Context, q api.DoctorQuery) (api.DoctorRep
 	if err != nil {
 		return rep, err
 	}
-	for _, d := range doctorIntents(e.loadedIntents().Registry, false) {
+	for _, d := range doctorIntents(e.loadedIntents().Registry, false, "") {
 		last, ok, err := store.LastBundledSHA(ctx, string(d.Name), q.Repo)
 		if err != nil {
 			return rep, err

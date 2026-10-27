@@ -32,12 +32,13 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 
 | Setting | Kind | Default | Meaning |
 |---|---|---|---|
-| `projects[]` | table |  | Settings for the pull requests of matching repositories; the first match wins. |
+| `projects[]` | table |  | Settings for the pull requests and the work of matching repositories; the first match wins. |
 | `projects[].match` | string |  | An owner/repo pattern, such as acme/* or acme/api. |
 | `projects[].projects_dir` | string |  | The project's projects_dir. |
 | `projects[].agent` | string |  | The agent the project's sessions run. |
 | `projects[].agent_home` | string |  | The project's agent_home. |
 | `projects[].workspace_managers` | list of strings |  | The managers a new worktree of the project picks from, in order. |
+| `projects[].trust_clones` | bool |  | Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*. |
 | `projects[].github` | table |  | The GitHub settings the project overrides. |
 | `projects[].github.trusted_authors` | list of strings |  | The project's github.trusted_authors. |
 | `projects[].github.followups_without_workspace` | bool |  | The project's github.followups_without_workspace. |
@@ -109,6 +110,7 @@ A plugin's settings live under its id (`github`, `slack`), and `<id>.enabled` sw
 | `slack.keychain_service` | string |  | The name of the Keychain items; empty is the brand's. |
 | `slack.post_allowlist` | list of strings |  | When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to. |
 | `slack.request_log` | bool | `false` | Logs one line per Slack call: method and HTTP status. |
+| `slack.ended_after` | duration | `7d` | How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended). |
 | `slack.turns` | table |  | What a turn on a Slack unit reads. |
 | `slack.turns.max_chars` | integer |  | The characters of the unit's messages rendered into the instructions; 0 is 30000. |
 | `slack.drafts` | table |  | The drafts the plugin's own rules propose. |

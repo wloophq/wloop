@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/config"
+
 	factslack "github.com/wloophq/wloop/internal/adapter/facts/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -19,6 +21,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -91,7 +94,7 @@ func newSubjectsRig(t *testing.T) *subjectsRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mods := []source.Module{{ID: dslack.Provider, Facts: factslack.New(db, clockFunc(func() time.Time { return te.Now() }))}}
+	mods := []source.Module{{ID: dslack.Provider, Facts: factslack.New(db, clockFunc(func() time.Time { return te.Now() }), config.DefaultSlackEndedAfter)}}
 	ed := engineDeps{DB: db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	te.wireSubjects(&serveWiring{DB: db, Cfg: te.cfg, Modules: mods, Engine: &ed})
 	return &subjectsRig{te: te, db: db, log: log, eng: te.planEngine(ed)}
@@ -211,5 +214,48 @@ func TestADisabledSlackPluginListsNoUnits(t *testing.T) {
 	}
 	if us, err := te.planEngine(ed).Units.List(context.Background(), gtd.Codec{}.Provider()); err != nil || len(us) > 0 {
 		t.Errorf("entries of an empty store: %v, %v", us, err)
+	}
+}
+
+func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newSubjectsRig(t)
+	r.entry(t, gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, gtd.OpCreate)
+	derived := gtd.Entry{ID: "e-02", Kind: gtd.KindClose, State: gtd.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
+		Origin: gtd.OriginDerived, Created: testNow, Updated: testNow}
+	if err := r.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: derived}}); err != nil {
+		t.Fatal(err)
+	}
+	closes := func() []string {
+		t.Helper()
+		p, err := r.eng.Evaluate(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, it := range p.Items {
+			if it.Workflow == "entry-results-ended" {
+				out = append(out, it.Unit.String())
+			}
+		}
+		return out
+	}
+	if got := closes(); len(got) != 0 {
+		t.Fatalf("closes %v before the thread ended", got)
+	}
+	if err := r.db.Extraction().Save(ctx, sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
+		subjectThread: {ClosurePosted: true, At: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := closes(); len(got) != 0 {
+		t.Fatalf("closes %v, an entry no turn ran on", got)
+	}
+	start := dturn.Book{Unit: gtd.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
+		t.Fatal(err)
+	}
+	if got := closes(); !slices.Equal(got, []string{"entry:e-01"}) {
+		t.Fatalf("closes %v, want the captured entry only", got)
 	}
 }

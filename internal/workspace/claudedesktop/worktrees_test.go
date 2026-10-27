@@ -245,3 +245,62 @@ func TestStartsASessionInAWorktreeTheAppCreated(t *testing.T) {
 		t.Fatalf("mint = %+v", c)
 	}
 }
+
+func TestCreateFromTheDefaultBaseFetchesItFirst(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if _, err := f.m.git(ctx, f.repo, "commit", "-q", "--allow-empty", "-m", "upstream"); err != nil {
+		t.Fatal(err)
+	}
+	upstream, err := f.m.git(ctx, f.repo, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.git(ctx, f.repo, "reset", "-q", "--hard", "HEAD~1"); err != nil {
+		t.Fatal(err)
+	}
+	f.exec.fetch = func(c Cmd) error {
+		_, err := f.m.git(ctx, f.repo, "update-ref", "refs/remotes/origin/develop", strings.TrimSpace(string(upstream)))
+		return err
+	}
+	ws, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "fix-login", DefaultBase: true, Parent: "/wt/lead"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fetches := slices.DeleteFunc(f.exec.ran("git"), func(c Cmd) bool { return !slices.Contains(c.Args, "fetch") })
+	if len(fetches) != 1 || !slices.Contains(fetches[0].Args, "+refs/heads/develop:refs/remotes/origin/develop") {
+		t.Fatalf("fetches = %v", fetches)
+	}
+	head, err := f.m.git(ctx, ws.Path, "rev-parse", "HEAD")
+	if err != nil || string(head) != string(upstream) {
+		t.Fatalf("worktree at %s, want origin/develop %s (%v)", head, upstream, err)
+	}
+	if !ws.ParentDropped {
+		t.Fatalf("a parent Claude Desktop cannot keep is not reported: %+v", ws)
+	}
+}
+
+func TestCreateFromTheDefaultBaseFallsBackToHEADWithoutOriginHEAD(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	if _, err := f.m.git(ctx, f.repo, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"); err != nil {
+		t.Fatal(err)
+	}
+	ws, _, err := f.m.Create(ctx, workspace.CreateRequest{RepoID: f.repo, Name: "fix-login", DefaultBase: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, _ := f.m.git(ctx, ws.Path, "rev-parse", "HEAD")
+	main, _ := f.m.git(ctx, f.repo, "rev-parse", "HEAD")
+	if string(head) != string(main) || ws.ParentDropped {
+		t.Fatalf("worktree %+v at %s, want HEAD %s", ws, head, main)
+	}
+}
+
+func TestCreateFromTheDefaultBaseFailsWhenTheFetchFails(t *testing.T) {
+	f := newFixture(t)
+	f.exec.fetch = func(Cmd) error { return errors.New("could not read from remote repository") }
+	if _, _, err := f.m.Create(context.Background(), workspace.CreateRequest{RepoID: f.repo, Name: "fix-login", DefaultBase: true}); err == nil {
+		t.Fatal("created a worktree from a default base it could not fetch")
+	}
+}

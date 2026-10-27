@@ -247,13 +247,18 @@ func (e *Env) roundName(opts roundOptions, u unit.Unit) (string, error) {
 	if opts.intent == "" {
 		return opts.title, nil
 	}
-	return e.sessionName(opts.intent, u)
+	return e.sessionName(opts.intent, u, opts.names)
 }
 
 // sessionName is what the manager and the agent show a session the loop
 // starts for a turn of intent on u as: its manifest's session.name.
-func (e *Env) sessionName(intent dintent.Name, u unit.Unit) (string, error) {
-	return e.loadedIntents().SessionName(intent, map[string]any{"unit.label": u.Label(), "session.started": e.Now()})
+func (e *Env) sessionName(intent dintent.Name, u unit.Unit, names map[string]any) (string, error) {
+	facts := maps.Clone(names)
+	if facts == nil {
+		facts = map[string]any{}
+	}
+	facts["unit.label"], facts["session.started"] = u.Label(), e.Now()
+	return e.loadedIntents().SessionName(intent, facts)
 }
 
 // beforeSet is whether a set input of the request runs the before builtin.

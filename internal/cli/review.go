@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -16,6 +17,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -259,6 +261,26 @@ func findReviewWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 }
 
 func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string) (wsdomain.Repo, error) {
+	repo, err := e.checkout(ctx, cfg, repos, remoteKey, ref, preferRepoID, nil)
+	return repo, err
+}
+
+// clones serializes the clones into one folder: a start racing another
+// waits for its clone instead of taking a half-written one for a checkout.
+var clones sync.Map
+
+func lockClone(path string) func() {
+	mu, _ := clones.LoadOrStore(path, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
+}
+
+// checkout is the main checkout of ref's repository: one of repos, else
+// the folder of projects_dir named after it, cloned there when absent and
+// refused when it holds another repository. A clone made now is handed to
+// cloned, when set, before another caller can take it; when cloned fails,
+// the clone is removed.
+func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, remoteKey string, ref github.Ref, preferRepoID string, cloned func(path string) error) (wsdomain.Repo, error) {
 	if found := wsdomain.FindRepos(repos, remoteKey, preferRepoID); len(found) > 0 {
 		return found[0], nil
 	}
@@ -266,13 +288,26 @@ func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []ws
 		return wsdomain.Repo{}, fmt.Errorf("%s/%s is not registered in %s and projects_dir is not set in %s; set it to the directory where repositories should be cloned", ref.Owner, ref.Repo, e.managerDisplay(), e.ConfigPath)
 	}
 	path := filepath.Join(cfg.ProjectsDir, ref.Repo)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	unlock := lockClone(path)
+	defer unlock()
+	_, err := os.Stat(path)
+	switch {
+	case os.IsNotExist(err):
 		fmt.Fprintf(e.Out, "cloning %s/%s into %s\n", ref.Owner, ref.Repo, path)
 		if _, err := e.GH.Run(ctx, "repo", "clone", ref.Owner+"/"+ref.Repo, path); err != nil {
 			return wsdomain.Repo{}, err
 		}
-	} else if err != nil {
+		if cloned != nil {
+			if err := cloned(path); err != nil {
+				return wsdomain.Repo{}, errors.Join(err, os.RemoveAll(path))
+			}
+		}
+		return wsdomain.Repo{Path: path, RemoteKey: remoteKey}, nil
+	case err != nil:
 		return wsdomain.Repo{}, err
+	}
+	if _, name := gitx.ParseRemote(gitx.RemoteURL(path, "origin")); !strings.EqualFold(name, ref.Owner+"/"+ref.Repo) {
+		return wsdomain.Repo{}, fmt.Errorf("%s exists and is not a checkout of %s/%s; move it, or clone %s/%s yourself and add it to %s", path, ref.Owner, ref.Repo, ref.Owner, ref.Repo, e.managerDisplay())
 	}
 	return wsdomain.Repo{Path: path, RemoteKey: remoteKey}, nil
 }

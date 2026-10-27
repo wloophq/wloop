@@ -123,7 +123,7 @@ func (c cliLauncher) probe(ctx context.Context, d dintent.Def, l turns.Launch) e
 		return err
 	}
 	sent.resume(l.ResumeOf)
-	name, err := e.sessionName(dintent.Name(r.Intent), r.Unit)
+	name, err := e.sessionName(dintent.Name(r.Intent), r.Unit, nil)
 	if err != nil {
 		return err
 	}

@@ -497,7 +497,7 @@
       "type": "string"
     },
     "projects": {
-      "description": "Settings for the pull requests of matching repositories; the first match wins.",
+      "description": "Settings for the pull requests and the work of matching repositories; the first match wins.",
       "items": {
         "additionalProperties": false,
         "properties": {
@@ -538,6 +538,10 @@
           "projects_dir": {
             "description": "The project's projects_dir.",
             "type": "string"
+          },
+          "trust_clones": {
+            "description": "Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*.",
+            "type": "boolean"
           },
           "workspace_managers": {
             "description": "The managers a new worktree of the project picks from, in order.",
@@ -594,6 +598,11 @@
         "enabled": {
           "description": "Switches the Slack plugin; left out, it is on.",
           "type": "boolean"
+        },
+        "ended_after": {
+          "default": "7d",
+          "description": "How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended).",
+          "type": "string"
         },
         "extraction": {
           "additionalProperties": false,

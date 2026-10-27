@@ -57,6 +57,8 @@ var (
 	_ port.Validator = (*Publisher)(nil)
 	_ port.Locator   = (*Publisher)(nil)
 	_ port.Placer    = (*Publisher)(nil)
+	_ port.Targeter  = (*Publisher)(nil)
+	_ port.Lander    = (*Publisher)(nil)
 )
 
 // plan is where and what a draft posts.
@@ -100,8 +102,8 @@ func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
 
 func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	k, err := dslack.ParseUnit(d.Unit)
-	if err != nil {
-		return plan{}, fmt.Errorf("slack publishes only slack units: %w", err)
+	if err != nil && strings.TrimSpace(d.Target) == "" {
+		return plan{}, fmt.Errorf("a draft on %s, which is not a Slack unit, needs a target to post to", d.Unit.Label())
 	}
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
@@ -219,6 +221,17 @@ func (p *Publisher) target(ctx context.Context, d draft.Draft, k dslack.Key, pl 
 		t = user
 	}
 	return p.resolve(ctx, send.Request{Target: t}, pl)
+}
+
+// Takes says whether target names a place a draft posts to in Slack: a
+// message permalink, a conversation or a person.
+func (p *Publisher) Takes(target string) bool {
+	t := strings.TrimSpace(target)
+	if _, _, _, err := parseMessage(t); err == nil {
+		return true
+	}
+	return conversationR.MatchString(t) || strings.HasPrefix(t, "#") || userOf(t) != "" ||
+		strings.Contains(t, "@") && !strings.ContainsAny(t, " /")
 }
 
 // Place names where a draft with no target posts. A thread unit's draft posts
@@ -663,6 +676,20 @@ func PublisherOver(db *sqlite.DB, s *send.Service, token func() (auth.Token, err
 			}
 			return out, nil
 		}}
+}
+
+// Landed is the thread the post of d, a draft on a unit of another provider
+// sent to a Slack target, started or replied in, read from its permalink.
+func (p *Publisher) Landed(_ context.Context, d draft.Draft) (unit.Unit, bool, error) {
+	conv, ts, threadTS, err := parseMessage(d.Evidence.Permalink)
+	if err != nil || p.Token == nil {
+		return unit.Unit{}, false, nil
+	}
+	tok, err := p.Token()
+	if err != nil {
+		return unit.Unit{}, false, err
+	}
+	return dslack.ThreadUnit(tok.Team, conv, cmp.Or(threadTS, ts)), true, nil
 }
 
 // Landing finds the tracked unit a post outside the outbox landed in.

@@ -161,8 +161,9 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a api.
 	if err != nil {
 		return draft.Draft{}, err
 	}
-	if action != "discard" && !s.pluginEnabled(d.Unit.Provider) {
-		return draft.Draft{}, pluginOff{d.Unit.Provider}
+	publisher := o.PublisherOf(d)
+	if action != "discard" && !s.pluginEnabled(publisher) {
+		return draft.Draft{}, pluginOff{publisher}
 	}
 	if a.Rev != nil && *a.Rev != d.Rev {
 		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", outbox.ErrConflict, id, *a.Rev, d.Rev)
@@ -193,7 +194,7 @@ func (s *Server) draftDo(ctx context.Context, id draft.ID, action string, a api.
 		return draft.Draft{}, badRequest{fmt.Sprintf("unknown draft action %q", action)}
 	}
 	if errors.Is(err, outbox.ErrDisabled) {
-		err = noPublisher{d.Unit.Provider, err}
+		err = noPublisher{publisher, err}
 	}
 	return got, err
 }
@@ -302,10 +303,11 @@ func (s *Server) draftView(ctx context.Context, d draft.Draft) api.Draft {
 		dl := d.Deadline
 		v.Deadline = &dl
 	}
-	f := catalog.DraftFacts{State: v.State, Provider: d.Unit.Provider, Disabled: !s.pluginEnabled(d.Unit.Provider),
+	publisher := s.publisherOf(d)
+	f := catalog.DraftFacts{State: v.State, Provider: publisher, Disabled: !s.pluginEnabled(publisher),
 		MayHaveBeenPosted: d.Error == outbox.NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)}
 	if o := s.deps.Outbox; o != nil && o.Effects != nil {
-		_, err := o.Effects(d.Unit.Provider)
+		_, err := o.Effects(publisher)
 		f.NoPublisher = err != nil
 	}
 	v.Actions = catalog.DraftStates(s.loaded(), f)
@@ -394,7 +396,7 @@ func (s *Server) draftWhere(ctx context.Context, d draft.Draft) string {
 			return w.where
 		}
 	}
-	loc := s.locator(d.Unit.Provider)
+	loc := s.locator(s.publisherOf(d))
 	if loc == nil {
 		return ""
 	}
@@ -427,6 +429,13 @@ type whereByKey struct{}
 // whereBy makes by the deadline of every draft destination lookup under ctx.
 func whereBy(ctx context.Context, by time.Time) context.Context {
 	return context.WithValue(ctx, whereByKey{}, by)
+}
+
+func (s *Server) publisherOf(d draft.Draft) unit.ProviderID {
+	if o := s.deps.Outbox; o != nil {
+		return o.PublisherOf(d)
+	}
+	return d.Unit.Provider
 }
 
 func (s *Server) locator(p unit.ProviderID) port.Locator {

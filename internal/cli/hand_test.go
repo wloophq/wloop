@@ -36,6 +36,24 @@ func TestATargetResolvesThroughTheCodecs(t *testing.T) {
 	if _, err := resolveTarget(context.Background(), "https://example.com/x", providers, resolvers, pluginCodecs()); err == nil {
 		t.Error("an address no provider knows resolved")
 	}
+	if got, err := resolveTarget(context.Background(), "entry:e-3f9a2c4b5d6e7f80", providers, resolvers, pluginCodecs()); err != nil || got != (unit.Unit{Provider: unit.Entry, Key: "e-3f9a2c4b5d6e7f80"}) {
+		t.Errorf("entry:<id> = %v %v", got, err)
+	}
+}
+
+func TestOnlyAnExplicitEntryIsAStartTarget(t *testing.T) {
+	t.Parallel()
+	for arg, want := range map[string]bool{
+		"entry:e-3f9a2c4b5d6e7f80":           true,
+		"https://github.com/acme/api/pull/7": false,
+		"acme/api#7 is flaky, fix it":        false,
+		"add retries":                        false,
+		"entry:":                             false,
+	} {
+		if _, got := explicitEntry(arg); got != want {
+			t.Errorf("%q: %v, want %v", arg, got, want)
+		}
+	}
 }
 
 func TestInstructionsByHandResolvesAnyProvider(t *testing.T) {

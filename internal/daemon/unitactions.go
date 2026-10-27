@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/port"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -37,6 +40,51 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(uni
 		return err
 	}
 	return unitIntent(d, u)
+}
+
+// entryIntentActions are the actions of the intents that name the entry provider
+// among theirs, over e's facts.
+func entryIntentActions(l *intentload.Loaded, e gtd.Entry) []api.ActionState {
+	if l == nil {
+		return nil
+	}
+	u := gtd.UnitOf(e.ID)
+	f := catalog.Facts{Row: api.Row{Unit: u}, Intents: l, Open: e.Live(), CapturedByUser: e.CapturedByUser()}
+	var out []api.ActionState
+	for _, st := range catalog.UnitStates(f) {
+		d, ok := l.Registry.Get(dintent.Name(st.ID))
+		if ok && (d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
+			st.Label = d.Label
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
+// entryRefusal is why the entry u names refuses the intent name, "" when
+// it takes it or names no entry.
+func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
+	id, ok := gtd.IDOf(u)
+	if !ok || isBuiltin(name) {
+		return "", nil
+	}
+	if s.deps.GTD == nil {
+		return "", errGTDUnavailable
+	}
+	e, err := s.deps.GTD.Entry(ctx, id)
+	if err != nil {
+		return "", notFound{err.Error()}
+	}
+	d, ok := l.Registry.Get(dintent.Name(name))
+	if !ok || !(d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
+		return "", nil
+	}
+	for _, st := range entryIntentActions(l, e) {
+		if st.ID == name {
+			return st.Reason, nil
+		}
+	}
+	return NotOffered(name, u), nil
 }
 
 // unitIntent admits d on u, a unit that is no pull request: d serves u's

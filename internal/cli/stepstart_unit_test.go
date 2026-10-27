@@ -164,7 +164,7 @@ help = "owner/name"
 		t.Fatalf("writes %q", r.m.Writes)
 	}
 	run.r.Unit, run.r.Inputs = thread2, map[string]any{"repo": "evil/elsewhere"}
-	if err := r.te.runOnUnit(context.Background(), run); err == nil || !strings.Contains(err.Error(), "does not know") {
+	if err := r.te.runOnUnit(context.Background(), run); err == nil || !strings.Contains(err.Error(), "is not registered") {
 		t.Fatalf("a repository the manager does not know: %v", err)
 	}
 }

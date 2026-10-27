@@ -977,3 +977,77 @@ func TestABrokenDefaultsSessionNameIsReportedInDefaults(t *testing.T) {
 		t.Fatalf("SessionName = %q, %v", got, err)
 	}
 }
+
+const startLike = `label = "Start"
+summary = "Start new work from a brief"
+provider = "entry"
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .entry.title}}-{{.entry.short_id}}' }
+session = { strategy = "new", title = "start", name = '{{or .workspace.name .entry.title}}' }
+
+[target]
+missing = "capture"
+title = '{{firstLine .guidance}}'
+
+[inputs.repo]
+type = "text"
+flag = "--repo"
+help = "owner/name"
+
+[headline]
+resumed = "start"
+[[headline.new]]
+line = "Start."
+
+[record]
+states = ["done"]
+`
+
+func TestAStartIntentNamesItsWorkspaceSessionAndEntry(t *testing.T) {
+	dir := t.TempDir()
+	writeIntent(t, dir, "begin", startLike, "Begin.")
+	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	d, _ := l.Registry.Get("begin")
+	if w := d.WorkspaceRepo; w == nil || w.RepoInput != "repo" || !w.Optional || w.Name.Src == "" {
+		t.Fatalf("workspace = %+v", d.WorkspaceRepo)
+	}
+	if d.Target.Missing != dintent.TargetCapture {
+		t.Fatalf("target = %+v", d.Target)
+	}
+	facts := map[string]any{"entry.title": "Add retries to the Webhook sender!", "entry.short_id": "3f9a2c"}
+	ws, err := l.WorkspaceName("begin", facts)
+	if err != nil || ws != "add-retries-to-the-webhook-sender-3f9a2c" {
+		t.Fatalf("WorkspaceName = %q, %v", ws, err)
+	}
+	facts["workspace.name"] = ws
+	if got, err := l.SessionName("begin", facts); err != nil || got != ws {
+		t.Fatalf("SessionName = %q, %v", got, err)
+	}
+	facts["workspace.name"] = ""
+	if got, err := l.SessionName("begin", facts); err != nil || got != "Add retries to the Webhook sender!" {
+		t.Fatalf("SessionName without a workspace = %q, %v", got, err)
+	}
+	if got, err := l.TargetTitle("begin", "  Add retries\nto the sender, with backoff"); err != nil || got != "Add retries" {
+		t.Fatalf("TargetTitle = %q, %v", got, err)
+	}
+}
+
+func TestStartKeysAreChecked(t *testing.T) {
+	for name, c := range map[string]struct{ from, to, want string }{
+		"repo_optional needs repo_input": {`workspace = { repo_input = "repo", repo_optional = true,`, `workspace = { repo = "acme/api", repo_optional = true,`, "workspace.repo_optional"},
+		"target.missing names capture":   {`missing = "capture"`, `missing = "skip"`, "target.missing"},
+		"workspace.name reads its facts": {`{{slug .entry.title}}`, `{{.pr.slug}}`, "workspace.name"},
+		"capture needs an entry intent":  {`provider = "entry"`, `provider = "github"`, "target.missing"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeIntent(t, dir, "begin", strings.Replace(startLike, c.from, c.to, 1), "Begin.")
+			_, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)
+			if e := problems.Error(); !strings.Contains(e, c.want) {
+				t.Fatalf("problems = %s", e)
+			}
+		})
+	}
+}

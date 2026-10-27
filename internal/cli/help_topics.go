@@ -382,7 +382,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Trust a repository in an agent home",
 				Usage:   []string{"trust [--home <dir>] [--exact] <folder|workspace>"},
 				About: "Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. " +
-					name + " never trusts a folder unless you run this.",
+					name + " never trusts a folder unless you run this, or the folder is a repository it just cloned for a project whose trust_clones is on.",
 				Flags: []helpFlag{
 					{"--home <dir>", "The agent home that trusts it"},
 					{"--exact", "Trust the folder alone rather than its repository's main checkout"},

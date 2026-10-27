@@ -2,6 +2,7 @@ package factslack_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -22,6 +23,8 @@ import (
 )
 
 var brt = time.FixedZone("BRT", -3*60*60)
+
+const endedAfter = 3 * 24 * time.Hour
 
 // monday is 10:00 BRT on a Monday.
 var monday = time.Date(2026, 3, 2, 10, 0, 0, 0, brt)
@@ -51,7 +54,7 @@ func newEnv(t *testing.T) *env {
 	}
 	t.Cleanup(func() { db.Close() })
 	e := &env{t: t, db: db, clock: &clock{now: monday}}
-	e.p = factslack.New(db, e.clock)
+	e.p = factslack.New(db, e.clock, endedAfter)
 	return e
 }
 
@@ -229,5 +232,44 @@ func TestSlackSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	}
 	if got := f["slack.settled_at"].(time.Time); !got.Equal(monday.Add(-3 * time.Hour)) {
 		t.Errorf("settled_at %v", got)
+	}
+}
+
+func (e *env) messages(tss ...string) {
+	e.t.Helper()
+	k, _ := dslack.ParseUnit(thread)
+	o := sqlite.ObjectFacts{Object: sqlite.ObjectRow{Object: k.Conversation + "/" + k.TS, Conversation: k.Conversation, TS: k.TS, Kind: sqlite.SlackThread}}
+	for _, ts := range tss {
+		o.Messages = append(o.Messages, sqlite.MessageRow{Conversation: k.Conversation, TS: ts, ThreadTS: k.TS, User: "U0009", Text: "m " + ts})
+	}
+	if _, err := e.db.Slack().Save(context.Background(), sqlite.FactsRows{Team: k.Team, Objects: []sqlite.ObjectFacts{o}}, monday); err != nil {
+		e.t.Fatal(err)
+	}
+}
+
+func tsAt(t time.Time) string { return fmt.Sprintf("%d.000100", t.Unix()) }
+
+func TestASlackUnitEndsWhenClosedOrQuietPastTheSetting(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	if f := e.facts(thread); f["slack.ended"] != false {
+		t.Fatal("a unit with no stored message has ended")
+	}
+	root, _ := dslack.ParseUnit(thread)
+	e.messages(root.TS, tsAt(monday.Add(-endedAfter+time.Minute)))
+	if f := e.facts(thread); f["slack.ended"] != false {
+		t.Fatal("a unit whose newest message is younger than the setting has ended")
+	}
+	e.clock.now = monday.Add(2 * time.Minute)
+	if f := e.facts(thread); f["slack.ended"] != true {
+		t.Fatal("a unit quiet for the setting has not ended")
+	}
+	e.clock.now = monday
+	if err := e.db.Extraction().Save(context.Background(), sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{
+		thread: {ClosurePosted: true, At: monday}}}); err != nil {
+		t.Fatal(err)
+	}
+	if f := e.facts(thread); f["slack.ended"] != true {
+		t.Fatal("a closed unit has not ended")
 	}
 }

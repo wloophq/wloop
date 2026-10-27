@@ -142,6 +142,43 @@ agent_home = "/p/.claude"
 	}
 }
 
+func TestTrustClonesIsPerProjectAndNamesAnOwner(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	file := filepath.Join(dir, "config.toml")
+	raw := `[[projects]]
+match = "acme/legacy"
+
+[[projects]]
+match = "acme/*"
+trust_clones = true
+`
+	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := LoadFile(file, tools())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		owner, repo string
+		want        bool
+	}{{"acme", "api", true}, {"ACME", "web", true}, {"acme", "legacy", false}, {"globex", "api", false}} {
+		if got := c.TrustsClones(tc.owner, tc.repo); got != tc.want {
+			t.Errorf("TrustsClones(%s/%s) = %v, want %v", tc.owner, tc.repo, got, tc.want)
+		}
+	}
+	for _, match := range []string{"*", "*/*", "*/api", "ac*/api", "acme?/*"} {
+		raw := "[[projects]]\nmatch = \"" + match + "\"\ntrust_clones = true\n"
+		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "trust_clones") {
+			t.Errorf("%s: accepted trust_clones on a match that names no owner: %v", match, err)
+		}
+	}
+}
+
 func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)

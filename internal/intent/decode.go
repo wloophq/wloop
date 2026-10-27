@@ -53,6 +53,12 @@ type manifest struct {
 	Schema      string            `toml:"schema"`
 	Skill       bool              `toml:"skill"`
 	Help        *mHelp            `toml:"help"`
+	Target      *mTarget          `toml:"target"`
+}
+
+type mTarget struct {
+	Missing string  `toml:"missing"`
+	Title   *string `toml:"title"`
 }
 
 type mRefuse struct {
@@ -62,6 +68,7 @@ type mRefuse struct {
 
 type mDrafts struct {
 	AllowedEffects []string   `toml:"allowed_effects"`
+	AttachPosts    bool       `toml:"attach_posts"`
 	Approval       *mApproval `toml:"approval"`
 }
 
@@ -135,6 +142,7 @@ type mRecord struct {
 	OutcomeDoc      string     `toml:"outcome_doc"`
 	HistoryArtifact string     `toml:"history_artifact"`
 	Require         []mRequire `toml:"require"`
+	AttachURL       bool       `toml:"attach_url"`
 }
 
 type mRequire struct {

@@ -50,12 +50,17 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `given`: The workspace the request names.
 - `workspace.repo` (string): The repository the turn runs in, owner/name.
 - `workspace.repo_input` (string): The input that holds the repository the turn runs in.
+- `workspace.repo_optional` (bool, default `false`): With repo_input: a turn whose input names no repository runs in the neutral repository, with no checkout.
+- `workspace.name` (template): The name of the worktree created for the turn's unit, over the name facts, with slug; the loop's own when absent.
 - `runners` (list of `session`, `headless`): How its turns may run; ["session"] when absent.
 - `session` (table): The agent session its turns run in.
 - `session.strategy` (one of `reuse_live`, `new`): Whether a turn reuses the unit's live session or starts a new one.
 - `session.title` (string): The session's title: 1 to 12 lowercase letters.
 - `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
+- `target` (table): What a run with no unit does.
+- `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.
+- `target.title` (template): The captured entry's title, over .guidance, with firstLine.
 
 ### How a turn runs
 
@@ -146,6 +151,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.
 - `record.outcome` (list of `verdict`, `url`): The outcome fields a record may carry.
+- `record.attach_url` (bool, default `false`): On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.
 - `record.outcome_doc` (string): What the outcome holds, for the instructions.
 - `record.history_artifact` (string): The artifact the unit's history shows.
 - `record.require[]` (table): What a record in a state must carry.
@@ -167,6 +173,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
   - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
+- `drafts.attach_posts` (bool, default `false`): On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.
 - `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
@@ -214,13 +221,14 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### Steps
 
 - `step[]` (table): A step the run takes, in order. Required: at least one.
-- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `turn.start`, `draft.propose`, `classify`, `notify.self`): The step.
+- `step[].use` (one of `session.close`, `workspace.remove`, `workspace.unregister`, `turn.dismiss`, `answer.refuse`, `session.mark_dormant`, `entry.close`, `turn.start`, `draft.propose`, `classify`, `notify.self`): The step.
   - `session.close`: Closes the agent session.
   - `workspace.remove`: Removes the workspace, after its guards. Never with `force`: a manifest that sets it fails to load.
   - `workspace.unregister`: Unregisters a workspace whose path is gone.
   - `turn.dismiss`: Dismisses the open turn, recording the reason.
   - `answer.refuse`: Refuses a queued answer whose route is gone.
   - `session.mark_dormant`: Marks dormant an active session whose process its manager's census no longer lists: the session stays open, and the next turn wakes it.
+  - `entry.close`: Closes the entry, marking it done. Refuses an entry derived from a unit's items, whose items close it, and one already done or in the trash.
   - `turn.start`: Starts a turn of `intent` on the unit, which the intent must serve; `stage` (`first` or `follow-up`) for a review; `runner` (`session` or `headless`), by default the intent's first runner. On a pull request, caps, the brief, busy and held checks apply as for any automatic round; on any other unit, the workflow's `limits.per_day` and `turns.per_day`.
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
@@ -251,6 +259,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `answer.refuse`:
   - `reason` (string): The reason the refused answer records.
 - `session.mark_dormant`: no arguments.
+- `entry.close`: no arguments.
 - `turn.start`:
   - `intent` (string): The intent whose turn starts; it must serve the unit. Required.
   - `stage` (one of `first`, `follow-up`): The pass over the unit: its first, or one after.
@@ -458,12 +467,13 @@ The fields each notice reads besides `Name` and `Command`:
 
 ### Projects
 
-- `projects[]` (table): Settings for the pull requests of matching repositories; the first match wins.
+- `projects[]` (table): Settings for the pull requests and the work of matching repositories; the first match wins.
 - `projects[].match` (string): An owner/repo pattern, such as acme/* or acme/api.
 - `projects[].projects_dir` (string): The project's projects_dir.
 - `projects[].agent` (string): The agent the project's sessions run.
 - `projects[].agent_home` (string): The project's agent_home.
 - `projects[].workspace_managers` (list of strings): The managers a new worktree of the project picks from, in order.
+- `projects[].trust_clones` (bool): Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*.
 - `projects[].github` (table): The GitHub settings the project overrides.
 - `projects[].github.trusted_authors` (list of strings): The project's github.trusted_authors.
 - `projects[].github.followups_without_workspace` (bool): The project's github.followups_without_workspace.
@@ -529,6 +539,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `slack.keychain_service` (string): The name of the Keychain items; empty is the brand's.
 - `slack.post_allowlist` (list of strings): When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to.
 - `slack.request_log` (bool, default `false`): Logs one line per Slack call: method and HTTP status.
+- `slack.ended_after` (duration, default `7d`): How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended).
 - `slack.turns` (table): What a turn on a Slack unit reads.
 - `slack.turns.max_chars` (integer): The characters of the unit's messages rendered into the instructions; 0 is 30000.
 - `slack.drafts` (table): The drafts the plugin's own rules propose.

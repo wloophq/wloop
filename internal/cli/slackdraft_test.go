@@ -742,3 +742,73 @@ func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
 		t.Fatalf("records %+v", ds)
 	}
 }
+
+func TestSlackDraftFromAnEntryTurnPostsToItsTargetThroughSlack(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	ctx := context.Background()
+	entry := unit.Unit{Provider: unit.Entry, Key: "e1"}
+	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: entry, Turns: []dturn.Turn{
+		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"the new search is live"}`); !isErr {
+		t.Fatalf("a draft with no target on an entry turn: %q", got)
+	}
+	got, isErr := w.draftTool(t, draftHandle, `{"text":"the new search is live","target":"`+sessChannel+`"}`)
+	if isErr || !strings.Contains(got, "#general") {
+		t.Fatalf("slack_draft = %q (error %v)", got, isErr)
+	}
+	ds := w.drafts(t)
+	if len(ds) != 1 {
+		t.Fatalf("drafts %+v", ds)
+	}
+	d := ds[0]
+	if d.Unit != entry || d.Target != sessChannel || d.Origin != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
+		d.State != draft.Proposed || d.Would.Policy != draft.WouldWait {
+		t.Fatalf("draft %+v", d)
+	}
+	if _, err := w.deps.Outbox.Approve(ctx, d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
+		t.Fatalf("Send = %d, %v; draft %+v", sent, err, w.drafts(t)[0])
+	}
+	if posts := w.st.srv.Calls("chat.postMessage"); len(posts) != 1 || posts[0].Get("channel") != sessChannel || posts[0].Has("thread_ts") {
+		t.Fatalf("posts %v", posts)
+	}
+}
+
+func TestSlackDraftFromAPullRequestTurnStillNeedsAPermalink(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit(), Turns: []dturn.Turn{
+		{Intent: "address", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, isErr := w.draftTool(t, draftHandle, `{"text":"x","target":"`+sessChannel+`"}`); !isErr || !strings.Contains(got, "permalink") {
+		t.Fatalf("slack_draft = %q", got)
+	}
+	if len(w.drafts(t)) != 0 {
+		t.Fatal("a refused call stored a draft")
+	}
+}
+
+func TestASendFromAnEntryTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	entry := unit.Unit{Provider: unit.Entry, Key: "e1"}
+	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: entry, Turns: []dturn.Turn{
+		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	w.send(t, sessChannel)
+	ds := w.drafts(t)
+	want := draft.Origin{Kind: draft.OriginSession, TurnSeq: 1, Intent: "act", Unit: entry}
+	if len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessChannel, sessPosted) || ds[0].State != draft.Sent || ds[0].Origin != want {
+		t.Fatalf("drafts %+v", ds)
+	}
+}

@@ -68,6 +68,7 @@ func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
   nudge            bundled   Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic
   probe            bundled   Check that an agent home can read its turn, record it, take an answer and be resumed
   review           bundled   Start or continue a review round on someone else's pull request, in a dedicated workspace
+  start            bundled   Start new work from a brief: in a fresh worktree of a repository, or with no checkout
 
 address  organization=acme/kind=fix/intent=address.md   organization acme, kind fix
 nudge    user=ana/intent=nudge.md   user ana

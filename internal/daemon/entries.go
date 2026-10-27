@@ -657,6 +657,7 @@ func (ev *entryViewer) view(ctx context.Context, e gtd.Entry) (api.EntryView, er
 	v.Message = msg
 	v.Attention = ev.attention(ctx, e)
 	v.Verbs = ev.verbs(ctx, e)
+	v.Actions = entryIntentActions(ev.s.loaded(), e)
 	if err := ev.project(ctx, e, &v); err != nil {
 		return api.EntryView{}, err
 	}

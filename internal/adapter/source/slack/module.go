@@ -105,7 +105,7 @@ func (p *plugin) module() sourcereg.Module {
 		m.Identity = p.identity
 	}
 	if p.deps.DB != nil {
-		m.Facts = factslack.New(p.deps.DB, clockFunc(p.now))
+		m.Facts = factslack.New(p.deps.DB, clockFunc(p.now), p.cfg.EndedAfterFor())
 	}
 	if p.deps.DB != nil && p.slack.Client != nil && p.slack.Tokens != nil {
 		m.Resolve = p.resolve
