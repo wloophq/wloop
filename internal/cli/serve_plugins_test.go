@@ -130,8 +130,8 @@ func TestPluginsRoute(t *testing.T) {
 
 func TestPluginsDefaultEnabled(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"brief": {"enabled": false}}`), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`brief = {enabled = false}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := config.LoadFile(path, Defaults())

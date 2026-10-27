@@ -916,6 +916,6 @@
       "type": "array"
     }
   },
-  "title": "Configuration (config.json)",
+  "title": "Configuration (config.toml)",
   "type": "object"
 }

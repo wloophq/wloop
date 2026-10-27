@@ -553,10 +553,21 @@ func TestDoctorFlagsMissingRestricted(t *testing.T) {
 func TestDoctorNamesTheUnknownConfigKeys(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
-	writeFile(t, te.ConfigPath, `{"gate": {"timeout": "60s"}}`)
+	writeFile(t, te.ConfigPath, `gate = {timeout = "60s"}`)
 	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
 	te.run("doctor")
 	if out := te.out.String(); !strings.Contains(out, te.ConfigPath+": unknown key gate") || !strings.Contains(out, "remove or rename those keys") {
+		t.Fatalf("%s", out)
+	}
+}
+
+func TestDoctorNamesALoneConfigJSON(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeFile(t, filepath.Join(filepath.Dir(te.ConfigPath), "config.json"), `{"agent": "claude"}`)
+	te.LoadConfig = func() (config.Config, error) { return config.LoadFile(te.ConfigPath, Defaults()) }
+	te.run("doctor")
+	if out := te.out.String(); !strings.Contains(out, config.MigrationURL) || !strings.Contains(out, "write "+te.ConfigPath) || strings.Contains(out, "fix the TOML") {
 		t.Fatalf("%s", out)
 	}
 }

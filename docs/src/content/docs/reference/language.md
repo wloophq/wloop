@@ -3,7 +3,7 @@ title: Profile language
 description: Every reserved word of the profile files and the configuration, one line each.
 ---
 
-Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
+Every key a profile file or `config.toml` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
 
 ## Intent manifest (`intents/<name>/intent.toml`)
 
@@ -412,7 +412,7 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 - `delegates` (table by name): Per agent, skills the finding step runs besides the procedure's own work.
 - `delegates.<name>` (list of strings): The agent's skills.
 
-## Configuration (`config.json`)
+## Configuration (`config.toml`)
 
 ### Agent and workspaces
 

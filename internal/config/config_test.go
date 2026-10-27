@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 )
@@ -25,7 +27,7 @@ func tools() Config {
 }
 
 func TestDefaults(t *testing.T) {
-	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.json"), tools())
+	c, err := LoadFile(filepath.Join(t.TempDir(), "absent.toml"), tools())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,8 +44,8 @@ func TestDefaultsNameNoTool(t *testing.T) {
 }
 
 func TestARefusedFileFallsBackToTheBase(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"workspace_managers":[]}`), 0o644); err != nil {
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte(`workspace_managers = []`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(file, tools())
@@ -53,8 +55,15 @@ func TestARefusedFileFallsBackToTheBase(t *testing.T) {
 }
 
 func TestLoadOverridesAndExpandsHome(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"projects_dir": "~/projects/work", "turns": {"per_unit_per_day": 2}, "github": {"owners": ["acme"]}}`), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(`projects_dir = "~/projects/work"
+
+[turns]
+per_unit_per_day = 2
+
+[github]
+owners = ["acme"]
+`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(path, tools())
@@ -66,8 +75,8 @@ func TestLoadOverridesAndExpandsHome(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsBrokenJSON(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
+func TestLoadRejectsBrokenTOML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(`{`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -79,12 +88,12 @@ func TestLoadRejectsBrokenJSON(t *testing.T) {
 func TestXDGPaths(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/cfg")
 	t.Setenv("XDG_STATE_HOME", "/st")
-	if Path() != "/cfg/"+brand.StateDir()+"/config.json" || StateDir() != "/st/"+brand.StateDir() {
+	if Path() != "/cfg/"+brand.StateDir()+"/config.toml" || StateDir() != "/st/"+brand.StateDir() {
 		t.Fatalf("Path = %s, StateDir = %s", Path(), StateDir())
 	}
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("XDG_STATE_HOME", "relative")
-	if Path() != filepath.Join(Home(), ".config/"+brand.StateDir()+"/config.json") || StateDir() != filepath.Join(Home(), ".local/state/"+brand.StateDir()) {
+	if Path() != filepath.Join(Home(), ".config/"+brand.StateDir()+"/config.toml") || StateDir() != filepath.Join(Home(), ".local/state/"+brand.StateDir()) {
 		t.Fatalf("Path = %s, StateDir = %s", Path(), StateDir())
 	}
 }
@@ -92,10 +101,17 @@ func TestXDGPaths(t *testing.T) {
 func TestProjectsOverrideByFirstMatch(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	file := filepath.Join(dir, "config.json")
-	raw := `{"projects_dir":"/work","projects":[
-		{"match":"Carol/notes-app"},
-		{"match":"carol/*","projects_dir":"/oss","agent_home":"/p/.claude"}]}`
+	file := filepath.Join(dir, "config.toml")
+	raw := `projects_dir = "/work"
+
+[[projects]]
+match = "Carol/notes-app"
+
+[[projects]]
+match = "carol/*"
+projects_dir = "/oss"
+agent_home = "/p/.claude"
+`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +134,7 @@ func TestProjectsOverrideByFirstMatch(t *testing.T) {
 		t.Errorf("AgentHomes = %v", got)
 	}
 
-	if err := os.WriteFile(file, []byte(`{"projects":[{"match":""}]}`), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(`projects = [{match = ""}]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadFile(file, tools()); err == nil {
@@ -129,30 +145,26 @@ func TestProjectsOverrideByFirstMatch(t *testing.T) {
 func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	file := filepath.Join(dir, "config.json")
-	raw := `{
-  "github": {
-    "followups_without_workspace": true
-  },
-  "projects": [
-    {
-      "match": "carol/sandbox",
-      "github": {
-        "followups_without_workspace": true
-      }
-    },
-    {
-      "match": "globex/*",
-      "github": {
-        "followups_without_workspace": false
-      }
-    },
-    {
-      "match": "carol/*",
-      "agent_home": "/p/.claude"
-    }
-  ]
-}`
+	file := filepath.Join(dir, "config.toml")
+	raw := `[github]
+followups_without_workspace = true
+
+[[projects]]
+match = "carol/sandbox"
+
+[projects.github]
+followups_without_workspace = true
+
+[[projects]]
+match = "globex/*"
+
+[projects.github]
+followups_without_workspace = false
+
+[[projects]]
+match = "carol/*"
+agent_home = "/p/.claude"
+`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -176,24 +188,20 @@ func TestFollowupsWithoutWorkspaceIsPerProject(t *testing.T) {
 func TestAddressWithoutWorkspaceIsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	file := filepath.Join(dir, "config.json")
-	raw := `{
-  "github": {
-    "address_without_workspace": true
-  },
-  "projects": [
-    {
-      "match": "globex/*",
-      "github": {
-        "address_without_workspace": false
-      }
-    },
-    {
-      "match": "carol/*",
-      "agent_home": "/p/.claude"
-    }
-  ]
-}`
+	file := filepath.Join(dir, "config.toml")
+	raw := `[github]
+address_without_workspace = true
+
+[[projects]]
+match = "globex/*"
+
+[projects.github]
+address_without_workspace = false
+
+[[projects]]
+match = "carol/*"
+agent_home = "/p/.claude"
+`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -232,39 +240,29 @@ func TestCockpitDefaults(t *testing.T) {
 
 func TestLoadCockpitKeys(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "config.json")
-	os.WriteFile(file, []byte(`{
-  "github": {
-    "scope": {
-      "people": [
-        "ana"
-      ],
-      "teams": [
-        "acme/search"
-      ],
-      "repos": [
-        "acme/api"
-      ],
-      "watch": [
-        "bruno"
-      ]
-    },
-    "stalled": {
-      "review": "3d",
-      "reply": "12h"
-    },
-    "rate_limit_fraction": 0.3
-  },
-  "sweep": {
-    "fast": "5m"
-  },
-  "http": {
-    "port": 4242
-  },
-  "mcp": {
-    "port": 47899
-  }
-}`), 0o644)
+	file := filepath.Join(dir, "config.toml")
+	os.WriteFile(file, []byte(`[github]
+rate_limit_fraction = 0.3
+
+[github.scope]
+people = ["ana"]
+teams = ["acme/search"]
+repos = ["acme/api"]
+watch = ["bruno"]
+
+[github.stalled]
+review = "3d"
+reply = "12h"
+
+[sweep]
+fast = "5m"
+
+[http]
+port = 4242
+
+[mcp]
+port = 47899
+`), 0o644)
 	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
@@ -285,14 +283,14 @@ func TestLoadCockpitKeys(t *testing.T) {
 
 func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	for _, body := range []string{
-		`{"sweep": {"fast": "0s"}}`,
-		`{"github": {"stalled": {"review": "-1d"}}}`,
-		`{"github": {"rate_limit_fraction": 2}}`,
-		`{"http": {"port": 70000}}`,
-		`{"mcp": {"port": 0}}`,
-		`{"mcp": {"port": 65536}}`,
+		`sweep = {fast = "0s"}`,
+		`github = {stalled = {review = "-1d"}}`,
+		`github = {rate_limit_fraction = 2}`,
+		`http = {port = 70000}`,
+		`mcp = {port = 0}`,
+		`mcp = {port = 65536}`,
 	} {
-		file := filepath.Join(t.TempDir(), "config.json")
+		file := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -302,32 +300,19 @@ func TestLoadRejectsOutOfRangeCockpitKeys(t *testing.T) {
 	}
 }
 
-func loadJSON(t *testing.T, raw string) Config {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	c, err := LoadFile(path, tools())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
-}
-
 func TestBriefDefaultsAndValidation(t *testing.T) {
 	if d := Defaults().Brief; d.Enabled || d.Tier != turns.TierFast || d.MaxInputBytes != 60000 {
 		t.Fatalf("defaults %+v", d)
 	}
-	if c := loadJSON(t, `{"brief": {"max_input_bytes": 200000}}`); c.Brief.MaxInputBytes != 200000 {
+	if c := loadRaw(t, `brief = {max_input_bytes = 200000}`); c.Brief.MaxInputBytes != 200000 {
 		t.Fatalf("ceiling refused: %+v", c.Brief)
 	}
-	c := loadJSON(t, `{"brief": {"enabled": true}}`)
+	c := loadRaw(t, `brief = {enabled = true}`)
 	if !c.Brief.Enabled || c.Brief.Tier != turns.TierFast || c.Brief.MaxInputBytes != 60000 {
 		t.Fatalf("partial brief lost its defaults: %+v", c.Brief)
 	}
-	for _, bad := range []string{`{"brief": {"max_input_bytes": 10}}`, `{"brief": {"max_input_bytes": 200001}}`, `{"brief": {"tier": "haiku"}}`} {
-		path := filepath.Join(t.TempDir(), "config.json")
+	for _, bad := range []string{`brief = {max_input_bytes = 10}`, `brief = {max_input_bytes = 200001}`, `brief = {tier = "haiku"}`} {
+		path := filepath.Join(t.TempDir(), "config.toml")
 		os.WriteFile(path, []byte(bad), 0o600)
 		if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "brief.") {
 			t.Errorf("%s: err %v", bad, err)
@@ -336,12 +321,17 @@ func TestBriefDefaultsAndValidation(t *testing.T) {
 }
 
 func TestAgentModelsPinTiersOpaquely(t *testing.T) {
-	c := loadJSON(t, `{"brief": {"tier": "balanced"}, "agent_models": {"claude": {"balanced": "claude-sonnet-5-5"}}}`)
+	c := loadRaw(t, `[brief]
+tier = "balanced"
+
+[agent_models.claude]
+balanced = "claude-sonnet-5-5"
+`)
 	if c.Brief.Tier != turns.TierBalanced || c.AgentModels["claude"][turns.TierBalanced] != "claude-sonnet-5-5" {
 		t.Fatalf("%+v %v", c.Brief, c.AgentModels)
 	}
-	for _, bad := range []string{`{"agent_models": {"claude": {"huge": "x"}}}`, `{"agent_models": {"claude": {"fast": " "}}}`} {
-		path := filepath.Join(t.TempDir(), "config.json")
+	for _, bad := range []string{`agent_models = {claude = {huge = "x"}}`, `agent_models = {claude = {fast = " "}}`} {
+		path := filepath.Join(t.TempDir(), "config.toml")
 		os.WriteFile(path, []byte(bad), 0o600)
 		if _, err := LoadFile(path, tools()); err == nil || !strings.Contains(err.Error(), "agent_models.claude") {
 			t.Errorf("%s: err %v", bad, err)
@@ -352,27 +342,19 @@ func TestAgentModelsPinTiersOpaquely(t *testing.T) {
 func TestTrustedAuthorsPerProject(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	file := filepath.Join(dir, "config.json")
-	raw := `{
-  "github": {
-    "trusted_authors": [
-      "a[bot]"
-    ]
-  },
-  "projects": [
-    {
-      "match": "acme/api",
-      "github": {
-        "trusted_authors": [
-          "b[bot]"
-        ]
-      }
-    },
-    {
-      "match": "acme/*"
-    }
-  ]
-}`
+	file := filepath.Join(dir, "config.toml")
+	raw := `[github]
+trusted_authors = ["a[bot]"]
+
+[[projects]]
+match = "acme/api"
+
+[projects.github]
+trusted_authors = ["b[bot]"]
+
+[[projects]]
+match = "acme/*"
+`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -392,10 +374,10 @@ func TestEmptyTrustedAuthorIsRefused(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	for _, raw := range []string{
-		`{"github": {"trusted_authors": ["a[bot]", " "]}}`,
-		`{"projects": [{"match": "acme/*", "github": {"trusted_authors": [""]}}]}`,
+		`github = {trusted_authors = ["a[bot]", " "]}`,
+		`projects = [{match = "acme/*", github = {trusted_authors = [""]}}]`,
 	} {
-		file := filepath.Join(dir, "config.json")
+		file := filepath.Join(dir, "config.toml")
 		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -407,8 +389,8 @@ func TestEmptyTrustedAuthorIsRefused(t *testing.T) {
 
 func TestProjectAgentOverridesTheTopLevel(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "config.json")
-	raw := `{"projects":[{"match":"oss/*","agent":"echo"},{"match":"acme/*","agent_home":"/w"}]}`
+	file := filepath.Join(dir, "config.toml")
+	raw := `projects = [{match = "oss/*", agent = "echo"}, {match = "acme/*", agent_home = "/w"}]`
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -428,8 +410,13 @@ func TestProjectAgentOverridesTheTopLevel(t *testing.T) {
 }
 
 func TestWorkspaceManagersOverrideTheBase(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"workspace_managers":["orca"],"projects":[{"match":"acme/*","workspace_managers":["claude-desktop"]}]}`), 0o644); err != nil {
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte(`workspace_managers = ["orca"]
+
+[[projects]]
+match = "acme/*"
+workspace_managers = ["claude-desktop"]
+`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(file, tools())
@@ -446,8 +433,8 @@ func TestWorkspaceManagersOverrideTheBase(t *testing.T) {
 
 func TestWorkspaceManagersRefusesTheOldKeyAndAnEmptyList(t *testing.T) {
 	dir := t.TempDir()
-	for name, raw := range map[string]string{"old": `{"workspace_manager":"orca"}`, "empty": `{"workspace_managers":[]}`} {
-		file := filepath.Join(dir, name+".json")
+	for name, raw := range map[string]string{"old": `workspace_manager = "orca"`, "empty": `workspace_managers = []`} {
+		file := filepath.Join(dir, name+".toml")
 		if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -459,7 +446,7 @@ func TestWorkspaceManagersRefusesTheOldKeyAndAnEmptyList(t *testing.T) {
 
 func loadRaw(t *testing.T, raw string) Config {
 	t.Helper()
-	file := filepath.Join(t.TempDir(), "config.json")
+	file := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(file, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -472,12 +459,12 @@ func loadRaw(t *testing.T, raw string) Config {
 
 func TestWithColumnsKeepsTheDefaultsTheConfigLeavesOut(t *testing.T) {
 	defaults := map[string]map[string]string{"orca": {"working": "reviewing", "needs-me": "needs-me"}}
-	for name, c := range map[string]Config{"defaults": Defaults(), "empty file": loadRaw(t, `{}`)} {
+	for name, c := range map[string]Config{"defaults": Defaults(), "empty file": loadRaw(t, ``)} {
 		if got := c.WithColumns(defaults).Views["orca"].Columns; !maps.Equal(got, defaults["orca"]) {
 			t.Errorf("%s: columns %v", name, got)
 		}
 	}
-	blank := loadRaw(t, `{"views":{"orca":{"columns":{"needs-me":""}}}}`).WithColumns(defaults)
+	blank := loadRaw(t, `views = {orca = {columns = {needs-me = ""}}}`).WithColumns(defaults)
 	if got := blank.Column("orca", ColumnNeedsMe); got != "" {
 		t.Errorf("a column set to empty took its default: %q", got)
 	}
@@ -487,7 +474,7 @@ func TestWithColumnsKeepsTheDefaultsTheConfigLeavesOut(t *testing.T) {
 }
 
 func TestViewsSectionSetsOnlyItsColumns(t *testing.T) {
-	c := loadRaw(t, `{"views":{"orca":{"columns":{"needs-me":"new"}},"zed":{"columns":{"needs-me":"z"}}}}`).WithColumns(map[string]map[string]string{"orca": {"working": "reviewing", "needs-me": "needs-me"}})
+	c := loadRaw(t, `views = {orca = {columns = {needs-me = "new"}}, zed = {columns = {needs-me = "z"}}}`).WithColumns(map[string]map[string]string{"orca": {"working": "reviewing", "needs-me": "needs-me"}})
 	if got := c.Column("orca", ColumnNeedsMe); got != "new" {
 		t.Errorf("needs-me column %q", got)
 	}
@@ -503,8 +490,8 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 	if d := Defaults().GTD; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 {
 		t.Fatalf("defaults %+v", d)
 	}
-	path := filepath.Join(t.TempDir(), "config.json")
-	raw := `{"gtd": {"stale_waiting_days": 3, "areas": ["OSS", "Hiring"], "contexts": ["@decide", "@reply"]}}`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	raw := `gtd = {stale_waiting_days = 3, areas = ["OSS", "Hiring"], contexts = ["@decide", "@reply"]}`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -518,9 +505,22 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 }
 
 func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	raw := `{"agnet": "claude", "sweep": {"fast": "2m", "fsat": "1m"}, "projects": [{"match": "a/*", "agent_hom": "/h"}],
-		"workflows": {"address": {"approval": {"windw": "1m"}}}, "github": {"drafts": {"aproval": {}}}}`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	raw := `agnet = "claude"
+
+[sweep]
+fast = "2m"
+fsat = "1m"
+
+[[projects]]
+match = "a/*"
+agent_hom = "/h"
+
+[workflows.address.approval]
+windw = "1m"
+
+[github.drafts.aproval]
+`
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -536,11 +536,19 @@ func TestLoadRefusesUnknownKeysByPath(t *testing.T) {
 }
 
 func TestEveryDefaultKeyIsKnown(t *testing.T) {
-	raw, err := json.Marshal(tools())
+	asJSON, err := json.Marshal(tools())
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "config.json")
+	var tree map[string]any
+	if err := json.Unmarshal(asJSON, &tree); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := toml.Marshal(withoutNulls(tree))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -551,8 +559,14 @@ func TestEveryDefaultKeyIsKnown(t *testing.T) {
 
 func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	t.Parallel()
-	file := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(file, []byte(`{"turns": {"per_day": 7}, "workflows": {"slack-closure": {"drafts": {"approval": {"mode": "delay", "window": "10m"}}}}}`), 0o600); err != nil {
+	file := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(file, []byte(`[turns]
+per_day = 7
+
+[workflows.slack-closure.drafts.approval]
+mode = "delay"
+window = "10m"
+`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c, err := LoadFile(file, tools())
@@ -571,13 +585,89 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 }
 
 func TestTheGitHubNudgeAndRateLimitKeysLiveUnderGitHub(t *testing.T) {
-	for _, body := range []string{`{"nudge": {"silent_days": 10}}`, `{"sweep": {"rate_limit_fraction": 0.3}}`} {
-		file := filepath.Join(t.TempDir(), "config.json")
+	for _, body := range []string{`nudge = {silent_days = 10}`, `sweep = {rate_limit_fraction = 0.3}`} {
+		file := filepath.Join(t.TempDir(), "config.toml")
 		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), "unknown key") {
 			t.Errorf("%s: %v", body, err)
 		}
+	}
+}
+
+func TestLoadReadsTOMLWithComments(t *testing.T) {
+	c := loadRaw(t, `# why the sweep is slower: a shared rate limit
+workspace_managers = ["orca"]
+
+[sweep]
+fast = "5m" # minutes
+
+[[projects]]
+match = "acme/*"
+agent_home = "/w"
+
+[workflows.workspace-review-finished]
+observe = false
+
+[[workflows.address.approval.rule]]
+when = "true"
+mode = "delay"
+window = "1h"
+`)
+	if time.Duration(c.Sweep.Fast) != 5*time.Minute || c.For("acme", "api").AgentHome != "/w" || *c.Workflows["workspace-review-finished"].Observe {
+		t.Fatalf("config = %+v", c)
+	}
+	if r := c.Workflows["address"].Approval.Rule; len(r) != 1 || r[0].Mode != "delay" || time.Duration(r[0].Window) != time.Hour {
+		t.Fatalf("rules = %+v", r)
+	}
+}
+
+func TestLoadRefusesWrongKindsInTOML(t *testing.T) {
+	for body, want := range map[string]string{
+		"[sweep]\nfast = 5":                      "sweep.fast",
+		"[sweep]\nfast = 1979-05-27":             "sweep.fast",
+		"[turns]\nper_day = 1.5":                 "turns.per_day",
+		"[github]\nowners = \"acme\"":            "github.owners",
+		"[views.orca.columns]\nready = 07:00:00": "views.orca.columns.ready",
+		"[brief]\nenabled = \"yes\"":             "brief.enabled",
+	} {
+		file := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadFile(file, tools()); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v", body, err)
+		}
+	}
+}
+
+func TestALoneConfigJSONIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"agent": "claude"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "config.toml")
+	c, err := LoadFile(file, tools())
+	if err == nil || !strings.Contains(err.Error(), file) || !strings.Contains(err.Error(), MigrationURL) {
+		t.Fatalf("err %v", err)
+	}
+	if c.Agent != "claude" || !slices.Equal(c.WorkspaceManagers, tools().WorkspaceManagers) {
+		t.Fatalf("loaded %+v", c)
+	}
+	if err := os.WriteFile(file, []byte(`agent = "echo"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if c, err := LoadFile(file, tools()); err != nil || c.Agent != "echo" {
+		t.Fatalf("with both files: agent %q, %v", c.Agent, err)
+	}
+}
+
+func TestTOMLStringEscapes(t *testing.T) {
+	t.Parallel()
+	in := "a \"b\" \\ c\td\x7f\x01é"
+	var doc struct{ V string }
+	if err := toml.Unmarshal([]byte("V = "+tomlString(in)), &doc); err != nil || doc.V != in {
+		t.Fatalf("%q read back as %q: %v", tomlString(in), doc.V, err)
 	}
 }

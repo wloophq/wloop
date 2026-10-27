@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	"github.com/wloophq/wloop/internal/brand"
@@ -86,7 +87,7 @@ func newInitTestEnv(t *testing.T) *initTestEnv {
 		kc:     newFakeKeychain(),
 		onPath: []string{"git", "claude"},
 	}
-	cfgPath := filepath.Join(t.TempDir(), "config", "config.json")
+	cfgPath := filepath.Join(t.TempDir(), "config", "config.toml")
 	te.Env = &Env{
 		Out: te.out, Err: te.err, In: strings.NewReader(""),
 		GH: te.gh, WS: workspace.NewSet(te.ws),
@@ -228,73 +229,76 @@ func TestInitFlagsExcludeEachOther(t *testing.T) {
 
 func TestMergeInitConfigKeepsTheKeysItDoesNotManage(t *testing.T) {
 	t.Parallel()
-	raw := `{
-  "sweep": {
-    "fast": "5m"
-  },
-  "agent": "claude",
-  "github": {
-    "scope": {
-      "watch": [
-        "boss"
-      ],
-      "repos": [
-        "old/repo"
-      ]
-    }
-  },
-  "slack": {
-    "post_allowlist": [
-      "C1"
-    ]
-  }
-}`
-	got, err := mergeInitConfig([]byte(raw), initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"})
+	raw := `# acme's loop
+agent = "claude" # the default
+
+[sweep]
+fast = "5m" # a shared rate limit
+
+[github.scope]
+# people I follow
+watch = ["boss"]
+repos = [
+  "old/repo", # moved
+]
+
+[slack]
+post_allowlist = ["C1"]
+`
+	a := initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
+	got, err := mergeInitConfig([]byte(raw), a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{
-  "sweep": {
-    "fast": "5m"
-  },
-  "agent": "claude",
-  "github": {
-    "scope": {
-      "watch": [
-        "boss"
-      ],
-      "repos": [
-        "acme/api"
-      ]
-    }
-  },
-  "slack": {
-    "post_allowlist": [
-      "C1"
-    ],
-    "client_id": "1.2"
-  },
-  "projects_dir": "/src"
-}
+	want := `# acme's loop
+agent = "claude" # the default
+projects_dir = "/src"
+
+[sweep]
+fast = "5m" # a shared rate limit
+
+[github.scope]
+# people I follow
+watch = ["boss"]
+repos = ["acme/api"]
+
+[slack]
+post_allowlist = ["C1"]
+client_id = "1.2"
 `
 	if string(got) != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
-	again, err := mergeInitConfig(got, initAnswers{ProjectsDir: "/src", Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"})
+	again, err := mergeInitConfig(got, a)
 	if err != nil || !bytes.Equal(again, got) {
 		t.Fatalf("a second merge changed the config (%v):\n%s", err, again)
 	}
 }
 
-func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
+func TestMergeInitConfigWritesAFreshFile(t *testing.T) {
 	t.Parallel()
 	got, err := mergeInitConfig(nil, initAnswers{ProjectsDir: "/src", Profile: "/profiles/mine", Agent: "claude",
 		Repos: []string{"acme/api"}, Teams: []string{"acme/core"}, People: []string{"ana"}, SlackClientID: "1.2"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	want := `projects_dir = "/src"
+profile = "/profiles/mine"
+agent = "claude"
+
+[github.scope]
+repos = ["acme/api"]
+teams = ["acme/core"]
+people = ["ana"]
+
+[slack]
+client_id = "1.2"
+`
+	if string(got) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
 	var doc map[string]any
-	if err := json.Unmarshal(got, &doc); err != nil {
+	if err := toml.Unmarshal(got, &doc); err != nil {
 		t.Fatal(err)
 	}
 	if ps := builtin.Check(builtin.SurfaceConfig, doc); len(ps) > 0 {
@@ -302,14 +306,53 @@ func TestInitWritesOnlyKeysTheGrammarKnows(t *testing.T) {
 	}
 }
 
+func TestMergeInitConfigWritesWhereTheFileHasTheTable(t *testing.T) {
+	t.Parallel()
+	a := initAnswers{Agent: "claude", Repos: []string{"acme/api"}, SlackClientID: "1.2"}
+	for name, c := range map[string]struct{ raw, want string }{
+		"a parent table": {
+			"[github]\nowners = [\"acme\"]\n\n[[projects]]\nmatch = \"acme/*\"\n",
+			"agent = \"claude\"\n\n[github]\nowners = [\"acme\"]\nscope.repos = [\"acme/api\"]\n\n[[projects]]\nmatch = \"acme/*\"\n\n[slack]\nclient_id = \"1.2\"\n",
+		},
+		"dotted keys at the top": {
+			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"old\"",
+			"agent = \"claude\"\ngithub.scope.watch = [\"boss\"]\nslack.client_id = \"1.2\"\ngithub.scope.repos = [\"acme/api\"]",
+		},
+		"a header with no keys": {
+			"agent = \"claude\"\n\n[github.scope] # mine\n",
+			"agent = \"claude\"\n\n[github.scope] # mine\nrepos = [\"acme/api\"]\n\n[slack]\nclient_id = \"1.2\"\n",
+		},
+	} {
+		got, err := mergeInitConfig([]byte(c.raw), a)
+		if err != nil || string(got) != c.want {
+			t.Errorf("%s: %v, got:\n%s\nwant:\n%s", name, err, got, c.want)
+			continue
+		}
+		if err := toml.Unmarshal(got, new(map[string]any)); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestMergeInitConfigRefusesToEditAnInlineTable(t *testing.T) {
+	t.Parallel()
+	raw := "github = {owners = [\"acme\"]}\n"
+	if _, err := mergeInitConfig([]byte(raw), initAnswers{Repos: []string{"acme/api"}}); err == nil || !strings.Contains(err.Error(), "github.scope.repos") {
+		t.Fatalf("err %v", err)
+	}
+	if got, err := mergeInitConfig([]byte(raw), initAnswers{}); err != nil || string(got) != raw {
+		t.Fatalf("an empty answer touched the inline table (%v):\n%s", err, got)
+	}
+}
+
 func TestMergeInitConfigKeepsAPathSpelledWithTilde(t *testing.T) {
 	t.Parallel()
-	raw := `{"projects_dir": "~/src", "profile": "mine"}`
+	raw := "projects_dir = \"~/src\"\nprofile = \"mine\"\n"
 	got, err := mergeInitConfig([]byte(raw), initAnswers{ProjectsDir: config.ExpandHome("~/src"), Profile: config.ResolveProfile("mine"), Agent: "claude"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(got), `"projects_dir": "~/src"`) || !strings.Contains(string(got), `"profile": "mine"`) {
+	if want := raw + "agent = \"claude\"\n"; string(got) != want {
 		t.Fatalf("got:\n%s", got)
 	}
 }
@@ -320,11 +363,11 @@ func TestMergeInitConfigAddsNoEmptyKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "{\n  \"projects_dir\": \"/src\",\n  \"agent\": \"claude\"\n}\n"; string(got) != want {
+	if want := "projects_dir = \"/src\"\nagent = \"claude\"\n"; string(got) != want {
 		t.Fatalf("got:\n%s", got)
 	}
-	if _, err := mergeInitConfig([]byte("[1]"), initAnswers{}); err == nil {
-		t.Fatal("a config that is not an object merged")
+	if _, err := mergeInitConfig([]byte("agent = "), initAnswers{}); err == nil {
+		t.Fatal("a config that does not parse merged")
 	}
 }
 
@@ -428,7 +471,7 @@ func TestInitFromFlagsWritesTheConfigAndTheProfile(t *testing.T) {
 		}
 	}
 	out := te.out.String()
-	for _, want := range []string{"+++ b/config.json", "Skipped; run '" + brand.Command + " install'", "Next: '" + brand.Command + " review"} {
+	for _, want := range []string{"+++ b/config.toml", "Skipped; run '" + brand.Command + " install'", "Next: '" + brand.Command + " review"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("out lacks %q:\n%s", want, out)
 		}
@@ -459,7 +502,7 @@ func TestInitRerunChangesNothing(t *testing.T) {
 
 func TestInitOverwritesOnlyWithYes(t *testing.T) {
 	te := newInitTestEnv(t)
-	raw := `{"projects_dir": "/old", "sweep": {"fast": "5m"}}`
+	raw := "projects_dir = \"/old\"\n\n[sweep]\nfast = \"5m\"\n"
 	te.writeConfig(t, raw)
 	args := []string{"--projects-dir", filepath.Join(te.Home, "src"), "--profile-default", "--no-install"}
 	if code := te.run(args...); code != 1 || !strings.Contains(te.err.String(), "pass --yes") {
@@ -468,7 +511,7 @@ func TestInitOverwritesOnlyWithYes(t *testing.T) {
 	if now, _ := os.ReadFile(te.ConfigPath); string(now) != raw {
 		t.Fatalf("changed without --yes:\n%s", now)
 	}
-	if !strings.Contains(te.out.String(), `-  "projects_dir": "/old",`) {
+	if !strings.Contains(te.out.String(), `-projects_dir = "/old"`) {
 		t.Errorf("no diff:\n%s", te.out)
 	}
 	if code := te.run(append(args, "--yes")...); code != 0 {

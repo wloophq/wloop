@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -448,11 +449,11 @@ func (w *initWizard) write(raw []byte, exists bool, a initAnswers) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", e.ConfigPath, err)
 	}
-	changed := !exists || !sameJSON(raw, next)
+	changed := !exists || !bytes.Equal(raw, next)
 	if changed {
 		var before []byte
 		if exists {
-			before = indentJSON(raw)
+			before = raw
 		}
 		w.printDiff(profile.Diff(profile.Change{Rel: filepath.Base(e.ConfigPath), Before: before, After: next}))
 		switch {

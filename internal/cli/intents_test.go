@@ -39,7 +39,7 @@ func TestAConfigThatStopsLoadingKeepsTheLastProfileIntents(t *testing.T) {
 	if _, ok := e.loadedIntents().Registry.Get(dintent.Name("ask-author")); !ok {
 		t.Fatal("the profile's intent did not load")
 	}
-	loadErr = errors.New("config.json: bad json")
+	loadErr = errors.New("config.toml: bad toml")
 	if err := os.Chtimes(filepath.Join(at, "intent.toml"), time.Unix(1, 0), time.Unix(1, 0)); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestAConfigThatStopsLoadingKeepsTheLastProfileIntents(t *testing.T) {
 		t.Fatal("a config failure dropped the profile's intents")
 	}
 	e.loadedIntents()
-	if n := strings.Count(warned.String(), "config.json: bad json"); n != 1 {
+	if n := strings.Count(warned.String(), "config.toml: bad toml"); n != 1 {
 		t.Fatalf("warned %d times: %q", n, warned.String())
 	}
 }

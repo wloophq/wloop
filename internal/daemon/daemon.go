@@ -239,7 +239,7 @@ type Deps struct {
 	Restart string
 	// Store is the open store's version and last backup, for the health.
 	Store *api.StoreStatus
-	// ConfigWarning is the health warning about config.json drifting from the
+	// ConfigWarning is the health warning about config.toml drifting from the
 	// running config, "" for none; nil never warns.
 	ConfigWarning func() string
 	// WorkspaceManager names the workspace managers in messages, such as

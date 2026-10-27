@@ -24,12 +24,11 @@ The manifest, also at [slack-app-manifest.yaml](/slack-app-manifest.yaml):
 
 ## 2. Log in
 
-In `config.json`:
+In `config.toml`:
 
-```json
-"slack": {
-  "client_id": "000000000000.000000000000"
-}
+```toml
+[slack]
+client_id = "000000000000.000000000000"
 ```
 
 Then:
@@ -48,15 +47,14 @@ Restart the daemon so it connects (on macOS, `launchctl kickstart -k gui/$(id -u
 
 By default, a message comes in when it mentions you, replies to you, sits in a thread you wrote in, or is in a DM. To widen it:
 
-```json
-"slack": {
-  "client_id": "000000000000.000000000000",
-  "ingest": {
-    "terms": ["api-outage", "billing"],
-    "allow_apps": ["B000"]
-  },
-  "post_allowlist": ["C000", "U000"]
-}
+```toml
+[slack]
+client_id = "000000000000.000000000000"
+post_allowlist = ["C000", "U000"] # channel ids, or user ids for their DMs
+
+[slack.ingest]
+terms = ["api-outage", "billing"]
+allow_apps = ["B000"]
 ```
 
 - `ingest.terms` admits messages with any of these words.
@@ -108,6 +106,6 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} slack logout
 ```
 
-It revokes the user token at Slack and deletes both Keychain entries, even when the revoke fails. To keep Slack configured but stop the source, set `"slack": {"enabled": false}` and restart the daemon.
+It revokes the user token at Slack and deletes both Keychain entries, even when the revoke fails. To keep Slack configured but stop the source, set `slack.enabled = false` and restart the daemon.
 
 See [Slack as a source](/concepts/slack/) for how messages are admitted and turned into items, and the [configuration reference](/reference/configuration/) for every key.

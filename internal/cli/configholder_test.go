@@ -1,11 +1,12 @@
 package cli
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/wloophq/wloop/internal/config"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -22,7 +23,7 @@ type holderEnv struct {
 func newHolderEnv(t *testing.T, cfg map[string]any) *holderEnv {
 	t.Helper()
 	h := &holderEnv{T: t, e: &Env{Err: os.Stderr}, now: time.Unix(5000, 0)}
-	h.e.ConfigPath = filepath.Join(t.TempDir(), "config.json")
+	h.e.ConfigPath = filepath.Join(t.TempDir(), "config.toml")
 	h.e.LoadConfig = func() (config.Config, error) { h.loads++; return config.LoadFile(h.e.ConfigPath, Defaults()) }
 	h.e.Now = func() time.Time { return h.now }
 	h.write(cfg)
@@ -41,7 +42,7 @@ func newHolderEnv(t *testing.T, cfg map[string]any) *holderEnv {
 
 func (h *holderEnv) write(cfg map[string]any) {
 	h.Helper()
-	raw, err := json.Marshal(cfg)
+	raw, err := toml.Marshal(cfg)
 	if err != nil {
 		h.Fatal(err)
 	}

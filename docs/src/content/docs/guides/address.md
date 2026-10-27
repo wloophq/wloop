@@ -47,23 +47,24 @@ From a session in the workspace: `/{{name}}-address <url>`. The reviews so far c
 
 Failing checks or a conflict alone never start a round without a workspace. Without a workspace, the daemon only records that it would start a round (`would_address`), and the cockpit lists the pull request in Needs me as "review to address, no workspace". To let it create the workspace and run the round:
 
-```json
-"github": { "address_without_workspace": true }
+```toml
+[github]
+address_without_workspace = true
 ```
 
-It can also go on a `projects` entry, as `"github": { "address_without_workspace": true }`, for some repositories only.
+It can also go on a `[[projects]]` entry, as `github.address_without_workspace = true`, for some repositories only.
 
 ## Turn it down
 
 | Setting | Effect |
 |---|---|
-| `"github": {"address_reviews": false}` | no round for reviews |
-| `"github": {"address_skip_reviewers": ["some-bot"]}` | reviews by these logins never start one |
-| `"github": {"address_checks": false}` | no round for failing checks |
-| `"github": {"ignore_checks": ["codecov/patch"]}` | these checks never start one |
-| `"github": {"address_conflicts": false}` | no round for a conflict with the base |
-| `"turns": {"per_unit_per_day": 5}` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
-| `"workflows": {"address": {"only_when": "pr.visibility == \"private\""}}` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
+| `github.address_reviews = false` | no round for reviews |
+| `github.address_skip_reviewers = ["some-bot"]` | reviews by these logins never start one |
+| `github.address_checks = false` | no round for failing checks |
+| `github.ignore_checks = ["codecov/patch"]` | these checks never start one |
+| `github.address_conflicts = false` | no round for a conflict with the base |
+| `turns.per_unit_per_day = 5` | at most this many automatic rounds per pull request per day, against a loop with a bot that reviews every push |
+| `workflows.address.only_when = 'pr.visibility == "private"'` | automatic rounds only in private repositories; any [workflow predicate](/guides/workflows/#narrow-one-to-some-pull-requests) over the owner, repository or author works the same way |
 
 ## Rules for one reviewer
 

@@ -99,7 +99,7 @@ func TestServeDegradedUntilTheConfigLoads(t *testing.T) {
 	broken.Store(true)
 	te.LoadConfig = func() (config.Config, error) {
 		if broken.Load() {
-			return config.Config{}, errors.New("config.json: unexpected end of JSON input")
+			return config.Config{}, errors.New("config.toml: unexpected end of TOML input")
 		}
 		return Defaults(), nil
 	}
@@ -113,13 +113,13 @@ func TestServeDegradedUntilTheConfigLoads(t *testing.T) {
 	eventually(t, "the config error in health", func() bool {
 		var err error
 		h, err = c.Health(ctx)
-		return err == nil && slices.ContainsFunc(h.Warnings, func(w string) bool { return strings.Contains(w, "unexpected end of JSON input") })
+		return err == nil && slices.ContainsFunc(h.Warnings, func(w string) bool { return strings.Contains(w, "unexpected end of TOML input") })
 	})
 	if names := jobNames(h); !slices.Equal(names, []string{"retain", "sweep", "usage"}) {
 		t.Fatalf("degraded jobs %v", names)
 	}
 	_, err := c.Action(ctx, r7.Unit(), "review", api.ActionRequest{Source: "cli"})
-	if err == nil || !strings.Contains(err.Error(), "unexpected end of JSON input") {
+	if err == nil || !strings.Contains(err.Error(), "unexpected end of TOML input") {
 		t.Fatalf("review in degraded serve: %v", err)
 	}
 
@@ -157,7 +157,7 @@ func TestServeNoJobsDegradedRunsNoJob(t *testing.T) {
 	broken.Store(true)
 	te.LoadConfig = func() (config.Config, error) {
 		if broken.Load() {
-			return config.Config{}, errors.New("config.json: unexpected end of JSON input")
+			return config.Config{}, errors.New("config.toml: unexpected end of TOML input")
 		}
 		cfg := Defaults()
 		cfg = withoutWindows(cfg)

@@ -9,8 +9,9 @@ description: How what people ask of you becomes GTD entries, and how the lists, 
 
 A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topic. Units come from plugins. Two are compiled in: `github` (pull requests) and `slack` (threads and DM topics). Each can be turned off:
 
-```json
-"slack": { "enabled": false }
+```toml
+[slack]
+enabled = false
 ```
 
 The daemon reads the switch when it starts. With a plugin off, nothing of it runs, its actions leave every surface, and its cards render from the last stored snapshot, marked stale.
@@ -92,9 +93,14 @@ The Review (`g r`) walks six steps, each a filtered view you mark done with `Ent
 
 ## Configuration
 
-```json
-"gtd": { "stale_waiting_days": 2, "areas": ["oss", "work"], "contexts": ["@decide", "@reply"] },
-"notifications": { "digest_at": "09:00" }
+```toml
+[gtd]
+stale_waiting_days = 2
+areas = ["oss", "work"]
+contexts = ["@decide", "@reply"]
+
+[notifications]
+digest_at = "09:00"
 ```
 
 The entries, messages, drafts, items and Slack messages have no retention yet: they grow until a later release prunes them. Only dossiers are archived and purged.

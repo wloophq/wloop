@@ -37,7 +37,7 @@ Schema version 4 keys briefs and tags by unit; the Slack conversations keep the 
 
 ## Your configuration and profile
 
-A key or a value the new release does not know, in `config.json` or in a manifest of your profile, fails at load with the key's path, and a close name when one exists; no old spelling is read, and a key that moved gets the same error as a typo. `{{command}} doctor` and `{{command}} profile check` list each one. The [profile language](/reference/language/) lists every reserved word, and the [configuration](/reference/configuration/) every key.
+A key or a value the new release does not know, in `config.toml` or in a manifest of your profile, fails at load with the key's path, and a close name when one exists; no old spelling is read, and a key that moved gets the same error as a typo. `{{command}} doctor` and `{{command}} profile check` list each one. The configuration is `config.toml`; a configuration directory that holds only the former `config.json` fails at load, naming `config.toml` and the page with the script that converts one. The [profile language](/reference/language/) lists every reserved word, and the [configuration](/reference/configuration/) every key.
 
 ## Going back to an earlier release
 

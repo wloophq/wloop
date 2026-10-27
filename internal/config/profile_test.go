@@ -28,9 +28,14 @@ func TestResolveProfile(t *testing.T) {
 func TestLoadResolvesProfilesAndAgentHome(t *testing.T) {
 	cfgHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgHome)
-	file := filepath.Join(t.TempDir(), "config.json")
-	os.WriteFile(file, []byte(`{"profile":"personal","agent_home":"~/.claude-personal",
-		"projects":[{"match":"acme/*","agent_home":"/h"}]}`), 0o600)
+	file := filepath.Join(t.TempDir(), "config.toml")
+	os.WriteFile(file, []byte(`profile = "personal"
+agent_home = "~/.claude-personal"
+
+[[projects]]
+match = "acme/*"
+agent_home = "/h"
+`), 0o600)
 	c, err := LoadFile(file, tools())
 	if err != nil {
 		t.Fatal(err)
