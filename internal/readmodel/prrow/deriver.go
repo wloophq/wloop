@@ -60,6 +60,24 @@ type TurnFact struct {
 	Waiting  bool
 	Unread   bool // the session of a started turn could not be read
 	Question *api.QuestionView
+	// Unstarted are the ids of the turns that ended before their agent
+	// started them.
+	Unstarted map[string]bool
+}
+
+// Unstarted are the ids of b's turns that ended before their agent started
+// them, which posted nothing.
+func Unstarted(b turn.Book) map[string]bool {
+	var out map[string]bool
+	for _, t := range b.Turns {
+		if !t.State.Open() && t.StartedAt.IsZero() {
+			if out == nil {
+				out = map[string]bool{}
+			}
+			out[t.ID] = true
+		}
+	}
+	return out
 }
 
 // IgnoreOf is who a row never waits on and a nudge never mentions.
@@ -87,7 +105,7 @@ func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.
 			f.Summary, f.At = r.Record.Headline(), r.At
 		}
 		f.AnsweredAt, _ = b.AnsweredAt(t.Seq)
-		fact := TurnFact{Facts: f}
+		fact := TurnFact{Facts: f, Unstarted: Unstarted(b)}
 		if q, ok := b.Question(reg.Answerable()); ok {
 			qLast, _ := b.LastRecord(q.Seq)
 			fact.Question, _ = questionOf(q, qLast)

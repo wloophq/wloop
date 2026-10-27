@@ -320,6 +320,6 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `entry.nudged` | any | Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none. |
 | `unit.closed` | any | Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin. |
-| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, or as the GitHub publisher posts its draft. |
+| `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |
 
 This page is generated from the binary's fact registry by `make docs-ref`.

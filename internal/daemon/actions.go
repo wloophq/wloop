@@ -705,13 +705,12 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 		}
 	}
 	call := Call{Guidance: cutGuidance(d, req.Guidance), AgentHome: req.AgentHome, Out: out, Inputs: inputs, Items: req.Items, Entry: req.Entry}
-	data := ""
 	if d.Prepare != "" {
 		prepare, ok := prepares[d.Prepare]
 		if !ok {
 			return fmt.Errorf("%s: the daemon has no prepare %s", name, d.Prepare)
 		}
-		if data, err = prepare(s, ctx, u, &call); err != nil {
+		if err := prepare(s, ctx, u, &call); err != nil {
 			return err
 		}
 	}
@@ -720,7 +719,7 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	}
 	for _, e := range effects {
 		if e.after != nil {
-			if err := e.after(s, ctx, u, data); err != nil {
+			if err := e.after(s, ctx, u); err != nil {
 				return err
 			}
 		}
@@ -896,34 +895,48 @@ func (s *Server) untrackFinished(ctx context.Context) {
 }
 
 func (s *Server) unmutedSituation(ctx context.Context, u unit.Unit) (api.Kind, string, error) {
-	r, _, _, err := s.unmutedRow(ctx, u)
-	return r.Kind, r.Summary.WaitsOn, err
+	um, err := s.unmutedRow(ctx, u)
+	return um.row.Kind, um.row.Summary.WaitsOn, err
 }
 
 // unmutedRow derives the row as it stands without the user's override and
 // pending round, with the events and the deriver it came from.
-func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (api.Row, []dinv.Event, prrow.Deriver, error) {
+func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (unmuted, error) {
 	rd, ok, err := s.readRow(ctx, u)
 	if err != nil {
-		return api.Row{}, nil, prrow.Deriver{}, err
+		return unmuted{}, err
 	}
 	if !ok {
 		st, found, err := s.storedRead(ctx, u, catalog.Asked{}, true)
 		if err != nil {
-			return api.Row{}, nil, prrow.Deriver{}, err
+			return unmuted{}, err
 		}
 		if !found {
-			return api.Row{}, nil, prrow.Deriver{}, notFound{u.Label() + " is not in the inventory"}
+			return unmuted{}, notFound{u.Label() + " is not in the inventory"}
 		}
-		return st.row, st.evs, st.d, nil
+		var b turn.Book
+		if st.book != nil {
+			b = *st.book
+		}
+		return unmuted{row: st.row, evs: st.evs, book: b, d: st.d}, nil
 	}
 	base := rd.Base
 	base.Pending, base.Asked = nil, catalog.Asked{}
 	row, err := rd.Derive(base, prrow.Unmuted(rd.In))
 	if err != nil {
-		return api.Row{}, nil, prrow.Deriver{}, err
+		return unmuted{}, err
 	}
-	return row, prrow.EventsOf(rd.In), s.deriverAt(base, rd.At), nil
+	b, _ := prrow.BookOf(rd.In)
+	return unmuted{row: row, evs: prrow.EventsOf(rd.In), book: b, d: s.deriverAt(base, rd.At)}, nil
+}
+
+// unmuted is a pull request's row without the user's mute, with what a
+// nudge reads beside it.
+type unmuted struct {
+	row  api.Row
+	evs  []dinv.Event
+	book turn.Book
+	d    prrow.Deriver
 }
 
 // updateOverride changes the stored override and reports whether it
@@ -968,15 +981,16 @@ func (s *Server) recordEvent(ctx context.Context, u unit.Unit, kind, data string
 // prepareNudge refuses when nobody but the user is to be asked, or the
 // same wait was already nudged, and fills who, the situation and whether
 // it asks the maintainers.
-func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string, error) {
-	r, evs, d, err := s.unmutedRow(ctx, u)
+func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) error {
+	um, err := s.unmutedRow(ctx, u)
 	if err != nil {
-		return "", err
+		return err
 	}
+	r, d := um.row, um.d
 	p, _ := prrow.PayloadOf(r)
 	who, why := prrow.NudgeTargets(r, p.Author, d.Viewer, d.Ignore)
-	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, evs, d.Now); refusal != "" {
-		return "", badRequest{refusal}
+	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, um.evs, prrow.Unstarted(um.book), d.Now); refusal != "" {
+		return badRequest{refusal}
 	}
 	if c.Inputs == nil {
 		c.Inputs = map[string]any{}
@@ -984,7 +998,7 @@ func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) (string
 	c.Inputs["situation"] = nudgeSituation(who, r)
 	c.Inputs["waits_on_maintainers"] = slices.Equal(who, []string{prrow.NudgeMaintainers})
 	c.Inputs["who"] = slices.Clone(who)
-	return strings.Join(who, ", "), nil
+	return nil
 }
 
 func nudgeSituation(who []string, r api.Row) string {

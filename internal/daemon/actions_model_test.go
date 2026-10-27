@@ -65,9 +65,9 @@ func TestNudgeUnmutedRowNoQuery(t *testing.T) {
 	seedWaitingOnAna(t, s)
 	warm(t, s)
 	ctx, sc := metertest.Start(t, context.Background())
-	row, evs, d, err := s.unmutedRow(ctx, r9.Unit())
-	if err != nil || row.Unit != r9.Unit() || len(evs) == 0 || d.Viewer != "me" {
-		t.Fatalf("%+v %d %q %v", row, len(evs), d.Viewer, err)
+	um, err := s.unmutedRow(ctx, r9.Unit())
+	if err != nil || um.row.Unit != r9.Unit() || len(um.evs) == 0 || um.d.Viewer != "me" {
+		t.Fatalf("%+v %d %q %v", um.row, len(um.evs), um.d.Viewer, err)
 	}
 	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 0})
 }
@@ -134,8 +134,8 @@ func TestUnmutedRowOfALapsedPR(t *testing.T) {
 	t.Parallel()
 	s := newNotedServer(t, func(*Deps) {})
 	ref := seedLapsed(t, s)
-	row, evs, d, err := s.unmutedRow(context.Background(), ref.Unit())
-	if err != nil || row.Unit != ref.Unit() || len(evs) != 1 || d.Viewer != "me" {
-		t.Fatalf("%+v %d %q %v", row, len(evs), d.Viewer, err)
+	um, err := s.unmutedRow(context.Background(), ref.Unit())
+	if err != nil || um.row.Unit != ref.Unit() || len(um.evs) != 1 || um.d.Viewer != "me" {
+		t.Fatalf("%+v %d %q %v", um.row, len(um.evs), um.d.Viewer, err)
 	}
 }
