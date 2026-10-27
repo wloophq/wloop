@@ -31,12 +31,14 @@ type Reader struct {
 	Client   *slackapi.Client
 	// Location is the time zone Search shows times in; nil is the local one.
 	Location *time.Location
+	// Log takes what a read leaves out on a Slack error; nil drops it.
+	Log func(format string, args ...any)
 }
 
 // ReaderOver reads the facts the Slack module stores in db.
 func ReaderOver(db *sqlite.DB, c *slackapi.Client, log func(string, ...any)) *Reader {
 	segs := Segments{Store: db.Segments()}
-	return &Reader{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Messages: StoredOver(db, log), Client: c}
+	return &Reader{Facts: &Store{DB: db.Slack(), Segments: segs}, Segments: segs, Messages: StoredOver(db, log), Client: c, Log: log}
 }
 
 const unitPrefix = string(dslack.Provider) + ":"
@@ -91,6 +93,9 @@ func (r *Reader) Read(ctx context.Context, target string, limit int) (string, er
 	if link == "" {
 		if link, err = r.Client.Permalink(ctx, conv, msgs[0].TS); err != nil {
 			link = ""
+			if r.Log != nil {
+				r.Log("slack_permalink channel=%s ts=%s error=%v", conv, msgs[0].TS, err)
+			}
 		}
 	}
 	out, err := r.render(ctx, c, msgs[0].Anchor(), msgs, link, limit)

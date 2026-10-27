@@ -319,3 +319,24 @@ func TestSlackReadSaysALongThreadWasCutOff(t *testing.T) {
 		t.Fatalf("replies pages = %d", n)
 	}
 }
+
+func TestSlackReadRefLogsAPermalinkSlackRefuses(t *testing.T) {
+	f := newFixture(t)
+	f.login(t)
+	f.api.Handle("conversations.replies", func(v url.Values) any {
+		return map[string]any{"messages": []map[string]any{{"ts": readParent, "user": other, "text": "live parent"}}, "has_more": false}
+	})
+	f.api.Handle("conversations.info", func(v url.Values) any {
+		return map[string]any{"channel": map[string]any{"id": v.Get("channel"), "name": "general", "is_channel": true}}
+	})
+	f.api.Handle("chat.getPermalink", func(url.Values) any { return map[string]any{"ok": false, "error": "ratelimited"} })
+	var logged []string
+	got, err := ReaderOver(f.db, f.slack.Client, func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }).
+		Read(context.Background(), readConv+"/"+readParent, 50)
+	if err != nil || !strings.Contains(got, "no permalink ("+readConv+"/"+readParent+")") {
+		t.Fatalf("Read = %q, %v", got, err)
+	}
+	if len(logged) != 1 || !strings.Contains(logged[0], "slack_permalink") || !strings.Contains(logged[0], "ratelimited") {
+		t.Fatalf("logged %q", logged)
+	}
+}
