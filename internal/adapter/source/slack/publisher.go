@@ -77,8 +77,17 @@ func (p *Publisher) Validate(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
-// Where names the conversation d would post to.
+// Where names the conversation d would post to, or, for a recorded edit, the
+// conversation of the message it replaced.
 func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
+	if d.Delivery == draft.EditDelivery {
+		if p.Send == nil || p.Send.Client == nil {
+			return "", send.ErrNotLoggedIn
+		}
+		no := false
+		res, err := p.Send.Resolve(ctx, send.Request{Target: d.Target, Thread: &no, Source: "draft"})
+		return res.Conversation, err
+	}
 	pl, err := p.prepare(ctx, d)
 	if err != nil {
 		return "", err
@@ -93,6 +102,9 @@ func (p *Publisher) prepare(ctx context.Context, d draft.Draft) (plan, error) {
 	}
 	if p.Send == nil || p.Send.Client == nil {
 		return plan{}, send.ErrNotLoggedIn
+	}
+	if d.Delivery == draft.EditDelivery {
+		return plan{}, errors.New("an edit goes out through slack_edit at once and is only recorded, never published from the Outbox")
 	}
 	var pl plan
 	if d.Delivery == draft.Reaction {

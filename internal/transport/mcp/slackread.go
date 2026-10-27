@@ -19,12 +19,11 @@ const (
 
 func slackReadTool() tool {
 	one := 1
-	limit := &schema{Type: "integer", Minimum: &one, Description: "how many messages to show, at most 200; the first message is always kept. Default 50"}
+	limit := &schema{Type: "integer", Minimum: &one}
 	return tool{
-		Name:        slackReadName,
-		Description: "Read a Slack thread or conversation, rendered: a unit (slack:<key>) or a message permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked.",
+		Name: slackReadName,
 		InputSchema: object(map[string]*schema{
-			"target": str(0, "a unit (slack:<key>) or a message permalink"),
+			"target": str(0),
 			"limit":  limit,
 		}, "target"),
 	}

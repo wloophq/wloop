@@ -271,7 +271,9 @@ func TestInstallBytesArePinned(t *testing.T) {
   "permissions": {
     "allow": [
       "` + brand.ToolPrefix() + `turn_end",
-      "` + brand.ToolPrefix() + `slack_send_message"
+      "` + brand.ToolPrefix() + `slack_send_message",
+      "` + brand.ToolPrefix() + `slack_react",
+      "` + brand.ToolPrefix() + `slack_edit"
     ]
   }
 }

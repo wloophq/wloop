@@ -179,7 +179,8 @@ func serve(ctx context.Context, e *Env, args []string) error {
 				return l.Registry
 			}
 			return nil
-		}}
+		},
+		texts: e.toolTexts}
 	e.observeGit(ctx, &daemon.GitAccessLog{Store: store}, logf)
 	startCfg, err := e.readConfig()
 	if err != nil {
@@ -262,6 +263,8 @@ type mcpEndpoint struct {
 	// intents is the loaded registry, whose drafts.allowed_effects bound an agent's
 	// drafts; nil allows no effect.
 	intents func() *dintent.Registry
+	// texts are the tools' descriptions from the loaded profile; nil describes none.
+	texts func() map[string]mcp.ToolText
 }
 
 func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
@@ -269,7 +272,7 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 	if m.port != 0 {
 		d.MCPPort = m.port
 	}
-	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key}
+	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: m.texts}
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
@@ -1331,4 +1334,17 @@ func fallbacksOf(set *workspace.Set) func() int64 {
 		}
 		return n
 	}
+}
+
+// toolTexts are the MCP tools' texts of the loaded profile.
+func (e *Env) toolTexts() map[string]mcp.ToolText {
+	l := e.loadedIntents()
+	if l == nil {
+		return nil
+	}
+	out := make(map[string]mcp.ToolText, len(l.Tools))
+	for name, t := range l.Tools {
+		out[name] = mcp.ToolText{Description: t.Description, Params: t.Params}
+	}
+	return out
 }

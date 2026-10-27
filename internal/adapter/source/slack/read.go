@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -24,6 +25,8 @@ type Reader struct {
 		UnitsFor(ctx context.Context, conv, ts string) ([]unit.Unit, error)
 	}
 	Client *slackapi.Client
+	// Location is the time zone Search shows times in; nil is the local one.
+	Location *time.Location
 }
 
 // ReaderOver reads the facts the Slack module stores in db.

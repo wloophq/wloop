@@ -61,11 +61,17 @@ type Server struct {
 	Slack      Slack
 	SlackRead  SlackReader
 	SlackDraft SlackDrafts
-	Inbox      Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post
-	mu         sync.Mutex
-	ids        map[string]string // Mcp-Session-Id to handle ("" when none), in memory only
+	// SlackSearch is set with SlackRead; nil hides slack_search.
+	SlackSearch SlackSearcher
+	Inbox       Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post
+	// Texts are the tools' descriptions, the profile's tools.toml; nil
+	// describes none.
+	Texts func() map[string]ToolText
+	mu    sync.Mutex
+	ids   map[string]string // Mcp-Session-Id to handle ("" when none), in memory only
 	// byHandle keeps one id per handle: initialize replaces the old one.
 	byHandle map[string]string
+	logged   map[string]bool // what logOnce logged
 
 	// Key is the per-install secret each request carries in
 	// api.MCPKeyHeader; the daemon always sets it, nil checks nothing.
@@ -277,10 +283,14 @@ type registered struct {
 func (s *Server) tools() []registered {
 	r := []registered{{turnEndTool(), true, s.turnEnd}}
 	if s.Slack != nil {
-		r = append(r, registered{slackSendTool(), false, s.slackSend})
+		r = append(r, registered{slackSendTool(), false, s.slackSend}, registered{slackReactTool(), false, s.slackReact},
+			registered{slackEditTool(), false, s.slackEdit})
 	}
 	if s.SlackRead != nil {
 		r = append(r, registered{slackReadTool(), false, s.slackRead})
+	}
+	if s.SlackSearch != nil {
+		r = append(r, registered{slackSearchTool(), false, s.slackSearch})
 	}
 	if s.SlackDraft != nil {
 		r = append(r, registered{slackDraftTool(), true, s.slackDraft})
@@ -292,9 +302,15 @@ func (s *Server) tools() []registered {
 }
 
 func (s *Server) listTools() []tool {
+	var texts map[string]ToolText
+	if s.Texts != nil {
+		texts = s.Texts()
+	}
 	var out []tool
 	for _, r := range s.tools() {
-		out = append(out, r.tool)
+		t := r.tool
+		s.describe(&t, texts[t.Name])
+		out = append(out, t)
 	}
 	return out
 }

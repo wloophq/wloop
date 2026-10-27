@@ -18,7 +18,7 @@ var golden = []string{
 	"classifications: provider, unit_key, fingerprint, workflow, output, at",
 	"classify_days: day, total",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
-	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at",
+	"drafts: id, provider, unit_key, items, entry, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
 	"entries: id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential, snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated, rev",
 	"entry_contexts: entry_id, context, ord",
 	"entry_items: entry_id, provider, unit_key, item",

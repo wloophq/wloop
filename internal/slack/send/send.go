@@ -31,6 +31,7 @@ type Resolved struct {
 type Sent struct {
 	Conversation string
 	Parent       string
+	ThreadTS     string // the thread replied in, "" when not a reply
 	Text         string // as posted, mrkdwn
 	Permalink    string
 	Channel, TS  string
@@ -98,13 +99,20 @@ func (s *Service) Allowed(res Resolved) error {
 	return fmt.Errorf("%w: conversation %s (%s)", ErrNotAllowed, res.Channel, res.Conversation)
 }
 
-// Send resolves r, checks the allowlist and posts. Once chat.postMessage succeeded it never fails:
+// Send resolves r and the mentions of its text, checks the allowlist and posts. Once chat.postMessage succeeded it never fails:
 // a permalink it cannot read is left empty, so a caller never retries a message that went out.
 func (s *Service) Send(ctx context.Context, r Request) (Sent, error) {
-	text := Mrkdwn(r.Text)
-	if strings.TrimSpace(text) == "" {
+	if strings.TrimSpace(r.Text) == "" {
 		return Sent{}, errors.New("the message is empty")
 	}
+	if s.Client == nil {
+		return Sent{}, ErrNotLoggedIn
+	}
+	markdown, err := s.Mentions(ctx, r.Text, func(user string) string { return "<@" + user + ">" })
+	if err != nil {
+		return Sent{}, err
+	}
+	text := Mrkdwn(markdown)
 	res, err := s.Resolve(ctx, r)
 	if err != nil {
 		return Sent{}, err
@@ -126,7 +134,7 @@ func (s *Service) Send(ctx context.Context, r Request) (Sent, error) {
 	if s.Log != nil {
 		s.Log("slack_sent source=%s channel=%s ts=%s", r.Source, channel, posted.TS)
 	}
-	sent := Sent{Conversation: res.Conversation, Parent: res.Parent, Text: text, Channel: channel, TS: posted.TS}
+	sent := Sent{Conversation: res.Conversation, Parent: res.Parent, ThreadTS: res.ThreadTS, Text: text, Channel: channel, TS: posted.TS}
 	if link, err := s.Client.Permalink(ctx, channel, posted.TS); err == nil {
 		sent.Permalink = link
 	} else if s.Log != nil {
@@ -165,6 +173,7 @@ type wireMessage struct {
 	TS       string `json:"ts"`
 	ThreadTS string `json:"thread_ts"`
 	Text     string `json:"text"`
+	User     string `json:"user"`
 }
 
 // firstMessage reads conversations.replies ts=<ts> limit=1: the message at ts, or the parent of its thread.

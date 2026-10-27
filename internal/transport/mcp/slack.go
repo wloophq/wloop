@@ -14,9 +14,13 @@ import (
 	"github.com/wloophq/wloop/internal/slack/send"
 )
 
+// Slack posts as the user at once, for the session; session is "" for a
+// caller no session took.
 type Slack interface {
 	LoggedIn() bool
-	Send(ctx context.Context, r send.Request) (send.Sent, error)
+	Send(ctx context.Context, session string, r send.Request) (send.Sent, error)
+	React(ctx context.Context, session string, r send.Reaction) (send.Reacted, error)
+	Edit(ctx context.Context, session string, e send.Edit) (send.Edited, error)
 }
 
 type SlackReader interface {
@@ -52,13 +56,12 @@ const slackSendName = "slack_send_message"
 
 func slackSendTool() tool {
 	return tool{
-		Name:        slackSendName,
-		Description: "Post a message to Slack as the user, at once and without their approval. When it is unclear whether the user wants this message posted in their name, ask them first.",
+		Name: slackSendName,
 		InputSchema: object(map[string]*schema{
-			"target":    str(0, "a message permalink, #channel, channel id, @handle, email or user id"),
-			"text":      str(0, "the message, in Markdown"),
-			"thread":    boolean("reply in the thread; defaults to true for a permalink, false otherwise"),
-			"broadcast": boolean("also send a thread reply to the conversation"),
+			"target":    str(0),
+			"text":      str(0),
+			"thread":    boolean(),
+			"broadcast": boolean(),
 		}, "target", "text"),
 	}
 }
@@ -70,7 +73,7 @@ type slackSendArgs struct {
 	Broadcast bool    `json:"broadcast"`
 }
 
-func (s *Server) slackSend(ctx context.Context, _ string, arguments json.RawMessage) any {
+func (s *Server) slackSend(ctx context.Context, session string, arguments json.RawMessage) any {
 	var a slackSendArgs
 	dec := json.NewDecoder(bytes.NewReader(arguments))
 	dec.DisallowUnknownFields()
@@ -97,7 +100,7 @@ func (s *Server) slackSend(ctx context.Context, _ string, arguments json.RawMess
 	if !s.Slack.LoggedIn() {
 		return text(notLoggedIn(), true)
 	}
-	sent, err := s.Slack.Send(ctx, send.Request{
+	sent, err := s.Slack.Send(ctx, session, send.Request{
 		Target: strings.TrimSpace(*a.Target), Text: *a.Text, Thread: a.Thread, Broadcast: a.Broadcast, Source: "session",
 	})
 	if errors.Is(err, send.ErrNotLoggedIn) {

@@ -258,6 +258,7 @@ var sections = []struct {
 	{builtin.SurfaceStep, "Steps and their arguments"},
 	{builtin.SurfaceDefaults, "Defaults (`defaults.toml`)"},
 	{builtin.SurfaceLabels, "Block headings (`labels.toml`)"},
+	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
 	{builtin.SurfaceConfig, "Configuration (`config.json`)"},
 }

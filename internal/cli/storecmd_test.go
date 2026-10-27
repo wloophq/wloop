@@ -94,11 +94,12 @@ func TestStoreMigrateWithNothingPending(t *testing.T) {
 func TestStoreMigrateRefusesANewerStore(t *testing.T) {
 	t.Parallel()
 	te := storeEnv(t, "a")
-	setStore(t, te.storePath(), `UPDATE meta SET value = '5' WHERE key = 'compatible_version'`, `PRAGMA user_version = 5`)
+	newer := fmt.Sprint(sqlite.SchemaVersion + 1)
+	setStore(t, te.storePath(), `UPDATE meta SET value = '`+newer+`' WHERE key = 'compatible_version'`, `PRAGMA user_version = `+newer)
 	if code := te.runCLI("store", "migrate", "--dry-run"); code != 1 {
 		t.Fatalf("exit %d", code)
 	}
-	want := "is at schema version 5, newer than this release reads (" + schemaV + "); upgrade " + brand.Name + " with `brew upgrade " + brand.Name + "`, or go back to the store from before that upgrade; `" + restoreCommand + "` restores it"
+	want := "is at schema version " + newer + ", newer than this release reads (" + schemaV + "); upgrade " + brand.Name + " with `brew upgrade " + brand.Name + "`, or go back to the store from before that upgrade; `" + restoreCommand + "` restores it"
 	if !strings.Contains(te.err.String(), want) {
 		t.Fatalf("%s", te.err)
 	}

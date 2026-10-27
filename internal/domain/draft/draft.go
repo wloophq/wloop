@@ -13,7 +13,7 @@ import (
 
 type ID int64
 
-type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment"
+type Kind string // "reply", "nudge", "close", "react", "ask_owner", "comment", "edit"
 
 const (
 	Reply    Kind = "reply"
@@ -22,14 +22,15 @@ const (
 	React    Kind = "react"
 	AskOwner Kind = "ask_owner"
 	Comment  Kind = "comment"
+	Edit     Kind = "edit"
 )
 
-var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment}
+var Kinds = []Kind{Reply, Nudge, Close, React, AskOwner, Comment, Edit}
 
 func (k Kind) Valid() bool { return slices.Contains(Kinds, k) }
 
-// ConversationKinds are the kinds a draft on a conversation takes, as an
-// agent names them: all but a review comment.
+// ConversationKinds are the kinds slack_draft offers on a conversation: all
+// but a review comment and an edit, which slack_edit makes at once.
 var ConversationKinds = []Kind{Reply, Nudge, Close, AskOwner, React}
 
 // Emoji says whether a draft of kind k posts an emoji, and no text.
@@ -39,12 +40,14 @@ func (k Kind) Emoji() bool {
 }
 
 // Delivery is how a draft reaches the provider.
-type Delivery string // "message", "reaction", "comment"
+type Delivery string // "message", "reaction", "comment", "edit"
 
 const (
 	Message         Delivery = "message"
 	Reaction        Delivery = "reaction"
 	CommentDelivery Delivery = "comment"
+	// EditDelivery replaces the text of a message the user posted.
+	EditDelivery Delivery = "edit"
 )
 
 // ShapeOf is the purpose and delivery of a draft of kind k.
@@ -54,6 +57,8 @@ func ShapeOf(k Kind) (purpose string, d Delivery) {
 		return string(k), Reaction
 	case Comment:
 		return string(k), CommentDelivery
+	case Edit:
+		return string(k), EditDelivery
 	}
 	return string(k), Message
 }
@@ -65,6 +70,8 @@ func KindOf(purpose string, d Delivery) Kind {
 		return React
 	case CommentDelivery:
 		return Comment
+	case EditDelivery:
+		return Edit
 	}
 	switch k := Kind(purpose); k {
 	case Nudge, Close, AskOwner:
@@ -105,6 +112,9 @@ type Origin struct {
 	Workflow string // the workflow that started the proposing turn (turn.Turn.Workflow), "" none
 	Rule     string // Kind "auto": the core or plugin rule, e.g. "stalled-nudge", "closure", "ask-owner", "github-nudge"
 	Key      string // Kind "auto": the rule's dedupe key, e.g. "stalled-nudge:<entry>:<person key>"
+	// Unit is the unit of the proposing turn when it is not the draft's, such
+	// as a pull request whose turn drafts in a Slack thread; zero when it is.
+	Unit unit.Unit
 }
 
 type Evidence struct {
@@ -148,6 +158,7 @@ type Draft struct {
 	Target   string   // plugin target grammar; "" means the unit itself (its thread, its PR)
 	Text     string   // standard Markdown with mentions as @{<person key>}; the Effects implementation converts both
 	Reaction string   // Kind "react" only: emoji name without colons
+	Replaced string   // Kind "edit" only: the text the edit replaced
 	Original string   // Text as proposed
 	Edited   bool     // Text != Original
 	Origin   Origin

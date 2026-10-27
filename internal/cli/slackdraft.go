@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -12,8 +13,10 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
+	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	slackapi "github.com/wloophq/wloop/internal/slack"
 	"github.com/wloophq/wloop/internal/slack/auth"
 	"github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/transport/mcp"
@@ -46,6 +49,13 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if !s.sender.LoggedIn() {
 		return mcp.DraftResult{}, send.ErrNotLoggedIn
 	}
+	if a.Text != "" {
+		text, err := s.sender.kit.Send.Mentions(ctx, a.Text, func(user string) string { return "@{" + string(slackPlugin) + ":" + user + "}" })
+		if err != nil {
+			return mcp.DraftResult{}, err
+		}
+		a.Text = text
+	}
 	b, ok, err := s.books.BookOf(ctx, turns.Key{Session: handle})
 	if err != nil {
 		return mcp.DraftResult{}, err
@@ -54,11 +64,22 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if ok {
 		t, ok = b.OfSession(handle)
 	}
-	if !ok {
-		return mcp.DraftResult{}, errNoDraftTurn
+	onSlack := ok && b.Unit.Provider == slackPlugin
+	if send.IsPermalink(a.Target) {
+		u, err := s.sender.permalinkUnit(ctx, a.Target)
+		if err != nil {
+			return mcp.DraftResult{}, err
+		}
+		if !onSlack || u != b.Unit {
+			return s.draftOutside(ctx, u, a, sessionOrigin(b, t, u, draft.OriginTurn))
+		}
 	}
-	if b.Unit.Provider != slackPlugin {
-		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts only on a Slack unit", b.Unit.Label())
+	switch {
+	case onSlack:
+	case !ok:
+		return mcp.DraftResult{}, errNoDraftTurn
+	default:
+		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message permalink target", b.Unit.Label())
 	}
 	its := a.Items
 	if len(its) == 0 {
@@ -71,19 +92,56 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	if err := checkEffects(def, string(t.Intent), a.Effects); err != nil {
 		return mcp.DraftResult{}, err
 	}
-	d, err := s.outbox.Propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind), Target: a.Target, Text: a.Text,
-		Reaction: a.Reaction, Effects: a.Effects, Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}})
+	return s.propose(ctx, outbox.Proposal{Unit: b.Unit, Items: its, Entry: turns.EntryOf(*t), Kind: draft.Kind(a.Kind),
+		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Effects: a.Effects,
+		Origin: sessionOrigin(b, t, b.Unit, draft.OriginTurn)})
+}
+
+// draftOutside proposes a on u, the unit of its permalink target, which is
+// not the unit of the session's turn: it answers none of that unit's items
+// and declares no effect.
+func (s *slackDrafts) draftOutside(ctx context.Context, u unit.Unit, a mcp.DraftArgs, origin draft.Origin) (mcp.DraftResult, error) {
+	switch {
+	case len(a.Items) > 0:
+		return mcp.DraftResult{}, errors.New("items: a draft outside the turn's Slack unit answers none of its items")
+	case len(a.Effects) > 0:
+		return mcp.DraftResult{}, errors.New("effects: a draft outside the turn's Slack unit declares none")
+	}
+	return s.propose(ctx, outbox.Proposal{Unit: u, Kind: draft.Kind(a.Kind),
+		Target: a.Target, Text: a.Text, Reaction: a.Reaction, Origin: origin})
+}
+
+func (s *slackDrafts) propose(ctx context.Context, p outbox.Proposal) (mcp.DraftResult, error) {
+	d, err := s.outbox.Propose(ctx, p)
 	if err != nil {
 		if errors.Is(err, send.ErrNotLoggedIn) {
 			s.sender.loggedOut()
 		}
 		return mcp.DraftResult{}, err
 	}
+	return s.result(ctx, d), nil
+}
+
+// sessionOrigin is the origin of a post the session of book b makes on u: its
+// turn t, on b's unit when that is not u; a session with no turn has kind
+// session.
+func sessionOrigin(b dturn.Book, t *dturn.Turn, u unit.Unit, kind draft.OriginKind) draft.Origin {
+	if t == nil {
+		return draft.Origin{Kind: draft.OriginSession}
+	}
+	o := draft.Origin{Kind: kind, TurnSeq: t.Seq, Intent: string(t.Intent), Workflow: t.Workflow}
+	if b.Unit != u {
+		o.Unit = b.Unit
+	}
+	return o
+}
+
+func (s *slackDrafts) result(ctx context.Context, d draft.Draft) mcp.DraftResult {
 	where, err := s.pub.Where(ctx, d)
 	if err != nil {
 		where = ""
 	}
-	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}, nil
+	return mcp.DraftResult{ID: int64(d.ID), Unit: d.Unit.Label(), Conversation: where, State: string(d.State)}
 }
 
 // intentDef is the loaded definition of intent; the zero Def, which allows
@@ -126,40 +184,97 @@ func (s *slackDrafts) checkItems(ctx context.Context, u unit.Unit, ids []string)
 	return nil
 }
 
-// sentPurpose is the purpose of a post a session made itself.
-const sentPurpose = "reply"
+// The purposes of the posts a session makes itself.
+const (
+	sentPurpose      = "reply"
+	reactedPurpose   = "react"
+	unreactedPurpose = "unreact"
+	editedPurpose    = "edit"
+)
 
-// sessionSends records a session's slack_send_message post as a sent draft
-// when it landed in a tracked unit; it never changes or fails the post.
+// sessionSends records each post a session makes itself as a sent draft, on
+// the unit it landed in, tracked or not, with the session's turn as its
+// origin; it never changes or fails the post.
 type sessionSends struct {
 	token   func() (auth.Token, error)
+	client  *slackapi.Client
 	landing slacksource.Landing
+	books   sessionBooks
 	outbox  *outbox.Service
 	log     func(format string, args ...any)
 }
 
-func (r sessionSends) record(ctx context.Context, req send.Request, sent send.Sent) {
+func (r sessionSends) post(ctx context.Context, session string, req send.Request, sent send.Sent) {
+	where := func(ctx context.Context, team string) (unit.Unit, error) {
+		thread := cmp.Or(sent.ThreadTS, sent.TS)
+		u, ok, err := r.landing.UnitOf(ctx, team, sent.Channel, sent.TS, sent.ThreadTS)
+		if err != nil || ok {
+			return u, err
+		}
+		return dslack.ThreadUnit(team, sent.Channel, thread), nil
+	}
+	r.record(ctx, session, where, outbox.Proposal{Purpose: sentPurpose, Delivery: draft.Message, Target: req.Target, Text: req.Text},
+		draft.Evidence{Ref: sent.TS, Permalink: sent.Permalink})
+}
+
+func (r sessionSends) reaction(ctx context.Context, session string, req send.Reaction, got send.Reacted) {
+	purpose := reactedPurpose
+	if req.Remove {
+		purpose = unreactedPurpose
+	}
+	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction, Target: req.Permalink,
+		Reaction: got.Name}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+}
+
+func (r sessionSends) edit(ctx context.Context, session string, req send.Edit, got send.Edited) {
+	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: req.Permalink,
+		Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+}
+
+func (r sessionSends) permalinkUnit(permalink string) func(context.Context, string) (unit.Unit, error) {
+	return func(ctx context.Context, team string) (unit.Unit, error) {
+		return r.landing.PermalinkUnit(ctx, r.client, team, permalink)
+	}
+}
+
+// record keeps p as a sent draft on the unit where says the post landed in.
+func (r sessionSends) record(ctx context.Context, session string, where func(ctx context.Context, team string) (unit.Unit, error),
+	p outbox.Proposal, ev draft.Evidence) {
 	ctx = context.WithoutCancel(ctx)
 	tok, err := r.token()
 	if err != nil {
-		r.logf("slack_sent_unrecorded channel=%s ts=%s error=%v", sent.Channel, sent.TS, err)
+		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
 		return
 	}
-	u, ok, err := r.landing.UnitOf(ctx, tok.Team, sent.Channel, sent.TS, slacksource.ThreadOf(sent.Permalink))
+	u, err := where(ctx, tok.Team)
 	if err != nil {
-		r.logf("slack_sent_unrecorded channel=%s ts=%s error=%v", sent.Channel, sent.TS, err)
+		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
 		return
 	}
-	if !ok {
-		return
-	}
-	d, err := r.outbox.RecordSent(ctx, outbox.Proposal{Unit: u, Purpose: sentPurpose, Delivery: draft.Message, Target: req.Target, Text: req.Text},
-		draft.Evidence{Ref: sent.TS, Permalink: sent.Permalink})
+	p.Unit, p.Origin = u, r.origin(ctx, session, u)
+	d, err := r.outbox.RecordSent(ctx, p, ev)
 	if err != nil {
-		r.logf("slack_sent_unrecorded channel=%s ts=%s error=%v", sent.Channel, sent.TS, err)
+		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
 		return
 	}
 	r.logf("slack_sent_recorded draft=%d unit=%s", d.ID, u)
+}
+
+// origin is the session's origin for a post on u; a book that cannot be
+// read leaves the turn out.
+func (r sessionSends) origin(ctx context.Context, session string, u unit.Unit) draft.Origin {
+	if session == "" || r.books == nil {
+		return draft.Origin{Kind: draft.OriginSession}
+	}
+	b, ok, err := r.books.BookOf(ctx, turns.Key{Session: session})
+	if err != nil || !ok {
+		return draft.Origin{Kind: draft.OriginSession}
+	}
+	t, ok := b.OfSession(session)
+	if !ok {
+		return draft.Origin{Kind: draft.OriginSession}
+	}
+	return sessionOrigin(b, t, u, draft.OriginSession)
 }
 
 func (r sessionSends) logf(format string, args ...any) {

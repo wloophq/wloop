@@ -9,7 +9,7 @@ description: What the loop protects against, what it does not, and the settings 
 
 A round publishes on GitHub through `gh`, with your login. On Slack it proposes drafts that the Outbox posts with your token, or posts at once through a tool the loop serves to the session, which tells the agent to ask you first when it is unclear whether you want the message posted in your name. {{name}} does not try to keep an agent from an identity that is already yours, on GitHub or on Slack.
 
-The Outbox, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, a tool that posts to Slack, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
+The Outbox, the approval policies and the refusals below are workflow controls. They hold against an agent's mistakes, and they keep text from other people from approving a draft: no agent's or thread's text sets a draft's approval (see [What waits for you](/concepts/approval/)). A draft whose policy waits for you is held, whoever steered it. They do not hold against an agent, steered or not, that acts as you by another path: `gh`, a tool that posts, reacts or edits on Slack, the daemon's socket or your Keychain. To keep an agent from your identities, run it where they are not: a virtual machine or another user account that does not mount your home directory or forward your SSH agent or credentials. {{name}} does not set this up for you.
 
 ## The same-user boundary
 
@@ -38,6 +38,15 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 
 - **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `github.address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
 - **Review rounds open the pull request's checkout.** An automated review round starts Claude Code in a worktree at the pull request's head. Claude Code loads that checkout's project settings, so a pull request that changes `.claude/settings.json` (hooks, permissions), `.mcp.json`, `CLAUDE.md` or `AGENTS.md` can run code or steer the agent as you. Claude Code's folder trust is recorded for the repository and covers every pull request worktree of it; where project settings are off, trusting a blocked round from the cockpit trusts that worktree alone. Automated review rounds skip forks and authors outside the members, collaborators, owners and `trusted_authors`, so the author needs push access to the repository; a round you start by hand has no such filter, but its session never loads the checkout's project settings for such a pull request.
+
+## What agents read from Slack
+
+Every agent session the MCP server serves reads Slack as you, within what your user token can read:
+
+- `slack_read` reads a stored unit, or the thread of any channel message whose permalink the agent holds, private channels and Slack Connect channels included; a direct message or a group DM only when {{name}} tracks it.
+- `slack_search` runs Slack's search over every channel you can read, and returns the permalink, author, time and first line of each match. An agent needs no permalink handed to it to find a channel's messages: one query reaches any channel you are in. Direct messages and group DMs are left out unless tracked, the same line `slack_read` draws, and the result says how many it left out.
+
+Reading is as you, like posting: {{name}} keeps no channel from a session, and the line on direct messages is a workflow control, not a barrier, since the agent can reach your token by the paths above. What an agent reads this way is other people's text, and reaches it as data it may follow: a message found by search can ask for anything, and no such text approves a draft. `slack.post_allowlist` bounds where any post lands; turning the Slack plugin off (`slack.enabled = false`) removes these tools.
 
 ## The settings that limit it
 

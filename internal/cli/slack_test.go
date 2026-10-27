@@ -490,7 +490,7 @@ func TestRequestLogFromConfig(t *testing.T) {
 		lines = append(lines, fmt.Sprintf(format, args...))
 	}
 	sender := wiredSlack(t, te, logf)
-	if _, err := sender.Send(context.Background(), sendRequest("C0000000001", "hi")); err != nil {
+	if _, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi")); err != nil {
 		t.Fatal(err)
 	}
 	if slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, "slack_call") }) {
@@ -500,7 +500,7 @@ func TestRequestLogFromConfig(t *testing.T) {
 	te.cfg.Slack.RequestLog = true
 	lines = nil
 	sender = wiredSlack(t, te, logf)
-	if _, err := sender.Send(context.Background(), sendRequest("C0000000001", "hi")); err != nil {
+	if _, err := sender.Send(context.Background(), "", sendRequest("C0000000001", "hi")); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(lines, "slack_call method=chat.postMessage status=200") {

@@ -46,10 +46,12 @@ type Draft struct {
 	Effects  []string `json:"effects"`
 	Target   string   `json:"target"`
 	// Where names the conversation or person the draft posts to; "" when its publisher could not tell.
-	Where     string        `json:"where"`
-	Text      string        `json:"text"`
-	Reaction  string        `json:"reaction"`
-	Original  string        `json:"original"`
+	Where    string `json:"where"`
+	Text     string `json:"text"`
+	Reaction string `json:"reaction"`
+	Original string `json:"original"`
+	// Replaced is the text a sent edit replaced.
+	Replaced  string        `json:"replaced,omitempty"`
 	Edited    bool          `json:"edited"`
 	Origin    DraftOrigin   `json:"origin"`
 	Approval  DraftApproval `json:"approval"`
@@ -82,6 +84,9 @@ type DraftOrigin struct {
 	Intent   string `json:"intent"`
 	Workflow string `json:"workflow"`
 	Rule     string `json:"rule"`
+	// Unit is the label of the proposing turn's unit when it is not the
+	// draft's, "" when it is.
+	Unit string `json:"unit,omitempty"`
 }
 
 type DraftApproval struct {

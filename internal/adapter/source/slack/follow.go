@@ -71,3 +71,16 @@ func parsePermalink(s string) (conv, ts, threadTS string, err error) {
 	}
 	return conv, ts, threadTS, nil
 }
+
+// PermalinkUnit is the unit holding a permalink's message in team: the
+// tracked DM segment or thread it lands in, else its thread.
+func (l Landing) PermalinkUnit(ctx context.Context, c *slackapi.Client, team, permalink string) (unit.Unit, error) {
+	conv, ts, threadTS, err := parsePermalink(permalink)
+	if err != nil {
+		return unit.Unit{}, err
+	}
+	if u, ok, err := l.UnitOf(ctx, team, conv, ts, threadTS); err != nil || ok {
+		return u, err
+	}
+	return FollowUnit(ctx, c, team, permalink)
+}

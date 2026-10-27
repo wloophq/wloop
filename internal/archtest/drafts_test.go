@@ -12,8 +12,8 @@ import (
 
 const draftPkg = module + "internal/domain/draft"
 
-// draftKindConsts are the kinds a draft took before purpose and delivery.
-var draftKindConsts = []string{"Reply", "Nudge", "Close", "React", "AskOwner", "Comment"}
+// draftKindConsts are the kinds, the words agents and the API read a draft by.
+var draftKindConsts = []string{"Reply", "Nudge", "Close", "React", "AskOwner", "Comment", "Edit"}
 
 // draftShapeHolders are the types whose Purpose, Delivery and Kind fields
 // name a draft's shape.

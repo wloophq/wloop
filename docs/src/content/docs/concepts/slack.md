@@ -29,13 +29,18 @@ Spend is capped: $0.10 per call, $3.00 and 500 calls per local day; a day's cap 
 
 ## The agent tools
 
-While Slack is configured and the plugin is on, the daemon's MCP server serves three tools to agent sessions:
+While Slack is configured and the plugin is on, the daemon's MCP server serves these tools to agent sessions:
 
-| Tool | Does |
-|---|---|
-| `slack_read` | reads the messages of a unit (`slack:<key>`) or a permalink, 50 by default, up to 200 |
-| `slack_draft` | proposes a draft (`reply`, `nudge`, `close`, `ask_owner`, `react`) on the turn's Slack unit; it posts nothing, and the draft waits in the Outbox |
-| `slack_send_message` | posts as you, now, without a prompt (`install` allows it), and tells the agent to ask you first when it is unclear whether you want the message posted in your name; a post in a tracked unit is recorded as a sent draft; it refuses `@channel`, `@here`, `@everyone` and group mentions |
+| Tool | Does | Slack calls and scopes |
+|---|---|---|
+| `slack_read` | reads the messages of a unit (`slack:<key>`) or a permalink, 50 by default, up to 200 | `conversations.replies`, `conversations.info` (`channels:history`, `groups:history`, `channels:read`, `groups:read`) |
+| `slack_search` | searches the messages you can read, newest first, with a query and optional `channel`, `from`, `after`, `before` and `limit` (20 by default, up to 100); one line per message: permalink, author, time in your time zone and first line; a direct message shows only when tracked | `search.messages` (`search:read`); `conversations.info` for a channel id and `users.lookupByEmail` for an email (`users:read.email`) |
+| `slack_draft` | proposes a draft (`reply`, `nudge`, `close`, `ask_owner`, `react`) on the turn's Slack unit, or in the thread of a message permalink, any thread; it posts nothing, and the draft waits in the Outbox | once approved, `chat.postMessage` (`chat:write`) or `reactions.add` (`reactions:write`) |
+| `slack_react` | adds a reaction to the message of a permalink, or with `remove` takes yours off, now, without a prompt (`install` allows it) | `reactions.add`, `reactions.remove` (`reactions:write`); `conversations.info` |
+| `slack_edit` | replaces the text of one of your own messages, now, without a prompt (`install` allows it); it refuses a message someone else posted, and the record keeps the text it replaced | `conversations.history` or `conversations.replies` to read the message and its author, then `chat.update` (`chat:write`) |
+| `slack_send_message` | posts as you, now, without a prompt (`install` allows it), and tells the agent to ask you first when it is unclear whether you want the message posted in your name; a post in a tracked unit is recorded as a sent draft; it refuses `@channel`, `@here`, `@everyone` and group mentions | `chat.postMessage` (`chat:write`) |
+
+A draft `slack_draft` proposes on a thread that is not the turn's unit, such as a team's thread from a pull request's turn, names that turn and its unit, answers no item, declares no effect and waits for your approval. Every post `slack_send_message`, `slack_react` and `slack_edit` make is recorded in the Outbox as a sent draft, on the thread or segment it landed in, tracked or not, with the turn that made it. A post in a direct message no segment covers yet is recorded on its message, and moves onto the segment that covers it once the extraction segments the conversation. In the text of `slack_draft`, `slack_edit` and `slack_send_message`, an `@handle`, an `@<user id>` or an email that names one person of the workspace becomes a mention of them; one that names nobody, or whose lookup fails, stays text, one several people hold is refused, and code spans, code blocks, links and URLs are left as written. An edit also clears the message's blocks, so the new text is what Slack shows. A draft keeps the mention as `@{slack:<user id>}`, so the Outbox shows whom it pings; `outbox show` of a recorded edit shows the text it replaced. Resolving a handle reads `users.list` (`users:read`), an email `users.lookupByEmail` (`users:read.email`). Every scope above is in the app manifest and the login's scopes; none is new.
 
 From a terminal, `{{command}} slack send <target> <text>` shows the message and asks before it posts, unless `--yes`. A target is a permalink (a reply in its thread), `#channel`, a channel id, `@handle`, an email or a user id. A reply in a thread goes through the Outbox as a draft of yours, approved when you say yes; the other targets, `--thread=false` and `--broadcast` post directly. `{{command}} outbox new <permalink> <text>` writes the reply as a draft that waits for your approval instead. `slack.post_allowlist`, when not empty, is the only set of channels or users any post may reach.
 

@@ -72,7 +72,7 @@ func TestShapeAndKindRoundTrip(t *testing.T) {
 		delivery Delivery
 	}{
 		Reply: {"reply", Message}, Nudge: {"nudge", Message}, Close: {"close", Message},
-		React: {"react", Reaction}, AskOwner: {"ask_owner", Message}, Comment: {"comment", CommentDelivery},
+		React: {"react", Reaction}, AskOwner: {"ask_owner", Message}, Comment: {"comment", CommentDelivery}, Edit: {"edit", EditDelivery},
 	}
 	for _, k := range Kinds {
 		p, d := ShapeOf(k)

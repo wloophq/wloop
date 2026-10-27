@@ -54,6 +54,9 @@ func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.P
 		}
 		return waitPol, nil
 	}
+	if !o.Unit.IsZero() {
+		u = o.Unit
+	}
 	intent, workflow, ok, err := r.Manifests.Turn(ctx, u, o.TurnSeq)
 	switch {
 	case err != nil:

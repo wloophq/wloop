@@ -26,11 +26,11 @@ const (
 	draftFields = `provider, unit_key, items, entry, kind, target, text, reaction, original, edited,
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome,
-	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at`
+	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced`
 	draftSelect = `SELECT id, rev, ` + draftFields + ` FROM drafts`
 	draftOrder  = ` ORDER BY id DESC`
-	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
+	insertDraft = `INSERT INTO drafts (` + draftFields + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateDraft = `UPDATE drafts SET (` + draftFields + `, rev) = (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, rev + 1)
 	WHERE id = ? AND state = ? AND rev = ?`
 )
 
@@ -61,7 +61,7 @@ func draftArgs(d draft.Draft) []any {
 		string(o.Kind), o.TurnSeq, o.Intent, o.Workflow, o.Rule, o.Key, string(a.Mode), int64(a.Window), draftTime(d.Deadline), string(d.State),
 		ev.Ref, ev.Permalink, draftTime(ev.At), d.Error, d.Reason, string(w.Policy), w.Reason, string(w.Outcome),
 		draftTime(d.CreatedAt), draftTime(d.UpdatedAt), draftTime(d.SendingAt), d.Purpose, string(d.Delivery), string(effects),
-		draftTime(d.EffectsAppliedAt)}
+		draftTime(d.EffectsAppliedAt), string(o.Unit.Provider), o.Unit.Key, d.Replaced}
 }
 
 // shaped is d with the purpose and delivery of its kind when it names
@@ -80,19 +80,19 @@ func shaped(d draft.Draft) draft.Draft {
 
 func scanDraft(row scanner) (draft.Draft, error) {
 	var d draft.Draft
-	var provider, list, kind, originKind, mode, state, policy, outcome, delivery, effects string
+	var provider, list, kind, originKind, mode, state, policy, outcome, delivery, effects, originProvider string
 	var window int64
 	var deadline, evAt, created, updated, sending, applied string
 	if err := row.Scan(&d.ID, &d.Rev, &provider, &d.Unit.Key, &list, &d.Entry, &kind, &d.Target, &d.Text, &d.Reaction, &d.Original, &d.Edited,
 		&originKind, &d.Origin.TurnSeq, &d.Origin.Intent, &d.Origin.Workflow, &d.Origin.Rule, &d.Origin.Key, &mode, &window, &deadline, &state,
 		&d.Evidence.Ref, &d.Evidence.Permalink, &evAt, &d.Error, &d.Reason, &policy, &d.Would.Reason, &outcome,
-		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied); err != nil {
+		&created, &updated, &sending, &d.Purpose, &delivery, &effects, &applied, &originProvider, &d.Origin.Unit.Key, &d.Replaced); err != nil {
 		return draft.Draft{}, err
 	}
 	d.Unit.Provider, d.Kind, d.Origin.Kind, d.State = unit.ProviderID(provider), draft.Kind(kind), draft.OriginKind(originKind), draft.State(state)
 	d.Approval = draft.Approval{Mode: draft.ApprovalMode(mode), Window: time.Duration(window)}
 	d.Would.Policy, d.Would.Outcome = draft.WouldPolicy(policy), draft.Outcome(outcome)
-	d.Delivery = draft.Delivery(delivery)
+	d.Delivery, d.Origin.Unit.Provider = draft.Delivery(delivery), unit.ProviderID(originProvider)
 	if err := json.Unmarshal([]byte(list), &d.Items); err != nil {
 		return draft.Draft{}, fmt.Errorf("the items of draft %d: %w", d.ID, err)
 	}

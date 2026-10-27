@@ -164,7 +164,7 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	origin := d.Origin.Kind
 	switch {
 	case d.Origin.TurnSeq > 0:
-		origin += fmt.Sprintf(" %d (%s)", d.Origin.TurnSeq, d.Origin.Intent)
+		origin += fmt.Sprintf(" %d (%s)", d.Origin.TurnSeq, d.Origin.Intent) + originOn(d)
 	case d.Origin.Rule != "":
 		origin += " " + d.Origin.Rule
 	}
@@ -193,6 +193,12 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 	if d.Edited && text == d.Text {
 		fmt.Fprintln(w, "as proposed:")
 		for _, l := range strings.Split(d.Original, "\n") {
+			fmt.Fprintln(w, "  "+l)
+		}
+	}
+	if d.Replaced != "" {
+		fmt.Fprintln(w, "replaced:")
+		for _, l := range strings.Split(d.Replaced, "\n") {
 			fmt.Fprintln(w, "  "+l)
 		}
 	}

@@ -626,3 +626,18 @@ func TestFinalTextKeepsOnlyConvertedMentions(t *testing.T) {
 		}
 	}
 }
+
+func TestAnEditIsNeverPublishedAsADraft(t *testing.T) {
+	ps := newPubSlack(t)
+	d := threadDraft(draft.Edit, "new text")
+	d.Target = "https://acme.slack.com/archives/" + pubConv + "/p" + strings.ReplaceAll(pubReply, ".", "")
+	if err := ps.publisher().Validate(context.Background(), d); err == nil || !strings.Contains(err.Error(), "edit") {
+		t.Fatalf("Validate = %v", err)
+	}
+	if _, err := ps.publisher().Publish(context.Background(), d); err == nil || len(ps.calls("chat.postMessage")) != 0 {
+		t.Fatalf("Publish = %v", err)
+	}
+	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
+		t.Fatalf("Where = %q %v", where, err)
+	}
+}
