@@ -1,0 +1,103 @@
+package outbox
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/unit"
+)
+
+// placing names the target of a draft proposed without one.
+type placing struct {
+	*fakeEffects
+	target string
+	refuse error
+	asked  []draft.Draft
+}
+
+func (p *placing) Place(ctx context.Context, d draft.Draft) (string, error) {
+	p.asked = append(p.asked, d)
+	return p.target, p.refuse
+}
+
+func withPlacer(e *env, target string) *placing {
+	p := &placing{fakeEffects: e.fx, target: target}
+	e.svc.Effects = func(unit.ProviderID) (port.Effects, error) { return p, nil }
+	return p
+}
+
+var segment = unit.Unit{Provider: "slack", Key: "T000AAA/D000AAA/seg/s1"}
+
+func TestADraftWithNoTargetStoresItsPlacement(t *testing.T) {
+	e := newEnv()
+	pl := withPlacer(e, "msg:D000AAA/1700000000.000100")
+	p := reply("done")
+	p.Unit, p.Items = segment, []string{"i1"}
+	d := e.propose(p)
+	if d.Target != "msg:D000AAA/1700000000.000100" || e.get(d.ID).Target != d.Target {
+		t.Fatalf("target %q, stored %q", d.Target, e.get(d.ID).Target)
+	}
+	if len(pl.asked) != 1 || pl.asked[0].Unit != segment || len(pl.asked[0].Items) != 1 {
+		t.Fatalf("asked %+v", pl.asked)
+	}
+}
+
+func TestAnExplicitTargetIsNotPlaced(t *testing.T) {
+	e := newEnv()
+	pl := withPlacer(e, "msg:elsewhere")
+	p := reply("done")
+	p.Unit, p.Target = segment, "U000BBB"
+	if d := e.propose(p); d.Target != "U000BBB" || len(pl.asked) != 0 {
+		t.Fatalf("target %q, asked %d", d.Target, len(pl.asked))
+	}
+}
+
+func TestAnEmptyPlacementKeepsTheUnitItself(t *testing.T) {
+	e := newEnv()
+	withPlacer(e, "")
+	if d := e.propose(reply("on it")); d.Target != "" {
+		t.Fatalf("target %q", d.Target)
+	}
+}
+
+func TestADraftThePluginCannotPlaceIsRefused(t *testing.T) {
+	e := newEnv()
+	pl := withPlacer(e, "")
+	pl.refuse = errors.New("names neither a target nor items")
+	p := reply("done")
+	p.Unit = segment
+	if _, err := e.svc.Propose(ctx, p); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "neither a target nor items") {
+		t.Fatalf("propose: %v", err)
+	}
+	if got, _ := e.store.List(ctx, Filter{}); len(got) != 0 {
+		t.Fatalf("stored %v", got)
+	}
+}
+
+func TestAPlacementIsInsideTheUnit(t *testing.T) {
+	e := newEnv()
+	withPolicy(e, none)
+	withPlacer(e, "msg:D000AAA/1700000000.000100")
+	p := reply("done")
+	p.Unit, p.Items = segment, []string{"i1"}
+	d := e.propose(p)
+	if d.Approval.Mode != draft.Send || d.State != draft.Approved || d.Would.Policy != draft.WouldRelease {
+		t.Fatalf("%+v", d)
+	}
+}
+
+func TestApprovingADraftProposedUnplacedPlacesIt(t *testing.T) {
+	e := newEnv()
+	p := reply("done")
+	p.Unit, p.Items = segment, []string{"i1"}
+	d := e.propose(p)
+	withPlacer(e, "msg:D000AAA/1700000000.000100")
+	got, err := e.svc.Approve(ctx, d.ID, nil)
+	if err != nil || got.Target != "msg:D000AAA/1700000000.000100" || e.get(d.ID).Target != got.Target {
+		t.Fatalf("approve: %+v %v", got, err)
+	}
+}

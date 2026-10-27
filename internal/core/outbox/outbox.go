@@ -149,20 +149,21 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 		return draft.Draft{}, err
 	}
 	approval := dec.Approval
-	if targetsOutside(d) && approval.Mode != draft.DryRun {
+	outside := targetsOutside(d)
+	if outside && approval.Mode != draft.DryRun {
 		approval = waiting
 	}
 	d.Approval = approval
 	if dup, ok, err := s.duplicate(ctx, d, p.RepeatAfter, now); err != nil || ok {
 		return dup, err
 	}
-	if err := s.publishable(ctx, d); err != nil {
+	if err := s.publishable(ctx, &d); err != nil {
 		return draft.Draft{}, err
 	}
 	if err := s.implemented(d); err != nil {
 		return draft.Draft{}, err
 	}
-	d.Would = s.would(ctx, d, dec)
+	d.Would = s.would(ctx, d, dec, outside)
 	switch approval.Mode {
 	case draft.Delay:
 		d.Deadline = now.Add(approval.Window)
@@ -343,11 +344,11 @@ func targetsOutside(d draft.Draft) bool {
 }
 
 // would is what auto-send would do with d: a comment only once a rule that
-// names comment delivery released it.
-func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision) draft.Would {
+// names comment delivery released it. outside is targetsOutside of d as proposed, before its placement.
+func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision, outside bool) draft.Would {
 	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldWait, Reason: reason} }
 	switch {
-	case targetsOutside(d):
+	case outside:
 		return hold("targets outside its unit")
 	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginAuto:
 		return hold(fmt.Sprintf("proposed by %s", d.Origin.Kind))
@@ -368,14 +369,22 @@ func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision) 
 	return draft.Would{Policy: draft.WouldRelease, Reason: fmt.Sprintf("a %s %s from a %s over confident items", d.Purpose, d.Delivery, d.Origin.Kind)}
 }
 
-// publishable refuses d when its provider has no enabled publisher, or its Validator refuses d.
-func (s *Service) publishable(ctx context.Context, d draft.Draft) error {
+// publishable refuses d when its provider has no enabled publisher, its Placer cannot place d
+// proposed with no target, or its Validator refuses d. A placement is stored in d.Target.
+func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
 	fx, err := s.effects(d.Unit.Provider)
 	if err != nil {
 		return err
 	}
+	if pl, ok := fx.(port.Placer); ok && strings.TrimSpace(d.Target) == "" {
+		target, err := pl.Place(ctx, *d)
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
+		d.Target = target
+	}
 	if v, ok := fx.(port.Validator); ok {
-		if err := v.Validate(ctx, d); err != nil {
+		if err := v.Validate(ctx, *d); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	}
@@ -457,7 +466,7 @@ func (s *Service) Approve(ctx context.Context, id draft.ID, text *string) (draft
 			return draft.Draft{}, err
 		}
 	}
-	if err := s.publishable(ctx, d); err != nil {
+	if err := s.publishable(ctx, &d); err != nil {
 		return draft.Draft{}, err
 	}
 	d.State, d.Would.Outcome = draft.Approved, draft.OutcomeAsIs
@@ -490,7 +499,7 @@ func (s *Service) Retry(ctx context.Context, id draft.ID, confirm bool) (draft.D
 	if !confirm && (d.Error == NotConfirmed || strings.HasPrefix(d.Error, mayHaveBeenPosted)) {
 		return draft.Draft{}, fmt.Errorf("draft %d: %w", id, ErrNeedsConfirm)
 	}
-	if err := s.publishable(ctx, d); err != nil {
+	if err := s.publishable(ctx, &d); err != nil {
 		return draft.Draft{}, err
 	}
 	d.State, d.Error = draft.Approved, ""

@@ -34,3 +34,10 @@ type Locator interface {
 type Deliverer interface {
 	Delivers(d draft.Delivery) draft.Delivery
 }
+
+// Placer is optional: an Effects value that implements it names, when a draft
+// is proposed with no target, where it posts, which the draft then stores as
+// its Target; "" keeps the unit itself. An error refuses the draft.
+type Placer interface {
+	Place(ctx context.Context, d draft.Draft) (string, error)
+}

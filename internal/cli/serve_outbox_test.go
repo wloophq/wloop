@@ -238,3 +238,20 @@ func TestAPinnedPublisherPostsAsItsPluginDelivers(t *testing.T) {
 		t.Errorf("a publisher that declares nothing: %s", got)
 	}
 }
+
+type placingPublisher struct{ recordingPublisher }
+
+func (*placingPublisher) Place(context.Context, draft.Draft) (string, error) {
+	return "https://slack.com/archives/D0000000001/p1700000000000100", nil
+}
+
+func TestAPinnedPublisherPlacesAsItsPluginPlaces(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	if got, err := (pinnedEffects{Effects: &placingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "https://slack.com/archives/D0000000001/p1700000000000100" {
+		t.Errorf("a placing publisher: %q %v", got, err)
+	}
+	if got, err := (pinnedEffects{Effects: &recordingPublisher{}}).Place(ctx, draft.Draft{}); err != nil || got != "" {
+		t.Errorf("a publisher that places nothing: %q %v", got, err)
+	}
+}
