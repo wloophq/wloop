@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // repliedKinds are the kinds of entry the user replies on: those about a unit's conversation.
@@ -140,6 +141,9 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 	if err != nil {
 		return draft.Draft{}, err
 	}
+	if err := s.targetIn(ctx, strings.TrimSpace(c.Target), c.Unit); err != nil {
+		return draft.Draft{}, err
+	}
 	s.draftMu.Lock()
 	defer s.draftMu.Unlock()
 	o := s.deps.Outbox
@@ -185,4 +189,25 @@ func userKind(c api.DraftCreate) string {
 		return api.DraftReact
 	}
 	return api.DraftReply
+}
+
+// targetIn refuses a draft target that does not land in u: the target is a
+// message of u, as the plugins resolve it, or none.
+func (s *Server) targetIn(ctx context.Context, target string, u unit.Unit) error {
+	if target == "" {
+		return nil
+	}
+	if s.deps.Resolve == nil {
+		return badRequest{fmt.Sprintf("no plugin resolves the target %q", target)}
+	}
+	got, ok, err := s.deps.Resolve(ctx, target)
+	switch {
+	case err != nil:
+		return err
+	case !ok:
+		return badRequest{fmt.Sprintf("the target %q names no message", target)}
+	case got != u:
+		return badRequest{fmt.Sprintf("the target %q is a message of %s, not of %s", target, got.Label(), u.Label())}
+	}
+	return nil
 }

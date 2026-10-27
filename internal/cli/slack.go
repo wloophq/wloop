@@ -201,7 +201,7 @@ func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, 
 	case err != nil:
 		return unit.Unit{}, err
 	case !ok || u.Provider != slackPlugin:
-		return unit.Unit{}, fmt.Errorf("the daemon runs no Slack plugin to resolve %s; restart it after enabling Slack", message)
+		return unit.Unit{}, fmt.Errorf("the daemon resolves no Slack unit for %s: is its Slack plugin running and logged in? Restart the daemon after enabling Slack", message)
 	}
 	return u, nil
 }
@@ -418,7 +418,7 @@ func (e *Env) slackLogout(ctx context.Context, kit *slackKit, args []string) err
 
 func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, args []string) error {
 	fs := quietFlags("slack send")
-	thread := fs.Bool("thread", true, "reply in the thread of a permalink target; --thread=false posts to its conversation")
+	thread := fs.Bool("thread", true, "reply in the thread of a message ref or permalink target; --thread=false posts to its conversation")
 	broadcast := fs.Bool("broadcast", false, "also send a thread reply to the conversation")
 	yes := fs.Bool("yes", false, "post without asking")
 	pos, err := parseInterspersed(fs, args)

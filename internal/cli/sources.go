@@ -42,7 +42,8 @@ func (e *Env) resolvers() map[unit.ProviderID]unit.Resolver {
 	return map[unit.ProviderID]unit.Resolver{dslack.Provider: slackResolver{e}}
 }
 
-// slackResolver resolves a Slack message ref or permalink to its thread.
+// slackResolver resolves a Slack message ref or permalink to its direct
+// message segment or thread.
 type slackResolver struct{ e *Env }
 
 func (s slackResolver) Resolve(ctx context.Context, address string) (string, bool, error) {
