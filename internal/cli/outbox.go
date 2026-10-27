@@ -24,7 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|permalink> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
 
 // outboxInteractive says whether e reads from a terminal; tests replace it.
 var outboxInteractive = func(e *Env) bool {

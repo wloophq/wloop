@@ -379,10 +379,16 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 
 	w.te.out.Reset()
-	if code := w.te.run("slack", "send", sessChannel, "top level", "--yes"); code != 0 || len(w.drafts(t)) != 1 {
+	if code := w.te.run("slack", "send", sessChannel+"/"+sessReply, "by ref", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 approved") {
+		t.Fatalf("a ref: exit %d: %s %s", code, w.te.out, w.te.err)
+	}
+	if ds := w.drafts(t); len(ds) != 2 || ds[1].Unit != dslack.ThreadUnit("T000", sessChannel, sessParent) {
+		t.Fatalf("a ref's drafts %+v", ds)
+	}
+	if code := w.te.run("slack", "send", sessChannel, "top level", "--yes"); code != 0 || len(w.drafts(t)) != 2 {
 		t.Fatalf("a post to a channel: exit %d, drafts %d: %s", code, len(w.drafts(t)), w.te.err)
 	}
-	if code := w.te.run("slack", "send", link, "to the channel", "--thread=false", "--yes"); code != 0 || len(w.drafts(t)) != 1 {
+	if code := w.te.run("slack", "send", link, "to the channel", "--thread=false", "--yes"); code != 0 || len(w.drafts(t)) != 2 {
 		t.Fatalf("--thread=false: exit %d, drafts %d: %s", code, len(w.drafts(t)), w.te.err)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")); n != 3 {

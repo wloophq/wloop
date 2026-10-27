@@ -81,6 +81,8 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 		{"follow", "https://acme.slack.com/archives/C000/p1700000050000200?thread_ts=1700000000.000100&cid=C000", true},
 		{"follow", "https://acme.slack.com/archives/C000/p1700000050000200", true},
 		{"unfollow", "https://acme.slack.com/archives/C000/p1700000050000200", false},
+		{"follow", "C000/1700000050.000200", true},
+		{"unfollow", "C000/1700000050.000200", false},
 	} {
 		te.out.Reset()
 		te.err.Reset()
@@ -94,8 +96,8 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 			t.Fatalf("after slack %s %s: watched %v", c.verb, c.link, !c.watched)
 		}
 	}
-	if n := len(te.srv.Calls("conversations.replies")); n != 4 {
-		t.Fatalf("conversations.replies calls %d, want one per permalink without thread_ts", n)
+	if n := len(te.srv.Calls("conversations.replies")); n != 6 {
+		t.Fatalf("conversations.replies calls %d, want one per ref or permalink without thread_ts", n)
 	}
 	assertNoSlackToken(t, te.out.String()+te.err.String())
 }

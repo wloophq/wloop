@@ -151,7 +151,7 @@ func (e *Env) sourcePlugins() []source.Plugin {
 }
 
 // slackFollow sends the track (follow) or untrack (unfollow) of the thread a
-// permalink names: the parent's thread when it names a reply.
+// message ref or permalink names: the parent's thread when it names a reply.
 func (e *Env) slackFollow(ctx context.Context, kit *slackKit, verb string, args []string) error {
 	if len(args) != 1 {
 		return usageError{usage: slackUsage}
@@ -174,23 +174,20 @@ func (e *Env) slackFollow(ctx context.Context, kit *slackKit, verb string, args 
 	return err
 }
 
-// isSlackPermalink says whether s is a Slack message permalink.
-func isSlackPermalink(s string) bool { return slacksource.IsPermalink(s) }
-
-// slackPermalinkUnit is the thread unit a permalink names, with the Slack plugin enabled.
-func (e *Env) slackPermalinkUnit(ctx context.Context, permalink string) (unit.Unit, error) {
+// slackMessageUnit is the thread unit a message ref or permalink names, with the Slack plugin enabled.
+func (e *Env) slackMessageUnit(ctx context.Context, message string) (unit.Unit, error) {
 	cfg, err := e.loadConfig()
 	if err != nil {
 		return unit.Unit{}, err
 	}
 	if !cfg.PluginEnabled(string(slackPlugin)) {
-		return unit.Unit{}, fmt.Errorf("%s is a Slack permalink, and the Slack plugin is disabled (slack.enabled is false)", permalink)
+		return unit.Unit{}, fmt.Errorf("%s names a Slack message, and the Slack plugin is disabled (slack.enabled is false)", message)
 	}
-	return slackThreadOf(ctx, e.slack.kit(cfg.Slack, nil), permalink)
+	return slackThreadOf(ctx, e.slack.kit(cfg.Slack, nil), message)
 }
 
-// slackThreadOf is the thread unit permalink names in the logged-in team.
-func slackThreadOf(ctx context.Context, kit *slackKit, permalink string) (unit.Unit, error) {
+// slackThreadOf is the thread unit a message ref or permalink names in the logged-in team.
+func slackThreadOf(ctx context.Context, kit *slackKit, message string) (unit.Unit, error) {
 	tok, err := kit.Store.Load()
 	if errors.Is(err, auth.ErrNotLoggedIn) {
 		return unit.Unit{}, fmt.Errorf("%w; run %q", err, brand.Command+" slack login")
@@ -198,7 +195,7 @@ func slackThreadOf(ctx context.Context, kit *slackKit, permalink string) (unit.U
 	if err != nil {
 		return unit.Unit{}, err
 	}
-	return slacksource.FollowUnit(ctx, kit.Client, tok.Team, permalink)
+	return slacksource.FollowUnit(ctx, kit.Client, tok.Team, message)
 }
 
 func (e *Env) slackNow() time.Time {
@@ -439,7 +436,7 @@ func (e *Env) slackSend(ctx context.Context, cfg config.Config, kit *slackKit, a
 	return err
 }
 
-// slackSendDraft posts req, a reply in the thread of a permalink, through the Outbox: a draft of the user's
+// slackSendDraft posts req, a reply in the thread of a message ref or permalink, through the Outbox: a draft of the user's
 // on the thread's unit, approved once they say yes, or at once with yes.
 func (e *Env) slackSendDraft(ctx context.Context, kit *slackKit, req send.Request, yes bool) error {
 	u, err := slackThreadOf(ctx, kit, req.Target)

@@ -274,8 +274,8 @@ Drafts waiting for your approval, and yours.
 ```sh
 {{command}} outbox [list] [--color <when>]
 {{command}} outbox show <id> [--color <when>]
-{{command}} outbox new <unit|permalink> <markdown> [--send [--yes]]
-{{command}} outbox new <unit|permalink> --react <emoji> [--send [--yes]]
+{{command}} outbox new <unit|message> <markdown> [--send [--yes]]
+{{command}} outbox new <unit|message> --react <emoji> [--send [--yes]]
 {{command}} outbox approve <id> [--text <markdown>] [--yes]
 {{command}} outbox retry <id> [--confirm] [--yes]
 {{command}} outbox edit <id> <markdown>

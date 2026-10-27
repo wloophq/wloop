@@ -144,7 +144,7 @@ func helpGroups(manager string) []helpGroup {
 				Summary: "Drafts waiting for your approval, and yours",
 				Usage: []string{
 					"outbox [list] [--color <when>]", "outbox show <id> [--color <when>]",
-					"outbox new <unit|permalink> <markdown> [--send [--yes]]", "outbox new <unit|permalink> --react <emoji> [--send [--yes]]",
+					"outbox new <unit|message> <markdown> [--send [--yes]]", "outbox new <unit|message> --react <emoji> [--send [--yes]]",
 					"outbox approve <id> [--text <markdown>] [--yes]", "outbox retry <id> [--confirm] [--yes]",
 					"outbox edit <id> <markdown>", "outbox discard <id> [--reason <why>]",
 				},
