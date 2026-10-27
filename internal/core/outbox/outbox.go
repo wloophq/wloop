@@ -633,10 +633,32 @@ func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 		return nil
 	}
 	id, ok := gtd.IDOf(d.Origin.Unit)
+	posted := d.Unit
+	if onEntry, isEntry := gtd.IDOf(d.Unit); isEntry {
+		landed, found, err := s.landed(ctx, d)
+		if err != nil || !found {
+			return err
+		}
+		id, ok, posted = onEntry, true, landed
+	}
 	if !ok || !s.Results.AttachesPosts(d.Origin.Intent) {
 		return nil
 	}
-	return s.Results.Attach(ctx, id, d.Unit)
+	return s.Results.Attach(ctx, id, posted)
+}
+
+// landed is the unit the post of d, a draft on an entry sent to a target of
+// another provider, landed in; false when its publisher cannot say.
+func (s *Service) landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error) {
+	fx, err := s.effects(s.PublisherOf(d))
+	if err != nil {
+		return unit.Unit{}, false, nil
+	}
+	l, ok := fx.(port.Lander)
+	if !ok {
+		return unit.Unit{}, false, nil
+	}
+	return l.Landed(ctx, d)
 }
 
 // posts are the deliveries that post a message; a reaction or an edit is none.

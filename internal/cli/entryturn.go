@@ -86,14 +86,18 @@ func (a envActions) PrepareAhead(ctx context.Context, name string, u unit.Unit, 
 	if err != nil {
 		return err
 	}
-	repo, err := runRepo(unitRun{def: d, r: turn.Request{Inputs: c.Inputs}})
+	if cfg.AgentHome == "" {
+		cfg.AgentHome = c.AgentHome
+	}
+	run := unitRun{def: d, cfg: cfg, r: turn.Request{Inputs: c.Inputs}, manager: c.Manager}
+	repo, err := runRepo(run)
 	if err != nil || repo == "" {
 		return err
 	}
 	owner, repoName, _ := strings.Cut(repo, "/")
-	cfg = cfg.For(owner, repoName)
-	if cfg.AgentHome == "" {
-		cfg.AgentHome = c.AgentHome
+	cfg = scoped(run)
+	if _, err := e.chooseManager(ctx, cfg, intentOptions(d, roundOptions{unit: u})); err != nil {
+		return err
 	}
 	checkout, cloned, err := e.repoCheckout(ctx, cfg, repo)
 	if err != nil || !cloned || !cfg.TrustsClones(owner, repoName) {

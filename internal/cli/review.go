@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -264,6 +265,16 @@ func (e *Env) resolveCheckout(ctx context.Context, cfg config.Config, repos []ws
 	return repo, err
 }
 
+// clones serializes the clones into one folder: a start racing another
+// waits for its clone instead of taking a half-written one for a checkout.
+var clones sync.Map
+
+func lockClone(path string) func() {
+	mu, _ := clones.LoadOrStore(path, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	return mu.(*sync.Mutex).Unlock
+}
+
 // checkout is the main checkout of ref's repository: one of repos, else
 // the folder of projects_dir named after it, cloned there when absent and
 // refused when it holds another repository; cloned says it was cloned now.
@@ -275,6 +286,8 @@ func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.
 		return wsdomain.Repo{}, false, fmt.Errorf("%s/%s is not registered in %s and projects_dir is not set in %s; set it to the directory where repositories should be cloned", ref.Owner, ref.Repo, e.managerDisplay(), e.ConfigPath)
 	}
 	path := filepath.Join(cfg.ProjectsDir, ref.Repo)
+	unlock := lockClone(path)
+	defer unlock()
 	_, err := os.Stat(path)
 	switch {
 	case os.IsNotExist(err):
@@ -286,7 +299,7 @@ func (e *Env) checkout(ctx context.Context, cfg config.Config, repos []wsdomain.
 	case err != nil:
 		return wsdomain.Repo{}, false, err
 	}
-	if host, name := gitx.ParseRemote(gitx.RemoteURL(path, "origin")); !strings.EqualFold(host+"/"+name, remoteKey) {
+	if _, name := gitx.ParseRemote(gitx.RemoteURL(path, "origin")); !strings.EqualFold(name, ref.Owner+"/"+ref.Repo) {
 		return wsdomain.Repo{}, false, fmt.Errorf("%s exists and is not a checkout of %s/%s; move it, or clone %s/%s yourself and add it to %s", path, ref.Owner, ref.Repo, ref.Owner, ref.Repo, e.managerDisplay())
 	}
 	return wsdomain.Repo{Path: path, RemoteKey: remoteKey}, false, nil

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
@@ -183,6 +184,9 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if t := m.Target; t != nil {
 		if t.Missing != "" && t.Missing != dintent.TargetCapture {
 			s.add("target.missing", "%q is not %q", t.Missing, dintent.TargetCapture)
+		}
+		if t.Missing == dintent.TargetCapture && d.Provider != (gtd.Codec{}).Provider() {
+			s.add("target.missing", "capture makes an entry the turn's unit, and the intent serves %s units, not entry ones", d.Provider)
 		}
 		d.Target = dintent.Target{Missing: t.Missing, Title: s.text("target.title", t.Title, "")}
 	}

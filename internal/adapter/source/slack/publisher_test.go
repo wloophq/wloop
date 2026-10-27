@@ -653,6 +653,20 @@ func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
 	}
 }
 
+func TestAPostOnAnotherProvidersUnitLandsInTheThreadItStarts(t *testing.T) {
+	ps := newPubSlack(t)
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Delivery: draft.Message, Target: pubConv,
+		Evidence: draft.Evidence{Ref: "1700000300.000100", Permalink: "https://acme.slack.com/archives/" + pubConv + "/p1700000300000100"}}
+	u, ok, err := ps.publisher().Landed(context.Background(), d)
+	if err != nil || !ok || u != dslack.ThreadUnit(team, pubConv, "1700000300.000100") {
+		t.Fatalf("Landed = %v %v %v", u, ok, err)
+	}
+	d.Evidence.Permalink = ""
+	if _, ok, _ := ps.publisher().Landed(context.Background(), d); ok {
+		t.Fatal("a post without a permalink landed")
+	}
+}
+
 func TestTakesTheTargetsSlackPostsTo(t *testing.T) {
 	p := &Publisher{}
 	for target, want := range map[string]bool{

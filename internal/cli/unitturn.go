@@ -103,6 +103,9 @@ func (e *Env) runOnUnit(ctx context.Context, run unitRun) error {
 	if err := e.roundReady(); err != nil {
 		return err
 	}
+	if run.def.WorkspaceRepo != nil {
+		run.cfg = scoped(run)
+	}
 	opts := intentOptions(run.def, roundOptions{allowUserActive: run.r.Trigger == turn.ByHand, resumeOf: run.resumeOf, unit: u})
 	ws, shared, err := e.runWorkspace(ctx, run, opts)
 	if err != nil {
@@ -168,12 +171,21 @@ func (e *Env) runWorkspace(ctx context.Context, run unitRun, opts roundOptions) 
 		}
 		return wsdomain.Workspace{}, false, err
 	}
-	owner, repo, _ := strings.Cut(name, "/")
-	run.cfg = run.cfg.For(owner, repo)
-	if run.manager != "" {
-		run.cfg.WorkspaceManagers = []string{run.manager}
-	}
 	return e.repoWorkspace(ctx, run, name, opts)
+}
+
+// scoped is run's configuration for its repository's project, with the
+// request's workspace manager in place of the configured ones.
+func scoped(run unitRun) config.Config {
+	cfg := run.cfg
+	if repo, err := runRepo(run); err == nil && repo != "" {
+		owner, name, _ := strings.Cut(repo, "/")
+		cfg = cfg.For(owner, name)
+	}
+	if run.manager != "" {
+		cfg.WorkspaceManagers = []string{run.manager}
+	}
+	return cfg
 }
 
 // keptRepo is inputs with the repository input d's newest turn on u kept,
@@ -265,7 +277,7 @@ func (e *Env) repoWorkspace(ctx context.Context, run unitRun, name string, opts 
 	req := workspace.CreateRequest{RepoID: in.ID, Name: cmp.Or(wsName, unitWorkspaceName(u)), Unit: u, DefaultBase: true, Parent: run.parent}
 	ws, err := e.createWorkspace(ctx, m, req, repo.Path)
 	if err == nil && ws.ParentDropped {
-		fmt.Fprintf(e.Out, "%s keeps %s under no parent: it lists no worktree at %s\n", e.displayOf([]string{m.Name()}), ws.DisplayName, run.parent)
+		fmt.Fprintf(e.Out, "%s did not place %s under %s\n", e.displayOf([]string{m.Name()}), ws.DisplayName, run.parent)
 	}
 	return ws, false, err
 }

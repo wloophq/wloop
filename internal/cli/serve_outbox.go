@@ -119,6 +119,13 @@ func (p pinnedEffects) Takes(target string) bool {
 	return ok && t.Takes(target)
 }
 
+func (p pinnedEffects) Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error) {
+	if l, ok := p.Effects.(port.Lander); ok {
+		return l.Landed(ctx, d)
+	}
+	return unit.Unit{}, false, nil
+}
+
 func (p pinnedEffects) Place(ctx context.Context, d draft.Draft) (string, error) {
 	if pl, ok := p.Effects.(port.Placer); ok {
 		return pl.Place(ctx, d)

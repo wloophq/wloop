@@ -121,9 +121,37 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	fmt.Fprintf(e.Out, "captured %s\n", u)
 	p.guidance = ""
 	if err := askOn(ctx, e, d, u, p); err != nil {
-		return fmt.Errorf("%w; run it again on the entry with %s %s %s", err, brand.Command, d.Name, u)
+		return fmt.Errorf("%w; run it again on the entry with %s", err, retryLine(retryArgs(d, u, p)))
 	}
 	return nil
+}
+
+// retryLine is args as a shell line.
+func retryLine(args []string) string {
+	words := make([]string, len(args))
+	for i, a := range args {
+		words[i] = shell.Word(a)
+	}
+	return strings.Join(words, " ")
+}
+
+// retryArgs is the command that runs d again on u with p's flags.
+func retryArgs(d dintent.Def, u unit.Unit, p intentArgs) []string {
+	args := []string{brand.Command, string(d.Name), u.String()}
+	for _, in := range d.Inputs {
+		if v, ok := p.inputs[in.Name].(string); ok && v != "" && in.Flag != "" {
+			args = append(args, in.Flag, v)
+		} else if b, ok := p.inputs[in.Name].(bool); ok && b && in.Flag != "" {
+			args = append(args, in.Flag)
+		}
+	}
+	if p.manager != "" {
+		args = append(args, flagManager, p.manager)
+	}
+	if p.parent != "" {
+		args = append(args, flagParent, p.parent)
+	}
+	return args
 }
 
 // runIntentOn runs d on u, a unit of a provider other than GitHub that d serves: headless when d's

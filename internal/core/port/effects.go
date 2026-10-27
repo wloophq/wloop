@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Effects publishes approved drafts of one provider. The core calls Publish
@@ -40,6 +41,13 @@ type Deliverer interface {
 // stores as its Target; "" keeps the unit itself. An error refuses the draft.
 type Placer interface {
 	Place(ctx context.Context, d draft.Draft) (string, error)
+}
+
+// Lander is optional: an Effects value that implements it names the unit the
+// post of a sent draft landed in, for a draft whose own unit publishes
+// nothing, such as a GTD entry's posted to a channel; false when it cannot.
+type Lander interface {
+	Landed(ctx context.Context, d draft.Draft) (unit.Unit, bool, error)
 }
 
 // Targeter is optional: an Effects value that implements it says whether it

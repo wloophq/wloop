@@ -1039,6 +1039,7 @@ func TestStartKeysAreChecked(t *testing.T) {
 		"repo_optional needs repo_input": {`workspace = { repo_input = "repo", repo_optional = true,`, `workspace = { repo = "acme/api", repo_optional = true,`, "workspace.repo_optional"},
 		"target.missing names capture":   {`missing = "capture"`, `missing = "skip"`, "target.missing"},
 		"workspace.name reads its facts": {`{{slug .entry.title}}`, `{{.pr.slug}}`, "workspace.name"},
+		"capture needs an entry intent":  {`provider = "entry"`, `provider = "github"`, "target.missing"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

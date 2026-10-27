@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/shell"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/gitx"
@@ -153,14 +154,18 @@ func TestStartRefusesWhatItCannotWorkIn(t *testing.T) {
 		unchanged(t, file)
 	})
 	t.Run("a manager that cannot host", func(t *testing.T) {
-		te, m, _, _ := startEnv(t)
+		te, m, _, file := startEnv(t)
 		var clones []string
 		te.gh.clone = cloneAs(t, "acme/api", &clones)
 		if code := te.run("start", "--repo", "acme/api", "--manager", "nowhere", "fix it"); code == 0 || !strings.Contains(te.err.String(), "nowhere") {
 			t.Fatalf("exit %d: %s", code, te.err)
 		}
-		if len(m.Creates) != 0 || len(m.Prompts) != 0 {
-			t.Fatalf("creates %+v, prompts %+v", m.Creates, m.Prompts)
+		if len(clones) != 0 || len(m.Creates) != 0 || len(m.Prompts) != 0 {
+			t.Fatalf("clones %q, creates %+v, prompts %+v", clones, m.Creates, m.Prompts)
+		}
+		unchanged(t, file)
+		if !strings.Contains(te.err.String(), "start entry:e-") || !strings.Contains(te.err.String(), "--repo acme/api --manager nowhere") {
+			t.Fatalf("the retry lacks the flags: %s", te.err)
 		}
 	})
 	t.Run("an existing clone is not trusted", func(t *testing.T) {
@@ -241,5 +246,59 @@ func TestAStartAgainOnTheEntryReusesItsRepositoryAndWorktree(t *testing.T) {
 	}
 	if m.Prompts[1].Handle != m.Prompts[0].Handle {
 		t.Fatalf("the second start ran in %s, the first in %s", m.Prompts[1].Handle, m.Prompts[0].Handle)
+	}
+}
+
+func TestStartRunsInTheProjectsAgentHome(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	home, file := untrustedHome(t)
+	te.cfg.Projects = []config.Project{{Match: "acme/*", AgentHome: home, TrustClones: true}}
+	te.serveEntries(t)
+	var clones []string
+	te.gh.clone = cloneAs(t, "acme/api", &clones)
+	if code := te.run("start", "--repo", "acme/api", "fix it"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if raw, _ := os.ReadFile(file); !strings.Contains(string(raw), "/api\": {") {
+		t.Fatalf("the project's home does not trust the clone:\n%s", raw)
+	}
+	if len(m.Commands) != 1 || !strings.HasPrefix(m.Commands[0], "CLAUDE_CONFIG_DIR="+shell.Quote(home)+" ") {
+		t.Fatalf("commands %q, want them in %s", m.Commands, home)
+	}
+}
+
+func TestStartTakesACheckoutWhoseOriginIsAnSSHAlias(t *testing.T) {
+	te, m, projects, _ := startEnv(t)
+	var clones []string
+	path := filepath.Join(projects, "api")
+	cloneAs(t, "acme/api", &clones)("acme/api", path)
+	if out, err := exec.Command(gitx.Binary(), "-C", path, "remote", "set-url", "origin", "git@github-work:acme/api.git").CombinedOutput(); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if code := te.run("start", "--repo", "acme/api", "fix it"); code != 0 || len(m.Creates) != 1 {
+		t.Fatalf("exit %d, creates %+v: %s", code, m.Creates, te.err)
+	}
+}
+
+func TestAHiddenStartActionStillRefusesADerivedEntry(t *testing.T) {
+	te, m, _, _ := startEnv(t)
+	raw, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "intent.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := strings.Replace(string(raw), "[action]\n", "[action]\nwhen = 'entry.captured_by_user'\n", 1)
+	manifest = regexp.MustCompile(`(?s)\[\[action.refuse\]\].*?why  = "[^"]*"\n`).ReplaceAllString(manifest, "")
+	body, err := os.ReadFile(filepath.Join("..", "..", "profiles", "default", "intents", "start", "instructions.md.tmpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userProfile(t, te, map[string]string{"intents/start/intent.toml": manifest, "intents/start/instructions.md.tmpl": string(body)})
+	te.serveEntries(t)
+	derived, err := te.Env.gtd.Open(context.Background(), coregtd.OpenRequest{Kind: gtd.KindMessage, Title: "ship the export", Origin: gtd.OriginMessage})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || len(m.Prompts) != 0 {
+		t.Fatalf("exit %d, prompts %+v: %s", code, m.Prompts, te.err)
 	}
 }

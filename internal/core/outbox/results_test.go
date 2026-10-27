@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -90,5 +91,43 @@ func TestOnlyAPostOfAnAttachingEntryTurnAttaches(t *testing.T) {
 				t.Fatalf("attached = %v, want nothing", r.attached)
 			}
 		})
+	}
+}
+
+// landing is a publisher that takes "#" targets and says which unit its post landed in.
+type landing struct {
+	taking
+	landed unit.Unit
+}
+
+func (l landing) Landed(context.Context, draft.Draft) (unit.Unit, bool, error) {
+	return l.landed, true, nil
+}
+
+func TestADraftOnTheEntryAttachesTheUnitItsPostLandedIn(t *testing.T) {
+	e := newEnv()
+	posted := unit.Unit{Provider: "chat", Key: "T1/C1/1.5"}
+	chat := &fakeEffects{}
+	e.svc.Effects = func(p unit.ProviderID) (port.Effects, error) {
+		if p == "chat" {
+			return landing{taking{chat, func(t string) bool { return t == "#general" }}, posted}, nil
+		}
+		return nil, ErrDisabled
+	}
+	e.svc.Targets = []unit.ProviderID{"chat"}
+	r := &postResults{intents: []string{"begin"}}
+	e.svc.Results = r
+	p := onEntry("#general")
+	p.Unit = gtd.UnitOf("e-1")
+	p.Origin = draft.Origin{Kind: draft.OriginSession, TurnSeq: 3, Intent: "begin"}
+	d := e.propose(p)
+	if _, err := e.svc.Approve(ctx, d.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.attached) != 1 || r.attached[0] != posted {
+		t.Fatalf("attached = %v, want %v", r.attached, posted)
 	}
 }

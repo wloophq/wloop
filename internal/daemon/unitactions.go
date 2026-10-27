@@ -70,12 +70,16 @@ func (s *Server) entryRefusal(ctx context.Context, l *intentload.Loaded, name st
 	if err != nil {
 		return "", notFound{err.Error()}
 	}
+	d, ok := l.Registry.Get(dintent.Name(name))
+	if !ok || !(d.ProviderOrDefault() == u.Provider || slices.Contains(d.Providers, u.Provider)) {
+		return "", nil
+	}
 	for _, st := range entryIntentActions(l, e) {
-		if st.ID == name && !st.Enabled {
+		if st.ID == name {
 			return st.Reason, nil
 		}
 	}
-	return "", nil
+	return NotOffered(name, u), nil
 }
 
 // unitIntent admits d on u, a unit that is no pull request: d serves u's
