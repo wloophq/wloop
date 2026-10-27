@@ -31,6 +31,7 @@ type Resolved struct {
 type Sent struct {
 	Conversation string
 	Parent       string
+	ThreadTS     string // the thread replied in, "" when not a reply
 	Text         string // as posted, mrkdwn
 	Permalink    string
 	Channel, TS  string
@@ -133,7 +134,7 @@ func (s *Service) Send(ctx context.Context, r Request) (Sent, error) {
 	if s.Log != nil {
 		s.Log("slack_sent source=%s channel=%s ts=%s", r.Source, channel, posted.TS)
 	}
-	sent := Sent{Conversation: res.Conversation, Parent: res.Parent, Text: text, Channel: channel, TS: posted.TS}
+	sent := Sent{Conversation: res.Conversation, Parent: res.Parent, ThreadTS: res.ThreadTS, Text: text, Channel: channel, TS: posted.TS}
 	if link, err := s.Client.Permalink(ctx, channel, posted.TS); err == nil {
 		sent.Permalink = link
 	} else if s.Log != nil {

@@ -77,8 +77,17 @@ func (p *Publisher) Validate(ctx context.Context, d draft.Draft) error {
 	return err
 }
 
-// Where names the conversation d would post to.
+// Where names the conversation d would post to, or, for a recorded edit, the
+// conversation of the message it replaced.
 func (p *Publisher) Where(ctx context.Context, d draft.Draft) (string, error) {
+	if d.Delivery == draft.EditDelivery {
+		if p.Send == nil || p.Send.Client == nil {
+			return "", send.ErrNotLoggedIn
+		}
+		no := false
+		res, err := p.Send.Resolve(ctx, send.Request{Target: d.Target, Thread: &no, Source: "draft"})
+		return res.Conversation, err
+	}
 	pl, err := p.prepare(ctx, d)
 	if err != nil {
 		return "", err

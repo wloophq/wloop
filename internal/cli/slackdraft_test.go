@@ -678,3 +678,16 @@ func TestPostingOutsideATurn(t *testing.T) {
 		})
 	}
 }
+
+func TestAReactionOnAReplyPermalinkIsRecordedOnItsThread(t *testing.T) {
+	t.Parallel()
+	w := newSessionWiring(t)
+	w.st.srv.Handle("reactions.add", func(url.Values) any { return map[string]any{} })
+	reply := "https://acme.slack.com/archives/" + sessThreaded + "/p" + strings.ReplaceAll(sessReply, ".", "")
+	if got, isErr := w.callTool(t, "", draftHandle, "slack_react", `{"permalink":"`+reply+`","emoji":"eyes"}`); isErr {
+		t.Fatalf("slack_react = %q", got)
+	}
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].Unit != dslack.ThreadUnit("T000", sessThreaded, sessParent) {
+		t.Fatalf("records %+v", ds)
+	}
+}

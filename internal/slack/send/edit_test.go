@@ -35,7 +35,7 @@ func TestEditReplacesTheUsersMessageAndKeepsWhatItReplaced(t *testing.T) {
 		t.Fatalf("Edit = %+v", got)
 	}
 	ups := f.slack.Calls("chat.update")
-	if len(ups) != 1 || ups[0].Get("channel") != "C100" || ups[0].Get("ts") != "1700000100.000200" || ups[0].Get("text") != got.Text {
+	if len(ups) != 1 || ups[0].Get("channel") != "C100" || ups[0].Get("ts") != "1700000100.000200" || ups[0].Get("text") != got.Text || ups[0].Get("blocks") != "[]" {
 		t.Fatalf("chat.update %v", ups)
 	}
 	assertNoPost(t, f)

@@ -431,6 +431,7 @@ func TestSentDescribesThePost(t *testing.T) {
 	want := send.Sent{
 		Conversation: "#general",
 		Parent:       "Parent question",
+		ThreadTS:     "1700000000.123456",
 		Text:         "*done* &amp; shipped",
 		Permalink:    "https://example.slack.com/archives/C100/p1800000000000001",
 		Channel:      "C100",

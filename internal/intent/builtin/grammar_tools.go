@@ -14,8 +14,8 @@ var Tools = []Value{
 	{Name: "slack_read", Doc: "Reads a Slack thread or conversation."},
 	{Name: "slack_search", Doc: "Searches the Slack messages the user can read."},
 	{Name: "slack_draft", Doc: "Proposes a Slack message or reaction for the user's approval."},
-	{Name: "slack_react", Doc: "Proposes a reaction on a Slack message for the user's approval."},
-	{Name: "slack_edit", Doc: "Proposes an edit of one of the user's Slack messages for the user's approval."},
+	{Name: "slack_react", Doc: "Adds or removes a reaction on a Slack message as the user, now."},
+	{Name: "slack_edit", Doc: "Replaces the text of one of the user's Slack messages, now."},
 }
 
 // ToolData is what a tools.toml text reads.

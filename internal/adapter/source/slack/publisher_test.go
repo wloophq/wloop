@@ -637,4 +637,7 @@ func TestAnEditIsNeverPublishedAsADraft(t *testing.T) {
 	if _, err := ps.publisher().Publish(context.Background(), d); err == nil || len(ps.calls("chat.postMessage")) != 0 {
 		t.Fatalf("Publish = %v", err)
 	}
+	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
+		t.Fatalf("Where = %q %v", where, err)
+	}
 }

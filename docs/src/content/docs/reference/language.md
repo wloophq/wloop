@@ -303,8 +303,8 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
   - `slack_draft`: Proposes a Slack message or reaction for the user's approval.
-  - `slack_react`: Proposes a reaction on a Slack message for the user's approval.
-  - `slack_edit`: Proposes an edit of one of the user's Slack messages for the user's approval.
+  - `slack_react`: Adds or removes a reaction on a Slack message as the user, now.
+  - `slack_edit`: Replaces the text of one of the user's Slack messages, now.
 - `<name>.description` (template): What the tool does and when to call it, over the tool data. Required.
 - `<name>.params` (table by name): A parameter's description, by its path: a nested one as "record.state", an array's element as "items[]".
 - `<name>.params.<name>` (template): The parameter's description, over the tool data.

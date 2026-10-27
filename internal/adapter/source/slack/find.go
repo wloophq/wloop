@@ -56,7 +56,7 @@ func (r *Reader) Search(ctx context.Context, q SearchQuery) (string, error) {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return "", fmt.Errorf("slack search match: %w", err)
 		}
-		if m.Channel.IsIM || m.Channel.IsMPIM {
+		if m.Channel.IsIM || m.Channel.IsMPIM || strings.HasPrefix(m.Channel.ID, "D") {
 			units, err := r.Segments.UnitsFor(ctx, m.Channel.ID, m.TS)
 			if err != nil {
 				return "", err
@@ -119,7 +119,7 @@ func (r *Reader) searchQuery(ctx context.Context, q SearchQuery) (string, error)
 	case c == "":
 	case strings.HasPrefix(c, "#"):
 		parts = append(parts, "in:"+c)
-	case conversationR.MatchString(c):
+	case conversationR.MatchString(c) && !strings.HasPrefix(c, "D"):
 		info, err := r.Client.ConversationInfo(ctx, c)
 		if err != nil {
 			return "", err

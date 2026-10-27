@@ -115,9 +115,11 @@ func (c *Client) PostMessage(ctx context.Context, a PostArgs) (Posted, error) {
 	return Posted{Channel: out.Channel, TS: out.TS}, nil
 }
 
-// UpdateMessage replaces the text of the message at ts in channel (chat.update).
+// UpdateMessage replaces the text of the message at ts in channel
+// (chat.update); its blocks go, since Slack keeps a message's blocks unless
+// the update replaces them, and a client renders the blocks over the text.
 func (c *Client) UpdateMessage(ctx context.Context, channel, ts, text string) error {
-	return c.Call(ctx, "chat.update", url.Values{"channel": {channel}, "ts": {ts}, "text": {text}}, nil)
+	return c.Call(ctx, "chat.update", url.Values{"channel": {channel}, "ts": {ts}, "text": {text}, "blocks": {"[]"}}, nil)
 }
 
 func (c *Client) Permalink(ctx context.Context, channel, ts string) (string, error) {

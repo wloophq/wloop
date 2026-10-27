@@ -3,6 +3,7 @@ package send_test
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -24,6 +25,9 @@ func TestMentionsResolveHandlesEmailsAndUserIDs(t *testing.T) {
 		"@here and @channel are not people":          "@here and @channel are not people",
 		"scoped @types/node and @{slack:U001} stay":  "scoped @types/node and @{slack:U001} stay",
 		"a deactivated @gone stays":                  "a deactivated @gone stays",
+		"@WIP hold, deploy at @UTC midnight":         "@WIP hold, deploy at @UTC midnight",
+		"see https://social.example/@alice now":      "see https://social.example/@alice now",
+		"[@alice](https://x.example) and <@U001>":    "[@alice](https://x.example) and <@U001>",
 	} {
 		got, err := f.svc.Mentions(context.Background(), in, slackToken)
 		if err != nil || got != want {
@@ -40,5 +44,23 @@ func TestSendResolvesMentions(t *testing.T) {
 	mustSend(t, f, send.Request{Target: "#general", Text: "@alice **shipped**"})
 	if got := onlyPost(t, f).Get("text"); got != "<@U001> *shipped*" {
 		t.Fatalf("posted %q", got)
+	}
+}
+
+func TestMentionsReadTheUserListingOnceAndNeverFailOnALookup(t *testing.T) {
+	f := newFixture(t, newWorkspace())
+	got, err := f.svc.Mentions(context.Background(), "@nobody @ghost @nope and @alice", slackToken)
+	if err != nil || got != "@nobody @ghost @nope and <@U001>" {
+		t.Fatalf("%q %v", got, err)
+	}
+	if n := len(f.slack.Calls("users.list")); n > 2 {
+		t.Fatalf("users.list called %d times for one text", n)
+	}
+	f = newFixture(t, newWorkspace())
+	for _, m := range []string{"users.list", "users.lookupByEmail"} {
+		f.slack.Handle(m, func(url.Values) any { return map[string]any{"ok": false, "error": "internal_error"} })
+	}
+	if got, err := f.svc.Mentions(context.Background(), "@alice and bob@example.com", slackToken); err != nil || got != "@alice and bob@example.com" {
+		t.Fatalf("a failing lookup: %q %v", got, err)
 	}
 }

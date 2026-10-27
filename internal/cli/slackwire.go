@@ -39,7 +39,7 @@ func (m mcpEndpoint) wireSlack(srv *mcp.Server, d daemon.Deps, cfg config.Config
 		}
 		sender.landing = slacksource.LandingOver(db)
 		srv.SlackDraft = &slackDrafts{sender: sender, books: books, items: d.Items, outbox: d.Outbox, pub: pub, intents: m.intents}
-		sender.records = &sessionSends{token: sender.kit.Store.Load, landing: sender.landing, books: books, outbox: d.Outbox, log: m.log}
+		sender.records = &sessionSends{token: sender.kit.Store.Load, client: sender.kit.Client, landing: sender.landing, books: books, outbox: d.Outbox, log: m.log}
 	}
 }
 
