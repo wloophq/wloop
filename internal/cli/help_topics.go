@@ -298,9 +298,9 @@ func helpGroups(manager string) []helpGroup {
 			{
 				Names:    []string{"profile schema"},
 				Summary:  "The JSON Schemas of the profile files, for editors",
-				Usage:    []string{"profile schema [--workflow|--actions|--config]"},
+				Usage:    []string{"profile schema [--workflow|--actions|--gtd|--config]"},
 				About:    "Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.",
-				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--config", "The schema of config.json"}},
+				Flags:    []helpFlag{{"--workflow", "The schema of workflow.toml"}, {"--actions", "The schema of actions.toml"}, {"--gtd", "The schema of gtd.toml"}, {"--config", "The schema of config.json"}},
 				Examples: []string{"profile schema > intent.schema.json", "profile schema --config > config.schema.json"},
 				Docs:     "reference/language",
 			},

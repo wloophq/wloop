@@ -99,6 +99,8 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
+	// GTD are the GTD verbs' and views' texts from gtd.toml.
+	GTD GTDTexts
 	// EmptyRefusal is what a [[refuse]] case whose why renders empty says,
 	// from defaults.toml.
 	EmptyRefusal string
@@ -179,8 +181,9 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		if len(broken) == 0 {
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
-			l.Actions, l.Tools = actions, tools
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems)
+			gtdTexts, gtdProblems := loadGTD(layers, bundled)
+			l.Actions, l.Tools, l.GTD = actions, tools, gtdTexts
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, gtdProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems

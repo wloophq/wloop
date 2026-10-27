@@ -181,6 +181,16 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `<name>.input.label` (string): The input's name.
 - `<name>.input.help` (string): What to write, shown in the empty input.
 
+## GTD verbs and views (`gtd.toml`)
+
+- `verbs` (table): The verbs an entry offers, by verb.
+- `verbs.<name>` (table): A verb, by its name.
+- `verbs.<name>.label` (string): The name people read on its button. Required.
+- `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
+- `views` (table): The lists of entries, by view.
+- `views.<name>` (table): A view, by its name.
+- `views.<name>.label` (string): The name people read in the list of views. Required.
+
 ## Workflow manifest (`workflows/<name>/workflow.toml`)
 
 ### What it matches

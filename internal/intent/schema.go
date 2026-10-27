@@ -21,3 +21,8 @@ var ActionsSchema []byte
 //
 //go:embed config.schema.json
 var ConfigSchema []byte
+
+// GTDSchema is the JSON Schema of gtd.toml, for editors.
+//
+//go:embed gtd.schema.json
+var GTDSchema []byte

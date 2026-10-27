@@ -26,7 +26,7 @@ var profileUsage = `usage:
   profile where <intent> [conditions]
   profile add <intent>[,<intent>...] [conditions] [--section <heading>] [--title <text>] [--override] [--paths <glob>]... [--apply] [-- <text>]
   profile check [<dir>] [--color auto|always|never]
-  profile schema [--workflow|--actions|--config]
+  profile schema [--workflow|--actions|--gtd|--config]
   profile try <pr-url>
 conditions: ` + conditionNames() + `, --tag <key>=<value> (repeatable)`
 
@@ -60,7 +60,7 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 	case "check":
 		return runProfileCheck(e, args[1:])
 	case "schema":
-		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--config": intentload.ConfigSchema}
+		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--gtd": intentload.GTDSchema, "--config": intentload.ConfigSchema}
 		switch {
 		case len(args) == 1:
 			_, err := e.Out.Write(intentload.Schema)

@@ -1,0 +1,50 @@
+{
+  "$id": "https://github.com/wloophq/wloop/gtd.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "verbs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A verb, by its name.",
+        "properties": {
+          "label": {
+            "description": "The name people read on its button. Required.",
+            "type": "string"
+          },
+          "summary": {
+            "description": "One line, what pressing it does: its tooltip. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "description": "The verbs an entry offers, by verb.",
+      "type": "object"
+    },
+    "views": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "A view, by its name.",
+        "properties": {
+          "label": {
+            "description": "The name people read in the list of views. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "type": "object"
+      },
+      "description": "The lists of entries, by view.",
+      "type": "object"
+    }
+  },
+  "title": "GTD verbs and views (gtd.toml)",
+  "type": "object"
+}
