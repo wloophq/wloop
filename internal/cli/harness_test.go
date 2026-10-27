@@ -549,6 +549,9 @@ type testEnv struct {
 	reg  *testRegistry
 	// loop is the loop mutex of the daemon serve started.
 	loop *sync.Mutex
+	// served ends every context serving gave.
+	served     context.Context
+	stopServed context.CancelFunc
 }
 
 // testRegistry knows every stored session as having the loop's MCP tool but
@@ -600,6 +603,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		cfg: (&Env{}).defaultConfig(),
 	}
 	te.Env = &Env{
+		background: &sync.WaitGroup{},
 		Out:        te.out,
 		Err:        te.err,
 		GH:         ghcli.Metered(te.gh),
@@ -634,6 +638,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 			return nil, fmt.Errorf("no agent in tests")
 		}}},
 	}
+	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)
 	te.Env.planReads = syncedInputs{te}
 	if ws != nil {
@@ -659,6 +664,28 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	var minted atomic.Int64
 	te.Turns.NewID = func() string { return fmt.Sprintf("sid-%d", minted.Add(1)) }
 	return te
+}
+
+// serving is ctx for the work serve starts on te's Env, ended by
+// stopServing, which the test's cleanup calls before the stores and
+// directories opened so far go away.
+func (te *testEnv) serving(ctx context.Context) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	context.AfterFunc(te.served, cancel)
+	te.t.Cleanup(te.stopServing)
+	return ctx
+}
+
+// stopServing cancels every context serving gave and waits for the work on
+// them.
+func (te *testEnv) stopServing() {
+	te.stopServed()
+	te.Env.background.Wait()
+}
+
+// serveDeps is serveDeps on te's Env, on a context serving binds to the test.
+func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+	return serveDeps(te.serving(ctx), te.Env, db, cfg, logf, loopMu, app)
 }
 
 // loadRounds reads the round state the commands saved.
@@ -835,23 +862,4 @@ func (te *testEnv) agentCommand(ctx context.Context, cfg config.Config, worktree
 		return "", err
 	}
 	return a.Command(s)
-}
-
-// serveLog logs to t until t ends: serve's loops outlive the test that
-// started them, and testing panics or races on a log after the end.
-func serveLog(t *testing.T) func(string, ...any) {
-	var mu sync.Mutex
-	ended := false
-	t.Cleanup(func() {
-		mu.Lock()
-		ended = true
-		mu.Unlock()
-	})
-	return func(format string, args ...any) {
-		mu.Lock()
-		defer mu.Unlock()
-		if !ended {
-			t.Logf(format, args...)
-		}
-	}
 }

@@ -183,7 +183,7 @@ func (s *Server) recheckHomesInBackground() {
 	}
 	s.homes.queued = true
 	s.homes.mu.Unlock()
-	go func() {
+	s.driving.Go(func() {
 		for {
 			s.homes.mu.Lock()
 			if s.life.Err() != nil || len(s.homes.pending) == 0 && !s.homesStaleLocked() {
@@ -194,7 +194,7 @@ func (s *Server) recheckHomesInBackground() {
 			s.homes.mu.Unlock()
 			s.RecheckHomes(s.life)
 		}
-	}()
+	})
 }
 
 // noteSessionHome rechecks the homes in the background when home is one no

@@ -52,7 +52,7 @@ func seedStore(t *testing.T, dir string, seed func(context.Context, *sqlite.DB))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seed(context.Background(), db)
 }
 
@@ -76,7 +76,7 @@ func serveUntil(t *testing.T, te *testEnv, what string, cond func(*sqlite.DB) bo
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	eventually(t, what, func() bool { return cond(db) })
 	cancel()
 	if err := <-done; err != nil {
@@ -135,7 +135,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	store := inventory.New(db)
@@ -154,7 +154,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 		return o
 	}
 	left := running()
-	d := serveDeps(ctx, te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if _, err := d.Brief.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -179,9 +179,9 @@ func TestEchoTurnsAreUnavailable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seq := endedTurn(t, db, "echo", "a1")
-	d := serveDeps(context.Background(), te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if _, err := d.Usage.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -201,8 +201,8 @@ func TestServeKeepsTheAgentSessionsTheHooksReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	serveDeps(context.Background(), te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	t.Cleanup(func() { db.Close() })
+	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	st := turns.SessionStart{Session: "term_1", AgentSession: "a1", Cwd: "/w", Home: "/h", Agent: "claude", Transcript: "/h/projects/-w/a1.jsonl"}
 	if err := te.Turns.SessionStarted(context.Background(), st); err != nil {
 		t.Fatal(err)

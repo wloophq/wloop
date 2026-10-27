@@ -39,7 +39,7 @@ func (e *Env) serveDossiers(ctx context.Context, db *sqlite.DB, cfg config.Confi
 	if e.noJobs {
 		return s
 	}
-	go func() {
+	e.background.Go(func() {
 		t := time.NewTicker(dossierSweepEvery)
 		defer t.Stop()
 		for {
@@ -58,6 +58,6 @@ func (e *Env) serveDossiers(ctx context.Context, db *sqlite.DB, cfg config.Confi
 			case <-t.C:
 			}
 		}
-	}()
+	})
 	return s
 }
