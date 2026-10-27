@@ -157,7 +157,7 @@ description = "Propose a Slack message, or a reaction, to be posted as the user 
 [slack_draft.params]
 "text" = "the message, in Markdown; empty for a reaction"
 "kind" = "what the draft is; defaults to reply"
-"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name; else a message permalink, #channel, channel id or user id"
+"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name (a reaction: the newest message an item started at); else a message permalink, #channel, channel id or user id"
 "items" = "the unit's items the draft answers; none outside the turn's Slack unit"
 "items[]" = "an item id of the unit"
 "reaction" = "the emoji name of a react draft, without colons"

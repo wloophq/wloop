@@ -376,18 +376,28 @@ func (s *Service) publishable(ctx context.Context, d *draft.Draft) error {
 	if err != nil {
 		return err
 	}
-	if pl, ok := fx.(port.Placer); ok && strings.TrimSpace(d.Target) == "" {
-		target, err := pl.Place(ctx, *d)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrInvalid, err)
-		}
-		d.Target = target
+	if err := place(ctx, fx, d); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if v, ok := fx.(port.Validator); ok {
 		if err := v.Validate(ctx, *d); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	}
+	return nil
+}
+
+// place stores in d.Target where fx's Placer puts d when d has no target.
+func place(ctx context.Context, fx port.Effects, d *draft.Draft) error {
+	pl, ok := fx.(port.Placer)
+	if !ok || strings.TrimSpace(d.Target) != "" {
+		return nil
+	}
+	target, err := pl.Place(ctx, *d)
+	if err != nil {
+		return err
+	}
+	d.Target = target
 	return nil
 }
 
@@ -598,8 +608,12 @@ func (s *Service) Send(ctx context.Context) (sent, failed int, err error) {
 var errClaimLost = errors.New("another pass or decision took the draft")
 
 // sendOne reports whether d was sent; a nil error with false means d is now failed.
+// A draft approved before it was placed is placed here, and its target stored with the claim.
 func (s *Service) sendOne(ctx context.Context, d draft.Draft) (bool, error) {
 	fx, fxErr := s.effects(d.Unit.Provider)
+	if fxErr == nil {
+		fxErr = place(ctx, fx, &d)
+	}
 	d.State, d.SendingAt = draft.Sending, s.Clock.Now()
 	d, err := s.save(ctx, d, draft.Approved)
 	if errors.Is(err, ErrConflict) {
