@@ -38,8 +38,8 @@ const (
 var EntryStepVerbs = verbNames(gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference,
 	gtd.VerbFocus, gtd.VerbContext, gtd.VerbArea, gtd.VerbDone, gtd.VerbDismiss)
 
-// EntryVerbArgs are the arguments entry.verb passes to each verb that
-// takes any; the verb ignores every other.
+// EntryVerbArgs are the arguments each verb takes; the loader refuses any
+// other.
 var EntryVerbArgs = map[string][]string{
 	string(gtd.VerbSchedule): {"until", "on_activity"},
 	string(gtd.VerbWaiting):  {"on", "resurface"},

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
@@ -135,7 +136,7 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		text("verbs."+id+".label", t.Label, &w.Label)
 		text("verbs."+id+".summary", t.Summary, &w.Summary)
 		text("verbs."+id+".input", t.Input, &w.Input)
-		if t.Offer != nil && id == "seen" {
+		if t.Offer != nil && id == string(gtd.VerbSeen) {
 			s.add("verbs.seen.offer", "seen takes no offer: clients send it when an entry opens")
 		} else if t.Offer != nil {
 			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {

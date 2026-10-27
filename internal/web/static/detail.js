@@ -351,8 +351,8 @@ function delegateBox(e) {
       detailEnv.render();
     }
   };
-  return h("section", { class: "d-delegate", "aria-label": "Delegate" },
-    h("h2", { class: "d-sub" }, "Delegate"),
+  return h("section", { class: "d-delegate", "aria-label": verbLabel("delegate") },
+    h("h2", { class: "d-sub" }, verbLabel("delegate")),
     st.enabled ? null : h("p", { class: "empty" }, st.reason || "Not offered here"),
     h("textarea", { rows: 2, "aria-label": "Guidance", placeholder: verbQuestion("delegate"), disabled: !st.enabled, "data-focus": "detail:guidance",
       oninput: (ev) => { detailState.guidance = ev.target.value; } }, detailState.guidance),

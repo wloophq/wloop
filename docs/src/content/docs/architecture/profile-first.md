@@ -19,13 +19,15 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
 | What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
+| The GTD verbs' words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first) and where an entry offers each (`offer`), and the labels of the views and of the Review's steps | `profiles/default/gtd.toml` | a `gtd.toml` whose keys replace the bundled ones |
+| The help line of each core key, by context, then action | `profiles/default/keys.toml` | a `keys.toml` whose keys replace the bundled ones |
 | What the loop tells a session: the notice that the user answered an Inbox message, and the reason a stop is blocked while the turn owes a record | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 
 ## What Go provides
 
-Manifests name Go through a closed vocabulary, listed in `internal/intent/builtin` and checked when the profile loads. Every reserved key of a manifest, of `actions.toml` and of the configuration is a row of one table, `builtin.Grammar` (`internal/intent/builtin/grammar*.go`), with its kind, values, default and doc; every loader runs `builtin.Check` against it, and the [profile language](/reference/language/) lists it:
+Manifests name Go through a closed vocabulary, listed in `internal/intent/builtin` and checked when the profile loads. Every reserved key of a manifest, of `actions.toml`, `gtd.toml`, `keys.toml` and of the configuration is a row of one table, `builtin.Grammar` (`internal/intent/builtin/grammar*.go`), with its kind, values, default and doc; every loader runs `builtin.Check` against it, and the [profile language](/reference/language/) lists it:
 
 - **Facts**: named, typed values a provider computes for a unit, in `builtin.Facts` (`internal/intent/builtin/facts.go`). Predicates are CEL over the facts of a slot, compiled at load by `internal/intent/expr`; an evaluation error reads as false. A fact flagged `Dim` is also a condition of a judgment block's path; today's dimension names (`organization`, `reviewer`, `kind`, ...) are aliases of facts in `internal/profile/dims.go`, and an enum field of the brief intent's `extra` is one too.
 - **Steps**: the actions a workflow runs, in `builtin.Steps`, each with its reach and its guards. A profile cannot lower a guard or force a step.
@@ -65,7 +67,7 @@ These texts and decisions are still in Go, and are moving to the profile:
 - the GitHub plugin's `github-nudge` rule and its text (`internal/adapter/source/github/proposals.go`);
 - the workflow providers, pull requests, sessions, workspaces, GTD entries and Slack units (`builtin.Slots`);
 - notification titles, the digest and the menu bar's copy;
-- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes; the GTD verbs', views' and Review steps' words are the profile's `gtd.toml`, and each key's help its `keys.toml`;
+- the cockpit's and the terminal's chrome: the hints a prompt gives on its keys (Tab, Ctrl+E), the titles and empty states of the panes, the modes of the delegate and reply prompts (draft for me, hand to an agent, send now), and the reason shown when an entry does not offer a verb;
 - the renderings of Slack messages that `slack_read` and `slack_search` return (`internal/adapter/source/slack`), the JSON-RPC errors of the MCP endpoint, and the error texts a mechanism returns through a tool's `failed` answer.
 
 ## Direction

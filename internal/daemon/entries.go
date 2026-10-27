@@ -260,10 +260,10 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is
-// offered everywhere, and so is seen, which clients send when an entry opens.
+// offered everywhere.
 func offers(words intentload.GTDTexts, e gtd.Entry, verb gtd.Verb) bool {
 	p := words.Verbs[string(verb)].Offer
-	if p == nil || verb == gtd.VerbSeen {
+	if p == nil {
 		return true
 	}
 	ok, err := p.Match(workflow.Vars{Facts: catalog.OfferFacts(e)})
