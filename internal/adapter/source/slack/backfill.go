@@ -185,7 +185,7 @@ func (pl *poller) searchThreads(ctx context.Context, q, oldest string, threads m
 			}
 			anchor := m.ThreadTS
 			if anchor == "" && m.Permalink != "" {
-				if _, _, threadTS, err := parsePermalink(m.Permalink); err == nil {
+				if _, _, threadTS, err := parseMessage(m.Permalink); err == nil {
 					anchor = threadTS
 				}
 			}

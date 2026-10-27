@@ -118,7 +118,7 @@ type Origin struct {
 }
 
 type Evidence struct {
-	Ref       string // Slack: message ts; GitHub: comment id
+	Ref       string // Slack: message ref, <conversation>/<ts>; GitHub: comment id
 	Permalink string
 	At        time.Time
 }

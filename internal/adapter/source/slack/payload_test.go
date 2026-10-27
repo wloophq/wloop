@@ -79,8 +79,8 @@ func TestSlackTurnInstructions(t *testing.T) {
 	for _, want := range []string{
 		"this Slack thread",
 		readPermalink(readParent, ""),
-		"[m1 ts=" + readParent + "] n (" + other + ")",
-		"[m2 ts=" + readReply + "] " + me,
+		"[m1 " + readConv + "/" + readParent + "] n (" + other + ")",
+		"[m2 " + readConv + "/" + readReply + "] " + me,
 		"`e1`",
 		"Review the change",
 		"turn end slack:" + u.Key + " --turn",
@@ -139,7 +139,7 @@ func TestPayloadCapKeepsParentAndNewest(t *testing.T) {
 	if n := utf8.RuneCountInString(got); n > limit {
 		t.Errorf("%d characters over the cap of %d", n, limit)
 	}
-	for _, want := range []string{"[m1 ts=" + readParent + "]", "message 00", "message 79", "[m80 ts=", "`slack_read slack:" + u.Key + "` with a larger limit reads up to the 200 newest"} {
+	for _, want := range []string{"[m1 " + readConv + "/" + readParent + "]", "message 00", "message 79", "[m80 " + readConv + "/", "`slack_read slack:" + u.Key + "` with a larger limit reads up to the 200 newest"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in\n%s", want, got)
 		}

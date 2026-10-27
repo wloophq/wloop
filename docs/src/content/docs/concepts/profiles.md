@@ -34,7 +34,7 @@ The bundled guides, `intent=review.md`, `intent=address.md` and `intent=nudge.md
 
 An **intent** is a kind of turn: `review`, `address`, `nudge`, `act`, the `probe`, or one your profile adds. Each is a manifest, `intent.toml`, plus the turn's instructions template, `instructions.md.tmpl`. From the manifest {{name}} builds:
 
-- a command: `{{command}} <intent> <url> [flags] [guidance...]`, listed by `{{command}} --help`; an intent that serves another provider takes that provider's unit, such as a Slack permalink or `slack:<key>`;
+- a command: `{{command}} <intent> <url> [flags] [guidance...]`, listed by `{{command}} --help`; an intent that serves another provider takes that provider's unit, such as a Slack message ref (`<conversation>/<ts>`), a permalink or `slack:<key>`;
 - a way to run it by hand from any agent session: `{{command}} instructions <intent>`, or the bundled skills such as `/{{name}}-review <url>`;
 - an action on the rows of the cockpit, the terminal client and the menu bar, with its own shortcut and its `summary` as its tooltip.
 

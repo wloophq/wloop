@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
-	slacksource "github.com/wloophq/wloop/internal/adapter/source/slack"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/github"
@@ -13,6 +12,7 @@ import (
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/ghcli"
+	"github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/source"
 )
 
@@ -42,14 +42,14 @@ func (e *Env) resolvers() map[unit.ProviderID]unit.Resolver {
 	return map[unit.ProviderID]unit.Resolver{dslack.Provider: slackResolver{e}}
 }
 
-// slackResolver resolves a Slack message permalink to its thread.
+// slackResolver resolves a Slack message ref or permalink to its thread.
 type slackResolver struct{ e *Env }
 
 func (s slackResolver) Resolve(ctx context.Context, address string) (string, bool, error) {
-	if !slacksource.IsPermalink(address) {
+	if !send.IsMessage(address) {
 		return "", false, nil
 	}
-	u, err := s.e.slackPermalinkUnit(ctx, address)
+	u, err := s.e.slackMessageUnit(ctx, address)
 	return u.Key, err == nil, err
 }
 

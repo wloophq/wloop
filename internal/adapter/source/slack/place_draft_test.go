@@ -219,7 +219,7 @@ func TestVerifyLooksForAnUnplacedSegmentMessageAtTheTopOfItsConversation(t *test
 	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": "sounds good"})
 	d := segmentDraft(seg, draft.Reply, draft.OriginAuto, "i1")
 	ev, ok, err := ps.publisher().Verify(context.Background(), d, time.Unix(1700000300, 0))
-	if err != nil || !ok || ev.Ref != pubPosted {
+	if err != nil || !ok || ev.Ref != pubDM+"/"+pubPosted {
 		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
 	}
 	if h := ps.calls("conversations.history"); len(h) == 0 || h[len(h)-1].Get("channel") != pubDM {

@@ -19,7 +19,7 @@ func BenchmarkLandingUnitOf(b *testing.B) {
 	if err := (&Store{DB: db.Slack()}).Save(ctx, nil, scaleFacts(500, 10), "", t0); err != nil {
 		b.Fatal(err)
 	}
-	l := LandingOver(db)
+	l := LandingOver(db, nil)
 	for name, parent := range map[string]string{"tracked": ts(24700), "untracked": ts(99999999)} {
 		b.Run(name, func(b *testing.B) {
 			for b.Loop() {

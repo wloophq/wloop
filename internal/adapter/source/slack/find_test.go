@@ -36,7 +36,7 @@ func findSlack(t *testing.T) (*fixture, *[]url.Values) {
 				"channel": map[string]any{"id": findDM, "is_im": true}},
 			{"ts": "1700000150.000100", "user": other, "text": "also between us", "permalink": "https://example.slack.com/archives/" + findDM + "/p1700000150000100",
 				"channel": map[string]any{"id": findDM}},
-			{"ts": "1700000200.000100", "username": "deploybot", "text": "", "permalink": "https://example.slack.com/archives/C0000000001/p1700000200000100",
+			{"ts": "1700000200.000100", "username": "deploybot", "text": "",
 				"channel": map[string]any{"id": readConv, "name": "releases"}},
 		}}}
 	})
@@ -57,7 +57,7 @@ func TestSlackSearchRendersOneLinePerMessage(t *testing.T) {
 	}
 	want := "2 of 42 matches for release in:#releases from:@dana after:2023-11-01 before:2023-11-30\n" +
 		findLink + " · n (U0002) · 2023-11-14 19:13 -03 · release 1.2 is out\n" +
-		"https://example.slack.com/archives/C0000000001/p1700000200000100 · deploybot (bot) · 2023-11-14 19:16 -03 · (no text)\n" +
+		"no permalink (C0000000001/1700000200.000100) · deploybot (bot) · 2023-11-14 19:16 -03 · (no text)\n" +
 		"(2 direct messages that are not tracked left out)"
 	if got != want {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)

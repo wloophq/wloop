@@ -9,6 +9,7 @@ import (
 	"time"
 
 	slackapi "github.com/wloophq/wloop/internal/slack"
+	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // SearchQuery is what slack_search looks for: Query as Slack's search
@@ -98,7 +99,7 @@ func (r *Reader) Search(ctx context.Context, q SearchQuery) (string, error) {
 		if t := tsTime(m.TS); !t.IsZero() {
 			when = t.In(loc).Format("2006-01-02 15:04 MST")
 		}
-		link := cmp.Or(m.Permalink, fmt.Sprintf("no permalink (channel %s, ts %s)", m.Channel.ID, m.TS))
+		link := cmp.Or(m.Permalink, fmt.Sprintf("no permalink (%s)", send.Ref(m.Channel.ID, m.TS)))
 		fmt.Fprintf(&b, "\n%s · %s · %s · %s", link, author, when, line)
 	}
 	if untracked > 0 {

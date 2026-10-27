@@ -189,6 +189,9 @@ type Env struct {
 	ports func(store *inventory.Store, cfg config.Config) (turns.Sessions, []views.Sink)
 	// served is the daemon's turns and views, built once per daemon.
 	served *servedTurns
+	// resolve is the daemon's own resolver of an address to its unit, set
+	// when this Env runs the daemon, so it does not ask itself over the API.
+	resolve func(ctx context.Context, address string) (unit.Unit, bool, error)
 	// background is the work serve starts on its contexts, which it waits for
 	// before it closes the store.
 	background *sync.WaitGroup
