@@ -149,7 +149,7 @@ func newPlugin(cfg config.Slack, d sourcereg.Deps, s Slack) *plugin {
 	p.watches = Watches{DB: db}
 	a := newAdmitter(cfg.Ingest)
 	a.db, a.log = db, p.logf
-	a.users = &userCache{db: db, client: s.Client, now: p.now}
+	a.users = &userCache{load: userSource{db: db, client: s.Client, now: p.now}.fetch, now: p.now}
 	heat := HeatScheduler{DB: db, Heat: sqlite.HeatReader{DB: d.DB, Clock: clockFunc(p.now)}, Segments: segs, Log: p.logf}
 	src := &Source{db: db, store: &Store{DB: db, Segments: segs, Scheduler: heat, Now: p.now}, client: s.Client, admit: a, segments: segs,
 		links: d.Links != nil, units: d.Units, log: p.logf}

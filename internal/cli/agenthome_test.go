@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/echo"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/setup"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -160,7 +160,7 @@ func TestHandNudgeNeverReentersTheAction(t *testing.T) {
 	te.gh.basics = openBasics
 	te.Rec = storeRecorder{te.Store}
 	inputs := map[string]any{"situation": "Waiting on: bob.", "waits_on_maintainers": false, "who": []string{"bob"}}
-	res, err := te.byHand(&sync.Mutex{})(context.Background(), api.ByHandRequest{Intent: "nudge", URL: r7.URL(), Home: "/session/home", Inputs: inputs}, "term_1")
+	res, err := te.byHand(&lock.Mutex{})(context.Background(), api.ByHandRequest{Intent: "nudge", URL: r7.URL(), Home: "/session/home", Inputs: inputs}, "term_1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestHandTakeOverRunsWithTheHomeItBrings(t *testing.T) {
 		te.Rec = storeRecorder{te.Store}
 		te.withCallerHome("/daemon/home")
 		req := api.ByHandRequest{Intent: "address", URL: "https://github.com/acme/api/pull/20", Home: brought, Cwd: t.TempDir(), Inputs: map[string]any{"take_over": true}}
-		if _, err := te.byHand(&sync.Mutex{})(context.Background(), req, "term_1"); err == nil || !strings.Contains(err.Error(), "run this command there") {
+		if _, err := te.byHand(&lock.Mutex{})(context.Background(), req, "term_1"); err == nil || !strings.Contains(err.Error(), "run this command there") {
 			t.Fatalf("brought %q: %v", brought, err)
 		}
 		if len(m.Commands) != 1 || strings.Contains(m.Commands[0], "/daemon/home") || want != "" && !strings.Contains(m.Commands[0], want) {

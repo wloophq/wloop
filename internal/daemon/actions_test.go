@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 	"unicode/utf8"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -359,30 +361,39 @@ func TestAdoptMarksOverride(t *testing.T) {
 
 func TestActionOutlivesTheRequest(t *testing.T) {
 	t.Parallel()
-	s := newServer(t)
-	fa := &fakeActions{}
-	s.deps.Actions = fa
-	ctx, cancel := context.WithCancel(context.Background())
-	s.deps.LoopMu.Lock()
-	done := make(chan int)
-	go func() {
-		rec := httptest.NewRecorder()
-		req := apiRequest("POST", "/api/units/github/acme%2Fapi%237/review", strings.NewReader(`{"source":"cockpit"}`)).WithContext(ctx)
-		s.Handler().ServeHTTP(rec, req)
-		done <- rec.Code
-	}()
-	time.Sleep(20 * time.Millisecond)
-	if countEvents(t, s, dinv.KindRoundSent) != 0 {
-		t.Fatal("the action ran while the loop mutex was held")
-	}
-	cancel()
-	s.deps.LoopMu.Unlock()
-	if code := <-done; code != 200 {
-		t.Fatalf("%d", code)
-	}
-	if countEvents(t, s, dinv.KindRoundSent) != 1 || len(fa.calls) != 1 {
-		t.Fatalf("calls %v", fa.calls)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		s := newServer(t)
+		fa := &fakeActions{}
+		s.deps.Actions = fa
+		ctx, cancel := context.WithCancel(context.Background())
+		s.deps.LoopMu.Lock()
+		unlock := sync.OnceFunc(s.deps.LoopMu.Unlock)
+		done := make(chan int, 1)
+		ran := make(chan struct{})
+		t.Cleanup(func() {
+			unlock()
+			<-ran
+		})
+		go func() {
+			defer close(ran)
+			rec := httptest.NewRecorder()
+			req := apiRequest("POST", "/api/units/github/acme%2Fapi%237/review", strings.NewReader(`{"source":"cockpit"}`)).WithContext(ctx)
+			s.Handler().ServeHTTP(rec, req)
+			done <- rec.Code
+		}()
+		synctest.Wait()
+		if countEvents(t, s, dinv.KindRoundSent) != 0 {
+			t.Fatal("the action ran while the loop mutex was held")
+		}
+		cancel()
+		unlock()
+		if code := <-done; code != 200 {
+			t.Fatalf("%d", code)
+		}
+		if countEvents(t, s, dinv.KindRoundSent) != 1 || len(fa.calls) != 1 {
+			t.Fatalf("calls %v", fa.calls)
+		}
+	})
 }
 
 func TestMuteWithBothFieldsIs400(t *testing.T) {
@@ -476,28 +487,37 @@ func TestQuickActionsSkipTheLoopMutex(t *testing.T) {
 
 func TestLoopActionsWaitOnTheSharedLoopMutex(t *testing.T) {
 	t.Parallel()
-	stDB, err := sqlitetest.Open(t.TempDir()+"/inv.db", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st := inventory.New(stDB)
-	t.Cleanup(func() { stDB.Close() })
-	var loop sync.Mutex
-	fa := &fakeActions{}
-	s := New(withStore(Deps{Activity: stDB, Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
-	loop.Lock()
-	done := make(chan error, 1)
-	go func() { done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, io.Discard) }()
-	select {
-	case err := <-done:
-		loop.Unlock()
-		t.Fatalf("review ran while the shared loop mutex was held: %v", err)
-	case <-time.After(50 * time.Millisecond):
-	}
-	loop.Unlock()
-	if err := <-done; err != nil || len(fa.calls) != 1 {
-		t.Fatalf("%v %v", err, fa.calls)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		stDB, err := sqlitetest.Open(t.TempDir()+"/inv.db", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		st := inventory.New(stDB)
+		t.Cleanup(func() { stDB.Close() })
+		var loop lock.Mutex
+		fa := &fakeActions{}
+		s := New(withStore(Deps{Activity: stDB, Actions: fa, LoopMu: &loop, Log: func(string, ...any) {}}, st))
+		loop.Lock()
+		unlock := sync.OnceFunc(loop.Unlock)
+		done := make(chan error, 1)
+		ran := make(chan struct{})
+		t.Cleanup(func() {
+			unlock()
+			<-ran
+		})
+		go func() {
+			defer close(ran)
+			done <- s.act(context.Background(), "review", r7.Unit(), api.ActionRequest{}, io.Discard)
+		}()
+		synctest.Wait()
+		if len(fa.calls) != 0 {
+			t.Fatalf("review ran while the shared loop mutex was held: %v", fa.calls)
+		}
+		unlock()
+		if err := <-done; err != nil || len(fa.calls) != 1 {
+			t.Fatalf("%v %v", err, fa.calls)
+		}
+	})
 }
 
 func TestMuteUntilStateLapsesOnce(t *testing.T) {
@@ -1132,7 +1152,7 @@ func TestUntrackingWhatOnlyTheTrackHeldTakesItOutOfAll(t *testing.T) {
 
 type fakeLauncher struct {
 	mu       sync.Mutex
-	loopMu   *sync.Mutex
+	loopMu   *lock.Mutex
 	launches []turns.Launch
 	// loopHeld records, per launch, whether the loop mutex was held.
 	loopHeld []bool
@@ -1408,7 +1428,7 @@ func TestTurnActionsWithoutTurnsAreUnavailable(t *testing.T) {
 // aheadActions records each read ahead and whether the loop mutex was free.
 type aheadActions struct {
 	*fakeActions
-	loop  *sync.Mutex
+	loop  *lock.Mutex
 	ahead []string
 }
 

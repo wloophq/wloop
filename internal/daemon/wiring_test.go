@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/intake/intaketest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -109,7 +110,7 @@ func TestUnavailableBriefsAreReported(t *testing.T) {
 func TestAnIntakeTheSweepAnsweredSendsNothingMore(t *testing.T) {
 	t.Parallel()
 	books := turnstest.NewStore()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) {
 		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books}
 		d.LoopMu = mu
@@ -137,7 +138,7 @@ func raceRun(t *testing.T, body string, before []turn.Turn, during []turn.Turn) 
 	if len(before) > 0 {
 		books.Put(turn.Book{Unit: pr.Ref(r7).Unit(), Turns: before})
 	}
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	s, fa := newIntakeServer(t, nil, func(d *Deps) {
 		d.Turns = &turns.Service{Intents: turnstest.Intents(), Store: books}
 		d.LoopMu = mu

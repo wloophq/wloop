@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/wloophq/wloop/internal/config"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -122,8 +121,7 @@ func TestBackfillCursorWaitsForTheInbox(t *testing.T) {
 	})
 	w.post(dm1, other, ts(1), "hi")
 	f.polling(t)
-	waitFor(t, "the DM queued", func() bool { return len(f.pendingObjects()) == 1 })
-	time.Sleep(3 * drainEvery)
+	waitFor(t, "the backfill waiting on the inbox", func() bool { return f.p.slack.Metrics.snapshot().Backfill.Draining == 1 })
 	cursor := func() string {
 		v, err := f.db.Slack().Cursor(context.Background(), CursorBackfill)
 		if err != nil {
