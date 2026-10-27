@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -43,7 +44,7 @@ func TestServeResolvesLinkedItems(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	if built.Links == nil || built.Units == nil || built.Units() != d.Units {
 		t.Fatalf("source deps: links %v, units set %v", built.Links, built.Units != nil)
 	}

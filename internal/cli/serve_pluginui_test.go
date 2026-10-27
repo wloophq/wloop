@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/ingest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -36,7 +36,7 @@ func servedUI(t *testing.T, cfg func(*config.Config)) ([]api.Plugin, api.Catalog
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	d.Startup = nil
 	h := daemon.New(d).Handler()
 	read := func(path string, out any) {

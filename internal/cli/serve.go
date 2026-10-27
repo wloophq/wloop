@@ -24,6 +24,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/intake"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -202,7 +203,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 
 	// One loop mutex for every server this process runs: an action the
 	// degraded server delegated may still run after it stops.
-	loopMu, appState := &sync.Mutex{}, &daemon.AppState{}
+	loopMu, appState := &lock.Mutex{}, &daemon.AppState{}
 	for {
 		cfg, cfgErr := e.readConfig()
 		if cfgErr == nil {
@@ -312,7 +313,7 @@ func (e *Env) noteConfig() {
 	}
 }
 
-func serveDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+func serveDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
 	d := serveAllDeps(ctx, e, db, cfg, logf, loopMu, app)
 	if e.noJobs {
 		d.Collector, d.Sweep, d.Ingest = nil, nil, nil
@@ -321,7 +322,7 @@ func serveDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, lo
 	return d
 }
 
-func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
 	store := inventory.New(db)
 	store.UseClock(e.Now)
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
@@ -1162,7 +1163,7 @@ func briefHome(cfg config.Config) func(github.Ref) string {
 // serveUntilConfigLoads serves health, with the config error as the sweep's
 // warning, and returns once the config loads so the caller starts the jobs.
 // Delegated actions load the config themselves and answer with its error.
-func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState, endpoint mcpEndpoint) error {
+func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState, endpoint mcpEndpoint) error {
 	cfg := e.defaultConfig()
 	dctx, cancel := context.WithCancel(ctx)
 	defer cancel()

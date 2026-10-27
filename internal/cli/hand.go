@@ -8,12 +8,12 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -38,7 +38,7 @@ const handInSession = "asked by you in a session"
 // byHand runs, in the daemon, a turn the user asked for from an agent
 // session, with the inputs the daemon checked and prepared; it waits on the
 // loop.
-func (e *Env) byHand(loopMu *sync.Mutex) func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
+func (e *Env) byHand(loopMu *lock.Mutex) func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
 	return func(ctx context.Context, r api.ByHandRequest, handle string) (api.ByHandResult, error) {
 		d, err := e.intentDef(r.Intent)
 		if err != nil {

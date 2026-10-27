@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
@@ -188,7 +189,7 @@ type Queue struct {
 	base      context.Context
 	// state serializes the reads and writes of a pull request's wanted,
 	// retry and give-up state.
-	state sync.Mutex
+	state lock.Mutex
 	wg    sync.WaitGroup
 	// wake and due hold one pending signal each.
 	wake, dueCh chan struct{}

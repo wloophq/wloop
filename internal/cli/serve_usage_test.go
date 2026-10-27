@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/turns"
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -154,7 +155,7 @@ func TestTheFirstBriefRunInterruptsWhenTheStartUpCouldNot(t *testing.T) {
 		return o
 	}
 	left := running()
-	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if _, err := d.Brief.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +182,7 @@ func TestEchoTurnsAreUnavailable(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	seq := endedTurn(t, db, "echo", "a1")
-	d := te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	if _, err := d.Usage.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +203,7 @@ func TestServeKeepsTheAgentSessionsTheHooksReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	st := turns.SessionStart{Session: "term_1", AgentSession: "a1", Cwd: "/w", Home: "/h", Agent: "claude", Transcript: "/h/projects/-w/a1.jsonl"}
 	if err := te.Turns.SessionStarted(context.Background(), st); err != nil {
 		t.Fatal(err)

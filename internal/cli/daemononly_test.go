@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -57,7 +57,7 @@ func TestCommandsFailFastWithoutTheDaemon(t *testing.T) {
 // and returns once the reconcile has reported.
 func startDaemonOf(t *testing.T, te *testEnv) {
 	t.Helper()
-	mu := &sync.Mutex{}
+	mu := &lock.Mutex{}
 	dir := shortDir(t)
 	cfg := te.cfg
 	cfg.HTTP.Port = 0

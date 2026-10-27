@@ -23,6 +23,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/headless"
+	"github.com/wloophq/wloop/internal/core/lock"
 	"github.com/wloophq/wloop/internal/core/setup"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -214,7 +215,7 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
@@ -331,7 +332,7 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	seedSlack(t, db)
 	ctx := context.Background()
-	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
 		if _, err := d.Startup(ctx); err != nil {
 			t.Fatal(err)
@@ -397,7 +398,7 @@ func TestAnActTurnReadsItsSlackThreadsBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &lock.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
 		if _, err := d.Startup(ctx); err != nil {
 			t.Fatal(err)
