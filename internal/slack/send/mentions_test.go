@@ -39,6 +39,33 @@ func TestMentionsResolveHandlesEmailsAndUserIDs(t *testing.T) {
 	}
 }
 
+func TestTypedUserMentionsBecomeMentions(t *testing.T) {
+	f := newFixture(t, newWorkspace())
+	draftMention := func(user string) string { return "@{slack:" + user + "}" }
+	for in, want := range map[string]string{
+		"<@U001> re-review done":                      "@{slack:U001} re-review done",
+		"<@W0000000042|Ana Souza>, see this":          "@{slack:W0000000042}, see this",
+		"<@U001|@here> and <@U002|!channel>":          "@{slack:U001} and @{slack:U002}",
+		"`<@U001>` and\n```\n<@U001>\n```\nstay":      "`<@U001>` and\n```\n<@U001>\n```\nstay",
+		"[<@U001>](https://x.example) stays":          "[<@U001>](https://x.example) stays",
+		"<@u001> <@U0> <@B001> <@U001 > stay as text": "<@u001> <@U0> <@B001> <@U001 > stay as text",
+		"<#C001|ops> and <!here> stay":                "<#C001|ops> and <!here> stay",
+	} {
+		got, err := f.svc.Mentions(context.Background(), in, draftMention)
+		if err != nil || got != want {
+			t.Errorf("%q: %q %v, want %q", in, got, err, want)
+		}
+	}
+}
+
+func TestSendPostsATypedLabeledMention(t *testing.T) {
+	f := newFixture(t, newWorkspace())
+	mustSend(t, f, send.Request{Target: "#general", Text: "<@U002|Bob Example> **shipped**"})
+	if got := onlyPost(t, f).Get("text"); got != "<@U002> *shipped*" {
+		t.Fatalf("posted %q", got)
+	}
+}
+
 func TestSendResolvesMentions(t *testing.T) {
 	f := newFixture(t, newWorkspace())
 	mustSend(t, f, send.Request{Target: "#general", Text: "@alice **shipped**"})

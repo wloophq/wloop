@@ -309,7 +309,6 @@ var (
 	// typedTokenRE are the mention, channel and special tokens a draft's text spells out itself; only
 	// user mentions, typed or written @{slack:U...}, reach Slack as tokens.
 	typedTokenRE     = regexp.MustCompile(`<[@#!][^<>]*>`)
-	typedUserRE      = regexp.MustCompile(`^<@([^<>|]+)(?:\|[^<>]*)?>$`)
 	broadcastRE      = regexp.MustCompile(`^<!(?:channel|here|everyone|subteam\^)`)
 	plainBroadcastRE = regexp.MustCompile(`(^|[^\w@])@(channel|here|everyone)\b`)
 )
@@ -337,13 +336,11 @@ func (p *Publisher) body(ctx context.Context, d draft.Draft) (string, error) {
 	}
 	var names map[string]string
 	var errs []error
-	text := typedTokenRE.ReplaceAllStringFunc(stripHolds.Replace(d.Text), func(m string) string {
+	text := send.TypedMentions(stripHolds.Replace(d.Text), func(user string) string { return hold("<@" + user + ">") })
+	text = typedTokenRE.ReplaceAllStringFunc(text, func(m string) string {
 		if broadcastRE.MatchString(m) {
 			errs = append(errs, fmt.Errorf("%s is a broadcast mention; drafts never ping a channel or a group", m))
 			return m
-		}
-		if u := typedUserRE.FindStringSubmatch(m); u != nil && userIDRE.MatchString(u[1]) {
-			return hold("<@" + u[1] + ">")
 		}
 		return hold(nameEscape.Replace(m))
 	})
@@ -565,11 +562,12 @@ var (
 	refTokenRE  = regexp.MustCompile(`<([@#!][^<>|\s]+)\|[^<>]*>`)
 	linkTokenRE = regexp.MustCompile(`<((?:https?|mailto):[^<>|\s]+)(?:\|([^<>]*))?>`)
 	spaceRE     = regexp.MustCompile(`\s+`)
-	unescape    = strings.NewReplacer("&lt;", "<", "&gt;", ">", "&amp;", "&")
+	unescape    = strings.NewReplacer("&lt;", "<", "&gt;", ">", "&amp;", "&", "\u2060", "")
 )
 
 // normalized is text as Verify compares it: labeled mentions bare, a link
-// whose label is its URL as that label, entities decoded, whitespace collapsed.
+// whose label is its URL as that label, entities decoded,
+// word joiners dropped, whitespace collapsed.
 func normalized(text string) string {
 	text = refTokenRE.ReplaceAllString(text, "<$1>")
 	text = linkTokenRE.ReplaceAllStringFunc(text, func(m string) string {

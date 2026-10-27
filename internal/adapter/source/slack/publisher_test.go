@@ -600,14 +600,27 @@ func TestTypedUserMentionsPostAsMentions(t *testing.T) {
 		"<@U0000000042> re-review done":                 "<@U0000000042> re-review done",
 		"<@W0000000042|Ana Souza> re-review **done**":   "<@W0000000042> re-review *done*",
 		"thanks <@U000AAA|a*b_c>, and @{slack:U000BBB}": "thanks <@U000AAA>, and <@U000BBB>",
+		"<@U000AAA|@here> <@U000BBB|!channel>":          "<@U000AAA> <@U000BBB>",
+		"see `<@U0000000042>` here":                     "see `&lt;@\u2060U0000000042&gt;` here",
+		"```\n<@U0000000042>\n```":                      "```\n&lt;@\u2060U0000000042&gt;\n```",
+		"[<@U0000000042>](https://x.y/1)":               "<https://x.y/1|&lt;@\u2060U0000000042&gt;>",
+		"<@B0000000042> stays":                          "&lt;@\u2060B0000000042&gt; stays",
 	} {
-		ps := newPubSlack(t)
-		if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
-			t.Fatalf("Publish(%q) = %v", text, err)
-		}
-		if got := ps.posted(t).Get("text"); got != want {
-			t.Fatalf("Publish(%q) posted %q\nwant   %q", text, got, want)
-		}
+		t.Run(text, func(t *testing.T) {
+			ps := newPubSlack(t)
+			if _, err := ps.publisher().Publish(context.Background(), threadDraft(draft.Reply, text)); err != nil {
+				t.Fatal(err)
+			}
+			if got := ps.posted(t).Get("text"); got != want {
+				t.Fatalf("posted %q\nwant   %q", got, want)
+			}
+		})
+	}
+}
+
+func TestVerifyMatchesAMentionPostedAsText(t *testing.T) {
+	if got, want := normalized("&lt;@\u2060U0000000042&gt; done"), normalized("<@U0000000042> done"); got != want {
+		t.Fatalf("normalized %q, want %q", got, want)
 	}
 }
 
