@@ -681,7 +681,7 @@ func PublisherOver(db *sqlite.DB, s *send.Service, token func() (auth.Token, err
 // Landed is the thread the post of d, a draft on a unit of another provider
 // sent to a Slack target, started or replied in, read from its permalink.
 func (p *Publisher) Landed(_ context.Context, d draft.Draft) (unit.Unit, bool, error) {
-	conv, ts, threadTS, err := parsePermalink(d.Evidence.Permalink)
+	conv, ts, threadTS, err := parseMessage(d.Evidence.Permalink)
 	if err != nil || p.Token == nil {
 		return unit.Unit{}, false, nil
 	}
