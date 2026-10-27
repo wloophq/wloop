@@ -164,3 +164,28 @@ func TestTheRecordBlockOfAPromptSurvivesANoticeInBetween(t *testing.T) {
 		t.Fatalf("the record was asked for again in the same prompt: %+v", got)
 	}
 }
+
+func TestANoticeBeforeTheRecordIsAckedStillOwesARecord(t *testing.T) {
+	s, store, _, _, _ := busyAsked(t)
+	ctx := context.Background()
+	b := bookOf(t, store, r7)
+	b.Records[0].Acked = false
+	store.Put(b)
+	if _, err := s.Answer(ctx, turns.AnswerRequest{Unit: r7, Message: 12, Text: "go ahead", Source: turn.Cockpit}); err != nil {
+		t.Fatal(err)
+	}
+	stop := func(prompt string) turns.StopAnswer {
+		t.Helper()
+		got, err := s.Stop(ctx, turns.StopRequest{Session: "term_1", AgentSession: "s1", PromptID: prompt})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := stop("p1"); !got.Block || !strings.HasPrefix(got.Reason, "answered") {
+		t.Fatalf("first stop %+v", got)
+	}
+	if got := stop("p1"); !got.Block || !strings.HasPrefix(got.Reason, "record_owed") {
+		t.Fatalf("a stop after acting on the answer with no record: %+v", got)
+	}
+}

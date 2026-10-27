@@ -98,11 +98,7 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	case turn.Allow:
 		return StopAnswer{}, nil, evs, nil
 	case turn.AckAndAllow:
-		for i := range b.Records {
-			if rec := &b.Records[i]; rec.TurnSeq == t.Seq && !rec.Acked {
-				rec.Acked, stop.RecordID = true, rec.ID
-			}
-		}
+		ackRecords(&b, t.Seq, &stop)
 		if _, err := s.Store.Save(ctx, b, stopped); err != nil {
 			return StopAnswer{}, nil, evs, err
 		}
@@ -110,6 +106,9 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 	case turn.LogAndAllow:
 	case turn.DeliverAnswers:
 		stop.Blocked = facts.BlockedThisPrompt
+		if found {
+			ackRecords(&b, t.Seq, &stop)
+		}
 		notices := make([]string, len(queued))
 		routed := []port.Event{stopped}
 		for n, i := range queued {
@@ -162,4 +161,13 @@ func (s *Service) queuedFor(b *turn.Book, handle string) []int {
 		}
 	}
 	return out
+}
+
+// ackRecords acks the unacked records of turn seq, the stop that follows them.
+func ackRecords(b *turn.Book, seq int64, stop *turn.Stop) {
+	for i := range b.Records {
+		if rec := &b.Records[i]; rec.TurnSeq == seq && !rec.Acked {
+			rec.Acked, stop.RecordID = true, rec.ID
+		}
+	}
 }

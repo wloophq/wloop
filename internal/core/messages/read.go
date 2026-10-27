@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/message"
@@ -157,16 +158,29 @@ func (s *Service) Question(ctx context.Context, u unit.Unit) (message.Message, b
 	if !ok {
 		return message.Message{}, false, nil
 	}
-	for i := len(b.Answers) - 1; i >= 0; i-- {
-		if a := b.Answers[i]; a.TurnSeq == q.Seq && a.Message != 0 && !a.Posted {
-			m, found, err := s.Store.Message(ctx, a.Message)
-			if err != nil || !found || m.State != message.Answered {
-				return message.Message{}, false, err
-			}
-			return m, true, nil
-		}
+	id, ok := answeredQuestion(&b, q.Seq)
+	if !ok {
+		return message.Message{}, false, nil
 	}
-	return message.Message{}, false, nil
+	m, found, err := s.Store.Message(ctx, id)
+	if err != nil || !found || m.State != message.Answered {
+		return message.Message{}, false, err
+	}
+	return m, true, nil
+}
+
+// answeredQuestion is the message the newest answer to turn seq's current question names: one given since
+// the turn's last record, so an earlier question of the same turn never takes it.
+func answeredQuestion(b *turn.Book, seq int64) (int64, bool) {
+	var since time.Time
+	if last, ok := b.LastRecord(seq); ok {
+		since = last.At
+	}
+	a, ok := lastAnswer(b, seq, since)
+	if !ok || a.Message == 0 || a.Posted {
+		return 0, false
+	}
+	return a.Message, true
 }
 
 // asking is the turn of the book an answer addresses while it waits on the user.

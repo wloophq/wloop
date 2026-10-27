@@ -576,7 +576,9 @@ func (s *Service) answerable(ctx context.Context, id int64) (message.Message, er
 	}
 	b := books[m.Unit]
 	if q, asks := asking(&b, s.Intents.Answerable()); asks && q.Seq == m.Origin.TurnSeq {
-		return m, nil
+		if id, ok := answeredQuestion(&b, q.Seq); ok && id == m.ID {
+			return m, nil
+		}
 	}
 	return message.Message{}, fmt.Errorf("%w: message %d is %s", ErrClosed, id, m.State)
 }

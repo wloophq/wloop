@@ -168,3 +168,28 @@ func TestAQuestionWhoseTurnMovedOnTakesNoAnswer(t *testing.T) {
 		t.Fatalf("answer to a done turn's question: %v", err)
 	}
 }
+
+func TestAnEarlierQuestionOfTheTurnTakesNoAnswerMeantForTheNewerOne(t *testing.T) {
+	r := newRig(t)
+	r.asked(t, r7)
+	r.live()
+	r.reconcile(t, r7)
+	first := r.only(t)
+	answerOf(t, r, first.ID, messages.Answer{OptionID: "hold"})
+	r.record(t, r7, 1, askedRecord(&record.Question{Kind: "choice", Text: "Delete the draft?", Options: []record.Option{
+		{ID: "delete", Label: "Delete", Consequence: "drops it"}, {ID: "keep", Label: "Keep", Consequence: "keeps it"}}}))
+	r.reconcile(t, r7)
+	second := r.only(t)
+	if second.ID == first.ID {
+		t.Fatal("the newer question reused the first message")
+	}
+	if _, err := r.svc.Answer(context.Background(), first.ID, messages.Answer{OptionID: "delete", Source: turn.Cockpit}); !errors.Is(err, messages.ErrClosed) {
+		t.Fatalf("the earlier question took the answer: %v", err)
+	}
+	if got, ok, err := r.svc.Question(context.Background(), r7); err != nil || !ok || got.ID != second.ID {
+		t.Fatalf("question %+v %v %v", got, ok, err)
+	}
+	if m := r.message(t, first.ID); m.Answer != "Hold (option hold)" {
+		t.Fatalf("the earlier question was reworded: %+v", m)
+	}
+}
