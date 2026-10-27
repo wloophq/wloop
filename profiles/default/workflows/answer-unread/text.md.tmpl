@@ -1,0 +1,1 @@
+{{$n := index .Facts "session.unread_answers"}}An agent{{with index .Facts "session.repo"}} on {{.}}{{end}} has not read {{if eq $n 1}}your answer{{else}}{{$n}} of your answers{{end}} for {{index .Facts "session.unread_for"}}; its session may be stuck.

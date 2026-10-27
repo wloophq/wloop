@@ -13,9 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/messages"
-	"github.com/wloophq/wloop/internal/core/messages/messagestest"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
@@ -39,23 +37,14 @@ type itemsNone struct{}
 
 func (itemsNone) Items(context.Context, unit.Unit) ([]items.Item, error) { return nil, nil }
 
-type messageRig struct {
-	*turnRig
-	msgs    *messagestest.Store
-	entries *gtdtest.Store
-	facts   enabledUnits
-}
+type messageRig struct{ *turnRig }
 
 var r8u = pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 
 // newMessageRig serves the messages over a turn rig, with the entries' verbs registered.
 func newMessageRig(t *testing.T) *messageRig {
 	t.Helper()
-	r := &messageRig{turnRig: newTurnRig(t), msgs: messagestest.New(), entries: gtdtest.New(), facts: enabledUnits{map[unit.ProviderID]bool{}}}
-	clock := fixedClock(r.s.deps.Now())
-	r.s.deps.GTD = coregtd.New(coregtd.Deps{Store: r.entries, Items: itemsNone{}, Facts: r.facts, Clock: clock})
-	r.s.deps.Messages = &messages.Service{Store: r.msgs, Books: r.store, Turns: r.s.deps.Turns, Entries: r.s.deps.GTD,
-		Intents: turnstest.Intents(), Clock: clock}
+	r := &messageRig{turnRig: newTurnRig(t)}
 	r.s.registerMessages()
 	return r
 }

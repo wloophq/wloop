@@ -221,7 +221,7 @@ func (b *Book) OwesRecord(seq int64) bool {
 		return !recorded
 	case Asked:
 		return recorded && slices.ContainsFunc(b.Answers, func(a Answer) bool {
-			return a.TurnSeq == seq && a.Route == Typed && a.Session == t.Session && a.At.After(last.At)
+			return a.TurnSeq == seq && a.Route.Noticed() && a.Session == t.Session && a.At.After(last.At)
 		})
 	}
 	return false
@@ -232,7 +232,7 @@ func (b *Book) OpenQuestion(i Intent) bool {
 	return ok && t.State == Asked
 }
 
-// AnsweredAt is when the newest answer typed or resumed after the turn's last
+// AnsweredAt is when the newest answer noticed or resumed after the turn's last
 // record arrived.
 func (b *Book) AnsweredAt(seq int64) (time.Time, bool) {
 	var since time.Time
@@ -241,7 +241,7 @@ func (b *Book) AnsweredAt(seq int64) (time.Time, bool) {
 	}
 	for i := len(b.Answers) - 1; i >= 0; i-- {
 		a := b.Answers[i]
-		if a.TurnSeq == seq && (a.Route == Typed || a.Route == Resumed) && a.At.After(since) {
+		if a.TurnSeq == seq && (a.Route.Noticed() || a.Route == Resumed) && a.At.After(since) {
 			return a.At, true
 		}
 	}

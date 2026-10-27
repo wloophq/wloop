@@ -21,6 +21,7 @@ import (
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/gtd"
@@ -748,5 +749,26 @@ func TestBridgeRelaysARefusalAsJSONOnly(t *testing.T) {
 	}
 	if h := rec.Header(); h.Get("Content-Type") != "application/json" || h.Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatalf("headers %v", h)
+	}
+}
+
+func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	r.idle()
+	if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish"},"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var v api.EntryView
+	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message == nil || len(v.Message.Answers) != 1 ||
+		v.Message.Answers[0].OptionID != "publish" || v.Message.Answers[0].Message != m.ID || v.Message.Answers[0].ReadAt != nil {
+		t.Fatalf("%d %+v", code, v.Message)
+	}
+	if _, err := r.s.deps.Messages.Read(context.Background(), messages.ReadRequest{Session: "term-1", Unit: r8u.Unit()}); err != nil {
+		t.Fatal(err)
+	}
+	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
+		t.Fatalf("%d %+v", code, v.Message.Answers)
 	}
 }

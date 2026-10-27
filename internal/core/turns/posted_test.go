@@ -25,7 +25,7 @@ func postingTurn(t *testing.T) (*turns.Service, *turnstest.Store, *turnstest.Ses
 }
 
 func posted(text string) turns.AnswerRequest {
-	return turns.AnswerRequest{Unit: r7, Message: 5, Turn: 1, Text: text, Source: turn.Cockpit}
+	return turns.AnswerRequest{Unit: r7, Message: 5, Posted: true, Turn: 1, Text: text, Source: turn.Cockpit}
 }
 
 func TestAPostedMessageAnswerIsTypedWhenIdle(t *testing.T) {
@@ -34,11 +34,11 @@ func TestAPostedMessageAnswerIsTypedWhenIdle(t *testing.T) {
 	if err != nil || got.Route != turn.Typed || got.Handle != "term_1" {
 		t.Fatalf("%+v %v", got, err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "The user answered your Inbox message: use the old column" {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=5 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
 	}
 	b := bookOf(t, store, r7)
-	if len(b.Answers) != 1 || b.Answers[0].TurnSeq != 1 || b.Answers[0].Route != turn.Typed || b.Turns[0].State != turn.Started {
+	if len(b.Answers) != 1 || b.Answers[0].TurnSeq != 1 || b.Answers[0].Message != 5 || !b.Answers[0].Posted || b.Answers[0].Route != turn.Typed || b.Turns[0].State != turn.Started {
 		t.Fatalf("book %+v %+v", b.Answers, b.Turns)
 	}
 	if len(rec.launches) != 0 {
@@ -63,7 +63,7 @@ func TestAPostedMessageAnswerQueuesWhileBusy(t *testing.T) {
 	if err := s.DeliverStopped(ctx, "term_1"); err != nil {
 		t.Fatal(err)
 	}
-	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "The user answered your Inbox message: go on" {
+	if typed := sess.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=5 Unit=https://github.com/acme/api/pull/7" {
 		t.Fatalf("typed %+v", typed)
 	}
 	if r := routes(t, store); len(r) != 1 || r[0] != turn.Typed {

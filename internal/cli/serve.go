@@ -277,6 +277,7 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 		texts = bundledToolTexts
 	}
 	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: texts, Bundled: bundledToolTexts}
+	d.ReadText = srv.ReadText
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
@@ -921,7 +922,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	e.Store, e.Views, e.served = store, v, served
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, GitHub: inventoryFacts{store},
-		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), FastJob: fast,
+		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
 		AgentFor:      e.agentFor(served),
 		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
@@ -1347,6 +1348,35 @@ func (e *Env) toolTexts() map[string]mcp.ToolText {
 	}
 	return mcpTexts(l.Tools)
 }
+
+// profileNotices words what the loop tells a session from the loaded profile's notices.toml, the bundled
+// text when the loaded one fails or before a profile loads.
+type profileNotices struct{ e *Env }
+
+func (p profileNotices) Notice(name string, data map[string]any) (string, error) {
+	data = maps.Clone(data)
+	data["Name"] = brand.Name
+	var loaded map[string]string
+	if l := p.e.loadedIntents(); l != nil {
+		loaded = l.Notices
+	}
+	err := fmt.Errorf("the profile has no notice %s", name)
+	for _, src := range []string{loaded[name], bundledNotices()[name]} {
+		if src == "" {
+			continue
+		}
+		var b strings.Builder
+		if err = builtin.RenderToolText(&b, name, src, data); err == nil {
+			return b.String(), nil
+		}
+	}
+	return "", err
+}
+
+var bundledNotices = sync.OnceValue(func() map[string]string {
+	notices, _ := intentload.BundledNotices(turn.BundledFS())
+	return notices
+})
 
 // bundledToolTexts are the MCP tools' texts of the bundled profile.
 var bundledToolTexts = sync.OnceValue(func() map[string]mcp.ToolText {

@@ -63,7 +63,7 @@ type Server struct {
 	SlackDraft SlackDrafts
 	// SlackSearch is set with SlackRead; nil hides slack_search.
 	SlackSearch SlackSearcher
-	Inbox       Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post
+	Inbox       Inbox // set by internal/cli/serve_messages.go; nil hides inbox_post and inbox_read
 	// Texts are the tools' descriptions, the profile's tools.toml; nil
 	// describes none.
 	Texts func() map[string]ToolText
@@ -299,7 +299,7 @@ func (s *Server) tools() []registered {
 		r = append(r, registered{slackDraftTool(), true, s.slackDraft})
 	}
 	if s.Inbox != nil {
-		r = append(r, registered{inboxPostTool(), true, s.inboxPost})
+		r = append(r, registered{inboxPostTool(), true, s.inboxPost}, registered{inboxReadTool(), true, s.inboxRead})
 	}
 	return r
 }

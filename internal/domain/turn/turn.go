@@ -93,12 +93,17 @@ type Route string
 const (
 	Pending Route = "pending"
 	// Queued is an answer that waits for its busy session to stop.
-	Queued  Route = "queued"
-	Typed   Route = "typed"
+	Queued Route = "queued"
+	Typed  Route = "typed"
+	// Hooked is an answer whose notice blocked its session's stop.
+	Hooked  Route = "hooked"
 	Resumed Route = "resumed"
 	Refused Route = "refused"
 	Direct  Route = "direct"
 )
+
+// Noticed says that the answer's session was told of it: typed into it, or noticed through its Stop hook.
+func (r Route) Noticed() bool { return r == Typed || r == Hooked }
 
 type Source string
 
@@ -118,6 +123,15 @@ type Answer struct {
 	Route   Route
 	Session string
 	At      time.Time
+	// Message is the Inbox message the answer answers, 0 for one stored before answers named theirs.
+	Message int64
+	// Posted says that Message is one the agent posted during its turn, not its turn's question; the store
+	// reads it from the message.
+	Posted bool
+	// NoticedAt is when the answer's session was told of it, zero until it is.
+	NoticedAt time.Time
+	// ReadAt is when the agent read the answer, zero until it does.
+	ReadAt time.Time
 }
 
 // Book holds one unit's turns in ascending Seq, new ones last.

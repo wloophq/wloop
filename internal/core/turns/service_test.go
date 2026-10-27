@@ -452,7 +452,7 @@ func TestStopTable(t *testing.T) {
 				if got.Block != c.wantBlocks[i] {
 					t.Fatalf("stop %d: blocked %v", i, got.Block)
 				}
-				if got.Block && !strings.Contains(got.Reason, "turn abc") || got.Block && !strings.Contains(got.Reason, "`'/bin/"+brand.Name+"' turn end https://github.com/acme/api/pull/7 --turn abc --file .loop/turn-abc.json`") {
+				if got.Block && got.Reason != "record_owed ScratchDir=.loop Turn=abc Unit=https://github.com/acme/api/pull/7" {
 					t.Fatalf("reason %q", got.Reason)
 				}
 			}
@@ -533,7 +533,7 @@ func TestAnswerRoutes(t *testing.T) {
 		sess.Put("ws", turns.Terminal{Session: "term_1", Key: "tab-1", LastOutput: t0.Add(-5 * time.Minute)})
 		return s, store, reg, sess, rec
 	}
-	pointer := "The user answered. Run '/bin/" + brand.Name + "' turn answer https://github.com/acme/api/pull/7 to read the answer."
+	notice := "answered Message=9 Unit=https://github.com/acme/api/pull/7"
 	for _, c := range []struct {
 		name      string
 		arrange   func(setup)
@@ -542,7 +542,7 @@ func TestAnswerRoutes(t *testing.T) {
 		refused   bool
 		typedLine string
 	}{
-		{name: "warm and capable", req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Typed, typedLine: "The user answered: go ahead"},
+		{name: "warm and capable", req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Typed, typedLine: notice},
 		{name: "working", arrange: func(x setup) {
 			x.sess.SetAgents(turns.AgentObservation{WorkspaceID: "ws", Pane: "tab-1:leaf-1", State: turn.AgentWorking})
 		}, req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Queued},
@@ -562,24 +562,24 @@ func TestAnswerRoutes(t *testing.T) {
 			x.reg.Put(turn.Session{ID: "term_1", Pane: "tab-1:leaf-1", WorkspaceID: "ws", StartedAt: t0.Add(-time.Minute), MCPAt: t0.Add(-2 * time.Hour)})
 		}, req: turns.AnswerRequest{Text: "go ahead", Source: turn.TUI}, route: turn.Resumed},
 		{name: "the agent took the line without submitting it", arrange: func(x setup) { x.sess.Hold("term_1") },
-			req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Refused, refused: true, typedLine: "The user answered: go ahead"},
+			req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Refused, refused: true, typedLine: notice},
 		{name: "a failed turn resumes", arrange: stoppedAs(turn.Failed), req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Resumed},
 		{name: "an unrecorded turn resumes", arrange: stoppedAs(turn.Unrecorded), req: turns.AnswerRequest{Text: "go ahead", Source: turn.Cockpit}, route: turn.Resumed},
-		{name: "multi-line", req: turns.AnswerRequest{Text: "keep the column\nand drop the index", Source: turn.Cockpit}, route: turn.Typed, typedLine: pointer},
-		{name: "an option from the notification", req: turns.AnswerRequest{OptionID: "publish", Source: turn.Notification}, route: turn.Typed, typedLine: "The user answered: Publish (option publish)"},
-		{name: "yes from the TUI", arrange: confirmAsked, req: turns.AnswerRequest{Yes: true, Source: turn.TUI}, route: turn.Typed, typedLine: "The user answered: yes"},
-		{name: "no to a confirm", arrange: confirmAsked, req: turns.AnswerRequest{Source: turn.TUI}, route: turn.Typed, typedLine: "The user answered: no"},
-		{name: "an explicit no", arrange: confirmAsked, req: turns.AnswerRequest{No: true, Source: turn.Notification}, route: turn.Typed, typedLine: "The user answered: no"},
+		{name: "multi-line", req: turns.AnswerRequest{Text: "keep the column\nand drop the index", Source: turn.Cockpit}, route: turn.Typed, typedLine: notice},
+		{name: "an option from the notification", req: turns.AnswerRequest{OptionID: "publish", Source: turn.Notification}, route: turn.Typed, typedLine: notice},
+		{name: "yes from the TUI", arrange: confirmAsked, req: turns.AnswerRequest{Yes: true, Source: turn.TUI}, route: turn.Typed, typedLine: notice},
+		{name: "no to a confirm", arrange: confirmAsked, req: turns.AnswerRequest{Source: turn.TUI}, route: turn.Typed, typedLine: notice},
+		{name: "an explicit no", arrange: confirmAsked, req: turns.AnswerRequest{No: true, Source: turn.Notification}, route: turn.Typed, typedLine: notice},
 		{name: "yes with a note", arrange: confirmAsked, req: turns.AnswerRequest{Yes: true, Text: "but thank them", Source: turn.Cockpit}, route: turn.Typed,
-			typedLine: "The user answered: yes. but thank them"},
+			typedLine: notice},
 		{name: "no with a note", arrange: confirmAsked, req: turns.AnswerRequest{No: true, Text: "the draft misreads the diff", Source: turn.Cockpit}, route: turn.Typed,
-			typedLine: "The user answered: no. the draft misreads the diff"},
+			typedLine: notice},
 		{name: "free text to a confirm", arrange: confirmAsked, req: turns.AnswerRequest{Text: "wait for CI first", Source: turn.Cockpit}, route: turn.Typed,
-			typedLine: "The user answered: wait for CI first"},
+			typedLine: notice},
 		{name: "an option with a note", req: turns.AnswerRequest{OptionID: "publish", Text: "shorten the summary", Source: turn.Cockpit}, route: turn.Typed,
-			typedLine: "The user answered: Publish (option publish). shorten the summary"},
+			typedLine: notice},
 		{name: "an option the client already worded", req: turns.AnswerRequest{OptionID: "publish", Text: "Publish (option publish)", Source: turn.Notification}, route: turn.Typed,
-			typedLine: "The user answered: Publish (option publish)"},
+			typedLine: notice},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s, store, reg, sess, rec := warm(t)
@@ -588,7 +588,7 @@ func TestAnswerRoutes(t *testing.T) {
 				c.arrange(setup{s, store, reg, sess})
 			}
 			req := c.req
-			req.Unit = r7
+			req.Unit, req.Message = r7, 9
 			got, err := s.Answer(ctx, req)
 			if c.refused != refusal(err, "no turn started") || (!c.refused && err != nil) {
 				t.Fatalf("err %v", err)
@@ -601,7 +601,7 @@ func TestAnswerRoutes(t *testing.T) {
 				t.Fatalf("answers %+v", b.Answers)
 			}
 			a := b.Answers[0]
-			if a.Route != c.route || a.TurnSeq != 1 || a.Text != req.Text || a.OptionID != req.OptionID || a.Yes != req.Yes || a.No != req.No || a.Source != req.Source {
+			if a.Route != c.route || a.TurnSeq != 1 || a.Message != 9 || (a.Route == turn.Resumed) != !a.ReadAt.IsZero() || (a.Route == turn.Typed) != !a.NoticedAt.IsZero() || a.Text != req.Text || a.OptionID != req.OptionID || a.Yes != req.Yes || a.No != req.No || a.Source != req.Source {
 				t.Fatalf("answer %+v", a)
 			}
 			typed := sess.Typed()
@@ -633,11 +633,6 @@ func TestAnswerRoutes(t *testing.T) {
 			}
 			if strings.Contains(answered[0].Data, "\n") {
 				t.Fatalf("answered data %q", answered[0].Data)
-			}
-			if c.typedLine == pointer {
-				if text, err := s.AnswerText(ctx, "term_1"); err != nil || text != req.Text {
-					t.Fatalf("answer text %q %v", text, err)
-				}
 			}
 		})
 	}

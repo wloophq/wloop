@@ -107,6 +107,22 @@ func TestOwesRecord(t *testing.T) {
 	}
 }
 
+func TestAnAnswerNoticedThroughTheStopHookCountsAsDelivered(t *testing.T) {
+	b := Book{Unit: r7, Turns: []Turn{{Seq: 1, Intent: "review", ID: "abc", State: Asked, Session: "term_1", StartedAt: at(1)}},
+		Records: []Record{{ID: 1, TurnSeq: 1, Session: "term_1", At: at(2), Record: askedRecord(false)}}}
+	hooked := b.Answer(Answer{TurnSeq: 1, Text: "go", Source: Cockpit, At: at(3)})
+	hooked.Route, hooked.Session = Hooked, "term_1"
+	if !b.OwesRecord(1) {
+		t.Fatal("an answer noticed through the Stop hook does not make the turn owe a record")
+	}
+	if got, ok := b.AnsweredAt(1); !ok || !got.Equal(at(3)) {
+		t.Fatalf("answered at %v %v", got, ok)
+	}
+	if h := b.History(10); len(h) != 1 || len(h[0].Said) != 1 || h[0].Said[0] != "go" {
+		t.Fatalf("history %+v", h)
+	}
+}
+
 func TestQuestionIsTheOpenOneAmongTheAnswerable(t *testing.T) {
 	answerable := []string{"review", "address", "probe"}
 	b := Book{Unit: r7, Turns: []Turn{

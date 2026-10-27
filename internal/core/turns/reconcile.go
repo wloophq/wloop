@@ -184,9 +184,9 @@ func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (reco
 	url := newest.URL
 	switch {
 	case url == "" && newest.ID != "":
-		url = urlOf(b.Unit) + "#pullrequestreview-" + newest.ID
+		url = unitArg(b.Unit) + "#pullrequestreview-" + newest.ID
 	case url == "":
-		url = urlOf(b.Unit)
+		url = unitArg(b.Unit)
 	}
 	return record.Record{
 		State:   record.Done,

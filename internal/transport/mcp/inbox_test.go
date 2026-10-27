@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/brand"
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -107,7 +108,7 @@ func TestInboxPostCreatesAMessage(t *testing.T) {
 		t.Fatalf("%+v; open %+v", got.Result, open)
 	}
 	m := open[0]
-	want := fmt.Sprintf("Posted to the Inbox as message %d; the user's answer is typed into this session when it is idle.", m.ID)
+	want := fmt.Sprintf("Posted to the Inbox as message %[1]d. When the user answers it, %[2]s tells this session that message %[1]d was answered; read the answer with inbox_read.", m.ID, brand.Name)
 	if got.Result.Content[0].Text != want {
 		t.Fatalf("result %q", got.Result.Content[0].Text)
 	}
