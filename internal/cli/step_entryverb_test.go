@@ -111,6 +111,28 @@ func TestEntryVerbCheckRefusesWhatTheEntrysStateRefuses(t *testing.T) {
 	}
 }
 
+func TestEntryVerbLeavesClosingADerivedEntryToItsItems(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newEntryRig(t, nil)
+	at := testNow.Add(-time.Hour)
+	if err := r.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: gtd.Entry{ID: "e-02", Kind: gtd.KindWaiting, State: gtd.Waiting,
+		Title: "Waiting on the reviewer", Origin: gtd.OriginDerived, Created: at, Updated: at}}}); err != nil {
+		t.Fatal(err)
+	}
+	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
+	why := workflow.Why{Workflow: "w"}
+	for _, v := range []string{"done", "dismiss"} {
+		refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", v), gtd.UnitOf("e-02"), why, automation.CheckOpts{})
+		if err != nil || !strings.Contains(refusal, "closes when its items resolve") {
+			t.Errorf("%s on a derived entry: %q %v", v, refusal, err)
+		}
+	}
+	if refusal, err := s.Check(ctx, wfStep("entry.verb", "verb", "someday"), gtd.UnitOf("e-02"), why, automation.CheckOpts{}); err != nil || refusal != "" {
+		t.Errorf("someday on a derived entry: %q %v", refusal, err)
+	}
+}
+
 func TestEntryVerbRunsOnlyVerbsThatMoveAStoredEntry(t *testing.T) {
 	t.Parallel()
 	for _, v := range builtin.EntryStepVerbs {

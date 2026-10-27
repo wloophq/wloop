@@ -470,3 +470,21 @@ func (s *Service) Sync(ctx context.Context, units []unit.Unit) error {
 	}
 	return s.d.Store.Apply(ctx, p.changes())
 }
+
+// Attach adds u to entry id's units, after those it holds; a unit it holds already changes nothing.
+func (s *Service) Attach(ctx context.Context, id gtd.ID, u unit.Unit) error {
+	if u.IsZero() || u == gtd.UnitOf(id) {
+		return fmt.Errorf("%w: attach %s to entry %s", ErrArgs, u, id)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := s.d.Store.Entry(ctx, id)
+	if err != nil {
+		return err
+	}
+	if slices.Contains(e.Units, u) {
+		return nil
+	}
+	e.Units, e.Updated = append(slices.Clone(e.Units), u), s.now()
+	return s.d.Store.Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: e, Why: "attached " + u.String()}})
+}

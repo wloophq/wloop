@@ -242,6 +242,11 @@
             }
           },
           "type": "object"
+        },
+        "attach_posts": {
+          "default": false,
+          "description": "On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -482,6 +487,11 @@
           },
           "type": "array"
         },
+        "attach_url": {
+          "default": false,
+          "description": "On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.",
+          "type": "boolean"
+        },
         "history_artifact": {
           "description": "The artifact the unit's history shows.",
           "type": "string"
@@ -619,6 +629,10 @@
           "description": "The session closes when its turn is done.",
           "type": "boolean"
         },
+        "name": {
+          "description": "What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.",
+          "type": "string"
+        },
         "strategy": {
           "description": "Whether a turn reuses the unit's live session or starts a new one.",
           "enum": [
@@ -651,6 +665,24 @@
       "description": "One line on what it does: its action's tooltip, its help line, its profile listing. Required.",
       "type": "string"
     },
+    "target": {
+      "additionalProperties": false,
+      "description": "What a run with no unit does.",
+      "properties": {
+        "missing": {
+          "description": "capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.",
+          "enum": [
+            "capture"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "description": "The captured entry's title, over .guidance, with firstLine.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "user_facing": {
       "default": true,
       "description": "Offered as a command, a skill and an action.",
@@ -678,6 +710,10 @@
         {
           "additionalProperties": false,
           "properties": {
+            "name": {
+              "description": "The name of the worktree created for the turn's unit, over the name facts, with slug; the loop's own when absent.",
+              "type": "string"
+            },
             "repo": {
               "description": "The repository the turn runs in, owner/name.",
               "type": "string"
@@ -685,6 +721,11 @@
             "repo_input": {
               "description": "The input that holds the repository the turn runs in.",
               "type": "string"
+            },
+            "repo_optional": {
+              "default": false,
+              "description": "With repo_input: a turn whose input names no repository runs in the neutral repository, with no checkout.",
+              "type": "boolean"
             }
           },
           "type": "object"

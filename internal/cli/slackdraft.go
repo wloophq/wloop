@@ -65,8 +65,8 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		t, ok = b.OfSession(handle)
 	}
 	onSlack := ok && b.Unit.Provider == slackPlugin
-	if send.IsPermalink(a.Target) {
-		u, err := s.sender.permalinkUnit(ctx, a.Target)
+	if send.IsMessage(a.Target) {
+		u, err := s.sender.messageUnit(ctx, a.Target)
 		if err != nil {
 			return mcp.DraftResult{}, err
 		}
@@ -78,8 +78,9 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 	case onSlack:
 	case !ok:
 		return mcp.DraftResult{}, errNoDraftTurn
-	default:
-		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message permalink target", b.Unit.Label())
+	case s.outbox.PublisherOf(draft.Draft{Unit: b.Unit, Target: a.Target}) != slackPlugin:
+		return mcp.DraftResult{}, fmt.Errorf("this session's turn is on %s; slack_draft drafts outside a Slack unit only on a message ref or permalink target, "+
+			"or on a channel or person target from a unit whose own plugin posts nothing", b.Unit.Label())
 	}
 	its := a.Items
 	if len(its) == 0 {
@@ -97,7 +98,7 @@ func (s *slackDrafts) Draft(ctx context.Context, handle string, a mcp.DraftArgs)
 		Origin: sessionOrigin(b, t, b.Unit, draft.OriginTurn)})
 }
 
-// draftOutside proposes a on u, the unit of its permalink target, which is
+// draftOutside proposes a on u, the unit of its message target, which is
 // not the unit of the session's turn: it answers none of that unit's items
 // and declares no effect.
 func (s *slackDrafts) draftOutside(ctx context.Context, u unit.Unit, a mcp.DraftArgs, origin draft.Origin) (mcp.DraftResult, error) {
@@ -214,7 +215,7 @@ func (r sessionSends) post(ctx context.Context, session string, req send.Request
 		return dslack.ThreadUnit(team, sent.Channel, thread), nil
 	}
 	r.record(ctx, session, where, outbox.Proposal{Purpose: sentPurpose, Delivery: draft.Message, Target: req.Target, Text: req.Text},
-		draft.Evidence{Ref: sent.TS, Permalink: sent.Permalink})
+		draft.Evidence{Ref: send.Ref(sent.Channel, sent.TS), Permalink: sent.Permalink})
 }
 
 func (r sessionSends) reaction(ctx context.Context, session string, req send.Reaction, got send.Reacted) {
@@ -222,18 +223,18 @@ func (r sessionSends) reaction(ctx context.Context, session string, req send.Rea
 	if req.Remove {
 		purpose = unreactedPurpose
 	}
-	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction, Target: req.Permalink,
-		Reaction: got.Name}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+	r.record(ctx, session, r.messageUnit(req.Message), outbox.Proposal{Purpose: purpose, Delivery: draft.Reaction, Target: req.Message,
+		Reaction: got.Name}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
 }
 
 func (r sessionSends) edit(ctx context.Context, session string, req send.Edit, got send.Edited) {
-	r.record(ctx, session, r.permalinkUnit(req.Permalink), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: req.Permalink,
-		Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: got.TS, Permalink: req.Permalink})
+	r.record(ctx, session, r.messageUnit(req.Message), outbox.Proposal{Purpose: editedPurpose, Delivery: draft.EditDelivery, Target: req.Message,
+		Text: req.Text, Replaced: got.Replaced}, draft.Evidence{Ref: send.Ref(got.Channel, got.TS), Permalink: got.Permalink})
 }
 
-func (r sessionSends) permalinkUnit(permalink string) func(context.Context, string) (unit.Unit, error) {
+func (r sessionSends) messageUnit(message string) func(context.Context, string) (unit.Unit, error) {
 	return func(ctx context.Context, team string) (unit.Unit, error) {
-		return r.landing.PermalinkUnit(ctx, r.client, team, permalink)
+		return r.landing.MessageUnit(ctx, r.client, team, message)
 	}
 }
 
@@ -243,18 +244,18 @@ func (r sessionSends) record(ctx context.Context, session string, where func(ctx
 	ctx = context.WithoutCancel(ctx)
 	tok, err := r.token()
 	if err != nil {
-		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
+		r.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
 		return
 	}
 	u, err := where(ctx, tok.Team)
 	if err != nil {
-		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
+		r.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
 		return
 	}
 	p.Unit, p.Origin = u, r.origin(ctx, session, u)
 	d, err := r.outbox.RecordSent(ctx, p, ev)
 	if err != nil {
-		r.logf("slack_sent_unrecorded ts=%s error=%v", ev.Ref, err)
+		r.logf("slack_sent_unrecorded message=%s error=%v", ev.Ref, err)
 		return
 	}
 	r.logf("slack_sent_recorded draft=%d unit=%s", d.ID, u)

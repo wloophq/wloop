@@ -167,7 +167,7 @@ func TestPublishDefaultsToTheUnitThread(t *testing.T) {
 	if post.Get("channel") != pubConv || post.Get("thread_ts") != pubParent || post.Get("text") != "on it" {
 		t.Fatalf("post %v", post)
 	}
-	if ev.Ref != pubPosted || !strings.Contains(ev.Permalink, "/p1700000300000300") || !ev.At.Equal(time.Unix(1700000300, 0).UTC()) {
+	if ev.Ref != pubConv+"/"+pubPosted || !strings.Contains(ev.Permalink, "/p1700000300000300") || !ev.At.Equal(time.Unix(1700000300, 0).UTC()) {
 		t.Fatalf("evidence %+v", ev)
 	}
 }
@@ -204,7 +204,7 @@ func TestReactAddsAReaction(t *testing.T) {
 	if len(adds) != 1 || adds[0].Get("channel") != pubConv || adds[0].Get("timestamp") != pubParent || adds[0].Get("name") != "white_check_mark" {
 		t.Fatalf("reactions.add %v", adds)
 	}
-	if n := len(ps.calls("chat.postMessage")); n != 0 || ev.Ref != pubParent {
+	if n := len(ps.calls("chat.postMessage")); n != 0 || ev.Ref != pubConv+"/"+pubParent {
 		t.Fatalf("posts %d, evidence %+v", n, ev)
 	}
 
@@ -395,7 +395,7 @@ func TestValidateRefusesWithoutPosting(t *testing.T) {
 		"not member": {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubOutside, pubParent), Kind: draft.Reply, Text: "hi"}, want: []string{"not a member", "#elsewhere"}, is: send.ErrCannotPost},
 		"two users":  {d: draft.Draft{Unit: dslack.ThreadUnit(team, pubConv, pubParent), Kind: draft.Nudge, Text: "hi", Target: "@sam"}, want: []string{"U0000000011", "U0000000012"}, is: send.ErrAmbiguous},
 		"empty":      {d: threadDraft(draft.Reply, "  "), want: []string{"empty"}},
-		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.GitHub, Key: "o/r#1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"slack units"}},
+		"other unit": {d: draft.Draft{Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Kind: draft.Reply, Text: "hi"}, want: []string{"needs a target"}},
 		"react dm":   {d: draft.Draft{Unit: ps.segmentUnit(t), Kind: draft.React, Delivery: draft.Reaction, Reaction: "eyes"}, want: []string{"needs a target"}},
 		"escapes":    {d: threadDraft(draft.Reply, "a & b <c> <@U0001|x> <https://x.y|z>"), want: nil},
 	} {
@@ -446,7 +446,7 @@ func TestVerifyFindsThePost(t *testing.T) {
 	ps := newPubSlack(t)
 	ps.stored(map[string]any{"ts": pubPosted, "thread_ts": pubParent, "user": me, "text": "on it"})
 	ev, ok, err := ps.publisher().Verify(context.Background(), threadDraft(draft.Reply, "on it"), started)
-	if err != nil || !ok || ev.Ref != pubPosted || ev.Permalink == "" {
+	if err != nil || !ok || ev.Ref != pubConv+"/"+pubPosted || ev.Permalink == "" {
 		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
 	}
 	replies := ps.calls("conversations.replies")
@@ -630,5 +630,63 @@ func TestAnEditIsNeverPublishedAsADraft(t *testing.T) {
 	}
 	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
 		t.Fatalf("Where = %q %v", where, err)
+	}
+}
+
+func TestADraftOnAnotherProvidersUnitPostsToItsTarget(t *testing.T) {
+	started := time.Unix(1700000300, 0)
+	ps := newPubSlack(t)
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Kind: draft.Reply, Purpose: "reply", Delivery: draft.Message,
+		Text: "the new search is live", Target: pubConv}
+	if where, err := ps.publisher().Where(context.Background(), d); err != nil || where != "#general" {
+		t.Fatalf("Where = %q, %v", where, err)
+	}
+	if _, err := ps.publisher().Publish(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if post := ps.posted(t); post.Get("channel") != pubConv || post.Has("thread_ts") || post.Get("text") != d.Text {
+		t.Fatalf("post %v", post)
+	}
+	ps.stored(map[string]any{"ts": pubPosted, "user": me, "text": d.Text})
+	if ev, ok, err := ps.publisher().Verify(context.Background(), d, started); err != nil || !ok || ev.Ref != pubConv+"/"+pubPosted {
+		t.Fatalf("Verify = %+v %v %v", ev, ok, err)
+	}
+}
+
+func TestAPostOnAnotherProvidersUnitLandsInTheThreadItStarts(t *testing.T) {
+	ps := newPubSlack(t)
+	d := draft.Draft{ID: 9, Unit: unit.Unit{Provider: unit.Entry, Key: "e1"}, Delivery: draft.Message, Target: pubConv,
+		Evidence: draft.Evidence{Ref: "1700000300.000100", Permalink: "https://acme.slack.com/archives/" + pubConv + "/p1700000300000100"}}
+	u, ok, err := ps.publisher().Landed(context.Background(), d)
+	if err != nil || !ok || u != dslack.ThreadUnit(team, pubConv, "1700000300.000100") {
+		t.Fatalf("Landed = %v %v %v", u, ok, err)
+	}
+	d.Evidence.Permalink = ""
+	if _, ok, _ := ps.publisher().Landed(context.Background(), d); ok {
+		t.Fatal("a post without a permalink landed")
+	}
+}
+
+func TestTakesTheTargetsSlackPostsTo(t *testing.T) {
+	p := &Publisher{}
+	for target, want := range map[string]bool{
+		"https://acme.slack.com/archives/" + pubConv + "/p1700000000000100": true,
+		pubConv:                    true,
+		pubDM:                      true,
+		"#general":                 true,
+		other:                      true,
+		"@ana":                     true,
+		"slack:" + other:           true,
+		"@{slack:" + other + "}":   true,
+		"ana@acme.example":         true,
+		" #general ":               true,
+		"":                         false,
+		"acme/api#3":               false,
+		"general":                  false,
+		"https://acme.example/x/1": false,
+	} {
+		if got := p.Takes(target); got != want {
+			t.Errorf("Takes(%q) = %v, want %v", target, got, want)
+		}
 	}
 }

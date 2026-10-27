@@ -513,6 +513,11 @@ type ActionRequest struct {
 	// was asked from.
 	Items []string `json:"items,omitempty"`
 	Entry string   `json:"entry,omitempty"`
+	// Manager is the workspace manager that creates the turn's worktree, ""
+	// for the configured ones; Parent is the caller's worktree, the new
+	// one's parent where its manager keeps parents.
+	Manager string `json:"manager,omitempty"`
+	Parent  string `json:"parent,omitempty"`
 }
 
 // ActionResult carries, for an action an intake runs, the intake that
@@ -614,4 +619,11 @@ type CheckDetail struct {
 type Info struct {
 	Port  int    `json:"port"`
 	Token string `json:"token"`
+}
+
+// Resolved is the unit an address lands in; Found is false when no plugin
+// reads the address.
+type Resolved struct {
+	Unit  unit.Unit `json:"unit"`
+	Found bool      `json:"found"`
 }

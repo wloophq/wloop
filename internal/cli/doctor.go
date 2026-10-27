@@ -210,7 +210,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 	case errors.As(cfgErr, new(*config.UnknownKeysError)):
 		add(markMissing, "config", cfgErr.Error(), "remove or rename those keys in "+e.ConfigPath+"; the configuration reference lists every key")
 	case cfgErr != nil:
-		add(markMissing, "config", cfgErr.Error(), "fix the JSON in "+e.ConfigPath)
+		add(markMissing, "config", cfgErr.Error(), e.configFix(cfgErr))
 	default:
 		where := e.ConfigPath
 		if _, err := os.Stat(e.ConfigPath); err != nil {
@@ -936,4 +936,12 @@ func (e *Env) launchChecks(ctx context.Context, cfg config.Config) []check {
 		out = append(out, check{markOK, "launch " + string(d.Name), "in " + e.displayOf([]string{m.Name()}), ""})
 	}
 	return out
+}
+
+// configFix is what fixes err, a refusal of the config file.
+func (e *Env) configFix(err error) string {
+	if errors.As(err, new(*config.LegacyFileError)) {
+		return "write " + e.ConfigPath + " with the script the error links"
+	}
+	return "fix the TOML in " + e.ConfigPath
 }

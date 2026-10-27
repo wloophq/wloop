@@ -76,8 +76,13 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 
 func TestTheConfigsDraftApprovalOverlaysTheWorkflows(t *testing.T) {
 	t.Parallel()
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-ask-owner": {"drafts": {"approval": {"mode": "send"}}},
-		"slack-closure": {"drafts": {"approval": {"mode": "delay", "window": "2h"}}}}}`)
+	cfg, err := loadConfigTOML(t, `[workflows.slack-ask-owner.drafts.approval]
+mode = "send"
+
+[workflows.slack-closure.drafts.approval]
+mode = "delay"
+window = "2h"
+`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,8 +106,13 @@ func TestTheConfigsDraftApprovalOverlaysTheWorkflows(t *testing.T) {
 
 func TestAConfigOverlayOnAWorkflowWithoutABlockOverlaysTheIntents(t *testing.T) {
 	t.Parallel()
-	cfg, err := loadConfigJSON(t, `{"workflows": {"review-first-round": {"drafts": {"approval": {"rule": [{"when": "pr.draft", "mode": "wait"}]}}},
-		"review-follow-up": {"drafts": {"approval": {"window": "30m"}}}}}`)
+	cfg, err := loadConfigTOML(t, `[[workflows.review-first-round.drafts.approval.rule]]
+when = "pr.draft"
+mode = "wait"
+
+[workflows.review-follow-up.drafts.approval]
+window = "30m"
+`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,12 +136,24 @@ func TestAConfigOverlayOnAWorkflowWithoutABlockOverlaysTheIntents(t *testing.T) 
 
 func TestConfigWorkflowProblemsCheckTheMergedBlocks(t *testing.T) {
 	t.Parallel()
-	cfg, err := loadConfigJSON(t, `{"workflows": {
-		"nudge-silent-30d": {"approval": {"window": "5m"}},
-		"review-first-round": {"approval": {"window": "5m"}, "drafts": {"approval": {"mode": "delay"}}},
-		"slack-closure": {"drafts": {"approval": {"window": "30m"}}},
-		"slack-ask-owner": {"drafts": {"approval": {"rule": []}}},
-		"address": {"only_when": "brief.extra.nope == true"}}}`)
+	cfg, err := loadConfigTOML(t, `[workflows.nudge-silent-30d.approval]
+window = "5m"
+
+[workflows.review-first-round.approval]
+window = "5m"
+
+[workflows.review-first-round.drafts.approval]
+mode = "delay"
+
+[workflows.slack-closure.drafts.approval]
+window = "30m"
+
+[workflows.slack-ask-owner.drafts.approval]
+rule = []
+
+[workflows.address]
+only_when = "brief.extra.nope == true"
+`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,9 +276,9 @@ when = 'slack.conversation == "dm"'
 mode = "send"
 `
 
-func loadConfigJSON(t *testing.T, body string) (config.Config, error) {
+func loadConfigTOML(t *testing.T, body string) (config.Config, error) {
 	t.Helper()
-	file := filepath.Join(t.TempDir(), "config.json")
+	file := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -273,8 +295,14 @@ func TestTheConfigsDraftApprovalReplacesTheManifestsRules(t *testing.T) {
 		t.Fatalf("not loaded: %v", l.Problems.Error())
 	}
 	w := l.Workflows[i]
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"drafts": {"approval": {"mode": "wait",
-		"rule": [{"when": "slack.channel == \"C0TEAM\" && draft.purpose == \"thanks\"", "mode": "delay", "window": "1h"}]}}}}}`)
+	cfg, err := loadConfigTOML(t, `[workflows.slack-thanks.drafts.approval]
+mode = "wait"
+
+[[workflows.slack-thanks.drafts.approval.rule]]
+when = "slack.channel == \"C0TEAM\" && draft.purpose == \"thanks\""
+mode = "delay"
+window = "1h"
+`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,8 +330,13 @@ func TestTheConfigsDraftApprovalReplacesTheManifestsRules(t *testing.T) {
 
 func TestAConfigRuleOverAnotherSubjectIsRefusedAndHolds(t *testing.T) {
 	t.Parallel()
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"drafts": {"approval": {"mode": "send",
-		"rule": [{"when": "pr.author == \"dependabot[bot]\"", "mode": "send"}]}}}}}`)
+	cfg, err := loadConfigTOML(t, `[workflows.slack-thanks.drafts.approval]
+mode = "send"
+
+[[workflows.slack-thanks.drafts.approval.rule]]
+when = "pr.author == \"dependabot[bot]\""
+mode = "send"
+`)
 	if err != nil {
 		t.Fatalf("a rule over one subject's facts loads: %v", err)
 	}
@@ -323,14 +356,14 @@ func TestAConfigRuleOverAnotherSubjectIsRefusedAndHolds(t *testing.T) {
 func TestTheConfigRefusesAnInvalidDraftApprovalRule(t *testing.T) {
 	t.Parallel()
 	for name, rule := range map[string]string{
-		"a bad predicate":         `{"when": "draft.delivery ==", "mode": "send"}`,
-		"a window with mode none": `{"when": "draft.delivery == \"message\"", "mode": "send", "window": "1h"}`,
-		"a brief fact":            `{"when": "brief.risk == \"low\"", "mode": "send"}`,
-		"no when":                 `{"mode": "send"}`,
-		"an untrusted fact":       `{"when": "slack.started_by_me", "mode": "send"}`,
-		"two subjects":            `{"when": "pr.author == \"x\" && slack.conversation == \"dm\"", "mode": "send"}`,
+		"a bad predicate":         `when = "draft.delivery =="` + "\nmode = \"send\"",
+		"a window with mode none": `when = 'draft.delivery == "message"'` + "\nmode = \"send\"\nwindow = \"1h\"",
+		"a brief fact":            `when = 'brief.risk == "low"'` + "\nmode = \"send\"",
+		"no when":                 `mode = "send"`,
+		"an untrusted fact":       `when = "slack.started_by_me"` + "\nmode = \"send\"",
+		"two subjects":            `when = 'pr.author == "x" && slack.conversation == "dm"'` + "\nmode = \"send\"",
 	} {
-		_, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"drafts": {"approval": {"mode": "wait", "rule": [`+rule+`]}}}}}`)
+		_, err := loadConfigTOML(t, "[workflows.slack-thanks.drafts.approval]\nmode = \"wait\"\n\n[[workflows.slack-thanks.drafts.approval.rule]]\n"+rule)
 		if err == nil || !strings.Contains(err.Error(), "workflows.slack-thanks.drafts.approval.rule[0]") {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -346,8 +379,13 @@ func TestARuleThatNeverReleasesACommentIsReportedAtLoad(t *testing.T) {
 		!strings.Contains(te.err.String(), "never releases a comment draft") {
 		t.Fatalf("code %d\n%s", code, te.err.String())
 	}
-	cfg, err := loadConfigJSON(t, `{"workflows": {"slack-thanks": {"drafts": {"approval": {"mode": "wait",
-		"rule": [{"when": "draft.delivery != \"reaction\"", "mode": "send"}]}}}}}`)
+	cfg, err := loadConfigTOML(t, `[workflows.slack-thanks.drafts.approval]
+mode = "wait"
+
+[[workflows.slack-thanks.drafts.approval.rule]]
+when = "draft.delivery != \"reaction\""
+mode = "send"
+`)
 	if err != nil {
 		t.Fatal(err)
 	}

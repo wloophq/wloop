@@ -117,6 +117,8 @@ const (
 	// ApprovalSlot holds the draft's own facts a [drafts.approval] rule
 	// reads besides its unit's.
 	ApprovalSlot FactSlot = "approval"
+	// NameSlot holds the facts a manifest's session.name reads.
+	NameSlot FactSlot = "name"
 )
 
 type Fact struct {
@@ -176,7 +178,7 @@ var IntentDims = []string{dintent.DimStage, dintent.DimReviewer}
 var Stages = []string{"first", "follow-up"}
 
 // ReservedFlags are flags the CLI owns; no input may declare them.
-var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help"}
+var ReservedFlags = []string{"--no-wait", "--no-brief", "--turn", "--help", "--manager", "--parent"}
 
 // RoundProviders are the providers whose plugin keeps a per-unit count of
 // turns: every automated turn.start on their units spends

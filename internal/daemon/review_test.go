@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/json"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"slices"
 	"testing"
 	"time"
@@ -152,7 +153,9 @@ func TestProjectEntryViews(t *testing.T) {
 func TestTheReviewStepsAreWordedByTheProfile(t *testing.T) {
 	t.Parallel()
 	texts := intentload.GTDTexts{Review: map[string]string{"waiting": "Chase what waits"}}
-	r := newEntriesRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts} } })
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
 	r.serveProjects()
 	var rv api.Review
 	if code := get(t, r.s, api.ReviewPath, &rv); code != 200 {

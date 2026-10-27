@@ -263,7 +263,7 @@ var sections = []struct {
 	{builtin.SurfaceTools, "MCP tool descriptions (`tools.toml`)"},
 	{builtin.SurfaceNotices, "What the loop tells a session (`notices.toml`)"},
 	{builtin.SurfaceBlock, "Judgment block front matter (`+++` in `<dim>=<value>/.../intent=<name>.md`)"},
-	{builtin.SurfaceConfig, "Configuration (`config.json`)"},
+	{builtin.SurfaceConfig, "Configuration (`config.toml`)"},
 }
 
 // line is a row of the language page, then what each of its values means
@@ -379,7 +379,7 @@ func languagePage() (string, error) {
 		"description: Every reserved word of the profile files and the configuration, one line each.",
 		"---",
 		"",
-		"Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.",
+		"Every key a profile file or `config.toml` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.",
 	}
 	for _, s := range sections {
 		out = append(out, "", "## "+s.title, "")
@@ -438,7 +438,7 @@ var schemas = []struct {
 	{"actions.schema.json", "Built-in actions (actions.toml)", builtin.SurfaceActions},
 	{"gtd.schema.json", "GTD verbs and views (gtd.toml)", builtin.SurfaceGTD},
 	{"keys.schema.json", "Key help (keys.toml)", builtin.SurfaceKeys},
-	{"config.schema.json", "Configuration (config.json)", builtin.SurfaceConfig},
+	{"config.schema.json", "Configuration (config.toml)", builtin.SurfaceConfig},
 }
 
 // node is a table of the grammar's tree: its row, its keys, an array of

@@ -188,6 +188,9 @@ func (s *sheet) validateRecord(d dintent.Def) {
 	if r.HistoryArtifact != "" && !slices.Contains(r.Artifacts, r.HistoryArtifact) {
 		s.add("record.history_artifact", "%s is not in record.artifacts", r.HistoryArtifact)
 	}
+	if r.AttachURL && !slices.Contains(r.Outcome, "url") {
+		s.add("record.attach_url", "needs url in record.outcome")
+	}
 	for i, q := range r.Require {
 		path := fmt.Sprintf("record.require[%d]", i)
 		if q.State != "" && !slices.Contains(r.States, q.State) {

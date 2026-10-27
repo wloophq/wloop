@@ -51,6 +51,10 @@ func (e Entry) FirstUnit() (unit.Unit, bool) {
 	return unit.Unit{}, false
 }
 
+// CapturedByUser says whether the user captured the entry, rather than the
+// loop deriving it from a third party's message or draft.
+func (e Entry) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }
+
 // Live says whether the entry is neither done nor trash.
 func (e Entry) Live() bool { return e.State != Done && e.State != Trash }
 

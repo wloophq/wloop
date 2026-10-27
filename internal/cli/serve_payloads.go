@@ -3,6 +3,7 @@ package cli
 import (
 	"maps"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/turn"
@@ -23,5 +24,6 @@ func (e *Env) payloadReaders() map[unit.ProviderID]turn.PayloadReader {
 	out := map[unit.ProviderID]turn.PayloadReader{}
 	maps.Copy(out, e.payloads)
 	out[unit.GitHub] = turn.GitHub{PRs: basicsReader{e}}
+	out[gtd.Codec{}.Provider()] = entryPayloads{e}
 	return out
 }

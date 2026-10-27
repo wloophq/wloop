@@ -3,3 +3,7 @@ provider = "github"
 
 # What a [[refuse]] case whose when holds says when its why renders empty.
 refusal = "its intent refuses it here"
+
+# What the workspace manager and the agent show a session as, when its
+# manifest has no session.name.
+session_name = '{{.session.title}} {{.unit.label}}'

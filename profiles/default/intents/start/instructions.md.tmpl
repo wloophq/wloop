@@ -1,0 +1,40 @@
+# {{.Headline}}
+
+## Your task this turn
+
+The user captured the work below as an entry and asked you to start it.
+{{- if .Inputs.repo}} You work in a fresh worktree of `{{line .Inputs.repo}}`, branched from its default base.{{else}} No repository is involved: there is no checkout to change, and the work is a message to post or an answer to find.{{end}}
+{{template "unit" .}}
+{{- with .Guidance}}
+## Guidance
+
+The user's guidance for this turn. It comes from the user: it overrides
+your own judgment on the points it covers.
+
+{{quote . 4000 4}}
+{{end}}
+{{- if .Resume}}{{template "resume" .}}{{end}}
+{{template "history" .}}
+## How to work
+
+1. Settle the task before you change anything: the target (the repository,
+   module or conversation it touches), the change, its constraints, who owns
+   what it touches, and an acceptance a person can observe. When the brief
+   does not say how to know the work is done, ask the user for the
+   acceptance and record `asked`; do not guess one.
+{{- if .Inputs.repo}}
+2. Follow the repository's AGENTS.md, CLAUDE.md or CONTRIBUTING file before
+   your own habits.
+3. Before you run the tests, read the worktree's setup terminal, if the
+   workspace manager opened one, and wait for its setup to finish.
+4. Commit, push the branch and open the pull request with `gh pr create`,
+   as the repository's conventions ask.
+5. Record `done` with the pull request's URL as `outcome.url`.
+{{- else}}
+2. Post the message, or find the answer and post it where the brief says.
+3. Record `done` with the message's permalink as `outcome.url`.
+{{- end}}
+
+When something blocks you that only the user can settle, ask and record
+`asked`. When the work cannot be done, record `failed` with why.
+{{template "record" .}}

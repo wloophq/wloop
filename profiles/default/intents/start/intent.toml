@@ -1,0 +1,48 @@
+label     = "Start"
+summary   = "Start new work from a brief: in a fresh worktree of a repository, or with no checkout"
+provider  = "entry"
+workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .entry.title}}-{{.entry.short_id}}' }
+runners   = ["session"]
+session   = { strategy = "new", title = "start", name = '{{or .workspace.name .entry.title}}' }
+brief     = { render = false, wait = false }
+
+[target]
+missing = "capture"
+title   = '{{firstLine .guidance}}'
+
+[help]
+target   = "entry:<id>, or none to capture the brief as a new entry"
+summary  = "Start new work from a brief"
+group    = "pull requests"
+examples = ["--repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times", "entry:e-3f9a2c4b5d6e7f80 --repo acme/api"]
+docs     = "concepts/gtd"
+
+[guidance]
+help = "the brief: what to build or say, and how to know it is done"
+
+[inputs.repo]
+type    = "text"
+flag    = "--repo"
+help    = "owner/name of the repository to work in; without it the session has no checkout"
+persist = true
+
+[drafts]
+attach_posts = true
+
+[action]
+note = "Starts an agent session on the entry's brief"
+
+[[action.refuse]]
+when = '!entry.captured_by_user'
+why  = "Start runs only on an entry you captured"
+
+[headline]
+resumed = "start work on {{.unit.ref}}"
+[[headline.new]]
+line = 'Start the work {{.unit.ref}} describes, {{template "started_by" .}}.'
+
+[record]
+states      = ["done", "asked", "failed"]
+outcome     = ["url"]
+attach_url  = true
+outcome_doc = "`outcome` (done): `url`, the pull request you opened or the message you posted."

@@ -39,11 +39,20 @@ The [approval window](/concepts/approval/) comes before a round starts, not befo
 - **Address rounds read third-party comments.** Reviews and review threads on your pull requests start address rounds, from any GitHub account that can comment on the repository, apart from the logins in `github.address_skip_reviewers`. On a public repository that is anyone. The agent verifies each comment against the code, but the comment's text reaches it, and so does anything the comment asks for.
 - **Review rounds open the pull request's checkout.** An automated review round starts Claude Code in a worktree at the pull request's head. Claude Code loads that checkout's project settings, so a pull request that changes `.claude/settings.json` (hooks, permissions), `.mcp.json`, `CLAUDE.md` or `AGENTS.md` can run code or steer the agent as you. Claude Code's folder trust is recorded for the repository and covers every pull request worktree of it; where project settings are off, trusting a blocked round from the cockpit trusts that worktree alone. Automated review rounds skip forks and authors outside the members, collaborators, owners and `trusted_authors`, so the author needs push access to the repository; a round you start by hand has no such filter, but its session never loads the checkout's project settings for such a pull request.
 
+## Starting new work
+
+`{{command}} start` gives an agent the brief of an entry you captured and, with `--repo`, a fresh worktree of that repository. It adds two powers:
+
+- **An agent chooses which repository to clone.** A repository no workspace manager knows is cloned into the project's `projects_dir`. That stays harmless until the clone is trusted: Claude Code loads an untrusted folder's settings and hooks only after you accept its trust dialog, so the start blocks on trust as any round does.
+- **`trust_clones` trusts a clone as it is made.** With `trust_clones = true` on a `projects[]` entry, a repository of that project is trusted in the agent home in the same call that clones it, so its hooks and settings run as you. The `match` must name an owner (`acme/*`, never `*`); a folder that already existed, or one cloned earlier, is never trusted this way. A clone whose trust fails is removed, so the start's retry clones it again.
+
+The residual risk is accepted: an injected brief can make an agent clone and trust a repository of an owner you listed. Two limits remain. Start runs only on entries you captured (`entry.captured_by_user`); an entry derived from a Slack thread carries other people's text and is refused. And the trusted owners are the ones you list, your own organization.
+
 ## What agents read from Slack
 
 Every agent session the MCP server serves reads Slack as you, within what your user token can read:
 
-- `slack_read` reads a stored unit, or the thread of any channel message whose permalink the agent holds, private channels and Slack Connect channels included; a direct message or a group DM only when {{name}} tracks it.
+- `slack_read` reads a stored unit, or the thread of any channel message whose ref or permalink the agent holds, private channels and Slack Connect channels included; a direct message or a group DM only when {{name}} tracks it.
 - `slack_search` runs Slack's search over every channel you can read, and returns the permalink, author, time and first line of each match. An agent needs no permalink handed to it to find a channel's messages: one query reaches any channel you are in. Direct messages and group DMs are left out unless tracked, the same line `slack_read` draws, and the result says how many it left out.
 
 Reading is as you, like posting: {{name}} keeps no channel from a session, and the line on direct messages is a workflow control, not a barrier, since the agent can reach your token by the paths above. What an agent reads this way is other people's text, and reaches it as data it may follow: a message found by search can ask for anything, and no such text approves a draft. `slack.post_allowlist` bounds where any post lands; turning the Slack plugin off (`slack.enabled = false`) removes these tools.
@@ -57,11 +66,12 @@ Two settings control what reaches an agent from other people:
 
 Both are on by default. The instruction is always on. The two switches are configuration keys whose value is a predicate over the pull request's facts; where the predicate does not hold, the behavior is off. They read the owner, the repository, the author and the visibility, and `intents.<intent>.project_settings.when` also reads the author association and the labels. For public repositories, keep both to private ones:
 
-```json
-{
-  "workflows": { "address": { "only_when": "pr.visibility == \"private\"" } },
-  "intents": { "review": { "project_settings": { "when": "pr.visibility == \"private\"" } } }
-}
+```toml
+[workflows.address]
+only_when = 'pr.visibility == "private"'
+
+[intents.review.project_settings]
+when = 'pr.visibility == "private"'
 ```
 
 `pr.visibility` is empty until a pull request has been read in full, so these plan nothing for one not read yet. Narrow by owner, repository or author the same way (`pr.owner != "acme"`, `pr.author != "renovate[bot]"`). Where project settings are off, review sessions start with `--setting-sources user`: your settings, hooks and MCP servers load, the checkout's `.claude/`, `.mcp.json` and `CLAUDE.md` do not, and the agent reads `CLAUDE.md` and `AGENTS.md` as text. Claude Desktop cannot start such a session, so it runs in the next manager of `workspace_managers` that can (Orca), and fails closed when none can. In Claude Desktop, the allows and denies {{name}} adds for a round are written into the worktree's `.claude/settings.local.json`, so they apply only where the checkout's project settings load. See the [configuration reference](/reference/configuration/).

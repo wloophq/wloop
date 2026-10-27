@@ -21,7 +21,7 @@ var groups = map[builtin.Surface][]group{
 	builtin.SurfaceIntent: {
 		{"Identity and help", []string{"label", "summary", "shortcut", "verb", "user_facing", "skill", "help"}},
 		{"Binding", []string{"role", "provider", "builds", "prompt", "schema"}},
-		{"Where it runs", []string{"workspace", "runners", "session"}},
+		{"Where it runs", []string{"workspace", "runners", "session", "target"}},
 		{"How a turn runs", []string{"intake", "owner_only", "join", "answerable", "reports"}},
 		{"Inputs", []string{"inputs"}},
 		{"When a turn is due or refused", []string{"why", "refuse"}},

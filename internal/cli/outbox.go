@@ -21,10 +21,11 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	slacksend "github.com/wloophq/wloop/internal/slack/send"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|permalink> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
+var outboxUsage = "usage: " + brand.Command + " outbox [list [--color <when>] | show <id> [--color <when>] | new <unit|message> <markdown> [--react <emoji>] [--send] [--yes] | approve <id> [--text <markdown>] [--yes] | edit <id> <markdown> | discard <id> [--reason <why>] | retry <id> [--confirm] [--yes]]"
 
 // outboxInteractive says whether e reads from a terminal; tests replace it.
 var outboxInteractive = func(e *Env) bool {
@@ -285,7 +286,7 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) error {
 	fs := flag.NewFlagSet("outbox new", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	react := fs.String("react", "", "react to the unit's message with this emoji instead of replying")
+	react := fs.String("react", "", "react with this emoji instead of replying: to the Slack message named, else to the unit's message")
 	send := fs.Bool("send", false, "post it now instead of saving it to the Outbox")
 	yes := fs.Bool("yes", false, "with --send, post without asking")
 	pos, err := parseInterspersed(fs, args)
@@ -303,6 +304,9 @@ func outboxNew(ctx context.Context, e *Env, c *client.Client, args []string) err
 		return err
 	}
 	cr := api.DraftCreate{Unit: u, Source: string(dturn.Terminal)}
+	if slacksend.IsMessage(pos[0]) {
+		cr.Target = pos[0]
+	}
 	if *react != "" {
 		cr.Kind, cr.Reaction = api.DraftReact, *react
 	} else {

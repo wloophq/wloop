@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/shell"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/slack/send"
 )
 
 // The input surfaces of the command line: an intent's own command and a
@@ -28,6 +31,8 @@ const (
 const (
 	flagNoWait  = "--no-wait"
 	flagNoBrief = "--no-brief"
+	flagManager = "--manager"
+	flagParent  = "--parent"
 )
 
 // intentArgs is what an intent's command line asked for.
@@ -35,6 +40,9 @@ type intentArgs struct {
 	inputs          map[string]any
 	noWait, noBrief bool
 	guidance        string
+	// manager and parent are the workspace manager and the parent worktree
+	// of the worktree the turn creates, "" for the configured and none.
+	manager, parent string
 }
 
 // runIntent runs an intent's own command: the daemon accepts an intake
@@ -42,6 +50,9 @@ type intentArgs struct {
 // once.
 func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error {
 	usage := intentUsage(d)
+	if d.Target.Missing == dintent.TargetCapture {
+		return runCapturing(ctx, e, d, args)
+	}
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
@@ -49,7 +60,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if err != nil {
 		u, uerr := e.unitTarget(ctx, args[0])
 		switch {
-		case uerr != nil && strings.Contains(args[0], "://") && !isSlackPermalink(args[0]):
+		case uerr != nil && strings.Contains(args[0], "://") && !send.IsPermalink(args[0]):
 			return err
 		case uerr != nil:
 			return uerr
@@ -78,6 +89,71 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	return takeOverHint(err, d, ref, p.inputs)
 }
 
+// runCapturing runs d, whose manifest captures a missing target, on the
+// entry args name as entry:<id>, else on a new entry that captures the
+// run's guidance as its notes; a failed run says how to retry on it.
+func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) error {
+	if len(args) > 0 {
+		if u, ok := explicitEntry(args[0]); ok {
+			return runIntentOn(ctx, e, d, u, args[1:])
+		}
+	}
+	p, err := parseIntentArgs(e.loadedIntents().Registry, d, surfaceCLI, intentUsage(d), args)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(p.guidance) == "" {
+		return errors.New(intentUsage(d))
+	}
+	title, err := e.loadedIntents().TargetTitle(d.Name, p.guidance)
+	if err != nil {
+		return err
+	}
+	c, err := e.daemonClient(ctx)
+	if err != nil {
+		return err
+	}
+	entry, err := c.Capture(ctx, api.CaptureRequest{Title: cmp.Or(title, p.guidance), Notes: p.guidance})
+	if err != nil {
+		return err
+	}
+	u := gtd.UnitOf(gtd.ID(entry.ID))
+	fmt.Fprintf(e.Out, "captured %s\n", u)
+	p.guidance = ""
+	if err := askOn(ctx, e, d, u, p); err != nil {
+		return fmt.Errorf("%w; run it again on the entry with %s", err, retryLine(retryArgs(d, u, p)))
+	}
+	return nil
+}
+
+// retryLine is args as a shell line.
+func retryLine(args []string) string {
+	words := make([]string, len(args))
+	for i, a := range args {
+		words[i] = shell.Word(a)
+	}
+	return strings.Join(words, " ")
+}
+
+// retryArgs is the command that runs d again on u with p's flags.
+func retryArgs(d dintent.Def, u unit.Unit, p intentArgs) []string {
+	args := []string{brand.Command, string(d.Name), u.String()}
+	for _, in := range d.Inputs {
+		if v, ok := p.inputs[in.Name].(string); ok && v != "" && in.Flag != "" {
+			args = append(args, in.Flag, v)
+		} else if b, ok := p.inputs[in.Name].(bool); ok && b && in.Flag != "" {
+			args = append(args, in.Flag)
+		}
+	}
+	if p.manager != "" {
+		args = append(args, flagManager, p.manager)
+	}
+	if p.parent != "" {
+		args = append(args, flagParent, p.parent)
+	}
+	return args
+}
+
 // runIntentOn runs d on u, a unit of a provider other than GitHub that d serves: headless when d's
 // manifest runs it so, else in a session where u's placement says.
 func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args []string) error {
@@ -88,6 +164,11 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 	if err != nil {
 		return err
 	}
+	return askOn(ctx, e, d, u, p)
+}
+
+// askOn asks the daemon for d's turn on u with what the command line set.
+func askOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, p intentArgs) error {
 	if p.noWait || p.noBrief || beforeSet(d, p.inputs, beforeTakeOver) {
 		return fmt.Errorf("%s, %s and taking over apply to pull requests only", flagNoWait, flagNoBrief)
 	}
@@ -95,7 +176,11 @@ func runIntentOn(ctx context.Context, e *Env, d dintent.Def, u unit.Unit, args [
 	if err != nil {
 		return err
 	}
-	req := api.ActionRequest{Guidance: p.guidance, Inputs: p.inputs, Source: sourceCLI, AgentHome: e.callerAgentHome(config.Config{Agent: e.callerKind()})}
+	req := api.ActionRequest{Guidance: p.guidance, Inputs: p.inputs, Source: sourceCLI, AgentHome: e.callerAgentHome(config.Config{Agent: e.callerKind()}),
+		Manager: p.manager, Parent: p.parent}
+	if d.WorkspaceRepo != nil && req.Parent == "" {
+		req.Parent = e.callerWorktree(ctx)
+	}
 	res, err := c.Ask(ctx, u, string(d.Name), req)
 	printLines(e.Out, res.Output)
 	if err != nil {
@@ -155,6 +240,23 @@ func parseIntentArgs(reg *dintent.Registry, d dintent.Def, surface, usage string
 				return p, fmt.Errorf("%s takes no value", name)
 			}
 			p.noWait, p.noBrief = p.noWait || name == flagNoWait, p.noBrief || name == flagNoBrief
+			continue
+		case flagManager, flagParent:
+			if d.WorkspaceRepo == nil {
+				return p, fmt.Errorf("%s applies to an intent that creates a worktree of a repository, and %s creates none", name, d.Name)
+			}
+			if !hasValue {
+				if i+1 >= len(args) {
+					return p, fmt.Errorf("%s needs a value\n%s", name, usage)
+				}
+				i++
+				value = args[i]
+			}
+			if name == flagManager {
+				p.manager = value
+			} else {
+				p.parent = value
+			}
 			continue
 		}
 		in, ok := inputOfFlag(d, name)
@@ -272,6 +374,9 @@ func intentUsage(d dintent.Def) string {
 // intentTarget is the target of d's command as a usage line names it: the
 // units d serves, as their providers' codecs name them.
 func intentTarget(d dintent.Def) string {
+	if d.Target.Missing == dintent.TargetCapture {
+		return "[entry:<id>]"
+	}
 	ps := d.Providers
 	if ps == nil {
 		ps = []unit.ProviderID{d.ProviderOrDefault()}
@@ -298,6 +403,9 @@ func intentFlags(d dintent.Def, surface string) string {
 	if d.Intake && surface == surfaceCLI {
 		fmt.Fprintf(&b, " [%s] [%s]", flagNoWait, flagNoBrief)
 	}
+	if d.WorkspaceRepo != nil && surface == surfaceCLI {
+		fmt.Fprintf(&b, " [%s <name>] [%s <worktree>]", flagManager, flagParent)
+	}
 	return b.String()
 }
 
@@ -306,4 +414,13 @@ func intentFlags(d dintent.Def, surface string) string {
 func (e *Env) brokenIntent(name string) error {
 	_, err := e.intentDef(name)
 	return err
+}
+
+// callerWorktree is the top of the git worktree the command runs in, "" outside one.
+func (e *Env) callerWorktree(ctx context.Context) string {
+	out, err := e.Git.R.Run(ctx, "", nil, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

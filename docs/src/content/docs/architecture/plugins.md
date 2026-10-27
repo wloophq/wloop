@@ -16,7 +16,7 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Units and their changes | `Ingest` (an `ingest.Job` over its `port.Source` and `port.SourceStore`), `Slow`, `Run` (a long-running stream, restarted after 30 s), `Jobs` | runs them as daemon jobs; a source never writes, ingest saves through the source's store |
 | Rows | `Rows`, a read model provider | serves them to every surface with the rest of the read model |
 | Items and cards | `Items` (deterministic, no I/O), `Card`, `Identity`, `UnitEvents` | turns items into GTD entries; renders the card on every surface; resolves linked items from unit events |
-| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records |
+| Workflow facts | `Facts`, an `automation.Units` | the engine evaluates workflows over the plugin's units; a fact that names a signal, such as `pr.head`, is what a workflow's mark records; `<slot>.ended` (`builtin.EndedFact`), such as `pr.ended` or `slack.ended`, is the plugin's word that a unit has ended, which the entries it is attached to read as `entry.units_ended` |
 | Marks | its planner's own mark names, written through the store | stores them per unit, retains them with the unit, and lets `handled()` read them |
 | What a turn reads about a unit | `Payload`, a `turn.PayloadReader` | renders it into the turn's instructions |
 | Where its work runs | `PlacementDefaults`, `PlacementHints` | the placement service decides the repository and checkout |
@@ -28,6 +28,7 @@ A module must have its codec, an ingestion job with an interval and its rows; a 
 | Its briefs | `Briefs`, a `brief.BriefSource` | the brief queue reads the unit's input, revision and staleness through it; an `IntentUser` gets its provider's brief intent |
 | Links to other plugins' units | `Links`, a `LinkResolver` | resolves a link of its units to the unit another plugin names |
 | A detail page | `Detail` | a client opens the unit's detail in the cockpit, in place of its link |
+| Addresses a person types | `Resolve` | the daemon answers `GET /api/resolve` with the unit an address lands in, such as a Slack message ref or permalink in its direct message segment or thread; a command line's target asks it |
 
 `Module.Capabilities()` names what a plugin can do (`checkouts`, `briefs`, `publishes`, `reacts`, `items`, `detail`), served in `api.Plugin.Capabilities`. The daemon and the clients ask a plugin what it can do, never which one it is (`api.PluginCan`). A unit's codec says the rest: `Equal` compares two keys of its provider, such as GitHub's without case, for units and person keys alike (`unit.Registry.Same`, `items.Identity.Codecs`); `URL` and `KeyOf` name a unit by its web address, so a unit with one is typed by its address (`unit.Registry.ParseURL`); `Target` is how a command line names one of its units, such as `<url>`, in an intent's usage line (`unit.Registry.Target`).
 

@@ -64,6 +64,9 @@ func (e *Env) serveGTD(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []s
 		}
 	}
 	e.pluginsOff.Store(&off)
+	if e.Turns != nil {
+		e.Turns.Results = e.newEntryResults(g, mods)
+	}
 	me := e.gtdMe
 	d.GTD = g
 	d.GTDMe = func(ctx context.Context) (bool, error) {

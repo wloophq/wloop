@@ -22,7 +22,7 @@ import (
 
 // startSlackDaemon serves a daemon wired as serve wires it, with the Slack
 // module over te's fake Keychain and fake Slack and a store of its own.
-func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
+func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.DB {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", brand.Name)
 	if err != nil {
@@ -53,13 +53,13 @@ func startSlackDaemon(t *testing.T, te *slackTestEnv) *sqlite.SlackStore {
 	hs.Start()
 	t.Cleanup(hs.Close)
 	te.Socket = sock
-	return db.Slack()
+	return db
 }
 
 func TestFollowSendsTrackForTheThread(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
-	slack := startSlackDaemon(t, te)
+	slack := startSlackDaemon(t, te).Slack()
 	te.saveToken(t, fakeToken())
 	te.srv.Handle("conversations.replies", func(v url.Values) any {
 		return map[string]any{"messages": []any{map[string]any{"type": "message", "ts": v.Get("ts"), "thread_ts": "1700000000.000100", "user": "U001"}}}
@@ -81,6 +81,8 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 		{"follow", "https://acme.slack.com/archives/C000/p1700000050000200?thread_ts=1700000000.000100&cid=C000", true},
 		{"follow", "https://acme.slack.com/archives/C000/p1700000050000200", true},
 		{"unfollow", "https://acme.slack.com/archives/C000/p1700000050000200", false},
+		{"follow", "C000/1700000050.000200", true},
+		{"unfollow", "C000/1700000050.000200", false},
 	} {
 		te.out.Reset()
 		te.err.Reset()
@@ -94,8 +96,8 @@ func TestFollowSendsTrackForTheThread(t *testing.T) {
 			t.Fatalf("after slack %s %s: watched %v", c.verb, c.link, !c.watched)
 		}
 	}
-	if n := len(te.srv.Calls("conversations.replies")); n != 4 {
-		t.Fatalf("conversations.replies calls %d, want one per permalink without thread_ts", n)
+	if n := len(te.srv.Calls("conversations.replies")); n != 6 {
+		t.Fatalf("conversations.replies calls %d, want one per ref or permalink without thread_ts", n)
 	}
 	assertNoSlackToken(t, te.out.String()+te.err.String())
 }
@@ -104,7 +106,7 @@ func TestFollowRefusesWhatIsNotAPermalink(t *testing.T) {
 	t.Parallel()
 	te := newSlackTestEnv(t)
 	te.saveToken(t, fakeToken())
-	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message permalink") {
+	if code := te.run("slack", "follow", "https://github.com/acme/api/pull/7"); code == 0 || !strings.Contains(te.err.String(), "not a Slack message ref (<conversation>/<ts>) or permalink") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if code := te.run("slack", "follow"); code == 0 {

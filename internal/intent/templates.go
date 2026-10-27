@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -51,7 +52,7 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 		}
 		set = clone.New(file)
 	}
-	set.Option("missingkey=error")
+	set.Option("missingkey=error").Funcs(NameFuncs)
 	baseNames := map[string]bool{}
 	if base != nil {
 		for _, t := range base.Templates() {
@@ -70,6 +71,12 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 	for i, c := range d.Headline.New {
 		text(fmt.Sprintf("headline.new[%d].line", i), HeadlineName(i), c.Text, turn)
 	}
+	names := builtin.Env(builtin.NameSlot, nil)
+	ok = s.parseText(set, "session.name", SessionNameName, d.Session.Name, names) && ok
+	if w := d.WorkspaceRepo; w != nil {
+		ok = s.parseText(set, "workspace.name", WorkspaceNameName, w.Name, names) && ok
+	}
+	ok = s.parseText(set, "target.title", TargetTitleName, d.Target.Title, targetEnv) && ok
 	unit := unitEnv(d)
 	text("why", WhyName, d.Why, unit)
 	for i, r := range d.Refuse {
@@ -87,7 +94,8 @@ func (s *sheet) parseMain(d dintent.Def, base *template.Template, file string, b
 	for _, in := range d.Inputs {
 		declared[in.Name] = true
 	}
-	inline := map[string]string{HeadlineName(-1): "headline.resumed", WhyName: "why"}
+	inline := map[string]string{HeadlineName(-1): "headline.resumed", WhyName: "why", SessionNameName: "session.name",
+		WorkspaceNameName: "workspace.name", TargetTitleName: "target.title"}
 	for i := range d.Headline.New {
 		inline[HeadlineName(i)] = fmt.Sprintf("headline.new[%d].line", i)
 	}
@@ -202,6 +210,50 @@ func walkBranch(b *parse.BranchNode, f func(parse.Node, []string)) {
 // intent's template set.
 const WhyName = "manifest.why"
 
+// SessionNameName is the name session.name is parsed under.
+const SessionNameName = "session.name"
+
+// WorkspaceNameName and TargetTitleName are the names workspace.name and
+// target.title are parsed under.
+const (
+	WorkspaceNameName = "workspace.name"
+	TargetTitleName   = "target.title"
+)
+
+// targetEnv is what target.title reads: the run's guidance.
+var targetEnv = expr.Env{"guidance": expr.String}
+
+// NameFuncs are the functions a manifest's names may call: slug, a text
+// as lowercase words joined by dashes, and firstLine, its first non-blank
+// line, trimmed.
+var NameFuncs = template.FuncMap{"slug": slug, "firstLine": firstLine}
+
+var notSlug = regexp.MustCompile(`[^a-z0-9]+`)
+
+// slugMax keeps a slug short enough for a branch and a folder name; a
+// longer one is cut at its last whole word.
+const slugMax = 48
+
+func slug(s string) string {
+	out := strings.Trim(notSlug.ReplaceAllString(strings.ToLower(s), "-"), "-")
+	if len(out) > slugMax {
+		out = out[:slugMax]
+		if i := strings.LastIndex(out, "-"); i > 0 {
+			out = out[:i]
+		}
+	}
+	return out
+}
+
+func firstLine(s string) string {
+	for l := range strings.Lines(s) {
+		if t := strings.TrimSpace(l); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
 // RefuseWhyName is the name refuse[i].why is parsed under.
 func RefuseWhyName(i int) string { return fmt.Sprintf("refuse[%d].why", i) }
 
@@ -311,6 +363,51 @@ func (l *Loaded) Why(name dintent.Name, facts map[string]any) (string, error) {
 		return "", nil
 	}
 	return l.render(name, WhyName, unitEnv(d), facts)
+}
+
+// SessionName renders the session.name of the intent name over facts, its
+// name facts but session.title, which it reads from the manifest; the title
+// when the template is empty or renders blank.
+func (l *Loaded) SessionName(name dintent.Name, facts map[string]any) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok {
+		return "", fmt.Errorf("no intent %s", name)
+	}
+	if d.Session.Name.Src == "" {
+		return d.Session.Title, nil
+	}
+	facts = maps.Clone(facts)
+	if facts == nil {
+		facts = map[string]any{}
+	}
+	facts["session.title"] = d.Session.Title
+	got, err := l.render(name, SessionNameName, builtin.Env(builtin.NameSlot, nil), facts)
+	if err != nil {
+		return "", err
+	}
+	return cmp.Or(strings.Join(strings.Fields(got), " "), d.Session.Title), nil
+}
+
+// WorkspaceName renders the workspace.name of the intent name over facts,
+// its name facts; "" when it has none.
+func (l *Loaded) WorkspaceName(name dintent.Name, facts map[string]any) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok || d.WorkspaceRepo == nil || d.WorkspaceRepo.Name.Src == "" {
+		return "", nil
+	}
+	got, err := l.render(name, WorkspaceNameName, builtin.Env(builtin.NameSlot, nil), facts)
+	return strings.TrimSpace(got), err
+}
+
+// TargetTitle renders the target.title of the intent name over guidance;
+// "" when it has none.
+func (l *Loaded) TargetTitle(name dintent.Name, guidance string) (string, error) {
+	d, ok := l.Registry.Get(name)
+	if !ok || d.Target.Title.Src == "" {
+		return "", nil
+	}
+	got, err := l.render(name, TargetTitleName, targetEnv, map[string]any{"guidance": guidance})
+	return strings.TrimSpace(got), err
 }
 
 // Refusal is the why of the intent name's first refusal whose when holds

@@ -26,6 +26,7 @@ rounds. This session only drives the CLI: never review the PR here.
 | know why nothing happens to a PR, a session or a workspace | `{{command}} plan --unit <url>` (its items, then every workflow that gives it none, with the facts its `when` read and the reasons beside them, such as `pr.first.reason`) |
 | run a sweep now | tell them to choose Sweep now in the menu bar; `{{command}} plan` prints what it would do |
 | stop or restart the automatic workflows, everywhere or on some PRs or repositories | `{{command}} pause [<url>\|<owner/repo>]...`, `{{command}} resume [<url>\|<owner/repo>]...` (none means everywhere; only when the user asks) |
+| start new work from a description: code to change, or a message to post | resolve the repository with `gh` (ask which when more than one matches), then `{{command}} start --repo <owner/name> <brief>`; leave out `--repo` when no code is involved. The brief says what to do and how to know it is done |
 | ask whoever a PR waits on for the next step (a reviewer, the author) | `{{command}} nudge <url> [guidance]` (an agent posts one comment under the user's name; only when the user asks, and it refuses when the PR waits on the user or the loop) |
 | run a kind of turn their profile defines | `{{command}} <intent> <url> [flags] [guidance]`; `{{command}} --help` lists the intents and their flags |
 | watch what needs them in the terminal, with one-key actions | tell them to run `{{command}} tui` in their own terminal (it needs one; do not run it here) |

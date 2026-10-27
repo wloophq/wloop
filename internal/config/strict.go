@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
@@ -34,12 +36,12 @@ func (e *UnknownKeysError) Error() string {
 	return msg
 }
 
-// decodeStrict decodes raw into c after the grammar checked it: a key no
-// setting reads is an UnknownKeysError, and a value of the wrong kind or
-// outside its set names its key.
+// decodeStrict decodes raw, a TOML document, into c after the grammar
+// checked it: a key no setting reads is an UnknownKeysError, and a value of
+// the wrong kind or outside its set names its key.
 func decodeStrict(file string, raw []byte, c *Config) error {
 	var tree map[string]any
-	if err := json.Unmarshal(raw, &tree); err != nil {
+	if err := toml.Unmarshal(raw, &tree); err != nil {
 		return fmt.Errorf("parsing %s: %w", file, err)
 	}
 	unknown := &UnknownKeysError{File: file, Near: map[string]string{}}
@@ -61,7 +63,12 @@ func decodeStrict(file string, raw []byte, c *Config) error {
 	if len(bad) > 0 {
 		return errors.Join(bad...)
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
+	// Config's keys are its json tags, which config get prints too.
+	asJSON, err := json.Marshal(tree)
+	if err != nil {
+		return fmt.Errorf("parsing %s: %w", file, err)
+	}
+	dec := json.NewDecoder(bytes.NewReader(asJSON))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(c); err != nil {
 		return fmt.Errorf("parsing %s: %w", file, err)

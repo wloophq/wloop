@@ -17,7 +17,7 @@ var WorkflowSchema []byte
 //go:embed actions.schema.json
 var ActionsSchema []byte
 
-// ConfigSchema is the JSON Schema of config.json, for editors.
+// ConfigSchema is the JSON Schema of config.toml, for editors.
 //
 //go:embed config.schema.json
 var ConfigSchema []byte

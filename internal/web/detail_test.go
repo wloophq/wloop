@@ -345,3 +345,31 @@ process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss
 		t.Errorf("buttons %+v", got)
 	}
 }
+
+func TestAnEntryOffersTheIntentsThatServeIt(t *testing.T) {
+	e := entry("e-3f9a", "inbox", func(e *api.EntryView) {
+		e.Title, e.Kind = "Add retries to the webhook sender", "capture"
+		e.Actions = []api.ActionState{{ID: "start", Label: "Begin work", Enabled: true, Note: "Starts an agent session on the entry's brief"}}
+	})
+	var got struct {
+		Text  string
+		Posts []struct {
+			Path string
+			Body map[string]any
+		}
+	}
+	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+(async () => {
+  await loadDetailPane({ entry: "e-3f9a" });
+  const pane = entryPane(detailState.entry);
+  await byFocus(pane, "detail:start:e-3f9a").attrs.onclick();
+  process.stdout.write(JSON.stringify({ Text: text(pane), Posts: posts }));
+})();`, map[string]any{"answers": map[string]any{"/api/entries/e-3f9a": e}}, &got)
+	if !strings.Contains(got.Text, "Begin work") {
+		t.Errorf("the detail lacks the action's label: %s", got.Text)
+	}
+	last := len(got.Posts) - 1
+	if last < 0 || got.Posts[last].Path != "/api/units/entry/e-3f9a/start" || got.Posts[last].Body["source"] != "cockpit" {
+		t.Fatalf("posts %+v", got.Posts)
+	}
+}

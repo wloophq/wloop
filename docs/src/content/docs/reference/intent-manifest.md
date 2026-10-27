@@ -58,11 +58,17 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `workspace` | one of `review`, `author`, `linked_else_main`, `given`, or a table |  | Where its turn runs, and the board it moves: a workspace builtin, or a table naming the repository. |
 | `workspace.repo` | string |  | The repository the turn runs in, owner/name. |
 | `workspace.repo_input` | string |  | The input that holds the repository the turn runs in. |
+| `workspace.repo_optional` | bool | `false` | With repo_input: a turn whose input names no repository runs in the neutral repository, with no checkout. |
+| `workspace.name` | template |  | The name of the worktree created for the turn's unit, over the name facts, with slug; the loop's own when absent. |
 | `runners` | list of `session`, `headless` |  | How its turns may run; ["session"] when absent. |
 | `session` | table |  | The agent session its turns run in. |
 | `session.strategy` | one of `reuse_live`, `new` |  | Whether a turn reuses the unit's live session or starts a new one. |
 | `session.title` | string |  | The session's title: 1 to 12 lowercase letters. |
+| `session.name` | template |  | What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it. |
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
+| `target` | table |  | What a run with no unit does. |
+| `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent. |
+| `target.title` | template |  | The captured entry's title, over .guidance, with firstLine. |
 
 ### How a turn runs
 
@@ -168,6 +174,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
 | `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
+| `record.attach_url` | bool | `false` | On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome. |
 | `record.outcome_doc` | string |  | What the outcome holds, for the instructions. |
 | `record.history_artifact` | string |  | The artifact the unit's history shows. |
 | `record.require[]` | table |  | What a record in a state must carry. |
@@ -182,6 +189,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `effects` | list of `plan.cleared`, `guidance.handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
 | `drafts.allowed_effects` | list of `entry.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
+| `drafts.attach_posts` | bool | `false` | On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts. |
 | `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
 | `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
 | `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |

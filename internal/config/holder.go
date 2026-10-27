@@ -102,7 +102,7 @@ func (h *Holder) Config() Config {
 	return c
 }
 
-// Warning is what a restart or a fix of config.json would change: the load
+// Warning is what a restart or a fix of config.toml would change: the load
 // failure of a file that broke, else that a changed file needs a restart; ""
 // when the running config matches the file.
 func (h *Holder) Warning() string {
@@ -115,9 +115,9 @@ func (h *Holder) Warning() string {
 func (h *Holder) warning() string {
 	switch {
 	case h.badFile != nil:
-		return "config.json does not load, so the running config stays: " + h.badFile.Error()
+		return "config.toml does not load, so the running config stays: " + h.badFile.Error()
 	case h.stale:
-		return "config.json changed; only the profile applies live, restart the daemon to apply the rest"
+		return "config.toml changed; only the profile applies live, restart the daemon to apply the rest"
 	}
 	return ""
 }

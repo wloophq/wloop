@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/frontmatter"
@@ -157,6 +158,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	s.provider(&d, m.Provider)
 	if m.Drafts != nil {
 		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
+		d.AttachPosts = m.Drafts.AttachPosts
 		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, builtin.ApprovalEnv(false, servedSlots(d)...))
 	}
 	s.workspace(&d, m.Workspace)
@@ -175,6 +177,18 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			Title:         s.required("session.title", m.Session.Title),
 			CloseWhenDone: m.Session.CloseWhenDone,
 		}
+		if m.Session.Name != nil || s.defaults.SessionName != "" {
+			d.Session.Name = s.text("session.name", m.Session.Name, s.defaults.SessionName)
+		}
+	}
+	if t := m.Target; t != nil {
+		if t.Missing != "" && t.Missing != dintent.TargetCapture {
+			s.add("target.missing", "%q is not %q", t.Missing, dintent.TargetCapture)
+		}
+		if t.Missing == dintent.TargetCapture && d.Provider != (gtd.Codec{}).Provider() {
+			s.add("target.missing", "capture makes an entry the turn's unit, and the intent serves %s units, not entry ones", d.Provider)
+		}
+		d.Target = dintent.Target{Missing: t.Missing, Title: s.text("target.title", t.Title, "")}
 	}
 	if m.Brief != nil {
 		d.Brief = dintent.Brief{Render: boolOr(m.Brief.Render, true), Wait: boolOr(m.Brief.Wait, true), Need: m.Brief.Need}
@@ -225,6 +239,7 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			Outcome:         orEmpty(r.Outcome, nil),
 			OutcomeDoc:      r.OutcomeDoc,
 			HistoryArtifact: r.HistoryArtifact,
+			AttachURL:       r.AttachURL,
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{

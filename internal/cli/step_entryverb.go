@@ -44,6 +44,9 @@ func (s *stepSet) entryVerbCheck(ctx context.Context, c stepCall, _ automation.C
 		return "", err
 	}
 	v := gtd.Verb(c.arg("verb"))
+	if e.Origin == gtd.OriginDerived && (v == gtd.VerbDone || v == gtd.VerbDismiss) {
+		return "a derived entry closes when its items resolve", nil
+	}
 	if g.Handles(e.Kind, v) {
 		return "", nil
 	}

@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dunit "github.com/wloophq/wloop/internal/domain/unit"
 )
 
 var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
+
+// ValidRepo says whether name is a repository, owner/name, whose parts
+// are names and not . or .., so no path joined from it leaves its folder.
+func ValidRepo(name string) bool {
+	owner, repo, _ := strings.Cut(name, "/")
+	return repoRe.MatchString(name) && !slices.Contains([]string{".", ".."}, owner) && !slices.Contains([]string{".", ".."}, repo)
+}
 
 // provider reads provider as one id or a list of ids; absent is the
 // profile's default provider.
@@ -53,19 +61,34 @@ func (s *sheet) workspace(d *dintent.Def, v any) {
 	case map[string]any:
 		w := &dintent.WorkspaceRepo{}
 		for k, raw := range v {
+			if k == "repo_optional" {
+				b, ok := raw.(bool)
+				if !ok {
+					s.add("workspace."+k, "must be a boolean")
+					return
+				}
+				w.Optional = b
+				continue
+			}
 			str, ok := raw.(string)
 			switch {
-			case k != "repo" && k != "repo_input":
-				s.add("workspace."+k, "unknown key; a workspace table holds repo or repo_input")
+			case k != "repo" && k != "repo_input" && k != "name":
+				s.add("workspace."+k, "unknown key; a workspace table holds repo or repo_input, repo_optional and name")
 				return
 			case !ok:
 				s.add("workspace."+k, "must be a string")
 				return
 			case k == "repo":
 				w.Repo = str
+			case k == "name":
+				w.Name = dintent.Text{Src: str, At: s.pos("workspace.name")}
 			default:
 				w.RepoInput = str
 			}
+		}
+		if w.Optional && w.RepoInput == "" {
+			s.add("workspace.repo_optional", "needs repo_input: only a repository an input names may be left out")
+			return
 		}
 		if (w.Repo == "") == (w.RepoInput == "") {
 			s.add("workspace", "a workspace table holds exactly one of repo or repo_input")
@@ -86,7 +109,7 @@ func (s *sheet) validateKeys(d dintent.Def) {
 		}
 	}
 	if w := d.WorkspaceRepo; w != nil {
-		if w.Repo != "" && !repoRe.MatchString(w.Repo) {
+		if w.Repo != "" && !ValidRepo(w.Repo) {
 			s.add("workspace.repo", "%q is not a repository: owner/name", w.Repo)
 		}
 		if w.RepoInput != "" && !slices.ContainsFunc(d.Inputs, func(in dintent.Input) bool { return in.Name == w.RepoInput }) {

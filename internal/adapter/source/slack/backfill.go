@@ -185,7 +185,7 @@ func (pl *poller) searchThreads(ctx context.Context, q, oldest string, threads m
 			}
 			anchor := m.ThreadTS
 			if anchor == "" && m.Permalink != "" {
-				if _, _, threadTS, err := parsePermalink(m.Permalink); err == nil {
+				if _, _, threadTS, err := parseMessage(m.Permalink); err == nil {
 					anchor = threadTS
 				}
 			}
@@ -208,12 +208,16 @@ func (pl *poller) drained(ctx context.Context, objects map[string]bool) error {
 	}
 	tick := time.NewTicker(drainEvery)
 	defer tick.Stop()
-	for len(pl.p.src.inbox.peek(list)) > 0 {
+	for {
+		n := len(pl.p.src.inbox.peek(list))
+		pl.p.slack.Metrics.BackfillDraining(n)
+		if n == 0 {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-tick.C:
 		}
 	}
-	return nil
 }

@@ -48,6 +48,17 @@ func runTrust(ctx context.Context, e *Env, args []string) error {
 	if *home != "" {
 		kind = e.kindOfHome(cfg, *home)
 	}
+	folder, err := e.trustFolder(ctx, rest[0])
+	if err != nil {
+		return err
+	}
+	return e.trustIn(ctx, kind, folder, []string{config.ExpandHome(cmp.Or(*home, e.agentHome(cfg)))}, *exact)
+}
+
+// trustIn trusts folder in each of homes with the agent kind's own trust,
+// printing what it wrote: with exact, the folder alone, else its
+// repository's main checkout.
+func (e *Env) trustIn(ctx context.Context, kind, folder string, homes []string, exact bool) error {
 	a, err := e.agent(kind)
 	if err != nil {
 		return err
@@ -56,16 +67,15 @@ func runTrust(ctx context.Context, e *Env, args []string) error {
 	if !ok {
 		return fmt.Errorf("agent %q has no folder trust "+brand.Name+" can record", kind)
 	}
-	folder, err := e.trustFolder(ctx, rest[0])
-	if err != nil {
-		return err
+	var errs []error
+	for _, home := range homes {
+		lines, err := t.Trust(ctx, folder, home, exact)
+		for _, l := range lines {
+			fmt.Fprintln(e.Out, l)
+		}
+		errs = append(errs, err)
 	}
-	dir := config.ExpandHome(cmp.Or(*home, e.agentHome(cfg)))
-	lines, err := t.Trust(ctx, folder, dir, *exact)
-	for _, l := range lines {
-		fmt.Fprintln(e.Out, l)
-	}
-	return err
+	return errors.Join(errs...)
 }
 
 // trustFolder is arg as a folder, or the checkout of the workspace whose id
@@ -201,25 +211,9 @@ func (e *Env) trustBlocked(ctx context.Context, cfg config.Config, b inventory.S
 	if b.Home != "" {
 		kind = e.kindOfHome(cfg, b.Home)
 	}
-	a, err := e.agent(kind)
-	if err != nil {
-		return err
-	}
-	t, ok := a.(truster)
-	if !ok {
-		return fmt.Errorf("agent %q has no folder trust "+brand.Name+" can record", kind)
-	}
 	folder := cmp.Or(b.Root, b.Folder)
 	if exact {
 		folder = cmp.Or(b.Folder, b.Root)
 	}
-	var errs []error
-	for _, home := range b.Homes {
-		lines, err := t.Trust(ctx, folder, home, exact)
-		for _, l := range lines {
-			fmt.Fprintln(e.Out, l)
-		}
-		errs = append(errs, err)
-	}
-	return errors.Join(errs...)
+	return e.trustIn(ctx, kind, folder, b.Homes, exact)
 }

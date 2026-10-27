@@ -215,7 +215,7 @@ func searchDelta(raw json.RawMessage, now time.Time) (dslack.Delta, bool, error)
 		return dslack.Delta{}, false, err
 	}
 	if m.ThreadTS == "" && w.Permalink != "" {
-		if _, _, threadTS, err := parsePermalink(w.Permalink); err == nil {
+		if _, _, threadTS, err := parseMessage(w.Permalink); err == nil {
 			m.ThreadTS = threadTS
 		}
 	}

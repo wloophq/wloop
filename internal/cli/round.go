@@ -60,6 +60,9 @@ type roundOptions struct {
 	head string
 	// unit is the round's unit, whose dossier the session is granted; zero for none.
 	unit unit.Unit
+	// names are the name facts the round knows besides the unit's label and
+	// the time, such as the worktree's name.
+	names map[string]any
 	// pr is the round's pull request as read for it, nil for none; the
 	// configuration's project_settings reads its facts.
 	pr *github.PullRequest
@@ -298,7 +301,11 @@ func (e *Env) session(ctx context.Context, cfg config.Config, ws wsdomain.Worksp
 	if err != nil {
 		return proc{}, "", err
 	}
-	p, err := e.startSession(ctx, cfg, ws, u, s, opts.title+" "+e.Now().Format(sessionTime), opts.keepBlocked, opts.trusted)
+	name, err := e.roundName(opts, u)
+	if err != nil {
+		return proc{}, "", err
+	}
+	p, err := e.startSession(ctx, cfg, ws, u, s, name, opts.keepBlocked, opts.trusted)
 	if err != nil {
 		return proc{}, "", err
 	}
@@ -337,6 +344,9 @@ func (e *Env) wake(ctx context.Context, cfg config.Config, m workspace.Manager, 
 		return proc{}, false, err
 	}
 	s.Resume = sess.AgentSession
+	if s.Name, err = e.roundName(opts, u); err != nil {
+		return proc{}, false, err
+	}
 	a, err := e.agent(cfg.Agent)
 	if err != nil {
 		return proc{}, false, err
@@ -346,7 +356,7 @@ func (e *Env) wake(ctx context.Context, cfg config.Config, m workspace.Manager, 
 		return proc{}, false, err
 	}
 	req := workspace.WakeRequest{WorkspaceID: ws.ID, Session: sess.ID, Handle: sess.LastHandle, Agent: cfg.Agent, AgentSession: sess.AgentSession,
-		Command: sessionEnv(e.Getenv, cmd), Title: opts.title + " " + e.Now().Format(sessionTime), Model: s.Model}
+		Command: sessionEnv(e.Getenv, cmd), Title: s.Name, Model: s.Model}
 	if r, ok := a.(turns.SettingsRenderer); ok {
 		req.Settings = r.Settings(s.Policy)
 	}
@@ -396,12 +406,12 @@ func (e *Env) liveSession(ctx context.Context, cfg config.Config, m workspace.Ma
 // session that cannot take the turn is abandoned, but for one blocked on a
 // prompt with keepBlocked, which stays for the user to answer. trusted is the
 // pull request's verdict from trusts.
-func (e *Env) startSession(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, u unit.Unit, s turns.AgentSession, title string, keepBlocked func(reason string) bool, trusted bool) (proc, error) {
+func (e *Env) startSession(ctx context.Context, cfg config.Config, ws wsdomain.Workspace, u unit.Unit, s turns.AgentSession, name string, keepBlocked func(reason string) bool, trusted bool) (proc, error) {
 	m, err := e.WS.For(ctx, ws)
 	if err != nil {
 		return proc{}, err
 	}
-	req, err := e.startRequest(cfg, ws, s, title)
+	req, err := e.startRequest(cfg, ws, s, name)
 	if err != nil {
 		return proc{}, err
 	}
@@ -440,13 +450,14 @@ func (e *Env) startSession(ctx context.Context, cfg config.Config, ws wsdomain.W
 }
 
 // startRequest is the start of s in ws under a minted session id: the command
-// a terminal manager runs and what a manager that takes no command needs.
-func (e *Env) startRequest(cfg config.Config, ws wsdomain.Workspace, s turns.AgentSession, title string) (workspace.StartRequest, error) {
+// a terminal manager runs and what a manager that takes no command needs,
+// both showing the session as name.
+func (e *Env) startRequest(cfg config.Config, ws wsdomain.Workspace, s turns.AgentSession, name string) (workspace.StartRequest, error) {
 	a, err := e.agent(cfg.Agent)
 	if err != nil {
 		return workspace.StartRequest{}, err
 	}
-	s.SessionID = turns.NewSessionID()
+	s.SessionID, s.Name = turns.NewSessionID(), name
 	if e.Turns != nil {
 		s.SessionID = e.Turns.MintID()
 	}
@@ -454,7 +465,7 @@ func (e *Env) startRequest(cfg config.Config, ws wsdomain.Workspace, s turns.Age
 	if err != nil {
 		return workspace.StartRequest{}, err
 	}
-	req := workspace.StartRequest{WorkspaceID: ws.ID, Session: s.SessionID, Agent: a.Name(), Command: sessionEnv(e.Getenv, cmd), Title: title, Model: s.Model}
+	req := workspace.StartRequest{WorkspaceID: ws.ID, Session: s.SessionID, Agent: a.Name(), Command: sessionEnv(e.Getenv, cmd), Title: name, Model: s.Model}
 	if r, ok := a.(turns.SettingsRenderer); ok {
 		req.Settings = r.Settings(s.Policy)
 	}

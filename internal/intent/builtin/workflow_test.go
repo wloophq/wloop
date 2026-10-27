@@ -12,7 +12,7 @@ import (
 
 // workflowTable is the plan's workflow fact table: slot, then name:type pairs.
 var workflowTable = map[string]string{
-	"pr": "state:S merged_at:T closed_at:T finished_for:D draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B muted:B " +
+	"pr": "state:S merged_at:T closed_at:T finished_for:D ended:B draft:B head:S conflicting_for:D mine:B checks:S stalled:B age:D held:B adopted:B muted:B " +
 		"has_workspace:B stale:B open_turn:S open_turn_seq:I orphan_answer_id:I review.action:S review.reason:S review.observed:B " +
 		"first.due:B first.reason:S address.due:B address.reason:S address.reviewers:L address.checks:L address.conflict:B address.observed:B " +
 		"last_interaction_at:T silent_days:I waits_on_user:B nudge.refusal:S mute.refusal:S fingerprint:S repo:S repo_name:S owner:S author:S visibility:S",
@@ -21,10 +21,10 @@ var workflowTable = map[string]string{
 		"idle_for:D unread_answers:I unread_since:T unread_for:D pr_state:S duplicate:B worktree_gone:B closed_by_manager:B transcript_gone:B process_gone:B fingerprint:S repo:S",
 	"workspace": "role:S main:B pr:S pr_state:S pr_finished_for:D path_exists:B temporary:B duplicate:B dirty:I untracked:I " +
 		"unpushed:I newest_turn_state:S open_turn:B pendency:L sessions:I manager:S last_activity:T quiet_for:D fingerprint:S repo:S",
-	"entry": "id:S kind:S state:S waiting_on:L resurface_at:T waiting_days:I since_nudge:D nudge_due_at:T muted:B unit:S unit_provider:S " +
+	"entry": "id:S kind:S state:S waiting_on:L resurface_at:T waiting_days:I since_nudge:D nudge_due_at:T muted:B unit:S unit_provider:S units:L unit_providers:L units_ended:B turns:I captured_by_user:B " +
 		"unit_started_by_me:B unit_closure_posted:B items_open:I items_resolved:I items_owed:I settled_at:T fingerprint:S",
 	"slack": "channel:S conversation:S started_by_me:B closure_posted:B live_entry:B items_open:I items_unowned:I items_unowned_age_days:I " +
-		"settled_at:T fingerprint:S",
+		"ended:B settled_at:T fingerprint:S",
 	"brief":   "goal:S risk:S kind:S size:S tags:L missing:L",
 	"draft":   "person_waited:B items_owed:I items_assigned:I unit_open:B",
 	"trigger": "kind:S event.kind:S event.key:S event.id:I event.data:S fired_at:T",

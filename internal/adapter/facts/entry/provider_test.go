@@ -45,6 +45,8 @@ type env struct {
 	clock *clock
 	p     *factentry.Provider
 	s     factentry.Settings
+	ended map[unit.Unit]bool
+	turns map[unit.Unit]int
 }
 
 func newEnv(t *testing.T) *env {
@@ -54,12 +56,14 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	e := &env{t: t, db: db, clock: &clock{now: monday}, s: factentry.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}}
+	e := &env{t: t, db: db, clock: &clock{now: monday}, s: factentry.Settings{StaleDays: 2, RenudgeAfter: 72 * time.Hour}, ended: map[unit.Unit]bool{}, turns: map[unit.Unit]int{}}
 	e.p = factentry.New(factentry.Deps{
 		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
 		Cards:    coregtd.CardFacts{Cards: db.Cards()},
 		Enabled:  func(p unit.ProviderID) bool { return p != mailX.Provider },
 		Settings: func() factentry.Settings { return e.s },
+		Ended:    func(_ context.Context, u unit.Unit) (bool, error) { return e.ended[u], nil },
+		Turns:    func(_ context.Context, u unit.Unit) (int, error) { return e.turns[u], nil },
 		Clock:    e.clock,
 	})
 	return e
@@ -271,7 +275,8 @@ func TestAnEntrysOwnerIsItsUnit(t *testing.T) {
 	e.entry(waiting("e-01", chatA, monday))
 	e.entry(gtd.Entry{ID: "e-02", Kind: gtd.KindAction, State: gtd.Next, Title: "a", Items: []gtd.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
 	e.entry(gtd.Entry{ID: "e-03", Kind: gtd.KindCapture, State: gtd.Inbox, Title: "c"})
-	for id, want := range map[gtd.ID][]unit.Unit{"e-01": {chatA}, "e-02": {chatB}, "e-03": nil, "e-99": nil} {
+	e.entry(gtd.Entry{ID: "e-04", Kind: gtd.KindCapture, State: gtd.Next, Title: "c", Units: []unit.Unit{chatB, chatA}})
+	for id, want := range map[gtd.ID][]unit.Unit{"e-01": {chatA}, "e-02": {chatB}, "e-03": nil, "e-04": {chatB, chatA}, "e-99": nil} {
 		got, err := e.p.Owners(context.Background(), gtd.UnitOf(id))
 		if err != nil || !slices.Equal(got, want) {
 			t.Errorf("owners of %s: %v, %v; want %v", id, got, err, want)
@@ -328,6 +333,78 @@ func TestAnEntryThatLeftItsListStillHasEventFacts(t *testing.T) {
 	for _, id := range []gtd.ID{"e-04", "e-99"} {
 		if _, err := e.p.EventFacts(context.Background(), gtd.UnitOf(id)); err != automation.ErrUnitGone {
 			t.Errorf("event facts of %s: %v, want ErrUnitGone", id, err)
+		}
+	}
+}
+
+var docY = unit.Unit{Provider: "doc", Key: "d-1"}
+
+func TestEntryFactsSpanEveryUnitInOrder(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.item(chatA, "i1", items.Open, monday)
+	owed := e.item(chatB, "i2", items.Open, monday, items.Person{Key: "chat:U1"})
+	e.item(chatB, "i3", items.Resolved, monday)
+	onDoc := e.item(docY, "i4", items.Open, monday)
+	en := gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "ship it", Units: []unit.Unit{chatA, chatB},
+		Items: []gtd.ItemRef{{Unit: owed.Unit, Item: owed.ID}, {Unit: onDoc.Unit, Item: onDoc.ID}}}
+	e.entry(en)
+	f := e.facts("e-01")
+	if f["entry.unit"] != chatA.String() || f["entry.unit_provider"] != "chat" {
+		t.Errorf("the first unit: %v %v", f["entry.unit"], f["entry.unit_provider"])
+	}
+	if got := f["entry.units"].([]string); !slices.Equal(got, []string{chatA.String(), chatB.String(), docY.String()}) {
+		t.Errorf("units %v, want the attached ones in order, then the one only an item names", got)
+	}
+	if got := f["entry.unit_providers"].([]string); !slices.Equal(got, []string{"chat", "doc"}) {
+		t.Errorf("unit_providers %v", got)
+	}
+	if f["entry.items_open"] != 3 || f["entry.items_resolved"] != 1 || f["entry.items_owed"] != 2 {
+		t.Errorf("items open %v, resolved %v, owed %v; want 3, 1, 2 over every unit", f["entry.items_open"], f["entry.items_resolved"], f["entry.items_owed"])
+	}
+}
+
+func TestEntryUnitsEndedWhenEveryUnitEnded(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.entry(gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "none"})
+	e.entry(gtd.Entry{ID: "e-02", Kind: gtd.KindCapture, State: gtd.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	if f := e.facts("e-01"); f["entry.units_ended"] != false {
+		t.Error("an entry with no unit has its units ended")
+	}
+	e.ended[chatA] = true
+	if f := e.facts("e-02"); f["entry.units_ended"] != false {
+		t.Error("an entry with a unit still going has its units ended")
+	}
+	e.ended[chatB] = true
+	if f := e.facts("e-02"); f["entry.units_ended"] != true {
+		t.Error("an entry whose every unit ended has not")
+	}
+}
+
+func TestEntryTurnsCountsTheTurnsOnTheEntryItself(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.entry(gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "tracked", Units: []unit.Unit{chatA}})
+	e.turns[chatA] = 3
+	if f := e.facts("e-01"); f["entry.turns"] != 0 {
+		t.Errorf("entry.turns %v, want the turns on its unit left out", f["entry.turns"])
+	}
+	e.turns[gtd.UnitOf("e-01")] = 2
+	if f := e.facts("e-01"); f["entry.turns"] != 2 {
+		t.Errorf("entry.turns %v, want 2", f["entry.turns"])
+	}
+}
+
+func TestEntryCapturedByUser(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.entry(gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Inbox, Title: "mine"})
+	e.entry(gtd.Entry{ID: "e-02", Kind: gtd.KindAction, State: gtd.Inbox, Title: "derived", Origin: gtd.OriginDerived, Units: []unit.Unit{chatA}})
+	e.entry(gtd.Entry{ID: "e-03", Kind: gtd.KindMessage, State: gtd.Inbox, Title: "a message", Origin: gtd.OriginMessage, Units: []unit.Unit{chatA}})
+	for id, want := range map[gtd.ID]bool{"e-01": true, "e-02": false, "e-03": false} {
+		if got := e.facts(id)["entry.captured_by_user"]; got != want {
+			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)
 		}
 	}
 }

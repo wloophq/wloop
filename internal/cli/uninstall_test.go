@@ -182,7 +182,7 @@ func TestUninstallDryRunChangesNothing(t *testing.T) {
 	out := w.out.String()
 	for _, want := range []string{"Would remove:", "LaunchAgent " + launchAgentLabel + " (" + w.plists[0] + ")", "app bundle " + bundlePath(w.Home),
 		"remove MCP server " + brand.MCPServer(), "skill " + brand.Name + " (" + filepath.Join(skillsRoot(w.claude), brand.Name) + ")",
-		"the Slack tokens in Keychain service", "Would delete (--purge):", w.StateDir + ": the store", filepath.Dir(w.ConfigPath) + ": config.json",
+		"the Slack tokens in Keychain service", "Would delete (--purge):", w.StateDir + ": the store", filepath.Dir(w.ConfigPath) + ": config.toml",
 		"Would leave:", "review profile " + w.profile, "brew uninstall --cask " + brand.Name} {
 		if !strings.Contains(out, want) {
 			t.Errorf("plan lacks %q:\n%s", want, out)

@@ -45,10 +45,12 @@ Every outbound post that an agent or a rule proposes (a reply, a nudge, a closin
 
 ```text
 proposed --> approved --> sending --> sent
-   |            |            |
-   v            v            v
-discarded    discarded     failed --> approved (retry, by hand)
+   |          |    |         |
+   v          v    |         v
+discarded  discarded +-----> failed --> approved (retry, by hand)
 ```
+
+An approved draft its publisher cannot take (the provider is off, or the draft cannot be placed) fails without ever being `sending`, so a restart never looks for a post that was never made.
 
 A draft goes out only once its approval policy lets it:
 
@@ -110,13 +112,13 @@ A workflow proposes drafts with its `draft.propose` step, its text rendered from
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose
 {{command}} outbox show <id>            # one draft as it reads, its items and the commands it takes
-{{command}} outbox new <unit> <markdown> # a reply of yours; --react <emoji> for a reaction, --send to post it now
+{{command}} outbox new <unit> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
 {{command}} outbox approve <id>         # shows it and posts it once you say yes
 {{command}} outbox edit <id> <markdown>
 {{command}} outbox discard <id> --reason "not needed"
 ```
 
-On a terminal the list groups the drafts by purpose (nudges, closings, replies, ...), each with its id, its unit as its row reads (`acme/api#7 · <title>`, `#channel · <thread>`, `DM with <name>`), who it mentions, its age and its first line; a column shows only where the drafts differ, such as the state when one failed. Piped, it prints one tab-separated line per draft for scripts: id, kind, state, unit, label, mentions, creation time (RFC 3339) and first line. A unit is a pull request URL or `owner/repo#n`, a Slack message permalink (its thread) or `<provider>:<key>`.
+On a terminal the list groups the drafts by purpose (nudges, closings, replies, ...), each with its id, its unit as its row reads (`acme/api#7 · <title>`, `#channel · <thread>`, `DM with <name>`), who it mentions, its age and its first line; a column shows only where the drafts differ, such as the state when one failed. Piped, it prints one tab-separated line per draft for scripts: id, kind, state, unit, label, mentions, creation time (RFC 3339) and first line. A unit is a pull request URL or `owner/repo#n`, a Slack message ref (`<conversation>/<ts>`) or permalink (its thread) or `<provider>:<key>`.
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment or no terminal. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 

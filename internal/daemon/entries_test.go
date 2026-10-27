@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -361,7 +362,9 @@ func TestTheCatalogIsWordedByTheProfile(t *testing.T) {
 		Verbs: map[string]intentload.VerbText{"done": {Label: "Finish", Summary: "Close it"}, "waiting": {Label: "Waiting", Summary: "Wait", Input: "On whom?"}},
 		Views: map[string]string{"next": "Now"},
 	}
-	r := newEntriesRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts} } })
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
 	var cat api.GTDCatalog
 	if code := get(t, r.s, api.GTDPath, &cat); code != 200 {
 		t.Fatalf("%d", code)
@@ -798,7 +801,9 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	texts := intentload.GTDTexts{Verbs: map[string]intentload.VerbText{"someday": {Offer: offer}}}
-	r := newEntriesRig(t, func(d *Deps) { d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts} } })
+	r := newEntriesRig(t, func(d *Deps) {
+		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{GTD: texts, Registry: dintent.NewRegistry(nil)} }
+	})
 	r.put(t, gtd.Entry{ID: "e-c", Kind: gtd.KindCapture, State: gtd.Inbox, Title: "c", Origin: gtd.OriginUser})
 	var v api.EntryView
 	if code := get(t, r.s, api.EntryPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {

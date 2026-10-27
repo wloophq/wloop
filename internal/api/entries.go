@@ -74,11 +74,13 @@ type EntryView struct {
 	Items            []ItemView   `json:"items"`
 	Cards            []CardView   `json:"cards,omitempty"` // detail only
 	Verbs            []VerbState  `json:"verbs"`
-	Attention        *Attention   `json:"attention,omitempty"`
-	Message          *Message     `json:"message,omitempty"`
-	Draft            *Draft       `json:"draft,omitempty"`
-	Created          time.Time    `json:"created"`
-	Updated          time.Time    `json:"updated"`
+	// Actions are the intents that serve the entry's own unit, such as start.
+	Actions   []ActionState `json:"actions,omitempty"`
+	Attention *Attention    `json:"attention,omitempty"`
+	Message   *Message      `json:"message,omitempty"`
+	Draft     *Draft        `json:"draft,omitempty"`
+	Created   time.Time     `json:"created"`
+	Updated   time.Time     `json:"updated"`
 
 	// A project's: its next action's id, its open actions, and its review.
 	Sequential      bool      `json:"sequential,omitempty"`

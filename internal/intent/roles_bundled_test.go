@@ -2,6 +2,7 @@ package intent_test
 
 import (
 	"testing"
+	"time"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/turn"
@@ -25,6 +26,7 @@ func TestRolesImplyTheRemovedKeys(t *testing.T) {
 		"nudge":   {prepare: "nudge.prepare", context: "pr", policy: "round", board: "none"},
 		"probe":   {context: "synthetic", launch: "probe", policy: "probe", board: "none"},
 		"review":  {roundKind: "review", reconcile: "my_review", context: "pr", policy: "round", board: "review", drivesRow: true},
+		"start":   {context: "pr", policy: "round", board: "none"},
 	}
 	for _, d := range l.Registry.All() {
 		got := implied{d.RoundKind, d.Reconcile, d.Prepare, d.Context, d.Launch, d.Policy, d.Board, d.DrivesRow}
@@ -66,5 +68,22 @@ func TestTheBundledNudgeRefusesWithItsFirstHoldingRefuse(t *testing.T) {
 	}
 	if got, _ := l.Refusal("review", map[string]any{"pr.mute.refusal": "muted"}); got != "" {
 		t.Errorf("the review, with no [[refuse]], refused: %q", got)
+	}
+}
+
+func TestTheBundledSessionNames(t *testing.T) {
+	l, err := turn.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts := map[string]any{"unit.label": "acme/api#7", "session.started": time.Date(2026, 10, 26, 14, 5, 0, 0, time.UTC)}
+	for name, want := range map[string]string{
+		"review":  "review acme/api#7 26/10 14:05",
+		"address": "triage acme/api#7 26/10 14:05",
+		"nudge":   "nudge acme/api#7",
+	} {
+		if got, err := l.SessionName(dintent.Name(name), facts); err != nil || got != want {
+			t.Errorf("%s: %q %v, want %q", name, got, err, want)
+		}
 	}
 }

@@ -95,7 +95,7 @@ var Steps = []StepDef{
 	{StepNotifySelf, nil, workflow.ReachPrivate, nil,
 		"A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts \"pr.slug\"}}`, none once the unit is gone)."},
 	{StepEntryVerb, providers(unit.Entry), workflow.ReachLocal, nil,
-		"Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
+		"Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_<verb>` event, which only a person's verb records, so a workflow never triggers another through it."},
 }
 
 // StepArg is the grammar row of step use's argument k.

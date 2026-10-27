@@ -102,7 +102,8 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	if d.Candidates == nil {
 		d.Candidates = candidatesOf(d.Modules)
 	}
-	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log, Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
+	sd := stepDeps{Units: units, Candidates: d.Candidates, Rounds: e.Rounds, Drafts: d.Drafts, Pub: d.Pub, Log: d.Log,
+		Headless: d.TurnStart.Headless, Turns: d.TurnStart.Turns}
 	if d.DB != nil {
 		sd.Pub = stepEvents{rec: sqlite.New(d.DB), next: d.Pub, log: d.Log}
 	}

@@ -1,7 +1,6 @@
 package profile
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +11,7 @@ import (
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/frontmatter"
 )
 
 // Addition is a rule to put in the block of each of Intents at Path.
@@ -55,28 +55,17 @@ func frontMatterOf(a Addition) string {
 		lines = append(lines, "override = true")
 	}
 	if a.Title != "" {
-		lines = append(lines, "title = "+tomlString(a.Title))
+		title, _ := frontmatter.Value(a.Title)
+		lines = append(lines, "title = "+title)
 	}
 	if len(a.Paths) > 0 {
-		quoted := make([]string, len(a.Paths))
-		for i, p := range a.Paths {
-			quoted[i] = tomlString(p)
-		}
-		lines = append(lines, "paths = ["+strings.Join(quoted, ", ")+"]")
+		paths, _ := frontmatter.Value(a.Paths)
+		lines = append(lines, "paths = "+paths)
 	}
 	if len(lines) == 0 {
 		return ""
 	}
 	return "+++\n" + strings.Join(lines, "\n") + "\n+++\n"
-}
-
-// tomlString is s as a TOML basic string; JSON escapes are a subset of TOML's.
-func tomlString(s string) string {
-	var b strings.Builder
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(s)
-	return strings.TrimSuffix(b.String(), "\n")
 }
 
 // underSection appends text at the end of the "## section" part of body,

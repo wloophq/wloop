@@ -43,6 +43,9 @@ type Manager struct {
 	// Tips is the commit of each local branch; Create puts the new branch at
 	// the PR head.
 	Tips map[string]string
+	// Creates records each create request. A parent no listed workspace has
+	// the path of is dropped, as Orca drops it.
+	Creates []workspace.CreateRequest
 	// StartFails and SendFails fail StartAgentSession and SendPrompt.
 	StartFails, SendFails error
 	// WakeLate fails Wake after it started the process, which it names.
@@ -174,6 +177,7 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (_ ws
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.write("create %s", req.Name)
+	m.Creates = append(m.Creates, req)
 	w := wsdomain.Workspace{
 		ID:          fmt.Sprintf("ws-%d", len(m.WorkspaceList)+1),
 		RepoID:      req.RepoID,
@@ -198,6 +202,7 @@ func (m *Manager) Create(ctx context.Context, req workspace.CreateRequest) (_ ws
 		}
 		w.BranchRenamed = w.Branch != req.HeadBranch
 	}
+	w.ParentDropped = req.Parent != "" && !slices.ContainsFunc(m.WorkspaceList, func(o wsdomain.Workspace) bool { return o.Path == req.Parent })
 	m.WorkspaceList = append(m.WorkspaceList, w)
 	handle := "term-" + w.ID
 	if req.Agent != "" {

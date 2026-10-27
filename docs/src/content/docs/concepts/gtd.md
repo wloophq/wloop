@@ -9,8 +9,9 @@ description: How what people ask of you becomes GTD entries, and how the lists, 
 
 A **unit** is a thing work happens on: a pull request, a Slack thread, a DM topic. Units come from plugins. Two are compiled in: `github` (pull requests) and `slack` (threads and DM topics). Each can be turned off:
 
-```json
-"slack": { "enabled": false }
+```toml
+[slack]
+enabled = false
 ```
 
 The daemon reads the switch when it starts. With a plugin off, nothing of it runs, its actions leave every surface, and its cards render from the last stored snapshot, marked stale.
@@ -32,6 +33,26 @@ Once you create or correct an item it is **confirmed**: extraction never overwri
 - When every item of an entry resolves, the entry moves to Done. When one reopens, the entry comes back to the Inbox, marked changed.
 
 You can capture an entry by hand with `n`.
+
+## Units attached to an entry
+
+An entry's units come in order: the unit it was captured or derived on, then the units attached to it, in the order they were attached, then any unit only its items name. The entry itself is never one of them.
+
+What a turn on an entry produces is attached to it, when the turn's intent asks for it:
+
+- With `record.attach_url = true`, a turn that records `done` with an outcome `url` naming a unit, such as a pull request, attaches that unit. The address is resolved by the plugins' units; a branch name never attaches anything.
+- With `drafts.attach_posts = true`, the unit of each post the turn's agent makes, sent at once or once approved, is attached; a draft on the entry posted to a channel or a person attaches the thread its post starts. Reactions and edits are not posts.
+
+Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `entry-results-ended` closes an entry you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`entry.captured_by_user && entry.turns > 0 && entry.units_ended`). An entry you captured on a pull request to keep track of it, with no turn on the entry itself, stays open. It never closes an entry derived from items, which its items close.
+
+## Start new work
+
+`{{command}} start --repo acme/api <brief>` captures the brief as an entry (its first line is the title, the whole brief its notes), prints `entry:<id>`, then starts an agent session on it. `{{command}} start entry:<id>` starts one on an entry you captured before, and the cockpit offers Start on such an entry. Start runs only on an entry you captured; a derived entry is refused.
+
+- **With `--repo`**, the session works in a fresh worktree of that repository, branched from its default base and named after the entry's title and short id. A repository no manager knows is cloned into the matching project's `projects_dir`; an existing folder there must be a checkout of that repository. `--manager` picks the workspace manager, and `--parent` the worktree the new one goes under in Orca (the one the command runs in by default). The project's `workspace_managers`, `agent` and `agent_home` apply, to the clone's trust and to the session alike. The manager is chosen before anything is cloned, so a start it refuses clones nothing. A failed start prints the command that retries it on the entry with the same flags.
+- **Without `--repo`**, the session runs with no checkout, in the neutral repository, for a message to post or an answer to find.
+
+The `start` intent records `done` with the pull request's or the message's URL, which attaches it to the entry (`record.attach_url`); posts it makes at once attach too (`drafts.attach_posts`). The entry then closes when they end, as the next section says. When the cockpit's Start runs, it takes no `--repo`: the turn reuses the repository an earlier start on the entry recorded, else it runs with no checkout.
 
 ## Lists are states
 
@@ -58,7 +79,7 @@ The words of the verbs, the views and the Review's steps come from the profile's
 
 Approve (`a`) and delegate (`d`) move nothing themselves: on an action entry with units they run that unit's action, such as Run now, a review or address round, or Act. Delegate also runs on a waiting, closure or captured entry that has a unit, and takes optional guidance and a mode: `headless` (Draft for me, which proposes drafts for the entry) or `session` (Hand to an agent). Without a mode the action picks its own, headless when it can. The entry says upfront whether a session can run on its unit, and why not when it cannot; a unit with no placement runs its session in a neutral directory with no checkout. A session started from an entry keeps the entry and its items, so the drafts it proposes serve that entry.
 
-Reply (`r`) writes a draft of your own on the entry's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the entry and its items. It waits in the Outbox, or goes out at once with Send now. From a terminal, `{{command}} outbox new <unit|permalink> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
+Reply (`r`) writes a draft of your own on the entry's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the entry and its items. It waits in the Outbox, or goes out at once with Send now. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
 
 ## Messages
 
@@ -66,11 +87,11 @@ An Inbox message needs you to decide: an agent's question at the end of its turn
 
 ## The Outbox
 
-Every post an agent or a rule proposes is a draft first, in the Outbox, until its approval policy lets it out. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep:
+Every post an agent or a rule proposes is a draft first, in the Outbox, until its approval policy lets it out. See [What waits for you](/concepts/approval/#the-outbox). Default workflows, and the GitHub plugin's rule, also add drafts on their own, at each sweep. A draft a workflow proposes on an entry goes to the unit its first item is on, else to its first unit:
 
 | Workflow or rule | Proposes |
 |---|---|
-| `slack-stalled-nudge` | a nudge to each person a Slack waiting entry waits on, once it is past its resurface date or stale and not nudged within `drafts.repeat_after` (1d) |
+| `slack-stalled-nudge` | a nudge to each person a waiting entry with a Slack unit waits on, once it is past its resurface date or stale and not nudged within `drafts.repeat_after` (1d) |
 | `slack-closure` | a closing message for a Slack unit you started whose items resolved |
 | `slack-ask-owner` | a question for a Slack unit's open items with no owner after a working day; it always waits for you |
 | `github-nudge` | the GitHub plugin's nudge |
@@ -94,9 +115,14 @@ The Review (`g r`) walks six steps, each a filtered view you mark done with `Ent
 
 ## Configuration
 
-```json
-"gtd": { "stale_waiting_days": 2, "areas": ["oss", "work"], "contexts": ["@decide", "@reply"] },
-"notifications": { "digest_at": "09:00" }
+```toml
+[gtd]
+stale_waiting_days = 2
+areas = ["oss", "work"]
+contexts = ["@decide", "@reply"]
+
+[notifications]
+digest_at = "09:00"
 ```
 
 The entries, messages, drafts, items and Slack messages have no retention yet: they grow until a later release prunes them. Only dossiers are archived and purged.

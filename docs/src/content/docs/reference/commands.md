@@ -75,10 +75,10 @@ See [Troubleshooting](/guides/troubleshooting/).
 Resolve a unit's open items, replies as drafts.
 
 ```sh
-{{command}} act <url|permalink|slack:key> [guidance...]
+{{command}} act <url|ref|permalink|slack:key> [guidance...]
 ```
 
-Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message permalink or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
+Act on the open items of a unit without touching its code: settle what you can and propose the replies it needs as drafts for you to approve; Address works on the code of a pull request you develop. The target is a pull request URL, a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, or &lt;provider&gt;:&lt;key&gt; of a unit the intent serves; words after it are guidance for the turn.
 
 Examples:
 
@@ -157,6 +157,31 @@ Examples:
 ```
 
 See [Review someone else's pull request](/guides/review/).
+
+### start
+
+Start new work from a brief.
+
+```sh
+{{command}} start [entry:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+```
+
+Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new entry; words after it are guidance for the turn.
+
+| Flag | Description |
+| --- | --- |
+| `--repo <repo>` | Owner/name of the repository to work in; without it the session has no checkout |
+| `--manager <name>` | The workspace manager that creates the worktree, instead of the configured ones |
+| `--parent <worktree>` | The worktree the new one goes under, where its manager keeps parents; the one the command runs in by default |
+
+Examples:
+
+```sh
+{{command}} start --repo acme/api add retries to the webhook sender; done when a failed delivery is retried three times
+{{command}} start entry:e-3f9a2c4b5d6e7f80 --repo acme/api
+```
+
+See [Inbox, entries and work units](/concepts/gtd/).
 
 ### take-over
 
@@ -274,20 +299,20 @@ Drafts waiting for your approval, and yours.
 ```sh
 {{command}} outbox [list] [--color <when>]
 {{command}} outbox show <id> [--color <when>]
-{{command}} outbox new <unit|permalink> <markdown> [--send [--yes]]
-{{command}} outbox new <unit|permalink> --react <emoji> [--send [--yes]]
+{{command}} outbox new <unit|message> <markdown> [--send [--yes]]
+{{command}} outbox new <unit|message> --react <emoji> [--send [--yes]]
 {{command}} outbox approve <id> [--text <markdown>] [--yes]
 {{command}} outbox retry <id> [--confirm] [--yes]
 {{command}} outbox edit <id> <markdown>
 {{command}} outbox discard <id> [--reason <why>]
 ```
 
-List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. new writes a reply, or a reaction, on a unit: a Slack message permalink (its thread), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in the Outbox for your approval; with `--send` it posts once you read it and say yes. approve shows a draft whole and posts it once you say yes, only from a terminal of your own, never an agent's shell; retry posts a failed one again. edit changes a draft's text and discard drops it.
+List the drafts waiting on you, proposed, failed or left sending, grouped by kind, or print one whole: its text as it reads, the items it is about and the commands it takes. Piped, the list is one tab-separated line per draft: id, kind, state, unit, label, mentions, creation time and first line. new writes a reply, or a reaction, on a unit: a Slack message ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink (its thread, or with `--react` the message itself), a pull request URL or owner/repo#n, or &lt;provider&gt;:&lt;key&gt;. It waits in the Outbox for your approval; with `--send` it posts once you read it and say yes. approve shows a draft whole and posts it once you say yes, only from a terminal of your own, never an agent's shell; retry posts a failed one again. edit changes a draft's text and discard drops it.
 
 | Flag | Description |
 | --- | --- |
 | `--color <when>` | list, show: auto, always or never |
-| `--react <emoji>` | new: react to the unit's message instead of replying |
+| `--react <emoji>` | new: react instead of replying: to the Slack message named, else to the unit's message |
 | `--send` | new: post it now, through the Outbox, instead of saving it there |
 | `--text <markdown>` | approve: post this text instead of the draft's |
 | `--confirm` | retry: post again a draft that may have been posted |
@@ -570,7 +595,7 @@ The JSON Schemas of the profile files, for editors.
 {{command}} profile schema [--workflow|--actions|--gtd|--keys|--config]
 ```
 
-Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or config.json, for an editor. Every schema comes from the grammar the loaders check.
+Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml, gtd.toml, keys.toml or config.toml, for an editor. Every schema comes from the grammar the loaders check.
 
 | Flag | Description |
 | --- | --- |
@@ -578,7 +603,7 @@ Print the JSON Schema of intent.toml, or of workflow.toml, actions.toml or confi
 | `--actions` | The schema of actions.toml |
 | `--gtd` | The schema of gtd.toml |
 | `--keys` | The schema of keys.toml |
-| `--config` | The schema of config.json |
+| `--config` | The schema of config.toml |
 
 Examples:
 
@@ -643,11 +668,11 @@ Post as you to a thread, channel or person.
 {{command}} slack send <target> <text> [--thread=false] [--broadcast] [--yes]
 ```
 
-Post as you to a permalink, #channel, channel id, @handle, email or user id. A permalink target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
+Post as you to a message, by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, a #channel, channel id, @handle, email or user id. A message target replies in its thread, through the Outbox: a draft of yours on the thread, approved once you say yes, so it feeds the thread's items and shows in the Logbook. It asks first unless `--yes`.
 
 | Flag | Description |
 | --- | --- |
-| `--thread=false` | Post to a permalink's conversation instead of its thread |
+| `--thread=false` | Post to a message's conversation instead of its thread |
 | `--broadcast` | Also send a thread reply to the conversation |
 | `--yes` | Post without asking |
 
@@ -665,11 +690,11 @@ See [Connect Slack](/guides/slack/).
 Admit every message of a thread, or stop.
 
 ```sh
-{{command}} slack follow <permalink>
-{{command}} slack unfollow <permalink>
+{{command}} slack follow <message>
+{{command}} slack unfollow <message>
 ```
 
-Follow a Slack thread, so every message of it is admitted, or stop following it.
+Follow the Slack thread of a message, named by its ref (&lt;conversation&gt;/&lt;ts&gt;) or permalink, so every message of it is admitted, or stop following it.
 
 Examples:
 
@@ -736,7 +761,7 @@ Trust a repository in an agent home.
 {{command}} trust [--home <dir>] [--exact] <folder|workspace>
 ```
 
-Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. {{name}} never trusts a folder unless you run this.
+Trust a folder's repository in an agent home, the configured one by default, as accepting the agent's trust dialog would; it covers every worktree of it. {{name}} never trusts a folder unless you run this, or the folder is a repository it just cloned for a project whose trust_clones is on.
 
 | Flag | Description |
 | --- | --- |

@@ -318,8 +318,8 @@ func (e *Env) closedByManager(ctx context.Context, manager, session, lastHandle 
 }
 
 // entryFacts is the entry subject's facts provider, reading the config the
-// daemon holds at each read.
-func (e *Env) entryFacts(db *sqlite.DB) *factentry.Provider {
+// daemon holds at each read; ended says whether a unit has ended.
+func (e *Env) entryFacts(db *sqlite.DB, ended func(context.Context, unit.Unit) (bool, error)) *factentry.Provider {
 	enabled := func(p unit.ProviderID) bool { return e.currentConfig().PluginEnabled(string(p)) }
 	return factentry.New(factentry.Deps{
 		Entries: db.Entries(), Items: db.Items(), Drafts: db.Drafts(),
@@ -328,6 +328,11 @@ func (e *Env) entryFacts(db *sqlite.DB) *factentry.Provider {
 		Settings: func() factentry.Settings {
 			cfg := e.currentConfig()
 			return factentry.Settings{StaleDays: cfg.GTD.StaleWaitingDays, RenudgeAfter: time.Duration(cfg.Drafts.RepeatAfter)}
+		},
+		Ended: ended,
+		Turns: func(ctx context.Context, u unit.Unit) (int, error) {
+			books, err := sqlite.New(db).Books(ctx, u)
+			return len(books[u].Turns), err
 		},
 		Clock: clockFunc(func() time.Time { return e.Now() }),
 	})

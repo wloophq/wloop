@@ -119,9 +119,9 @@ answer = "- {{.At}}: {{if .Option}}option {{.Option}}{{with .Label}} ({{.}}){{en
 description = "Post a message to Slack as the user, at once and without their approval. When it is unclear whether the user wants this message posted in their name, ask them first. An @handle, an @<user id> or an email in the text that names one person becomes a mention of them."
 
 [slack_send_message.params]
-"target" = "a message permalink, #channel, channel id, @handle, email or user id"
+"target" = "a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread; else #channel, channel id, @handle, email or user id"
 "text" = "the message, in Markdown"
-"thread" = "reply in the thread; defaults to true for a permalink, false otherwise"
+"thread" = "reply in the message's thread; defaults to true for a message, false otherwise"
 "broadcast" = "also send a thread reply to the conversation"
 
 [slack_send_message.answers]
@@ -134,15 +134,15 @@ failed = "Slack send failed: {{.Error}}"
 problem_target_required = "target: required"
 problem_text_required = "text: required, not empty"
 broadcast = "Nothing was sent: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to post it themselves."
-posted = """Posted to {{.Conversation}}{{with .Parent}} in the thread {{printf "%q" .}}{{end}}: {{if .Permalink}}{{.Permalink}}{{else}}no permalink (channel {{.Channel}}, ts {{.TS}}){{end}}
+posted = """Posted to {{.Conversation}}{{with .Parent}} in the thread {{printf "%q" .}}{{end}}: {{if .Permalink}}{{.Permalink}}{{else}}no permalink ({{.Channel}}/{{.TS}}){{end}}
 
 {{.Text}}"""
 
 [slack_read]
-description = "Read a Slack thread or conversation, rendered: a unit (slack:<key>) or a message permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked."
+description = "Read a Slack thread or conversation, rendered: a unit (slack:<key>), or the thread of a message ref (<conversation>/<ts>) or permalink. Stored messages come first; a channel thread not stored is read from Slack and not followed; direct messages only when tracked. Each message prints as [m<N> <conversation>/<ts>]: that ref is a target slack_react, slack_edit, slack_draft and slack_send_message take, and slack_read reads its thread; m<N> only numbers the messages of this read, as in \"reply to m<K>\"."
 
 [slack_read.params]
-"target" = "a unit (slack:<key>) or a message permalink"
+"target" = "a unit (slack:<key>), a message ref (<conversation>/<ts>) or a message permalink"
 "limit" = "how many messages to show, at most 200; the first message is always kept. Default 50"
 
 [slack_read.answers]
@@ -156,7 +156,7 @@ problem_target_required = "target: required"
 problem_limit = "limit: an integer from 1 to {{.Max}}"
 
 [slack_search]
-description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink to slack_read to read its thread, or to slack_draft, slack_react or slack_edit to act on it."
+description = "Search the Slack messages the user can read, newest first: one line per message, \"<permalink> · <author> · <time> · <first line>\", times in the user's time zone. Direct messages show only when tracked. Pass a permalink, or the ref a line without one prints, to slack_read to read its thread, or to slack_draft, slack_react, slack_edit or slack_send_message to act on it."
 
 [slack_search.params]
 "query" = "what to look for, as Slack's search box reads it"
@@ -180,12 +180,12 @@ problem_before_after = "before: a date after after"
 problem_limit = "limit: an integer from 1 to {{.Max}}"
 
 [slack_draft]
-description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message permalink to reply in its thread, even one your turn is not on. Name people as @{slack:<user id>}; an @handle or an email that names one person becomes that mention."
+description = "Propose a Slack message, or a reaction, to be posted as the user once they approve it in the {{.Name}} Outbox. It posts nothing itself. Target a message, by its ref (<conversation>/<ts>) or permalink, to reply in its thread, even one your turn is not on. From a turn on a GTD entry, a #channel, channel id or user id target works too. Name people as @{slack:<user id>}; an @handle or an email that names one person becomes that mention."
 
 [slack_draft.params]
 "text" = "the message, in Markdown; empty for a reaction"
 "kind" = "what the draft is; defaults to reply"
-"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name; else a message permalink, #channel, channel id or user id"
+"target" = "where it posts: empty for the unit's thread, or on a direct message the thread of the newest message its items name (a reaction: the newest message an item started at); else a message ref (<conversation>/<ts>) or permalink, #channel, channel id or user id"
 "items" = "the unit's items the draft answers; none outside the turn's Slack unit"
 "items[]" = "an item id of the unit"
 "reaction" = "the emoji name of a react draft, without colons"
@@ -210,42 +210,42 @@ dry_run = "Draft {{.ID}} on {{.Unit}} is a dry run: its approval stores drafts a
 description = "Add a reaction to a Slack message as the user, or remove one, at once and without their approval, such as swapping an hourglass for a check mark on a status reply. When it is unclear whether the user wants it, ask them first."
 
 [slack_react.params]
-"permalink" = "the message's permalink"
+"message" = "the message: its ref (<conversation>/<ts>), as slack_read and your turn print it, or its permalink"
 "emoji" = "the emoji name, such as white_check_mark, with or without colons"
 "remove" = "remove the user's reaction instead of adding it"
 
 [slack_react.answers]
 refused = "slack_react refused: {{.Error}}."
-bad_arguments = "Nothing was changed: the arguments are not an object with permalink and emoji{{with .Error}} ({{.}}){{end}}."
+bad_arguments = "Nothing was changed: the arguments are not an object with message and emoji{{with .Error}} ({{.}}){{end}}."
 fix_these = """Nothing was changed; fix these and call slack_react again:
 {{.Problems}}"""
 not_logged_in = "not logged in to Slack; run \"{{.Command}} slack login\""
 failed = "Slack reaction failed: {{.Error}}"
-problem_permalink = "permalink: required, a Slack message permalink"
+problem_message = "message: required, a Slack message ref (<conversation>/<ts>) or permalink"
 problem_emoji_required = "emoji: required, not empty"
-reacted = "Reacted :{{.Emoji}}: to the message in {{.Conversation}}: {{.Permalink}}"
-removed = "Removed :{{.Emoji}}: from the message in {{.Conversation}}: {{.Permalink}}"
-already = "The message already had :{{.Emoji}}: of the user; nothing changed: {{.Permalink}}"
-absent = "The message had no :{{.Emoji}}: of the user; nothing changed: {{.Permalink}}"
+reacted = "Reacted :{{.Emoji}}: to the message {{.Message}} in {{.Conversation}}{{with .Permalink}}: {{.}}{{end}}"
+removed = "Removed :{{.Emoji}}: from the message {{.Message}} in {{.Conversation}}{{with .Permalink}}: {{.}}{{end}}"
+already = "The message {{.Message}} already had :{{.Emoji}}: of the user; nothing changed{{with .Permalink}}: {{.}}{{end}}"
+absent = "The message {{.Message}} had no :{{.Emoji}}: of the user; nothing changed{{with .Permalink}}: {{.}}{{end}}"
 
 [slack_edit]
 description = "Replace the text of one of the user's own Slack messages, at once and without their approval; the {{.Name}} Outbox keeps the text it replaced. It refuses a message someone else posted. When it is unclear whether the user wants the message changed, ask them first. An @handle, an @<user id> or an email that names one person becomes a mention of them."
 
 [slack_edit.params]
-"permalink" = "the permalink of the user's message"
+"message" = "the user's message: its ref (<conversation>/<ts>), as slack_read and your turn print it, or its permalink"
 "text" = "the message's new text, in Markdown, replacing the whole message"
 
 [slack_edit.answers]
 refused = "slack_edit refused: {{.Error}}."
-bad_arguments = "Nothing was changed: the arguments are not an object with permalink and text{{with .Error}} ({{.}}){{end}}."
+bad_arguments = "Nothing was changed: the arguments are not an object with message and text{{with .Error}} ({{.}}){{end}}."
 fix_these = """Nothing was changed; fix these and call slack_edit again:
 {{.Problems}}"""
 not_logged_in = "not logged in to Slack; run \"{{.Command}} slack login\""
 failed = "Slack edit failed: {{.Error}}"
-problem_permalink = "permalink: required, a Slack message permalink"
+problem_message = "message: required, a Slack message ref (<conversation>/<ts>) or permalink"
 problem_text_required = "text: required, not empty"
 broadcast = "Nothing was changed: the text notifies a whole channel or group (<!channel>, <!here>, <!everyone> or a <!subteam^...> mention). Ask the user to edit it themselves."
-edited = """Edited the message in {{.Conversation}}: {{.Permalink}}
+edited = """Edited the message {{.Message}} in {{.Conversation}}{{with .Permalink}}: {{.}}{{end}}
 
 {{.Text}}
 

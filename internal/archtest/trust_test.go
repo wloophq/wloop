@@ -197,12 +197,12 @@ func plantConfig(t *testing.T) []trustPlant {
 	dir := t.TempDir()
 	var out []trustPlant
 	for i, f := range slices.Sorted(maps.Keys(facts)) {
-		rule := func(mode string) string { return fmt.Sprintf(`[{"when": %q, "mode": %q}]`, facts[f], mode) }
+		rule := func(mode string) string { return fmt.Sprintf(`[{when = %q, mode = %q}]`, facts[f], mode) }
 		for object, raw := range map[string]string{
-			"config workflows.<name>.approval":        `{"workflows": {"w": {"approval": {"rule": ` + rule(string(workflow.ApprovalRun)) + `}}}}`,
-			"config workflows.<name>.drafts.approval": `{"workflows": {"w": {"drafts": {"approval": {"rule": ` + rule(string(draft.Send)) + `}}}}}`,
+			"config workflows.<name>.approval":        "workflows.w.approval.rule = " + rule(string(workflow.ApprovalRun)),
+			"config workflows.<name>.drafts.approval": "workflows.w.drafts.approval.rule = " + rule(string(draft.Send)),
 		} {
-			file := filepath.Join(dir, fmt.Sprintf("%d-%d.json", i, len(out)))
+			file := filepath.Join(dir, fmt.Sprintf("%d-%d.toml", i, len(out)))
 			write(t, file, raw)
 			_, err := config.LoadFile(file, base)
 			out = append(out, trustPlant{object: object, fact: f, err: err})

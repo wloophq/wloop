@@ -20,7 +20,7 @@ const (
 	SurfaceKeys     Surface = "keys"     // keys.toml
 	SurfaceNotices  Surface = "notices"  // notices.toml
 	SurfaceBlock    Surface = "block"    // a judgment block's front matter
-	SurfaceConfig   Surface = "config"   // config.json
+	SurfaceConfig   Surface = "config"   // config.toml
 )
 
 // Kind is what a key's value is.

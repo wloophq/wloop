@@ -20,7 +20,8 @@ const (
 	KindReactionRemoved Kind = "reaction_removed"
 )
 
-// Via is counted only, never used for logic.
+// Via is how a message arrived. A message search stored with no thread is
+// not trusted to place a post: search may not say the thread.
 type Via string
 
 const (

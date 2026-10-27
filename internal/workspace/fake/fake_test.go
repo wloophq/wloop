@@ -10,6 +10,7 @@ import (
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
+	"github.com/wloophq/wloop/internal/workspace"
 )
 
 func TestObserverMirrorsTheFields(t *testing.T) {
@@ -86,5 +87,15 @@ func TestUnregisterDropsTheEntry(t *testing.T) {
 	}
 	if len(m.WorkspaceList) != 1 || m.WorkspaceList[0].ID != "b" {
 		t.Fatalf("workspaces %+v", m.WorkspaceList)
+	}
+}
+
+func TestCreateRecordsTheRequestAndDropsAnUnlistedParent(t *testing.T) {
+	m := &Manager{WorkspaceList: []wsdomain.Workspace{{ID: "lead", Path: "/worktrees/lead"}}}
+	ctx := context.Background()
+	under, _, _ := m.Create(ctx, workspace.CreateRequest{RepoID: "r", Name: "a", Parent: "/worktrees/lead", DefaultBase: true})
+	alone, _, _ := m.Create(ctx, workspace.CreateRequest{RepoID: "r", Name: "b", Parent: "/elsewhere"})
+	if under.ParentDropped || !alone.ParentDropped || len(m.Creates) != 2 || !m.Creates[0].DefaultBase {
+		t.Fatalf("under %+v, alone %+v, creates %+v", under, alone, m.Creates)
 	}
 }

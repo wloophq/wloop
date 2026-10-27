@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/wloophq/wloop/internal/domain/gtd"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"time"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
@@ -40,6 +42,10 @@ type Recorded struct {
 	// Dropped counts the record's ops left unapplied because the turn had
 	// already ended or was replaced.
 	Dropped int
+
+	// result is the unit the record produced for the turn's entry; zero
+	// when it attaches none.
+	result unit.Unit
 }
 
 // DroppedNote tells the agent its ops did not reach the ledger; "" when
@@ -73,7 +79,32 @@ func (s *Service) recordEnd(ctx context.Context, r RecordRequest, byHeadless boo
 		s.publish(evs...)
 		s.changed(ctx, got.Unit)
 	}
+	if !got.result.IsZero() {
+		s.attachResult(context.WithoutCancel(ctx), got.Unit, got.result)
+	}
 	return got, nil
+}
+
+// attachResult attaches u to the entry of the turn's unit on; a failure is
+// logged, since the record is stored.
+func (s *Service) attachResult(ctx context.Context, on, u unit.Unit) {
+	id, _ := gtd.IDOf(on)
+	if err := s.Results.Attach(ctx, id, u); err != nil {
+		s.logf("turn result %s on %s: %v", u, on, err)
+	}
+}
+
+// resultOf is the unit rec's outcome url names when rules attach it to the
+// entry the turn on u serves; zero otherwise.
+func (s *Service) resultOf(u unit.Unit, rules dintent.RecordRules, rec record.Record) unit.Unit {
+	if s.Results == nil || !rules.AttachURL || rec.State != record.Done || rec.Outcome == nil || rec.Outcome.URL == "" {
+		return unit.Unit{}
+	}
+	if _, ok := gtd.IDOf(u); !ok {
+		return unit.Unit{}
+	}
+	got, _ := s.Results.UnitOf(rec.Outcome.URL)
+	return got
 }
 
 // applyLedger applies a stored record's ops. A whole-call failure refuses
@@ -183,6 +214,7 @@ func (s *Service) recordTurnEnd(ctx context.Context, r RecordRequest, byHeadless
 	if !added {
 		return out, nil, ops, nil
 	}
+	out.result = s.resultOf(b.Unit, rules, r.Record)
 	data := r.Record.EventData()
 	if r.Via != "" {
 		data += " (via " + r.Via + ")"

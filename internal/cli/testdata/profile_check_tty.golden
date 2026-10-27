@@ -1,4 +1,4 @@
-[bold]Intents[/] [dim]7[/]
+[bold]Intents[/] [dim]8[/]
   act         [dim]bundled[/]                         Act on the open items of a unit without touching its
                                               code: settle what you can and propose the replies it
                                               needs as drafts for you to approve; Address works on
@@ -16,6 +16,8 @@
                                               take an answer and be resumed
   review      [dim]bundled[/]                         Start or continue a review round on someone else's
                                               pull request, in a dedicated workspace
+  start       [dim]bundled[/]                         Start new work from a brief: in a fresh worktree of a
+                                              repository, or with no checkout
 
 [bold]Blocks[/] [dim]5[/]
   [bold]address[/]  organization=acme/kind=fix/intent=address.md  [dim]organization acme, kind fix[/]

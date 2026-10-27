@@ -145,6 +145,20 @@ func TestReviewRejectsClosedPRs(t *testing.T) {
 	}
 }
 
+func TestReviewNamesTheSessionFromTheProfile(t *testing.T) {
+	t.Parallel()
+	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}
+	te := newTestEnv(t, m)
+	te.gh.basics = openBasics
+	te.git.branch["/worktrees/REVIEW feat/x"] = "me/REVIEW-feat-x"
+	if code := te.run("review", "https://github.com/acme/api/pull/7"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	if len(m.Commands) != 1 || !strings.Contains(m.Commands[0], " --name 'review acme/api#7 09/10 15:00' ") {
+		t.Fatalf("commands = %q", m.Commands)
+	}
+}
+
 func TestReviewStartsTheAgentInTheProjectProfile(t *testing.T) {
 	t.Parallel()
 	m := &fake.Manager{RepoList: []wsdomain.Repo{{ID: "r1", Path: "/src/api", RemoteKey: "github.com/acme/api"}}}

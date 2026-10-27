@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/gtd"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -51,14 +52,18 @@ func buildSources(ps []source.Plugin, cfg config.Config, sd source.Deps) ([]sour
 // streams, jobs and health run in the daemon; Track reads a unit through
 // its source.
 func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon.Deps {
-	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}}
+	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, gtd.Codec{}}
 	for _, p := range ps {
 		codecs = append(codecs, p.Codec)
 	}
 	tracks := map[unit.ProviderID]func(context.Context, unit.Unit) (port.TrackRead, error){}
 	untracks := map[unit.ProviderID]func(context.Context, unit.Unit) error{}
 	var slow slowJobs
+	var resolvers []func(context.Context, string) (unit.Unit, bool, error)
 	for _, m := range mods {
+		if m.Resolve != nil {
+			resolvers = append(resolvers, m.Resolve)
+		}
 		d.Ingest = append(d.Ingest, daemon.IngestJob{ID: m.ID, Job: m.Ingest})
 		d.RowProviders = append(d.RowProviders, m.Rows)
 		if m.Track != nil {
@@ -94,6 +99,16 @@ func withSources(d daemon.Deps, ps []source.Plugin, mods []source.Module) daemon
 	}
 	if len(slow) > 0 {
 		d.Collector = slow
+	}
+	if len(resolvers) > 0 {
+		d.Resolve = func(ctx context.Context, address string) (unit.Unit, bool, error) {
+			for _, resolve := range resolvers {
+				if u, ok, err := resolve(ctx, address); err != nil || ok {
+					return u, ok, err
+				}
+			}
+			return unit.Unit{}, false, nil
+		}
 	}
 	d.Plugins = pluginList(ps, mods, d.Cfg)
 	d.PluginEnabled = pluginSwitch(ps, mods, d.Cfg)

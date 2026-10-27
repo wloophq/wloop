@@ -18,7 +18,7 @@ func TestAddCreatesTheBlock(t *testing.T) {
 	}
 	c := changes[0]
 	if c.Rel != "organization=globex/intent=review.md" || c.Before != nil || changes[1].Rel != "organization=globex/intent=address.md" ||
-		string(c.After) != "+++\ntitle = \"Globex rules\"\npaths = [\"src/**\"]\n+++\nFollow xyz.\n" {
+		string(c.After) != "+++\ntitle = 'Globex rules'\npaths = ['src/**']\n+++\nFollow xyz.\n" {
 		t.Fatalf("%+v %q", c, c.After)
 	}
 	if got := Diff(c); !strings.HasPrefix(got, "--- /dev/null\n+++ b/organization=globex/intent=review.md\n@@ -0,0 +1,5 @@\n++++\n") {

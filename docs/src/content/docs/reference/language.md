@@ -3,7 +3,7 @@ title: Profile language
 description: Every reserved word of the profile files and the configuration, one line each.
 ---
 
-Every key a profile file or `config.json` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
+Every key a profile file or `config.toml` may set, with its kind, its values and its default. A key or a value not listed here fails to load, with a close listed one as a suggestion when one exists. `<name>` is a name the author chooses, and `[]` marks an array of tables (`[[step]]`). Predicates and templates read the [facts](/reference/facts/); the manifests are detailed in the [intent manifest](/reference/intent-manifest/), [workflow manifest](/reference/workflow-manifest/) and [configuration](/reference/configuration/) pages.
 
 ## Intent manifest (`intents/<name>/intent.toml`)
 
@@ -50,11 +50,17 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `given`: The workspace the request names.
 - `workspace.repo` (string): The repository the turn runs in, owner/name.
 - `workspace.repo_input` (string): The input that holds the repository the turn runs in.
+- `workspace.repo_optional` (bool, default `false`): With repo_input: a turn whose input names no repository runs in the neutral repository, with no checkout.
+- `workspace.name` (template): The name of the worktree created for the turn's unit, over the name facts, with slug; the loop's own when absent.
 - `runners` (list of `session`, `headless`): How its turns may run; ["session"] when absent.
 - `session` (table): The agent session its turns run in.
 - `session.strategy` (one of `reuse_live`, `new`): Whether a turn reuses the unit's live session or starts a new one.
 - `session.title` (string): The session's title: 1 to 12 lowercase letters.
+- `session.name` (template): What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it.
 - `session.close_when_done` (bool, default `false`): The session closes when its turn is done.
+- `target` (table): What a run with no unit does.
+- `target.missing` (one of `capture`): capture: a run with no unit captures its guidance as a new entry, the turn's unit; refused when absent.
+- `target.title` (template): The captured entry's title, over .guidance, with firstLine.
 
 ### How a turn runs
 
@@ -145,6 +151,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
 - `record.states` (list of `done`, `settled`, `asked`, `failed`): The states a record may take. Required.
 - `record.artifacts` (list of `review-draft`, `triage`): The artifacts a record may carry.
 - `record.outcome` (list of `verdict`, `url`): The outcome fields a record may carry.
+- `record.attach_url` (bool, default `false`): On a turn whose unit is an entry, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the entry; needs url in record.outcome.
 - `record.outcome_doc` (string): What the outcome holds, for the instructions.
 - `record.history_artifact` (string): The artifact the unit's history shows.
 - `record.require[]` (table): What a record in a state must carry.
@@ -166,6 +173,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `entry.nudged`: Stamps the last nudge of the draft's entry, or of every live waiting entry of its unit when it names none.
   - `unit.closed`: Records the closure of the draft's unit, which ends its close entry and unwatches it after its warm period; through the unit's plugin.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.
+- `drafts.attach_posts` (bool, default `false`): On a turn whose unit is an entry, the unit of each post its agent makes, sent at once or once approved, is attached to the entry; reactions and edits are not posts.
 - `drafts.approval` (an [approval table](#approval-tables) of draft modes): The approval of its drafts; wait when absent.
 
 ## Built-in actions (`actions.toml`)
@@ -245,7 +253,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `draft.propose`: Proposes a draft in the Outbox: `purpose` (a label), `delivery` (`message`, `reaction` or `comment`), `text` (a template in the workflow's directory, by default `text.md.tmpl`), `reaction` (an emoji name), `items` (`owed`, `resolved`, `unowned`, `unowned_aged` or `all`), `per` (`unit` or `person`), `target` (`unit` or `item`), `effects` (the effects sending it applies), `repeat_after` (the least time after a settled draft of the same person, a duration or a duration of the config such as `config.drafts.repeat_after`) and `repeat_after_sent` (the same after a sent one, or `forever`). Holds while a draft of the workflow, unit and person is open or failed; a run that leaves a person under a delay that ends with time stays pending until it ends.
   - `classify`: A headless classification whose output becomes facts: `prompt` (a file in the workflow's directory, by default `prompt.md`) and `schema` (the JSON schema its answer follows, by default `schema.json`). Event triggers only, cached by fingerprint, under `classify.per_day`.
   - `notify.self`: A private notification: `text` (a template in the workflow's directory, by default `text.md.tmpl`, over `.Workflow`, `.Unit` and `.Facts`, the unit's facts by name, such as `{{index .Facts "pr.slug"}}`, none once the unit is gone).
-  - `entry.verb`: Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
+  - `entry.verb`: Runs a GTD verb on the entry: `verb` (`next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done` or `dismiss`), with `until` and `on_activity` for schedule, `on` and `resurface` for waiting, and `set` for context and area. The plan blocks it while the entry's state refuses the verb, and `done` and `dismiss` on an entry derived from a unit's items, which closes when they resolve. It records no `verb_&lt;verb&gt;` event, which only a person's verb records, so a workflow never triggers another through it.
 - `step[].<name>` (string or list): The step's arguments.
 
 ### Run approval
@@ -312,6 +320,7 @@ Every key a profile file or `config.json` may set, with its kind, its values and
   - `slack`: Facts under slack.*.
   - `workspace`: Facts under workspace.*.
   - `any`: Every provider's units.
+- `session_name` (template): The session.name of an intent whose manifest has none.
 - `refusal` (string): What a [[refuse]] case whose when holds says when its why renders empty.
 
 ## Block headings (`labels.toml`)
@@ -429,22 +438,22 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_message`: A problem: message is not a message ref or permalink.
   - `problem_emoji_required`: A problem: emoji is missing or empty.
-  - `reacted` (`Emoji`, `Conversation`, `Permalink`): The reaction is added.
-  - `removed` (`Emoji`, `Conversation`, `Permalink`): The reaction is removed.
-  - `already` (`Emoji`, `Conversation`, `Permalink`): The message already had the user's reaction.
-  - `absent` (`Emoji`, `Conversation`, `Permalink`): The message had no such reaction of the user.
+  - `reacted` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is added; Permalink is "" when Slack gave none.
+  - `removed` (`Emoji`, `Conversation`, `Message`, `Permalink`): The reaction is removed; Permalink is "" when Slack gave none.
+  - `already` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message already had the user's reaction; Permalink is "" when Slack gave none.
+  - `absent` (`Emoji`, `Conversation`, `Message`, `Permalink`): The message had no such reaction of the user; Permalink is "" when Slack gave none.
 - `slack_edit`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `not_logged_in`: Slack is logged out.
   - `failed` (`Error`): Slack or the daemon failed the call.
-  - `problem_permalink`: A problem: permalink is not a message permalink.
+  - `problem_message`: A problem: message is not a message ref or permalink.
   - `problem_text_required`: A problem: text is missing or empty.
   - `broadcast`: The text notifies a whole channel or group.
-  - `edited` (`Conversation`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its new text as posted and the text it replaced.
+  - `edited` (`Conversation`, `Message`, `Permalink`, `Text`, `Replaced`): The message is edited: where, its ref and its permalink, "" when Slack gave none, its new text as posted and the text it replaced.
 
 ## What the loop tells a session (`notices.toml`)
 
@@ -466,7 +475,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `delegates` (table by name): Per agent, skills the finding step runs besides the procedure's own work.
 - `delegates.<name>` (list of strings): The agent's skills.
 
-## Configuration (`config.json`)
+## Configuration (`config.toml`)
 
 ### Agent and workspaces
 
@@ -485,12 +494,13 @@ The fields each notice reads besides `Name` and `Command`:
 
 ### Projects
 
-- `projects[]` (table): Settings for the pull requests of matching repositories; the first match wins.
+- `projects[]` (table): Settings for the pull requests and the work of matching repositories; the first match wins.
 - `projects[].match` (string): An owner/repo pattern, such as acme/* or acme/api.
 - `projects[].projects_dir` (string): The project's projects_dir.
 - `projects[].agent` (string): The agent the project's sessions run.
 - `projects[].agent_home` (string): The project's agent_home.
 - `projects[].workspace_managers` (list of strings): The managers a new worktree of the project picks from, in order.
+- `projects[].trust_clones` (bool): Trusts a repository of the project in the agent home at the moment the loop clones it, so its settings and hooks run as you; the match must name its owner, such as acme/*.
 - `projects[].github` (table): The GitHub settings the project overrides.
 - `projects[].github.trusted_authors` (list of strings): The project's github.trusted_authors.
 - `projects[].github.followups_without_workspace` (bool): The project's github.followups_without_workspace.
@@ -556,6 +566,7 @@ The fields each notice reads besides `Name` and `Command`:
 - `slack.keychain_service` (string): The name of the Keychain items; empty is the brand's.
 - `slack.post_allowlist` (list of strings): When not empty, the only channel ids, or user ids naming the DM with that user, a post may go to.
 - `slack.request_log` (bool, default `false`): Logs one line per Slack call: method and HTTP status.
+- `slack.ended_after` (duration, default `7d`): How long a Slack unit stays quiet, its newest stored message that old, before the plugin says it has ended (slack.ended).
 - `slack.turns` (table): What a turn on a Slack unit reads.
 - `slack.turns.max_chars` (integer): The characters of the unit's messages rendered into the instructions; 0 is 30000.
 - `slack.drafts` (table): The drafts the plugin's own rules propose.

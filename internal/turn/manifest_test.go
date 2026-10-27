@@ -44,7 +44,7 @@ func TestBundledManifestsLoad(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(names, ",") != "act,address,brief,nudge,probe,review" || len(l.Problems) != 0 {
+	if strings.Join(names, ",") != "act,address,brief,nudge,probe,review,start" || len(l.Problems) != 0 {
 		t.Fatalf("%v %v", names, l.Problems)
 	}
 	if p, _ := l.Registry.Get(dintent.Probe); p.UserFacing {
