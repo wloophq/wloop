@@ -165,7 +165,7 @@ func (s *SegmentStore) Apply(ctx context.Context, provider unit.ProviderID, team
 			}
 			out[i] = SegmentRow{Team: r.Team, Conversation: conv, ID: sp.ID, FromTS: sp.FromTS, ToTS: sp.ToTS}
 		}
-		return nil
+		return rehomeDrafts(ctx, tx, provider, team, conv, out, unitOf)
 	})
 	if err != nil {
 		return nil, err
@@ -203,4 +203,49 @@ func mintSegmentID(fromTS string, taken map[string]SegmentRow) string {
 		}
 		id = fmt.Sprintf("%s-%d", base, n)
 	}
+}
+
+// draftsOfConvSQL reads the drafts on the units of a conversation: the
+// unit keys "<team>/<conv>/..." from ?2 up to ?3.
+const draftsOfConvSQL = `SELECT id, unit_key FROM drafts WHERE provider = ?1 AND unit_key >= ?2 AND unit_key < ?3`
+
+// rehomeDrafts moves the drafts a session recorded on a direct message
+// before it was segmented, each on the thread-shaped unit of its message,
+// onto the segment of rows whose range holds that message.
+func rehomeDrafts(ctx context.Context, tx *Tx, provider unit.ProviderID, team, conv string, rows []SegmentRow, unitOf SegmentUnit) error {
+	prefix := team + "/" + conv + "/"
+	list, err := tx.QueryContext(ctx, draftsOfConvSQL, string(provider), prefix, team+"/"+conv+"0")
+	if err != nil {
+		return err
+	}
+	moves := map[int64]unit.Unit{}
+	for list.Next() {
+		var id int64
+		var key string
+		if err := list.Scan(&id, &key); err != nil {
+			list.Close()
+			return err
+		}
+		ts := strings.TrimPrefix(key, prefix)
+		if strings.Contains(ts, "/") {
+			continue
+		}
+		for _, r := range rows {
+			if ts >= r.FromTS && (r.ToTS == "" || ts <= r.ToTS) {
+				moves[id] = unitOf(team, conv, r.ID)
+				break
+			}
+		}
+	}
+	list.Close()
+	if err := list.Err(); err != nil {
+		return err
+	}
+	for id, u := range moves {
+		if _, err := tx.ExecContext(ctx, `UPDATE drafts SET unit_key = ?, rev = rev + 1 WHERE id = ?`, u.Key, id); err != nil {
+			return err
+		}
+		tx.Touch(port.TopicDrafts, u)
+	}
+	return nil
 }
