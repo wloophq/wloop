@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -650,19 +651,19 @@ func TestRunReportsThePermission(t *testing.T) {
 }
 
 func TestAStreamThatEndsAtOnceDoesNotSpin(t *testing.T) {
-	r := newRig(t)
-	r.d.dropped = true
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- r.c.Run(ctx) }()
-	time.Sleep(300 * time.Millisecond)
-	cancel()
-	<-done
-	r.d.mu.Lock()
-	defer r.d.mu.Unlock()
-	if r.d.reads > 6 {
-		t.Fatalf("%d reads of the rows in 300 ms", r.d.reads)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig(t)
+		r.d.dropped = true
+		stop := run(t, r)
+		time.Sleep(refreshMin * 5 / 2)
+		synctest.Wait()
+		stop()
+		r.d.mu.Lock()
+		defer r.d.mu.Unlock()
+		if r.d.reads != 3 {
+			t.Fatalf("%d reads of the rows in 2.5 refresh intervals, want 3", r.d.reads)
+		}
+	})
 }
 
 func (f *fakeDaemon) snapshotRequests() []actionCall {
@@ -679,7 +680,7 @@ func (f *fakeDaemon) snapshotActions() []string {
 
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(time.Minute)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatal("condition not met")
@@ -860,22 +861,24 @@ func TestMenubarHealthOnlyWhenTheChangeNamesIt(t *testing.T) {
 }
 
 func TestMenubarNoTickWhileConnected(t *testing.T) {
-	r, k := clockedRig(t)
-	r.d.events = make(chan api.Change)
-	stop := run(t, r)
-	defer stop()
-	waitFor(t, func() bool { r.d.mu.Lock(); defer r.d.mu.Unlock(); return r.d.eventsN == 1 })
-	rows, health := r.d.counts()
-	for range 20 {
-		k.advance(30 * time.Second)
-	}
-	time.Sleep(50 * time.Millisecond)
-	if r2, h2 := r.d.counts(); r2 != rows || h2 != health {
-		t.Fatalf("requests grew from %d/%d to %d/%d in 10 minutes with the stream up", rows, health, r2, h2)
-	}
-	if w := k.waited(); len(w) != 0 {
-		t.Fatalf("timers set while connected: %v", w)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r, k := clockedRig(t)
+		r.d.events = make(chan api.Change)
+		stop := run(t, r)
+		defer stop()
+		synctest.Wait()
+		rows, health := r.d.counts()
+		for range 20 {
+			k.advance(30 * time.Second)
+		}
+		synctest.Wait()
+		if r2, h2 := r.d.counts(); r2 != rows || h2 != health {
+			t.Fatalf("requests grew from %d/%d to %d/%d in 10 minutes with the stream up", rows, health, r2, h2)
+		}
+		if w := k.waited(); len(w) != 0 {
+			t.Fatalf("timers set while connected: %v", w)
+		}
+	})
 }
 
 func TestMenubarPollsWhileDisconnected(t *testing.T) {
