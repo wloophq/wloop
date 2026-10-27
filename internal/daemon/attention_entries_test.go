@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -595,4 +597,18 @@ func TestAnotherDerivedEntryOfANotifyingRowStaysSilent(t *testing.T) {
 // storedViews are the views the entries store serves; review needs its source.
 func storedViews() []string {
 	return slices.DeleteFunc(slices.Clone(builtin.GTDViews), func(v string) bool { return v == string(gtd.ViewReview) })
+}
+
+func TestANotificationOffersOnlyTheVerbsTheProfileOffers(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gtd.toml"), []byte("[verbs.dismiss]\noffer = 'entry.kind != \"draft\"'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cache := cacheOver(t, dir)
+	r := newEntriesRig(t, func(d *Deps) { d.Intents = cache.Get })
+	withOutbox(r, proposed(1, ""))
+	if a := attentions(t, r)["draft:1"]; a == nil || !slices.Equal(actionIDs(a), []string{"open"}) {
+		t.Errorf("%+v", a)
+	}
 }

@@ -33,6 +33,19 @@ var notifiedDrafts = []draft.State{draft.Proposed, draft.Failed}
 // once unless it serves an Inbox entry, whose id the draft then keys. A draft is never approved from a
 // notification, which shows its text cut. Nothing of a disabled plugin notifies.
 func (ev *entryViewer) attention(ctx context.Context, e gtd.Entry) *api.Attention {
+	a := ev.notice(ctx, e)
+	if a != nil {
+		words := ev.s.loaded().GTD
+		a.Actions = slices.DeleteFunc(a.Actions, func(act api.AttentionAction) bool {
+			v, ok := strings.CutPrefix(act.ID, verbAction(""))
+			return ok && !offers(words, e, gtd.Verb(v))
+		})
+	}
+	return a
+}
+
+// notice is e's notification before the profile's offers drop the buttons of verbs it does not offer.
+func (ev *entryViewer) notice(ctx context.Context, e gtd.Entry) *api.Attention {
 	if e.Kind == gtd.KindDraft {
 		return ev.draftAttention(ctx, e)
 	}

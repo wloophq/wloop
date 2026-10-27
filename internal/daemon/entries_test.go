@@ -832,3 +832,15 @@ func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) 
 		t.Fatalf("%d %+v", code, v.Message.Answers)
 	}
 }
+
+func TestAVerbAWorkflowRunsOnAMessageRecordsNothing(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
+		t.Fatal(err)
+	}
+	if evs := r.entries.Events; len(evs) != 0 {
+		t.Fatalf("events %+v", evs)
+	}
+}

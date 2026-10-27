@@ -333,3 +333,15 @@ process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map
 		t.Errorf("answers\n%q\nwant\n%q", got, want)
 	}
 }
+
+func TestAVerbTheEntryDoesNotOfferHasNoButton(t *testing.T) {
+	var got struct{ Approve, Dismiss, Done int }
+	e := entry("e-4", "inbox", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
+	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+const pane = h("div", {}, ...entryPane(input.entry));
+const n = (verb) => byFocus(pane, "detail:" + verb + ":e-4") ? 1 : 0;
+process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss"), Done: n("done") }));`, map[string]any{"entry": e, "answers": map[string]any{}}, &got)
+	if got.Approve != 0 || got.Dismiss != 0 || got.Done != 1 {
+		t.Errorf("buttons %+v", got)
+	}
+}

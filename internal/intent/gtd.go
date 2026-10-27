@@ -135,7 +135,9 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		text("verbs."+id+".label", t.Label, &w.Label)
 		text("verbs."+id+".summary", t.Summary, &w.Summary)
 		text("verbs."+id+".input", t.Input, &w.Input)
-		if t.Offer != nil {
+		if t.Offer != nil && id == "seen" {
+			s.add("verbs.seen.offer", "seen takes no offer: clients send it when an entry opens")
+		} else if t.Offer != nil {
 			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
 				w.Offer = p
 			}

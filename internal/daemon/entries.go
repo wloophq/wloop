@@ -108,7 +108,7 @@ func (s *Server) handleGTD(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	texts, bundled := s.loaded().GTD, bundledGTD()
+	texts, bundled := s.loaded().GTD, bundledWords().gtd
 	cat := api.GTDCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.GTD.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.GTD.Contexts))}
 	for _, v := range builtin.GTDViews {
 		if v != string(gtd.ViewReview) || g.Serves(gtd.ViewReview) {
@@ -260,10 +260,10 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is
-// offered everywhere.
+// offered everywhere, and so is seen, which clients send when an entry opens.
 func offers(words intentload.GTDTexts, e gtd.Entry, verb gtd.Verb) bool {
 	p := words.Verbs[string(verb)].Offer
-	if p == nil {
+	if p == nil || verb == gtd.VerbSeen {
 		return true
 	}
 	ok, err := p.Match(workflow.Vars{Facts: catalog.OfferFacts(e)})
@@ -272,9 +272,9 @@ func offers(words intentload.GTDTexts, e gtd.Entry, verb gtd.Verb) bool {
 
 // recordVerb records a verb another service ran on e; the verb already
 // happened, so a failure is logged and the answer stands.
-func (s *Server) recordVerb(ctx context.Context, g *coregtd.Service, e gtd.Entry, verb gtd.Verb, source string) {
-	if err := g.RecordVerb(ctx, e, coregtd.Request{Verb: verb, Source: source}); err != nil {
-		s.logf("%s on %s: recording the verb: %v", verb, e.ID, err)
+func (s *Server) recordVerb(ctx context.Context, g *coregtd.Service, e gtd.Entry, req coregtd.Request) {
+	if err := g.RecordVerb(ctx, e, req); err != nil {
+		s.logf("%s on %s: recording the verb: %v", req.Verb, e.ID, err)
 	}
 }
 
@@ -439,7 +439,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coregtd.Se
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
-	s.recordVerb(ctx, g, e, verb, req.Source)
+	s.recordVerb(ctx, g, e, coregtd.Request{Verb: verb, Source: req.Source})
 	now, err := g.Entry(ctx, e.ID)
 	if err != nil {
 		now = e

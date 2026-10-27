@@ -48,7 +48,7 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) wireReview(rv coregtd.Review) api.Review {
-	texts, bundled := s.loaded().GTD, bundledGTD()
+	texts, bundled := s.loaded().GTD, bundledWords().gtd
 	out := api.Review{ID: rv.ID, StartedAt: rv.StartedAt, Done: rv.Done, Steps: []api.ReviewStep{}}
 	for _, st := range rv.Steps {
 		label := cmp.Or(texts.Review[st.ID], bundled.Review[st.ID], st.ID)

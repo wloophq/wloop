@@ -150,3 +150,10 @@ func TestAVerbIsOfferedWhereTheProfileSays(t *testing.T) {
 		t.Error("a verb whose offer failed, or that has none, is offered everywhere")
 	}
 }
+
+func TestSeenTakesNoOffer(t *testing.T) {
+	texts, problems := loadGTDWith(t, string(defaultGTD()), "[verbs.seen]\noffer = 'entry.kind == \"message\"'\n")
+	if !strings.Contains(problems, "verbs.seen.offer: seen takes no offer") || texts.Verbs["seen"].Offer != nil {
+		t.Errorf("%s", problems)
+	}
+}

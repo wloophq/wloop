@@ -20,11 +20,6 @@ const VERB_ASKS = {
   delegate: { args: (v) => (v ? { guidance: v } : {}) },
   reply: { args: (v) => (v ? { text: v } : null) },
 };
-// verbQuestion is what a verb that asks puts first: the catalog's input.
-const verbQuestion = (name) => {
-  const v = typeof verbEntry === "function" ? verbEntry(name) : {};
-  return v.input || v.label || name;
-};
 const keyVerb = (name) => ENTRY_VERBS.has(name) || !!VERB_ASKS[name];
 
 // eventKey is the canonical name of a key event, as the served bindings
@@ -137,14 +132,14 @@ function createKeys(env) {
     const entry = isEntry(env.selected()) ? env.selected() : null;
     if (!entry) return false;
     const st = (entry.verbs || []).find((v) => v.verb === name);
-    if (st && !st.enabled) {
-      say(`${name}: ${st.reason || "not offered here"}`, true);
+    if (!st || !st.enabled) {
+      say(`${name}: ${(st && st.reason) || "not offered here"}`, true);
       return true;
     }
     let args = {};
     const ask = VERB_ASKS[name];
     if (ask) {
-      const v = await env.ask({ label: verbQuestion(name) });
+      const v = await env.ask({ label: typeof verbQuestion === "function" ? verbQuestion(name) : name });
       if (v === null || v === undefined) return true;
       args = ask.args(String(v).trim());
       if (!args) return true;

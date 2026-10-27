@@ -24,7 +24,7 @@ func gtdCatalog() api.GTDCatalog {
 		{Verb: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
 		{Verb: "reference", Label: "Reference", Key: "l"}, {Verb: "focus", Label: "Focus", Key: "f"},
 		{Verb: "project", Label: "Project", Key: "p"}, {Verb: "approve", Label: "Approve", Key: "a"},
-		{Verb: "delegate", Label: "Delegate", Key: "d"}, {Verb: "done", Label: "Done", Key: "e"},
+		{Verb: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"}, {Verb: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Label: "Done", Key: "e"},
 		{Verb: "dismiss", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
 	return api.GTDCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs}
 }
@@ -789,5 +789,10 @@ func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
 	press(m, Key{Rune: 'w'})
 	if m.prompt == nil || !strings.HasPrefix(m.prompt.label, "Waiting on whom") {
 		t.Fatalf("prompt %+v", m.prompt)
+	}
+	m = gtdModel(t)
+	press(m, Key{Rune: 'd'})
+	if m.prompt == nil || !strings.Contains(m.prompt.label, "what should the agent look at") {
+		t.Fatalf("delegate prompt %+v", m.prompt)
 	}
 }
