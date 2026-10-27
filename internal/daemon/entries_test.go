@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -20,6 +21,7 @@ import (
 	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
+	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/card"
 	"github.com/wloophq/wloop/internal/domain/gtd"
@@ -69,7 +71,7 @@ func newEntriesRig(t *testing.T, edit func(*Deps)) *entriesRig {
 			Me:    meID, Clock: fixedClock(entriesNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
 		d.GTD = r.g
 	})
-	t.Cleanup(r.s.stopLife)
+	stopOnCleanup(t, r.s)
 	return r
 }
 
@@ -443,7 +445,10 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := nextChange(t, sub)
-	if !slices.Contains(c.Units, r7u) || c.Counters.Views["inbox"] != 1 {
+	for !slices.Contains(c.Units, r7u) {
+		c = nextChange(t, sub)
+	}
+	if c.Counters.Views["inbox"] != 1 {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
 	es, err := r.db.Entries().EntriesOf(context.Background(), r7u)
@@ -454,24 +459,27 @@ func TestItemsNoteSyncsEntries(t *testing.T) {
 
 func TestSourceActivityReinboxes(t *testing.T) {
 	t.Parallel()
-	r := newEntriesRig(t, nil)
-	ctx := context.Background()
-	r.put(t, gtd.Entry{ID: "e-s", State: gtd.Scheduled, Units: []unit.Unit{r7u}, Snooze: gtd.Snooze{OnActivity: true, Return: gtd.Next},
-		SeenAt: entriesNow.Add(-time.Hour), Created: entriesNow.Add(-2 * time.Hour), Updated: entriesNow.Add(-2 * time.Hour)})
-	r.startSync(t)
-	r.log.Note(port.TopicSourceEvents, r7u)
-	time.Sleep(syncMaxDelay + 500*time.Millisecond)
-	if p := r.page(t, "view=inbox"); len(p.Entries) != 0 {
-		t.Fatalf("the source event moved the entry before its card: %+v", p.Entries)
-	}
-	ana := items.Person{Key: "github:ana", Name: "ana"}
-	c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: entriesNow.Add(-time.Minute)}}
-	if _, err := r.db.Cards().Save(ctx, c, entriesNow); err != nil {
-		t.Fatal(err)
-	}
-	waitUntil(t, "the entry back in the Inbox", func() bool {
-		p := r.page(t, "view=inbox")
-		return len(p.Entries) == 1 && p.Entries[0].ID == "e-s" && p.Entries[0].Changed
+	synctest.Test(t, func(t *testing.T) {
+		r := newEntriesRig(t, nil)
+		ctx := context.Background()
+		r.put(t, gtd.Entry{ID: "e-s", State: gtd.Scheduled, Units: []unit.Unit{r7u}, Snooze: gtd.Snooze{OnActivity: true, Return: gtd.Next},
+			SeenAt: entriesNow.Add(-time.Hour), Created: entriesNow.Add(-2 * time.Hour), Updated: entriesNow.Add(-2 * time.Hour)})
+		r.startSync(t)
+		r.log.Note(port.TopicSourceEvents, r7u)
+		time.Sleep(syncMaxDelay)
+		synctest.Wait()
+		if p := r.page(t, "view=inbox"); len(p.Entries) != 0 {
+			t.Fatalf("the source event moved the entry before its card: %+v", p.Entries)
+		}
+		ana := items.Person{Key: "github:ana", Name: "ana"}
+		c := card.Card{Unit: r7u, Title: "Batch export", State: "open", LastHuman: &card.Human{Who: ana, What: "commented", At: entriesNow.Add(-time.Minute)}}
+		if _, err := r.db.Cards().Save(ctx, c, entriesNow); err != nil {
+			t.Fatal(err)
+		}
+		waitUntil(t, "the entry back in the Inbox", func() bool {
+			p := r.page(t, "view=inbox")
+			return len(p.Entries) == 1 && p.Entries[0].ID == "e-s" && p.Entries[0].Changed
+		})
 	})
 }
 
@@ -801,5 +809,26 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	}
 	if rec := post(t, r.s, api.EntryPath("e-c", "next"), `{}`); rec.Code != 200 {
 		t.Fatalf("a verb the profile leaves alone: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAnEntrysMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
+	t.Parallel()
+	r := newMessageRig(t)
+	m := r.question(t)
+	r.idle()
+	if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish"},"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var v api.EntryView
+	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message == nil || len(v.Message.Answers) != 1 ||
+		v.Message.Answers[0].OptionID != "publish" || v.Message.Answers[0].Message != m.ID || v.Message.Answers[0].ReadAt != nil {
+		t.Fatalf("%d %+v", code, v.Message)
+	}
+	if _, err := r.s.deps.Messages.Read(context.Background(), messages.ReadRequest{Session: "term-1", Unit: r8u.Unit()}); err != nil {
+		t.Fatal(err)
+	}
+	if code := get(t, r.s, api.EntryPath(m.EntryID), &v); code != 200 || v.Message.Answers[0].ReadAt == nil {
+		t.Fatalf("%d %+v", code, v.Message.Answers)
 	}
 }

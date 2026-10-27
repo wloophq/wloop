@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -216,32 +217,34 @@ func drain(t *testing.T, j *job) int {
 
 func TestTheFastJobRunsOncePerIngestion(t *testing.T) {
 	t.Parallel()
-	clock := &stepClock{now: wakeStart}
-	job := ingest.Job{Every: 2 * time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
-		return ingest.Plan{}, "nothing to read", nil
-	}}
-	s := newServerWith(t, func(d *Deps) {
-		d.Cfg.Sweep.Fast = config.Days(2 * time.Minute)
-		d.Cfg.Sweep.Slow = config.Days(30 * time.Minute)
-		d.Collector = slowOnly{}
-		d.Ingest = []IngestJob{{ID: unit.GitHub, Job: job}}
+	synctest.Test(t, func(t *testing.T) {
+		clock := &stepClock{now: wakeStart}
+		job := ingest.Job{Every: 2 * time.Minute, Prepare: func(context.Context, time.Time) (ingest.Plan, string, error) {
+			return ingest.Plan{}, "nothing to read", nil
+		}}
+		s := newServerWith(t, func(d *Deps) {
+			d.Cfg.Sweep.Fast = config.Days(2 * time.Minute)
+			d.Cfg.Sweep.Slow = config.Days(30 * time.Minute)
+			d.Collector = slowOnly{}
+			d.Ingest = []IngestJob{{ID: unit.GitHub, Job: job}}
+		})
+		in, fast := s.jobs[ingestJobName(unit.GitHub)], s.jobs["fast"]
+		in.clock, fast.clock = clock, clock
+		fast.once(context.Background(), t.Logf, func(string, string) {})
+		ingested, ran := 0, 0
+		for k := 1; k <= 10; k++ {
+			clock.set(wakeStart.Add(time.Duration(k) * 2 * time.Minute))
+			ran += drain(t, fast)
+			in.once(context.Background(), t.Logf, func(string, string) {})
+			ingested++
+			ran += drain(t, fast)
+		}
+		if ran != ingested {
+			t.Fatalf("fast ran %d times over %d ingestion runs, want once each", ran, ingested)
+		}
+		clock.set(wakeStart.Add(20*time.Minute + 30*time.Minute))
+		if n := drain(t, fast); n != 1 {
+			t.Fatalf("with no ingestion for a slow period the watchdog ran fast %d times, want 1", n)
+		}
 	})
-	in, fast := s.jobs[ingestJobName(unit.GitHub)], s.jobs["fast"]
-	in.clock, fast.clock = clock, clock
-	fast.once(context.Background(), t.Logf, func(string, string) {})
-	ingested, ran := 0, 0
-	for k := 1; k <= 10; k++ {
-		clock.set(wakeStart.Add(time.Duration(k) * 2 * time.Minute))
-		ran += drain(t, fast)
-		in.once(context.Background(), t.Logf, func(string, string) {})
-		ingested++
-		ran += drain(t, fast)
-	}
-	if ran != ingested {
-		t.Fatalf("fast ran %d times over %d ingestion runs, want once each", ran, ingested)
-	}
-	clock.set(wakeStart.Add(20*time.Minute + 30*time.Minute))
-	if n := drain(t, fast); n != 1 {
-		t.Fatalf("with no ingestion for a slow period the watchdog ran fast %d times, want 1", n)
-	}
 }

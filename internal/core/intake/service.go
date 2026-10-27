@@ -299,7 +299,8 @@ func (s *Service) clock(t time.Time) string {
 // Recover, since nothing ran.
 func (s *Service) start(ctx context.Context, i Intake) (Intake, error) {
 	keep := context.WithoutCancel(ctx)
-	out := &logWriter{s: s, ctx: keep, i: &i}
+	out := &logWriter{s: s, ctx: keep, i: &i, done: make(chan struct{})}
+	defer out.trails.Wait()
 	st, ran, err := s.run(ctx, i, out)
 	if !ran {
 		return i, err
@@ -565,8 +566,8 @@ const logSaveEvery = time.Second
 
 // logWriter publishes each line the action writes as it comes and stores the
 // log at most once per logSaveEvery, with a trailing save for the lines a
-// skipped save left out. A failed line save is not reported: the final save
-// stores the whole log.
+// skipped save left out, which the final save cancels. A failed line save is
+// not reported: the final save stores the whole log.
 type logWriter struct {
 	s        *Service
 	ctx      context.Context
@@ -576,6 +577,8 @@ type logWriter struct {
 	dirty    bool
 	armed    bool
 	finished bool
+	done     chan struct{}
+	trails   sync.WaitGroup
 }
 
 func (w *logWriter) Write(p []byte) (int, error) {
@@ -600,6 +603,9 @@ func (w *logWriter) flushLocked() {
 		w.save([]string{string(w.buf)})
 		w.buf = nil
 	}
+	if !w.finished {
+		close(w.done)
+	}
 	w.finished = true
 }
 
@@ -617,7 +623,8 @@ func (w *logWriter) save(lines []string) {
 		w.dirty = true
 		if !w.armed {
 			w.armed = true
-			go w.trail(logSaveEvery - now.Sub(w.saved))
+			d := logSaveEvery - now.Sub(w.saved)
+			w.trails.Go(func() { w.trail(d) })
 		}
 	}
 	w.s.publish(notices...)
@@ -632,7 +639,10 @@ func (w *logWriter) store(now time.Time) {
 }
 
 func (w *logWriter) trail(d time.Duration) {
-	<-w.s.after(d)
+	select {
+	case <-w.s.after(d):
+	case <-w.done:
+	}
 	w.s.mu.Lock()
 	defer w.s.mu.Unlock()
 	w.armed = false

@@ -66,6 +66,7 @@ func newFixture(t *testing.T) *fixture {
 		Viewer: func(context.Context) (string, []string, error) { return "fer", []string{"acme/search"}, nil },
 		Log:    func(string, ...any) {}}, st))
 	f.s.token = ""
+	stopOnCleanup(t, f.s)
 	return f
 }
 
@@ -721,6 +722,7 @@ func TestTeamChangeReachesRowsInsideTheViewerTTL(t *testing.T) {
 		},
 		Log: func(string, ...any) {}}, st))
 	f.s.token = ""
+	stopOnCleanup(t, f.s)
 	f.open(13, "bob", fixtureNow.Add(-time.Hour), requests("team:acme/web"))
 	if got := numbers(f.rows("?view=needs-me")); len(got) != 0 {
 		t.Fatalf("needs-me before joining acme/web: %v", got)

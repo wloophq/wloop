@@ -413,8 +413,9 @@ func TestIdleRunStartsOnceLoggedIn(t *testing.T) {
 	f.build(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
+	looked := f.kc.readsOf("current")
 	go func() { done <- f.mod.Run(ctx) }()
-	time.Sleep(50 * time.Millisecond)
+	waitFor(t, "a second look for a login", func() bool { return f.kc.readsOf("current") >= looked+2 })
 	if srv.Opens() != 0 {
 		t.Fatal("dialed while logged out")
 	}

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
@@ -549,6 +550,9 @@ type testEnv struct {
 	reg  *testRegistry
 	// loop is the loop mutex of the daemon serve started.
 	loop *sync.Mutex
+	// served ends every context serving gave.
+	served     context.Context
+	stopServed context.CancelFunc
 }
 
 // testRegistry knows every stored session as having the loop's MCP tool but
@@ -600,6 +604,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 		cfg: (&Env{}).defaultConfig(),
 	}
 	te.Env = &Env{
+		background: &sync.WaitGroup{},
 		Out:        te.out,
 		Err:        te.err,
 		GH:         ghcli.Metered(te.gh),
@@ -634,6 +639,7 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 			return nil, fmt.Errorf("no agent in tests")
 		}}},
 	}
+	te.served, te.stopServed = context.WithCancel(context.Background())
 	te.Env.intents = newEnvIntents(te.Env)
 	te.Env.planReads = syncedInputs{te}
 	if ws != nil {
@@ -654,11 +660,33 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
 	clock := clockFunc(func() time.Time { return te.Env.Now() })
 	te.Views = &views.Service{Books: te.repo, Intents: registryPort{te.Env}, State: te.repo, Sinks: []views.Sink{{ViewSink: te.sink, Placements: te.sink}}, Clock: clock, Paused: te.boardPaused}
-	te.Turns = &turns.Service{Intents: registryPort{te.Env}, Store: te.repo, Registry: te.reg, Sessions: turnstest.NewSessions(), Launcher: cliLauncher{te.Env},
+	te.Turns = &turns.Service{Intents: registryPort{te.Env}, Notices: profileNotices{te.Env}, Store: te.repo, Registry: te.reg, Sessions: turnstest.NewSessions(), Launcher: cliLauncher{te.Env},
 		GitHub: inventoryFacts{te.Store}, Changed: te.Views.Changed, Clock: clock, Command: brand.Name, FastJob: 2 * time.Minute}
 	var minted atomic.Int64
 	te.Turns.NewID = func() string { return fmt.Sprintf("sid-%d", minted.Add(1)) }
 	return te
+}
+
+// serving is ctx for the work serve starts on te's Env, ended by
+// stopServing, which the test's cleanup calls before the stores and
+// directories opened so far go away.
+func (te *testEnv) serving(ctx context.Context) context.Context {
+	ctx, cancel := context.WithCancel(ctx)
+	context.AfterFunc(te.served, cancel)
+	te.t.Cleanup(te.stopServing)
+	return ctx
+}
+
+// stopServing cancels every context serving gave and waits for the work on
+// them.
+func (te *testEnv) stopServing() {
+	te.stopServed()
+	te.Env.background.Wait()
+}
+
+// serveDeps is serveDeps on te's Env, on a context serving binds to the test.
+func (te *testEnv) serveDeps(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *sync.Mutex, app *daemon.AppState) daemon.Deps {
+	return serveDeps(te.serving(ctx), te.Env, db, cfg, logf, loopMu, app)
 }
 
 // loadRounds reads the round state the commands saved.
@@ -695,6 +723,12 @@ func (te *testEnv) run(args ...string) int {
 }
 
 // noDaemon points te's command line at a socket nothing listens on.
+// bubbled runs a test in a synctest bubble, where time passes only on a
+// timer: a command that returns after 0 waited for nothing.
+func bubbled(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) { synctest.Test(t, f) }
+}
+
 func (te *testEnv) noDaemon(t *testing.T) {
 	te.Socket = filepath.Join(t.TempDir(), "none.sock")
 }
@@ -769,9 +803,10 @@ func (te *testEnv) serve(t *testing.T) {
 	t.Helper()
 	mu := &sync.Mutex{}
 	te.loop = mu
-	srv := daemon.New(withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
+	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState, Explorer: derivedRows{te.gh},
-		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store))
+		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store)
+	srv := daemon.New(te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf))
 	te.Socket = serveSocket(t, srv.Handler())
 }
 
@@ -835,23 +870,4 @@ func (te *testEnv) agentCommand(ctx context.Context, cfg config.Config, worktree
 		return "", err
 	}
 	return a.Command(s)
-}
-
-// serveLog logs to t until t ends: serve's loops outlive the test that
-// started them, and testing panics or races on a log after the end.
-func serveLog(t *testing.T) func(string, ...any) {
-	var mu sync.Mutex
-	ended := false
-	t.Cleanup(func() {
-		mu.Lock()
-		ended = true
-		mu.Unlock()
-	})
-	return func(format string, args ...any) {
-		mu.Lock()
-		defer mu.Unlock()
-		if !ended {
-			t.Logf(format, args...)
-		}
-	}
 }

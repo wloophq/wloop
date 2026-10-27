@@ -421,7 +421,7 @@ func TestHeldEntryIdStableAcrossRestart(t *testing.T) {
 	d.Now = func() time.Time { return catalogNow.Add(time.Hour) }
 	again := New(d)
 	again.token = ""
-	t.Cleanup(again.stopLife)
+	stopOnCleanup(t, again)
 	r.s = again
 	second := r.notified(t)
 	for id, e := range first {

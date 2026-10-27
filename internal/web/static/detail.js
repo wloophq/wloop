@@ -421,9 +421,17 @@ function questionCard(e) {
   return h("section", { class: "d-question", "aria-label": MESSAGE_HEAD[m.kind] || "Message" },
     h("h2", { class: "d-sub" }, MESSAGE_HEAD[m.kind] || "Message", open ? "" : ` (${m.state})`),
     h("p", { class: "summary" }, m.text),
+    (m.answers || []).length ? h("ul", { class: "d-answers", "aria-label": "Answers" }, ...m.answers.map((a) => answerItem(m, a))) : null,
     open ? h("textarea", { rows: 2, "aria-label": "Answer", placeholder: opts.length || m.confirm ? "A note with your choice (optional)" : "Your answer", "data-focus": "question:text", oninput: (ev) => { detailState.answer = ev.target.value; } }, detailState.answer) : null,
     open ? h("div", { class: "d-actions" }, ...choices,
       !opts.length && !m.confirm ? h("button", { type: "button", class: "act primary", "data-focus": "question:send", onclick: () => detailState.answer.trim() && answer({}) }, "Send") : null) : null);
+}
+
+// answerItem is one answer to m as the user gave it, and whether the agent read it.
+function answerItem(m, a) {
+  const option = (m.options || []).find((o) => o.id === a.option_id);
+  const said = [a.option_id ? (option ? option.label : a.option_id) : "", a.yes ? "yes" : a.no ? "no" : "", (a.text || "").trim()].filter(Boolean).join(", ");
+  return h("li", { class: "d-answer" }, said, ": ", h("span", { class: "muted" }, a.read_at ? "read by the agent" : "not read by the agent yet"));
 }
 
 function personName(p) {

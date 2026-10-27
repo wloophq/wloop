@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -23,6 +24,8 @@ type fakeAgent struct {
 	answer  api.TurnText
 	err     error
 	args    []string
+	// messages are the message ids TurnAnswer was asked for.
+	messages []int64
 }
 
 func (f *fakeAgent) EndTurn(_ context.Context, handle string, r api.TurnEndRequest) (api.TurnEnded, error) {
@@ -30,8 +33,8 @@ func (f *fakeAgent) EndTurn(_ context.Context, handle string, r api.TurnEndReque
 	return f.ended, f.err
 }
 
-func (f *fakeAgent) TurnAnswer(_ context.Context, handle, arg string) (api.TurnText, error) {
-	f.handles, f.args = append(f.handles, handle), append(f.args, arg)
+func (f *fakeAgent) TurnAnswer(_ context.Context, handle, arg string, message int64) (api.TurnText, error) {
+	f.handles, f.args, f.messages = append(f.handles, handle), append(f.args, arg), append(f.messages, message)
 	return f.answer, f.err
 }
 
@@ -107,24 +110,26 @@ func TestTurnEndRefusesAMalformedRecordAndStoresNothing(t *testing.T) {
 }
 
 func TestTurnEndFailsLoudlyWithoutTheDaemon(t *testing.T) {
-	dir, err := os.MkdirTemp("/tmp", brand.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
-	path := recordFile(t, `{"state":"failed","summary":"the build broke","resume":"rerun make"}`)
-	var out, errw bytes.Buffer
-	start := time.Now()
-	code := End(context.Background(), inTerm, []string{url, "--turn", "abc123abc123", "--file", path}, &out, &errw, client.New(filepath.Join(dir, "daemon.sock")), ports)
-	if took := time.Since(start); code != 1 || took > time.Second {
-		t.Fatalf("exit %d after %v: %s", code, took, errw.String())
-	}
-	if msg := errw.String(); !strings.Contains(msg, brand.Name+"'s daemon is not running, so this record was not stored") || !strings.Contains(msg, "launchctl kickstart gui/") {
-		t.Fatalf("err %q", msg)
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("the file is gone: %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		dir, err := os.MkdirTemp("/tmp", brand.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(dir) })
+		path := recordFile(t, `{"state":"failed","summary":"the build broke","resume":"rerun make"}`)
+		var out, errw bytes.Buffer
+		start := time.Now()
+		code := End(context.Background(), inTerm, []string{url, "--turn", "abc123abc123", "--file", path}, &out, &errw, client.New(filepath.Join(dir, "daemon.sock")), ports)
+		if took := time.Since(start); code != 1 || took != 0 {
+			t.Fatalf("exit %d after waiting %v: %s", code, took, errw.String())
+		}
+		if msg := errw.String(); !strings.Contains(msg, brand.Name+"'s daemon is not running, so this record was not stored") || !strings.Contains(msg, "launchctl kickstart gui/") {
+			t.Fatalf("err %q", msg)
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("the file is gone: %v", err)
+		}
+	})
 }
 
 func TestTurnEndStoresAndDeletesTheFile(t *testing.T) {
@@ -175,6 +180,19 @@ func TestTurnEndNeedsItsArguments(t *testing.T) {
 		var errw bytes.Buffer
 		if code := End(context.Background(), inTerm, args, &bytes.Buffer{}, &errw, &fakeAgent{}, ports); code != 2 || !strings.Contains(errw.String(), endUsage) {
 			t.Errorf("%v: exit %d: %s", args, code, errw.String())
+		}
+	}
+}
+
+func TestTurnAnswerReadsOneMessage(t *testing.T) {
+	a := &fakeAgent{answer: api.TurnText{Text: "Message 12: Which column?"}}
+	var out, errw bytes.Buffer
+	if code := Answer(context.Background(), inTerm, []string{url, "--message", "12"}, &out, &errw, a, ports); code != 0 || a.messages[0] != 12 || a.args[0] != url {
+		t.Fatalf("exit %d: %s; asked %v %v", code, errw.String(), a.args, a.messages)
+	}
+	for _, bad := range [][]string{{url, "--message"}, {url, "--message", "x"}, {url, "--message", "-1"}, {url, url}, {url, "--other", "1"}} {
+		if code := Answer(context.Background(), inTerm, bad, &out, &errw, a, ports); code != 2 {
+			t.Errorf("%q: exit %d", bad, code)
 		}
 	}
 }

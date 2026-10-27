@@ -29,17 +29,26 @@ func TestReconnectRunsCatchUp(t *testing.T) {
 	srv.Drop()
 	srv.Hello(1)
 	waitFor(t, "the reconnect catch-up", func() bool { return r.count(ReasonReconnect) == 1 })
-	time.Sleep(100 * time.Millisecond)
+	markOverflow(t, f, r, 3)
 	cancel()
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("Run returned %v", err)
 	}
-	if got := r.list(); !slices.Equal(got, []string{ReasonStart, ReasonReconnect}) {
+	if got := r.list(); !slices.Equal(got, []string{ReasonStart, ReasonReconnect, ReasonOverflow}) {
 		t.Fatalf("catch-ups %v", got)
 	}
-	if s := f.p.slack.Metrics.snapshot(); s.LastCatchUp == nil || s.LastCatchUp.Reason != ReasonReconnect {
+	if s := f.p.slack.Metrics.snapshot(); s.LastCatchUp == nil || s.LastCatchUp.Reason != ReasonOverflow {
 		t.Fatalf("last catch-up %+v", s.LastCatchUp)
 	}
+}
+
+// markOverflow marks an overflow and waits for the n-th catch-up. Catch-ups run one at a time
+// and a pending reason is kept over a later one, so a catch-up the test did not expect comes
+// before the overflow's.
+func markOverflow(t *testing.T, f *fixture, r *reasons, n int) {
+	t.Helper()
+	f.p.onState(socket.State{Kind: socket.StateOverflow, Reason: "events_api"})
+	waitFor(t, "the overflow catch-up", func() bool { return len(r.list()) >= n })
 }
 
 func TestOverflowRunsCatchUp(t *testing.T) {
@@ -68,9 +77,9 @@ func TestClockJumpRunsCatchUp(t *testing.T) {
 	g.tick()
 	c.advance(19*time.Minute, time.Second)
 	g.tick()
-	time.Sleep(50 * time.Millisecond)
-	if n := len(r.list()); n != 1 {
-		t.Fatalf("a 19 min drift ran a catch-up: %v", r.list())
+	markOverflow(t, f, r, 2)
+	if got := r.list(); !slices.Equal(got, []string{ReasonStart, ReasonOverflow}) {
+		t.Fatalf("a 19 min drift ran a catch-up: %v", got)
 	}
 	c.advance(40*time.Minute, GapTick)
 	g.tick()
@@ -98,8 +107,8 @@ func TestDownFiveMinutesRunsCatchUp(t *testing.T) {
 		c.advance(GapTick, GapTick)
 		g.tick()
 	}
-	time.Sleep(50 * time.Millisecond)
-	if got := r.list(); !slices.Equal(got, []string{ReasonStart, ReasonDown}) {
+	markOverflow(t, f, r, 3)
+	if got := r.list(); !slices.Equal(got, []string{ReasonStart, ReasonDown, ReasonOverflow}) {
 		t.Fatalf("catch-ups %v", got)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/domain/card"
@@ -307,5 +308,28 @@ const pane = h("div", {}, ...verbButtons(input.entry));
 })();`, map[string]any{"cat": cat, "entry": e}, &got)
 	if len(got.Asked) != 1 || got.Asked[0] != "On whom?" {
 		t.Errorf("asked %v", got.Asked)
+	}
+}
+
+func TestAQuestionCardShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
+	q := questionEntry()
+	read := time.Date(2026, 10, 22, 12, 5, 0, 0, time.UTC)
+	q.Message.State = "answered"
+	q.Message.Answers = []api.TurnAnswer{
+		{ID: 1, OptionID: "b", Text: "and say why", Message: 3, ReadAt: &read},
+		{ID: 2, Text: "one more thing", Message: 3},
+		{ID: 3, Yes: true, Message: 3},
+	}
+	var got []string
+	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+const card = questionCard(input.q);
+process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map[string]any{"q": q, "answers": map[string]any{}}, &got)
+	want := []string{
+		"Revert, and say why: read by the agent",
+		"one more thing: not read by the agent yet",
+		"yes: not read by the agent yet",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("answers\n%q\nwant\n%q", got, want)
 	}
 }

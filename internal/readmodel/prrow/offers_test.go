@@ -4,8 +4,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/situation"
 )
 
@@ -72,4 +76,30 @@ type nudgeCase struct {
 
 func (c nudgeCase) targets(viewer string, ignore []string) ([]string, string) {
 	return NudgeTargets(api.Row{Kind: api.Kind(c.Kind), Summary: api.Summary{WaitsOn: c.WaitingOn, Reason: c.Reason}}, c.Author, viewer, ignore)
+}
+
+func TestANudgeTurnThatNeverStartedDoesNotHoldTheNextNudge(t *testing.T) {
+	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	sent := time.Date(2026, 10, 26, 13, 35, 0, 0, time.UTC)
+	now := sent.Add(time.Hour)
+	evs := []dinv.Event{{PR: ref, Kind: dinv.KindNudged, Key: "t1", At: sent, Data: "@ana"}}
+	for _, c := range []struct {
+		name    string
+		turn    turn.Turn
+		refused bool
+	}{
+		{"still running", turn.Turn{ID: "t1", State: turn.Sent}, true},
+		{"unrecorded, never started", turn.Turn{ID: "t1", State: turn.Unrecorded}, false},
+		{"dismissed before it started", turn.Turn{ID: "t1", State: turn.Dismissed}, false},
+		{"replaced before it started", turn.Turn{ID: "t1", State: turn.Replaced}, false},
+		{"unrecorded after it started", turn.Turn{ID: "t1", State: turn.Unrecorded, StartedAt: sent}, true},
+		{"failed after it started", turn.Turn{ID: "t1", State: turn.Failed, StartedAt: sent}, true},
+		{"done", turn.Turn{ID: "t1", State: turn.Done, StartedAt: sent}, true},
+		{"another turn never started", turn.Turn{ID: "t2", State: turn.Unrecorded}, true},
+	} {
+		unstarted := Unstarted(turn.Book{Turns: []turn.Turn{c.turn}})
+		if got := NudgeRefusal(ref, []string{"@ana"}, "", sent.Add(-time.Hour), evs, unstarted, now); (got != "") != c.refused {
+			t.Errorf("%s: refusal %q, want refused %v", c.name, got, c.refused)
+		}
+	}
 }

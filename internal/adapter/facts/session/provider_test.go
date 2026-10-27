@@ -597,3 +597,25 @@ func TestTheOwnerIsTheUnitOfTheNewestTurn(t *testing.T) {
 		t.Errorf("Owners of a session with no turn = %v, %v; want none", got, err)
 	}
 }
+
+func TestUnreadAnswersAreTheDeliveredAnswersTheAgentHasNotRead(t *testing.T) {
+	w := newWorld(t)
+	w.session("term_1", nil)
+	u := prUnit(7)
+	w.store.Put(turn.Book{Unit: u,
+		Turns: []turn.Turn{{Seq: 1, Intent: turn.Intent(dintent.Review), ID: "abc", SentTo: "term_1", Session: "term_1", State: turn.Started, SentAt: t0.Add(-time.Hour)}},
+		Answers: []turn.Answer{
+			{ID: 1, TurnSeq: 1, Text: "read", Route: turn.Typed, At: t0.Add(-50 * time.Minute), NoticedAt: t0.Add(-50 * time.Minute), ReadAt: t0.Add(-40 * time.Minute)},
+			{ID: 2, TurnSeq: 1, Text: "queued long, noticed late", Route: turn.Hooked, At: t0.Add(-3 * time.Hour), NoticedAt: t0.Add(-30 * time.Minute)},
+			{ID: 3, TurnSeq: 1, Text: "typed", Route: turn.Typed, At: t0.Add(-20 * time.Minute), NoticedAt: t0.Add(-20 * time.Minute)},
+			{ID: 4, TurnSeq: 1, Text: "still queued", Route: turn.Queued, At: t0.Add(-10 * time.Minute)},
+		}})
+	f := w.facts(t, "term_1")
+	if f["session.unread_answers"] != 2 || f["session.unread_for"] != 30*time.Minute || f["session.unread_since"] != t0.Add(-30*time.Minute) {
+		t.Fatalf("unread %v for %v", f["session.unread_answers"], f["session.unread_for"])
+	}
+	w.session("term_2", nil)
+	if f := w.facts(t, "term_2"); f["session.unread_answers"] != 0 || f["session.unread_for"] != time.Duration(0) {
+		t.Fatalf("a session with no answers: %v %v", f["session.unread_answers"], f["session.unread_for"])
+	}
+}

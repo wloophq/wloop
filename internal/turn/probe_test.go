@@ -22,7 +22,7 @@ func TestProbeNamesTheManagersBinary(t *testing.T) {
 		if !strings.Contains(strings.ReplaceAll(r.Text, "\n", " "), want) {
 			t.Errorf("%q: probe lacks %q:\n%s", binary, want, r.Text)
 		}
-		if binary == "orca" && brandtest.IsDefault() && r.ID != "fcc9db862869" {
+		if binary == "orca" && brandtest.IsDefault() && r.ID != "f846d60afe2d" {
 			t.Errorf("orca's probe changed: id %s", r.ID)
 		}
 	}

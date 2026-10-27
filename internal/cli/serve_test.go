@@ -191,10 +191,10 @@ func TestServeNoJobsRegistersNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg.Brief.Enabled = true
 	te.noJobs = true
-	d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if d.Collector != nil || d.Sweep != nil || d.Brief != nil || d.Usage != nil || d.Retain != nil {
 		t.Fatalf("--no-jobs left a job: collector %v sweep %v brief %v usage %v retain %v", d.Collector != nil, d.Sweep != nil, d.Brief != nil, d.Usage != nil, d.Retain != nil)
 	}
@@ -213,7 +213,7 @@ func TestServeNoJobsWritesNoCard(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer storeDB.Close()
+			t.Cleanup(func() { storeDB.Close() })
 			te.cfg = withoutWindows(te.cfg)
 			te.noJobs = noJobs
 			sink := testsink.New("test")
@@ -222,7 +222,7 @@ func TestServeNoJobsWritesNoCard(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+			d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 			ref := pr.Ref(r7)
 			if _, err := d.Turns.Send(ctx, turns.SendRequest{Unit: ref.Unit(), Intent: dturn.Intent(dintent.Review), Turn: "abc", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
 				t.Fatal(err)
@@ -238,7 +238,7 @@ func TestServeNoJobsWritesNoCard(t *testing.T) {
 				eventually(t, "the card written", func() bool { c, _, _ := sink.Card(ref.Unit()); return c == sink.Column(view.Done) })
 				return
 			}
-			time.Sleep(100 * time.Millisecond)
+			te.stopServing()
 			if got := sink.Batches(); len(got) != 0 {
 				t.Fatalf("--no-jobs wrote cards: %+v", got)
 			}
@@ -274,7 +274,7 @@ func seedSession(t *testing.T, te *testEnv, id string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	store := sqlite.New(db)
 	if err := store.SaveSession(context.Background(), dturn.Session{ID: id, Manager: "fake", WorkspaceID: "ws-1", StartedAt: testNow}); err != nil {
 		t.Fatal(err)
@@ -357,13 +357,13 @@ func TestServeDepsShareTheLoopMutex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	var loop sync.Mutex
 	logf := func(string, ...any) {}
 	noWindows := withoutWindows(Defaults())
 	te.cfg = withoutWindows(te.cfg)
 	for _, cfg := range []config.Config{noWindows, te.cfg} {
-		if d := serveDeps(context.Background(), te.Env, storeDB, cfg, logf, &loop, nil); d.LoopMu != &loop {
+		if d := te.serveDeps(context.Background(), storeDB, cfg, logf, &loop, nil); d.LoopMu != &loop {
 			t.Fatal("a restarted daemon would get its own loop mutex")
 		}
 	}
@@ -378,10 +378,10 @@ func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := inventory.New(storeDB)
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	store.SetMeta(context.Background(), "scope_resolved", `{"Teams":["acme/platform","acme/search"],"MyTeams":["acme/search"]}`)
 	te.cfg = withoutWindows(te.cfg)
-	d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	login, teams, err := d.Viewer(context.Background())
 	if err != nil || login != "me" || !slices.Equal(teams, []string{"acme/search"}) {
 		t.Fatalf("%q %v %v", login, teams, err)
@@ -396,13 +396,13 @@ func TestViewerReadsNoGitHub(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := inventory.New(storeDB)
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	if err := store.SetViewer(context.Background(), unit.GitHub, "stored"); err != nil {
 		t.Fatal(err)
 	}
 	te.gh.viewerErr = errors.New("GitHub must not be asked")
 	te.cfg = withoutWindows(te.cfg)
-	d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	for range 100 {
 		if login, _, err := d.Viewer(context.Background()); err != nil || login != "stored" {
 			t.Fatalf("%q %v", login, err)
@@ -430,7 +430,7 @@ func seedPR(t *testing.T, te *testEnv, p dinv.PR) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	if err := inventory.New(db).UpsertPR(context.Background(), p); err != nil {
 		t.Fatal(err)
 	}
@@ -480,13 +480,13 @@ func TestServeDepsBriefOnlyWhenEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
-	if d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.Brief != nil {
+	if d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.Brief != nil {
 		t.Fatal("briefs while brief.enabled is false")
 	}
 	te.cfg.Brief.Enabled = true
-	if d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.Brief == nil {
+	if d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.Brief == nil {
 		t.Fatal("no briefs while brief.enabled is true")
 	}
 }
@@ -511,12 +511,12 @@ func TestNoBriefsForAnAgentWithoutHeadlessCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
 	te.cfg.Brief.Enabled = true
 	te.Agents = map[string]turns.Agent{"claude": plainKind{}}
 	var logs []string
-	if d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) }, &sync.Mutex{}, nil); d.Brief != nil {
+	if d := te.serveDeps(context.Background(), storeDB, te.cfg, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) }, &sync.Mutex{}, nil); d.Brief != nil {
 		t.Fatal("briefs from an agent that answers no headless call")
 	}
 	if !slices.ContainsFunc(logs, func(l string) bool { return strings.Contains(l, "cannot answer headless calls") }) {
@@ -561,13 +561,13 @@ func TestEverySinkIsWired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
 	a, b := testsink.New("a"), testsink.New("b")
 	te.ports = sinksOf(a, b)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	projectDone(t, ctx, d)
 	eventually(t, "the card on both sinks", func() bool { return shownDone(a) && shownDone(b) })
 }
@@ -579,7 +579,7 @@ func TestReloadUpdatesEverySink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
 	oldA, oldB := testsink.New("a"), testsink.New("b")
 	te.ports = sinksOf(oldA, oldB)
@@ -592,10 +592,10 @@ func TestReloadUpdatesEverySink(t *testing.T) {
 		defer mu.Unlock()
 		logs = append(logs, fmt.Sprintf(f, args...))
 	}
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 	newA, newB, extra := testsink.New("a"), testsink.New("b"), testsink.New("c")
 	te.ports = sinksOf(newA, newB, extra)
-	serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 	projectDone(t, ctx, d)
 	eventually(t, "the card on both reloaded sinks", func() bool { return shownDone(newA) && shownDone(newB) })
 	if len(oldA.Batches()) != 0 || len(oldB.Batches()) != 0 || len(extra.Batches()) != 0 {
@@ -615,11 +615,11 @@ func TestAReloadOntoAnotherManagerSaysToRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
 	te.ports = sinksOf()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() { cancel(); <-te.served.done }()
+	defer cancel()
 	var mu sync.Mutex
 	var logs []string
 	logf := func(f string, args ...any) {
@@ -629,7 +629,7 @@ func TestAReloadOntoAnotherManagerSaysToRestart(t *testing.T) {
 	}
 	reload := func(manager string) {
 		te.cfg.WorkspaceManagers = []string{manager}
-		serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+		te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 	}
 	for _, manager := range []string{"orca", "orca", "zed", "zed", "orca"} {
 		reload(manager)
@@ -657,7 +657,7 @@ func TestASinkNewSinceAStartWithoutSinksIsLogged(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer storeDB.Close()
+			t.Cleanup(func() { storeDB.Close() })
 			te.cfg = withoutWindows(te.cfg)
 			te.noJobs = noJobs
 			te.ports = sinksOf()
@@ -670,9 +670,9 @@ func TestASinkNewSinceAStartWithoutSinksIsLogged(t *testing.T) {
 				defer mu.Unlock()
 				logs = append(logs, fmt.Sprintf(f, args...))
 			}
-			serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+			te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 			te.ports = sinksOf(testsink.New("late"))
-			serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+			te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 			mu.Lock()
 			defer mu.Unlock()
 			logged := slices.ContainsFunc(logs, func(l string) bool { return strings.Contains(l, `view sink "late" is new`) })
@@ -690,7 +690,7 @@ func TestUnknownManagerIsLoggedNotSilent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.cfg = withoutWindows(te.cfg)
 	te.ports = nil
 	ctx, cancel := context.WithCancel(context.Background())
@@ -702,8 +702,8 @@ func TestUnknownManagerIsLoggedNotSilent(t *testing.T) {
 		defer mu.Unlock()
 		logs = append(logs, fmt.Sprintf(f, a...))
 	}
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
-	serveDeps(ctx, te.Env, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, storeDB, te.cfg, logf, &sync.Mutex{}, nil)
 	want := `workspace manager "zed" has no sessions adapter; ` + noSessionsAdapter
 	mu.Lock()
 	n := 0
@@ -737,19 +737,19 @@ func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	te.Agents = map[string]turns.Agent{"first": resumeKind{line: "first-resume"}, "second": resumeKind{line: "second-resume"}}
 	te.cfg = withoutWindows(te.cfg)
 	te.cfg.Agent = "first"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if r := d.Turns.AgentFor(pr.Ref{}.Unit()); r == nil || r.Resume("", "") != "first-resume" {
 		t.Fatalf("before the reload: %v", r)
 	}
 	reloaded := te.cfg
 	reloaded.Agent = "second"
-	serveDeps(ctx, te.Env, storeDB, reloaded, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, storeDB, reloaded, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if r := d.Turns.AgentFor(pr.Ref{}.Unit()); r == nil || r.Resume("", "") != "second-resume" {
 		t.Fatalf("after the reload: %v", r)
 	}
@@ -757,7 +757,7 @@ func TestAgentForFollowsTheReloadedConfig(t *testing.T) {
 		t.Fatalf("a project without its own agent: %v", r)
 	}
 	reloaded.Agent = "missing"
-	serveDeps(ctx, te.Env, storeDB, reloaded, func(string, ...any) {}, &sync.Mutex{}, nil)
+	te.serveDeps(ctx, storeDB, reloaded, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if r := d.Turns.AgentFor(pr.Ref{}.Unit()); r != nil {
 		t.Fatalf("an unknown agent resolved to %v", r)
 	}
@@ -786,7 +786,7 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx := context.Background()
 	spent := dgh.Limit{Resource: dgh.ResourceGraphQL, Limit: 5000, Remaining: 3000, ResetAt: at.Add(time.Hour).UTC()}
 	cfg := te.cfg
@@ -964,12 +964,12 @@ func TestHealthNamesTheEnabledManagers(t *testing.T) {
 			t.Fatal(err)
 		}
 		ctx, cancel := context.WithCancel(context.Background())
-		d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+		d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 		if d.WorkspaceManager != want || !slices.Equal(d.WorkspaceManagers, []string{want}) || !slices.Equal(d.ManagerNames, []string{name}) {
 			t.Errorf("%s: health names %q %q %q, want %q", name, d.WorkspaceManager, d.WorkspaceManagers, d.ManagerNames, want)
 		}
 		cancel()
-		<-te.served.done
+		te.Env.background.Wait()
 		storeDB.Close()
 	}
 }
@@ -1047,8 +1047,8 @@ func TestServeNotesOneLogFromStoreAndDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
-	d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	t.Cleanup(func() { storeDB.Close() })
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if d.Changes != log {
 		t.Fatal("the daemon does not share the store's log")
 	}
@@ -1124,10 +1124,10 @@ func TestServeRetainsTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	old := te.Now().Add(-40 * 24 * time.Hour).UTC().Format(event.TimeLayout)
 	sqlitetest.Exec(t, db, `INSERT INTO turn_stops (session, prompt_id, at) VALUES ('term_1', 'p1', ?)`, old)
-	d := serveDeps(context.Background(), te.Env, db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(context.Background(), db, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	if d.Retain == nil {
 		t.Fatal("no retain job")
 	}
@@ -1153,7 +1153,7 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	board := testsink.New("board").WithAuthorColumns()
 	te.ports = sinksOf(board)
 	saved := plugins
@@ -1165,7 +1165,7 @@ func TestServeWiresAuthorFactsIntoViews(t *testing.T) {
 	defer func() { plugins = saved }()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	u := r7.Unit()
 	board.Place(u, string(view.InReview))
 	if _, err := d.Turns.Send(ctx, turns.SendRequest{Unit: u, Intent: dturn.Intent(dintent.Address), Turn: "a1", Trigger: dturn.Automated, Head: "c2", Records: true}); err != nil {
@@ -1190,7 +1190,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
 	if err := inventory.New(storeDB).UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", URL: r7.URL(), Reasons: []string{"review-requested"}}); err != nil {
 		t.Fatal(err)
@@ -1203,7 +1203,7 @@ func TestPendingRoundsReachTheReadModel(t *testing.T) {
 	if err := storeDB.Ledger().Save(ctx, automation.PlanWrite{Workflows: []string{"review-follow-up"}, Items: []workflow.Item{it}}); err != nil {
 		t.Fatal(err)
 	}
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	d.Startup = nil
 	req := httptest.NewRequest("GET", api.Rows, nil)
 	req.Header.Set(api.Header, api.Version)
@@ -1226,8 +1226,8 @@ func TestThePlanAPIIsServedFromAnEngineOfItsOwn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
-	d := serveDeps(context.Background(), te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	t.Cleanup(func() { storeDB.Close() })
+	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	p, ok := d.Plan.(servedPlan)
 	if !ok || p.plan == nil || p.plan == te.engine || p.eng.Engine != te.engine || d.Sweep != daemon.Sweeper(p.eng) {
 		t.Fatalf("plan %T, sweep %T", d.Plan, d.Sweep)
@@ -1283,7 +1283,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer storeDB.Close()
+	t.Cleanup(func() { storeDB.Close() })
 	ctx := context.Background()
 	st := inventory.New(storeDB)
 	if err := st.UpsertPR(ctx, dinv.PR{Ref: r7, Title: "Batch export", Author: "ana", State: "OPEN", HeadOid: "c2", ChecksState: "SUCCESS",
@@ -1294,7 +1294,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	te.cfg.Brief.Enabled = true
-	d := serveDeps(ctx, te.Env, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, storeDB, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil)
 	d.Startup = nil
 	p := d.Plan.(servedPlan)
 	p.plan.Workflows = func() []workflow.Workflow {
@@ -1327,10 +1327,10 @@ func TestDaemonReadsSpawnNoGh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	dctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(dctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+	d := te.serveDeps(dctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 	te.Rec = storeRecorder{te.Store}
 
 	ctx, all := metertest.Start(t, context.Background())

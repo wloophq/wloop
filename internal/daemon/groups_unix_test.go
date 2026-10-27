@@ -29,9 +29,7 @@ func TestRunKillsTheGroupsACrashLeft(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(d.StateDir, groupsFile), []byte(strconv.Itoa(left.Process.Pid)+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- New(d).Run(ctx) }()
+	stop := runServer(t, New(d))
 	waitFor(t, func() bool { _, err := os.Stat(d.InfoPath); return err == nil })
 	waitFor(t, func() bool {
 		select {
@@ -41,8 +39,7 @@ func TestRunKillsTheGroupsACrashLeft(t *testing.T) {
 			return false
 		}
 	})
-	cancel()
-	if err := <-done; err != nil && !errors.Is(err, context.Canceled) {
+	if err := stop(); err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
@@ -149,48 +149,72 @@ func TestDebouncePerObject(t *testing.T) {
 	if Debounce != 2*time.Second {
 		t.Fatalf("Debounce %v", Debounce)
 	}
-	var mu sync.Mutex
-	var touches [][]string
-	b := newInbox(150*time.Millisecond, func(_ context.Context, objects []string) error {
-		mu.Lock()
-		defer mu.Unlock()
-		touches = append(touches, objects)
-		return nil
-	}, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go b.run(ctx)
-	obj := dslack.ThreadObject(chan1, ts(1))
-	for i := range 5 {
-		b.add(obj, dslack.KindChannel, dslack.Delta{Conversation: chan1, TS: ts(1 + i), Kind: dslack.KindMessage})
-		time.Sleep(10 * time.Millisecond)
-	}
-	waitFor(t, "a touch", func() bool { mu.Lock(); defer mu.Unlock(); return len(touches) > 0 })
-	time.Sleep(300 * time.Millisecond)
-	mu.Lock()
-	defer mu.Unlock()
-	if len(touches) != 1 || !slices.Equal(touches[0], []string{obj}) {
-		t.Fatalf("touches %v", touches)
-	}
-	if len(b.peek([]string{obj})) != 0 {
-		t.Fatal("the touched deltas are still waiting")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		const debounce = 150 * time.Millisecond
+		var touches [][]string
+		var touchedAt []time.Duration
+		start := time.Now()
+		b := newInbox(debounce, func(_ context.Context, objects []string) error {
+			touches = append(touches, objects)
+			touchedAt = append(touchedAt, time.Since(start))
+			return nil
+		}, nil)
+		stop := runInbox(b)
+		defer stop()
+		obj := dslack.ThreadObject(chan1, ts(1))
+		for i := range 5 {
+			b.add(obj, dslack.KindChannel, dslack.Delta{Conversation: chan1, TS: ts(1 + i), Kind: dslack.KindMessage})
+			time.Sleep(10 * time.Millisecond)
+		}
+		time.Sleep(10 * debounce)
+		synctest.Wait()
+		if len(touches) != 1 || !slices.Equal(touches[0], []string{obj}) || touchedAt[0] != debounce {
+			t.Fatalf("touches %v at %v", touches, touchedAt)
+		}
+		if len(b.peek([]string{obj})) != 0 {
+			t.Fatal("the touched deltas are still waiting")
+		}
+	})
 }
 
 func TestInboxRetriesAFailedTouch(t *testing.T) {
-	var n atomic.Int32
-	b := newInbox(20*time.Millisecond, func(context.Context, []string) error {
-		if n.Add(1) < 2 {
-			return errors.New("store busy")
+	synctest.Test(t, func(t *testing.T) {
+		const debounce = 20 * time.Millisecond
+		var touchedAt []time.Duration
+		start := time.Now()
+		b := newInbox(debounce, func(context.Context, []string) error {
+			touchedAt = append(touchedAt, time.Since(start))
+			if len(touchedAt) < 2 {
+				return errors.New("store busy")
+			}
+			return nil
+		}, nil)
+		stop := runInbox(b)
+		defer stop()
+		b.add(dm1, dslack.KindIM, dslack.Delta{Conversation: dm1, TS: ts(1), Kind: dslack.KindMessage})
+		time.Sleep(10 * debounce)
+		synctest.Wait()
+		if !slices.Equal(touchedAt, []time.Duration{debounce, 2 * debounce}) {
+			t.Fatalf("touched at %v", touchedAt)
 		}
-		return nil
-	}, nil)
+		if len(b.peek([]string{dm1})) != 0 {
+			t.Fatal("the inbox kept the retried deltas")
+		}
+	})
+}
+
+// runInbox runs b until the returned stop, which waits for run to return.
+func runInbox(b *inbox) (stop func()) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go b.run(ctx)
-	b.add(dm1, dslack.KindIM, dslack.Delta{Conversation: dm1, TS: ts(1), Kind: dslack.KindMessage})
-	waitFor(t, "the retry", func() bool { return n.Load() == 2 })
-	waitFor(t, "the inbox emptied", func() bool { return len(b.peek([]string{dm1})) == 0 })
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.run(ctx)
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 // TestRecordingReplay streams a reduced overnight recording through Run

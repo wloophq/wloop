@@ -177,6 +177,8 @@ type Message struct {
 	Origin    string          `json:"origin"`
 	State     string          `json:"state"`
 	CreatedAt time.Time       `json:"created_at"`
+	// Answers are the user's answers to the message, oldest first, each with when the agent read it.
+	Answers []TurnAnswer `json:"answers,omitempty"`
 }
 
 // UnitLabel is the i-th unit as a person reads it.

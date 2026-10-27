@@ -19,6 +19,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | Prompts of {{name}}'s own calls, such as the headless turn's wrapper | `profiles/default/prompts/` | replaces a prompt under `prompts/` |
 | The headings of a block's conditions in a turn's judgment | `profiles/default/labels.toml` | a `labels.toml` whose keys replace the bundled ones |
 | What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
+| What the loop tells a session: the notice that the user answered an Inbox message, and the reason a stop is blocked while the turn owes a record | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
 
 A file of yours replaces the bundled file of the same path; a manifest of yours replaces the bundled manifest whole. An intent becomes a command, a skill and an action on rows; a workflow is everything {{name}} does without being asked. A broken user intent or workflow disables only itself (a broken override leaves the bundled one in force), and evaluating the plan writes nothing. See [Profiles](/concepts/profiles/) and [The sweep and workflows](/concepts/workflows/).
 

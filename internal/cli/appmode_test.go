@@ -174,7 +174,7 @@ func TestNotifierStartKickstartsTheAppAgent(t *testing.T) {
 	}
 	te := newTestEnv(t, nil)
 	te.cfg = withoutWindows(te.cfg)
-	if d := serveDeps(context.Background(), te.Env, nil, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.NotifierStart != want {
+	if d := te.serveDeps(context.Background(), nil, te.cfg, func(string, ...any) {}, &sync.Mutex{}, nil); d.NotifierStart != want {
 		t.Fatalf("serve deps NotifierStart = %q", d.NotifierStart)
 	}
 	goos = "linux"

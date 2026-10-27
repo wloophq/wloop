@@ -34,16 +34,27 @@ const (
 type keychain struct {
 	mu    sync.Mutex
 	items map[string][]byte
+	reads map[string]int
 }
 
 func (k *keychain) Get(service, account string) ([]byte, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	if k.reads == nil {
+		k.reads = map[string]int{}
+	}
+	k.reads[account]++
 	v, ok := k.items[service+"/"+account]
 	if !ok {
 		return nil, auth.ErrNotFound
 	}
 	return append([]byte(nil), v...), nil
+}
+
+func (k *keychain) readsOf(account string) int {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.reads[account]
 }
 
 func (k *keychain) Set(service, account string, secret []byte) error {
@@ -126,7 +137,7 @@ func newFixture(t testing.TB, opts ...option) *fixture {
 	}
 	client := &slackapi.Client{BaseURL: f.api.URL}
 	tokens := &auth.Store{Keychain: f.kc, Service: f.cfg.Slack.Service(), LockPath: filepath.Join(t.TempDir(), "slack.lock"),
-		Client: client, ClientID: "1.2", Log: f.logs.logf}
+		Client: client, ClientID: "1.2", Log: f.logs.logf, Now: func() time.Time { return t0 }}
 	client.Tokens = tokens
 	f.slack = Slack{Tokens: tokens, Client: client, Now: func() time.Time { return f.now }, Debounce: 50 * time.Millisecond}
 	f.build(t)
@@ -142,7 +153,7 @@ func (f *fixture) build(t testing.TB) {
 // login stores both tokens and makes the plugin learn the viewer.
 func (f *fixture) login(t testing.TB) {
 	t.Helper()
-	raw, _ := json.Marshal(auth.Token{Team: team, User: me, Access: fakeUserToken, Expires: time.Now().Add(12 * time.Hour)})
+	raw, _ := json.Marshal(auth.Token{Team: team, User: me, Access: fakeUserToken, Expires: t0.Add(12 * time.Hour)})
 	f.kc.Set(f.cfg.Slack.Service(), "current", raw)
 	f.kc.Set(f.cfg.Slack.Service(), "app", []byte(fakeAppToken))
 	if skip, err := f.p.ready(context.Background()); err != nil || skip != "" {

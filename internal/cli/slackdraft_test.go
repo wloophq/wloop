@@ -102,7 +102,7 @@ func newSessionWiring(t *testing.T) *sessionWiring {
 	for _, id := range []string{draftHandle, "term_other1"} {
 		te.registerSession(t, dturn.Session{ID: id, WorkspaceID: "ws-1"})
 	}
-	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(serveDeps(context.Background(), te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil), te.cfg)
+	w.deps = (mcpEndpoint{slack: te.Env.slack, intents: func() *dintent.Registry { return te.loadedIntents().Registry }, texts: te.Env.toolTexts, log: w.logf}).wire(te.serveDeps(context.Background(), db, te.cfg, t.Logf, &sync.Mutex{}, nil), te.cfg)
 	w.srv = w.deps.MCP.(*mcp.Server)
 	sender, ok := w.srv.Slack.(*slackSender)
 	if !ok {

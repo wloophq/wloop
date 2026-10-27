@@ -186,12 +186,21 @@ func TestConcurrentPassesProposeOnce(t *testing.T) {
 		other := unit.Unit{Provider: unit.GitHub, Key: "o/r#2"}
 		src := &githubSource{out: []outbox.Proposal{ghNudge(pull), ghNudge(other)}}
 		e.job.Sources = []Source{{Provider: unit.GitHub, Proposals: src.Proposals}}
-		e.drafts.beforeList = func() { time.Sleep(time.Millisecond) }
+		const passes = 8
+		var calling sync.WaitGroup
+		calling.Add(passes)
+		allCalling := make(chan struct{})
+		go func() {
+			calling.Wait()
+			close(allCalling)
+		}()
+		e.drafts.beforeList = func() { <-allCalling }
 		var wg sync.WaitGroup
-		for range 8 {
+		for range passes {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				calling.Done()
 				if _, err := e.job.Run(ctx); err != nil {
 					t.Error(err)
 				}
