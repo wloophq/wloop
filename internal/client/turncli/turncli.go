@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -100,25 +99,28 @@ func End(ctx context.Context, env func(string) string, args []string, out, errw 
 
 // Answer prints the newest answer the user gave to the caller's turn.
 func Answer(ctx context.Context, env func(string) string, args []string, out, errw io.Writer, c Agent, h harness.Set) int {
-	var message int64
-	switch {
-	case len(args) == 3 && args[1] == "--message":
-		n, err := strconv.ParseInt(args[2], 10, 64)
-		if err != nil || n <= 0 {
-			fmt.Fprintln(errw, answerUsage)
-			return 2
-		}
-		message = n
-	case len(args) != 1:
+	raw, args := positional(args)
+	fs := flag.NewFlagSet("turn answer", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	message := fs.Int64("message", 0, "the id of the Inbox message to read; every unread answer without it")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if raw == "" && fs.NArg() == 1 {
+		raw = fs.Arg(0)
+	} else if fs.NArg() > 0 {
+		raw = ""
+	}
+	if raw == "" || *message < 0 {
 		fmt.Fprintln(errw, answerUsage)
 		return 2
 	}
-	arg, _, err := unitArg(args[0])
+	arg, _, err := unitArg(raw)
 	if err != nil {
 		fmt.Fprintln(errw, brand.Command+" turn answer:", err)
 		return 1
 	}
-	got, err := c.TurnAnswer(ctx, handle(env, h), arg, message)
+	got, err := c.TurnAnswer(ctx, handle(env, h), arg, *message)
 	if errors.Is(err, client.ErrDown) {
 		fmt.Fprintf(errw, brand.Name+"'s daemon is not running; start it with `%s`, then run this command again\n", client.Kickstart())
 		return 1

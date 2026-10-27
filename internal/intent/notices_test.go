@@ -26,7 +26,7 @@ func TestEveryNoticeHasABundledText(t *testing.T) {
 func TestAUserNoticeReplacesTheBundledOneUnlessItFails(t *testing.T) {
 	bundled := "answered = \"answered {{.Message}}\"\nrecord_owed = \"owed {{.Turn}}\"\n"
 	dir := t.TempDir()
-	user := "answered = \"look at {{.Message}} on {{.Unit}}\"\nrecord_owed = \"{{.Nope}}\"\nanswerd = \"x\"\n"
+	user := "answered = \"look at {{.Message}} on {{.Unit}}\"\nrecord_owed = \"{{.Nope}}\"\nanswred = \"x\"\n"
 	if err := os.WriteFile(filepath.Join(dir, NoticesFile), []byte(user), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestAUserNoticeReplacesTheBundledOneUnlessItFails(t *testing.T) {
 		t.Fatalf("notices %+v", notices)
 	}
 	got := problems.Error()
-	for _, want := range []string{"record_owed", "Nope", "answerd", `did you mean "answered"`} {
+	for _, want := range []string{"record_owed", "Nope", "answred", `did you mean "answered"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("problems %q lack %q", got, want)
 		}

@@ -27,9 +27,8 @@ type AnswerRequest struct {
 	// Yes and No are a confirm's explicit choice; Text is then a note.
 	Yes, No bool
 	Source  turn.Source
-	// Message is the Inbox message answered. Posted says the agent posted it during turn Turn, and Text is
-	// then the answer as the agent reads it: noticed to the posting session when idle, queued while busy,
-	// stored without a resume when the session is gone. Else it is the question of the unit's turn.
+	// Message is the Inbox message answered: the question of the unit's turn, or, when Posted, one the agent
+	// posted during turn Turn, whose answer never resumes a turn.
 	Message, Turn int64
 	Posted        bool
 }

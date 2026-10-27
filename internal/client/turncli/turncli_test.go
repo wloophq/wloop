@@ -187,7 +187,7 @@ func TestTurnAnswerReadsOneMessage(t *testing.T) {
 	if code := Answer(context.Background(), inTerm, []string{url, "--message", "12"}, &out, &errw, a, ports); code != 0 || a.messages[0] != 12 || a.args[0] != url {
 		t.Fatalf("exit %d: %s; asked %v %v", code, errw.String(), a.args, a.messages)
 	}
-	for _, bad := range [][]string{{url, "--message"}, {url, "--message", "x"}, {url, "--message", "0"}, {url, "--other", "1"}} {
+	for _, bad := range [][]string{{url, "--message"}, {url, "--message", "x"}, {url, "--message", "-1"}, {url, url}, {url, "--other", "1"}} {
 		if code := Answer(context.Background(), inTerm, bad, &out, &errw, a, ports); code != 2 {
 			t.Errorf("%q: exit %d", bad, code)
 		}
