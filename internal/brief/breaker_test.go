@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/brand"
@@ -226,31 +227,33 @@ func TestABlipAfterARecoveryRetriesAgain(t *testing.T) {
 }
 
 func TestTheTrialWaitsForTheWantedSemaphore(t *testing.T) {
-	r := newRig(t, 1)
-	r.run.fail["acme/api#1"] = fmt.Errorf("claude: %w", turns.ErrNoAgent)
-	r.q.Run(context.Background())
-	delete(r.run.fail, "acme/api#1")
-	for range WantedConcurrency {
-		r.q.wantedSem <- struct{}{}
-	}
-	r.now = t0.Add(BreakerCool)
-	if _, _, err := r.q.scan(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(50 * time.Millisecond)
-	r.run.mu.Lock()
-	calls := r.run.calls
-	r.run.mu.Unlock()
-	if calls != 1 {
-		t.Fatalf("the trial ran past a full semaphore: %d calls", calls)
-	}
-	for range WantedConcurrency {
-		<-r.q.wantedSem
-	}
-	r.settled()
-	if r.run.calls != 2 || r.q.isOpen() {
-		t.Fatalf("%d calls, open %v", r.run.calls, r.q.isOpen())
-	}
+	synctest.Test(t, func(t *testing.T) {
+		r := newRig(t, 1)
+		r.run.fail["acme/api#1"] = fmt.Errorf("claude: %w", turns.ErrNoAgent)
+		r.q.Run(context.Background())
+		delete(r.run.fail, "acme/api#1")
+		for range WantedConcurrency {
+			r.q.wantedSem <- struct{}{}
+		}
+		r.now = t0.Add(BreakerCool)
+		if _, _, err := r.q.scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		r.run.mu.Lock()
+		calls := r.run.calls
+		r.run.mu.Unlock()
+		if calls != 1 {
+			t.Fatalf("the trial ran past a full semaphore: %d calls", calls)
+		}
+		for range WantedConcurrency {
+			<-r.q.wantedSem
+		}
+		r.settled()
+		if r.run.calls != 2 || r.q.isOpen() {
+			t.Fatalf("%d calls, open %v", r.run.calls, r.q.isOpen())
+		}
+	})
 }
 
 func TestABlipLeavesTheBreakerClosed(t *testing.T) {

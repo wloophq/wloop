@@ -32,7 +32,7 @@ func TestServeResolvesLinkedItems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	var built source.Deps
 	saved := plugins
 	plugins = []source.Plugin{{ID: unit.GitHub, Codec: pr.Codec{}, Build: func(cfg config.Config, sd source.Deps) (source.Module, error) {
@@ -43,7 +43,7 @@ func TestServeResolvesLinkedItems(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, nil)
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, nil)
 	if built.Links == nil || built.Units == nil || built.Units() != d.Units {
 		t.Fatalf("source deps: links %v, units set %v", built.Links, built.Units != nil)
 	}

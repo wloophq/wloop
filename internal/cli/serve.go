@@ -169,6 +169,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	}
 	defer unlockStore()
 	defer db.Close()
+	defer e.background.Wait()
 	e.WS.UseCustody(db.Worktrees())
 	store := inventory.New(db)
 	store.UseClock(e.Now)
@@ -194,10 +195,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	}
 	vctx, stopViews := context.WithCancel(ctx)
 	e.serveTurns(vctx, db, store, startCfg, logf)
-	defer func() {
-		stopViews()
-		<-e.served.done
-	}()
+	defer stopViews()
 	if e.noJobs {
 		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage or retain")
 	}
@@ -279,6 +277,7 @@ func (m mcpEndpoint) wire(d daemon.Deps, cfg config.Config) daemon.Deps {
 		texts = bundledToolTexts
 	}
 	srv := &mcp.Server{Port: d.MCPPort, Version: Version, Log: m.log, Key: m.key, Texts: texts, Bundled: bundledToolTexts}
+	d.ReadText = srv.ReadText
 	if d.Turns != nil {
 		srv.Turns = d.Turns
 	}
@@ -476,11 +475,11 @@ func (e *Env) startBriefs(ctx context.Context, q *brief.Queue, logf func(string,
 	} else {
 		e.interruptedFlag().Store(true)
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("brief"))
 		defer scope.End()
 		q.Start(lctx)
-	}()
+	})
 }
 
 // withEngine is d with the workflows' engine as the sweep, its pending
@@ -846,7 +845,6 @@ type servedTurns struct {
 	db       *sqlite.DB
 	// sinks are the views' sinks, in the order the ports returned them.
 	sinks []*viewSink
-	done  chan struct{}
 
 	mu  sync.Mutex
 	cfg config.Config
@@ -901,7 +899,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 		}
 		return s.sessions
 	}
-	served := &servedTurns{sessions: sessions, db: db, done: make(chan struct{}), cfg: cfg}
+	served := &servedTurns{sessions: sessions, db: db, cfg: cfg}
 	var viewSinks []views.Sink
 	if !e.noJobs {
 		for _, sink := range sinks {
@@ -924,16 +922,15 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	}
 	e.Store, e.Views, e.served = store, v, served
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, GitHub: inventoryFacts{store},
-		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), FastJob: fast,
+		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
 		AgentFor:      e.agentFor(served),
 		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
-	go func() {
-		defer close(served.done)
+	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("views"))
 		defer scope.End()
 		v.Run(lctx)
-	}()
+	})
 	return sessions
 }
 
@@ -1184,7 +1181,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 			return "", "", nil
 		})
 	}
-	go func() {
+	e.background.Go(func() {
 		lctx, scope := meter.Start(dctx, meter.Loop("config"))
 		defer scope.End()
 		t := time.NewTicker(configRetry)
@@ -1205,7 +1202,7 @@ func serveUntilConfigLoads(ctx context.Context, e *Env, db *sqlite.DB, logf func
 				}
 			}
 		}
-	}()
+	})
 	return daemon.New(deps).Run(dctx)
 }
 
@@ -1351,6 +1348,35 @@ func (e *Env) toolTexts() map[string]mcp.ToolText {
 	}
 	return mcpTexts(l.Tools)
 }
+
+// profileNotices words what the loop tells a session from the loaded profile's notices.toml, the bundled
+// text when the loaded one fails or before a profile loads.
+type profileNotices struct{ e *Env }
+
+func (p profileNotices) Notice(name string, data map[string]any) (string, error) {
+	data = maps.Clone(data)
+	data["Name"] = brand.Name
+	var loaded map[string]string
+	if l := p.e.loadedIntents(); l != nil {
+		loaded = l.Notices
+	}
+	err := fmt.Errorf("the profile has no notice %s", name)
+	for _, src := range []string{loaded[name], bundledNotices()[name]} {
+		if src == "" {
+			continue
+		}
+		var b strings.Builder
+		if err = builtin.RenderToolText(&b, name, src, data); err == nil {
+			return b.String(), nil
+		}
+	}
+	return "", err
+}
+
+var bundledNotices = sync.OnceValue(func() map[string]string {
+	notices, _ := intentload.BundledNotices(turn.BundledFS())
+	return notices
+})
 
 // bundledToolTexts are the MCP tools' texts of the bundled profile.
 var bundledToolTexts = sync.OnceValue(func() map[string]mcp.ToolText {

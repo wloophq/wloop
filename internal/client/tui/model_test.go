@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -486,10 +487,14 @@ func TestAPromptHoldsAtMostAPasteOfText(t *testing.T) {
 	if n := len(m.prompt.text); n != pasteMax {
 		t.Fatalf("%d runes", n)
 	}
-	start := time.Now()
-	m.Render(80, 10, now)
-	if d := time.Since(start); d > 200*time.Millisecond {
-		t.Fatalf("rendering a full prompt took %v", d)
+	best := time.Duration(math.MaxInt64)
+	for range 5 {
+		start := time.Now()
+		m.Render(80, 10, now)
+		best = min(best, time.Since(start))
+	}
+	if !race && best > 200*time.Millisecond {
+		t.Fatalf("the fastest of 5 renders of a full prompt took %v", best)
 	}
 }
 

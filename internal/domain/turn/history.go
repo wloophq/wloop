@@ -209,7 +209,7 @@ func (b *Book) entry(t Turn) Entry {
 		}
 	}
 	for _, a := range b.Answers {
-		if a.TurnSeq == t.Seq && (a.Route == Typed || a.Route == Resumed || a.Route == Direct) {
+		if a.TurnSeq == t.Seq && (a.Route.Noticed() || a.Route == Resumed || a.Route == Direct) {
 			e.Said = append(e.Said, b.Said(a))
 		}
 	}
@@ -237,6 +237,8 @@ func (b *Book) Said(a Answer) string {
 
 func (b *Book) choice(a Answer) string {
 	switch {
+	case a.OptionID != "" && a.Posted:
+		return a.OptionID
 	case a.OptionID != "":
 		for i := len(b.Records) - 1; i >= 0; i-- {
 			if q := b.Records[i].Record.Question; b.Records[i].TurnSeq == a.TurnSeq && q != nil {

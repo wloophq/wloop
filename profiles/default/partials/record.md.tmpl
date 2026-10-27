@@ -43,7 +43,6 @@ Never pass the JSON on the command line.
 
 If the tool or the command lists problems, fix the record and call again. If
 it says {{name}}'s daemon is not running, tell the user and end your turn.{{if $asks}} The
-answer arrives as your next prompt; a long one tells you to run
-`{{.Command}} turn answer {{.Payload.Arg}}`. After you act on an answer, record
-again.{{end}}
+answer comes as a notice naming its Inbox message: read it with `inbox_read` or
+`{{.Command}} turn answer {{.Payload.Arg}}`, act on it, then record again.{{end}}
 {{end}}

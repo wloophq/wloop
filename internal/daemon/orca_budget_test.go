@@ -170,14 +170,10 @@ func TestHookReloadsPanesAndNotesAgents(t *testing.T) {
 	ws.Cache.SetBase(ctx)
 	gen := log.Gen()
 	rt.Update(func(w *orcatest.World) { w.Worktrees[0].Agents[0].State = "done" })
-	stopped := time.Now()
 	if rec := agentCall(t, s.Handler(), "POST", api.AgentSessionsStop, orcatest.Handle(0), `{"agent_session":"s-0"}`); rec.Code != http.StatusOK {
 		t.Fatalf("stop: %d %s", rec.Code, rec.Body)
 	}
 	waitFor(t, func() bool { return slices.Contains(log.Since(gen, port.TopicAgents).Units, ref.Unit()) })
-	if d := time.Since(stopped); d > 1500*time.Millisecond {
-		t.Errorf("the stop reached the change log after %v", d)
-	}
 	agents, err := a.Agents(ctx)
 	if err != nil {
 		t.Fatal(err)

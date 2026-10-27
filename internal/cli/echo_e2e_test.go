@@ -128,7 +128,7 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	var logMu sync.Mutex
 	var logs []string
 	logf := func(format string, args ...any) {
@@ -137,9 +137,9 @@ func TestEchoAgentRunsWithoutClaudeOrOrca(t *testing.T) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() { cancel(); <-te.served.done }()
+	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := serveDeps(ctx, te.Env, db, te.cfg, logf, &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, logf, &sync.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
@@ -348,11 +348,11 @@ func TestEchoAgentRunsAThreadTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() { cancel(); <-te.served.done }()
+	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)

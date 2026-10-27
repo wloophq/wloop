@@ -76,7 +76,7 @@ func servedMessages(t *testing.T, te *testEnv, db *sqlite.DB, log *change.Log) d
 	te.Env.changes = log
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	return te.Env.serveMessages(ctx, daemon.Deps{}, db, te.cfg, t.Logf)
+	return te.Env.serveMessages(te.serving(ctx), daemon.Deps{}, db, te.cfg, t.Logf)
 }
 
 func waitOpen(t *testing.T, d daemon.Deps, want func([]message.Message) bool) []message.Message {
@@ -201,7 +201,7 @@ func TestTheMCPEndpointPostsToTheInbox(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	te := newTestEnv(t, &fake.Manager{})
 	te.registerSession(t, turn.Session{ID: "term_1", WorkspaceID: "ws-1"})
-	d := mcpEndpoint{port: 47801}.wire(te.Env.serveMessages(context.Background(), daemon.Deps{Turns: te.Turns}, db, te.cfg, t.Logf), te.cfg)
+	d := mcpEndpoint{port: 47801}.wire(te.Env.serveMessages(te.serving(context.Background()), daemon.Deps{Turns: te.Turns}, db, te.cfg, t.Logf), te.cfg)
 	if d.MCP == nil || d.Messages == nil || d.GTD == nil {
 		t.Fatalf("deps %+v", d)
 	}
@@ -243,7 +243,7 @@ func TestMessagesCostOnARealStore(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	te := newTestEnv(t, &fake.Manager{})
-	d := te.Env.serveMessages(context.Background(), daemon.Deps{}, db, te.cfg, t.Logf)
+	d := te.Env.serveMessages(te.serving(context.Background()), daemon.Deps{}, db, te.cfg, t.Logf)
 	ctx := context.Background()
 	start := time.Now()
 	if err := d.Messages.Reconcile(ctx); err != nil {

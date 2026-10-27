@@ -23,6 +23,8 @@ type Response struct {
 type Server struct {
 	// URL is the base URL to use as slack.Client.BaseURL.
 	URL string
+	// HTTP is the client to use as slack.Client.HTTP; nil reaches URL over the network.
+	HTTP *http.Client
 
 	srv      *httptest.Server
 	mu       sync.Mutex
@@ -38,20 +40,45 @@ type rateLimit struct{ retryAfter, times int }
 // answers {"ok": false, "error": "unknown_method"}, as Slack does.
 func New(t testing.TB) *Server {
 	t.Helper()
-	s := &Server{
-		handlers: map[string]func(url.Values) any{},
-		calls:    map[string][]url.Values{},
-		auth:     map[string][]string{},
-		limits:   map[string]*rateLimit{},
-	}
+	s := newServer()
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	s.URL = s.srv.URL + "/api/"
 	t.Cleanup(s.srv.Close)
 	return s
 }
 
-// Close stops the server early, so calls fail at the transport.
-func (s *Server) Close() { s.srv.Close() }
+// NewInMemory is a fake Slack that HTTP serves in memory, without a socket, so a synctest
+// bubble can call it.
+func NewInMemory() *Server {
+	s := newServer()
+	s.URL = "http://slack.test/api/"
+	s.HTTP = &http.Client{Transport: inMemory(s.serve)}
+	return s
+}
+
+func newServer() *Server {
+	return &Server{
+		handlers: map[string]func(url.Values) any{},
+		calls:    map[string][]url.Values{},
+		auth:     map[string][]string{},
+		limits:   map[string]*rateLimit{},
+	}
+}
+
+type inMemory http.HandlerFunc
+
+func (h inMemory) RoundTrip(r *http.Request) (*http.Response, error) {
+	w := httptest.NewRecorder()
+	h(w, r)
+	return w.Result(), nil
+}
+
+// Close stops a networked server early, so calls fail at the transport.
+func (s *Server) Close() {
+	if s.srv != nil {
+		s.srv.Close()
+	}
+}
 
 // Handle answers method with fn's result encoded as JSON. nil or a map without
 // "ok" gets "ok": true; a string is sent raw; a Response sets status and headers too.

@@ -209,12 +209,12 @@ func TestSlackTurnEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seedSlack(t, db)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() { cancel(); <-te.served.done }()
+	defer cancel()
 	te.Rounds = sqlite.NewRounds(db)
-	deps := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	deps := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
 	te.Rec = storeRecorder{te.Store}
 	if _, err := deps.Startup(ctx); err != nil {
 		t.Fatal(err)
@@ -328,10 +328,10 @@ func TestHeadlessPromptCarriesFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seedSlack(t, db)
 	ctx := context.Background()
-	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
 		if _, err := d.Startup(ctx); err != nil {
 			t.Fatal(err)
@@ -389,7 +389,7 @@ func TestAnActTurnReadsItsSlackThreadsBrief(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 	seedSlack(t, db)
 	te.cfg.Brief.Enabled = true
 	if err := db.Extraction().Save(context.Background(), sqlite.ExtractionSave{States: map[unit.Unit]sqlite.ExtractionState{slackThread2: {
@@ -397,7 +397,7 @@ func TestAnActTurnReadsItsSlackThreadsBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	d := serveDeps(ctx, te.Env, db, te.cfg, serveLog(t), &sync.Mutex{}, &daemon.AppState{})
+	d := te.serveDeps(ctx, db, te.cfg, t.Logf, &sync.Mutex{}, &daemon.AppState{})
 	if d.Startup != nil {
 		if _, err := d.Startup(ctx); err != nil {
 			t.Fatal(err)

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
@@ -700,33 +701,38 @@ func TestDraftsShowWhereTheyPost(t *testing.T) {
 }
 
 func TestAHeldPublisherCostsOnePageBudget(t *testing.T) {
-	r := newOutboxRig(t)
-	r.s.whereLookup, r.s.wherePage = time.Second, 200*time.Millisecond
-	r.fx.whereHangs = true
-	for i := range 5 {
-		r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Wait)
-	}
-	for _, read := range []func(){
-		func() { r.page(t, "view=outbox") },
-		func() { get(t, r.s, api.Drafts, nil) },
-	} {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r := newOutboxRig(t)
+		const budget = 200 * time.Millisecond
+		r.s.whereLookup, r.s.wherePage = time.Second, budget
+		r.fx.whereHangs = true
+		for i := range 5 {
+			r.propose(t, r7u, fmt.Sprint("draft ", i), draft.Wait)
+		}
+		for _, read := range []func(){
+			func() { r.page(t, "view=outbox") },
+			func() { get(t, r.s, api.Drafts, nil) },
+		} {
+			r.s.draftWheres.Clear()
+			start := time.Now()
+			read()
+			if took := time.Since(start); took != budget {
+				t.Fatalf("a page took %v under a held publisher, want one page budget, %v", took, budget)
+			}
+		}
+		before := r.fx.whereCalls()
 		start := time.Now()
-		read()
-		if took := time.Since(start); took > 600*time.Millisecond {
-			t.Fatalf("a page took %v under a held publisher, want one page budget", took)
+		p := r.page(t, "view=outbox")
+		if took := time.Since(start); took != 0 || r.fx.whereCalls() != before {
+			t.Fatalf("a refresh took %v and looked up %d again, want the failures kept", took, r.fx.whereCalls()-before)
 		}
-	}
-	before := r.fx.whereCalls()
-	start := time.Now()
-	p := r.page(t, "view=outbox")
-	if took := time.Since(start); took > 100*time.Millisecond || r.fx.whereCalls() != before {
-		t.Fatalf("a refresh took %v and looked up %d again, want the failures kept", took, r.fx.whereCalls()-before)
-	}
-	for _, e := range p.Entries {
-		if e.Draft == nil || e.Draft.Where != "" {
-			t.Fatalf("entry %+v", e)
+		for _, e := range p.Entries {
+			if e.Draft == nil || e.Draft.Where != "" {
+				t.Fatalf("entry %+v", e)
+			}
 		}
-	}
+	})
 }
 
 func TestDraftTitleNamesWhereItGoes(t *testing.T) {
