@@ -50,6 +50,7 @@ func TestFastCycleRunsNoHomeCheck(t *testing.T) {
 	d.Homes = p.check
 	d.Collector = &ghsource.Collector{Store: closed, GH: unknownBudget{}, Cfg: d.Cfg, Now: time.Now}
 	s := New(d)
+	stopOnCleanup(t, s)
 	for range 10 {
 		s.jobs["fast"].once(context.Background(), t.Logf, func(string, string) {})
 	}
@@ -108,6 +109,7 @@ func TestStaleHomesRecheckOnRead(t *testing.T) {
 		p := &homeProbe{}
 		d.Homes = p.check
 		s := New(d)
+		stopOnCleanup(t, s)
 		s.refreshHomes(context.Background())
 		s.homeWarnings()
 		wantCalls(t, p, 1, "a read of a fresh result")

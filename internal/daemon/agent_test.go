@@ -45,6 +45,7 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }}, inventory.New(db)))
+	stopOnCleanup(t, s)
 	return s, svc
 }
 

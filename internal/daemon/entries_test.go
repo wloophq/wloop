@@ -66,7 +66,7 @@ func newEntriesRig(t *testing.T, edit func(*Deps)) *entriesRig {
 			Me:    meID, Clock: fixedClock(entriesNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
 		d.GTD = r.g
 	})
-	t.Cleanup(r.s.stopLife)
+	stopOnCleanup(t, r.s)
 	return r
 }
 

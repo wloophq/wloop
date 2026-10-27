@@ -97,6 +97,7 @@ func newWakeRig(t *testing.T, change func(*Deps)) *wakeRig {
 		change(&d)
 	}
 	r.s = New(d)
+	stopOnCleanup(t, r.s)
 	r.job = r.s.jobs["sweep"]
 	r.job.clock = r.clock
 	t.Cleanup(r.s.wakeSweep())

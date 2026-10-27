@@ -92,7 +92,7 @@ func newIntakeServer(t *testing.T, briefs intake.Briefs, change func(*Deps)) (*S
 		change(&d)
 	}
 	s := New(d)
-	t.Cleanup(s.stopLife)
+	stopOnCleanup(t, s)
 	return s, fa
 }
 
