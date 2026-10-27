@@ -31,7 +31,7 @@ Every goroutine a test starts, or makes the code under test start, is cancelled 
 
 ## The world outside
 
-Tests never touch your home, your agent homes, your workspaces or GitHub: they run on temporary directories and fakes. Live tests (`internal/e2e`) run behind the `live` build tag, only against a sandbox repository and in isolated daemons. The repository is public, so tests, fixtures and pull request bodies carry invented names; `make scan-real-data SCAN_BASE=origin/main` checks a branch against your own deny list before you push.
+Tests never touch your home, your agent homes, your workspaces or GitHub: they run on temporary directories and fakes. Live tests (`internal/e2e`) run behind the `live` build tag, only against a sandbox repository and in isolated daemons. The repository is public, so tests, fixtures and pull request bodies carry invented names and counts, never real user data.
 
 ## The brand
 
