@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,5 +88,28 @@ func TestAttachWithoutAHandleRefusesAndChangesNothing(t *testing.T) {
 	all, err := te.reg.Registry.Sessions(ctx)
 	if err != nil || len(all) != 0 {
 		t.Fatalf("sessions %+v %v", all, err)
+	}
+}
+
+func TestTwoSessionsAttachedToATaskAreTwoRuns(t *testing.T) {
+	te := attachEnv(t)
+	ctx := context.Background()
+	for _, h := range []string{"term_1", "term_2", "term_1"} {
+		inSession(te, h)
+		if code := te.run("task", "attach", "task:"+string(attachTask)); code != 0 {
+			t.Fatalf("%s: exit %d: %s", h, code, te.err)
+		}
+	}
+	runs, err := te.Turns.RunsOf(ctx, task.UnitOf(attachTask))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, r := range runs {
+		got = append(got, string(r.Turn.State)+" "+r.Session)
+	}
+	want := []string{"started " + te.sessionOf(t, "orca", "term_1"), "started " + te.sessionOf(t, "orca", "term_2")}
+	if !slices.Equal(got, want) {
+		t.Fatalf("runs %v, want %v", got, want)
 	}
 }

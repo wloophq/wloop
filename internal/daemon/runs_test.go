@@ -31,10 +31,10 @@ func (h *fakeHost) Focus(_ context.Context, manager, workspaceID string) error {
 	return nil
 }
 
-func (h *fakeHost) Wake(_ context.Context, u unit.Unit, sess turn.Session) error {
+func (h *fakeHost) Wake(_ context.Context, u unit.Unit, intent string, sess turn.Session) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.calls = append(h.calls, "wake "+u.String()+" "+sess.ID+" "+sess.AgentSession)
+	h.calls = append(h.calls, "wake "+u.String()+" "+intent+" "+sess.ID+" "+sess.AgentSession)
 	return nil
 }
 
@@ -76,10 +76,15 @@ func newRunsRig(t *testing.T) *runsRig {
 // session stores a session of the task in ws-1 of orca, live on handle when it is not "".
 func (r *runsRig) session(t *testing.T, id, handle, agentSession string) {
 	t.Helper()
+	r.sessionAt(t, id, handle, agentSession, tasksNow.Add(-time.Hour))
+}
+
+func (r *runsRig) sessionAt(t *testing.T, id, handle, agentSession string, started time.Time) {
+	t.Helper()
 	ctx := context.Background()
 	repo := sqlite.New(r.db)
 	if err := repo.SaveSession(ctx, turn.Session{ID: id, Manager: "orca", WorkspaceID: "ws-1", Worktree: "/src/api-retries", Home: "/home/ana/.claude",
-		AgentSession: agentSession, StartedAt: tasksNow.Add(-time.Hour), Unit: r.u}); err != nil {
+		AgentSession: agentSession, StartedAt: started, Unit: r.u}); err != nil {
 		t.Fatal(err)
 	}
 	if handle != "" {
@@ -161,10 +166,11 @@ func TestEnterWakesADormantSession(t *testing.T) {
 	}
 	r.session(t, "s2", "", "ag-2")
 	dormant := r.start(t, "turn-2", "s2")
+	r.sessionAt(t, "s3", "", "ag-3", tasksNow.Add(-time.Minute))
 	if rec := post(t, r.s, "/api/runs/"+itoa(dormant.Seq)+"/enter", `{}`); rec.Code != 200 {
 		t.Fatalf("enter a dormant session: %d %s", rec.Code, rec.Body)
 	}
-	want := []string{"focus orca ws-1", "wake " + r.u.String() + " s2 ag-2", "focus orca ws-1"}
+	want := []string{"focus orca ws-1", "wake " + r.u.String() + " start s2 ag-2", "focus orca ws-1"}
 	if got := r.host.seen(); !slices.Equal(got, want) {
 		t.Fatalf("a dormant session: host calls %v, want %v", got, want)
 	}

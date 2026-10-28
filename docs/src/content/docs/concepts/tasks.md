@@ -65,14 +65,14 @@ The `start` intent records `done` with the pull request's or the message's URL, 
 Every turn on a task is one of its runs. The task's page lists them newest first, each with its intent and state, the workspace manager, workspace and worktree it ran in, its session and that session's state (active, dormant or closed), and the command that resumes it. A run offers the actions it can take:
 
 - **Open workspace** brings its workspace on screen in the manager it ran in.
-- **Enter session** brings its session on screen to type in it. A dormant session is woken first in its own manager, as a round wakes one.
+- **Enter session** brings its session on screen to type in it. A dormant session, the run's own, is woken first in its own manager, with the policy, trust and session name a turn of the run's intent launches with.
 - **Transcript** reads what the person typed and what the agent answered in the session, page by page.
 
 A headless call has no workspace or session, so it offers none of them. `{{command}} open` on a task focuses the workspace of its newest run that ran in one.
 
 ### Attach a session
 
-`{{command}} task attach task:<id>`, run from an agent session a workspace manager started, makes that session a run of the task: the daemon starts the turn of the intent holding the `attach` role (the bundled `attach`) on it by hand, and the session takes the task as its unit, whatever unit it had before. What the session posts, drafts or records from then on lands on the task. The `attach` intent has no `[record]`, so its turn owes no record and the Stop hook never blocks the session for one. Outside a workspace manager's session, the command refuses with the `attach_needs_session` notice and changes nothing.
+`{{command}} task attach task:<id>`, run from an agent session a workspace manager started, makes that session a run of the task: the daemon starts the turn of the intent holding the `attach` role (the bundled `attach`) on it by hand, and the session takes the task as its unit, whatever unit it had before. Every attached session is a run of its own: attaching again from the same session replaces only that session's earlier attach (the role's `PerSession`). What the session posts, drafts or records from then on lands on the task. The `attach` intent has no `[record]`, so its turn owes no record and the Stop hook never blocks the session for one. Outside a workspace manager's session, the command refuses with the `attach_needs_session` notice and changes nothing.
 
 ## Lists are categories
 

@@ -18,8 +18,9 @@ import (
 type RunHost interface {
 	// Focus brings the workspace on screen in the manager's app.
 	Focus(ctx context.Context, manager, workspaceID string) error
-	// Wake gives the dormant session of u a live process again in its manager.
-	Wake(ctx context.Context, u unit.Unit, sess turn.Session) error
+	// Wake gives the dormant session of u a live process again in its
+	// manager, launched as a turn of intent on u would be.
+	Wake(ctx context.Context, u unit.Unit, intent string, sess turn.Session) error
 }
 
 // transcriptPage is how many lines a transcript read without limit returns.
@@ -121,8 +122,7 @@ func (s *Server) handleRunOpen(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRunEnter brings the run's session on screen: a live one at once, a
-// dormant one after its manager wakes the unit's newest dormant session in
-// the run's workspace.
+// dormant one after its manager wakes it.
 func (s *Server) handleRunEnter(w http.ResponseWriter, r *http.Request) {
 	run, u, ok := s.run(w, r)
 	if !ok || !s.offers(w, run, catalog.RunEnter) {
@@ -130,17 +130,17 @@ func (s *Server) handleRunEnter(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.WithoutCancel(r.Context())
 	if run.State != string(turn.SessionActive) {
-		sess, _, found, err := s.deps.Turns.DormantFor(ctx, u, run.Manager, run.Workspace, false)
+		sess, found, err := s.deps.Turns.Registry.Session(ctx, run.Session)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		if !found {
+		if !found || sess.AgentSession == "" || sess.State() != turn.SessionDormant {
 			writeError(w, http.StatusConflict, "run "+strconv.FormatInt(run.Turn.Seq, 10)+" has no session its manager can wake")
 			return
 		}
 		s.deps.LoopMu.Lock()
-		err = s.deps.RunHost.Wake(ctx, u, sess)
+		err = s.deps.RunHost.Wake(ctx, u, string(run.Turn.Intent), sess)
 		s.deps.LoopMu.Unlock()
 		if err != nil {
 			writeActionError(w, err)
