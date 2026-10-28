@@ -22,13 +22,13 @@ const (
 var _ coretasks.ProjectStore = projectStore{}
 
 // Projects are the projects' slugs and the Review's runs; a project's own fields are read and written with its
-// entry.
+// task.
 func (db *DB) Projects() coretasks.ProjectStore { return projectStore{db} }
 
-// loadProjects sets the project fields of the entries of out that the projects table holds, sub selecting
+// loadProjects sets the project fields of the tasks of out that the projects table holds, sub selecting
 // their ids with args.
 func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Task, at map[task.ID]int) error {
-	return eachRow(ctx, q, `SELECT entry_id, slug, review_every, reviewed_at FROM projects WHERE entry_id IN `+sub, args,
+	return eachRow(ctx, q, `SELECT task_id, slug, review_every, reviewed_at FROM projects WHERE task_id IN `+sub, args,
 		func(r *sql.Rows) error {
 			var id, slug, reviewed string
 			var every int64
@@ -50,8 +50,8 @@ func writeProject(ctx context.Context, tx *Tx, e task.Task) error {
 	if e.Kind != task.KindProject {
 		return nil
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO projects (entry_id, slug, review_every, reviewed_at) VALUES (?, ?, ?, ?)
-		ON CONFLICT (entry_id) DO UPDATE SET slug = excluded.slug, review_every = excluded.review_every, reviewed_at = excluded.reviewed_at`,
+	_, err := tx.ExecContext(ctx, `INSERT INTO projects (task_id, slug, review_every, reviewed_at) VALUES (?, ?, ?, ?)
+		ON CONFLICT (task_id) DO UPDATE SET slug = excluded.slug, review_every = excluded.review_every, reviewed_at = excluded.reviewed_at`,
 		string(e.ID), e.Slug, int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt))
 	return err
 }

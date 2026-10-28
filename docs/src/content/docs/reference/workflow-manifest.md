@@ -37,7 +37,7 @@ The loader refuses any other key, naming a close one when one exists. Without `[
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `summary` | string |  | One line, what the workflow does; its plan items' description. Required. |
-| `provider` | one of `entry`, `github`, `session`, `slack`, `workspace` |  | The provider of the units it matches. Required. |
+| `provider` | one of `github`, `session`, `slack`, `task`, `workspace` |  | The provider of the units it matches. Required. |
 | `when` | predicate |  | The match condition, over the unit's facts, the trigger's and config.*. Required. |
 | `order` | integer | `100` | Evaluation order, lowest first. |
 | `key` | list of facts |  | The facts forming the idempotency key, by default &lt;slot&gt;.fingerprint: a key that ran or was dismissed is not planned again. A workflow with trigger.on may add trigger.event.id, so each event plans its own run. |

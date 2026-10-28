@@ -66,7 +66,7 @@ func TestClassifyAndNotifyReadFiles(t *testing.T) {
 
 func TestEffectsIsAList(t *testing.T) {
 	const closeTask = `summary = "Close"
-provider = "entry"
+provider = "task"
 when = 'task.items_resolved > 0'
 
 [[step]]

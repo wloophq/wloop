@@ -6,7 +6,7 @@ import (
 )
 
 const onDone = `summary = "React to done"
-provider = "entry"
+provider = "task"
 when = 'trigger.event.kind == "verb_done"'
 key = ["trigger.event.id"]
 
@@ -30,7 +30,7 @@ func TestAWorkflowLoadsWithAVerbTrigger(t *testing.T) {
 func TestAVerbTriggerIsChecked(t *testing.T) {
 	for name, c := range map[string]struct{ manifest, problem string }{
 		"an unknown verb":      {strings.Replace(onDone, `on = ["verb_done"]`, `on = ["verb_dne"]`, 1), `"verb_dne" is not one of`},
-		"another provider":     {strings.Replace(onDone, `provider = "entry"`, `provider = "github"`, 1), `trigger.on[0]: verb_done is an event of entry units; it needs provider = "entry"`},
+		"another provider":     {strings.Replace(onDone, `provider = "task"`, `provider = "github"`, 1), `trigger.on[0]: verb_done is an event of task units; it needs provider = "task"`},
 		"an event key, sweeps": {strings.Replace(onDone, "[trigger]\non = [\"verb_done\"]\n", "", 1), `key[0]: trigger.event.id needs [trigger] on`},
 	} {
 		t.Run(name, func(t *testing.T) {

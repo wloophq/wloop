@@ -339,7 +339,7 @@ CREATE TABLE links (
 
 CREATE INDEX links_to ON links (to_provider, to_key);
 
-CREATE TABLE entries (
+CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL, state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
   focus_on INTEGER NOT NULL DEFAULT 0, focus_auto TEXT NOT NULL DEFAULT '', focus_at TEXT NOT NULL DEFAULT '',
@@ -352,30 +352,30 @@ CREATE TABLE entries (
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
   rev INTEGER NOT NULL
 ) WITHOUT ROWID;
-CREATE INDEX entries_state ON entries (state);
-CREATE INDEX entries_rev ON entries (rev);
+CREATE INDEX tasks_state ON tasks (state);
+CREATE INDEX tasks_rev ON tasks (rev);
 
-CREATE TABLE entry_items (
-  entry_id TEXT NOT NULL REFERENCES entries (id) ON DELETE CASCADE,
+CREATE TABLE task_items (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, item TEXT NOT NULL,
-  PRIMARY KEY (entry_id, provider, unit_key, item)
+  PRIMARY KEY (task_id, provider, unit_key, item)
 ) WITHOUT ROWID;
-CREATE INDEX entry_items_unit ON entry_items (provider, unit_key);
+CREATE INDEX task_items_unit ON task_items (provider, unit_key);
 
-CREATE TABLE entry_units (
-  entry_id TEXT NOT NULL REFERENCES entries (id) ON DELETE CASCADE,
+CREATE TABLE task_units (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, ord INTEGER NOT NULL,
-  PRIMARY KEY (entry_id, provider, unit_key)
+  PRIMARY KEY (task_id, provider, unit_key)
 ) WITHOUT ROWID;
-CREATE INDEX entry_units_unit ON entry_units (provider, unit_key);
+CREATE INDEX task_units_unit ON task_units (provider, unit_key);
 
-CREATE TABLE entry_contexts (
-  entry_id TEXT NOT NULL REFERENCES entries (id) ON DELETE CASCADE,
+CREATE TABLE task_contexts (
+  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
   context TEXT NOT NULL, ord INTEGER NOT NULL,
-  PRIMARY KEY (entry_id, context)
+  PRIMARY KEY (task_id, context)
 ) WITHOUT ROWID;
 
-CREATE TABLE entry_position (
+CREATE TABLE task_position (
   only INTEGER PRIMARY KEY CHECK (only = 1),
   epoch TEXT NOT NULL, rev INTEGER NOT NULL
 );
@@ -392,7 +392,7 @@ CREATE TABLE placements (
 -- theirs in turn_answers (message_id) too, and a proposal only here.
 CREATE TABLE messages (
   id INTEGER PRIMARY KEY,
-  entry_id TEXT NOT NULL DEFAULT '',
+  task_id TEXT NOT NULL DEFAULT '',
   provider TEXT NOT NULL DEFAULT '', unit_key TEXT NOT NULL DEFAULT '',
   kind TEXT NOT NULL, text TEXT NOT NULL,
   options TEXT NOT NULL DEFAULT '[]', recommend TEXT NOT NULL DEFAULT '', confirm INTEGER NOT NULL DEFAULT 0,
@@ -402,7 +402,7 @@ CREATE TABLE messages (
   created_at TEXT NOT NULL, closed_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX messages_open ON messages (state, id);
-CREATE INDEX messages_entry ON messages (entry_id);
+CREATE INDEX messages_task ON messages (task_id);
 CREATE UNIQUE INDEX messages_proposal ON messages (proposal) WHERE origin_kind = 'ledger';
 
 CREATE TABLE unit_cards (
@@ -414,7 +414,7 @@ CREATE TABLE unit_cards (
 CREATE TABLE drafts (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
-  items TEXT NOT NULL DEFAULT '[]', entry TEXT NOT NULL DEFAULT '',
+  items TEXT NOT NULL DEFAULT '[]', task TEXT NOT NULL DEFAULT '',
   kind TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', text TEXT NOT NULL DEFAULT '',
   reaction TEXT NOT NULL DEFAULT '', original TEXT NOT NULL DEFAULT '', edited INTEGER NOT NULL DEFAULT 0,
   origin_kind TEXT NOT NULL, turn_seq INTEGER NOT NULL DEFAULT 0, intent TEXT NOT NULL DEFAULT '',
@@ -436,12 +436,12 @@ CREATE TABLE drafts (
 );
 CREATE INDEX drafts_state ON drafts (state, id);
 CREATE INDEX drafts_unit ON drafts (provider, unit_key, id);
-CREATE INDEX drafts_entry ON drafts (entry, id);
+CREATE INDEX drafts_task ON drafts (task, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
 CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
 
 CREATE TABLE projects (
-  entry_id TEXT PRIMARY KEY REFERENCES entries (id) ON DELETE CASCADE,
+  task_id TEXT PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
   slug TEXT NOT NULL DEFAULT '',
   review_every INTEGER NOT NULL DEFAULT 0,
   reviewed_at TEXT NOT NULL DEFAULT ''
@@ -463,6 +463,15 @@ CREATE TABLE dossiers (
   last_write_at TEXT NOT NULL DEFAULT '', resolved_at TEXT NOT NULL DEFAULT '',
   archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
+
+-- A dossier directory a merge of tasks moved in the store and not yet on disk: paths under the dossiers
+-- root, an archive at the same path under .archive with .tar.gz. Moves apply in seq order, a later one
+-- moving what an earlier one put in place.
+CREATE TABLE dossier_moves (
+  seq INTEGER PRIMARY KEY,
+  from_path TEXT NOT NULL,
+  to_path TEXT NOT NULL
+);
 
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,

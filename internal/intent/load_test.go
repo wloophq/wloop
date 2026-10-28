@@ -980,7 +980,7 @@ func TestABrokenDefaultsSessionNameIsReportedInDefaults(t *testing.T) {
 
 const startLike = `label = "Start"
 summary = "Start new work from a brief"
-provider = "entry"
+provider = "task"
 workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .task.title}}-{{.task.short_id}}' }
 session = { strategy = "new", title = "start", name = '{{or .workspace.name .task.title}}' }
 
@@ -1039,7 +1039,7 @@ func TestStartKeysAreChecked(t *testing.T) {
 		"repo_optional needs repo_input": {`workspace = { repo_input = "repo", repo_optional = true,`, `workspace = { repo = "acme/api", repo_optional = true,`, "workspace.repo_optional"},
 		"target.missing names capture":   {`missing = "capture"`, `missing = "skip"`, "target.missing"},
 		"workspace.name reads its facts": {`{{slug .task.title}}`, `{{.pr.slug}}`, "workspace.name"},
-		"capture needs a task intent":    {`provider = "entry"`, `provider = "github"`, "target.missing"},
+		"capture needs a task intent":    {`provider = "task"`, `provider = "github"`, "target.missing"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

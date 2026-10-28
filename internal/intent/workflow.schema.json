@@ -182,10 +182,10 @@
     "provider": {
       "description": "The provider of the units it matches. Required.",
       "enum": [
-        "entry",
         "github",
         "session",
         "slack",
+        "task",
         "workspace"
       ],
       "type": "string"

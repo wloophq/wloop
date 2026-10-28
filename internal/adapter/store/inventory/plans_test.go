@@ -47,7 +47,7 @@ type hotPlan struct {
 
 var hotPlans = []hotPlan{
 	{name: "open messages", query: messagesOpenSQL, want: []string{"messages_open (state=?)"}},
-	{name: "message by entry", query: messageByTaskSQL, args: 1, want: []string{"messages_entry (entry_id=?)"}},
+	{name: "message by entry", query: messageByTaskSQL, args: 1, want: []string{"messages_task (task_id=?)"}},
 	{name: "open question", query: openQuestionSQL, args: 5, want: []string{"messages_open (state=?)"}},
 	{name: "open workflow proposal", query: openWorkflowSQL, args: 4, want: []string{"messages_open (state=?)"}},
 	{name: "ledger message", query: ledgerMessageSQL, args: 1, want: []string{"messages_proposal (proposal=?)"}},
@@ -130,10 +130,10 @@ var indexesPlannedElsewhere = []string{
 	"turn_records_once", "turn_records_unit", "turn_answers_unit", "turn_stops_session", "turn_stops_at", "intakes_open",
 	"session_handles_handle", "session_handles_open",
 	"plan_items_workflow",
-	"entries_state", "entries_rev", "entry_items_unit", "entry_units_unit",
+	"tasks_state", "tasks_rev", "task_items_unit", "task_units_unit",
 	"projects_slug", "review_runs_open",
 	"links_to",
-	"drafts_state", "drafts_unit", "drafts_entry", "drafts_rule", "drafts_workflow",
+	"drafts_state", "drafts_unit", "drafts_task", "drafts_rule", "drafts_workflow",
 }
 
 func TestNoUnusedIndex(t *testing.T) {

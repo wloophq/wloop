@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -138,7 +139,7 @@ func TestAV3ReleaseRefusesTheV4Store(t *testing.T) {
 	var compatible string
 	err = db.QueryRow(`SELECT value FROM meta WHERE key = ?`, compatibleKey).Scan(&compatible)
 	db.Close()
-	if err != nil || compatible != "4" {
+	if err != nil || compatible != strconv.FormatUint(uint64(current.compatibleAt(SchemaVersion)), 10) {
 		t.Fatalf("compatible version %q, %v", compatible, err)
 	}
 	frozen, err := os.ReadFile(filepath.Join("testdata", "schema-v3.sql"))

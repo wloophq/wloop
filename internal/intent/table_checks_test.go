@@ -35,7 +35,7 @@ func TestTheDecodersCheckValuesInTheTablesWords(t *testing.T) {
 	for edit, want := range map[[2]string]string{
 		{`workspace = "review"`, "workspace = \"review\"\nrunners = [\"sesion\"]"}:                                                        `runners[0]: "sesion" is not one of "session" or "headless"; did you mean "session"?`,
 		{`workspace = "review"`, `workspace = "linked_else_mian"`}:                                                                        `workspace: "linked_else_mian" is not one of "review", "author", "linked_else_main" or "given"; did you mean "linked_else_main"?`,
-		{`workspace = "review"`, "workspace = \"review\"\nprovider = \"slak\""}:                                                           `provider: "slak" is not one of "entry", "github", "session", "slack", "workspace" or "any"; did you mean "slack"?`,
+		{`workspace = "review"`, "workspace = \"review\"\nprovider = \"slak\""}:                                                           `provider: "slak" is not one of "github", "session", "slack", "task", "workspace" or "any"; did you mean "slack"?`,
 		{`workspace = "review"`, "workspace = \"review\"\nprovider = [\"github\", \"slak\"]"}:                                             `provider[1]: "slak" is not one of`,
 		{"[record]", "[drafts.approval]\nmode = \"dry-run\"\n\n[record]"}:                                                                 `drafts.approval.mode: "dry-run" is not one of "send", "delay", "wait" or "dry_run"; did you mean "dry_run"?`,
 		{"[record]", "[[also_profile]]\nprofile = \"review\"\ndefine = \"x\"\nwhen = \"true\"\ndims = { stag = \"first\" }\n\n[record]"}:  `also_profile[0].dims.stag: unknown key; did you mean "stage"?`,
@@ -66,7 +66,7 @@ func TestNoGuessReleasesADraftOrARun(t *testing.T) {
 func TestWorkflowValuesAreTheTables(t *testing.T) {
 	t.Parallel()
 	for edit, want := range map[[2]string]string{
-		{`provider = "session"`, `provider = "sesion"`}:                           `provider: "sesion" is not one of "entry", "github", "session", "slack" or "workspace"; did you mean "session"?`,
+		{`provider = "session"`, `provider = "sesion"`}:                           `provider: "sesion" is not one of "github", "session", "slack", "task" or "workspace"; did you mean "session"?`,
 		{`use = "session.close"`, `use = "session.clsoe"`}:                        `step[0].use: "session.clsoe" is not one of`,
 		{`use = "session.close"`, "use = \"session.close\"\nreasn = \"x\""}:       `step[0].reasn: unknown key`,
 		{`when = 'session`, "[trigger]\non = [\"zzz\"]\n\nwhen = 'session"}:       `trigger.on[0]: "zzz" is not one of`,
@@ -124,7 +124,7 @@ when = 'pr.repo == "acme/api" && pr.repo_name == "api" && pr.state == "OPEN"'
 func TestAWorkflowNamesOnlyItsProvidersEffects(t *testing.T) {
 	t.Parallel()
 	task := `summary = "Nudge a waiting task"
-provider = "entry"
+provider = "task"
 when = 'task.waiting_days > 2'
 
 [[step]]
@@ -132,5 +132,5 @@ use = "draft.propose"
 purpose = "nudge"
 effects = ["pr.nudged"]
 `
-	wantProblem(t, workflowProblems(t, task), "step[0].effects[0]: pr.nudged applies to github units only; a entry workflow cannot name it")
+	wantProblem(t, workflowProblems(t, task), "step[0].effects[0]: pr.nudged applies to github units only; a task workflow cannot name it")
 }

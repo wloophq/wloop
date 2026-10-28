@@ -90,11 +90,15 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 }
 
 // runCapturing runs d, whose manifest captures a missing target, on the
-// entry args name as entry:<id>, else on a new entry that captures the
+// task args name as task:<id>, else on a new task that captures the
 // run's guidance as its notes; a failed run says how to retry on it.
 func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) error {
 	if len(args) > 0 {
-		if u, ok := explicitTask(args[0]); ok {
+		u, ok, err := explicitTask(args[0])
+		if err != nil {
+			return err
+		}
+		if ok {
 			return runIntentOn(ctx, e, d, u, args[1:])
 		}
 	}
@@ -375,7 +379,7 @@ func intentUsage(d dintent.Def) string {
 // units d serves, as their providers' codecs name them.
 func intentTarget(d dintent.Def) string {
 	if d.Target.Missing == dintent.TargetCapture {
-		return "[entry:<id>]"
+		return "[task:<id>]"
 	}
 	ps := d.Providers
 	if ps == nil {

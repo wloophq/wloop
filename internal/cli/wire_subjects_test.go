@@ -31,7 +31,7 @@ var subjectThread = dslack.ThreadUnit("T0001", "C0001", "1700000000.000100")
 
 const (
 	waitingWorkflow = `summary = "Watch waiting entries"
-provider = "entry"
+provider = "task"
 when = 'task.state == "waiting" && task.items_owed > 0 && task.settled_at < now'
 key = ["task.settled_at", "task.waiting_on"]
 
@@ -39,7 +39,7 @@ key = ["task.settled_at", "task.waiting_on"]
 use = "notify.self"
 `
 	closeWorkflow = `summary = "Watch close entries with a resolved item"
-provider = "entry"
+provider = "task"
 when = 'task.kind == "close" && task.items_resolved > 0'
 
 [[step]]
@@ -150,7 +150,7 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
 		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
-	want := []string{"my-slack " + subjectThread.String(), "my-waiting entry:e-01"}
+	want := []string{"my-slack " + subjectThread.String(), "my-waiting task:e-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
 	}
@@ -180,11 +180,11 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
 	close := task.Task{ID: "e-01", Kind: task.KindClose, State: task.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
 	woke("a new entry", func() { r.task(t, close, task.OpCreate) })
-	if got := r.planned(t); slices.Contains(got, "my-close entry:e-01") {
+	if got := r.planned(t); slices.Contains(got, "my-close task:e-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
 	}
 	woke("a resolved item", func() { r.item(t, it.Unit, it.ID, items.Resolved) })
-	if got := r.planned(t); !slices.Contains(got, "my-close entry:e-01") {
+	if got := r.planned(t); !slices.Contains(got, "my-close task:e-01") {
 		t.Fatalf("the next pass after the item resolved plans the close entry: %v", got)
 	}
 	woke("a draft", func() {
@@ -255,7 +255,7 @@ func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}
-	if got := closes(); !slices.Equal(got, []string{"entry:e-01"}) {
+	if got := closes(); !slices.Equal(got, []string{"task:e-01"}) {
 		t.Fatalf("closes %v, want the captured entry only", got)
 	}
 }

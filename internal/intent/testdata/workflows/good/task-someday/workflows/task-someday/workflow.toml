@@ -1,5 +1,5 @@
 summary = "Move a stale next action to Someday"
-provider = "entry"
+provider = "task"
 when = 'task.state == "next"'
 
 [[step]]

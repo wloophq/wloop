@@ -35,8 +35,8 @@ const (
 	KindReference Kind = "reference"
 )
 
-// ID is "e-" + 16 hex. Derived entries: sha256(kind|provider|unit_key|group)[:16], so a re-derivation is idempotent;
-// captures, projects, messages: random. Draft entries: "draft:<draft id>".
+// ID is "t-" + 16 hex. Derived tasks: sha256(kind|provider|unit_key|group)[:16], so a re-derivation is idempotent;
+// captures, projects, messages: random. Draft tasks: "draft:<draft id>".
 type ID string
 
 // ItemRef names an items.Item.ID of a unit.

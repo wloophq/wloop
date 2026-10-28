@@ -24,6 +24,9 @@ func (e *Env) diskChecks(ctx context.Context, cfg config.Config) []check {
 		out = append(out, check{markMissing, "dossiers", "the state directory " + e.StateDir + " is inside the repository checkout " + co + "; dossiers are refused there",
 			"set XDG_STATE_HOME to a directory outside any repository"})
 	}
+	if st, err := sqlite.Inspect(filepath.Join(e.StateDir, storeFile)); err == nil && (st.Version == 0 || st.Version >= taskRenamedAt) {
+		out = append(out, leftoverEntryDossiers(e.StateDir)...)
+	}
 	p := dossierPolicy(cfg.Dossiers)
 	var r dossiers.Report
 	var worktrees []sqlite.AgentWorktree
@@ -38,6 +41,7 @@ func (e *Env) diskChecks(ctx context.Context, cfg config.Config) []check {
 		if r, err = s.Report(ctx); err != nil {
 			return append(out, check{markInfo, "disk use", err.Error(), ""})
 		}
+		out = append(out, pendingDossierMoves(ctx, e.StateDir, db)...)
 		if worktrees, err = db.AgentWorktrees(ctx); err != nil {
 			return append(out, check{markInfo, "disk use", err.Error(), ""})
 		}

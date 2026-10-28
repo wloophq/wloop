@@ -16,7 +16,7 @@ import (
 )
 
 // Messages stores the Inbox messages; a write notes TopicTasks for the message's unit, since each message is
-// served on its entry.
+// served on its task.
 type Messages struct{ db *sqlite.DB }
 
 var _ message.Store = (*Messages)(nil)
@@ -24,20 +24,20 @@ var _ message.Store = (*Messages)(nil)
 func NewMessages(db *sqlite.DB) *Messages { return &Messages{db: db} }
 
 const (
-	messageColumns = `id, entry_id, provider, unit_key, kind, text, options, recommend, confirm,
+	messageColumns = `id, task_id, provider, unit_key, kind, text, options, recommend, confirm,
 		origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at`
 	messagesOpenSQL  = `SELECT ` + messageColumns + ` FROM messages WHERE state = 'open' ORDER BY id`
 	messageByIDSQL   = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
-	messageByTaskSQL = `SELECT ` + messageColumns + ` FROM messages WHERE entry_id = ? ORDER BY id DESC LIMIT 1`
+	messageByTaskSQL = `SELECT ` + messageColumns + ` FROM messages WHERE task_id = ? ORDER BY id DESC LIMIT 1`
 	openQuestionSQL  = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND turn_seq = ? AND kind = ?`
 	openWorkflowSQL = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND workflow = ?`
 	ledgerMessageSQL = `SELECT id FROM messages WHERE origin_kind = 'ledger' AND proposal = ?`
-	insertMessageSQL = `INSERT INTO messages (entry_id, provider, unit_key, kind, text, options, recommend, confirm,
+	insertMessageSQL = `INSERT INTO messages (task_id, provider, unit_key, kind, text, options, recommend, confirm,
 		origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateMessageSQL = `UPDATE messages SET entry_id = ?, text = ?, options = ?, recommend = ?, confirm = ?, session = ?
+	updateMessageSQL = `UPDATE messages SET task_id = ?, text = ?, options = ?, recommend = ?, confirm = ?, session = ?
 		WHERE id = ?`
 	closeMessageSQL = `UPDATE messages SET state = ?1, answer = ?2, closed_at = CASE state WHEN 'open' THEN ?3 ELSE closed_at END
 		WHERE id = ?4 AND (state = 'open' OR (state = 'answered' AND ?1 = 'answered' AND answer != ?2))`
@@ -96,7 +96,7 @@ func (s *Messages) Upsert(ctx context.Context, m message.Message) (message.Messa
 			if task == "" {
 				task = old.TaskID
 			}
-			res, err := tx.ExecContext(ctx, updateMessageSQL+` AND (entry_id, text, options, recommend, confirm, session) IS NOT (?, ?, ?, ?, ?, ?)`,
+			res, err := tx.ExecContext(ctx, updateMessageSQL+` AND (task_id, text, options, recommend, confirm, session) IS NOT (?, ?, ?, ?, ?, ?)`,
 				task, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session, id,
 				task, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session)
 			if err != nil {

@@ -61,9 +61,6 @@ func TestAnEntryNudgedEffectNamesTaskNudged(t *testing.T) {
 }
 
 func TestAnEntryProviderNamesTask(t *testing.T) {
-	if dunit.Task == "entry" {
-		t.Skip("the provider's value is the store's, renamed with the store's own rename")
-	}
 	got := userWorkflowProblems(t, "mine", strings.Replace(taskWorkflow(`task.state == "inbox"`, "use = \"task.verb\"\nverb = \"done\""),
 		"provider = \""+string(dunit.Task)+"\"", `provider = "entry"`, 1))
 	if !strings.Contains(got, `"entry" is not one of`) || !strings.Contains(got, `did you mean "task"?`) {

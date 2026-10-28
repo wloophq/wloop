@@ -22,8 +22,8 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 // resolveTarget is unitTarget over the providers, their resolvers and
 // their codecs.
 func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID, resolvers map[unit.ProviderID]unit.Resolver, codecs *unit.Registry) (unit.Unit, error) {
-	if u, ok := explicitTask(arg); ok {
-		return u, nil
+	if u, ok, err := explicitTask(arg); err != nil || ok {
+		return u, err
 	}
 	if p, key, ok := strings.Cut(arg, ":"); ok && key != "" && !strings.HasPrefix(key, "//") && slices.Contains(providers, unit.ProviderID(p)) {
 		return unit.Unit{Provider: unit.ProviderID(p), Key: key}, nil
@@ -50,14 +50,21 @@ func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID,
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message ref or permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
-// explicitTask is the GTD entry arg names as entry:<id>, the only way an
-// argument names one.
-func explicitTask(arg string) (unit.Unit, bool) {
+// explicitTask is the task arg names as task:<id>, the only way an argument names one. An argument in
+// the entry:<id> form tasks had before is refused with the form it has now.
+func explicitTask(arg string) (unit.Unit, bool, error) {
+	if key, ok := strings.CutPrefix(arg, "entry:"); ok && (task.Codec{}).Valid(key) == nil {
+		if rest, ok := strings.CutPrefix(key, "e-"); ok {
+			key = "t-" + rest
+		}
+		now := task.UnitOf(task.ID(key))
+		return unit.Unit{}, false, fmt.Errorf("%s names an entry, and entries are tasks now: give %s", arg, now)
+	}
 	key, ok := strings.CutPrefix(arg, string(task.Codec{}.Provider())+":")
 	if !ok || (task.Codec{}).Valid(key) != nil {
-		return unit.Unit{}, false
+		return unit.Unit{}, false, nil
 	}
-	return task.UnitOf(task.ID(key)), true
+	return task.UnitOf(task.ID(key)), true, nil
 }
 
 // pluginCodecs are the codecs of the compiled-in plugins.

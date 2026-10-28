@@ -1,5 +1,5 @@
 summary = "Nudge each person a stalled Slack waiting task waits on, listing the open items they owe"
-provider = "entry"
+provider = "task"
 when = '"slack" in task.unit_providers && task.nudge_due_at > timestamp(0) && task.items_owed > 0'
 order = 50
 key = ["task.settled_at", "task.waiting_on"]

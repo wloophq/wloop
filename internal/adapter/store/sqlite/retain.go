@@ -42,15 +42,15 @@ type Retention struct {
 	WorkflowRuns   time.Duration
 	PlanItems      time.Duration // plan items not pending, last saved that long ago
 	WorkflowEvents time.Duration // the engine's events, workflow.EngineKinds
-	VerbEvents     time.Duration // the verbs people ran on entries, task.VerbEventKinds
+	VerbEvents     time.Duration // the verbs people ran on tasks, task.VerbEventKinds
 	// UnitlessLoopRows drops the turns, records, answers, intakes, events,
 	// workflow runs and plan items of a github unit with no pull_requests
 	// row, no overrides row and nothing newer.
 	UnitlessLoopRows time.Duration
 	Classifications  time.Duration // classifications and classify_days
 	Fetches          time.Duration
-	// SubjectMarks drops the marks of entries done, in the trash or gone,
-	// and of Slack units with no extraction cursor, no item and no entry.
+	// SubjectMarks drops the marks of tasks done, in the trash or gone,
+	// and of Slack units with no extraction cursor, no item and no task.
 	SubjectMarks bool
 	VacuumPages  int // PRAGMA incremental_vacuum(VacuumPages) after each pass; 0 runs none
 }
@@ -143,11 +143,11 @@ const (
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
-		(provider = 'entry' AND unit_key NOT IN (SELECT id FROM entries WHERE state NOT IN ('done', 'trash')))
+		(provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE state NOT IN ('done', 'trash')))
 		OR (provider = 'slack'
 			AND NOT EXISTS (SELECT 1 FROM extraction_cursors c WHERE c.provider = 'slack' AND c.unit_key = unit_marks.unit_key)
 			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
-			AND NOT EXISTS (SELECT 1 FROM entry_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
+			AND NOT EXISTS (SELECT 1 FROM task_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
 	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`

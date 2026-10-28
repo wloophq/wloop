@@ -9,7 +9,7 @@ import (
 )
 
 const slackNudge = `summary = "Case"
-provider = "entry"
+provider = "task"
 when = 'task.state == "waiting" && now >= task.nudge_due_at'
 key = ["task.settled_at", "task.waiting_on"]
 
@@ -33,7 +33,7 @@ func TestAWorkflowOnTasksProposesAndWithdrawsDrafts(t *testing.T) {
 		t.Fatalf("%s", problems.Error())
 	}
 	w := l.Workflows[0]
-	if w.Provider != "entry" || w.Slot != "task" || w.Withdraw == nil || !slices.Equal(w.Steps[0].Args["effects"].([]string), []string{"task.nudged"}) {
+	if w.Provider != "task" || w.Slot != "task" || w.Withdraw == nil || !slices.Equal(w.Steps[0].Args["effects"].([]string), []string{"task.nudged"}) {
 		t.Fatalf("%+v", w)
 	}
 	if reads := strings.Join(w.Withdraw.Reads(), ","); !strings.Contains(reads, "draft.person_waited") {

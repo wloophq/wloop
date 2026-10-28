@@ -48,10 +48,10 @@ func TestDeletingAParentCascades(t *testing.T) {
 	}
 	children := []struct{ table, column, parent string }{
 		{"worktree_units", "path", "/wt/a"},
-		{"entry_items", "entry_id", "e-p"},
-		{"entry_units", "entry_id", "e-p"},
-		{"entry_contexts", "entry_id", "e-p"},
-		{"projects", "entry_id", "e-p"},
+		{"task_items", "task_id", "e-p"},
+		{"task_units", "task_id", "e-p"},
+		{"task_contexts", "task_id", "e-p"},
+		{"projects", "task_id", "e-p"},
 	}
 	for _, c := range children {
 		if n := countRows(t, db, c.table, c.column+` = ?`, c.parent); n == 0 {
@@ -61,7 +61,7 @@ func TestDeletingAParentCascades(t *testing.T) {
 	if err := execWrite(db, `DELETE FROM worktrees WHERE path = ?`, "/wt/a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := execWrite(db, `DELETE FROM entries WHERE id = ?`, "e-p"); err != nil {
+	if err := execWrite(db, `DELETE FROM tasks WHERE id = ?`, "e-p"); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range children {
@@ -83,7 +83,7 @@ func TestRewritingATaskKeepsItsProjectRow(t *testing.T) {
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
-	if n := countRows(t, db, "projects", `entry_id = 'e-p' AND slug = 'p' AND review_every = ?`, int64(36*time.Hour/time.Second)); n != 1 {
+	if n := countRows(t, db, "projects", `task_id = 'e-p' AND slug = 'p' AND review_every = ?`, int64(36*time.Hour/time.Second)); n != 1 {
 		t.Errorf("the project row of a rewritten entry: %d rows, want 1", n)
 	}
 	got, err := db.Tasks().Task(ctx, "e-p")
@@ -97,10 +97,10 @@ func TestAChildWithoutItsParentIsRefused(t *testing.T) {
 	db, _ := openTemp(t)
 	for _, insert := range []string{
 		`INSERT INTO worktree_units (path, provider, unit_key, at) VALUES ('/wt/none', 'github', 'acme/api#7', '')`,
-		`INSERT INTO entry_items (entry_id, provider, unit_key, item) VALUES ('e-none', 'github', 'acme/api#7', 'a')`,
-		`INSERT INTO entry_units (entry_id, provider, unit_key, ord) VALUES ('e-none', 'github', 'acme/api#7', 0)`,
-		`INSERT INTO entry_contexts (entry_id, context, ord) VALUES ('e-none', '@reply', 0)`,
-		`INSERT INTO projects (entry_id) VALUES ('e-none')`,
+		`INSERT INTO task_items (task_id, provider, unit_key, item) VALUES ('e-none', 'github', 'acme/api#7', 'a')`,
+		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('e-none', 'github', 'acme/api#7', 0)`,
+		`INSERT INTO task_contexts (task_id, context, ord) VALUES ('e-none', '@reply', 0)`,
+		`INSERT INTO projects (task_id) VALUES ('e-none')`,
 	} {
 		if err := execWrite(db, insert); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
 			t.Errorf("%s: %v, want a foreign key error", insert, err)
