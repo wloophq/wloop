@@ -69,7 +69,7 @@ func checkFacts(t *testing.T, u unit.Unit, facts workflow.Facts) {
 			t.Errorf("%s: facts in slots %q and %q", u, slot, s)
 		}
 		switch v.(type) {
-		case bool, int, string, []string, time.Duration, time.Time:
+		case bool, int, string, []string, time.Duration, time.Time, workflow.Temporal:
 		default:
 			t.Errorf("%s: fact %q is a %T", u, name, v)
 		}
@@ -80,6 +80,71 @@ func checkFacts(t *testing.T, u unit.Unit, facts workflow.Facts) {
 	if _, ok := facts[slot+".repo"].(string); !ok {
 		t.Errorf("%s: no %s.repo string", u, slot)
 	}
+}
+
+// RevisionerBackend is what RunRevisioner needs beyond automation.Units
+// and automation.Revisioner: a way to have a unit's source report it again.
+type RevisionerBackend interface {
+	automation.Units
+	automation.Revisioner
+	Report(t *testing.T, u unit.Unit)
+}
+
+// RunRevisioner checks the revs of a facts provider holding at least one
+// unit of p: every listed unit has one, an unknown unit has none, and a new
+// report of a unit grows its rev and no other.
+func RunRevisioner(t *testing.T, p unit.ProviderID, mk func(*testing.T) RevisionerBackend) {
+	ctx := context.Background()
+	listed := func(t *testing.T, b RevisionerBackend) []unit.Unit {
+		t.Helper()
+		us, err := b.List(ctx, p)
+		if err != nil || len(us) == 0 {
+			t.Fatalf("List(%s) = %v, %v; want a unit", p, us, err)
+		}
+		return us
+	}
+	t.Run("AReportedUnitHasARev", func(t *testing.T) {
+		b := mk(t)
+		us := listed(t, b)
+		revs, err := b.Revs(ctx, us)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, u := range us {
+			if _, ok := revs[u]; !ok {
+				t.Errorf("%s has no rev in %v", u, revs)
+			}
+		}
+	})
+	t.Run("AnUnknownUnitIsAbsent", func(t *testing.T) {
+		b := mk(t)
+		gone := unit.Unit{Provider: p, Key: "no-such-unit"}
+		revs, err := b.Revs(ctx, append(listed(t, b)[:1], gone))
+		if _, ok := revs[gone]; err != nil || ok || len(revs) != 1 {
+			t.Errorf("Revs with an unknown unit = %v, %v", revs, err)
+		}
+	})
+	t.Run("ANewReportGrowsTheRev", func(t *testing.T) {
+		b := mk(t)
+		us := listed(t, b)
+		before, err := b.Revs(ctx, us)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.Report(t, us[0])
+		after, err := b.Revs(ctx, us)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after[us[0]] <= before[us[0]] {
+			t.Errorf("%s reported again: rev %d, was %d", us[0], after[us[0]], before[us[0]])
+		}
+		for _, u := range us[1:] {
+			if after[u] != before[u] {
+				t.Errorf("%s was not reported: rev %d, was %d", u, after[u], before[u])
+			}
+		}
+	})
 }
 
 // EventsBackend is what RunEvents needs beyond automation.Events: a way to

@@ -240,6 +240,13 @@ func (f *Units) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) {
 	return slices.Clone(f.owners[u]), nil
 }
 
+// Report has u's source report it again: its rev grows.
+func (f *Units) Report(_ *testing.T, u unit.Unit) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revs[u]++
+}
+
 // Revs are the units' revs; a unit SetMoved names is reported again at
 // every read.
 func (f *Units) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error) {

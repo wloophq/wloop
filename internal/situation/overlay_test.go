@@ -1,53 +1,93 @@
 package situation
 
 import (
-	"fmt"
+	"bufio"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
-// TestTheHostOverlaysDecideAsDeriveDid compares the source-free overlays
-// with Derive on a pull request whose source situation is plain: the run
-// overlay, then the mute.
+// TestTheHostOverlaysDecideAsDeriveDid composes the host's overlays over
+// each source situation as a reported row does (the run overlay but on a
+// done unit, the mute, then the pending round) and compares them with
+// testdata/overlays.golden, which Derive and prrow's pending round wrote
+// before the overlays left them. The run overlay now wins over blocked,
+// held and to_address, which Derive put before the turn: those rows must
+// differ from the golden.
 func TestTheHostOverlaysDecideAsDeriveDid(t *testing.T) {
-	var turns []*overlay.Turn
-	turns = append(turns, nil)
-	for _, role := range []string{builtin.RoleReview, builtin.RoleAddress, "pr.nudge", ""} {
-		for _, st := range []string{"asked", "failed", "unrecorded", "started", "ended", "sent"} {
-			for _, sum := range []string{"", "which branch?"} {
-				turns = append(turns, &overlay.Turn{Intent: "review", Role: role, State: st, Summary: sum, At: h(2)},
-					&overlay.Turn{Intent: "review", Role: role, State: st, Summary: sum, At: h(2), AnsweredAt: h(3)})
-			}
-		}
+	golden := map[string]string{}
+	f, err := os.Open(filepath.Join("testdata", "overlays.golden"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	mutes := []dinv.Override{{}, {MutedUntil: h(20)}, {MutedUntil: h(5)},
-		{MuteUntilStateChange: true, MutedKind: string(KindLoopWaiting), MutedWaitingOn: "me"},
-		{MuteUntilStateChange: true, MutedKind: string(KindNoReviewer), MutedWaitingOn: "author"},
-		{MuteUntilStateChange: true, MutedKind: string(KindLoopWorking), MutedWaitingOn: "ana"}}
-	p := pr("ana")
-	src := Derive(Input{PR: p, Viewer: "me", Now: h(10), Stalled: th})
-	for _, tf := range turns {
-		for _, waiting := range []bool{false, true} {
-			for _, o := range mutes {
-				name := fmt.Sprintf("%+v waiting %t %+v", tf, waiting, o)
-				want := Derive(Input{PR: p, Override: o, Viewer: "me", Now: h(10), Stalled: th, Turn: tf, SessionWaiting: waiting})
-				got := overlay.Situation{Kind: string(src.Kind), WaitingOn: src.WaitingOn, Since: src.Since, Reason: src.Reason, Stalled: src.Stalled}
-				if tf != nil {
-					if s, ok := tf.Situation(waiting); ok {
-						got = s
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		k, v, _ := strings.Cut(sc.Text(), " => ")
+		golden[k] = v
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatal(err)
+	}
+	cases, diverged := 0, 0
+	for _, s := range gridSources() {
+		src := overlayOf(Derive(Input{PR: s.pr, Events: s.evs, Viewer: "me", MyTeams: []string{"Acme/search"}, Ignore: []string{"sonar"},
+			Now: s.now, Stalled: th}))
+		for _, gt := range gridTurns() {
+			for _, waiting := range []bool{false, true} {
+				for _, o := range gridMutes() {
+					for _, p := range gridPendings() {
+						cases++
+						sit, ran := src, false
+						if gt != nil && sit.Kind != overlay.KindDone {
+							tf := overlay.Turn{Intent: "review", Role: gt.role, State: gt.state, Summary: gt.summary, At: h(2)}
+							if gt.answered {
+								tf.AnsweredAt = h(3)
+							}
+							if r, ok := tf.Situation(waiting); ok {
+								sit, ran = r, true
+							}
+						}
+						if m := (overlay.Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange, Kind: o.MutedKind,
+							WaitingOn: o.MutedWaitingOn}); m.Holds(sit, s.now) {
+							sit = m.Muted()
+						}
+						if p != nil {
+							sit = overlay.Pending{Intent: p.Intent, Reason: p.Reason}.Over(sit)
+						}
+						key := gridCase(s, gt, waiting, o, p)
+						want, ok := golden[key]
+						if !ok {
+							t.Fatalf("the golden has no %s", key)
+						}
+						got := gridResult(sit.Kind, sit.WaitingOn, sit.Since, sit.Reason, sit.Stalled)
+						switch reorders := ran && (src.Kind == string(KindBlocked) || src.Kind == string(KindHeldByCap) || src.Kind == string(KindToAddress)); {
+						case reorders && !overlaid(sit.Kind):
+							t.Errorf("%s: the run overlay no longer wins: %s", key, got)
+						case reorders:
+							if got != want {
+								diverged++
+							}
+						case got != want:
+							t.Errorf("%s:\n got %s\nwant %s", key, got, want)
+						}
 					}
 				}
-				m := overlay.Mute{Until: o.MutedUntil, UntilStateChange: o.MuteUntilStateChange, Kind: o.MutedKind, WaitingOn: o.MutedWaitingOn}
-				if m.Holds(got, h(10)) {
-					got = m.Muted()
-				}
-				if string(want.Kind) != got.Kind || want.WaitingOn != got.WaitingOn || !want.Since.Equal(got.Since) || want.Reason != got.Reason || want.Stalled != got.Stalled {
-					t.Errorf("%s: Derive %+v, overlays %+v", name, want, got)
-				}
 			}
 		}
 	}
+	if cases != len(golden) || diverged == 0 {
+		t.Errorf("%d cases for %d golden rows, %d reordered", cases, len(golden), diverged)
+	}
+}
+
+func overlaid(kind string) bool {
+	switch kind {
+	case overlay.KindLoopWorking, overlay.KindLoopWaiting, overlay.KindLoopStopped, overlay.KindMuted, overlay.KindRoundPending:
+		return true
+	}
+	return false
 }

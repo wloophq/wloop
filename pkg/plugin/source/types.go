@@ -11,37 +11,37 @@ import (
 // the unit replaces it whole. Fields holding JSON hold an object whose shape
 // the plugin and its profile layer own.
 type Snapshot struct {
-	Unit plugin.Unit
+	Unit plugin.Unit `json:"unit,omitzero"`
 	// Rev grows with every change of the unit the plugin reports; the host
 	// compares it with the rev its facts came from.
-	Rev uint64
-	At  time.Time
+	Rev uint64    `json:"rev,omitempty"`
+	At  time.Time `json:"at,omitzero"`
 	// Gone says the unit no longer exists in its source.
-	Gone bool
+	Gone bool `json:"gone,omitempty"`
 	// Data is the unit's data, which its templates and rows read.
-	Data json.RawMessage
+	Data json.RawMessage `json:"data,omitempty"`
 	// Situation is what the unit waits on as its source says; nil for none.
-	Situation *Situation
-	Card      *Card
-	Items     []Item
-	Facts     []Fact
-	Signals   []Signal
+	Situation *Situation `json:"situation,omitempty"`
+	Card      *Card      `json:"card,omitempty"`
+	Items     []Item     `json:"items,omitempty"`
+	Facts     []Fact     `json:"facts,omitempty"`
+	Signals   []Signal   `json:"signals,omitempty"`
 	// Owes are who the unit waits on.
-	Owes   []Person
-	Offers []Offer
+	Owes   []Person `json:"owes,omitempty"`
+	Offers []Offer  `json:"offers,omitempty"`
 	// Extraction is the health of the unit's extraction; nil for a unit
 	// the plugin extracts nothing from.
-	Extraction *ExtractionHealth
+	Extraction *ExtractionHealth `json:"extraction,omitempty"`
 	// Contexts and Due are the task fields the plugin writes.
-	Contexts []string
-	Due      time.Time
+	Contexts []string  `json:"contexts,omitempty"`
+	Due      time.Time `json:"due,omitzero"`
 	// Links are the addresses the unit's source links to, which the host
 	// resolves with every manifest's codec.
-	Links []Link
+	Links []Link `json:"links,omitempty"`
 	// Facets are the unit's values of the manifest's facets, by facet id;
 	// Views the ids of the manifest's views its row is in.
-	Facets map[string]string
-	Views  []string
+	Facets map[string]string `json:"facets,omitempty"`
+	Views  []string          `json:"views,omitempty"`
 }
 
 // Situation is what a unit waits on, as the plugin derives it from its
@@ -49,137 +49,139 @@ type Snapshot struct {
 // (matched by Kind and WaitingOn) and a pending round.
 type Situation struct {
 	// Kind is one of the manifest's situations.
-	Kind      string
-	WaitingOn string
-	Since     time.Time
-	Reason    string
+	Kind      string    `json:"kind,omitempty"`
+	WaitingOn string    `json:"waiting_on,omitempty"`
+	Since     time.Time `json:"since,omitzero"`
+	Reason    string    `json:"reason,omitempty"`
 	// Stalled is an After value: the situation is stalled once it holds.
-	Stalled Value
+	Stalled Value `json:"stalled,omitzero"`
 }
 
 // Link is an address a unit's source links to.
 type Link struct {
-	URL      string
-	Kind     string
-	Item     string
-	Evidence Anchor
+	URL      string `json:"url,omitempty"`
+	Kind     string `json:"kind,omitempty"`
+	Item     string `json:"item,omitempty"`
+	Evidence Anchor `json:"evidence,omitzero"`
 }
 
 // Signal is a link signal the manifest declares, on one unit.
 type Signal struct {
-	Name string
-	On   bool
+	Name string `json:"name,omitempty"`
+	On   bool   `json:"on,omitempty"`
 	// Since is when it turned on; zero when unknown or off.
-	Since time.Time
+	Since time.Time `json:"since,omitzero"`
 }
 
 // Offer is an action the plugin offers on a unit.
 type Offer struct {
-	Action string
-	Args   json.RawMessage
+	Action string          `json:"action,omitempty"`
+	Args   json.RawMessage `json:"args,omitempty"`
 }
 
 // ExtractionHealth says what a unit's extraction has not yet read.
 type ExtractionHealth struct {
-	Pending   int
-	BudgetHit bool
+	Pending   int  `json:"pending,omitempty"`
+	BudgetHit bool `json:"budget_hit,omitempty"`
 	// Oldest is the oldest message not yet extracted; zero with none.
-	Oldest time.Time
+	Oldest time.Time `json:"oldest,omitzero"`
 }
 
 // Person is a person or group as a source knows them; Key is
 // "<provider>:<id>", "group:<name>" or "system:<name>".
 type Person struct {
-	Key     string
-	Name    string
-	Aliases []string
+	Key     string   `json:"key,omitempty"`
+	Name    string   `json:"name,omitempty"`
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // Anchor is a point in a unit, such as a message or a review.
 type Anchor struct {
-	Unit      plugin.Unit
-	Ref       string
-	Permalink string
-	At        time.Time
+	Unit      plugin.Unit `json:"unit,omitzero"`
+	Ref       string      `json:"ref,omitempty"`
+	Permalink string      `json:"permalink,omitempty"`
+	At        time.Time   `json:"at,omitzero"`
 }
 
 // Card is what the plugin shows of one unit.
 type Card struct {
-	Label         string
-	Title         string
-	State         string
-	Outcome       string
-	Signals       []CardSignal
-	LastHuman     *Human
-	Why           string
-	WaitsOn       []Person
-	Since         time.Time
-	Link          string
-	TurnsLink     string
-	StartedByMe   bool
-	ClosurePosted bool
-	Cares         bool
+	Label         string       `json:"label,omitempty"`
+	Title         string       `json:"title,omitempty"`
+	State         string       `json:"state,omitempty"`
+	Outcome       string       `json:"outcome,omitempty"`
+	Signals       []CardSignal `json:"signals,omitempty"`
+	LastHuman     *Human       `json:"last_human,omitempty"`
+	Why           string       `json:"why,omitempty"`
+	WaitsOn       []Person     `json:"waits_on,omitempty"`
+	Since         time.Time    `json:"since,omitzero"`
+	Link          string       `json:"link,omitempty"`
+	TurnsLink     string       `json:"turns_link,omitempty"`
+	StartedByMe   bool         `json:"started_by_me,omitempty"`
+	ClosurePosted bool         `json:"closure_posted,omitempty"`
+	Cares         bool         `json:"cares,omitempty"`
 }
 
 // CardSignal is one line of a card: a key, its value and its tone.
 type CardSignal struct {
-	Key, Value, Tone string
-	At               time.Time
+	Key   string    `json:"key,omitempty"`
+	Value string    `json:"value,omitempty"`
+	Tone  string    `json:"tone,omitempty"`
+	At    time.Time `json:"at,omitzero"`
 }
 
 // Human is the last thing a person did on a unit.
 type Human struct {
-	Who  Person
-	What string
-	At   time.Time
-	Link string
+	Who  Person    `json:"who,omitzero"`
+	What string    `json:"what,omitempty"`
+	At   time.Time `json:"at,omitzero"`
+	Link string    `json:"link,omitempty"`
 }
 
 // Item is a commitment the plugin observed: who asks whom for what.
 type Item struct {
-	ID       string
-	Unit     plugin.Unit
-	Kind     string
-	Summary  string
-	Context  string
-	Options  []Option
-	Deadline string
-	URLs     []string
-	Contexts []string
+	ID       string      `json:"id,omitempty"`
+	Unit     plugin.Unit `json:"unit,omitzero"`
+	Kind     string      `json:"kind,omitempty"`
+	Summary  string      `json:"summary,omitempty"`
+	Context  string      `json:"context,omitempty"`
+	Options  []Option    `json:"options,omitempty"`
+	Deadline string      `json:"deadline,omitempty"`
+	URLs     []string    `json:"urls,omitempty"`
+	Contexts []string    `json:"contexts,omitempty"`
 	// Category is the task category the plugin proposes for a new task,
 	// such as "inbox" or "ready"; never a state name. Empty is inbox.
-	Category   string
-	Origin     Anchor
-	Requester  Person
-	Assignees  []Person
-	AssignedAt Anchor
-	Basis      string
-	WaitingOn  []Person
-	State      string
-	Resolution string
-	Evidence   ItemEvidence
-	Trail      []ItemEvidence
-	Confidence string
-	Ambiguity  string
-	Provenance string
-	Confirmed  bool
+	Category   string         `json:"category,omitempty"`
+	Origin     Anchor         `json:"origin,omitzero"`
+	Requester  Person         `json:"requester,omitzero"`
+	Assignees  []Person       `json:"assignees,omitempty"`
+	AssignedAt Anchor         `json:"assigned_at,omitzero"`
+	Basis      string         `json:"basis,omitempty"`
+	WaitingOn  []Person       `json:"waiting_on,omitempty"`
+	State      string         `json:"state,omitempty"`
+	Resolution string         `json:"resolution,omitempty"`
+	Evidence   ItemEvidence   `json:"evidence,omitzero"`
+	Trail      []ItemEvidence `json:"trail,omitempty"`
+	Confidence string         `json:"confidence,omitempty"`
+	Ambiguity  string         `json:"ambiguity,omitempty"`
+	Provenance string         `json:"provenance,omitempty"`
+	Confirmed  bool           `json:"confirmed,omitempty"`
 	// TaskKey groups items into one task: the item id when empty.
-	TaskKey   string
-	UserAt    time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	TaskKey   string    `json:"task_key,omitempty"`
+	UserAt    time.Time `json:"user_at,omitzero"`
+	CreatedAt time.Time `json:"created_at,omitzero"`
+	UpdatedAt time.Time `json:"updated_at,omitzero"`
 }
 
 // Option is one of the choices a decision item offers.
 type Option struct {
-	Label    string
-	ArguedBy []Person
+	Label    string   `json:"label,omitempty"`
+	ArguedBy []Person `json:"argued_by,omitempty"`
 }
 
 // ItemEvidence is what moved an item, and where.
 type ItemEvidence struct {
-	Kind   string
-	Anchor Anchor
+	Kind   string `json:"kind,omitempty"`
+	Anchor Anchor `json:"anchor,omitzero"`
 }
 
 // ItemOp is one change to the host's items ledger.

@@ -26,7 +26,7 @@ func Fact(v src.Value) any {
 	case src.KindBool:
 		return v.Bool
 	case src.KindInt:
-		return v.Int
+		return int(v.Int)
 	case src.KindString:
 		return v.String
 	case src.KindList:

@@ -47,8 +47,8 @@ type Kind string
 // Unit names a unit of work by its provider and the provider's key, as the
 // host's unit does.
 type Unit struct {
-	Provider string
-	Key      string
+	Provider string `json:"provider,omitempty"`
+	Key      string `json:"key,omitempty"`
 }
 
 // Topic names host state a kind may read, of which Notify says what changed.
