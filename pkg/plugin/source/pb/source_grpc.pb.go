@@ -19,34 +19,34 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SourceService_Capabilities_FullMethodName     = "/wloop.source.v1.SourceService/Capabilities"
-	SourceService_Ingest_FullMethodName           = "/wloop.source.v1.SourceService/Ingest"
-	SourceService_Track_FullMethodName            = "/wloop.source.v1.SourceService/Track"
-	SourceService_Untrack_FullMethodName          = "/wloop.source.v1.SourceService/Untrack"
-	SourceService_Resolve_FullMethodName          = "/wloop.source.v1.SourceService/Resolve"
-	SourceService_Locate_FullMethodName           = "/wloop.source.v1.SourceService/Locate"
-	SourceService_Action_FullMethodName           = "/wloop.source.v1.SourceService/Action"
-	SourceService_View_FullMethodName             = "/wloop.source.v1.SourceService/View"
-	SourceService_Identity_FullMethodName         = "/wloop.source.v1.SourceService/Identity"
-	SourceService_Validate_FullMethodName         = "/wloop.source.v1.SourceService/Validate"
-	SourceService_Where_FullMethodName            = "/wloop.source.v1.SourceService/Where"
-	SourceService_Place_FullMethodName            = "/wloop.source.v1.SourceService/Place"
-	SourceService_Publish_FullMethodName          = "/wloop.source.v1.SourceService/Publish"
-	SourceService_Verify_FullMethodName           = "/wloop.source.v1.SourceService/Verify"
-	SourceService_Landed_FullMethodName           = "/wloop.source.v1.SourceService/Landed"
-	SourceService_Checkout_FullMethodName         = "/wloop.source.v1.SourceService/Checkout"
-	SourceService_WriteState_FullMethodName       = "/wloop.source.v1.SourceService/WriteState"
-	SourceService_BriefInput_FullMethodName       = "/wloop.source.v1.SourceService/BriefInput"
-	SourceService_BriefRevision_FullMethodName    = "/wloop.source.v1.SourceService/BriefRevision"
-	SourceService_BriefDescribe_FullMethodName    = "/wloop.source.v1.SourceService/BriefDescribe"
-	SourceService_BriefStale_FullMethodName       = "/wloop.source.v1.SourceService/BriefStale"
-	SourceService_Plan_FullMethodName             = "/wloop.source.v1.SourceService/Plan"
-	SourceService_Payload_FullMethodName          = "/wloop.source.v1.SourceService/Payload"
-	SourceService_ApplyEffect_FullMethodName      = "/wloop.source.v1.SourceService/ApplyEffect"
-	SourceService_Proposals_FullMethodName        = "/wloop.source.v1.SourceService/Proposals"
-	SourceService_PlacementDefault_FullMethodName = "/wloop.source.v1.SourceService/PlacementDefault"
-	SourceService_CallTool_FullMethodName         = "/wloop.source.v1.SourceService/CallTool"
-	SourceService_RunCLI_FullMethodName           = "/wloop.source.v1.SourceService/RunCLI"
+	SourceService_Capabilities_FullMethodName  = "/wloop.source.v1.SourceService/Capabilities"
+	SourceService_Ingest_FullMethodName        = "/wloop.source.v1.SourceService/Ingest"
+	SourceService_Track_FullMethodName         = "/wloop.source.v1.SourceService/Track"
+	SourceService_Untrack_FullMethodName       = "/wloop.source.v1.SourceService/Untrack"
+	SourceService_Resolve_FullMethodName       = "/wloop.source.v1.SourceService/Resolve"
+	SourceService_Locate_FullMethodName        = "/wloop.source.v1.SourceService/Locate"
+	SourceService_Action_FullMethodName        = "/wloop.source.v1.SourceService/Action"
+	SourceService_View_FullMethodName          = "/wloop.source.v1.SourceService/View"
+	SourceService_Identity_FullMethodName      = "/wloop.source.v1.SourceService/Identity"
+	SourceService_Validate_FullMethodName      = "/wloop.source.v1.SourceService/Validate"
+	SourceService_Where_FullMethodName         = "/wloop.source.v1.SourceService/Where"
+	SourceService_Place_FullMethodName         = "/wloop.source.v1.SourceService/Place"
+	SourceService_Publish_FullMethodName       = "/wloop.source.v1.SourceService/Publish"
+	SourceService_Verify_FullMethodName        = "/wloop.source.v1.SourceService/Verify"
+	SourceService_Landed_FullMethodName        = "/wloop.source.v1.SourceService/Landed"
+	SourceService_Checkout_FullMethodName      = "/wloop.source.v1.SourceService/Checkout"
+	SourceService_WriteState_FullMethodName    = "/wloop.source.v1.SourceService/WriteState"
+	SourceService_BriefInput_FullMethodName    = "/wloop.source.v1.SourceService/BriefInput"
+	SourceService_BriefRevision_FullMethodName = "/wloop.source.v1.SourceService/BriefRevision"
+	SourceService_BriefDescribe_FullMethodName = "/wloop.source.v1.SourceService/BriefDescribe"
+	SourceService_BriefStale_FullMethodName    = "/wloop.source.v1.SourceService/BriefStale"
+	SourceService_Plan_FullMethodName          = "/wloop.source.v1.SourceService/Plan"
+	SourceService_Payload_FullMethodName       = "/wloop.source.v1.SourceService/Payload"
+	SourceService_ApplyEffect_FullMethodName   = "/wloop.source.v1.SourceService/ApplyEffect"
+	SourceService_Proposals_FullMethodName     = "/wloop.source.v1.SourceService/Proposals"
+	SourceService_Placement_FullMethodName     = "/wloop.source.v1.SourceService/Placement"
+	SourceService_CallTool_FullMethodName      = "/wloop.source.v1.SourceService/CallTool"
+	SourceService_RunCLI_FullMethodName        = "/wloop.source.v1.SourceService/RunCLI"
 )
 
 // SourceServiceClient is the client API for SourceService service.
@@ -91,11 +91,13 @@ type SourceServiceClient interface {
 	Payload(ctx context.Context, in *PayloadRequest, opts ...grpc.CallOption) (*PayloadResponse, error)
 	ApplyEffect(ctx context.Context, in *ApplyEffectRequest, opts ...grpc.CallOption) (*ApplyEffectResponse, error)
 	Proposals(ctx context.Context, in *ProposalsRequest, opts ...grpc.CallOption) (*ProposalsResponse, error)
-	PlacementDefault(ctx context.Context, in *PlacementDefaultRequest, opts ...grpc.CallOption) (*PlacementDefaultResponse, error)
+	Placement(ctx context.Context, in *PlacementRequest, opts ...grpc.CallOption) (*PlacementResponse, error)
 	// Tooler.
 	CallTool(ctx context.Context, in *CallToolRequest, opts ...grpc.CallOption) (*CallToolResponse, error)
 	// CLIRunner.
-	RunCLI(ctx context.Context, in *RunCLIRequest, opts ...grpc.CallOption) (*RunCLIResponse, error)
+	// RunCLI streams the command's output as it writes it, its exit code last.
+	// The host calls it in CLI mode without Start: the plugin opens no store.
+	RunCLI(ctx context.Context, in *RunCLIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunCLIResponse], error)
 }
 
 type sourceServiceClient struct {
@@ -356,10 +358,10 @@ func (c *sourceServiceClient) Proposals(ctx context.Context, in *ProposalsReques
 	return out, nil
 }
 
-func (c *sourceServiceClient) PlacementDefault(ctx context.Context, in *PlacementDefaultRequest, opts ...grpc.CallOption) (*PlacementDefaultResponse, error) {
+func (c *sourceServiceClient) Placement(ctx context.Context, in *PlacementRequest, opts ...grpc.CallOption) (*PlacementResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PlacementDefaultResponse)
-	err := c.cc.Invoke(ctx, SourceService_PlacementDefault_FullMethodName, in, out, cOpts...)
+	out := new(PlacementResponse)
+	err := c.cc.Invoke(ctx, SourceService_Placement_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -376,15 +378,24 @@ func (c *sourceServiceClient) CallTool(ctx context.Context, in *CallToolRequest,
 	return out, nil
 }
 
-func (c *sourceServiceClient) RunCLI(ctx context.Context, in *RunCLIRequest, opts ...grpc.CallOption) (*RunCLIResponse, error) {
+func (c *sourceServiceClient) RunCLI(ctx context.Context, in *RunCLIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunCLIResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RunCLIResponse)
-	err := c.cc.Invoke(ctx, SourceService_RunCLI_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &SourceService_ServiceDesc.Streams[0], SourceService_RunCLI_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[RunCLIRequest, RunCLIResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SourceService_RunCLIClient = grpc.ServerStreamingClient[RunCLIResponse]
 
 // SourceServiceServer is the server API for SourceService service.
 // All implementations must embed UnimplementedSourceServiceServer
@@ -428,11 +439,13 @@ type SourceServiceServer interface {
 	Payload(context.Context, *PayloadRequest) (*PayloadResponse, error)
 	ApplyEffect(context.Context, *ApplyEffectRequest) (*ApplyEffectResponse, error)
 	Proposals(context.Context, *ProposalsRequest) (*ProposalsResponse, error)
-	PlacementDefault(context.Context, *PlacementDefaultRequest) (*PlacementDefaultResponse, error)
+	Placement(context.Context, *PlacementRequest) (*PlacementResponse, error)
 	// Tooler.
 	CallTool(context.Context, *CallToolRequest) (*CallToolResponse, error)
 	// CLIRunner.
-	RunCLI(context.Context, *RunCLIRequest) (*RunCLIResponse, error)
+	// RunCLI streams the command's output as it writes it, its exit code last.
+	// The host calls it in CLI mode without Start: the plugin opens no store.
+	RunCLI(*RunCLIRequest, grpc.ServerStreamingServer[RunCLIResponse]) error
 	mustEmbedUnimplementedSourceServiceServer()
 }
 
@@ -518,14 +531,14 @@ func (UnimplementedSourceServiceServer) ApplyEffect(context.Context, *ApplyEffec
 func (UnimplementedSourceServiceServer) Proposals(context.Context, *ProposalsRequest) (*ProposalsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Proposals not implemented")
 }
-func (UnimplementedSourceServiceServer) PlacementDefault(context.Context, *PlacementDefaultRequest) (*PlacementDefaultResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method PlacementDefault not implemented")
+func (UnimplementedSourceServiceServer) Placement(context.Context, *PlacementRequest) (*PlacementResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Placement not implemented")
 }
 func (UnimplementedSourceServiceServer) CallTool(context.Context, *CallToolRequest) (*CallToolResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CallTool not implemented")
 }
-func (UnimplementedSourceServiceServer) RunCLI(context.Context, *RunCLIRequest) (*RunCLIResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RunCLI not implemented")
+func (UnimplementedSourceServiceServer) RunCLI(*RunCLIRequest, grpc.ServerStreamingServer[RunCLIResponse]) error {
+	return status.Error(codes.Unimplemented, "method RunCLI not implemented")
 }
 func (UnimplementedSourceServiceServer) mustEmbedUnimplementedSourceServiceServer() {}
 func (UnimplementedSourceServiceServer) testEmbeddedByValue()                       {}
@@ -998,20 +1011,20 @@ func _SourceService_Proposals_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SourceService_PlacementDefault_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PlacementDefaultRequest)
+func _SourceService_Placement_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PlacementRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SourceServiceServer).PlacementDefault(ctx, in)
+		return srv.(SourceServiceServer).Placement(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SourceService_PlacementDefault_FullMethodName,
+		FullMethod: SourceService_Placement_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SourceServiceServer).PlacementDefault(ctx, req.(*PlacementDefaultRequest))
+		return srv.(SourceServiceServer).Placement(ctx, req.(*PlacementRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1034,23 +1047,16 @@ func _SourceService_CallTool_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SourceService_RunCLI_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RunCLIRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _SourceService_RunCLI_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RunCLIRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(SourceServiceServer).RunCLI(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SourceService_RunCLI_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SourceServiceServer).RunCLI(ctx, req.(*RunCLIRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(SourceServiceServer).RunCLI(m, &grpc.GenericServerStream[RunCLIRequest, RunCLIResponse]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type SourceService_RunCLIServer = grpc.ServerStreamingServer[RunCLIResponse]
 
 // SourceService_ServiceDesc is the grpc.ServiceDesc for SourceService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -1160,19 +1166,21 @@ var SourceService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SourceService_Proposals_Handler,
 		},
 		{
-			MethodName: "PlacementDefault",
-			Handler:    _SourceService_PlacementDefault_Handler,
+			MethodName: "Placement",
+			Handler:    _SourceService_Placement_Handler,
 		},
 		{
 			MethodName: "CallTool",
 			Handler:    _SourceService_CallTool_Handler,
 		},
+	},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "RunCLI",
-			Handler:    _SourceService_RunCLI_Handler,
+			StreamName:    "RunCLI",
+			Handler:       _SourceService_RunCLI_Handler,
+			ServerStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "wloop/source/v1/source.proto",
 }
 
@@ -1198,6 +1206,8 @@ const (
 	HostService_Ask_FullMethodName          = "/wloop.source.v1.HostService/Ask"
 	HostService_Meter_FullMethodName        = "/wloop.source.v1.HostService/Meter"
 	HostService_Config_FullMethodName       = "/wloop.source.v1.HostService/Config"
+	HostService_Profile_FullMethodName      = "/wloop.source.v1.HostService/Profile"
+	HostService_Events_FullMethodName       = "/wloop.source.v1.HostService/Events"
 )
 
 // HostServiceClient is the client API for HostService service.
@@ -1205,7 +1215,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // HostService is what the host serves a source plugin on the broker id of
-// its StartRequest: the union of the SDK's broker interfaces.
+// its StartRequest: the union of the SDK's broker interfaces. No method takes
+// the host's loop lock, which the host may hold while it calls the plugin.
 type HostServiceClient interface {
 	// Reporter.
 	Report(ctx context.Context, in *ReportRequest, opts ...grpc.CallOption) (*ReportResponse, error)
@@ -1235,6 +1246,9 @@ type HostServiceClient interface {
 	Ask(ctx context.Context, in *AskRequest, opts ...grpc.CallOption) (*AskResponse, error)
 	Meter(ctx context.Context, in *MeterRequest, opts ...grpc.CallOption) (*MeterResponse, error)
 	Config(ctx context.Context, in *ConfigRequest, opts ...grpc.CallOption) (*ConfigResponse, error)
+	Profile(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*ProfileResponse, error)
+	// History.
+	Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*EventsResponse, error)
 }
 
 type hostServiceClient struct {
@@ -1455,12 +1469,33 @@ func (c *hostServiceClient) Config(ctx context.Context, in *ConfigRequest, opts 
 	return out, nil
 }
 
+func (c *hostServiceClient) Profile(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*ProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProfileResponse)
+	err := c.cc.Invoke(ctx, HostService_Profile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *hostServiceClient) Events(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*EventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EventsResponse)
+	err := c.cc.Invoke(ctx, HostService_Events_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // HostServiceServer is the server API for HostService service.
 // All implementations must embed UnimplementedHostServiceServer
 // for forward compatibility.
 //
 // HostService is what the host serves a source plugin on the broker id of
-// its StartRequest: the union of the SDK's broker interfaces.
+// its StartRequest: the union of the SDK's broker interfaces. No method takes
+// the host's loop lock, which the host may hold while it calls the plugin.
 type HostServiceServer interface {
 	// Reporter.
 	Report(context.Context, *ReportRequest) (*ReportResponse, error)
@@ -1490,6 +1525,9 @@ type HostServiceServer interface {
 	Ask(context.Context, *AskRequest) (*AskResponse, error)
 	Meter(context.Context, *MeterRequest) (*MeterResponse, error)
 	Config(context.Context, *ConfigRequest) (*ConfigResponse, error)
+	Profile(context.Context, *ProfileRequest) (*ProfileResponse, error)
+	// History.
+	Events(context.Context, *EventsRequest) (*EventsResponse, error)
 	mustEmbedUnimplementedHostServiceServer()
 }
 
@@ -1562,6 +1600,12 @@ func (UnimplementedHostServiceServer) Meter(context.Context, *MeterRequest) (*Me
 }
 func (UnimplementedHostServiceServer) Config(context.Context, *ConfigRequest) (*ConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Config not implemented")
+}
+func (UnimplementedHostServiceServer) Profile(context.Context, *ProfileRequest) (*ProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Profile not implemented")
+}
+func (UnimplementedHostServiceServer) Events(context.Context, *EventsRequest) (*EventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Events not implemented")
 }
 func (UnimplementedHostServiceServer) mustEmbedUnimplementedHostServiceServer() {}
 func (UnimplementedHostServiceServer) testEmbeddedByValue()                     {}
@@ -1962,6 +2006,42 @@ func _HostService_Config_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HostService_Profile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HostServiceServer).Profile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HostService_Profile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HostServiceServer).Profile(ctx, req.(*ProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HostService_Events_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HostServiceServer).Events(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HostService_Events_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HostServiceServer).Events(ctx, req.(*EventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // HostService_ServiceDesc is the grpc.ServiceDesc for HostService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2052,6 +2132,14 @@ var HostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Config",
 			Handler:    _HostService_Config_Handler,
+		},
+		{
+			MethodName: "Profile",
+			Handler:    _HostService_Profile_Handler,
+		},
+		{
+			MethodName: "Events",
+			Handler:    _HostService_Events_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -41,7 +41,9 @@ const (
 )
 
 // Value is a fact's value: a literal, or a temporal value the host resolves
-// with its clock whenever it reads it. Build one with its constructor.
+// with its clock whenever it reads it. Build one with its constructor. A
+// temporal value whose Time is zero resolves to its type's zero (a zero
+// duration, false) and has no deadline.
 type Value struct {
 	Kind      ValueKind
 	Bool      bool

@@ -2,7 +2,6 @@ package source
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -111,8 +110,8 @@ func (s *hostServer) RoundState(ctx context.Context, r *pb.RoundStateRequest) (*
 
 func (s *hostServer) Workspaces(ctx context.Context, r *pb.WorkspacesRequest) (*pb.WorkspacesResponse, error) {
 	return hostCall(ctx, s.h.Reader, "reader", func(h Reader) (*pb.WorkspacesResponse, error) {
-		ws, err := h.Workspaces(ctx, r.GetRepo())
-		return &pb.WorkspacesResponse{Workspaces: mapSlice(ws, workspacePB)}, err
+		l, err := h.Workspaces(ctx, r.GetRepo())
+		return listingPB(l), err
 	})
 }
 
@@ -125,28 +124,31 @@ func (s *hostServer) Session(ctx context.Context, r *pb.SessionRequest) (*pb.Ses
 
 func (s *hostServer) OpenGate(ctx context.Context, r *pb.OpenGateRequest) (*pb.OpenGateResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.OpenGateResponse, error) {
-		g, err := h.OpenGate(ctx, draftGo(r.GetDraft()))
+		g, err := h.OpenGate(ctx, GateRequest{Draft: draftGo(r.GetDraft()), Session: r.GetSession()})
 		return &pb.OpenGateResponse{Gate: gateRefPB(g)}, err
 	})
 }
 
 func (s *hostServer) RecordSent(ctx context.Context, r *pb.RecordSentRequest) (*pb.RecordSentResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.RecordSentResponse, error) {
-		g, err := h.RecordSent(ctx, draftGo(r.GetDraft()), r.GetSession())
+		g, err := h.RecordSent(ctx, draftGo(r.GetDraft()), r.GetSession(), r.GetTool())
 		return &pb.RecordSentResponse{Gate: gateRefPB(g)}, err
 	})
 }
 
 func (s *hostServer) RehomeDrafts(ctx context.Context, r *pb.RehomeDraftsRequest) (*pb.RehomeDraftsResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.RehomeDraftsResponse, error) {
-		n, err := h.RehomeDrafts(ctx, unitGo(r.GetFrom()), unitGo(r.GetTo()))
+		n, err := h.RehomeDrafts(ctx, mapSlice(r.GetMoves(), func(m *pb.UnitMove) UnitMove {
+			return UnitMove{From: unitGo(m.GetFrom()), To: unitGo(m.GetTo())}
+		}))
 		return &pb.RehomeDraftsResponse{Moved: int64(n)}, err
 	})
 }
 
 func (s *hostServer) SetOverride(ctx context.Context, r *pb.SetOverrideRequest) (*pb.SetOverrideResponse, error) {
 	return hostCall(ctx, s.h.Gates, "gates", func(h Gates) (*pb.SetOverrideResponse, error) {
-		return &pb.SetOverrideResponse{}, h.SetOverride(ctx, unitGo(r.GetUnit()), r.GetName(), r.GetValue())
+		ok, err := h.SetOverride(ctx, unitGo(r.GetUnit()), r.GetSet(), r.GetIfMatch())
+		return &pb.SetOverrideResponse{Written: ok}, err
 	})
 }
 
@@ -183,7 +185,7 @@ func (s *hostServer) ClearWake(ctx context.Context, r *pb.ClearWakeRequest) (*pb
 func (s *hostServer) Ask(ctx context.Context, r *pb.AskRequest) (*pb.AskResponse, error) {
 	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.AskResponse, error) {
 		res, err := h.Ask(ctx, AskRequest{Prompt: r.GetPrompt(), Schema: raw(r.GetSchemaJson()), Tier: r.GetTier(), MaxCostUSD: r.GetMaxCostUsd(), MeterScope: r.GetMeterScope()})
-		return &pb.AskResponse{Text: res.Text, CostUsd: res.CostUSD}, err
+		return &pb.AskResponse{Text: res.Text, Model: res.Model, CostUsd: res.CostUSD, Duration: durationpb.New(res.Duration), Tokens: res.Tokens}, err
 	})
 }
 
@@ -197,7 +199,21 @@ func (s *hostServer) Meter(ctx context.Context, r *pb.MeterRequest) (*pb.MeterRe
 func (s *hostServer) Config(ctx context.Context, _ *pb.ConfigRequest) (*pb.ConfigResponse, error) {
 	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.ConfigResponse, error) {
 		c, err := h.Config(ctx)
-		return &pb.ConfigResponse{ConfigJson: c}, err
+		return &pb.ConfigResponse{Config: configPB(c)}, err
+	})
+}
+
+func (s *hostServer) Profile(ctx context.Context, r *pb.ProfileRequest) (*pb.ProfileResponse, error) {
+	return hostCall(ctx, s.h.Services, "services", func(h Services) (*pb.ProfileResponse, error) {
+		b, err := h.Profile(ctx, r.GetPath())
+		return &pb.ProfileResponse{Content: b}, err
+	})
+}
+
+func (s *hostServer) Events(ctx context.Context, r *pb.EventsRequest) (*pb.EventsResponse, error) {
+	return hostCall(ctx, s.h.History, "history", func(h History) (*pb.EventsResponse, error) {
+		evs, err := h.Events(ctx, EventQuery{Units: unitsGo(r.GetUnits()), Kinds: r.GetKinds(), Since: tm(r.GetSince())})
+		return &pb.EventsResponse{Events: mapSlice(evs, eventPB)}, err
 	})
 }
 
@@ -207,7 +223,7 @@ type hostClient struct {
 	c pb.HostServiceClient
 }
 
-func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h} }
+func (h *hostClient) host() Host { return Host{h, h, h, h, h, h, h, h} }
 
 func viaHost[Resp any](h *hostClient, f func(pb.HostServiceClient) (Resp, error)) (Resp, error) {
 	var zero Resp
@@ -270,11 +286,11 @@ func (h *hostClient) RoundState(ctx context.Context, u plugin.Unit) (RoundState,
 	return roundStateGo(r.GetState()), err
 }
 
-func (h *hostClient) Workspaces(ctx context.Context, repo string) ([]Workspace, error) {
+func (h *hostClient) Workspaces(ctx context.Context, repo string) (Listing, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.WorkspacesResponse, error) {
 		return c.Workspaces(ctx, &pb.WorkspacesRequest{Repo: repo})
 	})
-	return mapSlice(r.GetWorkspaces(), workspaceGo), err
+	return listingGo(r), err
 }
 
 func (h *hostClient) Session(ctx context.Context, handle string) (Session, error) {
@@ -284,32 +300,34 @@ func (h *hostClient) Session(ctx context.Context, handle string) (Session, error
 	return Session{Unit: unitGo(r.GetUnit()), Turn: r.GetTurn(), TurnSeq: r.GetTurnSeq(), Intent: r.GetIntent(), Role: r.GetRole(), AllowedEffects: r.GetAllowedEffects()}, err
 }
 
-func (h *hostClient) OpenGate(ctx context.Context, d Draft) (GateRef, error) {
+func (h *hostClient) OpenGate(ctx context.Context, req GateRequest) (GateRef, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.OpenGateResponse, error) {
-		return c.OpenGate(ctx, &pb.OpenGateRequest{Draft: draftPB(d)})
+		return c.OpenGate(ctx, &pb.OpenGateRequest{Draft: draftPB(req.Draft), Session: req.Session})
 	})
 	return gateRefGo(r.GetGate()), err
 }
 
-func (h *hostClient) RecordSent(ctx context.Context, d Draft, session string) (GateRef, error) {
+func (h *hostClient) RecordSent(ctx context.Context, d Draft, session, tool string) (GateRef, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.RecordSentResponse, error) {
-		return c.RecordSent(ctx, &pb.RecordSentRequest{Draft: draftPB(d), Session: session})
+		return c.RecordSent(ctx, &pb.RecordSentRequest{Draft: draftPB(d), Session: session, Tool: tool})
 	})
 	return gateRefGo(r.GetGate()), err
 }
 
-func (h *hostClient) RehomeDrafts(ctx context.Context, from, to plugin.Unit) (int, error) {
+func (h *hostClient) RehomeDrafts(ctx context.Context, moves []UnitMove) (int, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.RehomeDraftsResponse, error) {
-		return c.RehomeDrafts(ctx, &pb.RehomeDraftsRequest{From: unitPB(from), To: unitPB(to)})
+		return c.RehomeDrafts(ctx, &pb.RehomeDraftsRequest{Moves: mapSlice(moves, func(m UnitMove) *pb.UnitMove {
+			return &pb.UnitMove{From: unitPB(m.From), To: unitPB(m.To)}
+		})})
 	})
 	return int(r.GetMoved()), err
 }
 
-func (h *hostClient) SetOverride(ctx context.Context, u plugin.Unit, name, value string) error {
-	_, err := viaHost(h, func(c pb.HostServiceClient) (*pb.SetOverrideResponse, error) {
-		return c.SetOverride(ctx, &pb.SetOverrideRequest{Unit: unitPB(u), Name: name, Value: value})
+func (h *hostClient) SetOverride(ctx context.Context, u plugin.Unit, set, ifMatch map[string]string) (bool, error) {
+	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.SetOverrideResponse, error) {
+		return c.SetOverride(ctx, &pb.SetOverrideRequest{Unit: unitPB(u), Set: set, IfMatch: ifMatch})
 	})
-	return err
+	return r.GetWritten(), err
 }
 
 func (h *hostClient) RecordEvents(ctx context.Context, events []Event) error {
@@ -351,7 +369,7 @@ func (h *hostClient) Ask(ctx context.Context, req AskRequest) (AskResult, error)
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.AskResponse, error) {
 		return c.Ask(ctx, &pb.AskRequest{Prompt: req.Prompt, SchemaJson: req.Schema, Tier: req.Tier, MaxCostUsd: req.MaxCostUSD, MeterScope: req.MeterScope})
 	})
-	return AskResult{Text: r.GetText(), CostUSD: r.GetCostUsd()}, err
+	return AskResult{Text: r.GetText(), Model: r.GetModel(), CostUSD: r.CostUsd, Duration: r.GetDuration().AsDuration(), Tokens: r.GetTokens()}, err
 }
 
 func (h *hostClient) Meter(ctx context.Context, s Sample) error {
@@ -362,9 +380,23 @@ func (h *hostClient) Meter(ctx context.Context, s Sample) error {
 	return err
 }
 
-func (h *hostClient) Config(ctx context.Context) (json.RawMessage, error) {
+func (h *hostClient) Config(ctx context.Context) (Config, error) {
 	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.ConfigResponse, error) {
 		return c.Config(ctx, &pb.ConfigRequest{})
 	})
-	return raw(r.GetConfigJson()), err
+	return configGo(r.GetConfig()), err
+}
+
+func (h *hostClient) Profile(ctx context.Context, path string) ([]byte, error) {
+	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.ProfileResponse, error) {
+		return c.Profile(ctx, &pb.ProfileRequest{Path: path})
+	})
+	return r.GetContent(), err
+}
+
+func (h *hostClient) Events(ctx context.Context, q EventQuery) ([]Event, error) {
+	r, err := viaHost(h, func(c pb.HostServiceClient) (*pb.EventsResponse, error) {
+		return c.Events(ctx, &pb.EventsRequest{Units: unitsPB(q.Units), Kinds: q.Kinds, Since: ts(q.Since)})
+	})
+	return mapSlice(r.GetEvents(), eventGo), err
 }

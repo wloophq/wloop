@@ -56,16 +56,23 @@ type Unit struct {
 type Topic string
 
 const (
-	TopicRounds    Topic = "rounds"    // round state, its marks and the pending rounds
-	TopicGates     Topic = "gates"     // gates: drafts, plans, questions, proposals
-	TopicMarks     Topic = "marks"     // unit marks
-	TopicTasks     Topic = "tasks"     // tasks and their properties
-	TopicTurns     Topic = "turns"     // turns and their records
-	TopicSessions  Topic = "sessions"  // sessions and the workspaces they run in
-	TopicOverrides Topic = "overrides" // per-unit overrides
-	TopicViewer    Topic = "viewer"    // the viewer's login and teams
-	TopicConfig    Topic = "config"    // the loaded profile and configuration
+	TopicRounds     Topic = "rounds"     // round state, its marks, the pending rounds and the pause
+	TopicGates      Topic = "gates"      // gates: drafts, plans, questions, proposals
+	TopicMarks      Topic = "marks"      // unit marks
+	TopicTasks      Topic = "tasks"      // tasks and their properties
+	TopicTurns      Topic = "turns"      // turns and their records
+	TopicSessions   Topic = "sessions"   // sessions and the workspaces they run in
+	TopicOverrides  Topic = "overrides"  // per-unit overrides
+	TopicViewer     Topic = "viewer"     // the viewer's login and teams
+	TopicConfig     Topic = "config"     // the loaded profile and configuration
+	TopicEvents     Topic = "events"     // events on units, the loop's and the plugins'
+	TopicWorkspaces Topic = "workspaces" // the workspace managers' listing
+	TopicAgents     Topic = "agents"     // the agents and their activity
 )
+
+// Topics are every Topic, which a manifest's notify list names from.
+var Topics = []Topic{TopicRounds, TopicGates, TopicMarks, TopicTasks, TopicTurns, TopicSessions, TopicOverrides,
+	TopicViewer, TopicConfig, TopicEvents, TopicWorkspaces, TopicAgents}
 
 // Status is what a kind's health reports.
 type Status int32

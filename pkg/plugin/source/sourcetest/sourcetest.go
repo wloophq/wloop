@@ -93,8 +93,8 @@ func (s *Stub) Ingest(ctx context.Context, _ source.IngestRequest) (source.Inges
 	return source.IngestResult{Summary: "reported"}, nil
 }
 
-func (s *Stub) Track(_ context.Context, u plugin.Unit) (source.Tracked, error) {
-	return source.Tracked{Unit: u}, nil
+func (s *Stub) Track(_ context.Context, req source.TrackRequest) (source.Tracked, error) {
+	return source.Tracked{Unit: req.Unit}, nil
 }
 
 func (s *Stub) Untrack(context.Context, plugin.Unit) error { return nil }

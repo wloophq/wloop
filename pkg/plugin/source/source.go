@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -33,6 +34,10 @@ const Kind plugin.Kind = "source"
 
 // Source is what every source plugin implements. Start receives the host's
 // broker; the plugin keeps it to report snapshots and call the host.
+//
+// In CLI mode the host runs the plugin binary for one [CLIRunner.RunCLI]
+// without calling Start: the plugin has no broker and opens no store, which
+// the daemon's process of the plugin owns.
 type Source interface {
 	Health(ctx context.Context) (plugin.Health, error)
 	Start(ctx context.Context, req StartRequest) error
@@ -55,17 +60,17 @@ type StartRequest struct {
 // names.
 type Ingester interface {
 	Ingest(ctx context.Context, req IngestRequest) (IngestResult, error)
-	// Track reads a unit about to be followed and follows it, returning the
-	// unit as its source names it; ErrNotFound or ErrUnavailable say why a
-	// read failed when the plugin can tell.
-	Track(ctx context.Context, u plugin.Unit) (Tracked, error)
+	// Track reads a unit, returning it as its source names it, and follows
+	// it when req.Follow is set: the host reads, admits, then follows. A
+	// read not followed reports no snapshot. ErrNotFound or ErrUnavailable
+	// say why a read failed when the plugin can tell.
+	Track(ctx context.Context, req TrackRequest) (Tracked, error)
 	Untrack(ctx context.Context, u plugin.Unit) error
 	// Resolve is the unit an address a person gives lands in; false for an
 	// address that is not the plugin's.
 	Resolve(ctx context.Context, address string) (plugin.Unit, bool, error)
-	// Locate is the unit of another plugin a link in the plugin's units
-	// names, such as a pull request a thread links; false for none.
-	Locate(ctx context.Context, url string) (plugin.Unit, bool, error)
+	// Locate is the unit a local checkout's directory holds; false for none.
+	Locate(ctx context.Context, dir string) (plugin.Unit, bool, error)
 }
 
 // Presenter serves what clients show of the plugin: its actions, its views
@@ -105,25 +110,33 @@ type Briefer interface {
 }
 
 // Planner plans the automatic rounds on the plugin's units from the host's
-// round state, builds a turn's payload, applies the plugin's effects and
-// proposes drafts of its own rules.
+// round state, builds a turn's payload, applies the plugin's effects,
+// proposes drafts of its own rules and places a unit's work.
+//
+// The host calls Plan when it launches or skips a round; workflow facts
+// come from the snapshot, which the plugin reports again after
+// Notify(rounds).
 type Planner interface {
 	Plan(ctx context.Context, u plugin.Unit, st RoundState) (Plan, error)
-	Payload(ctx context.Context, req PayloadRequest) (json.RawMessage, error)
+	Payload(ctx context.Context, req PayloadRequest) (PayloadResult, error)
 	ApplyEffect(ctx context.Context, req EffectRequest) error
 	Proposals(ctx context.Context, now time.Time) ([]Draft, error)
-	PlacementDefault(ctx context.Context, u plugin.Unit, item string) (Placement, bool, error)
+	Placement(ctx context.Context, u plugin.Unit, item string) (Placements, error)
 }
 
-// Tooler serves the MCP tools the manifest declares.
+// Tooler serves the MCP tools the manifest declares. A result names one of
+// the tool's manifest answers; the host words it from the layered
+// tools.toml.
 type Tooler interface {
 	CallTool(ctx context.Context, call ToolCall) (ToolResult, error)
 }
 
 // CLIRunner runs the commands the manifest declares, which need no daemon.
-// The host prints their output: the plugin process never writes stdout.
+// The command writes to stdout and stderr, which stream to the host as it
+// writes them, and returns its exit code; the plugin process never writes
+// its own stdout.
 type CLIRunner interface {
-	RunCLI(ctx context.Context, req CLIRequest) (CLIResult, error)
+	RunCLI(ctx context.Context, req CLIRequest, stdout, stderr io.Writer) (exit int, err error)
 }
 
 // Capability names a capability interface a plugin implements.
@@ -175,6 +188,8 @@ var (
 	ErrUnavailable = errors.New("source unavailable")
 	// ErrUnsupported: the other side does not implement the call.
 	ErrUnsupported = errors.New("not supported")
+	// ErrUnfit: the agent's answer to an Ask does not fit what was asked.
+	ErrUnfit = errors.New("answer does not fit")
 )
 
 // Priority orders who may spend a rate-limited budget when it runs low.

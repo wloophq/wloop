@@ -24,6 +24,8 @@ func toStatus(err error) error {
 		code = codes.Unavailable
 	case errors.Is(err, ErrUnsupported):
 		code = codes.Unimplemented
+	case errors.Is(err, ErrUnfit):
+		code = codes.FailedPrecondition
 	case errors.Is(err, context.Canceled):
 		code = codes.Canceled
 	case errors.Is(err, context.DeadlineExceeded):
@@ -47,6 +49,8 @@ func fromStatus(err error) error {
 		return fmt.Errorf("%w: %s", ErrUnavailable, st.Message())
 	case codes.Unimplemented:
 		return fmt.Errorf("%w: %s", ErrUnsupported, st.Message())
+	case codes.FailedPrecondition:
+		return fmt.Errorf("%w: %s", ErrUnfit, st.Message())
 	case codes.Canceled:
 		return fmt.Errorf("%w: %s", context.Canceled, st.Message())
 	case codes.DeadlineExceeded:

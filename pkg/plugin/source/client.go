@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/wloophq/wloop/pkg/plugin"
@@ -54,9 +55,9 @@ func (c *Client) Ingest(ctx context.Context, req IngestRequest) (IngestResult, e
 	return IngestResult{Summary: r.GetSummary(), Skipped: r.GetSkipped()}, err
 }
 
-func (c *Client) Track(ctx context.Context, u plugin.Unit) (Tracked, error) {
+func (c *Client) Track(ctx context.Context, req TrackRequest) (Tracked, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.TrackResponse, error) {
-		return c.c.Track(ctx, &pb.TrackRequest{Call: call, Unit: unitPB(u)})
+		return c.c.Track(ctx, &pb.TrackRequest{Call: call, Unit: unitPB(req.Unit), Follow: req.Follow})
 	})
 	return Tracked{Unit: unitGo(r.GetUnit()), State: r.GetState()}, err
 }
@@ -75,9 +76,9 @@ func (c *Client) Resolve(ctx context.Context, address string) (plugin.Unit, bool
 	return unitGo(r.GetUnit()), r.GetOk(), err
 }
 
-func (c *Client) Locate(ctx context.Context, url string) (plugin.Unit, bool, error) {
+func (c *Client) Locate(ctx context.Context, dir string) (plugin.Unit, bool, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.LocateResponse, error) {
-		return c.c.Locate(ctx, &pb.LocateRequest{Call: call, Url: url})
+		return c.c.Locate(ctx, &pb.LocateRequest{Call: call, Dir: dir})
 	})
 	return unitGo(r.GetUnit()), r.GetOk(), err
 }
@@ -149,7 +150,7 @@ func (c *Client) Checkout(ctx context.Context, u plugin.Unit) (Checkout, bool, e
 	r, err := via(ctx, func(call *pb.Call) (*pb.CheckoutResponse, error) {
 		return c.c.Checkout(ctx, &pb.CheckoutRequest{Call: call, Unit: unitPB(u)})
 	})
-	return Checkout{Repo: r.GetRepo(), Branch: r.GetBranch(), Head: r.GetHead()}, r.GetOk(), err
+	return Checkout{Repo: r.GetRepo(), Branch: r.GetBranch(), Head: r.GetHead(), Base: r.GetBase(), Fork: r.GetFork()}, r.GetOk(), err
 }
 
 func (c *Client) WriteState(ctx context.Context, w StateWrite) (Evidence, error) {
@@ -185,7 +186,7 @@ func (c *Client) BriefStale(ctx context.Context, req BriefStaleRequest) (bool, e
 	r, err := via(ctx, func(call *pb.Call) (*pb.BriefStaleResponse, error) {
 		return c.c.BriefStale(ctx, &pb.BriefStaleRequest{
 			Call:    call,
-			Written: &pb.BriefWritten{At: briefRevisionPB(w.At), Version: w.Version, Error: w.Error, Failures: int64(w.Failures), AttemptedAt: ts(w.AttemptedAt)},
+			Written: &pb.BriefWritten{At: briefRevisionPB(w.At), Version: w.Version, Error: w.Error, Failures: int64(w.Failures), AttemptedAt: ts(w.AttemptedAt), AttemptOf: w.AttemptOf},
 			Current: briefRevisionPB(req.Current), Version: req.Version, Now: ts(req.Now),
 		})
 	})
@@ -196,17 +197,16 @@ func (c *Client) Plan(ctx context.Context, u plugin.Unit, st RoundState) (Plan, 
 	r, err := via(ctx, func(call *pb.Call) (*pb.PlanResponse, error) {
 		return c.c.Plan(ctx, &pb.PlanRequest{Call: call, Unit: unitPB(u), State: roundStatePB(st)})
 	})
-	return Plan{Facts: factsGo(r.GetFacts()), Due: tm(r.GetDue()), Rank: r.GetRank()}, err
+	return planGo(r), err
 }
 
-func (c *Client) Payload(ctx context.Context, req PayloadRequest) (json.RawMessage, error) {
+func (c *Client) Payload(ctx context.Context, req PayloadRequest) (PayloadResult, error) {
+	in := payloadRequestPB(req)
 	r, err := via(ctx, func(call *pb.Call) (*pb.PayloadResponse, error) {
-		return c.c.Payload(ctx, &pb.PayloadRequest{
-			Call: call, Unit: unitPB(req.Unit), Intent: req.Intent, Role: req.Role, Trigger: req.Trigger, InputsJson: req.Inputs,
-			Guidance: req.Guidance, Local: req.Local, Owned: req.Owned, Plain: req.Plain,
-		})
+		in.Call = call
+		return c.c.Payload(ctx, in)
 	})
-	return raw(r.GetPayloadJson()), err
+	return payloadGo(r), err
 }
 
 func (c *Client) ApplyEffect(ctx context.Context, req EffectRequest) error {
@@ -231,23 +231,42 @@ func (c *Client) Proposals(ctx context.Context, now time.Time) ([]Draft, error) 
 	return mapSlice(r.GetDrafts(), draftGo), err
 }
 
-func (c *Client) PlacementDefault(ctx context.Context, u plugin.Unit, item string) (Placement, bool, error) {
-	r, err := via(ctx, func(call *pb.Call) (*pb.PlacementDefaultResponse, error) {
-		return c.c.PlacementDefault(ctx, &pb.PlacementDefaultRequest{Call: call, Unit: unitPB(u), Item: item})
+func (c *Client) Placement(ctx context.Context, u plugin.Unit, item string) (Placements, error) {
+	r, err := via(ctx, func(call *pb.Call) (*pb.PlacementResponse, error) {
+		return c.c.Placement(ctx, &pb.PlacementRequest{Call: call, Unit: unitPB(u), Item: item})
 	})
-	return placementGo(r.GetPlacement()), r.GetOk(), err
+	return Placements{Default: placementGo(r.GetDefault()), Suggested: placementGo(r.GetSuggested())}, err
 }
 
 func (c *Client) CallTool(ctx context.Context, tc ToolCall) (ToolResult, error) {
 	r, err := via(ctx, func(call *pb.Call) (*pb.CallToolResponse, error) {
 		return c.c.CallTool(ctx, &pb.CallToolRequest{Call: call, Tool: tc.Tool, ArgsJson: tc.Args, Session: tc.Session, Turn: tc.Turn})
 	})
-	return ToolResult{Result: raw(r.GetResultJson()), IsError: r.GetIsError()}, err
+	return ToolResult{Answer: r.GetAnswer(), Fields: raw(r.GetFieldsJson()), IsError: r.GetIsError()}, err
 }
 
-func (c *Client) RunCLI(ctx context.Context, req CLIRequest) (CLIResult, error) {
-	r, err := via(ctx, func(call *pb.Call) (*pb.RunCLIResponse, error) {
-		return c.c.RunCLI(ctx, &pb.RunCLIRequest{Call: call, Args: req.Args, Stdin: req.Stdin})
-	})
-	return CLIResult{Stdout: r.GetStdout(), Stderr: r.GetStderr(), ExitCode: int(r.GetExitCode())}, err
+func (c *Client) RunCLI(ctx context.Context, req CLIRequest, stdout, stderr io.Writer) (int, error) {
+	stream, err := c.c.RunCLI(ctx, &pb.RunCLIRequest{Call: callPB(CallOf(ctx)), Args: req.Args, Stdin: req.Stdin, Config: configPB(req.Config)})
+	if err != nil {
+		return 0, fromStatus(err)
+	}
+	for {
+		part, err := stream.Recv()
+		if err != nil {
+			return 0, fromStatus(err)
+		}
+		if part.GetDone() {
+			return int(part.GetExitCode()), nil
+		}
+		if b := part.GetStdout(); len(b) > 0 {
+			if _, err := stdout.Write(b); err != nil {
+				return 0, err
+			}
+		}
+		if b := part.GetStderr(); len(b) > 0 {
+			if _, err := stderr.Write(b); err != nil {
+				return 0, err
+			}
+		}
+	}
 }

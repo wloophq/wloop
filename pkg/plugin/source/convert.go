@@ -97,11 +97,11 @@ func factPB(f Fact) *pb.Fact {
 	case KindTime:
 		out.Value = &pb.Fact_Time{Time: timestamppb.New(v.Time)}
 	case KindSince:
-		out.Value = &pb.Fact_Since{Since: &pb.Since{Since: timestamppb.New(v.Time)}}
+		out.Value = &pb.Fact_Since{Since: &pb.Since{Since: ts(v.Time)}}
 	case KindAt:
-		out.Value = &pb.Fact_At{At: &pb.At{At: timestamppb.New(v.Time)}}
+		out.Value = &pb.Fact_At{At: &pb.At{At: ts(v.Time)}}
 	case KindAfter:
-		out.Value = &pb.Fact_After{After: &pb.After{After: timestamppb.New(v.Time), Threshold: durationpb.New(v.Threshold), Unit: timeUnits[v.Unit]}}
+		out.Value = &pb.Fact_After{After: &pb.After{After: ts(v.Time), Threshold: durationpb.New(v.Threshold), Unit: timeUnits[v.Unit]}}
 	}
 	return out
 }
@@ -122,15 +122,15 @@ func factGo(f *pb.Fact) Fact {
 	case *pb.Fact_Time:
 		out.Value = Time(v.Time.AsTime())
 	case *pb.Fact_Since:
-		out.Value = Since(v.Since.GetSince().AsTime())
+		out.Value = Since(tm(v.Since.GetSince()))
 	case *pb.Fact_At:
-		out.Value = At(v.At.GetAt().AsTime())
+		out.Value = At(tm(v.At.GetAt()))
 	case *pb.Fact_After:
 		unit := Calendar
 		if v.After.GetUnit() == pb.TimeUnit_TIME_UNIT_WORKING_DAYS {
 			unit = WorkingDays
 		}
-		out.Value = After(v.After.GetAfter().AsTime(), v.After.GetThreshold().AsDuration(), unit)
+		out.Value = After(tm(v.After.GetAfter()), v.After.GetThreshold().AsDuration(), unit)
 	}
 	return out
 }
@@ -224,7 +224,8 @@ func itemsGo(its []*pb.Item) []Item { return mapSlice(its, itemGo) }
 
 func snapshotPB(s Snapshot) *pb.Snapshot {
 	out := &pb.Snapshot{
-		Unit: unitPB(s.Unit), Rev: s.Rev, At: ts(s.At), Gone: s.Gone, DataJson: s.Data, SituationJson: s.Situation,
+		Unit: unitPB(s.Unit), Rev: s.Rev, At: ts(s.At), Gone: s.Gone, DataJson: s.Data, Situation: situationPB(s.Situation),
+		Links: mapSlice(s.Links, linkPB), Facets: s.Facets, Views: s.Views,
 		Card: cardPB(s.Card), Items: itemsPB(s.Items), Facts: factsPB(s.Facts), Owes: peoplePB(s.Owes),
 		Signals: mapSlice(s.Signals, func(g Signal) *pb.LinkSignal {
 			return &pb.LinkSignal{Name: g.Name, On: g.On, Since: ts(g.Since)}
@@ -241,13 +242,17 @@ func snapshotPB(s Snapshot) *pb.Snapshot {
 func snapshotGo(s *pb.Snapshot) Snapshot {
 	out := Snapshot{
 		Unit: unitGo(s.GetUnit()), Rev: s.GetRev(), At: tm(s.GetAt()), Gone: s.GetGone(),
-		Data: raw(s.GetDataJson()), Situation: raw(s.GetSituationJson()),
+		Data: raw(s.GetDataJson()), Situation: situationGo(s.GetSituation()),
+		Links: mapSlice(s.GetLinks(), linkGo), Views: s.GetViews(),
 		Card: cardGo(s.GetCard()), Items: itemsGo(s.GetItems()), Facts: factsGo(s.GetFacts()), Owes: peopleGo(s.GetOwes()),
 		Signals: mapSlice(s.GetSignals(), func(g *pb.LinkSignal) Signal {
 			return Signal{Name: g.GetName(), On: g.GetOn(), Since: tm(g.GetSince())}
 		}),
 		Offers:   mapSlice(s.GetOffers(), func(o *pb.Offer) Offer { return Offer{Action: o.GetAction(), Args: raw(o.GetArgsJson())} }),
 		Contexts: s.GetContexts(), Due: tm(s.GetDue()),
+	}
+	if len(s.GetFacets()) > 0 {
+		out.Facets = s.GetFacets()
 	}
 	if h := s.GetExtractionHealth(); h != nil {
 		out.Extraction = &ExtractionHealth{Pending: int(h.GetPending()), BudgetHit: h.GetBudgetHit(), Oldest: tm(h.GetOldest())}
@@ -295,16 +300,21 @@ func briefInputGo(in *pb.BriefInputResponse) BriefInput {
 }
 
 func briefRevisionPB(r BriefRevision) *pb.BriefRevisionResponse {
-	return &pb.BriefRevisionResponse{Revision: r.Revision, PartsJson: r.Parts}
+	return &pb.BriefRevisionResponse{Revision: r.Revision, PartsJson: r.Parts, Attempt: r.Attempt}
 }
 
 func briefRevisionGo(r *pb.BriefRevisionResponse) BriefRevision {
-	return BriefRevision{Revision: r.GetRevision(), Parts: raw(r.GetPartsJson())}
+	return BriefRevision{Revision: r.GetRevision(), Parts: raw(r.GetPartsJson()), Attempt: r.GetAttempt()}
 }
 
 func roundStatePB(st RoundState) *pb.RoundState {
+	var blocked *pb.Blocked
+	if b := st.Blocked; b != nil {
+		blocked = &pb.Blocked{Question: b.Question, Root: b.Root, Folder: b.Folder, Since: ts(b.Since)}
+	}
 	return &pb.RoundState{
-		Marks: st.Marks, SentAt: ts(st.SentAt), AgentHome: st.AgentHome, FirstRoundSkipped: st.FirstRoundSkipped,
+		Blocked: blocked,
+		Marks:   st.Marks, SentAt: ts(st.SentAt), AgentHome: st.AgentHome, Overrides: st.Overrides,
 		Today: int64(st.Today), DayTotal: int64(st.DayTotal), Paused: st.Paused,
 		Pending: mapSlice(st.Pending, func(p PendingRound) *pb.PendingRound {
 			return &pb.PendingRound{Intent: p.Intent, Reason: p.Reason, Since: ts(p.Since), Deadline: ts(p.Deadline)}
@@ -314,7 +324,7 @@ func roundStatePB(st RoundState) *pb.RoundState {
 
 func roundStateGo(st *pb.RoundState) RoundState {
 	out := RoundState{
-		SentAt: tm(st.GetSentAt()), AgentHome: st.GetAgentHome(), FirstRoundSkipped: st.GetFirstRoundSkipped(),
+		SentAt: tm(st.GetSentAt()), AgentHome: st.GetAgentHome(),
 		Today: int(st.GetToday()), DayTotal: int(st.GetDayTotal()), Paused: st.GetPaused(),
 		Pending: mapSlice(st.GetPending(), func(p *pb.PendingRound) PendingRound {
 			return PendingRound{Intent: p.GetIntent(), Reason: p.GetReason(), Since: tm(p.GetSince()), Deadline: tm(p.GetDeadline())}
@@ -323,15 +333,27 @@ func roundStateGo(st *pb.RoundState) RoundState {
 	if len(st.GetMarks()) > 0 {
 		out.Marks = st.GetMarks()
 	}
+	if len(st.GetOverrides()) > 0 {
+		out.Overrides = st.GetOverrides()
+	}
+	if b := st.GetBlocked(); b != nil {
+		out.Blocked = &Blocked{Question: b.GetQuestion(), Root: b.GetRoot(), Folder: b.GetFolder(), Since: tm(b.GetSince())}
+	}
 	return out
 }
 
-func placementPB(p Placement) *pb.Placement {
+func placementPB(p *Placement) *pb.Placement {
+	if p == nil {
+		return nil
+	}
 	return &pb.Placement{Repo: p.Repo, Checkout: p.Checkout, Role: p.Role, Shared: p.Shared}
 }
 
-func placementGo(p *pb.Placement) Placement {
-	return Placement{Repo: p.GetRepo(), Checkout: p.GetCheckout(), Role: p.GetRole(), Shared: p.GetShared()}
+func placementGo(p *pb.Placement) *Placement {
+	if p == nil {
+		return nil
+	}
+	return &Placement{Repo: p.GetRepo(), Checkout: p.GetCheckout(), Role: p.GetRole(), Shared: p.GetShared()}
 }
 
 func optString(p *string) *string {
@@ -420,11 +442,11 @@ func itemOpGo(o *pb.ItemOp) ItemOp {
 }
 
 func eventPB(e Event) *pb.Event {
-	return &pb.Event{Unit: unitPB(e.Unit), Kind: e.Kind, Actor: e.Actor, At: ts(e.At), Anchor: anchorPB(e.Anchor), DataJson: e.Data}
+	return &pb.Event{Unit: unitPB(e.Unit), Kind: e.Kind, Actor: e.Actor, At: ts(e.At), Anchor: anchorPB(e.Anchor), DataJson: e.Data, Key: e.Key}
 }
 
 func eventGo(e *pb.Event) Event {
-	return Event{Unit: unitGo(e.GetUnit()), Kind: e.GetKind(), Actor: e.GetActor(), At: tm(e.GetAt()), Anchor: anchorGo(e.GetAnchor()), Data: raw(e.GetDataJson())}
+	return Event{Unit: unitGo(e.GetUnit()), Kind: e.GetKind(), Actor: e.GetActor(), At: tm(e.GetAt()), Anchor: anchorGo(e.GetAnchor()), Data: raw(e.GetDataJson()), Key: e.GetKey()}
 }
 
 func taskPB(t Task) *pb.Task {
@@ -440,7 +462,8 @@ func bookPB(b Book) *pb.Book {
 		Unit: unitPB(b.Unit),
 		Turns: mapSlice(b.Turns, func(t Turn) *pb.Turn {
 			return &pb.Turn{Seq: t.Seq, Id: t.ID, Intent: t.Intent, Role: t.Role, Workflow: t.Workflow, State: t.State, Head: t.Head,
-				Session: t.Session, SentAt: ts(t.SentAt), StartedAt: ts(t.StartedAt), EndedAt: ts(t.EndedAt)}
+				Session: t.Session, SentAt: ts(t.SentAt), StartedAt: ts(t.StartedAt), EndedAt: ts(t.EndedAt),
+				Summary: t.Summary, AnsweredAt: ts(t.AnsweredAt), At: ts(t.At), Items: t.Items, Task: t.Task}
 		}),
 		Records: mapSlice(b.Records, func(r TurnRecord) *pb.TurnRecord {
 			return &pb.TurnRecord{Id: r.ID, TurnSeq: r.TurnSeq, Head: r.Head, At: ts(r.At), RecordJson: r.Record}
@@ -453,7 +476,8 @@ func bookGo(b *pb.Book) Book {
 		Unit: unitGo(b.GetUnit()),
 		Turns: mapSlice(b.GetTurns(), func(t *pb.Turn) Turn {
 			return Turn{Seq: t.GetSeq(), ID: t.GetId(), Intent: t.GetIntent(), Role: t.GetRole(), Workflow: t.GetWorkflow(), State: t.GetState(),
-				Head: t.GetHead(), Session: t.GetSession(), SentAt: tm(t.GetSentAt()), StartedAt: tm(t.GetStartedAt()), EndedAt: tm(t.GetEndedAt())}
+				Head: t.GetHead(), Session: t.GetSession(), SentAt: tm(t.GetSentAt()), StartedAt: tm(t.GetStartedAt()), EndedAt: tm(t.GetEndedAt()),
+				Summary: t.GetSummary(), AnsweredAt: tm(t.GetAnsweredAt()), At: tm(t.GetAt()), Items: t.GetItems(), Task: t.GetTask()}
 		}),
 		Records: mapSlice(b.GetRecords(), func(r *pb.TurnRecord) TurnRecord {
 			return TurnRecord{ID: r.GetId(), TurnSeq: r.GetTurnSeq(), Head: r.GetHead(), At: tm(r.GetAt()), Record: raw(r.GetRecordJson())}
@@ -463,12 +487,14 @@ func bookGo(b *pb.Book) Book {
 
 func workspacePB(w Workspace) *pb.Workspace {
 	return &pb.Workspace{Manager: w.Manager, Id: w.ID, Repo: w.Repo, Path: w.Path, Branch: w.Branch, PushBranch: w.PushBranch,
-		Status: w.Status, IsMain: w.IsMain, Units: unitsPB(w.Units)}
+		Status: w.Status, IsMain: w.IsMain, Units: unitsPB(w.Units), RepoId: w.RepoID, DisplayName: w.DisplayName, Local: w.Local,
+		AgentStates: w.AgentStates, Comment: w.Comment}
 }
 
 func workspaceGo(w *pb.Workspace) Workspace {
 	return Workspace{Manager: w.GetManager(), ID: w.GetId(), Repo: w.GetRepo(), Path: w.GetPath(), Branch: w.GetBranch(),
-		PushBranch: w.GetPushBranch(), Status: w.GetStatus(), IsMain: w.GetIsMain(), Units: unitsGo(w.GetUnits())}
+		PushBranch: w.GetPushBranch(), Status: w.GetStatus(), IsMain: w.GetIsMain(), Units: unitsGo(w.GetUnits()), RepoID: w.GetRepoId(),
+		DisplayName: w.GetDisplayName(), Local: w.GetLocal(), AgentStates: w.GetAgentStates(), Comment: w.GetComment()}
 }
 
 func gateRefGo(g *pb.GateRef) GateRef { return GateRef{Gate: g.GetGate(), Draft: g.GetDraft()} }
@@ -488,4 +514,120 @@ func callGo(c *pb.Call) Call {
 		out.Priority = PriorityBackground
 	}
 	return out
+}
+
+func situationPB(s *Situation) *pb.Situation {
+	if s == nil {
+		return nil
+	}
+	out := &pb.Situation{Kind: s.Kind, WaitingOn: s.WaitingOn, Since: ts(s.Since), Reason: s.Reason}
+	if s.Stalled.Kind != KindNone {
+		out.Stalled = factPB(Fact{Value: s.Stalled})
+	}
+	return out
+}
+
+func situationGo(s *pb.Situation) *Situation {
+	if s == nil {
+		return nil
+	}
+	out := &Situation{Kind: s.GetKind(), WaitingOn: s.GetWaitingOn(), Since: tm(s.GetSince()), Reason: s.GetReason()}
+	if s.GetStalled() != nil {
+		out.Stalled = factGo(s.GetStalled()).Value
+	}
+	return out
+}
+
+func linkPB(l Link) *pb.Link {
+	return &pb.Link{Url: l.URL, Kind: l.Kind, Item: l.Item, Evidence: anchorPB(l.Evidence)}
+}
+
+func linkGo(l *pb.Link) Link {
+	return Link{URL: l.GetUrl(), Kind: l.GetKind(), Item: l.GetItem(), Evidence: anchorGo(l.GetEvidence())}
+}
+
+func roundPB(r Round) *pb.Round {
+	out := &pb.Round{Name: r.Name, Head: r.Head, Reason: r.Reason, Observed: r.Observed, TurnFacts: factsPB(r.TurnFacts),
+		OnSent: r.OnSent, OnSkipped: r.OnSkipped}
+	if r.Workspace != (WorkspaceRef{}) {
+		out.Workspace = &pb.WorkspaceRef{Manager: r.Workspace.Manager, Id: r.Workspace.ID}
+	}
+	return out
+}
+
+func nonEmpty(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	return m
+}
+
+func roundGo(r *pb.Round) Round {
+	return Round{Name: r.GetName(), Head: r.GetHead(), Reason: r.GetReason(), Observed: r.GetObserved(), TurnFacts: factsGo(r.GetTurnFacts()),
+		OnSent: nonEmpty(r.GetOnSent()), OnSkipped: nonEmpty(r.GetOnSkipped()),
+		Workspace: WorkspaceRef{Manager: r.GetWorkspace().GetManager(), ID: r.GetWorkspace().GetId()}}
+}
+
+func planPB(p Plan) *pb.PlanResponse {
+	return &pb.PlanResponse{Facts: factsPB(p.Facts), Due: ts(p.Due), Rank: p.Rank, Rounds: mapSlice(p.Rounds, roundPB)}
+}
+
+func planGo(p *pb.PlanResponse) Plan {
+	return Plan{Facts: factsGo(p.GetFacts()), Due: tm(p.GetDue()), Rank: p.GetRank(), Rounds: mapSlice(p.GetRounds(), roundGo)}
+}
+
+func payloadRequestPB(r PayloadRequest) *pb.PayloadRequest {
+	out := &pb.PayloadRequest{
+		Unit: unitPB(r.Unit), Intent: r.Intent, Role: r.Role, Trigger: r.Trigger, InputsJson: r.Inputs,
+		Guidance: r.Guidance, Local: r.Local, Owned: r.Owned, Plain: r.Plain,
+		Round: r.Round, Agent: r.Agent, BriefMissing: r.BriefMissing, Items: r.Items, Task: r.Task,
+	}
+	if v := r.LastVerdict; v != nil {
+		out.LastVerdict = &pb.Verdict{Head: v.Head, Endorsed: v.Endorsed, At: ts(v.At)}
+	}
+	return out
+}
+
+func payloadRequestGo(r *pb.PayloadRequest) PayloadRequest {
+	out := PayloadRequest{
+		Unit: unitGo(r.GetUnit()), Intent: r.GetIntent(), Role: r.GetRole(), Trigger: r.GetTrigger(), Inputs: raw(r.GetInputsJson()),
+		Guidance: r.GetGuidance(), Local: r.GetLocal(), Owned: r.GetOwned(), Plain: r.GetPlain(),
+		Round: r.GetRound(), Agent: r.GetAgent(), BriefMissing: r.GetBriefMissing(), Items: r.GetItems(), Task: r.GetTask(),
+	}
+	if v := r.GetLastVerdict(); v != nil {
+		out.LastVerdict = &Verdict{Head: v.GetHead(), Endorsed: v.GetEndorsed(), At: tm(v.GetAt())}
+	}
+	return out
+}
+
+func payloadPB(p PayloadResult) *pb.PayloadResponse {
+	w := p.Wording
+	return &pb.PayloadResponse{Arg: p.Arg, Wording: &pb.Wording{Noun: w.Noun, This: w.This, Ref: w.Ref, Short: w.Short},
+		Facts: factsPB(p.Facts), DataJson: p.Data, Contents: p.Contents}
+}
+
+func payloadGo(p *pb.PayloadResponse) PayloadResult {
+	w := p.GetWording()
+	return PayloadResult{Arg: p.GetArg(), Wording: Wording{Noun: w.GetNoun(), This: w.GetThis(), Ref: w.GetRef(), Short: w.GetShort()},
+		Facts: factsGo(p.GetFacts()), Data: raw(p.GetDataJson()), Contents: p.GetContents()}
+}
+
+func configPB(c Config) *pb.Config { return &pb.Config{PluginJson: c.Plugin, HostJson: c.Host} }
+
+func configGo(c *pb.Config) Config {
+	return Config{Plugin: raw(c.GetPluginJson()), Host: raw(c.GetHostJson())}
+}
+
+func listingPB(l Listing) *pb.WorkspacesResponse {
+	return &pb.WorkspacesResponse{Partial: l.Partial, Workspaces: mapSlice(l.Workspaces, workspacePB),
+		Repos: mapSlice(l.Repos, func(r Repo) *pb.Repo {
+			return &pb.Repo{Id: r.ID, Remote: r.Remote, Path: r.Path, DefaultBranch: r.DefaultBranch}
+		})}
+}
+
+func listingGo(l *pb.WorkspacesResponse) Listing {
+	return Listing{Partial: l.GetPartial(), Workspaces: mapSlice(l.GetWorkspaces(), workspaceGo),
+		Repos: mapSlice(l.GetRepos(), func(r *pb.Repo) Repo {
+			return Repo{ID: r.GetId(), Remote: r.GetRemote(), Path: r.GetPath(), DefaultBranch: r.GetDefaultBranch()}
+		})}
 }

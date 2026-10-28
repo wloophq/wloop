@@ -52,17 +52,20 @@ service SourceService {
   rpc Payload(PayloadRequest) returns (PayloadResponse);
   rpc ApplyEffect(ApplyEffectRequest) returns (ApplyEffectResponse);
   rpc Proposals(ProposalsRequest) returns (ProposalsResponse);
-  rpc PlacementDefault(PlacementDefaultRequest) returns (PlacementDefaultResponse);
+  rpc Placement(PlacementRequest) returns (PlacementResponse);
 
   // Tooler.
   rpc CallTool(CallToolRequest) returns (CallToolResponse);
 
   // CLIRunner.
-  rpc RunCLI(RunCLIRequest) returns (RunCLIResponse);
+  // RunCLI streams the command's output as it writes it, its exit code last.
+  // The host calls it in CLI mode without Start: the plugin opens no store.
+  rpc RunCLI(RunCLIRequest) returns (stream RunCLIResponse);
 }
 
 // HostService is what the host serves a source plugin on the broker id of
-// its StartRequest: the union of the SDK's broker interfaces.
+// its StartRequest: the union of the SDK's broker interfaces. No method takes
+// the host's loop lock, which the host may hold while it calls the plugin.
 service HostService {
   // Reporter.
   rpc Report(ReportRequest) returns (ReportResponse);
@@ -98,6 +101,10 @@ service HostService {
   rpc Ask(AskRequest) returns (AskResponse);
   rpc Meter(MeterRequest) returns (MeterResponse);
   rpc Config(ConfigRequest) returns (ConfigResponse);
+  rpc Profile(ProfileRequest) returns (ProfileResponse);
+
+  // History.
+  rpc Events(EventsRequest) returns (EventsResponse);
 }
 
 // Call is what the host's caller carried in its context, sent as fields.
@@ -301,7 +308,7 @@ message Snapshot {
   // gone says the unit no longer exists in its source.
   bool gone = 4;
   bytes data_json = 5;
-  bytes situation_json = 6;
+  Situation situation = 6;
   Card card = 7;
   repeated Item items = 8;
   repeated Fact facts = 9;
@@ -313,6 +320,32 @@ message Snapshot {
   // contexts and due are the task fields the plugin writes, as writer plugin.
   repeated string contexts = 14;
   google.protobuf.Timestamp due = 15;
+  repeated Link links = 16;
+  // facets are the unit's values of the manifest's facets, by facet id.
+  map<string, string> facets = 17;
+  // views are the ids of the manifest's views the unit's row is in.
+  repeated string views = 18;
+}
+
+// Situation is what the unit waits on, as the plugin derives it from its
+// source; the host overlays its own state (runs, mutes, pending rounds).
+message Situation {
+  // kind is one of the manifest's situations.
+  string kind = 1;
+  string waiting_on = 2;
+  google.protobuf.Timestamp since = 3;
+  string reason = 4;
+  // stalled is an After value: the situation is stalled once it holds.
+  Fact stalled = 5;
+}
+
+// Link is a link the unit's source holds to an address, which the host
+// resolves with every manifest's codec.
+message Link {
+  string url = 1;
+  string kind = 2;
+  string item = 3;
+  Anchor evidence = 4;
 }
 
 message DraftOrigin {
@@ -380,6 +413,9 @@ message IngestResponse {
 message TrackRequest {
   Call call = 1;
   wloop.plugin.v1.Unit unit = 2;
+  // follow false only reads the unit; true follows it. A read not followed
+  // reports no snapshot.
+  bool follow = 3;
 }
 
 message TrackResponse {
@@ -407,7 +443,8 @@ message ResolveResponse {
 
 message LocateRequest {
   Call call = 1;
-  string url = 2;
+  // dir is a local checkout's directory.
+  string dir = 2;
 }
 
 message LocateResponse {
@@ -512,6 +549,10 @@ message CheckoutResponse {
   string branch = 2;
   string head = 3;
   bool ok = 4;
+  // base is the branch the work merges into; fork says the head lives in
+  // another repository.
+  string base = 5;
+  bool fork = 6;
 }
 
 message WriteStateRequest {
@@ -546,6 +587,9 @@ message BriefRevisionRequest {
 message BriefRevisionResponse {
   string revision = 1;
   bytes parts_json = 2;
+  // attempt names what an attempt at the unit now is made from, so a
+  // failure counts against that attempt only.
+  string attempt = 3;
 }
 
 message BriefDescribeRequest {
@@ -563,6 +607,7 @@ message BriefWritten {
   string error = 3;
   int64 failures = 4;
   google.protobuf.Timestamp attempted_at = 5;
+  string attempt_of = 6;
 }
 
 message BriefStaleRequest {
@@ -589,12 +634,24 @@ message RoundState {
   map<string, string> marks = 1;
   google.protobuf.Timestamp sent_at = 2;
   string agent_home = 3;
-  bool first_round_skipped = 4;
+  reserved 4;
   // today counts the unit's automatic rounds today, day_total every unit's.
   int64 today = 5;
   int64 day_total = 6;
+  // paused says the unit's rounds are held, by the user or a pause.
   bool paused = 7;
   repeated PendingRound pending = 8;
+  // overrides are the unit's host overrides, by name.
+  map<string, string> overrides = 9;
+  // blocked is set while a round's start is blocked on a question.
+  Blocked blocked = 10;
+}
+
+message Blocked {
+  string question = 1;
+  string root = 2;
+  string folder = 3;
+  google.protobuf.Timestamp since = 4;
 }
 
 message PlanRequest {
@@ -610,6 +667,28 @@ message PlanResponse {
   google.protobuf.Timestamp due = 2;
   // rank orders the units whose rounds are due, lowest first.
   int64 rank = 3;
+  repeated Round rounds = 4;
+}
+
+message WorkspaceRef {
+  string manager = 1;
+  string id = 2;
+}
+
+// Round is a round the plan would launch on the unit.
+message Round {
+  string name = 1;
+  WorkspaceRef workspace = 2;
+  string head = 3;
+  string reason = 4;
+  // observed says the round's cause was already seen.
+  bool observed = 5;
+  // turn_facts are the turn slot's facts of the round's turn.
+  repeated Fact turn_facts = 6;
+  // on_sent and on_skipped are the marks the host writes when it sends or
+  // skips the round; "" removes a mark.
+  map<string, string> on_sent = 7;
+  map<string, string> on_skipped = 8;
 }
 
 message PayloadRequest {
@@ -623,10 +702,35 @@ message PayloadRequest {
   string local = 8;
   bool owned = 9;
   bool plain = 10;
+  Verdict last_verdict = 11;
+  // round is the planned round: "first", "follow-up" or "".
+  string round = 12;
+  string agent = 13;
+  // brief_missing says why the turn runs without a brief; "" with one.
+  string brief_missing = 14;
+  repeated string items = 15;
+  string task = 16;
+}
+
+message Verdict {
+  string head = 1;
+  string endorsed = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+message Wording {
+  string noun = 1;
+  string this = 2;
+  string ref = 3;
+  string short = 4;
 }
 
 message PayloadResponse {
-  bytes payload_json = 1;
+  string arg = 1;
+  Wording wording = 2;
+  repeated Fact facts = 3;
+  bytes data_json = 4;
+  string contents = 5;
 }
 
 message TurnRef {
@@ -655,15 +759,17 @@ message ProposalsResponse {
   repeated Draft drafts = 1;
 }
 
-message PlacementDefaultRequest {
+message PlacementRequest {
   Call call = 1;
   wloop.plugin.v1.Unit unit = 2;
   string item = 3;
 }
 
-message PlacementDefaultResponse {
-  Placement placement = 1;
-  bool ok = 2;
+message PlacementResponse {
+  // default is the plugin's placement of the unit, suggested what its
+  // source suggests for the item; each unset when there is none.
+  Placement default = 1;
+  Placement suggested = 2;
 }
 
 message CallToolRequest {
@@ -676,23 +782,28 @@ message CallToolRequest {
   string turn = 5;
 }
 
+// CallToolResponse names the manifest answer the host renders from the
+// layered tools.toml, with its fields.
 message CallToolResponse {
-  bytes result_json = 1;
-  bool is_error = 2;
+  string answer = 1;
+  bytes fields_json = 2;
+  bool is_error = 3;
 }
 
 message RunCLIRequest {
   Call call = 1;
   repeated string args = 2;
   bytes stdin = 3;
+  Config config = 4;
 }
 
-// RunCLIResponse is the command's output, which the host prints: the plugin
-// process never writes stdout.
+// RunCLIResponse is a part of the command's output, which the host prints:
+// the plugin process never writes stdout. The last part has done set.
 message RunCLIResponse {
   bytes stdout = 1;
   bytes stderr = 2;
-  int64 exit_code = 3;
+  bool done = 3;
+  int64 exit_code = 4;
 }
 
 message ReportRequest {
@@ -792,6 +903,12 @@ message Turn {
   google.protobuf.Timestamp sent_at = 9;
   google.protobuf.Timestamp started_at = 10;
   google.protobuf.Timestamp ended_at = 11;
+  string summary = 12;
+  google.protobuf.Timestamp answered_at = 13;
+  // at is when the turn reached its state.
+  google.protobuf.Timestamp at = 14;
+  repeated string items = 15;
+  string task = 16;
 }
 
 message TurnRecord {
@@ -834,6 +951,19 @@ message Workspace {
   string status = 7;
   bool is_main = 8;
   repeated wloop.plugin.v1.Unit units = 9;
+  string repo_id = 10;
+  string display_name = 11;
+  // local says the workspace is on this host.
+  bool local = 12;
+  repeated string agent_states = 13;
+  string comment = 14;
+}
+
+message Repo {
+  string id = 1;
+  string remote = 2;
+  string path = 3;
+  string default_branch = 4;
 }
 
 message WorkspacesRequest {
@@ -842,7 +972,10 @@ message WorkspacesRequest {
 }
 
 message WorkspacesResponse {
-  repeated Workspace workspaces = 1;
+  // partial says a manager failed to list, so the listing misses some.
+  bool partial = 1;
+  repeated Repo repos = 2;
+  repeated Workspace workspaces = 3;
 }
 
 message SessionRequest {
@@ -865,40 +998,57 @@ message GateRef {
   int64 draft = 2;
 }
 
+// OpenGateRequest proposes a draft. With a session, the host sets its origin,
+// task and default items from the session's book and refuses effects the
+// session's intent does not allow; without, the origin is the plugin's rule.
 message OpenGateRequest {
   Draft draft = 1;
+  string session = 2;
 }
 
 message OpenGateResponse {
   GateRef gate = 1;
 }
 
+// RecordSentRequest records a post a tool made at once; the host refuses it
+// for a session that is not live or a tool the manifest does not mark posts
+// "now".
 message RecordSentRequest {
   Draft draft = 1;
   string session = 2;
+  string tool = 3;
 }
 
 message RecordSentResponse {
   GateRef gate = 1;
 }
 
-message RehomeDraftsRequest {
+message UnitMove {
   wloop.plugin.v1.Unit from = 1;
   wloop.plugin.v1.Unit to = 2;
+}
+
+// RehomeDraftsRequest moves the open drafts of each move's from unit onto its
+// to unit, in one host transaction; applying it twice changes nothing.
+message RehomeDraftsRequest {
+  repeated UnitMove moves = 1;
 }
 
 message RehomeDraftsResponse {
   int64 moved = 1;
 }
 
+// SetOverrideRequest sets overrides of a unit in one transaction, only while
+// each of if_match holds its value ("" for unset); a set value "" clears one.
 message SetOverrideRequest {
   wloop.plugin.v1.Unit unit = 1;
-  string name = 2;
-  // value "" clears the override.
-  string value = 3;
+  map<string, string> set = 2;
+  map<string, string> if_match = 3;
 }
 
-message SetOverrideResponse {}
+message SetOverrideResponse {
+  bool written = 1;
+}
 
 message Event {
   wloop.plugin.v1.Unit unit = 1;
@@ -907,6 +1057,9 @@ message Event {
   google.protobuf.Timestamp at = 4;
   Anchor anchor = 5;
   bytes data_json = 6;
+  // key dedupes the event: a second event of a unit with its kind and key
+  // is not recorded.
+  string key = 7;
 }
 
 message RecordEventsRequest {
@@ -960,7 +1113,11 @@ message AskRequest {
 
 message AskResponse {
   string text = 1;
-  double cost_usd = 2;
+  string model = 2;
+  // cost_usd is unset when the agent reported no cost.
+  optional double cost_usd = 3;
+  google.protobuf.Duration duration = 4;
+  int64 tokens = 5;
 }
 
 message MeterRequest {
@@ -977,7 +1134,35 @@ message MeterResponse {}
 
 message ConfigRequest {}
 
+// Config is the configuration a plugin reads.
+message Config {
+  // plugin_json is the plugin's [plugins.<id>] table of config.toml.
+  bytes plugin_json = 1;
+  // host_json holds the host keys the manifest's config_reads names.
+  bytes host_json = 2;
+}
+
 message ConfigResponse {
-  // config_json is the plugin's [plugins.<id>] table of config.toml.
-  bytes config_json = 1;
+  Config config = 1;
+}
+
+message ProfileRequest {
+  // path is relative to the plugin's profile layer, the user's plugins/<id>/
+  // over the plugin's own.
+  string path = 1;
+}
+
+message ProfileResponse {
+  bytes content = 1;
+}
+
+message EventsRequest {
+  repeated wloop.plugin.v1.Unit units = 1;
+  // kinds narrows to these kinds; empty reads every one.
+  repeated string kinds = 2;
+  google.protobuf.Timestamp since = 3;
+}
+
+message EventsResponse {
+  repeated Event events = 1;
 }

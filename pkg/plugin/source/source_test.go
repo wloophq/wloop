@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
 	"slices"
 	"strings"
@@ -31,6 +33,33 @@ type recorder struct {
 	sessions  []string
 	asks      []source.AskRequest
 	ops       []source.ItemOp
+	gates     []string
+}
+
+func (r *recorder) note(format string, args ...any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.gates = append(r.gates, fmt.Sprintf(format, args...))
+}
+
+func (r *recorder) OpenGate(_ context.Context, req source.GateRequest) (source.GateRef, error) {
+	r.note("open %s %s %s", req.Session, req.Draft.Kind, req.Draft.Text)
+	return source.GateRef{Gate: "g-1", Draft: 4}, nil
+}
+
+func (r *recorder) RecordSent(_ context.Context, d source.Draft, session, tool string) (source.GateRef, error) {
+	r.note("sent %s %s %s", session, tool, d.Text)
+	return source.GateRef{Gate: "g-2", Draft: 5}, nil
+}
+
+func (r *recorder) RehomeDrafts(_ context.Context, moves []source.UnitMove) (int, error) {
+	r.note("rehome %s->%s", moves[0].From.Key, moves[0].To.Key)
+	return len(moves), nil
+}
+
+func (r *recorder) SetOverride(_ context.Context, u plugin.Unit, set, ifMatch map[string]string) (bool, error) {
+	r.note("override %s set %v if %v", u.Key, set, ifMatch)
+	return ifMatch["muted_kind"] == "", nil
 }
 
 func (r *recorder) Report(_ context.Context, s []source.Snapshot) error {
@@ -61,13 +90,21 @@ func (r *recorder) Ask(_ context.Context, req source.AskRequest) (source.AskResu
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.asks = append(r.asks, req)
-	return source.AskResult{Text: "yes", CostUSD: 0.02}, nil
+	return source.AskResult{Text: "yes", Model: "small-1", CostUSD: ptr(0.02), Duration: 2 * time.Second, Tokens: 120}, nil
 }
 
 func (r *recorder) Meter(context.Context, source.Sample) error { return nil }
 
-func (r *recorder) Config(context.Context) (json.RawMessage, error) {
-	return json.RawMessage(`{"enabled":true}`), nil
+func (r *recorder) Config(context.Context) (source.Config, error) {
+	return source.Config{Plugin: json.RawMessage(`{"enabled":true}`), Host: json.RawMessage(`{"sweep":{"fast":"1m"}}`)}, nil
+}
+
+func (r *recorder) Profile(_ context.Context, path string) ([]byte, error) {
+	return []byte("profile " + path), nil
+}
+
+func (r *recorder) Events(_ context.Context, q source.EventQuery) ([]source.Event, error) {
+	return []source.Event{{Unit: q.Units[0], Kind: q.Kinds[0], Actor: "pulls:ana", At: q.Since, Key: "review:9"}}, nil
 }
 
 type sessions struct{ rec *recorder }
@@ -77,7 +114,9 @@ func (s sessions) Books(context.Context, []plugin.Unit) ([]source.Book, error) {
 func (s sessions) RoundState(context.Context, plugin.Unit) (source.RoundState, error) {
 	return source.RoundState{}, nil
 }
-func (s sessions) Workspaces(context.Context, string) ([]source.Workspace, error) { return nil, nil }
+func (s sessions) Workspaces(context.Context, string) (source.Listing, error) {
+	return source.Listing{}, nil
+}
 
 func (s sessions) Session(_ context.Context, handle string) (source.Session, error) {
 	s.rec.mu.Lock()
@@ -87,7 +126,7 @@ func (s sessions) Session(_ context.Context, handle string) (source.Session, err
 }
 
 func (r *recorder) host() source.Host {
-	return source.Host{Reporter: r, Ledger: r, Reader: sessions{r}, Services: r}
+	return source.Host{Reporter: r, Ledger: r, Reader: sessions{r}, Gates: r, Services: r, History: r}
 }
 
 func snapshot() source.Snapshot {
@@ -95,7 +134,7 @@ func snapshot() source.Snapshot {
 	return source.Snapshot{
 		Unit: pr, Rev: 42, At: t0,
 		Data:      json.RawMessage(`{"title":"Add retries","draft":false}`),
-		Situation: json.RawMessage(`{"kind":"to_review"}`),
+		Situation: &source.Situation{Kind: "to_review", WaitingOn: "pulls:bruno", Since: t0, Reason: "Ana asked", Stalled: source.After(t0, 48*time.Hour, source.WorkingDays)},
 		Card: &source.Card{
 			Label: "api#12", Title: "Add retries", State: "open", Outcome: "",
 			Signals:   []source.CardSignal{{Key: "checks", Value: "green", Tone: "good", At: t0}},
@@ -120,6 +159,9 @@ func snapshot() source.Snapshot {
 		Extraction: &source.ExtractionHealth{Pending: 3, BudgetHit: true, Oldest: t0},
 		Contexts:   []string{"@repo-api"},
 		Due:        t0.Add(48 * time.Hour),
+		Links:      []source.Link{{URL: "https://chat.example/archives/C1/p1", Kind: "mentions", Item: "pull:review", Evidence: anchor}},
+		Facets:     map[string]string{"repo": "acme/api", "author": "ana"},
+		Views:      []string{"needs-me", "all"},
 	}
 }
 
@@ -161,11 +203,47 @@ func (s tooler) CallTool(ctx context.Context, call source.ToolCall) (source.Tool
 		return source.ToolResult{}, err
 	}
 	wakeErr := h.SetWake(ctx, source.Wake{Unit: se.Unit, Until: t0})
+	evs, err := h.Events(ctx, source.EventQuery{Units: []plugin.Unit{se.Unit}, Kinds: []string{"pull.merged"}, Since: t0})
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	cfg, err := h.Config(ctx)
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	prompt, err := h.Profile(ctx, "prompts/extract.md")
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	gate, err := h.OpenGate(ctx, source.GateRequest{Draft: source.Draft{Unit: se.Unit, Kind: "nudge", Text: "Any news?"}, Session: call.Session})
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	if _, err := h.RecordSent(ctx, source.Draft{Unit: se.Unit, Text: "Done"}, call.Session, call.Tool); err != nil {
+		return source.ToolResult{}, err
+	}
+	moved, err := h.RehomeDrafts(ctx, []source.UnitMove{{From: plugin.Unit{Provider: "pulls", Key: "a"}, To: plugin.Unit{Provider: "pulls", Key: "b"}}})
+	if err != nil {
+		return source.ToolResult{}, err
+	}
+	written, err := h.SetOverride(ctx, se.Unit, map[string]string{"muted_until": ""}, map[string]string{"muted_kind": "review"})
+	if err != nil {
+		return source.ToolResult{}, err
+	}
 	out, _ := json.Marshal(map[string]any{
-		"effects": se.AllowedEffects, "answer": ans.Text, "item": res[0].Item,
+		"effects": se.AllowedEffects, "answer": ans.Text, "model": ans.Model, "cost": *ans.CostUSD, "item": res[0].Item,
 		"priority": source.CallOf(ctx).Priority, "wake": errors.Is(wakeErr, source.ErrUnsupported),
+		"event": evs[0].Key, "host": string(cfg.Host), "prompt": string(prompt),
+		"gate": gate.Gate, "draft": gate.Draft, "moved": moved, "written": written,
 	})
-	return source.ToolResult{Result: out}, nil
+	return source.ToolResult{Answer: "read", Fields: out}, nil
+}
+
+func (s tooler) RunCLI(_ context.Context, req source.CLIRequest, stdout, stderr io.Writer) (int, error) {
+	fmt.Fprintf(stdout, "open %s\n", req.Args[0])
+	fmt.Fprintf(stderr, "waiting for %s\n", req.Config.Plugin)
+	fmt.Fprint(stdout, "logged in\n")
+	return 3, nil
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -178,16 +256,24 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if res.Answer != "read" || res.IsError {
+		t.Errorf("answer %q, error %v", res.Answer, res.IsError)
+	}
 	var got map[string]any
-	if err := json.Unmarshal(res.Result, &got); err != nil {
+	if err := json.Unmarshal(res.Fields, &got); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "item": "icreate", "priority": float64(source.PriorityBackground), "wake": true}
+	want := map[string]any{"effects": []any{"pull.nudged"}, "answer": "yes", "model": "small-1", "cost": 0.02, "item": "icreate",
+		"priority": float64(source.PriorityBackground), "wake": true, "event": "review:9", "host": `{"sweep":{"fast":"1m"}}`, "prompt": "profile prompts/extract.md",
+		"gate": "g-1", "draft": float64(4), "moved": float64(1), "written": false}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tool result %v, want %v", got, want)
 	}
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
+	if want := []string{"open s-1 nudge Any news?", "sent s-1 pull_read Done", "rehome a->b", "override acme/api#12 set map[muted_until:] if map[muted_kind:review]"}; !slices.Equal(rec.gates, want) {
+		t.Errorf("gates\n%q\nwant\n%q", rec.gates, want)
+	}
 	if !slices.Equal(rec.sessions, []string{"s-1"}) {
 		t.Errorf("sessions read %v", rec.sessions)
 	}
@@ -203,11 +289,20 @@ func TestBrokerCallbackReachesTheHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(caps, []source.Capability{source.CapabilityIngester, source.CapabilityTooler}) {
+	if !slices.Equal(caps, []source.Capability{source.CapabilityIngester, source.CapabilityTooler, source.CapabilityCLIRunner}) {
 		t.Errorf("capabilities %v", caps)
 	}
 	if _, err := c.Publish(t.Context(), source.Draft{Unit: pr}); !errors.Is(err, source.ErrUnsupported) {
 		t.Errorf("Publish on a plugin with no publisher = %v", err)
+	}
+
+	var stdout, stderr strings.Builder
+	exit, err := c.RunCLI(t.Context(), source.CLIRequest{Args: []string{"login"}, Config: source.Config{Plugin: json.RawMessage(`{"client_id":"c1"}`)}}, &stdout, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exit != 3 || stdout.String() != "open login\nlogged in\n" || stderr.String() != "waiting for {\"client_id\":\"c1\"}\n" {
+		t.Errorf("RunCLI = %d, stdout %q, stderr %q", exit, stdout.String(), stderr.String())
 	}
 }
 
@@ -220,18 +315,25 @@ type planner struct {
 
 func (p planner) Plan(_ context.Context, _ plugin.Unit, st source.RoundState) (source.Plan, error) {
 	p.got <- st
-	return source.Plan{Facts: p.facts, Due: t0.Add(time.Hour), Rank: 3}, nil
+	return source.Plan{Facts: p.facts, Due: t0.Add(time.Hour), Rank: 3, Rounds: rounds(p.facts)}, nil
 }
 
-func (planner) Payload(context.Context, source.PayloadRequest) (json.RawMessage, error) {
-	return nil, nil
+func rounds(facts []source.Fact) []source.Round {
+	return []source.Round{{
+		Name: "address", Workspace: source.WorkspaceRef{Manager: "trees", ID: "w1"}, Head: "abc123", Reason: "checks failed",
+		Observed: true, TurnFacts: facts[:2], OnSent: map[string]string{"addressed.checks": "abc123"}, OnSkipped: map[string]string{"skipped": "1"},
+	}}
+}
+
+func (planner) Payload(context.Context, source.PayloadRequest) (source.PayloadResult, error) {
+	return source.PayloadResult{}, nil
 }
 func (planner) ApplyEffect(context.Context, source.EffectRequest) error { return nil }
 func (planner) Proposals(context.Context, time.Time) ([]source.Draft, error) {
 	return nil, nil
 }
-func (planner) PlacementDefault(context.Context, plugin.Unit, string) (source.Placement, bool, error) {
-	return source.Placement{}, false, nil
+func (planner) Placement(context.Context, plugin.Unit, string) (source.Placements, error) {
+	return source.Placements{}, nil
 }
 
 func TestTemporalFactsRoundTrip(t *testing.T) {
@@ -246,10 +348,16 @@ func TestTemporalFactsRoundTrip(t *testing.T) {
 		{Name: "pull.first.due", Value: source.At(t0.Add(2 * time.Hour))},
 		{Name: "pull.stalled", Value: source.After(t0, 48*time.Hour, source.WorkingDays)},
 		{Name: "pull.quiet", Value: source.After(t0, 6*time.Hour, source.Calendar)},
+		{Name: "pull.never_waited", Value: source.Since(time.Time{})},
+		{Name: "pull.no_deadline", Value: source.At(time.Time{})},
+		{Name: "pull.never_stalled", Value: source.After(time.Time{}, time.Hour, source.WorkingDays)},
+		{Name: "pull.closed_at", Value: source.Time(time.Time{})},
 	}
 	st := source.RoundState{
-		Marks: map[string]string{"reviewed": "abc123"}, SentAt: t0, AgentHome: "home-a", FirstRoundSkipped: true, Today: 1, DayTotal: 4, Paused: true,
-		Pending: []source.PendingRound{{Intent: "review", Reason: "held", Since: t0, Deadline: t0.Add(time.Hour)}},
+		Marks: map[string]string{"reviewed": "abc123"}, SentAt: t0, AgentHome: "home-a", Today: 1, DayTotal: 4, Paused: true,
+		Pending:   []source.PendingRound{{Intent: "review", Reason: "held", Since: t0, Deadline: t0.Add(time.Hour)}},
+		Overrides: map[string]string{"next_guidance": "check the retries"},
+		Blocked:   &source.Blocked{Question: "Which branch?", Root: "/w/api", Folder: "api", Since: t0},
 	}
 	p := planner{Stub: sourcetest.NewStub(), facts: facts, got: make(chan source.RoundState, 1)}
 	c := sourcetest.Launch(t, "pulls", p, (&recorder{}).host())
@@ -257,16 +365,20 @@ func TestTemporalFactsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(plan, source.Plan{Facts: facts, Due: t0.Add(time.Hour), Rank: 3}) {
+	if !reflect.DeepEqual(plan, source.Plan{Facts: facts, Due: t0.Add(time.Hour), Rank: 3, Rounds: rounds(facts)}) {
 		t.Errorf("plan\n%+v\nwant facts\n%+v", plan, facts)
 	}
 	if got := <-p.got; !reflect.DeepEqual(got, st) {
 		t.Errorf("the planner got round state %+v, want %+v", got, st)
 	}
 	for _, f := range plan.Facts {
-		temporal := slices.Contains([]string{"pull.waiting", "pull.first.due", "pull.stalled", "pull.quiet"}, f.Name)
+		temporal := slices.Contains([]string{"pull.waiting", "pull.first.due", "pull.stalled", "pull.quiet", "pull.never_waited", "pull.no_deadline", "pull.never_stalled"}, f.Name)
 		if f.Value.Temporal() != temporal {
 			t.Errorf("%s: Temporal = %v", f.Name, f.Value.Temporal())
+		}
+		zero := strings.HasPrefix(f.Name, "pull.never") || f.Name == "pull.no_deadline" || f.Name == "pull.closed_at"
+		if zero != f.Value.Time.IsZero() && (f.Value.Temporal() || f.Value.Kind == source.KindTime) {
+			t.Errorf("%s: a zero time did not stay zero: %v", f.Name, f.Value.Time)
 		}
 	}
 }
@@ -280,7 +392,7 @@ func TestEveryCapabilityHasAtMostFiveMethods(t *testing.T) {
 	brokers := []reflect.Type{
 		reflect.TypeFor[source.Reporter](), reflect.TypeFor[source.Ledger](), reflect.TypeFor[source.Reader](),
 		reflect.TypeFor[source.Gates](), reflect.TypeFor[source.Recorder](), reflect.TypeFor[source.Wakes](),
-		reflect.TypeFor[source.Services](), reflect.TypeFor[source.Source](),
+		reflect.TypeFor[source.Services](), reflect.TypeFor[source.History](), reflect.TypeFor[source.Source](),
 	}
 	for _, i := range append(slices.Clone(capabilities), brokers...) {
 		if n := i.NumMethod(); n > 5 {

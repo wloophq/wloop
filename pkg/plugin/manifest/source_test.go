@@ -19,6 +19,10 @@ rounds = true
 payload = "Pull"
 row_kinds = ["to_review", "held"]
 kinds = ["pull-request"]
+default_delivery = "comment"
+steps = ["turn.dismiss"]
+config_reads = ["sweep", "brief"]
+notify = ["rounds", "events"]
 
 [source.codec]
 keys = ["{owner}/{repo}#{number}"]
@@ -50,6 +54,12 @@ doc = "Records the nudge."
 [[source.events]]
 name = "pull.merged"
 doc = "The pull request merged."
+resolves = "merged"
+
+[[source.events]]
+name = "pull.reviewed"
+doc = "I reviewed it."
+answers_asked_turn = true
 
 [[source.roles]]
 name = "probe"
@@ -64,6 +74,13 @@ posts = true
 [[source.deliveries]]
 name = "reaction"
 
+[[source.draft_kinds]]
+name = "nudge"
+
+[[source.draft_kinds]]
+name = "react"
+delivery = "reaction"
+
 [[source.signals]]
 name = "stalled"
 doc = "Nobody moved it past the threshold."
@@ -71,10 +88,12 @@ doc = "Nobody moved it past the threshold."
 [[source.situations]]
 name = "review"
 doc = "Someone asked for my review."
+rank = 2
 
 [[source.jobs]]
 name = "ingest"
 every = "5m"
+every_from = "sweep.fast"
 
 [[source.commands]]
 name = "status"
@@ -82,7 +101,42 @@ usage = "status"
 
 [[source.tools]]
 name = "pull_read"
+doc = "Reads a pull request."
 input = '{"type": "object", "properties": {"url": {"type": "string"}}}'
+
+[[source.tools.answers]]
+name = "read"
+doc = "The pull request, read."
+fields = [{name = "Title"}, {name = "Count", number = true}]
+
+[[source.tools]]
+name = "pull_comment"
+doc = "Comments at once."
+input = '{"type": "object"}'
+posts = "now"
+
+[source.ui]
+web = "web"
+
+[[source.ui.views]]
+id = "my-pulls"
+rows = true
+surfaces = ["web", "menubar"]
+unit_sort = "repo"
+
+[[source.ui.facets]]
+id = "repo"
+field = "pull.repo"
+match = "suffix"
+menu = true
+
+[[source.ui.menubar]]
+id = "mine"
+view = "my-pulls"
+
+[[source.ui.keys]]
+key = "g p"
+action = "nav:my-pulls"
 `
 
 const threads = `
@@ -112,7 +166,10 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if src.Provider != "pulls" || src.Slot != "pull" || len(src.Facts) != 2 || src.Jobs[0].Every != Duration(5*time.Minute) || !src.Deliveries[0].Posts || src.Deliveries[1].Posts {
+	if src.Provider != "pulls" || src.Slot != "pull" || len(src.Facts) != 2 || src.Jobs[0].Every != Duration(5*time.Minute) || src.Jobs[0].EveryFrom != "sweep.fast" ||
+		!src.Deliveries[0].Posts || src.Deliveries[1].Posts || src.Events[0].Resolves != "merged" || !src.Events[1].AnswersAskedTurn ||
+		src.Situations[0].Rank != 2 || src.Tools[0].Answers[0].Fields[1] != (AnswerField{Name: "Count", Number: true}) || src.Tools[1].Posts != "now" ||
+		src.UI.Views[0].UnitSort != "repo" || src.UI.Web != "web" || src.DraftKinds[1].Delivery != "reaction" {
 		t.Errorf("source %+v", src)
 	}
 	c, err := src.Codec.Compile()
@@ -178,7 +235,7 @@ func TestManifestCodecParsesKeysWithoutThePlugin(t *testing.T) {
 }
 
 func TestSourceTableRefuses(t *testing.T) {
-	head := "id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\n[source.codec]\nkeys = [\"{id}\"]\n"
+	head := "id = \"acme\"\nkinds = [\"source\"]\nprotocol = 1\n[source]\nname = \"Acme\"\nslot = \"acme\"\ncodec = {keys = [\"{id}\"]}\n"
 	for _, c := range []struct{ name, extra, want string }{
 		{"a fact of another slot", "[[source.facts]]\nname = \"pr.x\"\ntype = \"bool\"\ndoc = \"d\"\n", "acme.<name>"},
 		{"a fact type", "[[source.facts]]\nname = \"acme.x\"\ntype = \"float\"\ndoc = \"d\"\n", "float"},
@@ -187,6 +244,14 @@ func TestSourceTableRefuses(t *testing.T) {
 		{"an effect applying to nothing", "[[source.effects]]\nname = \"acme.x\"\ndoc = \"d\"\n", "applies"},
 		{"a tool schema", "[[source.tools]]\nname = \"acme_read\"\ninput = \"[\"\n", "JSON"},
 		{"a job without an interval", "[[source.jobs]]\nname = \"ingest\"\n", "every"},
+		{"an interval key not read", "[[source.jobs]]\nname = \"ingest\"\nevery = \"1m\"\nevery_from = \"sweep.fast\"\n", "config_reads"},
+		{"a topic", "notify = [\"weather\"]\n", "weather"},
+		{"a default delivery not declared", "default_delivery = \"comment\"\n", "default_delivery"},
+		{"a draft kind without a delivery", "[[source.draft_kinds]]\nname = \"nudge\"\n", "no delivery"},
+		{"a tool posting later", "[[source.tools]]\nname = \"acme_post\"\ndoc = \"d\"\ninput = \"{}\"\nposts = \"later\"\n", "later"},
+		{"an event resolving nothing", "[[source.events]]\nname = \"acme.done\"\ndoc = \"d\"\nresolves = \"done\"\n", "resolves"},
+		{"a menu of no view", "[[source.ui.menubar]]\nid = \"m\"\nview = \"nope\"\n", "nope"},
+		{"a web directory outside", "[source.ui]\nweb = \"../x\"\n", "web"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			m, err := Parse([]byte(head + c.extra))

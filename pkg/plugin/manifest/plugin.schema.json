@@ -97,6 +97,17 @@
           },
           "type": "array"
         },
+        "config_reads": {
+          "description": "The configuration keys outside its own table the plugin reads, such as \"sweep\" or \"items.heat\"; Config returns them, checked against the configuration's keys.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "default_delivery": {
+          "description": "The delivery of a draft whose kind names none; one of deliveries.",
+          "type": "string"
+        },
         "deliveries": {
           "description": "How the plugin posts drafts.",
           "items": {
@@ -109,6 +120,31 @@
               "posts": {
                 "description": "A draft with this delivery reaches people, so it waits for approval.",
                 "type": "boolean"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "draft_kinds": {
+          "description": "The kinds of the plugin's drafts; the host derives a draft's delivery from its kind.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "delivery": {
+                "description": "How it is posted, one of deliveries; empty is default_delivery.",
+                "type": "string"
+              },
+              "name": {
+                "description": "The kind's name, such as \"nudge\". Required.",
+                "type": "string"
+              },
+              "purpose": {
+                "description": "What a draft of the kind is for; empty is its name.",
+                "type": "string"
               }
             },
             "required": [
@@ -157,12 +193,25 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "answers_asked_turn": {
+                "description": "The event answers the turn that asked for it, which my_review reconciles with.",
+                "type": "boolean"
+              },
               "doc": {
-                "description": "What it means. Required.",
+                "description": "What happened. Required.",
                 "type": "string"
               },
               "name": {
-                "description": "The name. Required.",
+                "description": "The event kind. Required.",
+                "type": "string"
+              },
+              "resolves": {
+                "description": "The link event the host's resolver reads it as.",
+                "enum": [
+                  "review",
+                  "merged",
+                  "closed"
+                ],
                 "type": "string"
               }
             },
@@ -246,7 +295,11 @@
             "additionalProperties": false,
             "properties": {
               "every": {
-                "description": "How often the job runs, as a Go duration. Required.",
+                "description": "How often the job runs, as a Go duration, unless every_from is set. Required.",
+                "type": "string"
+              },
+              "every_from": {
+                "description": "A duration key of the configuration the interval comes from, such as \"sweep.fast\", one of config_reads or under them; every is its default.",
                 "type": "string"
               },
               "name": {
@@ -276,6 +329,27 @@
         "name": {
           "description": "How a person reads the plugin's service, such as \"GitHub\". Required.",
           "type": "string"
+        },
+        "notify": {
+          "description": "The host topics whose changes the host notifies the plugin of.",
+          "items": {
+            "enum": [
+              "rounds",
+              "gates",
+              "marks",
+              "tasks",
+              "turns",
+              "sessions",
+              "overrides",
+              "viewer",
+              "config",
+              "events",
+              "workspaces",
+              "agents"
+            ],
+            "type": "string"
+          },
+          "type": "array"
         },
         "payload": {
           "description": "The template root of the plugin's turn payload, such as \"PR\", which only intents of the plugin read.",
@@ -369,17 +443,21 @@
           "type": "array"
         },
         "situations": {
-          "description": "The situations the plugin derives items from.",
+          "description": "The situations the plugin derives, in the order the cockpit ranks them.",
           "items": {
             "additionalProperties": false,
             "properties": {
               "doc": {
-                "description": "What it means. Required.",
+                "description": "What the unit waits on. Required.",
                 "type": "string"
               },
               "name": {
-                "description": "The name. Required.",
+                "description": "The situation's kind. Required.",
                 "type": "string"
+              },
+              "rank": {
+                "description": "Its order among the plugin's situations, lowest first; 0 is its place among the declarations.",
+                "type": "integer"
               }
             },
             "required": [
@@ -394,11 +472,65 @@
           "description": "The workflow fact slot of the plugin's units, such as \"pr\"; every fact name starts with it. Required.",
           "type": "string"
         },
+        "steps": {
+          "description": "The core workflow steps that run on the plugin's units, such as \"turn.dismiss\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "tools": {
           "description": "The MCP tools the plugin serves through CallTool.",
           "items": {
             "additionalProperties": false,
             "properties": {
+              "answers": {
+                "description": "The answers the tool returns, which tools.toml words.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "doc": {
+                      "description": "When the tool answers it. Required.",
+                      "type": "string"
+                    },
+                    "fields": {
+                      "description": "The fields its wording reads.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "description": "The field's name, as the template reads it. Required.",
+                            "type": "string"
+                          },
+                          "number": {
+                            "description": "The field is a number; otherwise text.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "description": "The answer's name. Required.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "doc"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "doc": {
+                "description": "What the tool does, for the reference pages. Required.",
+                "type": "string"
+              },
               "input": {
                 "description": "The JSON schema of the tool's arguments, an object. Required.",
                 "type": "string"
@@ -406,15 +538,182 @@
               "name": {
                 "description": "The tool's name; its description lives in the profile's tools.toml. Required.",
                 "type": "string"
+              },
+              "posts": {
+                "description": "The tool posts at once, recorded as a sent draft; empty posts nothing.",
+                "enum": [
+                  "now"
+                ],
+                "type": "string"
               }
             },
             "required": [
               "name",
+              "doc",
               "input"
             ],
             "type": "object"
           },
           "type": "array"
+        },
+        "ui": {
+          "additionalProperties": false,
+          "description": "What clients show of the plugin; every label lives in its profile layer.",
+          "properties": {
+            "facets": {
+              "description": "The facets of the plugin's rows, whose values a snapshot reports.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "description": "What it reads: row.*, item.* or \u003cprovider\u003e.*.",
+                    "type": "string"
+                  },
+                  "group": {
+                    "description": "Rows may be grouped by it.",
+                    "type": "boolean"
+                  },
+                  "id": {
+                    "description": "The facet's id. Required.",
+                    "type": "string"
+                  },
+                  "match": {
+                    "description": "How a filter matches a value; empty is exact.",
+                    "enum": [
+                      "exact",
+                      "suffix",
+                      "prefix",
+                      "team"
+                    ],
+                    "type": "string"
+                  },
+                  "menu": {
+                    "description": "It shows in the filter menu.",
+                    "type": "boolean"
+                  },
+                  "rank": {
+                    "description": "Its values in order, with sort = rank.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "sort": {
+                    "description": "How its values sort.",
+                    "enum": [
+                      "rank",
+                      "text",
+                      "time"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "keys": {
+              "description": "The plugin's key bindings.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "description": "The action it runs. Required.",
+                    "type": "string"
+                  },
+                  "key": {
+                    "description": "The key. Required.",
+                    "type": "string"
+                  },
+                  "surface": {
+                    "description": "Where it binds; empty is every surface.",
+                    "enum": [
+                      "web",
+                      "tui"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "key",
+                  "action"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "menubar": {
+              "description": "The menu bar's sections of the plugin.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "description": "The section's id. Required.",
+                    "type": "string"
+                  },
+                  "view": {
+                    "description": "The view it shows. Required.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "view"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "views": {
+              "description": "The plugin's views.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "description": "The view's id, unique across plugins. Required.",
+                    "type": "string"
+                  },
+                  "order": {
+                    "description": "Its order among the views.",
+                    "type": "integer"
+                  },
+                  "rows": {
+                    "description": "A list of rows filtered by a snapshot's views; otherwise a custom view served by View.",
+                    "type": "boolean"
+                  },
+                  "surfaces": {
+                    "description": "Where it shows.",
+                    "items": {
+                      "enum": [
+                        "web",
+                        "tui",
+                        "menubar"
+                      ],
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "unit_sort": {
+                    "description": "The facet the unit column sorts by.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "web": {
+              "description": "A directory of the plugin the host serves under /plugins/\u003cid\u003e/, with no call to the plugin.",
+              "type": "string"
+            }
+          },
+          "type": "object"
         }
       },
       "required": [

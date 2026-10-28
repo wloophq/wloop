@@ -20,8 +20,8 @@ type Snapshot struct {
 	Gone bool
 	// Data is the unit's data, which its templates and rows read.
 	Data json.RawMessage
-	// Situation holds the inputs the host's situation derivation reads.
-	Situation json.RawMessage
+	// Situation is what the unit waits on as its source says; nil for none.
+	Situation *Situation
 	Card      *Card
 	Items     []Item
 	Facts     []Fact
@@ -35,6 +35,34 @@ type Snapshot struct {
 	// Contexts and Due are the task fields the plugin writes.
 	Contexts []string
 	Due      time.Time
+	// Links are the addresses the unit's source links to, which the host
+	// resolves with every manifest's codec.
+	Links []Link
+	// Facets are the unit's values of the manifest's facets, by facet id;
+	// Views the ids of the manifest's views its row is in.
+	Facets map[string]string
+	Views  []string
+}
+
+// Situation is what a unit waits on, as the plugin derives it from its
+// source alone. The host overlays its own state: a run on the unit, a mute
+// (matched by Kind and WaitingOn) and a pending round.
+type Situation struct {
+	// Kind is one of the manifest's situations.
+	Kind      string
+	WaitingOn string
+	Since     time.Time
+	Reason    string
+	// Stalled is an After value: the situation is stalled once it holds.
+	Stalled Value
+}
+
+// Link is an address a unit's source links to.
+type Link struct {
+	URL      string
+	Kind     string
+	Item     string
+	Evidence Anchor
 }
 
 // Signal is a link signal the manifest declares, on one unit.
@@ -236,6 +264,10 @@ type Evidence struct {
 type Checkout struct {
 	// Repo is "owner/name"; Branch "" is the default branch; Head "" unknown.
 	Repo, Branch, Head string
+	// Base is the branch the work merges into; Fork says the head lives in
+	// another repository.
+	Base string
+	Fork bool
 }
 
 // StateWrite is a task's move the plugin writes back to its source.
@@ -244,6 +276,12 @@ type StateWrite struct {
 	Task     string
 	State    string
 	Category string
+}
+
+// Placements are where a unit's work runs: the plugin's default, and what
+// its source suggests for an item; each nil when there is none.
+type Placements struct {
+	Default, Suggested *Placement
 }
 
 // Placement is where a unit's work runs.
@@ -263,7 +301,13 @@ type IngestResult struct {
 	Summary, Skipped string
 }
 
-// Tracked is a unit the plugin now follows.
+// TrackRequest reads a unit, and follows it when Follow is set.
+type TrackRequest struct {
+	Unit   plugin.Unit
+	Follow bool
+}
+
+// Tracked is a unit as its source names it.
 type Tracked struct {
 	Unit  plugin.Unit
 	State string
@@ -301,6 +345,9 @@ type BriefInput struct {
 type BriefRevision struct {
 	Revision string
 	Parts    json.RawMessage
+	// Attempt names what an attempt at the unit now is made from, so a
+	// failure counts against that attempt only.
+	Attempt string
 }
 
 // BriefWritten is what a stored brief was made from and how its last
@@ -311,6 +358,8 @@ type BriefWritten struct {
 	Error       string
 	Failures    int
 	AttemptedAt time.Time
+	// AttemptOf is the Attempt of the last attempt.
+	AttemptOf string
 }
 
 // BriefStaleRequest asks whether a brief is due again.
@@ -324,14 +373,24 @@ type BriefStaleRequest struct {
 // RoundState is the host's round bookkeeping of one unit, which a Plan
 // reads.
 type RoundState struct {
-	Marks             map[string]string
-	SentAt            time.Time
-	AgentHome         string
-	FirstRoundSkipped bool
+	Marks     map[string]string
+	SentAt    time.Time
+	AgentHome string
 	// Today counts the unit's automatic rounds today, DayTotal every unit's.
 	Today, DayTotal int
-	Paused          bool
-	Pending         []PendingRound
+	// Paused says the unit's rounds are held, by the user or a pause.
+	Paused  bool
+	Pending []PendingRound
+	// Overrides are the unit's host overrides, by name.
+	Overrides map[string]string
+	// Blocked is set while a round's start is blocked on a question.
+	Blocked *Blocked
+}
+
+// Blocked is a round's start blocked on the agent's question.
+type Blocked struct {
+	Question, Root, Folder string
+	Since                  time.Time
 }
 
 // PendingRound is an automatic round waiting on the user until Deadline.
@@ -341,11 +400,33 @@ type PendingRound struct {
 }
 
 // Plan is a unit's round plan: the facts the profile's workflows read, its
-// next deadline, and its rank among the units due.
+// next deadline, its rank among the units due, and the rounds it would
+// launch.
 type Plan struct {
-	Facts []Fact
-	Due   time.Time
-	Rank  int64
+	Facts  []Fact
+	Due    time.Time
+	Rank   int64
+	Rounds []Round
+}
+
+// Round is a round a plan would launch on a unit.
+type Round struct {
+	Name      string
+	Workspace WorkspaceRef
+	Head      string
+	Reason    string
+	// Observed says the round's cause was already seen.
+	Observed bool
+	// TurnFacts are the turn slot's facts of the round's turn.
+	TurnFacts []Fact
+	// OnSent and OnSkipped are the marks the host writes when it sends or
+	// skips the round; "" removes a mark.
+	OnSent, OnSkipped map[string]string
+}
+
+// WorkspaceRef names a workspace in its manager.
+type WorkspaceRef struct {
+	Manager, ID string
 }
 
 // PayloadRequest asks for the payload of a turn on a unit.
@@ -359,6 +440,38 @@ type PayloadRequest struct {
 	Local    string
 	Owned    bool
 	Plain    bool
+	// LastVerdict is the head the loop's last record covered; nil none.
+	LastVerdict *Verdict
+	// Round is the planned round: "first", "follow-up" or "".
+	Round string
+	Agent string
+	// BriefMissing says why the turn runs without a brief; "" with one.
+	BriefMissing string
+	Items        []string
+	Task         string
+}
+
+// Verdict is what the loop's last record of a unit covered.
+type Verdict struct {
+	Head, Endorsed string
+	At             time.Time
+}
+
+// PayloadResult is a turn's payload: the argument its prompt names, how the
+// unit is worded, the facts its instructions read, its data for templates
+// and the contents the prompt carries.
+type PayloadResult struct {
+	Arg      string
+	Wording  Wording
+	Facts    []Fact
+	Data     json.RawMessage
+	Contents string
+}
+
+// Wording is how a turn names its unit; the plugin takes the words from its
+// profile layer.
+type Wording struct {
+	Noun, This, Ref, Short string
 }
 
 // TurnRef names a turn.
@@ -387,20 +500,18 @@ type ToolCall struct {
 	Turn    string
 }
 
-// ToolResult is the tool's MCP result.
+// ToolResult names one of the tool's manifest answers and its fields; the
+// host words it from the layered tools.toml.
 type ToolResult struct {
-	Result  json.RawMessage
+	Answer  string
+	Fields  json.RawMessage
 	IsError bool
 }
 
-// CLIRequest is a command of the manifest the host runs.
+// CLIRequest is a command of the manifest the host runs, with the
+// configuration the plugin reads, as the plugin has no broker in CLI mode.
 type CLIRequest struct {
-	Args  []string
-	Stdin []byte
-}
-
-// CLIResult is the command's output, which the host prints.
-type CLIResult struct {
-	Stdout, Stderr []byte
-	ExitCode       int
+	Args   []string
+	Stdin  []byte
+	Config Config
 }

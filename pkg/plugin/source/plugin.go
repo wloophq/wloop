@@ -1,6 +1,7 @@
 package source
 
 import (
+	"bytes"
 	"context"
 	"sync"
 
@@ -102,7 +103,7 @@ func (s *server) Ingest(ctx context.Context, r *pb.IngestRequest) (*pb.IngestRes
 
 func (s *server) Track(ctx context.Context, r *pb.TrackRequest) (*pb.TrackResponse, error) {
 	return serve[Ingester](ctx, s.src, "ingester", r.GetCall(), func(ctx context.Context, c Ingester) (*pb.TrackResponse, error) {
-		t, err := c.Track(ctx, unitGo(r.GetUnit()))
+		t, err := c.Track(ctx, TrackRequest{Unit: unitGo(r.GetUnit()), Follow: r.GetFollow()})
 		return &pb.TrackResponse{Unit: unitPB(t.Unit), State: t.State}, err
 	})
 }
@@ -122,7 +123,7 @@ func (s *server) Resolve(ctx context.Context, r *pb.ResolveRequest) (*pb.Resolve
 
 func (s *server) Locate(ctx context.Context, r *pb.LocateRequest) (*pb.LocateResponse, error) {
 	return serve[Ingester](ctx, s.src, "ingester", r.GetCall(), func(ctx context.Context, c Ingester) (*pb.LocateResponse, error) {
-		u, ok, err := c.Locate(ctx, r.GetUrl())
+		u, ok, err := c.Locate(ctx, r.GetDir())
 		return &pb.LocateResponse{Unit: unitPB(u), Ok: ok}, err
 	})
 }
@@ -192,7 +193,7 @@ func (s *server) Landed(ctx context.Context, r *pb.LandedRequest) (*pb.LandedRes
 func (s *server) Checkout(ctx context.Context, r *pb.CheckoutRequest) (*pb.CheckoutResponse, error) {
 	return serve[Lander](ctx, s.src, "lander", r.GetCall(), func(ctx context.Context, c Lander) (*pb.CheckoutResponse, error) {
 		co, ok, err := c.Checkout(ctx, unitGo(r.GetUnit()))
-		return &pb.CheckoutResponse{Repo: co.Repo, Branch: co.Branch, Head: co.Head, Ok: ok}, err
+		return &pb.CheckoutResponse{Repo: co.Repo, Branch: co.Branch, Head: co.Head, Ok: ok, Base: co.Base, Fork: co.Fork}, err
 	})
 }
 
@@ -228,7 +229,7 @@ func (s *server) BriefStale(ctx context.Context, r *pb.BriefStaleRequest) (*pb.B
 	return serve[Briefer](ctx, s.src, "briefer", r.GetCall(), func(ctx context.Context, c Briefer) (*pb.BriefStaleResponse, error) {
 		w := r.GetWritten()
 		stale, err := c.BriefStale(ctx, BriefStaleRequest{
-			Written: BriefWritten{At: briefRevisionGo(w.GetAt()), Version: w.GetVersion(), Error: w.GetError(), Failures: int(w.GetFailures()), AttemptedAt: tm(w.GetAttemptedAt())},
+			Written: BriefWritten{At: briefRevisionGo(w.GetAt()), Version: w.GetVersion(), Error: w.GetError(), Failures: int(w.GetFailures()), AttemptedAt: tm(w.GetAttemptedAt()), AttemptOf: w.GetAttemptOf()},
 			Current: briefRevisionGo(r.GetCurrent()), Version: r.GetVersion(), Now: tm(r.GetNow()),
 		})
 		return &pb.BriefStaleResponse{Stale: stale}, err
@@ -238,17 +239,14 @@ func (s *server) BriefStale(ctx context.Context, r *pb.BriefStaleRequest) (*pb.B
 func (s *server) Plan(ctx context.Context, r *pb.PlanRequest) (*pb.PlanResponse, error) {
 	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.PlanResponse, error) {
 		p, err := c.Plan(ctx, unitGo(r.GetUnit()), roundStateGo(r.GetState()))
-		return &pb.PlanResponse{Facts: factsPB(p.Facts), Due: ts(p.Due), Rank: p.Rank}, err
+		return planPB(p), err
 	})
 }
 
 func (s *server) Payload(ctx context.Context, r *pb.PayloadRequest) (*pb.PayloadResponse, error) {
 	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.PayloadResponse, error) {
-		p, err := c.Payload(ctx, PayloadRequest{
-			Unit: unitGo(r.GetUnit()), Intent: r.GetIntent(), Role: r.GetRole(), Trigger: r.GetTrigger(), Inputs: raw(r.GetInputsJson()),
-			Guidance: r.GetGuidance(), Local: r.GetLocal(), Owned: r.GetOwned(), Plain: r.GetPlain(),
-		})
-		return &pb.PayloadResponse{PayloadJson: p}, err
+		p, err := c.Payload(ctx, payloadRequestGo(r))
+		return payloadPB(p), err
 	})
 }
 
@@ -273,23 +271,50 @@ func (s *server) Proposals(ctx context.Context, r *pb.ProposalsRequest) (*pb.Pro
 	})
 }
 
-func (s *server) PlacementDefault(ctx context.Context, r *pb.PlacementDefaultRequest) (*pb.PlacementDefaultResponse, error) {
-	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.PlacementDefaultResponse, error) {
-		p, ok, err := c.PlacementDefault(ctx, unitGo(r.GetUnit()), r.GetItem())
-		return &pb.PlacementDefaultResponse{Placement: placementPB(p), Ok: ok}, err
+func (s *server) Placement(ctx context.Context, r *pb.PlacementRequest) (*pb.PlacementResponse, error) {
+	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.PlacementResponse, error) {
+		p, err := c.Placement(ctx, unitGo(r.GetUnit()), r.GetItem())
+		return &pb.PlacementResponse{Default: placementPB(p.Default), Suggested: placementPB(p.Suggested)}, err
 	})
 }
 
 func (s *server) CallTool(ctx context.Context, r *pb.CallToolRequest) (*pb.CallToolResponse, error) {
 	return serve[Tooler](ctx, s.src, "tooler", r.GetCall(), func(ctx context.Context, c Tooler) (*pb.CallToolResponse, error) {
 		res, err := c.CallTool(ctx, ToolCall{Tool: r.GetTool(), Args: raw(r.GetArgsJson()), Session: r.GetSession(), Turn: r.GetTurn()})
-		return &pb.CallToolResponse{ResultJson: res.Result, IsError: res.IsError}, err
+		return &pb.CallToolResponse{Answer: res.Answer, FieldsJson: res.Fields, IsError: res.IsError}, err
 	})
 }
 
-func (s *server) RunCLI(ctx context.Context, r *pb.RunCLIRequest) (*pb.RunCLIResponse, error) {
-	return serve[CLIRunner](ctx, s.src, "CLI runner", r.GetCall(), func(ctx context.Context, c CLIRunner) (*pb.RunCLIResponse, error) {
-		res, err := c.RunCLI(ctx, CLIRequest{Args: r.GetArgs(), Stdin: r.GetStdin()})
-		return &pb.RunCLIResponse{Stdout: res.Stdout, Stderr: res.Stderr, ExitCode: int64(res.ExitCode)}, err
-	})
+func (s *server) RunCLI(r *pb.RunCLIRequest, stream grpc.ServerStreamingServer[pb.RunCLIResponse]) error {
+	c, ok := s.src.(CLIRunner)
+	if !ok {
+		return unsupported("CLI runner")
+	}
+	ctx := WithCall(stream.Context(), callGo(r.GetCall()))
+	var mu sync.Mutex
+	out := &streamWriter{mu: &mu, send: func(b []byte) error { return stream.Send(&pb.RunCLIResponse{Stdout: b}) }}
+	errw := &streamWriter{mu: &mu, send: func(b []byte) error { return stream.Send(&pb.RunCLIResponse{Stderr: b}) }}
+	exit, err := c.RunCLI(ctx, CLIRequest{Args: r.GetArgs(), Stdin: r.GetStdin(), Config: configGo(r.GetConfig())}, out, errw)
+	if err != nil {
+		return toStatus(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	return stream.Send(&pb.RunCLIResponse{Done: true, ExitCode: int64(exit)})
+}
+
+// streamWriter sends each write as one part of a stream. A gRPC stream
+// takes one sender at a time, so a command's two writers share mu.
+type streamWriter struct {
+	mu   *sync.Mutex
+	send func([]byte) error
+}
+
+func (w *streamWriter) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.send(bytes.Clone(b)); err != nil {
+		return 0, err
+	}
+	return len(b), nil
 }
