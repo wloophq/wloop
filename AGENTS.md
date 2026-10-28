@@ -46,7 +46,7 @@ These stay in Go and are exposed as facts for the profile to act on:
 - injection markers, JSON schemas and limits;
 - the gate guard: every decision waiting on the user is a gate, which only the gates service resolves, by a person, a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for approval unless a user rule that names that delivery releases it, and no agent or thread text resolves a gate (no rule reads an untrusted fact).
 
-Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule and its text, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, the cockpit's and the terminal's chrome (prompt hints, pane titles, empty states), and the Slack renderings `slack_read` and `slack_search` return.
+Still owned by Go and being moved to the profile ([Profile first](docs/src/content/docs/architecture/profile-first.md#what-go-still-owns-today) lists them): the GitHub plugin's `github-nudge` rule, the workflow providers (`builtin.Slots`), the notification titles, the digest and the menu bar's copy, the cockpit's and the terminal's chrome (prompt hints, pane titles, empty states), and the Slack renderings `slack_read` and `slack_search` return.
 
 ## Conventions
 

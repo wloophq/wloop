@@ -18,9 +18,6 @@ import (
 // the presenter: over host, which serves the unit's events and turns, for
 // the viewer viewer names now, who never waits on whom ignore names.
 func Prepare(host func() src.Host, viewer func(ctx context.Context) (string, error), ignore func() []string, now func() time.Time) func(context.Context, src.ActionRequest) (json.RawMessage, error) {
-	if now == nil {
-		now = time.Now
-	}
 	return func(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
 		v, err := viewer(ctx)
 		if err != nil {
