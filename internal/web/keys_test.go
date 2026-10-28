@@ -738,3 +738,7 @@ return { nav: k.log.nav, help };`, map[string]any{"catalog": catalog, "served": 
 		t.Errorf("the help lists %q: a view's key reads its catalog label", got.Help)
 	}
 }
+
+func TestKeysFixtureHoldsTheServedSpecKeys(t *testing.T) {
+	t.Skip("K1b review F1: the fixture's spec part binds H to hold/release where the daemon serves pause/resume; regenerate it whole and move TestPluginKeyRunsUnitAction and TestPaletteShowsEveryKey to the served ids (owner: the task that owns the spec keys)")
+}

@@ -28,7 +28,7 @@ The leading glyph is the category of the task's state, drawn like OmniFocus's st
 | `done` | `done`, `reference` | filled `loop` circle with a check | finished or kept to read; the row goes `muted` |
 | `dropped` | `trash` | circle with a slash | dismissed |
 
-What used to replace the glyph is no longer a kind of task. An agent's question, a draft in the Outbox and a proposal are **gates** on a task: the task keeps its glyph, and the gate shows on its page as a GateCard and in the views that list gates. A **project** is a task that is the parent of others; its glyph is its own state's.
+An agent's question, a draft in the Outbox and a proposal are **gates** on a task: the task keeps its glyph, and the gate shows on its page as a GateCard and in the views that list gates. A **project** is a task that is the parent of others; its glyph is its own state's.
 
 ## The task row
 
