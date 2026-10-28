@@ -67,9 +67,9 @@ type Gates interface {
 	// host refuses it for a session that is not live, or for a tool the
 	// manifest does not mark posts = "now".
 	RecordSent(ctx context.Context, d Draft, session, tool string) (GateRef, error)
-	// RehomeDrafts moves the open drafts of each move's From onto its To in
-	// one host transaction, and counts them; applying it twice changes
-	// nothing, so a plugin retries it after a crash.
+	// RehomeDrafts moves every draft of each move's From, open or sent, onto
+	// its To in one host transaction, and counts them; applying it twice
+	// changes nothing, so a plugin retries it after a crash.
 	RehomeDrafts(ctx context.Context, moves []UnitMove) (int, error)
 	// SetOverride sets the host overrides of u in one transaction, only
 	// while each of ifMatch holds its value ("" for unset); a set value ""

@@ -20,7 +20,7 @@ func statusOf(t *testing.T, ctx context.Context, q *Queue) Status {
 	return st
 }
 
-func TestStatusReadsOnce(t *testing.T) {
+func TestStatusReadsTheBriefStatesOnce(t *testing.T) {
 	r := newRig(t, 3)
 	r.q.Run(context.Background())
 	for range 2 {

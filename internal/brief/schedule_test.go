@@ -352,7 +352,7 @@ func TestScanTellsTheJobAboutADuePullRequest(t *testing.T) {
 	})
 }
 
-func TestRunWithNothingDueReadsOnceAndWritesNothing(t *testing.T) {
+func TestRunWithNothingDueReadsTheBriefStatesOnceAndWritesNothing(t *testing.T) {
 	r := newRig(t, 3)
 	if _, err := r.q.Run(context.Background()); err != nil {
 		t.Fatal(err)

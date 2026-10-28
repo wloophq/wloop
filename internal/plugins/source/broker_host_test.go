@@ -85,3 +85,7 @@ func TestTheBrokerRehomesAPluginsDrafts(t *testing.T) {
 		t.Error("moved a draft onto another provider's unit")
 	}
 }
+
+func TestRecordEventsKeepsTheAnchor(t *testing.T) {
+	t.Skip("X8b: the events table has no anchor column, so RecordEvents drops Event.Anchor; add the column when GitHub reports anchored events, or drop Anchor from Event")
+}

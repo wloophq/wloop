@@ -318,8 +318,6 @@ func (e *Env) servePlugins(ctx context.Context, store snapshot.Store, cfg config
 	}
 }
 
-// unitCodecs are the codecs of every provider: the core's and every
-// plugin's, enabled or not.
 // moduleHost is the broker the host serves a built-in source module of
 // provider id: its events, marks and drafts are the host's, in db.
 func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
@@ -331,6 +329,8 @@ func (e *Env) moduleHost(db *sqlite.DB) func(id unit.ProviderID) src.Host {
 	}
 }
 
+// unitCodecs are the codecs of every provider: the core's and every
+// plugin's, enabled or not.
 func (e *Env) unitCodecs() *unit.Registry {
 	codecs := []unit.Codec{dturn.SessionCodec{}, wsdomain.Codec{}, task.Codec{}}
 	for _, p := range e.sourcePlugins() {

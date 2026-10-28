@@ -85,14 +85,14 @@ Test imports count too, except a plugin's own test fake: a core test builds its 
 
 ## Plugin storage
 
-The plugins' tables still sit in the core store's file, but no query names a plugin's table and a core table (`TestNoQueryJoinsPluginAndCoreTables`), and no transaction writes both: a plugin's store writes its own tables, then reaches the host's data through the broker, and a reader that needs both reads each apart.
+The plugins' tables still sit in the core store's file, but no query names a plugin's table and a core table (`TestNoQueryJoinsPluginAndCoreTables`), and no transaction writes both but the override write, which keeps the `overrides` row and the pull request's reasons in one transaction until the host's `SetOverride` serves it: a plugin's store writes its own tables, then reaches the host's data through the broker, and a reader that needs both reads each apart.
 
 | Owner | Tables |
 |---|---|
 | core | `round_state`, `round_days`, `round_day_prs`, `round_day_notes`, `events`, `unit_marks`, `view_applied`, `turn_instructions`, and every other table but the plugins'; of `overrides`, the mute columns (`muted_until`, `mute_until_state`, `muted_kind`, `muted_waiting_on`) and `next_guidance`, which the host reads and writes |
 | plugins | `pull_requests`, `pr_seen`, `pr_details`, `fetches`, the GitHub `meta` rows and the other columns of `overrides` (`hold`, `taken_over`, `tracked`) for GitHub; `slack_*`, `segment_map` and `extraction_*` for Slack |
 
-The workspace link of a pull request (its `ws_*` columns) is host data derived from the workspaces' units; the plugin reads it through `Reader.Workspaces`.
+The workspace link of a pull request (its `ws_*` columns) is host data: the host writes it on the pull request's row through `inventory.SetWorkspace` until it derives the link from the workspaces' units, which the plugin reads through `Reader.Workspaces`.
 
 - **Events and marks are host data.** The GitHub plugin's store (`inventory.Store`) records the events it observes through the broker's `Recorder.RecordEvents` after its own write: the timeline kinds `opened`, `push`, `review_requested`, `review_request_removed`, `review`, `comment`, `check`, `ready`, `draft`, `merged` and `closed`, and the `followed` and `unfollowed` of a scope flip. It reads back through `History.Events` the `push` and `merged` events a fresh snapshot is compared with, and the last `followed` event that dates an unfollow. The host keeps a keyed event once per unit, kind and key, and an unkeyed one once per unit, kind and time, filling the actor and data a stored one lacks; it notes `TopicSourceEvents`.
 - **Snapshot reads.** The read model's pull requests and their overrides, the brief queue's open pull requests and their brief states, and the activity feed's events and their pull requests are separate reads.
