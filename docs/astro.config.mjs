@@ -75,6 +75,7 @@ export default defineConfig({
             'reference/profile-blocks',
             'reference/intent-manifest',
             'reference/workflow-manifest',
+            'reference/plugin-manifest',
             'reference/facts',
             'reference/architecture-rules',
             'reference/keys',
