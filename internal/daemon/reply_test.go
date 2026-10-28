@@ -15,9 +15,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func entryResult(t *testing.T, body []byte) api.EntryResult {
+func taskResult(t *testing.T, body []byte) api.TaskResult {
 	t.Helper()
-	var res api.EntryResult
+	var res api.TaskResult
 	if err := json.Unmarshal(body, &res); err != nil {
 		t.Fatalf("%v %s", err, body)
 	}
@@ -36,17 +36,17 @@ func (r *outboxRig) drafts(t *testing.T) []draft.Draft {
 func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitEntry("e-1", task.KindAction, r7u))
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-1"), &v); code != 200 ||
+	r.put(t, unitTask("e-1", task.KindAction, r7u))
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-1"), &v); code != 200 ||
 		!slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "reply" && s.Enabled }) {
 		t.Fatalf("%d %+v", code, v.Verbs)
 	}
-	rec := post(t, r.s, api.EntryPath("e-1", "reply"), `{"source":"tui","args":{"text":"On it, thanks"}}`)
+	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"tui","args":{"text":"On it, thanks"}}`)
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if res := entryResult(t, rec.Body.Bytes()); len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "saved to the Outbox") || res.Entry.ID != "e-1" {
+	if res := taskResult(t, rec.Body.Bytes()); len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "saved to the Outbox") || res.Task.ID != "e-1" {
 		t.Fatalf("result %+v", res)
 	}
 	ds := r.drafts(t)
@@ -54,7 +54,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 		t.Fatalf("drafts %+v", ds)
 	}
 	d := ds[0]
-	if d.Unit != r7u || d.Entry != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
+	if d.Unit != r7u || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
 		d.Origin.Kind != draft.OriginUser || d.Approval.Mode != draft.Wait || d.State != draft.Proposed {
 		t.Fatalf("draft %+v", d)
 	}
@@ -71,8 +71,8 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitEntry("e-1", task.KindWaiting, r7u))
-	rec := post(t, r.s, api.EntryPath("e-1", "reply"), `{"source":"notification","args":{"text":"Ping","send":"now"}}`)
+	r.put(t, unitTask("e-1", task.KindWaiting, r7u))
+	rec := post(t, r.s, api.TaskPath("e-1", "reply"), `{"source":"notification","args":{"text":"Ping","send":"now"}}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "approved; it goes out") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -89,8 +89,8 @@ func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 func TestReplyRefusals(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitEntry("e-none", task.KindCapture), unitEntry("e-msg", task.KindMessage, r7u), unitEntry("e-1", task.KindAction, r7u),
-		unitEntry("e-s", task.KindAction, slackUnit))
+	r.put(t, unitTask("e-none", task.KindCapture), unitTask("e-msg", task.KindMessage, r7u), unitTask("e-1", task.KindAction, r7u),
+		unitTask("e-s", task.KindAction, slackUnit))
 	for _, c := range []struct {
 		name, id, body string
 		code           int
@@ -104,7 +104,7 @@ func TestReplyRefusals(t *testing.T) {
 		{"text on a reaction", "e-1", `{"source":"cockpit","args":{"kind":"react","text":"x","reaction":"eyes"}}`, 400, "takes an emoji"},
 		{"no publisher", "e-s", `{"source":"cockpit","args":{"text":"x"}}`, 409, "publisher"},
 	} {
-		rec := post(t, r.s, api.EntryPath(c.id, "reply"), c.body)
+		rec := post(t, r.s, api.TaskPath(c.id, "reply"), c.body)
 		if rec.Code != c.code || !strings.Contains(rec.Body.String(), c.says) {
 			t.Errorf("%s: %d %s", c.name, rec.Code, rec.Body)
 		}
@@ -112,8 +112,8 @@ func TestReplyRefusals(t *testing.T) {
 	if ds := r.drafts(t); len(ds) != 0 {
 		t.Fatalf("drafts %+v", ds)
 	}
-	var v api.EntryView
-	if get(t, r.s, api.EntryPath("e-none"), &v); slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "reply" && s.Enabled }) {
+	var v api.TaskView
+	if get(t, r.s, api.TaskPath("e-none"), &v); slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "reply" && s.Enabled }) {
 		t.Fatalf("reply offered on an entry with no unit: %+v", v.Verbs)
 	}
 }
@@ -121,14 +121,14 @@ func TestReplyRefusals(t *testing.T) {
 func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t)
-	r.put(t, unitEntry("e-1", task.KindAction, r7u))
+	r.put(t, unitTask("e-1", task.KindAction, r7u))
 	rec := post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"text":"LGTM","source":"cockpit"}`)
 	var d api.Draft
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "proposed" || d.Origin.Kind != "user" || d.Entry != "" || d.Kind != "reply" {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "proposed" || d.Origin.Kind != "user" || d.Task != "" || d.Kind != "reply" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	rec = post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"entry":"e-1","items":["it-e-1"],"text":"Done","send":true,"source":"cockpit"}`)
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "approved" || d.Entry != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "approved" || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) {
 		t.Fatalf("send: %d %s", rec.Code, rec.Body)
 	}
 	for _, c := range []struct {

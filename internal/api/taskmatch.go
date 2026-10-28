@@ -8,7 +8,7 @@ import (
 )
 
 // CountersTerm is the query parameter of CountersPath, repeated, that counts only the entries holding every
-// term, as EntryMatches reads them.
+// term, as TaskMatches reads them.
 const CountersTerm = "term"
 
 // accents folds the accents Portuguese and Spanish titles carry, without golang.org/x/text.
@@ -35,7 +35,7 @@ func Fold(s string) string {
 // Texts are what a filter's free words search in an entry: its title, notes, state, kind, area, project and
 // contexts, its units, the people it waits on, its items, its cards' people, its draft and its message. The
 // cockpit's entryHaystack lists the same texts.
-func (e EntryView) Texts() []string {
+func (e TaskView) Texts() []string {
 	out := []string{e.Title, e.Notes, e.State, e.Kind, e.Area, e.ProjectTitle}
 	out = append(out, e.Contexts...)
 	for i, u := range e.Units {
@@ -66,8 +66,8 @@ func (e EntryView) Texts() []string {
 	return out
 }
 
-// EntryMatches says whether every term is in one of e's Texts, ignoring case and accents.
-func EntryMatches(e EntryView, terms []string) bool {
+// TaskMatches says whether every term is in one of e's Texts, ignoring case and accents.
+func TaskMatches(e TaskView, terms []string) bool {
 	if len(terms) == 0 {
 		return true
 	}

@@ -46,7 +46,7 @@ func (m *memStore) List(ctx context.Context, f Filter) ([]draft.Draft, error) {
 	for i := len(m.drafts) - 1; i >= 0; i-- {
 		d := m.drafts[i]
 		if len(f.States) > 0 && !slices.Contains(f.States, d.State) ||
-			f.Unit != nil && *f.Unit != d.Unit || f.Entry != "" && f.Entry != d.Entry ||
+			f.Unit != nil && *f.Unit != d.Unit || f.Task != "" && f.Task != d.Task ||
 			f.Rule != "" && f.Rule != d.Origin.Rule || f.Key != "" && f.Key != d.Origin.Key {
 			continue
 		}

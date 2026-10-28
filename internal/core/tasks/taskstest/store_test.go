@@ -7,6 +7,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 )
 
-func TestEntryStoreContract(t *testing.T) {
+func TestTaskStoreContract(t *testing.T) {
 	taskstest.Contract(t, func(t *testing.T) coretasks.Store { return taskstest.New() })
 }

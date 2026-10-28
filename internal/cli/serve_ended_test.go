@@ -45,7 +45,7 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	d := servedMessages(t, te, db, log)
 	open := waitOpen(t, d, func(ms []message.Message) bool {
-		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.EntryID == "" })
+		return len(ms) == 3 && !slices.ContainsFunc(ms, func(m message.Message) bool { return m.TaskID == "" })
 	})
 	if open[2].Unit != ghUnit(3) {
 		t.Fatalf("a closed pull request's question opened: %+v", open)
@@ -58,7 +58,7 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.State != message.Superseded {
 		t.Fatalf("the merged one's message %+v", m)
 	}
-	inbox, err := db.Entries().Entries(ctx, task.Query{View: task.ViewInbox})
+	inbox, err := db.Tasks().Tasks(ctx, task.Query{View: task.ViewInbox})
 	if err != nil || len(inbox) != 2 {
 		t.Fatalf("inbox %+v %v", inbox, err)
 	}

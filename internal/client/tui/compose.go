@@ -66,9 +66,9 @@ func (m *Model) pickedDraft() (api.Draft, bool) {
 	return m.listedDrafts()[i], true
 }
 
-// draftEntry is the Outbox entry of d, its verbs read from the draft's actions.
-func draftEntry(d api.Draft, title string) api.EntryView {
-	e := api.EntryView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title, Draft: &d}
+// draftTask is the Outbox entry of d, its verbs read from the draft's actions.
+func draftTask(d api.Draft, title string) api.TaskView {
+	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title, Draft: &d}
 	for _, a := range d.Actions {
 		if v, ok := draftVerbs[a.ID]; ok {
 			e.Verbs = append(e.Verbs, api.VerbState{Verb: v, Enabled: a.Enabled, Reason: a.Reason})
@@ -79,8 +79,8 @@ func draftEntry(d api.Draft, title string) api.EntryView {
 
 // pickedVerb runs verb on the picked draft as on an Outbox entry: approve and retry after a y with the
 // revision on screen, discard after a y, edit through the text prompt.
-func (m *Model) pickedVerb(e api.EntryView, d api.Draft, verb string, read uint64) (Command, bool) {
-	de := draftEntry(d, e.Title)
+func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64) (Command, bool) {
+	de := draftTask(d, e.Title)
 	if i := slices.IndexFunc(de.Verbs, func(v api.VerbState) bool { return v.Verb == verb }); i < 0 || !de.Verbs[i].Enabled {
 		reason := "not offered on a draft"
 		if i >= 0 {
@@ -89,7 +89,7 @@ func (m *Model) pickedVerb(e api.EntryView, d api.Draft, verb string, read uint6
 		m.status = verb + ": " + reason
 		return Command{}, false
 	}
-	c := Command{Unit: entryUnit(de.ID), Label: entryLabel(e), Action: verb, entry: de.ID, verb: verb}
+	c := Command{Unit: taskUnit(de.ID), Label: taskLabel(e), Action: verb, task: de.ID, verb: verb}
 	target := draftTarget(de)
 	switch verb {
 	case "edit":
@@ -121,7 +121,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 		m.edit = &EditRequest{Label: "edit", Text: d.Text, submit: submit}
 		return Command{}, false
 	}
-	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(api.EntryView{Draft: &d}) + " (Ctrl+E: editor)", text: []rune(d.Text),
+	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(api.TaskView{Draft: &d}) + " (Ctrl+E: editor)", text: []rune(d.Text),
 		read: read, submit: submit, editor: true}
 	return Command{}, false
 }
@@ -129,8 +129,8 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 // delegatePrompt asks for the delegate's guidance, empty allowed, then runs it as the action chooses
 // (headless when it can); Tab hands it to an agent in a session instead, unless the entry has nowhere
 // to run one, which the label says.
-func (m *Model) delegatePrompt(e api.EntryView, c Command, confirm string, read uint64) (Command, bool) {
-	name, q := entryLabel(e), m.verbQuestion("delegate")
+func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read uint64) (Command, bool) {
+	name, q := taskLabel(e), m.verbQuestion("delegate")
 	labels := map[string]string{
 		"":        "delegate " + name + ": " + q + " (Tab: hand to an agent)",
 		"session": "hand " + name + " to an agent: " + q + " (Tab: draft for me)",
@@ -171,7 +171,7 @@ func (m *Model) delegatePrompt(e api.EntryView, c Command, confirm string, read 
 
 // sessionOff is why the entry's delegate cannot hand it to an agent in a session, "" when it can or the
 // daemon says nothing of its modes.
-func sessionOff(e api.EntryView) string {
+func sessionOff(e api.TaskView) string {
 	for _, v := range e.Verbs {
 		if v.Verb != "delegate" {
 			continue
@@ -190,8 +190,8 @@ func sessionOff(e api.EntryView) string {
 
 // replyPrompt asks for a reply in the entry's conversation, saved to the Outbox; Tab sends it at once,
 // after a y, and Ctrl+E writes it in the editor.
-func (m *Model) replyPrompt(e api.EntryView, c Command, read uint64) (Command, bool) {
-	name := entryLabel(e)
+func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bool) {
+	name := taskLabel(e)
 	labels := map[bool]string{
 		false: m.verbQuestion("reply") + ", on " + name + " (Tab: send now; Ctrl+E: editor)",
 		true:  "reply on " + name + ", sent now (Tab: save to the Outbox; Ctrl+E: editor)",
@@ -220,11 +220,11 @@ func (m *Model) replyPrompt(e api.EntryView, c Command, read uint64) (Command, b
 }
 
 // replyTarget names where an entry's reply goes: its first unit.
-func replyTarget(e api.EntryView) string {
+func replyTarget(e api.TaskView) string {
 	if len(e.Units) > 0 {
 		return e.UnitLabel(0)
 	}
-	return entryLabel(e)
+	return taskLabel(e)
 }
 
 // draftLines adds the drafts listed under the open detail, numbered for the digits that pick them.

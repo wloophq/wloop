@@ -1002,7 +1002,7 @@ line = "Start."
 states = ["done"]
 `
 
-func TestAStartIntentNamesItsWorkspaceSessionAndEntry(t *testing.T) {
+func TestAStartIntentNamesItsWorkspaceSessionAndTask(t *testing.T) {
 	dir := t.TempDir()
 	writeIntent(t, dir, "begin", startLike, "Begin.")
 	l, problems := Load(userLayer(dir), bundledFS(), testBase(), nil)

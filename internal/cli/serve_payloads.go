@@ -24,6 +24,6 @@ func (e *Env) payloadReaders() map[unit.ProviderID]turn.PayloadReader {
 	out := map[unit.ProviderID]turn.PayloadReader{}
 	maps.Copy(out, e.payloads)
 	out[unit.GitHub] = turn.GitHub{PRs: basicsReader{e}}
-	out[task.Codec{}.Provider()] = entryPayloads{e}
+	out[task.Codec{}.Provider()] = taskPayloads{e}
 	return out
 }

@@ -197,11 +197,11 @@ type Env struct {
 	background *sync.WaitGroup
 	// items is the daemon's one items ledger; every writer of items shares it.
 	items *coreitems.Ledger
-	// gtd and messages are the daemon's entries and Inbox messages, built once per daemon; gtdMe is the
+	// tasks and messages are the daemon's entries and Inbox messages, built once per daemon; tasksMe is the
 	// user's identity the entries reconcile with.
-	gtd   *coretasks.Service
-	gtdMe *identity
-	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveGTD.
+	tasks   *coretasks.Service
+	tasksMe *identity
+	// pluginsOff holds the plugins the daemon serves disabled, by config or build; empty until serveTasks.
 	pluginsOff *atomic.Pointer[[]unit.ProviderID]
 	messages   *messages.Service
 	// outbox is the daemon's drafts, built once per daemon by serveOutbox.

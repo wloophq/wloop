@@ -115,10 +115,10 @@ func (r *subjectsRig) item(t *testing.T, u unit.Unit, id string, s items.State, 
 	return it
 }
 
-func (r *subjectsRig) entry(t *testing.T, e task.Entry, op task.ChangeOp) {
+func (r *subjectsRig) task(t *testing.T, e task.Task, op task.ChangeOp) {
 	t.Helper()
 	e.Origin, e.Created, e.Updated = task.OriginUser, testNow.Add(-72*time.Hour), testNow.Add(-72*time.Hour)
-	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: op, Entry: e}}); err != nil {
+	if err := r.db.Tasks().Apply(context.Background(), []task.Change{{Op: op, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -142,19 +142,19 @@ func (r *subjectsRig) planned(t *testing.T) []string {
 	return out
 }
 
-func TestPlanEvaluatesUserWorkflowsOnEntryAndSlackSubjects(t *testing.T) {
+func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	t.Parallel()
 	r := newSubjectsRig(t)
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
-	r.entry(t, task.Entry{ID: "e-01", Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "e-01", Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
 		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
 	want := []string{"my-slack " + subjectThread.String(), "my-waiting entry:e-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
 	}
-	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Entry: "e-01", Kind: draft.Nudge, Purpose: "nudge",
+	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "e-01", Kind: draft.Nudge, Purpose: "nudge",
 		Delivery: draft.Message, Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
 		Approval: draft.Approval{Mode: draft.Wait}, State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestPlanEvaluatesUserWorkflowsOnEntryAndSlackSubjects(t *testing.T) {
 	}
 }
 
-func TestTheSweepWakesOnEntryItemAndDraftChanges(t *testing.T) {
+func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
@@ -178,8 +178,8 @@ func TestTheSweepWakesOnEntryItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := task.Entry{ID: "e-01", Kind: task.KindClose, State: task.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
-	woke("a new entry", func() { r.entry(t, close, task.OpCreate) })
+	close := task.Task{ID: "e-01", Kind: task.KindClose, State: task.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	woke("a new entry", func() { r.task(t, close, task.OpCreate) })
 	if got := r.planned(t); slices.Contains(got, "my-close entry:e-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
 	}
@@ -217,14 +217,14 @@ func TestADisabledSlackPluginListsNoUnits(t *testing.T) {
 	}
 }
 
-func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
+func TestACapturedTaskWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.entry(t, task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
-	derived := task.Entry{ID: "e-02", Kind: task.KindClose, State: task.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
+	r.task(t, task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Task{ID: "e-02", Kind: task.KindClose, State: task.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
 		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
-	if err := r.db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: derived}}); err != nil {
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: derived}}); err != nil {
 		t.Fatal(err)
 	}
 	closes := func() []string {

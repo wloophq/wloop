@@ -31,7 +31,7 @@ type actionCall struct {
 
 type verbCall struct {
 	id, verb string
-	req      api.EntryRequest
+	req      api.TaskRequest
 }
 
 type fakeDaemon struct {
@@ -54,23 +54,23 @@ type fakeDaemon struct {
 	paused     []bool
 	app        []api.AppStatus
 	jobs       []string
-	failing    error // Action and EntryDo answer it
+	failing    error // Action and TaskDo answer it
 	output     []string
 	plugins    []api.Plugin // nil: github enabled with its In loop section
 	pluginsN   int
 	pluginsErr error // Plugins answers it
 
-	entries      map[string][]api.EntryView // by view
-	entryDelta   map[string]*api.EntriesPage
-	counters     api.Counters
-	entryReads   int
-	entrySinces  map[string][]api.Since
-	verbs        []verbCall
-	result       api.EntryResult
-	entryLookups int
-	digests      map[string]api.Digest
-	digestDays   []string
-	digestErr    error
+	tasks       map[string][]api.TaskView // by view
+	taskDelta   map[string]*api.TasksPage
+	counters    api.Counters
+	taskReads   int
+	taskSinces  map[string][]api.Since
+	verbs       []verbCall
+	result      api.TaskResult
+	taskLookups int
+	digests     map[string]api.Digest
+	digestDays  []string
+	digestErr   error
 }
 
 func (f *fakeDaemon) RowsSince(_ context.Context, since api.Since) (api.RowsPage, error) {
@@ -102,42 +102,42 @@ func (f *fakeDaemon) RowsSince(_ context.Context, since api.Since) (api.RowsPage
 	return api.RowsPage{Epoch: "e1", Rev: uint64(f.reads), Full: true, Rows: rows, Removed: []unit.Unit{}}, nil
 }
 
-func (f *fakeDaemon) EntriesSince(_ context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error) {
+func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.entryReads++
-	if f.entrySinces == nil {
-		f.entrySinces = map[string][]api.Since{}
+	f.taskReads++
+	if f.taskSinces == nil {
+		f.taskSinces = map[string][]api.Since{}
 	}
-	f.entrySinces[q.View] = append(f.entrySinces[q.View], since)
+	f.taskSinces[q.View] = append(f.taskSinces[q.View], since)
 	if f.err != nil {
-		return api.EntriesPage{}, f.err
+		return api.TasksPage{}, f.err
 	}
-	if p := f.entryDelta[q.View]; p != nil {
-		delete(f.entryDelta, q.View)
+	if p := f.taskDelta[q.View]; p != nil {
+		delete(f.taskDelta, q.View)
 		return *p, nil
 	}
 	if since != (api.Since{}) {
-		return api.EntriesPage{Epoch: "e1", Rev: uint64(f.entryReads), Entries: []api.EntryView{}, Removed: []string{}, Counters: f.counters}, nil
+		return api.TasksPage{Epoch: "e1", Rev: uint64(f.taskReads), Tasks: []api.TaskView{}, Removed: []string{}, Counters: f.counters}, nil
 	}
-	return api.EntriesPage{Epoch: "e1", Rev: uint64(f.entryReads), Full: true, Entries: slices.Clone(f.entries[q.View]), Removed: []string{}, Counters: f.counters}, nil
+	return api.TasksPage{Epoch: "e1", Rev: uint64(f.taskReads), Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters}, nil
 }
 
-func (f *fakeDaemon) Entry(_ context.Context, id string) (api.EntryView, error) {
+func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.entryLookups++
-	for _, list := range f.entries {
+	f.taskLookups++
+	for _, list := range f.tasks {
 		for _, e := range list {
 			if e.ID == id {
 				return e, nil
 			}
 		}
 	}
-	return api.EntryView{}, errors.New("no entry " + id)
+	return api.TaskView{}, errors.New("no entry " + id)
 }
 
-func (f *fakeDaemon) EntryDo(_ context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error) {
+func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.verbs = append(f.verbs, verbCall{id, verb, req})
@@ -362,7 +362,7 @@ func (r *rig) openedURLs() []string {
 }
 
 func newDaemon() *fakeDaemon {
-	return &fakeDaemon{rows: map[string][]api.Row{}, entries: map[string][]api.EntryView{}, entryDelta: map[string]*api.EntriesPage{}, digests: map[string]api.Digest{}}
+	return &fakeDaemon{rows: map[string][]api.Row{}, tasks: map[string][]api.TaskView{}, taskDelta: map[string]*api.TasksPage{}, digests: map[string]api.Digest{}}
 }
 
 func newRig(t *testing.T) *rig {

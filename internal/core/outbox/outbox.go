@@ -21,7 +21,7 @@ import (
 type Proposal struct {
 	Unit                   unit.Unit
 	Items                  []string
-	Entry                  string
+	Task                   string
 	Kind                   draft.Kind
 	Target, Text, Reaction string
 	// Replaced is the text a recorded edit replaced.
@@ -48,7 +48,7 @@ type Proposal struct {
 type Filter struct {
 	States    []draft.State
 	Unit      *unit.Unit
-	Entry     string
+	Task      string
 	Rule, Key string
 	// Workflow keeps the drafts whose Origin.Workflow is it; "" any.
 	Workflow string
@@ -100,7 +100,7 @@ type ItemReader interface {
 type Results interface {
 	// AttachesPosts says whether the turns of intent attach their posts.
 	AttachesPosts(intent string) bool
-	Attach(ctx context.Context, entry task.ID, u unit.Unit) error
+	Attach(ctx context.Context, tk task.ID, u unit.Unit) error
 }
 
 type Service struct {
@@ -150,7 +150,7 @@ func (s *Service) Propose(ctx context.Context, p Proposal) (draft.Draft, error) 
 	}
 	now := s.Clock.Now()
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
+		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction,
 		Original: p.Text, Origin: p.Origin, State: draft.Proposed, CreatedAt: now, UpdatedAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
 	}))
@@ -584,7 +584,7 @@ func (s *Service) RecordSent(ctx context.Context, p Proposal, ev draft.Evidence)
 		ev.At = now
 	}
 	d := s.delivered(shaped(draft.Draft{
-		Unit: p.Unit, Items: p.Items, Entry: p.Entry, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
+		Unit: p.Unit, Items: p.Items, Task: p.Task, Kind: p.Kind, Target: p.Target, Text: p.Text, Reaction: p.Reaction, Replaced: p.Replaced,
 		Original: p.Text, Origin: p.Origin, State: draft.Sent, Evidence: ev, CreatedAt: now, UpdatedAt: now, SendingAt: now,
 		Purpose: p.Purpose, Delivery: p.Delivery, Effects: p.Effects,
 	}))
@@ -634,12 +634,12 @@ func (s *Service) attachPost(ctx context.Context, d draft.Draft) error {
 	}
 	id, ok := task.IDOf(d.Origin.Unit)
 	posted := d.Unit
-	if onEntry, isEntry := task.IDOf(d.Unit); isEntry {
+	if onTask, isTask := task.IDOf(d.Unit); isTask {
 		landed, found, err := s.landed(ctx, d)
 		if err != nil || !found {
 			return err
 		}
-		id, ok, posted = onEntry, true, landed
+		id, ok, posted = onTask, true, landed
 	}
 	if !ok || !s.Results.AttachesPosts(d.Origin.Intent) {
 		return nil

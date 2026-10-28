@@ -523,8 +523,8 @@ func TestViewsSectionSetsOnlyItsColumns(t *testing.T) {
 	}
 }
 
-func TestGTDDefaultsAndParsing(t *testing.T) {
-	if d := Defaults().GTD; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 {
+func TestTaskSettingsDefaultsAndParsing(t *testing.T) {
+	if d := Defaults().Tasks; d.StaleWaitingDays != 2 || len(d.Areas) != 0 || len(d.Contexts) != 0 {
 		t.Fatalf("defaults %+v", d)
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
@@ -536,7 +536,7 @@ func TestGTDDefaultsAndParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g := c.GTD; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" {
+	if g := c.Tasks; g.StaleWaitingDays != 3 || strings.Join(g.Areas, ",") != "OSS,Hiring" || strings.Join(g.Contexts, ",") != "@decide,@reply" {
 		t.Fatalf("gtd %+v", g)
 	}
 }

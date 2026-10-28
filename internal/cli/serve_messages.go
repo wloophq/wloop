@@ -17,12 +17,12 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 		return d
 	}
 	ledger := e.itemsLedger(db, cfg, logf)
-	entries := e.entries(db, cfg, ledger)
+	tasks := e.newTasks(db, cfg, ledger)
 	if e.messages == nil {
 		e.messages = &messages.Service{Store: inventory.NewMessages(db), Books: openPRBooks{sqlite.New(db), inventory.New(db)}, Turns: e.Turns,
-			Ledger: ledger, Entries: entries, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf}
+			Ledger: ledger, Tasks: tasks, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf}
 	}
-	d.GTD, d.Messages = entries, e.messages
+	d.Tasks, d.Messages = tasks, e.messages
 	if e.changes != nil {
 		e.background.Go(func() { e.messages.Run(ctx, e.changes) })
 		e.background.Go(func() { reconcileEnded(ctx, e.messages, e.changes, logf) })

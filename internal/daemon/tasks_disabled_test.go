@@ -13,26 +13,26 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *testing.T) {
+func TestADisabledPluginsTasksAndDraftsLeaveTheCountsAndStayDismissable(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, unit.GitHub, "slack")
 	ctx := context.Background()
-	r.put(t, task.Entry{ID: "e-gh", Kind: task.KindAction, State: task.Inbox, Title: "reply", Units: []unit.Unit{r7u}})
-	r.put(t, task.Entry{ID: "e-mine", Kind: task.KindAction, State: task.Inbox, Title: "mine"})
+	r.put(t, task.Task{ID: "e-gh", Kind: task.KindAction, State: task.Inbox, Title: "reply", Units: []unit.Unit{r7u}})
+	r.put(t, task.Task{ID: "e-mine", Kind: task.KindAction, State: task.Inbox, Title: "mine"})
 	d := r.stored(t, draft.Draft{Unit: slackUnit, Text: "hi", State: draft.Proposed})
 
 	inbox := r.page(t, "view=inbox")
-	if got := entryIDs(inbox.Entries); len(got) != 1 || got[0] != "e-mine" {
+	if got := taskIDs(inbox.Tasks); len(got) != 1 || got[0] != "e-mine" {
 		t.Fatalf("inbox %v", got)
 	}
 	if c := inbox.Counters; c.Badge != 1 || c.Views["inbox"] != 1 || c.Views["outbox"] != 0 {
 		t.Fatalf("counters %+v", c)
 	}
-	if p := r.page(t, "view=outbox"); len(p.Entries) != 0 {
-		t.Fatalf("outbox %v", entryIDs(p.Entries))
+	if p := r.page(t, "view=outbox"); len(p.Tasks) != 0 {
+		t.Fatalf("outbox %v", taskIDs(p.Tasks))
 	}
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-gh"), &v); code != 200 {
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-gh"), &v); code != 200 {
 		t.Fatalf("GET by id: %d", code)
 	}
 	for _, vs := range v.Verbs {
@@ -40,14 +40,14 @@ func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *tes
 			t.Errorf("%+v", vs)
 		}
 	}
-	if rec := post(t, r.s, api.EntryPath("e-gh", "next"), `{"source":"cockpit"}`); rec.Code != 409 {
+	if rec := post(t, r.s, api.TaskPath("e-gh", "next"), `{"source":"cockpit"}`); rec.Code != 409 {
 		t.Fatalf("next: %d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-gh", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
+	if rec := post(t, r.s, api.TaskPath("e-gh", "dismiss"), `{"source":"cockpit"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"trash"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
-	var dv api.EntryView
-	if code := get(t, r.s, api.EntryPath(fmt.Sprintf("draft:%d", d.ID)), &dv); code != 200 {
+	var dv api.TaskView
+	if code := get(t, r.s, api.TaskPath(fmt.Sprintf("draft:%d", d.ID)), &dv); code != 200 {
 		t.Fatalf("GET the draft: %d", code)
 	}
 	for _, vs := range dv.Verbs {
@@ -66,15 +66,15 @@ func TestADisabledPluginsEntriesAndDraftsLeaveTheCountsAndStayDismissable(t *tes
 	}
 }
 
-func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
+func TestDismissDetachesADisabledPluginFromAMixedTask(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
-	r.put(t, task.Entry{ID: "e-mixed", Kind: task.KindAction, State: task.Inbox, Title: "both", Units: []unit.Unit{slackUnit, r7u}})
-	if got := entryIDs(r.page(t, "view=inbox").Entries); len(got) != 1 || got[0] != "e-mixed" {
+	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: task.Inbox, Title: "both", Units: []unit.Unit{slackUnit, r7u}})
+	if got := taskIDs(r.page(t, "view=inbox").Tasks); len(got) != 1 || got[0] != "e-mixed" {
 		t.Fatalf("inbox %v", got)
 	}
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-mixed"), &v); code != 200 {
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-mixed"), &v); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range v.Verbs {
@@ -82,18 +82,18 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 			t.Errorf("%+v", vs)
 		}
 	}
-	if rec := post(t, r.s, api.EntryPath("e-mixed", "next"), `{"source":"cockpit"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+	if rec := post(t, r.s, api.TaskPath("e-mixed", "next"), `{"source":"cockpit"}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
 		t.Fatalf("next: %d %s", rec.Code, rec.Body)
 	}
-	rec := post(t, r.s, api.EntryPath("e-mixed", "dismiss"), `{"source":"cockpit"}`)
+	rec := post(t, r.s, api.TaskPath("e-mixed", "dismiss"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"state":"inbox"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
-	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || !slices.Equal(got.Units, []unit.Unit{r7u}) || got.State != task.Inbox {
+	if got, err := r.g.Task(context.Background(), "e-mixed"); err != nil || !slices.Equal(got.Units, []unit.Unit{r7u}) || got.State != task.Inbox {
 		t.Fatalf("detached %+v %v", got, err)
 	}
-	var after api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-mixed"), &after); code != 200 {
+	var after api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-mixed"), &after); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range after.Verbs {
@@ -101,9 +101,9 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 			t.Errorf("still refused: %+v", vs)
 		}
 	}
-	r.put(t, task.Entry{ID: "e-trashed", Kind: task.KindAction, State: task.Trash, Title: "gone", Units: []unit.Unit{r7u, slackUnit}})
-	var trashed api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-trashed"), &trashed); code != 200 {
+	r.put(t, task.Task{ID: "e-trashed", Kind: task.KindAction, State: task.Trash, Title: "gone", Units: []unit.Unit{r7u, slackUnit}})
+	var trashed api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-trashed"), &trashed); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range trashed.Verbs {
@@ -113,12 +113,12 @@ func TestDismissDetachesADisabledPluginFromAMixedEntry(t *testing.T) {
 	}
 }
 
-func TestDismissOnAMixedEntryRunsItsEnabledUnitsAction(t *testing.T) {
+func TestDismissOnAMixedTaskRunsItsEnabledUnitsAction(t *testing.T) {
 	t.Parallel()
 	r := newOutboxRig(t, "slack")
-	r.put(t, task.Entry{ID: "e-mixed", Kind: task.KindAction, State: task.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-mixed"), &v); code != 200 {
+	r.put(t, task.Task{ID: "e-mixed", Kind: task.KindAction, State: task.Inbox, Title: "both", Units: []unit.Unit{r7u, slackUnit}})
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-mixed"), &v); code != 200 {
 		t.Fatalf("GET: %d", code)
 	}
 	for _, vs := range v.Verbs {
@@ -126,10 +126,10 @@ func TestDismissOnAMixedEntryRunsItsEnabledUnitsAction(t *testing.T) {
 			t.Errorf("dismiss follows the row of %s: %+v", r7u.Label(), vs)
 		}
 	}
-	if rec := post(t, r.s, api.EntryPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 || strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
+	if rec := post(t, r.s, api.TaskPath("e-mixed", "dismiss"), `{"source":"cockpit"}`); rec.Code != 409 || strings.Contains(rec.Body.String(), `"plugin":"slack"`) {
 		t.Fatalf("dismiss: %d %s", rec.Code, rec.Body)
 	}
-	if got, err := r.g.Entry(context.Background(), "e-mixed"); err != nil || len(got.Units) != 2 || got.State != task.Inbox {
+	if got, err := r.g.Task(context.Background(), "e-mixed"); err != nil || len(got.Units) != 2 || got.State != task.Inbox {
 		t.Fatalf("untouched %+v %v", got, err)
 	}
 }

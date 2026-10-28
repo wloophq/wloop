@@ -25,5 +25,5 @@ func SettledAt(ds []Draft, workflow string, subject unit.Unit) time.Time {
 }
 
 func on(d Draft, subject unit.Unit) bool {
-	return d.Unit == subject || d.Entry != "" && task.UnitOf(task.ID(d.Entry)) == subject
+	return d.Unit == subject || d.Task != "" && task.UnitOf(task.ID(d.Task)) == subject
 }

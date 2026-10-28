@@ -88,7 +88,7 @@ func TestGitHubDelegateRunsReviewWithActLoaded(t *testing.T) {
 	if st, ok := c.s.offeredFor(row, task.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
 		t.Fatalf("delegate runs %q (%v), want review", st.ID, ok)
 	}
-	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit"}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit"}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "review accepted as intake") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -149,22 +149,22 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 	}
 }
 
-func TestTheBridgeDelegatesActHeadlessWithTheEntrysItems(t *testing.T) {
+func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 	t.Parallel()
 	s, h := newThreadActServer(t)
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := task.Entry{ID: "e-t", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
+	e := task.Task{ID: "e-t", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
 		Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
-	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
+	s.runBridge(rec, apiRequest("POST", api.TaskPath("e-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.TaskRequest{Source: "cockpit"})
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Entry != "e-t" {
+	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Task != "e-t" {
 		t.Fatalf("started %+v", h.got)
 	}
 	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "cockpit" {

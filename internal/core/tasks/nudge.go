@@ -15,17 +15,17 @@ import (
 func (s *Service) Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var es []task.Entry
+	var es []task.Task
 	if len(ids) == 0 {
-		got, err := s.d.Store.EntriesOf(ctx, u)
+		got, err := s.d.Store.TasksOf(ctx, u)
 		if err != nil {
 			return err
 		}
 		es = got
 	}
 	for _, id := range ids {
-		e, err := s.d.Store.Entry(ctx, id)
-		if errors.Is(err, ErrNoEntry) {
+		e, err := s.d.Store.Task(ctx, id)
+		if errors.Is(err, ErrNoTask) {
 			continue
 		}
 		if err != nil {
@@ -42,7 +42,7 @@ func (s *Service) Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at tim
 		w := *e.Waiting
 		w.LastNudge = at
 		e.Waiting, e.Updated = &w, now
-		cs = append(cs, task.Change{Op: task.OpUpdate, Entry: e, Why: "nudged"})
+		cs = append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "nudged"})
 	}
 	if len(cs) == 0 {
 		return nil

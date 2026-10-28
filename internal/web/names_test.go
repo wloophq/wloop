@@ -37,9 +37,9 @@ process.stdout.write(JSON.stringify(input.rows.map((r) => {
 	}
 }
 
-func slackEntry() api.EntryView {
+func slackTask() api.TaskView {
 	at := time.Date(2026, 10, 23, 14, 15, 0, 0, time.UTC)
-	return entry("e-9", "waiting", func(e *api.EntryView) {
+	return task("e-9", "waiting", func(e *api.TaskView) {
 		e.Kind = "waiting"
 		e.Units = []unit.Unit{slackUnit}
 		e.UnitLabels = []string{"#general"}
@@ -50,12 +50,12 @@ func slackEntry() api.EntryView {
 	})
 }
 
-func TestSlackEntryDetailReadsByName(t *testing.T) {
+func TestSlackTaskDetailReadsByName(t *testing.T) {
 	var got struct {
 		Text, Head string
 		Pills      int
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
 (async () => {
   await loadDetailPane({ entry: "e-9" });
@@ -63,7 +63,7 @@ globalThis.document = { activeElement: null, body: { classList: { add() {} } } }
   renderEntryDetail(box, { entry: "e-9" });
   const head = byClass(box.kids, "d-head")[0];
   process.stdout.write(JSON.stringify({ Text: text(box.kids), Head: text(head), Pills: byClass(head, "pill").filter((p) => text(p) === "waiting").length }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-9": slackEntry()}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/entries/e-9": slackTask()}}, &got)
 	if strings.Contains(got.Text, "[object ") {
 		t.Errorf("the detail prints an element list as text: %s", got.Text)
 	}
@@ -146,11 +146,11 @@ func TestRailGroupsViewsByPlugin(t *testing.T) {
 		Title string
 		Views []string
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const nav = gtdNav(input.cat, input.served, [], null);
 const names = { github: "GitHub", slack: "Slack" };
 process.stdout.write(JSON.stringify(railSections(nav, (p) => names[p]).map((s) => ({ Title: s.title, Views: s.views.map((v) => v.id) }))));`,
-		map[string]any{"cat": gtdCatalog(), "served": served}, &got)
+		map[string]any{"cat": viewsCatalog(), "served": served}, &got)
 	if len(got) != 3 || got[0].Title != "" || !slices.Equal(got[0].Views, coreViewIDs) ||
 		got[1].Title != "GitHub" || !slices.Equal(got[1].Views, []string{"needs-me", "all"}) ||
 		got[2].Title != "Slack" || !slices.Equal(got[2].Views, []string{"slack"}) {

@@ -26,38 +26,38 @@ function safeURL(u) { return u; }
 function stamp(t) { return String(t); }
 `
 
-// gtdCatalog is GET /api/gtd with the core views the daemon serves.
-func gtdCatalog() api.GTDCatalog {
-	return api.GTDCatalog{
-		Views: []api.GTDView{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "next", Label: "Next"},
+// viewsCatalog is GET /api/gtd with the core views the daemon serves.
+func viewsCatalog() api.ViewsCatalog {
+	return api.ViewsCatalog{
+		Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "next", Label: "Next"},
 			{ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"}, {ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}},
 		Areas:    []string{"OSS", "Hiring"},
 		Contexts: []string{"@decide", "@reply"},
-		Verbs: []api.GTDVerb{{Verb: "approve", Label: "Approve"}, {Verb: "edit", Label: "Edit"}, {Verb: "dismiss", Label: "Discard"},
+		Verbs: []api.VerbSpec{{Verb: "approve", Label: "Approve"}, {Verb: "edit", Label: "Edit"}, {Verb: "dismiss", Label: "Discard"},
 			{Verb: "retry", Label: "Retry"}},
 	}
 }
 
 var coreViewIDs = []string{"focus", "inbox", "outbox", "next", "waiting", "projects", "someday", "logbook"}
 
-// noGTD stands in for views.js where a test runs app.js's loading alone.
-const noGTD = "const loadGTD = async () => {};\n"
+// noViews stands in for views.js where a test runs app.js's loading alone.
+const noViews = "const loadGTD = async () => {};\n"
 
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\n"
 
-// gtdScripts are routes.js, views.js and detail.js.
-func gtdScripts(t *testing.T) string {
+// viewsScripts are routes.js, views.js and detail.js.
+func viewsScripts(t *testing.T) string {
 	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "detail.js")
 }
 
-// gtdPrelude is plugins.js, routes.js, views.js and detail.js over a tree h.
-func gtdPrelude(t *testing.T) string {
-	return treeJS + pluginsJS(t) + gtdScripts(t)
+// viewsPrelude is plugins.js, routes.js, views.js and detail.js over a tree h.
+func viewsPrelude(t *testing.T) string {
+	return treeJS + pluginsJS(t) + viewsScripts(t)
 }
 
-func entry(id, state string, mod func(*api.EntryView)) api.EntryView {
-	e := api.EntryView{ID: id, Kind: "action", State: state, Title: "Entry " + id, Contexts: []string{}, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
+func task(id, state string, mod func(*api.TaskView)) api.TaskView {
+	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Entry " + id, Contexts: []string{}, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
 		Created: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), Updated: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	if mod != nil {
 		mod(&e)
@@ -72,10 +72,10 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 		Counts []any    `json:"counts"`
 	}
 	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "next": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
-	nodeRun(t, catalogPrelude(t)+gtdPrelude(t), nil, `
+	nodeRun(t, catalogPrelude(t)+viewsPrelude(t), nil, `
 const nav = gtdNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
-		map[string]any{"cat": gtdCatalog(), "counters": counters}, &got)
+		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
 	plugin := []string{"needs-me", "stalled", "mine", "loop", "plan", "approved", "dash", "done", "all", "explore", "recent"}
 	want := slices.Concat(coreViewIDs, plugin, []string{"fake-board"})
 	if !slices.Equal(got.IDs, want) {
@@ -104,7 +104,7 @@ func TestDisabledPluginViewsVanish(t *testing.T) {
 		Enabled  string   `json:"enabled"`
 		CoreStay string   `json:"core_stay"`
 	}
-	nodeRun(t, catalogPrelude(t)+gtdPrelude(t), nil, `
+	nodeRun(t, catalogPrelude(t)+viewsPrelude(t), nil, `
 const served = catalog.views;
 const nav = gtdNav(input.cat, [], [], null);
 process.stdout.write(JSON.stringify({
@@ -113,7 +113,7 @@ process.stdout.write(JSON.stringify({
   before: gtdResolveView("needs-me", null, [], () => false),
   enabled: gtdResolveView("needs-me", input.cat, served, () => false),
   core_stay: gtdResolveView("waiting", input.cat, [], () => false),
-}));`, map[string]any{"cat": gtdCatalog()}, &got)
+}));`, map[string]any{"cat": viewsCatalog()}, &got)
 	if !slices.Equal(got.IDs, coreViewIDs) {
 		t.Errorf("nav with the GitHub plugin off %v, want the core views alone", got.IDs)
 	}
@@ -126,27 +126,27 @@ process.stdout.write(JSON.stringify({
 }
 
 func TestGroupingPerView(t *testing.T) {
-	entries := []api.EntryView{
-		entry("e-1", "next", func(e *api.EntryView) { e.Contexts = []string{"@reply"} }),
-		entry("e-2", "next", func(e *api.EntryView) { e.Contexts = []string{"@decide", "@reply"} }),
-		entry("e-3", "next", nil),
-		entry("e-4", "next", func(e *api.EntryView) { e.Contexts = []string{"@reply"} }),
+	tasks := []api.TaskView{
+		task("e-1", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
+		task("e-2", "next", func(e *api.TaskView) { e.Contexts = []string{"@decide", "@reply"} }),
+		task("e-3", "next", nil),
+		task("e-4", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
 	}
-	waiting := []api.EntryView{
-		entry("w-1", "waiting", func(e *api.EntryView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
-		entry("w-2", "waiting", func(e *api.EntryView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "alice"}}} }),
-		entry("w-3", "waiting", func(e *api.EntryView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
+	waiting := []api.TaskView{
+		task("w-1", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
+		task("w-2", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "alice"}}} }),
+		task("w-3", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
 	}
-	logbook := []api.EntryView{entry("d-1", "done", nil), entry("r-1", "reference", nil), entry("d-2", "done", nil)}
+	logbook := []api.TaskView{task("d-1", "done", nil), task("r-1", "reference", nil), task("d-2", "done", nil)}
 	type group struct {
 		Label string   `json:"label"`
 		IDs   []string `json:"ids"`
 	}
 	var got map[string][]group
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const g = (v, es) => gtdGroups(v, es).map((x) => ({ label: x.label, ids: x.entries.map((e) => e.id) }));
 process.stdout.write(JSON.stringify({ next: g("next", input.next), waiting: g("waiting", input.waiting), logbook: g("logbook", input.logbook), inbox: g("inbox", input.next) }));`,
-		map[string]any{"next": entries, "waiting": waiting, "logbook": logbook}, &got)
+		map[string]any{"next": tasks, "waiting": waiting, "logbook": logbook}, &got)
 	want := map[string][]group{
 		"next":    {{"@decide", []string{"e-2"}}, {"@reply", []string{"e-1", "e-4"}}, {"No context", []string{"e-3"}}},
 		"waiting": {{"alice", []string{"w-2"}}, {"bob", []string{"w-1", "w-3"}}},
@@ -161,17 +161,17 @@ process.stdout.write(JSON.stringify({ next: g("next", input.next), waiting: g("w
 }
 
 func TestNavCountsComeFromThePage(t *testing.T) {
-	full := api.EntriesPage{Epoch: "ep", Rev: 4, Full: true, Removed: []string{},
-		Entries:  []api.EntryView{entry("e-1", "inbox", nil), entry("e-2", "inbox", nil)},
+	full := api.TasksPage{Epoch: "ep", Rev: 4, Full: true, Removed: []string{},
+		Tasks:    []api.TaskView{task("e-1", "inbox", nil), task("e-2", "inbox", nil)},
 		Counters: api.Counters{Views: map[string]int{"inbox": 2}}}
-	delta := api.EntriesPage{Epoch: "ep", Rev: 6, Removed: []string{"e-1"}, Entries: []api.EntryView{},
+	delta := api.TasksPage{Epoch: "ep", Rev: 6, Removed: []string{"e-1"}, Tasks: []api.TaskView{},
 		Counters: api.Counters{Views: map[string]int{"inbox": 1}}}
 	var got struct {
 		Asked  []string `json:"asked"`
 		Counts []any    `json:"counts"`
 		Lens   []int    `json:"lens"`
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const asked = []; const pages = [input.full, input.delta];
 async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input.cat : pages.shift(); }
 const inboxCount = () => gtdNav(gtdState.catalog, [], [], gtdState.counters).find((v) => v.id === "inbox").count;
@@ -185,7 +185,7 @@ const inboxCount = () => gtdNav(gtdState.catalog, [], [], gtdState.counters).fin
   if (change.counters) await loadGTD(route);
   counts.push(inboxCount()); lens.push(gtdState.entries.length);
   process.stdout.write(JSON.stringify({ asked, counts, lens }));
-})();`, map[string]any{"cat": gtdCatalog(), "full": full, "delta": delta}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "full": full, "delta": delta}, &got)
 	if len(got.Counts) != 2 || got.Counts[0] != float64(2) || got.Counts[1] != float64(1) || !slices.Equal(got.Lens, []int{2, 1}) {
 		t.Errorf("counts %v with lists of %v, want the page's 2 then 1", got.Counts, got.Lens)
 	}
@@ -202,7 +202,7 @@ func TestAreaSparesInbox(t *testing.T) {
 		Hash  string            `json:"hash"`
 		Asked []string          `json:"asked"`
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const urls = {};
 for (const v of input.views) urls[v] = entriesURL(v, "OSS", [], "");
 const asked = [];
@@ -217,7 +217,7 @@ async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input.cat :
     route: readRoute(routeHash("next", "", new URLSearchParams({ area: "OSS" }))),
     hash: routeHash("next", "", new URLSearchParams({ area: "OSS" })),
   }));
-})();`, map[string]any{"cat": gtdCatalog(), "views": coreViewIDs}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "views": coreViewIDs}, &got)
 	for _, v := range coreViewIDs {
 		has := strings.Contains(got.URLs[v], "area=OSS")
 		if has == (v == "inbox") {
@@ -268,15 +268,15 @@ process.stdout.write(JSON.stringify({ Row: text(tr), Card: text(c), Keys: Object
 	}
 }
 
-func outboxEntries() []api.EntryView {
-	return []api.EntryView{
-		entry("draft:7", "inbox", func(e *api.EntryView) {
+func outboxTasks() []api.TaskView {
+	return []api.TaskView{
+		task("draft:7", "inbox", func(e *api.TaskView) {
 			e.Kind, e.Title = "draft", "Reply to the deploy thread"
 			e.Draft = &api.Draft{ID: 7, Unit: "slack/T1/C1", Kind: "reply", Target: "C1", Where: `#deploys in the thread "Deploy at five"`, Text: "Deployed, all green.", State: "proposed", Rev: 3,
 				Would: api.DraftWould{Policy: "release", Reason: "a reply from a turn"}}
 			e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "edit", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "retry", Enabled: false}}
 		}),
-		entry("draft:8", "inbox", func(e *api.EntryView) {
+		task("draft:8", "inbox", func(e *api.TaskView) {
 			e.Kind, e.Title = "draft", "Nudge the reviewer"
 			e.Draft = &api.Draft{ID: 8, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Ping?", State: "failed", Error: "rate limited", Rev: 5,
 				Would: api.DraftWould{Policy: "hold", Reason: "low confidence"}}
@@ -293,7 +293,7 @@ func TestOutboxListsDraftsAndApproves(t *testing.T) {
 		Editing []string          `json:"editing"`
 		Areas   map[string]string `json:"areas"`
 	}
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const posts = [];
 detailEnv.post = async (path, body) => { posts.push({ path, body }); return { entry: {} }; };
 detailEnv.notice = () => {}; detailEnv.changed = () => {}; detailEnv.render = () => {};
@@ -316,7 +316,7 @@ const buttons = cards.map(buttonLabels);
   await byFocus(first, "outbox:dismiss:draft:8").attrs.onclick();
   await byFocus(first, "outbox:retry:draft:8").attrs.onclick();
   process.stdout.write(JSON.stringify({ text: text(first), buttons, posts, editing: buttonLabels(byClass(editing, "d-draft")[0]) }));
-})();`, map[string]any{"cat": gtdCatalog(), "entries": outboxEntries()}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "entries": outboxTasks()}, &got)
 	for _, s := range []string{`To #deploys in the thread "Deploy at five"`, "Deployed, all green.", "Auto-send would release: a reply from a turn",
 		"To acme/api#8 (destination unknown)", "Ping?", "rate limited", "Auto-send would hold: low confidence"} {
 		if !strings.Contains(got.Text, s) {
@@ -347,7 +347,7 @@ const buttons = cards.map(buttonLabels);
 
 func TestUnitLabelFallsBackToTheUnitForEveryProvider(t *testing.T) {
 	var got []string
-	nodeRun(t, gtdPrelude(t), nil, `process.stdout.write(JSON.stringify([
+	nodeRun(t, viewsPrelude(t), nil, `process.stdout.write(JSON.stringify([
   unitLabel({ provider: "github", key: "acme/api#7" }), unitLabel({ provider: "linear", key: "PAY-88" }), unitLabel(null)]));`, nil, &got)
 	if want := []string{"github:acme/api#7", "linear:PAY-88", ""}; !slices.Equal(got, want) {
 		t.Fatalf("labels %q, want %q", got, want)

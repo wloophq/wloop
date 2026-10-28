@@ -15,12 +15,12 @@ import (
 
 var prUnit = unit.Unit{Provider: "github", Key: "acme/api#8"}
 
-func questionEntry() api.EntryView {
-	return entry("e-1", "inbox", func(e *api.EntryView) {
+func questionTask() api.TaskView {
+	return task("e-1", "inbox", func(e *api.TaskView) {
 		e.Title, e.Contexts, e.Changed = "Pick a fix", []string{"@decide"}, true
 		e.Units = []unit.Unit{prUnit}
 		e.Items = []api.ItemView{{Unit: prUnit, ID: "gh:review", Summary: "Review the retry change", State: "open", Kind: "action"}}
-		e.Message = &api.Message{ID: 3, EntryID: "e-1", Unit: prUnit, Kind: "question", Text: "Retry or revert?", State: "open", Recommend: "b",
+		e.Message = &api.Message{ID: 3, TaskID: "e-1", Unit: prUnit, Kind: "question", Text: "Retry or revert?", State: "open", Recommend: "b",
 			Options: []record.Option{{ID: "a", Label: "Retry"}, {ID: "b", Label: "Revert"}}}
 		e.Cards = []api.CardView{{Card: card.Card{Unit: prUnit, Title: "Retry flaky uploads", State: "open", Why: "your review is requested",
 			Link: "https://github.com/acme/api/pull/8", Signals: []card.Signal{{Key: "checks", Value: "failing", Tone: "bad"}},
@@ -38,8 +38,8 @@ detailEnv.post = async (path, body) => { posts.push({ path, body }); return { en
 detailEnv.notice = () => {}; detailEnv.changed = () => {}; detailEnv.render = () => {};
 `
 
-func TestEntryDetailSections(t *testing.T) {
-	e := questionEntry()
+func TestTaskDetailSections(t *testing.T) {
+	e := questionTask()
 	var got struct {
 		Before, After string
 		Questions     int
@@ -48,7 +48,7 @@ func TestEntryDetailSections(t *testing.T) {
 		LogAfter      bool
 		Asked         []string
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-1" });
   const before = entryPane(detailState.entry);
@@ -82,11 +82,11 @@ func TestEntryDetailSections(t *testing.T) {
 }
 
 func TestUnitDetailRoute(t *testing.T) {
-	mine := entry("e-1", "next", func(e *api.EntryView) { e.Units = []unit.Unit{prUnit} })
-	other := entry("e-2", "next", func(e *api.EntryView) { e.Units = []unit.Unit{{Provider: "github", Key: "acme/api#80"}} })
-	waiting := entry("e-3", "waiting", func(e *api.EntryView) { e.Units = []unit.Unit{prUnit} })
-	page := func(es ...api.EntryView) api.EntriesPage {
-		return api.EntriesPage{Full: true, Entries: es, Removed: []string{}}
+	mine := task("e-1", "next", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
+	other := task("e-2", "next", func(e *api.TaskView) { e.Units = []unit.Unit{{Provider: "github", Key: "acme/api#80"}} })
+	waiting := task("e-3", "waiting", func(e *api.TaskView) { e.Units = []unit.Unit{prUnit} })
+	page := func(es ...api.TaskView) api.TasksPage {
+		return api.TasksPage{Full: true, Tasks: es, Removed: []string{}}
 	}
 	detail := map[string]any{"row": map[string]any{"unit": prUnit}, "events": []any{}, "items": []any{},
 		"card": card.Snapshot{Card: card.Card{Unit: prUnit, Title: "Retry flaky uploads", State: "open"}}}
@@ -95,7 +95,7 @@ func TestUnitDetailRoute(t *testing.T) {
 		Entries []string
 		Route   map[string]any
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 function hashString(x) { return routeHash(x.view, x.pr, new URLSearchParams(x.entry ? { entry: x.entry } : {})); }
 function readHash() { return { view: "next" }; }
 (async () => {
@@ -126,9 +126,9 @@ function readHash() { return { view: "next" }; }
 }
 
 func TestOpeningClearsChanged(t *testing.T) {
-	next := entry("e-2", "next", func(e *api.EntryView) { e.Changed = true })
+	next := task("e-2", "next", func(e *api.TaskView) { e.Changed = true })
 	var got struct{ Paths []string }
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-1" });
   await loadDetailPane({ entry: "e-1" });
@@ -136,7 +136,7 @@ func TestOpeningClearsChanged(t *testing.T) {
   await loadDetailPane({ entry: "" });
   await loadDetailPane({ entry: "e-1" });
   process.stdout.write(JSON.stringify({ Paths: posts.map((p) => p.path + " " + JSON.stringify(p.body)) }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-1": questionEntry(), "/api/entries/e-2": next}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/entries/e-1": questionTask(), "/api/entries/e-2": next}}, &got)
 	want := []string{`/api/entries/e-1/seen {"source":"cockpit"}`, `/api/entries/e-1/seen {"source":"cockpit"}`}
 	if !slices.Equal(got.Paths, want) {
 		t.Errorf("posts %v, want seen once per opening of the Inbox entry: %v", got.Paths, want)
@@ -144,15 +144,15 @@ func TestOpeningClearsChanged(t *testing.T) {
 }
 
 func TestQuestionCardAnswers(t *testing.T) {
-	confirm := questionEntry()
+	confirm := questionTask()
 	confirm.ID = "e-9"
-	confirm.Message = &api.Message{ID: 9, EntryID: "e-9", Kind: "question", Text: "Merge it?", Confirm: true, State: "open"}
+	confirm.Message = &api.Message{ID: 9, TaskID: "e-9", Kind: "question", Text: "Merge it?", Confirm: true, State: "open"}
 	var got struct {
 		Bodies  []string
 		Classes []bool
 		Digit   []string
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   const card = questionCard(input.q);
   await byFocus(card, "question:a").attrs.onclick();
@@ -169,7 +169,7 @@ func TestQuestionCardAnswers(t *testing.T) {
     Classes: [byClass(card, "d-question").length === 1, card.attrs.class === "d-question"],
     Digit: [q.entry.id, q.question.recommend, ...q.question.options.map((o) => o.id)],
   }));
-})();`, map[string]any{"q": questionEntry(), "c": confirm, "answers": map[string]any{}}, &got)
+})();`, map[string]any{"q": questionTask(), "c": confirm, "answers": map[string]any{}}, &got)
 	want := []string{
 		`/api/entries/e-1/answer {"source":"cockpit","args":{"option_id":"a"}}`,
 		`/api/entries/e-1/answer {"source":"cockpit","args":{"option_id":"b"}}`,
@@ -188,10 +188,10 @@ func TestQuestionCardAnswers(t *testing.T) {
 }
 
 func TestProposalShowsItsDraft(t *testing.T) {
-	e := entry("e-5", "inbox", func(e *api.EntryView) {
+	e := task("e-5", "inbox", func(e *api.TaskView) {
 		e.Kind, e.Title = "message", "Nudge the reviewer?"
 		e.Units = []unit.Unit{prUnit}
-		e.Message = &api.Message{ID: 5, EntryID: "e-5", Kind: "proposal", Text: "The review waits for 3 days; nudge?", State: "open",
+		e.Message = &api.Message{ID: 5, TaskID: "e-5", Kind: "proposal", Text: "The review waits for 3 days; nudge?", State: "open",
 			Options: []record.Option{{ID: "accept", Label: "Accept"}, {ID: "reject", Label: "Reject"}}}
 		e.Draft = &api.Draft{ID: 11, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "proposed", Rev: 2}
 		e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "answer", Enabled: true}}
@@ -203,7 +203,7 @@ func TestProposalShowsItsDraft(t *testing.T) {
 		Edited []string
 		Keyed  []string
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-5" });
   const pane = entryPane(detailState.entry);
@@ -246,7 +246,7 @@ func TestProposalShowsItsDraft(t *testing.T) {
 func TestCardRefOpensTheUnitInItsPluginView(t *testing.T) {
 	type link struct{ Href, Text, Target string }
 	var got map[string]struct{ Ref, Ext []link }
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const catalog = { views: [
   { id: "needs-me", provider: "github", rows: true }, { id: "dash", provider: "github", rows: false },
   { id: "all", provider: "github", rows: true }, { id: "slack", provider: "slack", rows: true },
@@ -278,11 +278,11 @@ func TestAVerbButtonSaysWhatItDoes(t *testing.T) {
 	var got struct {
 		On, Off string
 	}
-	e := entry("e-2", "next", func(e *api.EntryView) {
+	e := task("e-2", "next", func(e *api.TaskView) {
 		e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}, {Verb: "someday", Reason: "not on a someday entry"}}
 	})
-	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}}}
-	nodeRun(t, gtdPrelude(t), nil, `
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "done", Label: "Finish", Summary: "Close it"}, {Verb: "someday", Label: "Someday", Summary: "Not now"}}}
+	nodeRun(t, viewsPrelude(t), nil, `
 gtdState.catalog = input.cat;
 const pane = h("div", {}, ...verbButtons(input.entry));
 process.stdout.write(JSON.stringify({
@@ -296,9 +296,9 @@ process.stdout.write(JSON.stringify({
 
 func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
 	var got struct{ Asked []string }
-	e := entry("e-3", "next", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
-	cat := api.GTDCatalog{Verbs: []api.GTDVerb{{Verb: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
-	nodeRun(t, gtdPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
+	e := task("e-3", "next", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "waiting", Enabled: true}} })
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "waiting", Label: "Waiting", Summary: "Wait", Input: "On whom?"}}}
+	nodeRun(t, viewsPrelude(t)+strings.Replace(staticJS(t, "keys.js"), `"use strict";`, "", 1)+detailHarness, nil, `
 gtdState.catalog = input.cat;
 detailEnv.ask = (label) => { asked.push(label); return "ana"; };
 const pane = h("div", {}, ...verbButtons(input.entry));
@@ -312,7 +312,7 @@ const pane = h("div", {}, ...verbButtons(input.entry));
 }
 
 func TestAQuestionCardShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
-	q := questionEntry()
+	q := questionTask()
 	read := time.Date(2026, 10, 22, 12, 5, 0, 0, time.UTC)
 	q.Message.State = "answered"
 	q.Message.Answers = []api.TurnAnswer{
@@ -321,7 +321,7 @@ func TestAQuestionCardShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 		{ID: 3, Yes: true, Message: 3},
 	}
 	var got []string
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 const card = questionCard(input.q);
 process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map[string]any{"q": q, "answers": map[string]any{}}, &got)
 	want := []string{
@@ -334,10 +334,10 @@ process.stdout.write(JSON.stringify(byClass(card, "d-answer").map(text)));`, map
 	}
 }
 
-func TestAVerbTheEntryDoesNotOfferHasNoButton(t *testing.T) {
+func TestAVerbTheTaskDoesNotOfferHasNoButton(t *testing.T) {
 	var got struct{ Approve, Dismiss, Done int }
-	e := entry("e-4", "inbox", func(e *api.EntryView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	e := task("e-4", "inbox", func(e *api.TaskView) { e.Verbs = []api.VerbState{{Verb: "done", Enabled: true}} })
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 const pane = h("div", {}, ...entryPane(input.entry));
 const n = (verb) => byFocus(pane, "detail:" + verb + ":e-4") ? 1 : 0;
 process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss"), Done: n("done") }));`, map[string]any{"entry": e, "answers": map[string]any{}}, &got)
@@ -346,8 +346,8 @@ process.stdout.write(JSON.stringify({ Approve: n("approve"), Dismiss: n("dismiss
 	}
 }
 
-func TestAnEntryOffersTheIntentsThatServeIt(t *testing.T) {
-	e := entry("e-3f9a", "inbox", func(e *api.EntryView) {
+func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
+	e := task("e-3f9a", "inbox", func(e *api.TaskView) {
 		e.Title, e.Kind = "Add retries to the webhook sender", "capture"
 		e.Actions = []api.ActionState{{ID: "start", Label: "Begin work", Enabled: true, Note: "Starts an agent session on the entry's brief"}}
 	})
@@ -358,7 +358,7 @@ func TestAnEntryOffersTheIntentsThatServeIt(t *testing.T) {
 			Body map[string]any
 		}
 	}
-	nodeRun(t, gtdPrelude(t)+detailHarness, nil, `
+	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
   await loadDetailPane({ entry: "e-3f9a" });
   const pane = entryPane(detailState.entry);

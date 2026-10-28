@@ -52,21 +52,21 @@ type fakeDaemon struct {
 	plugins    []api.Plugin
 	pluginsErr error
 
-	gtd *api.GTDCatalog
-	// entries are each view's entries; a page since the fake's position
-	// carries entryDelta of its view instead, once.
-	entries     map[string][]api.EntryView
-	entryRev    uint64
-	entryDelta  map[string][]api.EntryView
+	viewsCat *api.ViewsCatalog
+	// tasks are each view's tasks; a page since the fake's position
+	// carries taskDelta of its view instead, once.
+	tasks       map[string][]api.TaskView
+	taskRev     uint64
+	taskDelta   map[string][]api.TaskView
 	counters    api.Counters
-	entryAsks   []entryAsk
+	taskAsks    []taskAsk
 	counterAsks [][]string
 	drafts      []api.Draft
-	entryDos    []entryDo
-	// doLag holds EntryDo's reply after the verb is recorded, as a slow daemon does.
+	taskDos     []taskDo
+	// doLag holds TaskDo's reply after the verb is recorded, as a slow daemon does.
 	doLag        time.Duration
 	captures     []string
-	entryReads   []string
+	taskReads    []string
 	keysFetched  int
 	catalogReads int
 
@@ -75,12 +75,12 @@ type fakeDaemon struct {
 	stepsDone   []string
 }
 
-type entryAsk struct {
+type taskAsk struct {
 	view, area string
 	since      api.Since
 }
 
-type entryDo struct {
+type taskDo struct {
 	id, verb, source string
 	args             map[string]string
 }
@@ -91,28 +91,28 @@ func (f *fakeDaemon) Plugins(context.Context) ([]api.Plugin, error) {
 	return slices.Clone(f.plugins), f.pluginsErr
 }
 
-// GTD fails as a daemon without a store does unless gtd is set.
-func (f *fakeDaemon) GTD(context.Context) (api.GTDCatalog, error) {
+// Views fails as a daemon without a store does unless viewsCat is set.
+func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.gtd == nil {
-		return api.GTDCatalog{}, errors.New("the entries are not served: the daemon runs without a store")
+	if f.viewsCat == nil {
+		return api.ViewsCatalog{}, errors.New("the entries are not served: the daemon runs without a store")
 	}
-	return *f.gtd, nil
+	return *f.viewsCat, nil
 }
 
-func (f *fakeDaemon) EntriesSince(_ context.Context, q client.EntryQuery, since api.Since) (api.EntriesPage, error) {
+func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api.Since) (api.TasksPage, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.entryAsks = append(f.entryAsks, entryAsk{q.View, q.Area, since})
+	f.taskAsks = append(f.taskAsks, taskAsk{q.View, q.Area, since})
 	if f.down {
-		return api.EntriesPage{}, errors.New("connection refused")
+		return api.TasksPage{}, errors.New("connection refused")
 	}
 	if since == (api.Since{}) || since.Epoch != "g1" {
-		return api.EntriesPage{Epoch: "g1", Rev: f.entryRev, Full: true, Entries: slices.Clone(f.entries[q.View]), Removed: []string{}, Counters: f.counters}, nil
+		return api.TasksPage{Epoch: "g1", Rev: f.taskRev, Full: true, Tasks: slices.Clone(f.tasks[q.View]), Removed: []string{}, Counters: f.counters}, nil
 	}
-	page := api.EntriesPage{Epoch: "g1", Rev: f.entryRev, Entries: f.entryDelta[q.View], Removed: []string{}, Counters: f.counters}
-	delete(f.entryDelta, q.View)
+	page := api.TasksPage{Epoch: "g1", Rev: f.taskRev, Tasks: f.taskDelta[q.View], Removed: []string{}, Counters: f.counters}
+	delete(f.taskDelta, q.View)
 	return page, nil
 }
 
@@ -125,10 +125,10 @@ func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (
 		return api.Counters{}, errors.New("connection refused")
 	}
 	c := api.Counters{Area: area, Views: map[string]int{}}
-	for v, es := range f.entries {
+	for v, es := range f.tasks {
 		c.Views[v] = 0
 		for _, e := range es {
-			if api.EntryMatches(e, terms) {
+			if api.TaskMatches(e, terms) {
 				c.Views[v]++
 			}
 		}
@@ -136,46 +136,46 @@ func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (
 	return c, nil
 }
 
-func (f *fakeDaemon) Entry(_ context.Context, id string) (api.EntryView, error) {
+func (f *fakeDaemon) Task(_ context.Context, id string) (api.TaskView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.entryReads = append(f.entryReads, id)
-	for _, es := range f.entries {
+	f.taskReads = append(f.taskReads, id)
+	for _, es := range f.tasks {
 		for _, e := range es {
 			if e.ID == id {
 				return e, nil
 			}
 		}
 	}
-	return api.EntryView{}, errors.New("no entry " + id)
+	return api.TaskView{}, errors.New("no entry " + id)
 }
 
-func (f *fakeDaemon) EntryDo(_ context.Context, id, verb string, req api.EntryRequest) (api.EntryResult, error) {
+func (f *fakeDaemon) TaskDo(_ context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {
 	f.mu.Lock()
-	f.entryDos = append(f.entryDos, entryDo{id, verb, req.Source, req.Args})
+	f.taskDos = append(f.taskDos, taskDo{id, verb, req.Source, req.Args})
 	lag := f.doLag
 	f.mu.Unlock()
 	time.Sleep(lag)
-	return api.EntryResult{Lines: []string{verb + " done"}}, nil
+	return api.TaskResult{Lines: []string{verb + " done"}}, nil
 }
 
-func (f *fakeDaemon) EntryDrafts(_ context.Context, entry string) ([]api.Draft, error) {
+func (f *fakeDaemon) TaskDrafts(_ context.Context, task string) ([]api.Draft, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []api.Draft
 	for _, d := range f.drafts {
-		if d.Entry == entry {
+		if d.Task == task {
 			out = append(out, d)
 		}
 	}
 	return out, nil
 }
 
-func (f *fakeDaemon) Capture(_ context.Context, req api.CaptureRequest) (api.EntryView, error) {
+func (f *fakeDaemon) Capture(_ context.Context, req api.CaptureRequest) (api.TaskView, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.captures = append(f.captures, req.Title)
-	return api.EntryView{ID: "e-new", Title: req.Title}, nil
+	return api.TaskView{ID: "e-new", Title: req.Title}, nil
 }
 
 func (f *fakeDaemon) Keys(_ context.Context, surface string) (api.KeysResponse, error) {
@@ -188,15 +188,15 @@ func (f *fakeDaemon) Keys(_ context.Context, surface string) (api.KeysResponse, 
 	return api.KeysResponse{Bindings: servedKeys(f.specs)}, nil
 }
 
-// changeEntries makes the daemon hold delta for view at the next position
+// changeTasks makes the daemon hold delta for view at the next position
 // and announces it with the counters, as the entries feed does.
-func (f *fakeDaemon) changeEntries(view string, delta []api.EntryView, c api.Counters) {
+func (f *fakeDaemon) changeTasks(view string, delta []api.TaskView, c api.Counters) {
 	f.mu.Lock()
-	f.entryRev++
-	if f.entryDelta == nil {
-		f.entryDelta = map[string][]api.EntryView{}
+	f.taskRev++
+	if f.taskDelta == nil {
+		f.taskDelta = map[string][]api.TaskView{}
 	}
-	f.entryDelta[view] = delta
+	f.taskDelta[view] = delta
 	f.counters = c
 	s, rev := f.stream, f.rev
 	f.mu.Unlock()

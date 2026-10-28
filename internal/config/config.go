@@ -62,7 +62,7 @@ type Config struct {
 	Plugins map[string]Plugin `json:"-"`
 	// Placement is the rules that place units; the first match wins.
 	Placement []PlacementRule `json:"placement,omitempty"`
-	GTD       GTD             `json:"gtd"`
+	Tasks     Tasks           `json:"gtd"`
 	// Notifications sets the menu bar's daily digest.
 	Notifications Notifications `json:"notifications"`
 	Slack         Slack         `json:"slack"`
@@ -161,8 +161,8 @@ type Dossiers struct {
 	CompactAtKB  int64 `json:"compact_at_kb"` // log/ size that triggers compaction
 }
 
-// GTD holds the entries' settings: when a waiting entry goes stale, and the areas and contexts offered.
-type GTD struct {
+// Tasks holds the entries' settings: when a waiting entry goes stale, and the areas and contexts offered.
+type Tasks struct {
 	StaleWaitingDays int      `json:"stale_waiting_days"` // working days
 	Areas            []string `json:"areas"`
 	Contexts         []string `json:"contexts"`
@@ -448,7 +448,7 @@ func Defaults() Config {
 			},
 		},
 		Classify:      Classify{PerDay: 50},
-		GTD:           GTD{StaleWaitingDays: 2},
+		Tasks:         Tasks{StaleWaitingDays: 2},
 		Notifications: Notifications{DigestAt: "09:00"},
 		Dossiers: Dossiers{ArchiveAfter: Days(30 * 24 * time.Hour), PurgeAfter: Days(400 * 24 * time.Hour),
 			SoftCapMB: 50, TotalCapMB: 2048, MaxFileMB: 5, CompactAtKB: 256},

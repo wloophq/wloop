@@ -29,7 +29,7 @@ type reviewView struct {
 }
 
 func (m *Model) inReview() bool {
-	v, ok := m.gtdView()
+	v, ok := m.viewOnScreen()
 	return ok && v.ID == viewReview
 }
 
@@ -40,7 +40,7 @@ func (m *Model) SetReview(r api.Review) {
 	if _, ok := m.reviewStep(); !ok {
 		m.rv.step, m.rv.head = firstOpenStep(r.Steps, -1), true
 	}
-	m.keepEntrySelection()
+	m.keepTaskSelection()
 }
 
 // reviewStep is the step on screen.
@@ -109,14 +109,14 @@ func (m *Model) reviewAction(action string) (c Command, ok, took bool) {
 		if !m.rv.review.Done {
 			m.showStep(firstOpenStep(steps, at))
 		}
-		c, ok = m.send(Command{Unit: entryUnit(viewReview), Label: st.Label, Action: "review", reviewStep: st.ID})
+		c, ok = m.send(Command{Unit: taskUnit(viewReview), Label: st.Label, Action: "review", reviewStep: st.ID})
 		return c, ok, true
 	}
 	return Command{}, false, false
 }
 
 func (m *Model) showStep(id string) {
-	m.rv.step, m.rv.head, m.entryAt, m.entrySel = id, true, 0, ""
+	m.rv.step, m.rv.head, m.taskAt, m.taskSel = id, true, 0, ""
 	m.closeDetail()
 }
 
@@ -126,14 +126,14 @@ func (m *Model) reviewMove(delta int) bool {
 	if !m.inReview() {
 		return false
 	}
-	entries := m.visibleEntries()
+	tasks := m.visibleTasks()
 	switch {
-	case m.rv.head && delta > 0 && len(entries) > 0:
-		m.rv.head, m.entryAt, m.entrySel = false, 0, entries[0].ID
+	case m.rv.head && delta > 0 && len(tasks) > 0:
+		m.rv.head, m.taskAt, m.taskSel = false, 0, tasks[0].ID
 		return true
 	case m.rv.head:
 		return true
-	case delta < 0 && m.entryCursor(entries) == 0:
+	case delta < 0 && m.taskCursor(tasks) == 0:
 		m.rv.head = true
 		m.closeDetail()
 		return true
@@ -174,7 +174,7 @@ func (m *Model) renderReview(lines []string, width, body int, now time.Time) []s
 		line = t.Reverse(line + strings.Repeat(" ", max(width-termfmt.Cells(termfmt.Plain(line)), 0)))
 	}
 	lines = append(lines, "", line)
-	return m.renderEntries(lines, View{ID: st.View, Label: st.Label}, width, body-(len(lines)-start), now)
+	return m.renderTasks(lines, View{ID: st.View, Label: st.Label}, width, body-(len(lines)-start), now)
 }
 
 // reviewLine is the steps on one line, by id: a short screen's.
@@ -232,7 +232,7 @@ func (m *Model) reviewHelp() []helpItem {
 
 // projectFacts are a project's review mark, next action, open actions and
 // interval; none for another kind.
-func projectFacts(e api.EntryView) []string {
+func projectFacts(e api.TaskView) []string {
 	if e.Kind != "project" {
 		return nil
 	}

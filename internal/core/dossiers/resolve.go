@@ -233,7 +233,7 @@ func (r *Resolution) logf(format string, args ...any) {
 	}
 }
 
-// Watch follows the units of each TopicItems or TopicEntries note, everything once at start, and runs
+// Watch follows the units of each TopicItems or TopicTasks note, everything once at start, and runs
 // Retry every retry, until ctx ends; the subscriber only queues.
 func (r *Resolution) Watch(ctx context.Context, changes port.Changes, retry time.Duration) {
 	var mu sync.Mutex
@@ -241,7 +241,7 @@ func (r *Resolution) Watch(ctx context.Context, changes port.Changes, retry time
 	all := true
 	kick := make(chan struct{}, 1)
 	cancel := changes.Subscribe(func(c port.Change) {
-		if !c.Has(port.TopicItems | port.TopicEntries) {
+		if !c.Has(port.TopicItems | port.TopicTasks) {
 			return
 		}
 		mu.Lock()

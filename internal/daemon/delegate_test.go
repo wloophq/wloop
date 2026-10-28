@@ -17,9 +17,9 @@ import (
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
-// unitEntry is an Inbox entry of kind on units, with one item on each.
-func unitEntry(id string, kind task.Kind, units ...unit.Unit) task.Entry {
-	e := task.Entry{ID: task.ID(id), Kind: kind, State: task.Inbox, Title: "Entry " + id, Units: units}
+// unitTask is an Inbox entry of kind on units, with one item on each.
+func unitTask(id string, kind task.Kind, units ...unit.Unit) task.Task {
+	e := task.Task{ID: task.ID(id), Kind: kind, State: task.Inbox, Title: "Entry " + id, Units: units}
 	for _, u := range units {
 		e.Items = append(e.Items, task.ItemRef{Unit: u, Item: "it-" + id})
 	}
@@ -27,10 +27,10 @@ func unitEntry(id string, kind task.Kind, units ...unit.Unit) task.Entry {
 }
 
 // newDelegateRig serves the entries over a thread provider whose rows are read like Slack's.
-func newDelegateRig(t *testing.T) (*entriesRig, *startedHeadless, *fakeActions) {
+func newDelegateRig(t *testing.T) (*tasksRig, *startedHeadless, *fakeActions) {
 	t.Helper()
 	h, fa := &startedHeadless{}, &fakeActions{}
-	r := newEntriesRig(t, func(d *Deps) {
+	r := newTasksRig(t, func(d *Deps) {
 		d.Headless, d.Actions = h, fa
 		d.Units = unit.NewRegistry(pr.Codec{}, unit.OpaqueCodec{ID: "thread"})
 		d.RowProviders = append(d.RowProviders, func(readmodel.RowDeps) readmodel.Provider { return threadRows{units: []unit.Unit{actThread}} })
@@ -38,7 +38,7 @@ func newDelegateRig(t *testing.T) (*entriesRig, *startedHeadless, *fakeActions) 
 	return r, h, fa
 }
 
-func verbState(v api.EntryView, verb string) api.VerbState {
+func verbState(v api.TaskView, verb string) api.VerbState {
 	i := slices.IndexFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == verb })
 	if i < 0 {
 		return api.VerbState{}
@@ -46,37 +46,37 @@ func verbState(v api.EntryView, verb string) api.VerbState {
 	return v.Verbs[i]
 }
 
-func TestDelegateOnAThreadEntryRunsActWithGuidanceAndMode(t *testing.T) {
+func TestDelegateOnAThreadTaskRunsActWithGuidanceAndMode(t *testing.T) {
 	t.Parallel()
 	r, h, fa := newDelegateRig(t)
-	r.put(t, unitEntry("e-a", task.KindAction, actThread), unitEntry("e-w", task.KindWaiting, actThread),
-		unitEntry("e-c", task.KindClose, actThread), unitEntry("e-n", task.KindCapture))
+	r.put(t, unitTask("e-a", task.KindAction, actThread), unitTask("e-w", task.KindWaiting, actThread),
+		unitTask("e-c", task.KindClose, actThread), unitTask("e-n", task.KindCapture))
 	for _, id := range []string{"e-a", "e-w", "e-c"} {
-		var v api.EntryView
-		if code := get(t, r.s, api.EntryPath(id), &v); code != 200 || !verbState(v, "delegate").Enabled {
+		var v api.TaskView
+		if code := get(t, r.s, api.TaskPath(id), &v); code != 200 || !verbState(v, "delegate").Enabled {
 			t.Fatalf("%s: %d delegate %+v", id, code, verbState(v, "delegate"))
 		}
 	}
-	var none api.EntryView
-	if get(t, r.s, api.EntryPath("e-n"), &none); verbState(none, "delegate").Enabled {
+	var none api.TaskView
+	if get(t, r.s, api.TaskPath("e-n"), &none); verbState(none, "delegate").Enabled {
 		t.Fatalf("delegate offered on a capture with no unit: %+v", none.Verbs)
 	}
-	rec := post(t, r.s, api.EntryPath("e-a", "delegate"), `{"source":"cockpit","args":{"guidance":"keep it short","mode":"headless"}}`)
+	rec := post(t, r.s, api.TaskPath("e-a", "delegate"), `{"source":"cockpit","args":{"guidance":"keep it short","mode":"headless"}}`)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("headless: %d %s", rec.Code, rec.Body)
 	}
-	if len(h.got) != 1 || h.got[0].Guidance != "keep it short" || h.got[0].Entry != "e-a" || !slices.Equal(h.got[0].Items, []string{"it-e-a"}) ||
+	if len(h.got) != 1 || h.got[0].Guidance != "keep it short" || h.got[0].Task != "e-a" || !slices.Equal(h.got[0].Items, []string{"it-e-a"}) ||
 		h.got[0].Intent != turn.Intent(dintent.Act) {
 		t.Fatalf("started %+v", h.got)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-w", "delegate"), `{"source":"tui"}`); rec.Code != 200 || len(h.got) != 2 || h.got[1].Entry != "e-w" {
+	if rec := post(t, r.s, api.TaskPath("e-w", "delegate"), `{"source":"tui"}`); rec.Code != 200 || len(h.got) != 2 || h.got[1].Task != "e-w" {
 		t.Fatalf("a waiting entry, no mode: %d %s %+v", rec.Code, rec.Body, h.got)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-c", "delegate"), `{"source":"cockpit","args":{"guidance":"close it","mode":"session"}}`); rec.Code != 200 ||
+	if rec := post(t, r.s, api.TaskPath("e-c", "delegate"), `{"source":"cockpit","args":{"guidance":"close it","mode":"session"}}`); rec.Code != 200 ||
 		len(fa.calls) != 1 || !strings.HasPrefix(fa.calls[0], "act ") || len(h.got) != 2 || !slices.Equal(fa.bound, []string{"it-e-c@e-c"}) {
 		t.Fatalf("session: %d %s, calls %v, bound %v", rec.Code, rec.Body, fa.calls, fa.bound)
 	}
-	if rec := post(t, r.s, api.EntryPath("e-a", "delegate"), `{"source":"cockpit","args":{"mode":"later"}}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "mode is headless or session") {
+	if rec := post(t, r.s, api.TaskPath("e-a", "delegate"), `{"source":"cockpit","args":{"mode":"later"}}`); rec.Code != 400 || !strings.Contains(rec.Body.String(), "mode is headless or session") {
 		t.Fatalf("an unknown mode: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -84,10 +84,10 @@ func TestDelegateOnAThreadEntryRunsActWithGuidanceAndMode(t *testing.T) {
 func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	t.Parallel()
 	r, _, _ := newDelegateRig(t)
-	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(entriesNow)}
-	r.put(t, unitEntry("e-a", task.KindAction, actThread), unitEntry("e-n", task.KindCapture))
-	var v api.EntryView
-	if code := get(t, r.s, api.EntryPath("e-a"), &v); code != 200 || v.Attention == nil {
+	r.s.deps.Outbox = &outbox.Service{Store: r.db.Drafts(), Clock: fixedClock(tasksNow)}
+	r.put(t, unitTask("e-a", task.KindAction, actThread), unitTask("e-n", task.KindCapture))
+	var v api.TaskView
+	if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 || v.Attention == nil {
 		t.Fatalf("%d %+v", code, v.Attention)
 	}
 	var ids []string
@@ -100,10 +100,10 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	if want := []string{api.AttentionDraftForMe, api.AttentionReply, api.AttentionSendReply}; !slices.Equal(ids, want) {
 		t.Fatalf("actions %v, want %v", ids, want)
 	}
-	if get(t, r.s, api.EntryPath("e-n"), &v); v.Attention == nil || len(v.Attention.Actions) != 0 {
+	if get(t, r.s, api.TaskPath("e-n"), &v); v.Attention == nil || len(v.Attention.Actions) != 0 {
 		t.Fatalf("a capture with no unit: %+v", v.Attention)
 	}
-	rec := post(t, r.s, api.EntryPath("e-a", "delegate"), `{"source":"menubar","args":{"mode":"headless"}}`)
+	rec := post(t, r.s, api.TaskPath("e-a", "delegate"), `{"source":"menubar","args":{"mode":"headless"}}`)
 	if rec.Code != 200 {
 		t.Fatalf("Draft for me: %d %s", rec.Code, rec.Body)
 	}
@@ -112,11 +112,11 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 func TestDelegateRefusesAModeTheActionDoesNotRun(t *testing.T) {
 	t.Parallel()
 	c, _ := bridgeRig(t)
-	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit","args":{"mode":"headless"}}`)
+	rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit","args":{"mode":"headless"}}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "review does not run in headless mode; hand it to an agent instead") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit","args":{"mode":"session"}}`); rec.Code != 200 {
+	if rec := post(t, c.s, api.TaskPath("e-r", "delegate"), `{"source":"cockpit","args":{"mode":"session"}}`); rec.Code != 200 {
 		t.Fatalf("session: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -128,10 +128,10 @@ func (f placerFunc) SessionPlace(_ context.Context, u unit.Unit) (string, error)
 func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
 	t.Parallel()
 	r, _, fa := newDelegateRig(t)
-	r.put(t, unitEntry("e-a", task.KindAction, actThread))
+	r.put(t, unitTask("e-a", task.KindAction, actThread))
 	modes := func() []api.RunnerState {
-		var v api.EntryView
-		if code := get(t, r.s, api.EntryPath("e-a"), &v); code != 200 {
+		var v api.TaskView
+		if code := get(t, r.s, api.TaskPath("e-a"), &v); code != 200 {
 			t.Fatalf("%d", code)
 		}
 		return verbState(v, "delegate").Runners
@@ -145,7 +145,7 @@ func TestDelegateSaysUpfrontWhetherASessionCanRun(t *testing.T) {
 	if got := modes(); !slices.Equal(got, want) {
 		t.Fatalf("unplaceable: %+v", got)
 	}
-	rec := post(t, r.s, api.EntryPath("e-a", "delegate"), `{"source":"cockpit","args":{"mode":"session"}}`)
+	rec := post(t, r.s, api.TaskPath("e-a", "delegate"), `{"source":"cockpit","args":{"mode":"session"}}`)
 	if rec.Code != 409 || !strings.Contains(rec.Body.String(), "no workspace manager") || len(fa.calls) != 0 {
 		t.Fatalf("session refused upfront: %d %s, calls %v", rec.Code, rec.Body, fa.calls)
 	}

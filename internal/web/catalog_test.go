@@ -112,7 +112,7 @@ func cockpitScript(t *testing.T) string {
 		t.Fatal("app.js has no hashchange listener")
 	}
 	raw := strings.TrimPrefix(src, app) + "\n" + app[:boot]
-	return domShim + pluginsJS(t) + gtdScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
+	return domShim + pluginsJS(t) + viewsScripts(t) + strings.Replace(raw, `"use strict";`, "", 1)
 }
 
 func TestThreadRowRendersInTheCockpit(t *testing.T) {
@@ -227,7 +227,7 @@ func jsonEqual(t *testing.T, a, b []byte) bool {
 func TestDeepLinkViewSurvivesBeforeTheCatalog(t *testing.T) {
 	src := appJS(t)
 	prelude := jsConst(t, src, "catalog") + jsConst(t, src, "UNIT_KEY") + jsConst(t, src, "QUERY_MAX") +
-		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + gtdScripts(t)
+		noPlugins + "const location = { hash: \"#view=stalled&q=x\" };\nconst groupField = () => null;\nconst parseSort = () => ({ field: \"\" });\n" + viewsScripts(t)
 	var got struct{ Before, Unknown, After, Missing string }
 	nodeRun(t, prelude, []string{"readHash"}, `
 const before = readHash().view;

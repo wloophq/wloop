@@ -77,7 +77,7 @@ type Reports interface {
 type Results interface {
 	// UnitOf is the unit a web address names; false for an address of none.
 	UnitOf(url string) (unit.Unit, bool)
-	Attach(ctx context.Context, entry task.ID, u unit.Unit) error
+	Attach(ctx context.Context, tk task.ID, u unit.Unit) error
 }
 
 // Intents is what the turns ask of the loaded intents: the record rules, the

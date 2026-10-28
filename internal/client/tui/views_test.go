@@ -16,17 +16,17 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-func gtdCatalog() api.GTDCatalog {
-	views := []api.GTDView{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"},
+func viewsCatalog() api.ViewsCatalog {
+	views := []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"},
 		{ID: "next", Label: "Next"}, {ID: "waiting", Label: "Waiting"}, {ID: "projects", Label: "Projects"},
 		{ID: "someday", Label: "Someday"}, {ID: "logbook", Label: "Logbook"}}
-	verbs := []api.GTDVerb{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
+	verbs := []api.VerbSpec{{Verb: "next", Label: "Next", Key: "x"}, {Verb: "waiting", Label: "Waiting", Key: "w", Input: "Waiting on whom"},
 		{Verb: "schedule", Label: "Schedule", Key: "s", Input: "Until when"}, {Verb: "someday", Label: "Someday", Key: "y"},
 		{Verb: "reference", Label: "Reference", Key: "l"}, {Verb: "focus", Label: "Focus", Key: "f"},
 		{Verb: "project", Label: "Project", Key: "p"}, {Verb: "approve", Label: "Approve", Key: "a"},
 		{Verb: "delegate", Label: "Delegate", Key: "d", Input: "what should the agent look at"}, {Verb: "reply", Label: "Reply", Input: "Reply, saved to the Outbox"}, {Verb: "done", Label: "Done", Key: "e"},
 		{Verb: "dismiss", Label: "Dismiss", Key: "Backspace"}, {Verb: "seen", Label: "Seen"}}
-	return api.GTDCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs}
+	return api.ViewsCatalog{Views: views, Areas: []string{"work", "home"}, Contexts: []string{"computer", "calls"}, Verbs: verbs}
 }
 
 var allVerbs = []string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss"}
@@ -43,12 +43,12 @@ func verbs(enabled ...string) []api.VerbState {
 	return out
 }
 
-func entry(id, title, state string, contexts ...string) api.EntryView {
-	return api.EntryView{ID: id, Kind: "action", State: state, Title: title, Contexts: contexts,
+func task(id, title, state string, contexts ...string) api.TaskView {
+	return api.TaskView{ID: id, Kind: "action", State: state, Title: title, Contexts: contexts,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
-func waitingOn(e api.EntryView, names ...string) api.EntryView {
+func waitingOn(e api.TaskView, names ...string) api.TaskView {
 	w := &api.WaitingView{Since: now.Add(-3 * 24 * time.Hour)}
 	for _, n := range names {
 		w.On = append(w.On, api.WaitingPerson{Name: n})
@@ -57,43 +57,43 @@ func waitingOn(e api.EntryView, names ...string) api.EntryView {
 	return e
 }
 
-// gtdEntries are the entries of each GTD view.
-func gtdEntries() map[string][]api.EntryView {
-	focus := entry("e1", "Reply on the batch export review", "next", "computer")
+// viewTasks are the entries of each GTD view.
+func viewTasks() map[string][]api.TaskView {
+	focus := task("e1", "Reply on the batch export review", "next", "computer")
 	focus.Focus, focus.Units = true, []unit.Unit{ref(7).Unit()}
-	asked := entry("e2", "Deploy window tonight?", "inbox")
+	asked := task("e2", "Deploy window tonight?", "inbox")
 	asked.Changed, asked.Verbs = true, verbs("next", "someday", "reference", "dismiss", "done", "focus", "waiting", "schedule", "project")
-	asked.Message = &api.Message{ID: 4, EntryID: "e2", Kind: "question", Text: "Which window?", State: "open", Recommend: "late",
+	asked.Message = &api.Message{ID: 4, TaskID: "e2", Kind: "question", Text: "Which window?", State: "open", Recommend: "late",
 		Options: []record.Option{{ID: "early", Label: "Before six"}, {ID: "late", Label: "After ten"}}}
-	captured := entry("e3", "Buy cables", "inbox")
-	draft := entry("draft:11", "Reply in the release thread", "outbox")
+	captured := task("e3", "Buy cables", "inbox")
+	draft := task("draft:11", "Reply in the release thread", "outbox")
 	draft.Kind, draft.Verbs = "draft", verbs("approve", "dismiss")
 	draft.Draft = &api.Draft{ID: 11, Rev: 4, Kind: "reply", Purpose: "reply", Target: "C0REL", Where: "#releases thread", Text: "Ship it tonight.\nRollback plan in the doc.",
 		State: "pending", Approval: api.DraftApproval{Mode: "wait"}, Origin: api.DraftOrigin{Kind: "turn"}}
-	return map[string][]api.EntryView{
+	return map[string][]api.TaskView{
 		"focus":  {focus},
 		"inbox":  {asked, captured},
 		"outbox": {draft},
-		"next": {entry("e4", "Call the bank", "next", "calls"), entry("e5", "Rename the export flag", "next", "computer"),
-			entry("e6", "Sort the receipts", "next"), entry("e7", "Write the runbook", "next", "computer")},
-		"waiting": {waitingOn(entry("e8", "Contract signature", "waiting"), "bob"), waitingOn(entry("e9", "Design review", "waiting"), "ana"),
-			waitingOn(entry("e10", "Reimbursement", "waiting")), waitingOn(entry("e11", "Laptop order", "waiting"), "ana")},
+		"next": {task("e4", "Call the bank", "next", "calls"), task("e5", "Rename the export flag", "next", "computer"),
+			task("e6", "Sort the receipts", "next"), task("e7", "Write the runbook", "next", "computer")},
+		"waiting": {waitingOn(task("e8", "Contract signature", "waiting"), "bob"), waitingOn(task("e9", "Design review", "waiting"), "ana"),
+			waitingOn(task("e10", "Reimbursement", "waiting")), waitingOn(task("e11", "Laptop order", "waiting"), "ana")},
 	}
 }
 
-func gtdCounters() api.Counters {
+func viewCounters() api.Counters {
 	return api.Counters{Views: map[string]int{"focus": 1, "inbox": 2, "outbox": 1, "next": 4, "waiting": 4, "projects": 0, "someday": 0, "logbook": 12},
 		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
 }
 
-// gtdModel is a model with the GTD views loaded, on Focus.
-func gtdModel(t testing.TB, rs ...api.Row) *Model {
+// viewsModel is a model with the GTD views loaded, on Focus.
+func viewsModel(t testing.TB, rs ...api.Row) *Model {
 	t.Helper()
 	m := newModel(t)
 	m.SetData(rs, api.Health{})
-	m.SetGTD(gtdCatalog())
-	for v, es := range gtdEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(viewsCatalog())
+	for v, es := range viewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	return m
 }
@@ -113,9 +113,9 @@ func screenOf(m *Model, w, h int) string { return strings.Join(m.Render(w, h, no
 func TestStartsOnFocus(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		registerBoard(t)
-		m := gtdModel(t)
+		m := viewsModel(t)
 		m.SetPlugins(boardPlugins(true))
-		if v, ok := m.gtdView(); !ok || v.ID != "focus" {
+		if v, ok := m.viewOnScreen(); !ok || v.ID != "focus" {
 			t.Fatalf("started on view %d", m.view)
 		}
 		tabs := m.Render(220, 20, now)[0]
@@ -132,7 +132,7 @@ func TestStartsOnFocus(t *testing.T) {
 			t.Fatalf("a narrow tab line keeps the GTD views whole and drops the others: %q", narrow)
 		}
 
-		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
 		term, done := start(t, d)
 		eventually(t, "Focus", func() bool {
 			s := term.screen()
@@ -155,9 +155,9 @@ func TestDisabledPluginHasNoTUIView(t *testing.T) {
 	r := row(7, "Batch export", "review", "needs-me")
 	m.SetData([]api.Row{r}, api.Health{})
 	m.SetPlugins([]api.Plugin{{ID: unit.GitHub, Name: "GitHub"}, {ID: boardProvider}})
-	m.SetGTD(gtdCatalog())
-	for v, es := range gtdEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(viewsCatalog())
+	for v, es := range viewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	screen := screenOf(m, 220, 30)
 	for _, gone := range []string{"Needs me", "Board", "V review", "F address"} {
@@ -171,13 +171,13 @@ func TestDisabledPluginHasNoTUIView(t *testing.T) {
 		}
 	}
 	chord(m, "gg")
-	if v, ok := m.gtdView(); !ok || v.ID != "focus" || !strings.Contains(m.status, "no GitHub views") {
+	if v, ok := m.viewOnScreen(); !ok || v.ID != "focus" || !strings.Contains(m.status, "no GitHub views") {
 		t.Fatalf("g g with GitHub disabled: view %d, status %q", m.view, m.status)
 	}
 }
 
 func TestFakeProviderRowRendersInTUI(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	c := api.CatalogResponse{Views: []api.ViewSpec{{ID: "threads", Label: "Threads", Provider: "thread", Rows: true, Surfaces: []string{"tui"}}},
 		Situations: []api.SituationSpec{{Provider: "thread", Kind: "waiting", Label: "waiting on you"}}}
 	m.SetCatalog(c)
@@ -203,7 +203,7 @@ func TestFakeProviderRowRendersInTUI(t *testing.T) {
 }
 
 func TestGoGitHubSkipsOtherProviders(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	m.SetCatalog(api.CatalogResponse{Views: []api.ViewSpec{
 		{ID: "threads", Label: "Threads", Provider: "thread", Rows: true, Order: 0, Surfaces: []string{"tui"}},
 		{ID: "needs-me", Label: "Needs me", Provider: "github", Rows: true, Order: 1, Surfaces: []string{"tui"}}}})
@@ -215,7 +215,7 @@ func TestGoGitHubSkipsOtherProviders(t *testing.T) {
 
 func TestOutboxInTUI(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters(), doLag: 300 * time.Millisecond}
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters(), doLag: 300 * time.Millisecond}
 		term, done := start(t, d)
 		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
 		term.press(Key{Rune: 'g'}, Key{Rune: 'o'})
@@ -242,7 +242,7 @@ func TestOutboxInTUI(t *testing.T) {
 		term.press(Key{Rune: 'y'})
 		eventually(t, "the discard", func() bool { return len(d.dos()) == 2 })
 		text := map[string]string{"text": "Ship it tonight.\nRollback plan in the doc.", "rev": "4"}
-		want := []entryDo{{"draft:11", "approve", "tui", text}, {"draft:11", "dismiss", "tui", nil}}
+		want := []taskDo{{"draft:11", "approve", "tui", text}, {"draft:11", "dismiss", "tui", nil}}
 		if got := d.dos(); !reflect.DeepEqual(got, want) {
 			t.Fatalf("sent %+v", got)
 		}
@@ -251,12 +251,12 @@ func TestOutboxInTUI(t *testing.T) {
 }
 
 func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	chord(m, "go")
 	if _, ok := press(m, Key{Rune: 'a'}, Key{Rune: 'y'}); ok {
 		t.Fatal("approved from the list")
 	}
-	e := gtdEntries()["outbox"][0]
+	e := viewTasks()["outbox"][0]
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
 	edited := e
@@ -264,7 +264,7 @@ func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
 	edited.Draft = ptr(*e.Draft)
 	edited.Draft.Text = "Ship it now, no rollback."
 	edited.Draft.Rev = 5
-	m.SetEntries("outbox", []api.EntryView{edited}, gtdCounters())
+	m.SetTasks("outbox", []api.TaskView{edited}, viewCounters())
 	if _, ok := press(m, Key{Rune: 'a'}); ok || m.prompt == nil || !m.prompt.confirm {
 		t.Fatalf("a did not ask: %+v", m.prompt)
 	}
@@ -274,21 +274,21 @@ func TestOutboxApprovesTheTextOnScreen(t *testing.T) {
 	}
 }
 
-func (f *fakeDaemon) dos() []entryDo {
+func (f *fakeDaemon) dos() []taskDo {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.entryDos)
+	return slices.Clone(f.taskDos)
 }
 
 func TestGChordsSwitchViews(t *testing.T) {
-	m := gtdModel(t, rows()...)
+	m := viewsModel(t, rows()...)
 	chord(m, "gi")
-	if v, _ := m.gtdView(); v.ID != "inbox" {
+	if v, _ := m.viewOnScreen(); v.ID != "inbox" {
 		t.Fatalf("g i: view %d", m.view)
 	}
 	for keys, want := range map[string]string{"gf": "focus", "go": "outbox", "gn": "next", "gw": "waiting", "gp": "projects"} {
 		chord(m, keys)
-		if v, _ := m.gtdView(); v.ID != want {
+		if v, _ := m.viewOnScreen(); v.ID != want {
 			t.Errorf("%s: view %d, want %s", keys, m.view, want)
 		}
 	}
@@ -306,10 +306,10 @@ func TestGChordsSwitchViews(t *testing.T) {
 }
 
 func TestDigitsDoNotSwitchViews(t *testing.T) {
-	m := gtdModel(t, rows()...)
+	m := viewsModel(t, rows()...)
 	for _, k := range []rune{'1', '2', '3'} {
 		press(m, Key{Rune: k})
-		if v, ok := m.gtdView(); !ok || v.ID != "focus" {
+		if v, ok := m.viewOnScreen(); !ok || v.ID != "focus" {
 			t.Fatalf("%c moved to view %d", k, m.view)
 		}
 	}
@@ -349,7 +349,7 @@ func TestDigitsDoNotSwitchViews(t *testing.T) {
 	}
 }
 
-func TestVerbKeysSendEntryVerbs(t *testing.T) {
+func TestVerbKeysSendTaskVerbs(t *testing.T) {
 	for _, c := range []struct {
 		key   Key
 		verb  string
@@ -371,7 +371,7 @@ func TestVerbKeysSendEntryVerbs(t *testing.T) {
 		{Key{Name: KeyBackspace}, "dismiss", "", nil},
 	} {
 		t.Run(c.verb, func(t *testing.T) {
-			m := gtdModel(t)
+			m := viewsModel(t)
 			got, ok := press(m, c.key)
 			if _, asks := verbAsks[c.verb]; asks || c.verb == "delegate" || c.verb == "reply" {
 				if ok || m.prompt == nil {
@@ -379,29 +379,29 @@ func TestVerbKeysSendEntryVerbs(t *testing.T) {
 				}
 				got, ok = press(m, append(typed(c.typed), Key{Name: KeyEnter})...)
 			}
-			if !ok || got.entry != "e1" || got.verb != c.verb || !reflect.DeepEqual(got.args, c.args) {
+			if !ok || got.task != "e1" || got.verb != c.verb || !reflect.DeepEqual(got.args, c.args) {
 				t.Fatalf("%+v %v", got, ok)
 			}
 			d := &fakeDaemon{}
 			if _, err := carry(context.Background(), Config{Daemon: d}, got); err != nil {
 				t.Fatal(err)
 			}
-			if want := []entryDo{{"e1", c.verb, "tui", c.args}}; !reflect.DeepEqual(d.dos(), want) {
+			if want := []taskDo{{"e1", c.verb, "tui", c.args}}; !reflect.DeepEqual(d.dos(), want) {
 				t.Fatalf("sent %+v", d.dos())
 			}
 		})
 	}
 	held := row(7, "Batch export", "round_pending", "needs-me")
 	held.Actions = []api.ActionState{{ID: "run_now", Enabled: true, Confirm: "Run the held round on acme/api#7 now? It does not count against the cap."}}
-	m := gtdModel(t, held)
+	m := viewsModel(t, held)
 	if _, ok := press(m, Key{Rune: 'a'}); ok || m.prompt == nil || !m.prompt.confirm || !strings.HasPrefix(m.prompt.label, "Run the held round") {
 		t.Fatalf("a bridged to a confirmed run_now did not ask: %+v", m.prompt)
 	}
-	if c, ok := press(m, Key{Rune: 'y'}); !ok || c.verb != "approve" || c.entry != "e1" {
+	if c, ok := press(m, Key{Rune: 'y'}); !ok || c.verb != "approve" || c.task != "e1" {
 		t.Fatalf("a then y: %+v %v", c, ok)
 	}
 
-	m = gtdModel(t)
+	m = viewsModel(t)
 	chord(m, "gi")
 	if _, ok := press(m, Key{Rune: 'a'}); ok || m.status != "approve: approve is not offered here" {
 		t.Fatalf("a disabled verb: status %q", m.status)
@@ -415,12 +415,12 @@ func TestVerbKeysSendEntryVerbs(t *testing.T) {
 func TestCaptureAndOpenSourceInTUI(t *testing.T) {
 	r := row(7, "Batch export", "review", "needs-me")
 	r.Link = "https://github.com/acme/api/pull/7"
-	m := gtdModel(t, r)
+	m := viewsModel(t, r)
 	c, ok := press(m, append(append([]Key{{Rune: 'n'}}, typed("Buy cables")...), Key{Name: KeyEnter})...)
 	if !ok || c.capture != "Buy cables" {
 		t.Fatalf("capture %+v %v", c, ok)
 	}
-	d := &fakeDaemon{entries: map[string][]api.EntryView{}}
+	d := &fakeDaemon{tasks: map[string][]api.TaskView{}}
 	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || !slices.Equal(d.captures, []string{"Buy cables"}) || len(got.lines) != 1 {
 		t.Fatalf("captured %v: %v", d.captures, err)
 	}
@@ -436,13 +436,13 @@ func TestCaptureAndOpenSourceInTUI(t *testing.T) {
 	}
 
 	slack := unit.Unit{Provider: "slack", Key: "C1/171.1"}
-	e := entry("e20", "Thread with no row", "next")
+	e := task("e20", "Thread with no row", "next")
 	e.Units = []unit.Unit{slack}
 	e.Cards = []api.CardView{{Card: card.Card{Unit: slack, Link: "https://chat.example/C1/171.1"}}}
-	d.entries["focus"] = []api.EntryView{e}
+	d.tasks["focus"] = []api.TaskView{e}
 	listed := e
 	listed.Cards = nil
-	m.SetEntries("focus", []api.EntryView{listed}, gtdCounters())
+	m.SetTasks("focus", []api.TaskView{listed}, viewCounters())
 	m.Done(c, nil, nil)
 	c, ok = press(m, Key{Rune: 'o'})
 	if !ok || !c.openFind {
@@ -467,16 +467,16 @@ func TestOnlyHTTPSLinksOpen(t *testing.T) {
 }
 
 func TestDigitsAnswerTheQuestion(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	chord(m, "gi")
 	if _, ok := press(m, Key{Rune: '2'}); ok {
 		t.Fatal("a digit answered with the detail closed")
 	}
 	c, ok := press(m, Key{Name: KeyEnter})
-	if !ok || !c.fetch || c.entry != "e2" {
+	if !ok || !c.fetch || c.task != "e2" {
 		t.Fatalf("Enter: %+v %v", c, ok)
 	}
-	e := gtdEntries()["inbox"][0]
+	e := viewTasks()["inbox"][0]
 	m.SetDetail("e2", e, nil)
 	screen := screenOf(m, 120, 40)
 	for _, want := range []string{"Which window?", "1. Before six", "2. After ten (recommended)"} {
@@ -485,7 +485,7 @@ func TestDigitsAnswerTheQuestion(t *testing.T) {
 		}
 	}
 	c, ok = press(m, Key{Rune: '2'})
-	if want := map[string]string{"option_id": "late", "guidance": "After ten (option late)"}; !ok || c.verb != "answer" || c.entry != "e2" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"option_id": "late", "guidance": "After ten (option late)"}; !ok || c.verb != "answer" || c.task != "e2" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("2: %+v %v", c, ok)
 	}
 
@@ -500,20 +500,20 @@ func TestDigitsAnswerTheQuestion(t *testing.T) {
 		t.Fatalf("1 then y on a row's question: %+v %v", c, ok)
 	}
 
-	m = gtdModel(t)
+	m = viewsModel(t)
 	chord(m, "gi")
 	reads++
 	if c, ok := m.Key(Key{Name: KeyEnter, Read: reads}); !ok || !c.fetch {
 		t.Fatalf("Enter: %+v", c)
 	}
-	m.SetDetail("e2", gtdEntries()["inbox"][0], nil)
+	m.SetDetail("e2", viewTasks()["inbox"][0], nil)
 	if c, ok := m.Key(Key{Rune: '2', Read: reads}); ok {
 		t.Fatalf("a digit typed ahead with the Enter answered: %+v", c)
 	}
 }
 
 func TestPluginKeysRunUnitActions(t *testing.T) {
-	m := gtdModel(t, row(7, "Batch export", "review", "needs-me"))
+	m := viewsModel(t, row(7, "Batch export", "review", "needs-me"))
 	c, ok := press(m, Key{Rune: 'H'})
 	if !ok || c.Action != "pause" || c.Unit != ref(7).Unit() || c.Req.Source != "tui" {
 		t.Fatalf("H: %+v %v", c, ok)
@@ -525,7 +525,7 @@ func TestPluginKeysRunUnitActions(t *testing.T) {
 }
 
 func TestPlanViewReachableAndKeys(t *testing.T) {
-	m := gtdModel(t, oneRow()...)
+	m := viewsModel(t, oneRow()...)
 	m.SetPlanSpecs(servedSpecs(t).Plan)
 	m.SetPlan(planItems(), nil)
 	chord(m, "gg")
@@ -546,7 +546,7 @@ func TestPlanViewReachableAndKeys(t *testing.T) {
 }
 
 func TestPaletteAndHelp(t *testing.T) {
-	m := gtdModel(t, row(7, "Batch export", "review", "needs-me"))
+	m := viewsModel(t, row(7, "Batch export", "review", "needs-me"))
 	press(m, Key{Name: KeyCtrlK})
 	if m.overlay == nil {
 		t.Fatal("no palette")
@@ -568,7 +568,7 @@ func TestPaletteAndHelp(t *testing.T) {
 	if m.area != "home" || m.overlay != nil {
 		t.Fatalf("area %q", m.area)
 	}
-	if _, area, _ := m.EntryQuery(); area != "home" {
+	if _, area, _ := m.TaskQuery(); area != "home" {
 		t.Fatalf("the entries do not follow the area: %q", area)
 	}
 
@@ -586,7 +586,7 @@ func TestPaletteAndHelp(t *testing.T) {
 }
 
 func TestShiftDigitsPickAreas(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	press(m, Key{Rune: '!'})
 	if m.area != "work" {
 		t.Fatalf("! picked %q", m.area)
@@ -601,14 +601,14 @@ func TestShiftDigitsPickAreas(t *testing.T) {
 	}
 }
 
-func TestEntryDetail(t *testing.T) {
+func TestTaskDetail(t *testing.T) {
 	r := row(7, "Batch export", "review", "needs-me")
-	m := gtdModel(t, r)
+	m := viewsModel(t, r)
 	c, ok := press(m, Key{Name: KeyEnter})
-	if !ok || !c.fetch || c.entry != "e1" || c.seen {
+	if !ok || !c.fetch || c.task != "e1" || c.seen {
 		t.Fatalf("Enter: %+v %v", c, ok)
 	}
-	e := gtdEntries()["focus"][0]
+	e := viewTasks()["focus"][0]
 	e.Items = []api.ItemView{{Unit: ref(7).Unit(), ID: "i1", Summary: "answer the reviewer on the batch size", State: "open", Kind: "request"}}
 	e.Cards = []api.CardView{{Card: card.Card{Unit: ref(7).Unit(), Title: "Batch export", State: "open", Why: "review requested",
 		Signals: []card.Signal{{Key: "checks", Value: "passing"}}, LastHuman: &card.Human{Who: items.Person{Name: "ana"}, What: "comment"}}}}
@@ -627,17 +627,17 @@ func TestEntryDetail(t *testing.T) {
 }
 
 func TestOpeningSendsSeen(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	chord(m, "gi")
 	c, ok := press(m, Key{Name: KeyEnter})
 	if !ok || !c.seen {
 		t.Fatalf("Enter on a changed Inbox entry: %+v", c)
 	}
-	d := &fakeDaemon{entries: gtdEntries()}
-	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || got.entry.ID != "e2" {
-		t.Fatalf("%v %v", got.entry.ID, err)
+	d := &fakeDaemon{tasks: viewTasks()}
+	if got, err := carry(context.Background(), Config{Daemon: d}, c); err != nil || got.task.ID != "e2" {
+		t.Fatalf("%v %v", got.task.ID, err)
 	}
-	if want := []entryDo{{"e2", "seen", "tui", nil}}; !reflect.DeepEqual(d.dos(), want) {
+	if want := []taskDo{{"e2", "seen", "tui", nil}}; !reflect.DeepEqual(d.dos(), want) {
 		t.Fatalf("sent %+v", d.dos())
 	}
 	press(m, Key{Name: KeyEsc})
@@ -645,23 +645,23 @@ func TestOpeningSendsSeen(t *testing.T) {
 		t.Fatal("seen sent twice")
 	}
 	press(m, Key{Name: KeyEsc}, Key{Name: KeyDown})
-	if c, _ := press(m, Key{Name: KeyEnter}); c.seen || c.entry != "e3" {
+	if c, _ := press(m, Key{Name: KeyEnter}); c.seen || c.task != "e3" {
 		t.Fatalf("an unchanged entry: %+v", c)
 	}
 }
 
-func TestEntriesFollowChanges(t *testing.T) {
+func TestTasksFollowChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
 		term, done := start(t, d)
 		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "Reply on the batch export review") })
 		eventually(t, "the stream", func() bool { return len(d.times(&d.eventsAt)) == 1 })
 		before := len(d.asks())
-		moved := gtdEntries()["focus"][0]
+		moved := viewTasks()["focus"][0]
 		moved.Title = "Reply on the batch export review, again"
-		c := gtdCounters()
+		c := viewCounters()
 		c.Views["inbox"] = 5
-		d.changeEntries("focus", []api.EntryView{moved}, c)
+		d.changeTasks("focus", []api.TaskView{moved}, c)
 		eventually(t, "the delta and the counts", func() bool {
 			s := term.screen()
 			return strings.Contains(s, "review, again") && strings.Contains(s, "Inbox 5")
@@ -679,10 +679,10 @@ func TestEntriesFollowChanges(t *testing.T) {
 	})
 }
 
-func (f *fakeDaemon) asks() []entryAsk {
+func (f *fakeDaemon) asks() []taskAsk {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.entryAsks)
+	return slices.Clone(f.taskAsks)
 }
 
 func TestTheCatalogSurvivesAFailedPluginsRead(t *testing.T) {
@@ -718,19 +718,19 @@ func squash(s string) string {
 }
 
 func TestOutboxRetrySendsTheRevOnScreen(t *testing.T) {
-	m := gtdModel(t)
-	e := gtdEntries()["outbox"][0]
+	m := viewsModel(t)
+	e := viewTasks()["outbox"][0]
 	e.Draft = ptr(*e.Draft)
 	e.Draft.State = "failed"
 	e.Verbs = []api.VerbState{{Verb: "retry", Enabled: true}}
-	m.SetEntries("outbox", []api.EntryView{e}, gtdCounters())
+	m.SetTasks("outbox", []api.TaskView{e}, viewCounters())
 	chord(m, "go")
-	if c, ok := m.entryVerb("retry", 0); ok || c.verb != "" {
+	if c, ok := m.taskVerb("retry", 0); ok || c.verb != "" {
 		t.Fatalf("retried from the list: %+v", c)
 	}
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
-	if _, ok := m.entryVerb("retry", 0); ok || m.prompt == nil || !m.prompt.confirm {
+	if _, ok := m.taskVerb("retry", 0); ok || m.prompt == nil || !m.prompt.confirm {
 		t.Fatalf("retry did not ask: %+v", m.prompt)
 	}
 	c, ok := press(m, Key{Rune: 'y'})
@@ -739,8 +739,8 @@ func TestOutboxRetrySendsTheRevOnScreen(t *testing.T) {
 	}
 }
 
-func TestTheFilterNarrowsTheGTDTabCounts(t *testing.T) {
-	m := gtdModel(t)
+func TestTheFilterNarrowsTheViewTabCounts(t *testing.T) {
+	m := viewsModel(t)
 	press(m, Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"}, Key{Name: KeyEnter, Read: 1})
 	tabs := m.Render(220, 20, now)[0]
 	if strings.Contains(tabs, "Next 4") || !strings.Contains(tabs, "Next") {
@@ -765,7 +765,7 @@ func TestTheFilterNarrowsTheGTDTabCounts(t *testing.T) {
 
 func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		d := &fakeDaemon{rows: oneRow(), gtd: ptr(gtdCatalog()), entries: gtdEntries(), counters: gtdCounters()}
+		d := &fakeDaemon{rows: oneRow(), viewsCat: ptr(viewsCatalog()), tasks: viewTasks(), counters: viewCounters()}
 		term, done := start(t, d)
 		eventually(t, "Focus", func() bool { return strings.Contains(term.screen(), "[Focus 1]") })
 		term.press(Key{Rune: '/'}, Key{Name: KeyPaste, Text: "computer"})
@@ -785,12 +785,12 @@ func TestTheFilterAsksTheDaemonForTheCountsItNarrows(t *testing.T) {
 }
 
 func TestAVerbAsksTheProfilesQuestion(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	press(m, Key{Rune: 'w'})
 	if m.prompt == nil || !strings.HasPrefix(m.prompt.label, "Waiting on whom") {
 		t.Fatalf("prompt %+v", m.prompt)
 	}
-	m = gtdModel(t)
+	m = viewsModel(t)
 	press(m, Key{Rune: 'd'})
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "what should the agent look at") {
 		t.Fatalf("delegate prompt %+v", m.prompt)

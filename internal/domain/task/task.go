@@ -35,13 +35,13 @@ func NewID() ID {
 }
 
 // Open says whether the entry is still to do: not done, trash or reference.
-func (e Entry) Open() bool {
+func (e Task) Open() bool {
 	return e.State != Done && e.State != Trash && e.State != Reference
 }
 
 // FirstUnit is the unit the entry is about: its first unit, else its
 // first item's.
-func (e Entry) FirstUnit() (unit.Unit, bool) {
+func (e Task) FirstUnit() (unit.Unit, bool) {
 	if len(e.Units) > 0 {
 		return e.Units[0], true
 	}
@@ -53,19 +53,19 @@ func (e Entry) FirstUnit() (unit.Unit, bool) {
 
 // CapturedByUser says whether the user captured the entry, rather than the
 // loop deriving it from a third party's message or draft.
-func (e Entry) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }
+func (e Task) CapturedByUser() bool { return e.Origin == OriginUser && e.Kind == KindCapture }
 
 // Live says whether the entry is neither done nor trash.
-func (e Entry) Live() bool { return e.State != Done && e.State != Trash }
+func (e Task) Live() bool { return e.State != Done && e.State != Trash }
 
 // Same says whether e and o hold the same values, Updated aside.
-func (e Entry) Same(o Entry) bool {
+func (e Task) Same(o Task) bool {
 	a, b := e.canonical(), o.canonical()
 	a.Updated, b.Updated = time.Time{}, time.Time{}
 	return reflect.DeepEqual(a, b)
 }
 
-func (e Entry) canonical() Entry {
+func (e Task) canonical() Task {
 	t := func(x time.Time) time.Time {
 		if x.IsZero() {
 			return time.Time{}

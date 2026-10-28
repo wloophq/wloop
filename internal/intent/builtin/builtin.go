@@ -195,14 +195,14 @@ var PayloadProviders = map[string]unit.ProviderID{"PR": unit.GitHub}
 var EventProviders = func() map[string]unit.ProviderID {
 	out := map[string]unit.ProviderID{}
 	for _, k := range task.VerbEventKinds {
-		out[k] = unit.Entry
+		out[k] = unit.Task
 	}
 	return out
 }()
 
 // Slots name each provider's fact slot.
 var Slots = map[unit.ProviderID]string{unit.GitHub: "pr", unit.Session: "session", unit.Workspace: "workspace",
-	unit.Entry: "entry", dslack.Provider: "slack"}
+	unit.Task: "entry", dslack.Provider: "slack"}
 
 // Providers are the providers an intent may serve: those of Slots, and a
 // plugin whose units have no workflow facts adds its own.

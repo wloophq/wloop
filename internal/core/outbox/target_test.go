@@ -20,7 +20,7 @@ type taking struct {
 
 func (t taking) Takes(target string) bool { return t.takes(target) }
 
-var entry = unit.Unit{Provider: unit.Entry, Key: "e1"}
+var taskUnit = unit.Unit{Provider: unit.Task, Key: "e1"}
 
 // byTarget wires a chat publisher that takes "#" targets, a plain one for
 // pull requests, and no publisher for entries.
@@ -40,16 +40,16 @@ func byTarget(e *env) (chat, prs *fakeEffects) {
 	return chat, prs
 }
 
-func onEntry(target string) Proposal {
+func onTask(target string) Proposal {
 	p := reply("shipped")
-	p.Unit, p.Target = entry, target
+	p.Unit, p.Target = taskUnit, target
 	return p
 }
 
-func TestADraftOnAnEntryIsPublishedByTheProviderOfItsTarget(t *testing.T) {
+func TestADraftOnATaskIsPublishedByTheProviderOfItsTarget(t *testing.T) {
 	e := newEnv()
 	chat, _ := byTarget(e)
-	d := e.propose(onEntry("#general"))
+	d := e.propose(onTask("#general"))
 	if got := e.svc.PublisherOf(d); got != "chat" {
 		t.Fatalf("PublisherOf = %s", got)
 	}
@@ -64,11 +64,11 @@ func TestADraftOnAnEntryIsPublishedByTheProviderOfItsTarget(t *testing.T) {
 	}
 }
 
-func TestADraftOnAnEntryStuckSendingIsVerifiedByItsTargetsProvider(t *testing.T) {
+func TestADraftOnATaskStuckSendingIsVerifiedByItsTargetsProvider(t *testing.T) {
 	e := newEnv()
 	chat, _ := byTarget(e)
 	chat.found = true
-	d := e.propose(onEntry("#general"))
+	d := e.propose(onTask("#general"))
 	d.State = draft.Sending
 	if _, err := e.store.Update(ctx, d, draft.Proposed); err != nil {
 		t.Fatal(err)
@@ -81,11 +81,11 @@ func TestADraftOnAnEntryStuckSendingIsVerifiedByItsTargetsProvider(t *testing.T)
 	}
 }
 
-func TestADraftOnAnEntryWhoseTargetNoProviderTakesIsRefused(t *testing.T) {
+func TestADraftOnATaskWhoseTargetNoProviderTakesIsRefused(t *testing.T) {
 	e := newEnv()
 	byTarget(e)
 	for _, target := range []string{"", "ana@acme.example"} {
-		if _, err := e.svc.Propose(ctx, onEntry(target)); !errors.Is(err, ErrDisabled) {
+		if _, err := e.svc.Propose(ctx, onTask(target)); !errors.Is(err, ErrDisabled) {
 			t.Errorf("target %q: %v", target, err)
 		}
 	}
@@ -122,7 +122,7 @@ func TestATargetTwoProvidersTakeNamesNeither(t *testing.T) {
 		return inner(p)
 	}
 	e.svc.Targets = append(e.svc.Targets, "mail")
-	if _, err := e.svc.Propose(ctx, onEntry("#general")); !errors.Is(err, ErrDisabled) {
+	if _, err := e.svc.Propose(ctx, onTask("#general")); !errors.Is(err, ErrDisabled) {
 		t.Fatalf("propose: %v", err)
 	}
 	if len(chat.published) != 0 {

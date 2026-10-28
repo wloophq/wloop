@@ -30,10 +30,10 @@ type SendRequest struct {
 	Workflow string
 	// Role is the role the turn's intent holds, "" none.
 	Role string
-	// Items and Entry are the unit's item ids and the GTD entry the turn was asked about, kept with
+	// Items and Task are the unit's item ids and the GTD entry the turn was asked about, kept with
 	// the turn so its drafts are tied to them.
 	Items []string
-	Entry string
+	Task  string
 }
 
 // Send stores a new turn, replacing the open one of the same intent. The
@@ -74,7 +74,7 @@ func (s *Service) send(ctx context.Context, r SendRequest, start bool, handle st
 	now := s.now()
 	b.Send(turn.Turn{
 		Intent: r.Intent, ID: r.Turn, Trigger: r.Trigger, Guidance: r.Guidance, Head: r.Head,
-		ResumeOf: r.ResumeOf, Inputs: bound(r.Inputs, r.Items, r.Entry), SentAt: now, Agent: r.Agent, BriefRun: r.BriefRun, Workflow: r.Workflow, Role: r.Role,
+		ResumeOf: r.ResumeOf, Inputs: bound(r.Inputs, r.Items, r.Task), SentAt: now, Agent: r.Agent, BriefRun: r.BriefRun, Workflow: r.Workflow, Role: r.Role,
 	})
 	evs := []port.Event{s.event(r.Unit, KindTurnSent, r.Turn, string(r.Intent))}
 	if start {

@@ -16,12 +16,12 @@ import (
 	"github.com/wloophq/wloop/internal/profile"
 )
 
-// GTDFile is the profile file that words the GTD verbs and views.
-const GTDFile = "gtd.toml"
+// ListsFile is the profile file that words the GTD verbs and views.
+const ListsFile = "gtd.toml"
 
-// GTDTexts are the words of the GTD verbs, by verb, and the labels of the
+// ListTexts are the words of the GTD verbs, by verb, and the labels of the
 // views and of the Review's steps, by id.
-type GTDTexts struct {
+type ListTexts struct {
 	Verbs  map[string]VerbText
 	Views  map[string]string
 	Review map[string]string
@@ -34,7 +34,7 @@ type VerbText struct {
 	Offer                 workflow.Predicate
 }
 
-type mGTD struct {
+type mLists struct {
 	Verbs  map[string]mVerbText `toml:"verbs"`
 	Views  map[string]mViewText `toml:"views"`
 	Review map[string]mViewText `toml:"review"`
@@ -51,33 +51,33 @@ type mViewText struct {
 	Label *string `toml:"label"`
 }
 
-// BundledGTD is the GTD texts of the bundled profile alone.
-func BundledGTD(bundled fs.FS) (GTDTexts, Problems) {
-	return loadGTD(nil, bundled)
+// BundledLists is the GTD texts of the bundled profile alone.
+func BundledLists(bundled fs.FS) (ListTexts, Problems) {
+	return loadLists(nil, bundled)
 }
 
-// loadGTD reads gtd.toml from bundled and the user's layers: a higher
+// loadLists reads gtd.toml from bundled and the user's layers: a higher
 // layer's key replaces a lower one's, and a user's text that is empty or
 // names nothing keeps the lower one. A bundled FS without the file, or nil,
 // words nothing.
-func loadGTD(layers []profile.Layer, bundled fs.FS) (GTDTexts, Problems) {
-	out := GTDTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}, Review: map[string]string{}}
+func loadLists(layers []profile.Layer, bundled fs.FS) (ListTexts, Problems) {
+	out := ListTexts{Verbs: map[string]VerbText{}, Views: map[string]string{}, Review: map[string]string{}}
 	if bundled == nil {
 		return out, nil
 	}
-	src, err := fs.ReadFile(bundled, GTDFile)
+	src, err := fs.ReadFile(bundled, ListsFile)
 	if errors.Is(err, fs.ErrNotExist) {
 		return out, nil
 	}
 	if err != nil {
-		return out, Problems{{File: GTDFile, Msg: err.Error()}}
+		return out, Problems{{File: ListsFile, Msg: err.Error()}}
 	}
-	problems := mergeGTD(out, GTDFile, src)
+	problems := mergeLists(out, ListsFile, src)
 	for _, l := range layers {
 		if l.Dir == "" {
 			continue
 		}
-		file := filepath.Join(l.Dir, GTDFile)
+		file := filepath.Join(l.Dir, ListsFile)
 		src, err := os.ReadFile(file)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -86,34 +86,34 @@ func loadGTD(layers []profile.Layer, bundled fs.FS) (GTDTexts, Problems) {
 			problems = append(problems, Problem{File: file, Msg: err.Error()})
 			continue
 		}
-		problems = append(problems, mergeGTD(out, file, src)...)
+		problems = append(problems, mergeLists(out, file, src)...)
 	}
-	for _, v := range builtin.GTDVerbs {
+	for _, v := range builtin.TaskVerbs {
 		if _, ok := out.Verbs[v]; !ok {
-			problems = append(problems, Problem{File: GTDFile, Field: "verbs." + v, Msg: "is missing: every verb has a table"})
+			problems = append(problems, Problem{File: ListsFile, Field: "verbs." + v, Msg: "is missing: every verb has a table"})
 		}
 	}
-	for _, v := range builtin.GTDVerbInputs {
+	for _, v := range builtin.TaskVerbInputs {
 		if w, ok := out.Verbs[v]; ok && w.Input == "" {
-			problems = append(problems, Problem{File: GTDFile, Field: "verbs." + v + ".input", Msg: "is required: the verb asks for a value first"})
+			problems = append(problems, Problem{File: ListsFile, Field: "verbs." + v + ".input", Msg: "is required: the verb asks for a value first"})
 		}
 	}
-	for _, v := range builtin.GTDViews {
+	for _, v := range builtin.Views {
 		if _, ok := out.Views[v]; !ok {
-			problems = append(problems, Problem{File: GTDFile, Field: "views." + v, Msg: "is missing: every view has a table"})
+			problems = append(problems, Problem{File: ListsFile, Field: "views." + v, Msg: "is missing: every view has a table"})
 		}
 	}
-	for _, v := range builtin.GTDReviewSteps {
+	for _, v := range builtin.ReviewSteps {
 		if _, ok := out.Review[v]; !ok {
-			problems = append(problems, Problem{File: GTDFile, Field: "review." + v, Msg: "is missing: every Review step has a table"})
+			problems = append(problems, Problem{File: ListsFile, Field: "review." + v, Msg: "is missing: every Review step has a table"})
 		}
 	}
 	return out, problems
 }
 
-// mergeGTD lays the tables of file over out.
-func mergeGTD(out GTDTexts, file string, src []byte) Problems {
-	m, problems, _, complete := decode[mGTD](file, src)
+// mergeLists lays the tables of file over out.
+func mergeLists(out ListTexts, file string, src []byte) Problems {
+	m, problems, _, complete := decode[mLists](file, src)
 	if !complete {
 		return problems
 	}
@@ -128,8 +128,8 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		}
 	}
 	for _, id := range slices.Sorted(maps.Keys(m.Verbs)) {
-		if !slices.Contains(builtin.GTDVerbs, id) {
-			s.add("verbs."+id, "names no verb%s", expr.DidYouMean(id, builtin.GTDVerbs))
+		if !slices.Contains(builtin.TaskVerbs, id) {
+			s.add("verbs."+id, "names no verb%s", expr.DidYouMean(id, builtin.TaskVerbs))
 			continue
 		}
 		w, t := out.Verbs[id], m.Verbs[id]
@@ -151,9 +151,9 @@ func mergeGTD(out GTDTexts, file string, src []byte) Problems {
 		}
 		out.Verbs[id] = w
 	}
-	labels(s, "views", "view", m.Views, out.Views, builtin.GTDViews)
-	labels(s, "review", "Review step", m.Review, out.Review, builtin.GTDReviewSteps)
-	s.addGrammar(grammar(builtin.SurfaceGTD, src))
+	labels(s, "views", "view", m.Views, out.Views, builtin.Views)
+	labels(s, "review", "Review step", m.Review, out.Review, builtin.ReviewSteps)
+	s.addGrammar(grammar(builtin.SurfaceViews, src))
 	return s.problems
 }
 

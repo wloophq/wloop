@@ -14,7 +14,7 @@ import (
 )
 
 func TestDelegateTabHandsToAnAgent(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	press(m, Key{Rune: 'd'})
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "Tab: hand to an agent") {
 		t.Fatalf("d did not ask: %+v", m.prompt)
@@ -35,11 +35,11 @@ func TestDelegateTabHandsToAnAgent(t *testing.T) {
 }
 
 func TestDelegateSaysWhyNoAgentSessionCanRun(t *testing.T) {
-	m := gtdModel(t)
-	focus := gtdEntries()["focus"][0]
+	m := viewsModel(t)
+	focus := viewTasks()["focus"][0]
 	focus.Verbs = append(focus.Verbs, api.VerbState{Verb: "delegate", Enabled: true, Runners: []api.RunnerState{
 		{Runner: "headless", Enabled: true}, {Runner: "session", Reason: "no workspace manager is enabled"}}})
-	m.SetEntries("focus", []api.EntryView{focus}, gtdCounters())
+	m.SetTasks("focus", []api.TaskView{focus}, viewCounters())
 	press(m, Key{Rune: 'd'})
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "no agent session: no workspace manager is enabled") {
 		t.Fatalf("d did not say why: %+v", m.prompt)
@@ -51,7 +51,7 @@ func TestDelegateSaysWhyNoAgentSessionCanRun(t *testing.T) {
 }
 
 func TestReplySavesOrSendsAfterAy(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	press(m, Key{Rune: 'r'})
 	if m.prompt == nil || !strings.Contains(m.prompt.label, "saved to the Outbox") {
 		t.Fatalf("r did not ask: %+v", m.prompt)
@@ -65,13 +65,13 @@ func TestReplySavesOrSendsAfterAy(t *testing.T) {
 		t.Fatalf("send now did not ask for a y: %+v", m.prompt)
 	}
 	c, ok := press(m, Key{Rune: 'y'})
-	if want := map[string]string{"text": "Shipped", "send": "now"}; !ok || c.verb != "reply" || c.entry != "e1" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"text": "Shipped", "send": "now"}; !ok || c.verb != "reply" || c.task != "e1" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("%+v %v", c, ok)
 	}
 }
 
 func TestCtrlEHandsThePromptToTheEditor(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	press(m, Key{Rune: 'r'})
 	press(m, append(typed("First"), Key{Name: KeyCtrlE})...)
 	e := m.TakeEdit()
@@ -91,7 +91,7 @@ func TestCtrlEHandsThePromptToTheEditor(t *testing.T) {
 }
 
 func TestEditADraftFromItsDetail(t *testing.T) {
-	m := gtdModel(t)
+	m := viewsModel(t)
 	chord(m, "go")
 	press(m, Key{Name: KeyEnter})
 	if _, ok := press(m, Key{Rune: 'i'}); ok || m.prompt != nil {
@@ -102,34 +102,34 @@ func TestEditADraftFromItsDetail(t *testing.T) {
 		t.Fatalf("edit %+v", e)
 	}
 	c, ok := m.Edited(e, "Ship it tomorrow.", nil)
-	if !ok || c.entry != "draft:11" || c.verb != "edit" || c.args["text"] != "Ship it tomorrow." {
+	if !ok || c.task != "draft:11" || c.verb != "edit" || c.args["text"] != "Ship it tomorrow." {
 		t.Fatalf("%+v %v", c, ok)
 	}
 
-	one := entry("draft:12", "Thanks", "inbox")
+	one := task("draft:12", "Thanks", "inbox")
 	one.Kind, one.Verbs = "draft", []api.VerbState{{Verb: "edit", Enabled: true}}
 	one.Draft = &api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "proposed"}
-	m.SetEntries("outbox", []api.EntryView{one}, gtdCounters())
+	m.SetTasks("outbox", []api.TaskView{one}, viewCounters())
 	m.Done(c, nil, nil)
 	press(m, Key{Name: KeyEnter}, Key{Rune: 'i'})
 	if m.prompt == nil || string(m.prompt.text) != "Thanks!" || !m.prompt.editor {
 		t.Fatalf("prompt %+v", m.prompt)
 	}
 	c, ok = press(m, append(typed(" Merged."), Key{Name: KeyEnter})...)
-	if !ok || c.entry != "draft:12" || c.args["text"] != "Thanks! Merged." {
+	if !ok || c.task != "draft:12" || c.args["text"] != "Thanks! Merged." {
 		t.Fatalf("%+v %v", c, ok)
 	}
 }
 
-func TestEntryDetailListsAndPicksItsDrafts(t *testing.T) {
-	m := gtdModel(t)
-	e := m.entries["focus"][0]
+func TestTaskDetailListsAndPicksItsDrafts(t *testing.T) {
+	m := viewsModel(t)
+	e := m.tasks["focus"][0]
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Entry: e.ID, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
+		{ID: 4, Task: e.ID, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
 			Actions: []api.ActionState{{ID: "draft.approve", Enabled: true}, {ID: "draft.edit", Enabled: true}, {ID: "draft.discard", Enabled: true}}},
-		{ID: 3, Entry: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}}},
+		{ID: 3, Task: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}}},
 	})
 	screen := screenOf(m, 100, 40)
 	for _, s := range []string{"drafts", "1. reply · proposed · from turn", "Friday works", "2. react · sent", ":eyes:"} {
@@ -154,7 +154,7 @@ func TestEntryDetailListsAndPicksItsDrafts(t *testing.T) {
 		t.Fatalf("approve did not ask: %+v", m.prompt)
 	}
 	c, ok := press(m, Key{Rune: 'y'})
-	if want := map[string]string{"rev": "2", "text": "Friday works"}; !ok || c.entry != "draft:4" || c.verb != "approve" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"rev": "2", "text": "Friday works"}; !ok || c.task != "draft:4" || c.verb != "approve" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("%+v %v", c, ok)
 	}
 	m.Done(c, nil, nil)
@@ -164,27 +164,27 @@ func TestEntryDetailListsAndPicksItsDrafts(t *testing.T) {
 	}
 }
 
-func TestTheFilterReadsAnEntrysWords(t *testing.T) {
-	e := entry("e7", "Rollout date", "inbox")
+func TestTheFilterReadsATasksWords(t *testing.T) {
+	e := task("e7", "Rollout date", "inbox")
 	e.UnitLabels, e.Units = []string{"#ops"}, []unit.Unit{{Provider: "slack", Key: "T1/C1/1.1"}}
 	e.Items = []api.ItemView{{Summary: "Confirm the freeze with Dana"}}
 	e.Cards = []api.CardView{{Card: card.Card{LastHuman: &card.Human{Who: items.Person{Name: "Ana Lima"}}}}}
 	e = waitingOn(e, "Bruno")
 	for q, want := range map[string]bool{"#ops": true, "freeze dana": true, "ana": true, "bruno rollout": true, "zzz": false, "": true} {
-		if got := entryMatches(e, q); got != want {
+		if got := taskMatches(e, q); got != want {
 			t.Errorf("%q: %v, want %v", q, got, want)
 		}
 	}
 }
 
 func TestOpeningADetailFetchesItsDrafts(t *testing.T) {
-	d := &fakeDaemon{entries: gtdEntries(), drafts: []api.Draft{{ID: 4, Entry: "e1"}, {ID: 5, Entry: "e9"}}}
-	got, err := carry(context.Background(), Config{Daemon: d}, Command{Unit: unit.Unit{}, entry: "e1", fetch: true})
-	if err != nil || got.entry.ID != "e1" || len(got.drafts) != 1 || got.drafts[0].ID != 4 {
+	d := &fakeDaemon{tasks: viewTasks(), drafts: []api.Draft{{ID: 4, Task: "e1"}, {ID: 5, Task: "e9"}}}
+	got, err := carry(context.Background(), Config{Daemon: d}, Command{Unit: unit.Unit{}, task: "e1", fetch: true})
+	if err != nil || got.task.ID != "e1" || len(got.drafts) != 1 || got.drafts[0].ID != 4 {
 		t.Fatalf("%+v %v", got, err)
 	}
-	got, err = carry(context.Background(), Config{Daemon: d}, Command{entry: "draft:11", fetch: true})
-	if err != nil || got.entry.ID != "draft:11" || got.drafts != nil {
+	got, err = carry(context.Background(), Config{Daemon: d}, Command{task: "draft:11", fetch: true})
+	if err != nil || got.task.ID != "draft:11" || got.drafts != nil {
 		t.Fatalf("a draft's own detail: %+v %v", got, err)
 	}
 }

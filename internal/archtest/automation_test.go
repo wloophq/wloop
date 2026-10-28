@@ -21,10 +21,10 @@ var engineBans = []string{"internal/domain/pr", "internal/domain/turn", "interna
 	"internal/domain/workspace", "internal/domain/round", "internal/adapter"}
 
 var providerIDs = map[string]bool{string(unit.GitHub): true, string(unit.Session): true, string(unit.Workspace): true,
-	string(unit.Entry): true, "slack": true}
+	string(unit.Task): true, "slack": true}
 
 // providerConsts are the unit provider constants the core may not spell.
-var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Entry": true}
+var providerConsts = map[string]bool{"GitHub": true, "Session": true, "Workspace": true, "Task": true}
 
 // engineImports flags an import of engineBans by internal/core/automation;
 // its fakes, automationtest, are excluded.
@@ -53,7 +53,7 @@ type providerSite struct {
 
 // coreProviderAllowlist are the places that may still name a provider.
 var coreProviderAllowlist = []providerSite{
-	{"internal/core/turns/headless.go", "entryInput", `"entry"`, 1, "the headless turn's entry input, which shares the entry provider's spelling"},
+	{"internal/core/turns/headless.go", "taskInput", `"entry"`, 1, "the headless turn's entry input, which shares the entry provider's spelling"},
 	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},
 	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},
@@ -127,7 +127,7 @@ func ownProvider(dir string) string {
 }
 
 // constIDs are the ids the unit provider constants hold.
-var constIDs = map[string]unit.ProviderID{"GitHub": unit.GitHub, "Session": unit.Session, "Workspace": unit.Workspace, "Entry": unit.Entry}
+var constIDs = map[string]unit.ProviderID{"GitHub": unit.GitHub, "Session": unit.Session, "Workspace": unit.Workspace, "Task": unit.Task}
 
 // decls are f's top-level declarations by name: a function, a method as
 // Type.Method, and each var, const and type by its first name.
@@ -371,7 +371,7 @@ var b = unit.Session
 var c = "sessions"
 var d = workflow.Session
 var e = unit.Unit{}
-var f = unit.Entry
+var f = unit.Task
 var g = "entry"
 `)
 	none := map[int]int{}

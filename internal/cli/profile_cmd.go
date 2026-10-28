@@ -60,7 +60,7 @@ func runProfile(ctx context.Context, e *Env, args []string) error {
 	case "check":
 		return runProfileCheck(e, args[1:])
 	case "schema":
-		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--gtd": intentload.GTDSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema}
+		schemas := map[string][]byte{"--workflow": intentload.WorkflowSchema, "--actions": intentload.ActionsSchema, "--gtd": intentload.ListsSchema, "--keys": intentload.KeysSchema, "--config": intentload.ConfigSchema}
 		switch {
 		case len(args) == 1:
 			_, err := e.Out.Write(intentload.Schema)

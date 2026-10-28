@@ -53,7 +53,7 @@ func known(v task.Verb) bool {
 }
 
 // accepts says whether e's state takes verb, naming both when it does not.
-func accepts(e task.Entry, v task.Verb) error {
+func accepts(e task.Task, v task.Verb) error {
 	m, ok := moves[v]
 	if !ok {
 		return fmt.Errorf("%w: unknown verb %q", ErrArgs, v)
@@ -65,9 +65,9 @@ func accepts(e task.Entry, v task.Verb) error {
 }
 
 // transition is the state change of a verb with no handler; project is the service's.
-func transition(e task.Entry, req Request, now time.Time) (task.Entry, error) {
+func transition(e task.Task, req Request, now time.Time) (task.Task, error) {
 	if err := accepts(e, req.Verb); err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	m := moves[req.Verb]
 	switch req.Verb {
@@ -82,13 +82,13 @@ func transition(e task.Entry, req Request, now time.Time) (task.Entry, error) {
 	case task.VerbSchedule:
 		snooze, err := scheduleArgs(e, req.Args, now)
 		if err != nil {
-			return task.Entry{}, err
+			return task.Task{}, err
 		}
 		e.Snooze = snooze
 	case task.VerbWaiting:
 		w, err := waitingArgs(e, req.Args, now)
 		if err != nil {
-			return task.Entry{}, err
+			return task.Task{}, err
 		}
 		e.Waiting = w
 	}
@@ -123,7 +123,7 @@ func parseDate(key, s string, now time.Time) (time.Time, error) {
 	return t, nil
 }
 
-func scheduleArgs(e task.Entry, args map[string]string, now time.Time) (task.Snooze, error) {
+func scheduleArgs(e task.Task, args map[string]string, now time.Time) (task.Snooze, error) {
 	until, err := parseDate("until", args["until"], now)
 	if err != nil {
 		return task.Snooze{}, err
@@ -139,7 +139,7 @@ func scheduleArgs(e task.Entry, args map[string]string, now time.Time) (task.Sno
 	return task.Snooze{Until: until, OnActivity: onActivity, Return: ret}, nil
 }
 
-func waitingArgs(e task.Entry, args map[string]string, now time.Time) (*task.WaitingOn, error) {
+func waitingArgs(e task.Task, args map[string]string, now time.Time) (*task.WaitingOn, error) {
 	var w task.WaitingOn
 	if e.Waiting != nil {
 		w = *e.Waiting

@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	entriesBodyMax = 64 << 10
+	tasksBodyMax = 64 << 10
 	// The Sync worker folds a burst of notes as the row feed does, and wakes each minute for the snoozes and
 	// stars that come due with no note.
 	syncQuiet    = 250 * time.Millisecond
@@ -45,8 +45,8 @@ const (
 // syncInputs are the notes whose units Sync reconciles.
 const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
 
-// entryInputs are the notes after which a change carries the counters.
-const entryInputs = port.TopicEntries | port.TopicDrafts
+// taskInputs are the notes after which a change carries the counters.
+const taskInputs = port.TopicTasks | port.TopicDrafts
 
 // bridged are the verbs an entry with units runs as its unit's action when no handler takes them.
 var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
@@ -56,14 +56,14 @@ var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
 var delegableKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
 
 // bridges says whether verb on e runs as its first unit's action, a handler aside.
-func bridges(e task.Entry, verb task.Verb) bool {
+func bridges(e task.Task, verb task.Verb) bool {
 	if len(e.Units) == 0 || !slices.Contains(bridged, verb) {
 		return false
 	}
 	return e.Kind == task.KindAction || verb == task.VerbDelegate && slices.Contains(delegableKinds, e.Kind)
 }
 
-var errGTDUnavailable = errors.New("the entries are not served: the daemon runs without a store")
+var errTasksUnavailable = errors.New("the entries are not served: the daemon runs without a store")
 
 func verbKey(v task.Verb) string {
 	for _, b := range keys.Core {
@@ -74,27 +74,27 @@ func verbKey(v task.Verb) string {
 	return ""
 }
 
-func knownVerb(v string) bool { return slices.Contains(builtin.GTDVerbs, v) }
+func knownVerb(v string) bool { return slices.Contains(builtin.TaskVerbs, v) }
 
-func verbNames() string { return strings.Join(builtin.GTDVerbs, ", ") }
+func verbNames() string { return strings.Join(builtin.TaskVerbs, ", ") }
 
-func (s *Server) gtd(w http.ResponseWriter) (*coretasks.Service, bool) {
-	if s.deps.GTD == nil {
-		writeError(w, http.StatusServiceUnavailable, errGTDUnavailable.Error())
+func (s *Server) tasks(w http.ResponseWriter) (*coretasks.Service, bool) {
+	if s.deps.Tasks == nil {
+		writeError(w, http.StatusServiceUnavailable, errTasksUnavailable.Error())
 		return nil, false
 	}
-	return s.deps.GTD, true
+	return s.deps.Tasks, true
 }
 
-// writeGTDError answers a gtd service error with its status.
-func writeGTDError(w http.ResponseWriter, err error) {
+// writeTasksError answers a tasks service error with its status.
+func writeTasksError(w http.ResponseWriter, err error) {
 	var disabled pluginOff
 	switch {
 	case errors.As(err, &disabled):
 		writePluginDisabled(w, disabled.provider)
 	case errors.Is(err, coretasks.ErrArgs):
 		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, coretasks.ErrNoEntry), errors.Is(err, messages.ErrNoMessage):
+	case errors.Is(err, coretasks.ErrNoTask), errors.Is(err, messages.ErrNoMessage):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, coretasks.ErrVerb), errors.Is(err, coretasks.ErrPluginDisabled), errors.Is(err, messages.ErrClosed), errors.Is(err, turn.ErrClosed):
 		writeError(w, http.StatusConflict, err.Error())
@@ -103,34 +103,34 @@ func writeGTDError(w http.ResponseWriter, err error) {
 	}
 }
 
-func (s *Server) handleGTD(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
-	texts, bundled := s.loaded().GTD, bundledWords().gtd
-	cat := api.GTDCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.GTD.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.GTD.Contexts))}
-	for _, v := range builtin.GTDViews {
+	texts, bundled := s.loaded().Lists, bundledWords().lists
+	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts))}
+	for _, v := range builtin.Views {
 		if v != string(task.ViewReview) || g.Serves(task.ViewReview) {
-			cat.Views = append(cat.Views, api.GTDView{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v)})
+			cat.Views = append(cat.Views, api.TaskViewSpec{ID: v, Label: cmp.Or(texts.Views[v], bundled.Views[v], v)})
 		}
 	}
-	for _, v := range builtin.GTDVerbs {
+	for _, v := range builtin.TaskVerbs {
 		t, b := texts.Verbs[v], bundled.Verbs[v]
-		cat.Verbs = append(cat.Verbs, api.GTDVerb{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
+		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
 	}
 	writeJSON(w, cat)
 }
 
-func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
 	q := r.URL.Query()
 	view := task.View(q.Get("view"))
-	if !slices.Contains(builtin.GTDViews, string(view)) {
+	if !slices.Contains(builtin.Views, string(view)) {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unknown view %q", view))
 		return
 	}
@@ -146,20 +146,20 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
-	p, err := g.EntriesSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev})
+	p, err := g.TasksSince(ctx, query, coretasks.Since{Epoch: since.Epoch, Rev: since.Rev})
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
-	page := api.EntriesPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Entries: []api.EntryView{}, Removed: []string{}, Counters: wireCounters(p.Counters)}
-	vs := s.entryViews(ctx, g, false)
-	for _, e := range p.Entries {
+	page := api.TasksPage{Epoch: p.Epoch, Rev: p.Rev, Full: p.Full, Tasks: []api.TaskView{}, Removed: []string{}, Counters: wireCounters(p.Counters)}
+	vs := s.taskViews(ctx, g, false)
+	for _, e := range p.Tasks {
 		v, err := vs.view(ctx, e)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		page.Entries = append(page.Entries, v)
+		page.Tasks = append(page.Tasks, v)
 	}
 	for _, id := range p.Removed {
 		page.Removed = append(page.Removed, string(id))
@@ -167,18 +167,18 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, page)
 }
 
-func (s *Server) handleEntry(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
 	ctx := r.Context()
-	e, err := g.Entry(ctx, task.ID(r.PathValue("id")))
+	e, err := g.Task(ctx, task.ID(r.PathValue("id")))
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
-	v, err := s.entryViews(ctx, g, true).view(ctx, e)
+	v, err := s.taskViews(ctx, g, true).view(ctx, e)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -187,12 +187,12 @@ func (s *Server) handleEntry(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
 	var req api.CaptureRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, entriesBodyMax)).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, tasksBodyMax)).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
@@ -202,23 +202,23 @@ func (s *Server) handleCapture(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	e, err := g.Capture(ctx, req.Title, req.Notes, req.Unit)
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
-	s.writeEntry(w, ctx, g, e)
+	s.writeTask(w, ctx, g, e)
 }
 
-func (s *Server) handleEntryVerb(w http.ResponseWriter, r *http.Request) {
-	var req api.EntryRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, entriesBodyMax)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+func (s *Server) handleTaskVerb(w http.ResponseWriter, r *http.Request) {
+	var req api.TaskRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, tasksBodyMax)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	s.runEntryVerb(w, r, r.PathValue("verb"), req)
+	s.runTaskVerb(w, r, r.PathValue("verb"), req)
 }
 
-func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb string, req api.EntryRequest) {
-	g, ok := s.gtd(w)
+func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string, req api.TaskRequest) {
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -227,13 +227,13 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
-	e, err := g.Entry(ctx, task.ID(r.PathValue("id")))
+	e, err := g.Task(ctx, task.ID(r.PathValue("id")))
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	v := task.Verb(verb)
-	if !offers(s.loaded().GTD, e, v) {
+	if !offers(s.loaded().Lists, e, v) {
 		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this entry: the profile's gtd.toml says where it is", v))
 		return
 	}
@@ -256,12 +256,12 @@ func (s *Server) runEntryVerb(w http.ResponseWriter, r *http.Request, verb strin
 		return
 	}
 	res, err := g.Do(ctx, e.ID, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source})
-	s.writeEntryResult(ctx, w, g, res, err)
+	s.writeTaskResult(ctx, w, g, res, err)
 }
 
 // offers says whether the profile offers verb on e; a verb with no offer is
 // offered everywhere.
-func offers(words intentload.GTDTexts, e task.Entry, verb task.Verb) bool {
+func offers(words intentload.ListTexts, e task.Task, verb task.Verb) bool {
 	p := words.Verbs[string(verb)].Offer
 	if p == nil {
 		return true
@@ -272,23 +272,23 @@ func offers(words intentload.GTDTexts, e task.Entry, verb task.Verb) bool {
 
 // recordVerb records a verb another service ran on e; the verb already
 // happened, so a failure is logged and the answer stands.
-func (s *Server) recordVerb(ctx context.Context, g *coretasks.Service, e task.Entry, req coretasks.Request) {
+func (s *Server) recordVerb(ctx context.Context, g *coretasks.Service, e task.Task, req coretasks.Request) {
 	if err := g.RecordVerb(ctx, e, req); err != nil {
 		s.logf("%s on %s: recording the verb: %v", req.Verb, e.ID, err)
 	}
 }
 
-func (s *Server) writeEntryResult(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, res coretasks.Result, err error) {
+func (s *Server) writeTaskResult(ctx context.Context, w http.ResponseWriter, g *coretasks.Service, res coretasks.Result, err error) {
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
-	view, err := s.entryViews(ctx, g, false).view(ctx, res.Entry)
+	view, err := s.taskViews(ctx, g, false).view(ctx, res.Task)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, api.EntryResult{Entry: view, Lines: res.Lines})
+	writeJSON(w, api.TaskResult{Task: view, Lines: res.Lines})
 }
 
 // bridgeAction are the row's actions a verb may run on a unit: those of the highest rank the row offers whose gtd
@@ -331,7 +331,7 @@ func (b bridgeAction) reason() string {
 
 // bridge is what verb runs on e as its unit's action: ok false when a handler takes the verb or bridges says
 // it does not run as one. A dismiss the row offers no action for is the state change.
-func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Entry, verb task.Verb) (bridgeAction, bool) {
+func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Task, verb task.Verb) (bridgeAction, bool) {
 	if !bridges(e, verb) || g.Handles(e.Kind, verb) || !s.pluginEnabled(e.Units[0].Provider) {
 		return bridgeAction{}, false
 	}
@@ -381,7 +381,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb task.Verb) bridgeAct
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
 // entry's items on u, and the guidance and mode of the entry's args.
-func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Entry, verb task.Verb, u unit.Unit, st api.ActionState, req api.EntryRequest) {
+func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -402,7 +402,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 	body, err := json.Marshal(struct {
 		api.ActionRequest
 		Mode string `json:"mode,omitempty"`
-	}{api.ActionRequest{Basis: st.Basis, Source: req.Source, Guidance: req.Args["guidance"], Items: its, Entry: string(e.ID)}, mode})
+	}{api.ActionRequest{Basis: st.Basis, Source: req.Source, Guidance: req.Args["guidance"], Items: its, Task: string(e.ID)}, mode})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -440,11 +440,11 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 	}
 	ctx := context.WithoutCancel(r.Context())
 	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source})
-	now, err := g.Entry(ctx, e.ID)
+	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
 	}
-	view, err := s.entryViews(ctx, g, false).view(ctx, now)
+	view, err := s.taskViews(ctx, g, false).view(ctx, now)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -453,7 +453,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 	if res.Intake != nil {
 		lines = append(lines, fmt.Sprintf("%s accepted as intake %d", st.ID, res.Intake.Seq))
 	}
-	writeJSON(w, api.EntryResult{Entry: view, Lines: lines})
+	writeJSON(w, api.TaskResult{Task: view, Lines: lines})
 }
 
 // bridgeMode refuses a mode the action does not run in; "" leaves the choice to the action.
@@ -524,7 +524,7 @@ func (b *bufferedResponse) WriteHeader(code int) {
 }
 
 func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
-	g, ok := s.gtd(w)
+	g, ok := s.tasks(w)
 	if !ok {
 		return
 	}
@@ -540,21 +540,21 @@ func (s *Server) handleCounters(w http.ResponseWriter, r *http.Request) {
 	if len(terms) == 0 {
 		c, err = g.Counts(ctx, q.Get("area"))
 	} else {
-		vs := s.entryViews(ctx, g, false)
-		c, err = g.CountsWhere(ctx, q.Get("area"), func(e task.Entry) (bool, error) {
+		vs := s.taskViews(ctx, g, false)
+		c, err = g.CountsWhere(ctx, q.Get("area"), func(e task.Task) (bool, error) {
 			v, err := vs.view(ctx, e)
-			return err == nil && api.EntryMatches(v, terms), err
+			return err == nil && api.TaskMatches(v, terms), err
 		})
 	}
 	if err != nil {
-		writeGTDError(w, err)
+		writeTasksError(w, err)
 		return
 	}
 	writeJSON(w, wireCounters(c))
 }
 
-func (s *Server) writeEntry(w http.ResponseWriter, ctx context.Context, g *coretasks.Service, e task.Entry) {
-	v, err := s.entryViews(ctx, g, false).view(ctx, e)
+func (s *Server) writeTask(w http.ResponseWriter, ctx context.Context, g *coretasks.Service, e task.Task) {
+	v, err := s.taskViews(ctx, g, false).view(ctx, e)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -564,10 +564,10 @@ func (s *Server) writeEntry(w http.ResponseWriter, ctx context.Context, g *coret
 
 // counters are the Area "" counters a change or a rows page carries; nil without the entries.
 func (s *Server) counters(ctx context.Context) *api.Counters {
-	if s.deps.GTD == nil {
+	if s.deps.Tasks == nil {
 		return nil
 	}
-	c, err := s.deps.GTD.Counts(ctx, "")
+	c, err := s.deps.Tasks.Counts(ctx, "")
 	if err != nil {
 		s.logf("entries: counters: %v", err)
 		return nil
@@ -592,8 +592,8 @@ func wireCounters(c task.Counters) api.Counters {
 	return out
 }
 
-// entryViewer maps entries to their wire views; detail expands the cards and the items.
-type entryViewer struct {
+// taskViewer maps entries to their wire views; detail expands the cards and the items.
+type taskViewer struct {
 	s        *Server
 	g        *coretasks.Service
 	detail   bool
@@ -604,12 +604,12 @@ type entryViewer struct {
 	whereBy time.Time
 }
 
-func (s *Server) entryViews(_ context.Context, g *coretasks.Service, detail bool) *entryViewer {
-	return &entryViewer{s: s, g: g, detail: detail, projects: map[task.ID]string{}, whereBy: time.Now().Add(s.whereBudget())}
+func (s *Server) taskViews(_ context.Context, g *coretasks.Service, detail bool) *taskViewer {
+	return &taskViewer{s: s, g: g, detail: detail, projects: map[task.ID]string{}, whereBy: time.Now().Add(s.whereBudget())}
 }
 
-func (ev *entryViewer) view(ctx context.Context, e task.Entry) (api.EntryView, error) {
-	v := api.EntryView{ID: string(e.ID), Kind: string(e.Kind), State: string(e.State), Title: e.Title, Notes: e.Notes,
+func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, error) {
+	v := api.TaskView{ID: string(e.ID), Kind: string(e.Kind), State: string(e.State), Title: e.Title, Notes: e.Notes,
 		Focus: e.Focus.On, FocusAuto: e.Focus.Auto, Contexts: nonNil(slices.Clone(e.Contexts)), Area: e.Area, Project: string(e.Project),
 		Deadline: e.Deadline, Changed: e.Changed, Units: slices.Clone(e.Units), Items: []api.ItemView{}, Created: e.Created, Updated: e.Updated}
 	if v.Units == nil {
@@ -629,7 +629,7 @@ func (ev *entryViewer) view(ctx context.Context, e task.Entry) (api.EntryView, e
 	if e.Project != "" {
 		title, ok := ev.projects[e.Project]
 		if !ok {
-			if p, err := ev.g.Entry(ctx, e.Project); err == nil {
+			if p, err := ev.g.Task(ctx, e.Project); err == nil {
 				title = p.Title
 			}
 			ev.projects[e.Project] = title
@@ -637,31 +637,31 @@ func (ev *entryViewer) view(ctx context.Context, e task.Entry) (api.EntryView, e
 		v.ProjectTitle = title
 	}
 	if err := ev.items(ctx, e, &v); err != nil {
-		return api.EntryView{}, err
+		return api.TaskView{}, err
 	}
 	if ev.detail {
 		if err := ev.cards(ctx, e, &v); err != nil {
-			return api.EntryView{}, err
+			return api.TaskView{}, err
 		}
 	}
-	msg, err := ev.s.entryMessage(ctx, string(e.ID))
+	msg, err := ev.s.taskMessage(ctx, string(e.ID))
 	if err != nil {
-		return api.EntryView{}, err
+		return api.TaskView{}, err
 	}
 	v.Message = msg
 	v.Attention = ev.attention(ctx, e)
 	v.Verbs = ev.verbs(ctx, e)
-	v.Actions = entryIntentActions(ev.s.loaded(), e)
+	v.Actions = taskIntentActions(ev.s.loaded(), e)
 	if err := ev.project(ctx, e, &v); err != nil {
-		return api.EntryView{}, err
+		return api.TaskView{}, err
 	}
 	if err := ev.s.withDraft(whereBy(ctx, ev.whereBy), e, &v); err != nil {
-		return api.EntryView{}, err
+		return api.TaskView{}, err
 	}
 	return v, nil
 }
 
-func (ev *entryViewer) items(ctx context.Context, e task.Entry, v *api.EntryView) error {
+func (ev *taskViewer) items(ctx context.Context, e task.Task, v *api.TaskView) error {
 	byUnit := map[unit.Unit][]items.Item{}
 	for _, ref := range e.Items {
 		iv := api.ItemView{Unit: ref.Unit, ID: ref.Item}
@@ -683,7 +683,7 @@ func (ev *entryViewer) items(ctx context.Context, e task.Entry, v *api.EntryView
 	return nil
 }
 
-func (ev *entryViewer) cards(ctx context.Context, e task.Entry, v *api.EntryView) error {
+func (ev *taskViewer) cards(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if ev.s.deps.Cards == nil || len(e.Units) == 0 {
 		return nil
 	}
@@ -701,9 +701,9 @@ func (ev *entryViewer) cards(ctx context.Context, e task.Entry, v *api.EntryView
 
 // verbs are the verbs of the catalog as they stand on e: refused all over on a disabled plugin's unit, taken by
 // a handler, run as the unit's action, or the state change.
-func (ev *entryViewer) verbs(ctx context.Context, e task.Entry) []api.VerbState {
-	out := make([]api.VerbState, 0, len(builtin.GTDVerbs))
-	words := ev.s.loaded().GTD
+func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
+	out := make([]api.VerbState, 0, len(builtin.TaskVerbs))
+	words := ev.s.loaded().Lists
 	off := ""
 	for _, u := range e.Units {
 		if !ev.s.pluginEnabled(u.Provider) {
@@ -723,7 +723,7 @@ func (ev *entryViewer) verbs(ctx context.Context, e task.Entry) []api.VerbState 
 		}
 		return ev.s.offeredFor(*row, verb)
 	}
-	for _, name := range builtin.GTDVerbs {
+	for _, name := range builtin.TaskVerbs {
 		verb := task.Verb(name)
 		if !offers(words, e, verb) {
 			continue
@@ -759,11 +759,11 @@ func (ev *entryViewer) verbs(ctx context.Context, e task.Entry) []api.VerbState 
 	return out
 }
 
-// syncEntries runs Sync once per burst of item, source-event and card notes, on its own goroutine, until ctx
+// syncTasks runs Sync once per burst of item, source-event and card notes, on its own goroutine, until ctx
 // ends: everything at start, after an All note and when the user's identity grows, and each minute for the
 // snoozes and stars that come due.
-func (s *Server) syncEntries(ctx context.Context) {
-	g := s.deps.GTD
+func (s *Server) syncTasks(ctx context.Context) {
+	g := s.deps.Tasks
 	var poke <-chan struct{}
 	var from port.Generation
 	if s.deps.Changes != nil {
@@ -773,7 +773,7 @@ func (s *Server) syncEntries(ctx context.Context) {
 	}
 	tick := time.NewTicker(syncTick)
 	defer tick.Stop()
-	all, settled := true, s.deps.GTDMe == nil
+	all, settled := true, s.deps.TasksMe == nil
 	var retry []unit.Unit
 	var quiet, late <-chan time.Time
 	idErr := ""
@@ -784,7 +784,7 @@ func (s *Server) syncEntries(ctx context.Context) {
 			from, all, units = c.Gen, all || c.All, c.Units
 		}
 		if !settled {
-			grew, err := s.deps.GTDMe(ctx)
+			grew, err := s.deps.TasksMe(ctx)
 			switch {
 			case err == nil:
 				idErr = ""
@@ -794,8 +794,8 @@ func (s *Server) syncEntries(ctx context.Context) {
 			}
 			settled, all = err == nil, all || grew
 		}
-		if all && s.deps.GTDUnits != nil {
-			us, err := s.deps.GTDUnits(ctx)
+		if all && s.deps.TaskUnits != nil {
+			us, err := s.deps.TaskUnits(ctx)
 			if err != nil {
 				s.logf("entries: units: %v", err)
 			}
@@ -803,7 +803,7 @@ func (s *Server) syncEntries(ctx context.Context) {
 		}
 		units = append(units, retry...)
 		all, retry = false, nil
-		sctx, scope := meter.Start(ctx, meter.Loop("entries"))
+		sctx, scope := meter.Start(ctx, meter.Loop("tasks"))
 		if err := g.Sync(sctx, units); err != nil && ctx.Err() == nil {
 			s.logf("entries: sync: %v", err)
 			retry = units
@@ -831,13 +831,13 @@ func (s *Server) syncEntries(ctx context.Context) {
 	}
 }
 
-// feedEntries publishes a change with the counters after each burst of entry and draft notes, naming the units
+// feedTasks publishes a change with the counters after each burst of entry and draft notes, naming the units
 // of the entries that moved, until ctx ends.
-func (s *Server) feedEntries(ctx context.Context) {
+func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return
 	}
-	poke, cancel := change.Poke(s.deps.Changes, entryInputs)
+	poke, cancel := change.Poke(s.deps.Changes, taskInputs)
 	defer cancel()
 	from := s.deps.Changes.Gen()
 	var quiet <-chan time.Time
@@ -853,9 +853,9 @@ func (s *Server) feedEntries(ctx context.Context) {
 		case <-quiet:
 			quiet = nil
 		}
-		c := s.deps.Changes.Since(from, entryInputs)
+		c := s.deps.Changes.Since(from, taskInputs)
 		from = c.Gen
-		pctx, scope := meter.Start(ctx, meter.Loop("entries-feed"))
+		pctx, scope := meter.Start(ctx, meter.Loop("tasks-feed"))
 		counters := s.counters(pctx)
 		scope.End()
 		pos := s.hub.position()

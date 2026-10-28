@@ -13,21 +13,21 @@ import (
 
 type countedView struct{ n int }
 
-func (v countedView) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
+func (v countedView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	return nil, nil
 }
-func (v countedView) Entry(ctx context.Context, id task.ID) (task.Entry, bool, error) {
-	return task.Entry{}, false, nil
+func (v countedView) Task(ctx context.Context, id task.ID) (task.Task, bool, error) {
+	return task.Task{}, false, nil
 }
 func (v countedView) Count(ctx context.Context, area string) (int, error) { return v.n, nil }
 
 // reviewRig has 2 in the Inbox, 1 waiting, nothing for someday, 1 starred and 1 project without a next action.
 func reviewRig(t *testing.T) *projectRig {
 	r := newProjectRig()
-	r.put(t, task.Entry{ID: "i1", Kind: task.KindCapture, State: task.Inbox, Title: "i1", Origin: task.OriginUser})
-	r.put(t, task.Entry{ID: "i2", Kind: task.KindCapture, State: task.Inbox, Title: "i2", Origin: task.OriginUser})
-	r.put(t, task.Entry{ID: "w1", Kind: task.KindCapture, State: task.Waiting, Title: "w1", Origin: task.OriginUser})
-	r.put(t, task.Entry{ID: "f1", Kind: task.KindCapture, State: task.Next, Title: "f1", Origin: task.OriginUser, Focus: task.Focus{On: true}})
+	r.put(t, task.Task{ID: "i1", Kind: task.KindCapture, State: task.Inbox, Title: "i1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "i2", Kind: task.KindCapture, State: task.Inbox, Title: "i2", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "w1", Kind: task.KindCapture, State: task.Waiting, Title: "w1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "f1", Kind: task.KindCapture, State: task.Next, Title: "f1", Origin: task.OriginUser, Focus: task.Focus{On: true}})
 	r.project(t, "p", nil)
 	return r
 }
@@ -96,7 +96,7 @@ func TestStepDone(t *testing.T) {
 	if !stepOf(t, got, "inbox").Done || got.ID != rv.ID {
 		t.Fatalf("inbox not done in %+v", got)
 	}
-	r.put(t, task.Entry{ID: "s1", Kind: task.KindCapture, State: task.Someday, Title: "s1", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "s1", Kind: task.KindCapture, State: task.Someday, Title: "s1", Origin: task.OriginUser})
 	again, err := r.svc.Review(ctx)
 	if err != nil {
 		t.Fatal(err)

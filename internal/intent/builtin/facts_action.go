@@ -47,7 +47,7 @@ var rowActionFacts = []Fact{
 	fact("row.remove_refusal", expr.String, act, "What refused removing the row's workspace, which a force remove overrides; empty when nothing did."),
 	enum(fact("row.recommended", expr.String, act, "The runner recommended for the row's items: session or headless; empty when none is."),
 		enumOf("", "session", "headless")),
-	entryFact("entry.captured_by_user", expr.Bool, act, "The user captured the entry: origin user and kind capture; false for a derived entry, such as one from a Slack thread."),
+	taskFact("entry.captured_by_user", expr.Bool, act, "The user captured the entry: origin user and kind capture; false for a derived entry, such as one from a Slack thread."),
 	fact("pr.nudge.who", expr.List, act, "Whom a nudge would address, from nudge.targets."),
 	fact("pr.nudge.why", expr.String, act, "Why the pull request waits on them, from nudge.targets."),
 	fact("pr.nudge.refusal", expr.String, act, "The text nudge.prepare would refuse with now; empty when allowed."),
@@ -61,9 +61,9 @@ var draftActionFacts = []Fact{
 	fact("draft.maybe_posted", expr.Bool, []FactSlot{DraftActionSlot}, "The draft failed after its post may have reached its provider."),
 }
 
-// entryFact is a fact of a GTD entry, which only entry intents read.
-func entryFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
+// taskFact is a fact of a GTD entry, which only entry intents read.
+func taskFact(name string, t expr.Type, slots []FactSlot, doc string) Fact {
 	f := fact(name, t, slots, doc)
-	f.Provider = unit.Entry
+	f.Provider = unit.Task
 	return f
 }

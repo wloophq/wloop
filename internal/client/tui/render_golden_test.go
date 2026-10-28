@@ -59,19 +59,19 @@ func goldenModel(t *testing.T, color bool) *Model {
 	return m
 }
 
-// gtdGolden is the golden model on GTD view, the Inbox with its first
+// viewsGolden is the golden model on GTD view, the Inbox with its first
 // entry's detail open, the Outbox with its draft's.
-func gtdGolden(t *testing.T, color bool, view string) *Model {
+func viewsGolden(t *testing.T, color bool, view string) *Model {
 	m := goldenModel(t, color)
-	m.SetGTD(gtdCatalog())
-	for v, es := range gtdEntries() {
-		m.SetEntries(v, es, gtdCounters())
+	m.SetViews(viewsCatalog())
+	for v, es := range viewTasks() {
+		m.SetTasks(v, es, viewCounters())
 	}
 	m.navigate(view)
-	m.busy[entryUnit("e5")] = "done"
+	m.busy[taskUnit("e5")] = "done"
 	if view == "inbox" || view == "outbox" {
-		e, _ := m.selectedEntry()
-		m.openEntry(e, 0)
+		e, _ := m.selectedTask()
+		m.openTask(e, 0)
 		m.SetDetail(e.ID, e, nil)
 	}
 	return m
@@ -80,13 +80,13 @@ func gtdGolden(t *testing.T, color bool, view string) *Model {
 // draftsGolden is Focus with its entry's detail open, listing the drafts
 // made for it, the first one picked.
 func draftsGolden(t *testing.T, color bool) *Model {
-	m := gtdGolden(t, color, "focus")
-	e, _ := m.selectedEntry()
-	m.openEntry(e, 0)
+	m := viewsGolden(t, color, "focus")
+	e, _ := m.selectedTask()
+	m.openTask(e, 0)
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Entry: e.ID, Kind: "reply", Purpose: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
-		{ID: 3, Entry: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
+		{ID: 4, Task: e.ID, Kind: "reply", Purpose: "reply", Text: "Thanks, the export now runs in batches.\nI will watch tonight's job.", State: "proposed", Origin: api.DraftOrigin{Kind: "turn"}},
+		{ID: 3, Task: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Origin: api.DraftOrigin{Kind: "user"}},
 	})
 	m.picked = 4
 	return m
@@ -110,7 +110,7 @@ func planGolden(t *testing.T, color bool) *Model {
 func TestRenderGolden(t *testing.T) {
 	models := map[string]func(*testing.T, bool) *Model{"render": goldenModel}
 	for _, v := range []string{"focus", "inbox", "outbox", "next", "waiting"} {
-		models["gtd-"+v] = func(t *testing.T, color bool) *Model { return gtdGolden(t, color, v) }
+		models["gtd-"+v] = func(t *testing.T, color bool) *Model { return viewsGolden(t, color, v) }
 	}
 	models["gtd-review"] = func(t *testing.T, color bool) *Model { return reviewModel(t, color) }
 	models["gtd-drafts"] = draftsGolden

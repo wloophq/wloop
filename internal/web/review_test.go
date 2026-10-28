@@ -79,17 +79,17 @@ func TestReviewStepsWeb(t *testing.T) {
 		After   string   `json:"after"`
 		Moves   []string `json:"moves"`
 		Text    string   `json:"text"`
-		Entries []string `json:"entries"`
+		Tasks   []string `json:"entries"`
 		Heads   []string `json:"heads"`
 		Focused []string `json:"focused"`
 	}
 	review := reviewFixture()
 	doneInbox := reviewFixture()
 	doneInbox["steps"].([]any)[0].(map[string]any)["done"] = true
-	project := entry("e-p", "next", nil)
+	project := task("e-p", "next", nil)
 	project.Kind, project.Title = "project", "Ship the v2 API"
 	project.ReviewDue, project.OpenActions, project.ReviewEvery = true, 0, "168h0m0s"
-	nodeRun(t, gtdPrelude(t)+staticJS(t, "review.js"), nil, `
+	nodeRun(t, viewsPrelude(t)+staticJS(t, "review.js"), nil, `
 const gets = [], posts = [], focused = [];
 reviewEnv.getJSON = async (url) => {
   gets.push(url);
@@ -117,7 +117,7 @@ reviewEnv.focusStep = (id) => focused.push(id);
   const panel = reviewPanel("");
   process.stdout.write(JSON.stringify({ first, gets, posts, after, moves, text: text(panel), entries: gtdState.entries.map((e) => e.id).concat(inboxIDs),
     heads: all(panel, (x) => String(x.attrs["data-focus"] || "").startsWith("review:step:")).map((x) => x.attrs["data-focus"]), focused }));
-})();`, map[string]any{"review": review, "doneInbox": doneInbox, "inbox": []any{entry("e-1", "inbox", nil), entry("e-2", "inbox", nil)}, "projects": []any{project}}, &got)
+})();`, map[string]any{"review": review, "doneInbox": doneInbox, "inbox": []any{task("e-1", "inbox", nil), task("e-2", "inbox", nil)}, "projects": []any{project}}, &got)
 	if got.First != "inbox" {
 		t.Errorf("the review opened on %q, want the first open step", got.First)
 	}
@@ -130,8 +130,8 @@ reviewEnv.focusStep = (id) => focused.push(id);
 	if !slices.Contains(got.Gets, "/api/entries?view=inbox") || !slices.Contains(got.Gets, "/api/entries?view=review") {
 		t.Errorf("step queries %v", got.Gets)
 	}
-	if !reflect.DeepEqual(got.Entries, []string{"e-p", "e-1", "e-2"}) {
-		t.Errorf("entries %v", got.Entries)
+	if !reflect.DeepEqual(got.Tasks, []string{"e-p", "e-1", "e-2"}) {
+		t.Errorf("entries %v", got.Tasks)
 	}
 	for _, s := range []string{"Weekly review", "Inbox to zero", "Prune Focus", "Ship the v2 API", "review due", "no next action", "every 7d"} {
 		if !strings.Contains(got.Text, s) {
@@ -148,12 +148,12 @@ func TestProjectFactsShowTheNextActionAndTheLocalDay(t *testing.T) {
 		With    string `json:"with"`
 		Without string `json:"without"`
 	}
-	p := entry("e-p", "next", nil)
+	p := task("e-p", "next", nil)
 	p.Kind, p.Title, p.NextAction, p.NextActionTitle, p.OpenActions, p.ReviewEvery = "project", "Ship", "e-a", "Draft the plan", 2, "168h0m0s"
 	p.ReviewedAt = time.Date(2026, 10, 23, 2, 30, 0, 0, time.UTC)
-	q := entry("e-q", "next", nil)
+	q := task("e-q", "next", nil)
 	q.Kind, q.Title = "project", "Idle"
-	nodeRun(t, gtdPrelude(t), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 process.env.TZ = "America/Sao_Paulo";
 process.stdout.write(JSON.stringify({ with: text(entryItem(input.p, "")), without: text(entryItem(input.q, "")) }));`, map[string]any{"p": p, "q": q}, &got)
 	for _, s := range []string{"next: Draft the plan", "2 open", "every 7d", "reviewed 2026-10-22"} {

@@ -21,9 +21,9 @@ const (
 	GitHub    ProviderID = "github"
 	Session   ProviderID = "session"
 	Workspace ProviderID = "workspace"
-	// Entry is the provider the core keeps for GTD entries: the key is the
+	// Task is the provider the core keeps for GTD entries: the key is the
 	// entry's id.
-	Entry ProviderID = "entry"
+	Task ProviderID = "entry"
 )
 
 type Unit struct {

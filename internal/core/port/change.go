@@ -34,7 +34,7 @@ const (
 	TopicLinks                          // links
 	TopicItems                          // items, item_proposals
 	TopicCards                          // unit_cards
-	TopicEntries                        // entries and their tables
+	TopicTasks                          // entries and their tables
 	TopicDrafts                         // drafts
 	TopicMarks                          // unit_marks of units other than pull requests, whose are TopicRounds
 )
@@ -56,7 +56,7 @@ const (
 	// extraction notes SourceEvents.
 	SweepInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicOverrides | TopicTurns |
 		TopicIntakes | TopicBriefs | TopicPause | TopicGate | TopicAgents | TopicConfig | TopicViewer |
-		TopicEntries | TopicItems | TopicDrafts
+		TopicTasks | TopicItems | TopicDrafts
 	// BriefInputs leaves out the queue's own Briefs writes.
 	BriefInputs = TopicPRs | TopicFollow | TopicConfig
 )

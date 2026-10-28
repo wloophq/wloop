@@ -65,7 +65,7 @@ type WaitingOn struct {
 	Resurface time.Time // "if no reply by D, propose a nudge"
 }
 
-type Entry struct {
+type Task struct {
 	ID         ID
 	Kind       Kind
 	State      State
@@ -122,9 +122,9 @@ const (
 )
 
 type Change struct {
-	Op    ChangeOp
-	Entry Entry
-	Why   string
+	Op   ChangeOp
+	Task Task
+	Why  string
 }
 
 type Verb string

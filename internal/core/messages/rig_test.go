@@ -111,30 +111,30 @@ func (l *fakeLedger) Decide(_ context.Context, id int64, accept bool) (coreitems
 }
 
 type rig struct {
-	svc     *messages.Service
-	turns   *turns.Service
-	books   *turnstest.Store
-	reg     *turnstest.Registry
-	sess    *turnstest.Sessions
-	msgs    *messagestest.Store
-	gtd     *coretasks.Service
-	entries *taskstest.Store
-	items   noItems
-	facts   facts
-	ledger  *fakeLedger
-	clock   *clock
-	launch  *launcher
+	svc       *messages.Service
+	turns     *turns.Service
+	books     *turnstest.Store
+	reg       *turnstest.Registry
+	sess      *turnstest.Sessions
+	msgs      *messagestest.Store
+	tasks     *coretasks.Service
+	taskStore *taskstest.Store
+	items     noItems
+	facts     facts
+	ledger    *fakeLedger
+	clock     *clock
+	launch    *launcher
 }
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	r := &rig{books: turnstest.NewStore(), reg: turnstest.NewRegistry(), sess: turnstest.NewSessions(), msgs: messagestest.New(),
-		entries: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
+		taskStore: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
 	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, GitHub: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
-	r.gtd = coretasks.New(coretasks.Deps{Store: r.entries, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
-	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Entries: r.gtd, Intents: turnstest.Intents(),
+	r.tasks = coretasks.New(coretasks.Deps{Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
+	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),
 		Clock: r.clock, Log: t.Logf}
 	return r
 }
@@ -218,18 +218,18 @@ func (r *rig) message(t *testing.T, id int64) message.Message {
 	return m
 }
 
-func (r *rig) entry(t *testing.T, id string) task.Entry {
+func (r *rig) task(t *testing.T, id string) task.Task {
 	t.Helper()
-	e, err := r.entries.Entry(context.Background(), task.ID(id))
+	e, err := r.taskStore.Task(context.Background(), task.ID(id))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return e
 }
 
-func (r *rig) inbox(t *testing.T) []task.Entry {
+func (r *rig) inbox(t *testing.T) []task.Task {
 	t.Helper()
-	es, err := r.gtd.Entries(context.Background(), task.Query{View: task.ViewInbox})
+	es, err := r.tasks.Tasks(context.Background(), task.Query{View: task.ViewInbox})
 	if err != nil {
 		t.Fatal(err)
 	}

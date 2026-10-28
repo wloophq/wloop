@@ -54,15 +54,15 @@ func TestAUnitHasEndedWhenItsPluginsEndedFactSaysSo(t *testing.T) {
 	}
 }
 
-func TestEntryResultsResolveAddressesAndReadTheManifest(t *testing.T) {
+func TestTaskResultsResolveAddressesAndReadTheManifest(t *testing.T) {
 	ctx := context.Background()
 	store := taskstest.New()
 	g := coretasks.New(coretasks.Deps{Store: store, Clock: clockFunc(func() time.Time { return testNow })})
-	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-1", Kind: task.KindCapture, State: task.Next, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
+	if err := store.Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture, State: task.Next, Title: "ship it", Origin: task.OriginUser}}}); err != nil {
 		t.Fatal(err)
 	}
 	reg := dintent.NewRegistry([]dintent.Def{{Name: "begin", AttachPosts: true}, {Name: "reply"}})
-	r := entryResults{entries: g, units: unit.NewRegistry(pr.Codec{}), intents: func() *dintent.Registry { return reg }}
+	r := taskResults{tasks: g, units: unit.NewRegistry(pr.Codec{}), intents: func() *dintent.Registry { return reg }}
 	u, ok := r.UnitOf("https://github.com/acme/api/pull/9")
 	if want := (unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}); !ok || u != want {
 		t.Fatalf("UnitOf = %v, %t; want %v", u, ok, want)
@@ -76,12 +76,12 @@ func TestEntryResultsResolveAddressesAndReadTheManifest(t *testing.T) {
 	if err := r.Attach(ctx, "e-1", u); err != nil {
 		t.Fatal(err)
 	}
-	if e, _ := store.Entry(ctx, "e-1"); !slices.Equal(e.Units, []unit.Unit{u}) {
+	if e, _ := store.Task(ctx, "e-1"); !slices.Equal(e.Units, []unit.Unit{u}) {
 		t.Fatalf("units %v", e.Units)
 	}
 }
 
-func TestServeWiresTheEntryResults(t *testing.T) {
+func TestServeWiresTheTaskResults(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.cfg = withoutWindows(te.cfg)

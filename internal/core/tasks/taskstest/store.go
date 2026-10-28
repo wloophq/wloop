@@ -18,7 +18,7 @@ type Store struct {
 	mu      sync.Mutex
 	epoch   string
 	rev     uint64
-	entries map[task.ID]task.Entry
+	tasks   map[task.ID]task.Task
 	revs    map[task.ID]uint64
 	Notes   int
 	Applies int
@@ -28,51 +28,51 @@ type Store struct {
 var _ coretasks.Store = (*Store)(nil)
 
 func New() *Store {
-	return &Store{epoch: "fake", entries: map[task.ID]task.Entry{}, revs: map[task.ID]uint64{}}
+	return &Store{epoch: "fake", tasks: map[task.ID]task.Task{}, revs: map[task.ID]uint64{}}
 }
 
-func (s *Store) all() []task.Entry {
-	out := make([]task.Entry, 0, len(s.entries))
-	for _, e := range s.entries {
+func (s *Store) all() []task.Task {
+	out := make([]task.Task, 0, len(s.tasks))
+	for _, e := range s.tasks {
 		out = append(out, e)
 	}
-	slices.SortFunc(out, func(a, b task.Entry) int { return a.Created.Compare(b.Created) })
+	slices.SortFunc(out, func(a, b task.Task) int { return a.Created.Compare(b.Created) })
 	return out
 }
 
-func (s *Store) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
+func (s *Store) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return task.Select(s.all(), q), nil
 }
 
-func (s *Store) EntriesSince(ctx context.Context, q task.Query, since coretasks.Since) (coretasks.Page, error) {
+func (s *Store) TasksSince(ctx context.Context, q task.Query, since coretasks.Since) (coretasks.Page, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := s.all()
 	p := coretasks.Page{Epoch: s.epoch, Rev: s.rev, Counters: task.CountsOf(all, q.Area)}
 	if since.Epoch != s.epoch || since.Rev > s.rev {
-		p.Full, p.Entries = true, task.Select(all, q)
+		p.Full, p.Tasks = true, task.Select(all, q)
 		return p, nil
 	}
-	p.Entries, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return s.revs[id] > since.Rev })
+	p.Tasks, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return s.revs[id] > since.Rev })
 	return p, nil
 }
 
-func (s *Store) Entry(ctx context.Context, id task.ID) (task.Entry, error) {
+func (s *Store) Task(ctx context.Context, id task.ID) (task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, ok := s.entries[id]
+	e, ok := s.tasks[id]
 	if !ok {
-		return task.Entry{}, fmt.Errorf("%w: %s", coretasks.ErrNoEntry, id)
+		return task.Task{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
 	}
 	return e, nil
 }
 
-func (s *Store) EntriesOf(ctx context.Context, u unit.Unit) ([]task.Entry, error) {
+func (s *Store) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []task.Entry
+	var out []task.Task
 	for _, e := range s.all() {
 		if slices.Contains(e.Units, u) || slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return r.Unit == u }) {
 			out = append(out, e)
@@ -91,15 +91,15 @@ func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Applies++
-	var changed []task.Entry
+	var changed []task.Task
 	for _, c := range cs {
-		if c.Entry.ID == "" {
+		if c.Task.ID == "" {
 			return fmt.Errorf("an entry without an id")
 		}
-		if old, ok := s.entries[c.Entry.ID]; ok && old.Same(c.Entry) {
+		if old, ok := s.tasks[c.Task.ID]; ok && old.Same(c.Task) {
 			continue
 		}
-		changed = append(changed, c.Entry)
+		changed = append(changed, c.Task)
 	}
 	if len(changed) == 0 {
 		if len(cs) == 0 {
@@ -110,7 +110,7 @@ func (s *Store) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) 
 	s.Events = append(s.Events, evs...)
 	s.rev++
 	for _, e := range changed {
-		s.entries[e.ID], s.revs[e.ID] = e, s.rev
+		s.tasks[e.ID], s.revs[e.ID] = e, s.rev
 	}
 	s.Notes++
 	return nil

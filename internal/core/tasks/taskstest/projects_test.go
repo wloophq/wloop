@@ -9,6 +9,6 @@ import (
 func TestProjectStoreContract(t *testing.T) {
 	ProjectsContract(t, func(t *testing.T) (coretasks.Store, coretasks.ProjectStore) {
 		s := New()
-		return s, &Projects{Entries: s}
+		return s, &Projects{Tasks: s}
 	})
 }

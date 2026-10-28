@@ -48,9 +48,9 @@ func TestAVerbAPersonRunsPlansItsWorkflow(t *testing.T) {
 	if err := db.Events().Advance(ctx, "my-done", 0, time.Time{}); err != nil {
 		t.Fatal(err)
 	}
-	g := coretasks.New(coretasks.Deps{Store: db.Entries(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	g := coretasks.New(coretasks.Deps{Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	at := testNow.Add(-time.Hour)
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next,
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next,
 		Title: "Ship it", Origin: task.OriginUser, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}

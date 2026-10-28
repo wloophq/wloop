@@ -19,21 +19,21 @@ import (
 	"github.com/wloophq/wloop/internal/source"
 )
 
-// entries is the daemon's one entries service, built on first use; its unit facts come from the stored cards.
-func (e *Env) entries(db *sqlite.DB, cfg config.Config, its coretasks.Items) *coretasks.Service {
-	if e.gtd == nil {
-		e.gtdMe = &identity{}
+// newTasks is the daemon's one entries service, built on first use; its unit facts come from the stored cards.
+func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *coretasks.Service {
+	if e.tasks == nil {
+		e.tasksMe = &identity{}
 		e.pluginsOff = &atomic.Pointer[[]unit.ProviderID]{}
 		off := func() []unit.ProviderID { return offProviders(cfg, e.pluginsOff.Load()) }
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
-		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.gtdMe.get}
-		e.gtd = coretasks.New(coretasks.Deps{Store: db.Entries(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
-			StaleWaitingDays: cfg.GTD.StaleWaitingDays, Disabled: off})
+		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get}
+		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
+			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off})
 	}
-	return e.gtd
+	return e.tasks
 }
 
-// offProviders are the plugins cfg disables and those the daemon serves disabled (built), once serveGTD
+// offProviders are the plugins cfg disables and those the daemon serves disabled (built), once serveTasks
 // knows them.
 func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID {
 	var out []unit.ProviderID
@@ -52,11 +52,11 @@ func offProviders(cfg config.Config, built *[]unit.ProviderID) []unit.ProviderID
 	return out
 }
 
-// serveGTD serves the entries on d: the user's identity from every built module's Identity, and the units a
+// serveTasks serves the entries on d: the user's identity from every built module's Identity, and the units a
 // full Sync covers. The daemon's Sync worker also runs under --no-jobs, since it only reads and writes the store.
-func (e *Env) serveGTD(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
+func (e *Env) serveTasks(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) daemon.Deps {
 	ledger := e.itemsLedger(db, cfg, logf)
-	g := e.entries(db, cfg, ledger)
+	g := e.newTasks(db, cfg, ledger)
 	var off []unit.ProviderID
 	for _, p := range d.Plugins {
 		if !p.Enabled {
@@ -65,17 +65,17 @@ func (e *Env) serveGTD(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods []s
 	}
 	e.pluginsOff.Store(&off)
 	if e.Turns != nil {
-		e.Turns.Results = e.newEntryResults(g, mods)
+		e.Turns.Results = e.newTaskResults(g, mods)
 	}
-	me := e.gtdMe
-	d.GTD = g
-	d.GTDMe = func(ctx context.Context) (bool, error) {
+	me := e.tasksMe
+	d.Tasks = g
+	d.TasksMe = func(ctx context.Context) (bool, error) {
 		got, err := meOf(ctx, mods)
 		grew := me.set(got)
 		g.SetMe(me.get())
 		return grew, err
 	}
-	d.GTDUnits = func(ctx context.Context) ([]unit.Unit, error) { return syncUnits(ctx, db.Entries(), ledger) }
+	d.TaskUnits = func(ctx context.Context) ([]unit.Unit, error) { return syncUnits(ctx, db.Tasks(), ledger) }
 	return d
 }
 
@@ -134,7 +134,7 @@ func (i *identity) set(me task.Me) (grew bool) {
 }
 
 // syncUnits are the units with an open item or a live entry.
-func syncUnits(ctx context.Context, entries coretasks.Reader, ledger *coreitems.Ledger) ([]unit.Unit, error) {
+func syncUnits(ctx context.Context, tasks coretasks.Reader, ledger *coreitems.Ledger) ([]unit.Unit, error) {
 	open, err := ledger.Query(ctx, coreitems.Query{State: items.Open})
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func syncUnits(ctx context.Context, entries coretasks.Reader, ledger *coreitems.
 	for _, it := range open {
 		add(it.Unit)
 	}
-	live, err := entries.Entries(ctx, task.Query{View: task.ViewOpen})
+	live, err := tasks.Tasks(ctx, task.Query{View: task.ViewOpen})
 	if err != nil {
 		return nil, err
 	}

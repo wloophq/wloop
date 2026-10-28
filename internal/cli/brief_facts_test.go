@@ -38,8 +38,8 @@ func TestEveryBriefedSubjectReadsItsUnitsBrief(t *testing.T) {
 	}{
 		"a pull request":         {prU, workflow.Facts{"pr.state": "OPEN"}, "feature", ""},
 		"a Slack thread":         {thread, workflow.Facts{}, "incident", "patch"},
-		"an entry of the thread": {unit.Unit{Provider: unit.Entry, Key: "e1"}, workflow.Facts{"entry.unit": "slack:" + thread.Key}, "incident", "patch"},
-		"an entry without unit":  {unit.Unit{Provider: unit.Entry, Key: "e2"}, workflow.Facts{"entry.unit": ""}, "", ""},
+		"an entry of the thread": {unit.Unit{Provider: unit.Task, Key: "e1"}, workflow.Facts{"entry.unit": "slack:" + thread.Key}, "incident", "patch"},
+		"an entry without unit":  {unit.Unit{Provider: unit.Task, Key: "e2"}, workflow.Facts{"entry.unit": ""}, "", ""},
 	} {
 		got, err := b.add(ctx, cs.u, cs.f)
 		if err != nil {
@@ -87,7 +87,7 @@ func TestABriefedSubjectReadsItsProvidersBriefIntent(t *testing.T) {
 	}{
 		"a pull request":         {prU, workflow.Facts{}, "approach", "urgency"},
 		"a Slack thread":         {thread, workflow.Facts{}, "urgency", "approach"},
-		"an entry of the thread": {unit.Unit{Provider: unit.Entry, Key: "e1"}, workflow.Facts{"entry.unit": "slack:" + thread.Key}, "urgency", "approach"},
+		"an entry of the thread": {unit.Unit{Provider: unit.Task, Key: "e1"}, workflow.Facts{"entry.unit": "slack:" + thread.Key}, "urgency", "approach"},
 	} {
 		got, err := b.add(ctx, cs.u, cs.f)
 		if err != nil {

@@ -38,8 +38,8 @@ type draftOutbox interface {
 	Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
 }
 
-type draftEntries interface {
-	Entry(ctx context.Context, id task.ID) (task.Entry, error)
+type draftTasks interface {
+	Task(ctx context.Context, id task.ID) (task.Task, error)
 }
 
 type draftItems interface {
@@ -49,9 +49,9 @@ type draftItems interface {
 // draftDeps are what draft.propose and the workflows' withdrawals read and
 // act through.
 type draftDeps struct {
-	Outbox  func() draftOutbox // nil until the Outbox is served
-	Entries draftEntries
-	Items   draftItems
+	Outbox func() draftOutbox // nil until the Outbox is served
+	Tasks  draftTasks
+	Items  draftItems
 	// Workflow is the loaded manifest of a workflow, before the config.
 	Workflow func(name string) (workflow.Workflow, bool)
 	Config   func() config.Config
@@ -129,7 +129,7 @@ type draftCandidate struct {
 // on, and the entry when the subject is one.
 type draftSubject struct {
 	subject, unit unit.Unit
-	entry         *task.Entry
+	task          *task.Task
 	items         []items.Item
 }
 
@@ -240,8 +240,8 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 		cd.p = outbox.Proposal{Unit: sub.unit, Items: itemIDs(its), Purpose: a.purpose, Delivery: a.delivery, Reaction: a.reaction,
 			Effects: a.effects, RepeatAfter: a.repeatAfter, Policy: &policy, Subject: subject,
 			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: w.Name, Rule: w.Name, Key: key}}
-		if sub.entry != nil {
-			cd.p.Entry = string(sub.entry.ID)
+		if sub.task != nil {
+			cd.p.Task = string(sub.task.ID)
 		}
 		switch {
 		case len(its) == 0:
@@ -282,11 +282,11 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
 	if id, ok := task.IDOf(u); ok {
-		e, err := d.Entries.Entry(ctx, id)
+		e, err := d.Tasks.Task(ctx, id)
 		if err != nil {
 			return sub, err
 		}
-		sub.entry = &e
+		sub.task = &e
 		switch {
 		case len(e.Items) > 0:
 			sub.unit = e.Items[0].Unit
@@ -315,9 +315,9 @@ func (s draftSubject) people(per string) []items.Person {
 		return []items.Person{{}}
 	}
 	var out []items.Person
-	if s.entry != nil {
-		if s.entry.Waiting != nil {
-			for _, p := range s.entry.Waiting.On {
+	if s.task != nil {
+		if s.task.Waiting != nil {
+			for _, p := range s.task.Waiting.On {
 				if strings.Contains(p.Key, ":") {
 					out = append(out, p)
 				}
@@ -340,7 +340,7 @@ func (s draftSubject) people(per string) []items.Person {
 func (s draftSubject) held() []items.Item {
 	var out []items.Item
 	for _, it := range s.items {
-		if it.State == items.Open && it.Unit == s.unit && (s.entry == nil || slices.Contains(s.entry.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})) {
+		if it.State == items.Open && it.Unit == s.unit && (s.task == nil || slices.Contains(s.task.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})) {
 			out = append(out, it)
 		}
 	}
@@ -496,8 +496,8 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		}
 	}
 	waited := person == ""
-	if !waited && sub.entry != nil {
-		e := sub.entry
+	if !waited && sub.task != nil {
+		e := sub.task
 		waited = e.State == task.Waiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
 	}
 	held, owned := 0, 0
@@ -512,7 +512,7 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		case person != "" && slices.ContainsFunc(heldNow, func(h items.Item) bool { return h.ID == it.ID }):
 			held++
 		}
-		if !waited && sub.entry == nil && it.State == items.Open &&
+		if !waited && sub.task == nil && it.State == items.Open &&
 			slices.ContainsFunc(it.WaitingOn, func(p items.Person) bool { return p.Key == person }) {
 			waited = true
 		}
@@ -521,7 +521,7 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 		"draft.person_waited":  waited,
 		"draft.items_owed":     held,
 		"draft.items_assigned": owned,
-		"draft.unit_open":      sub.entry == nil || sub.entry.Open(),
+		"draft.unit_open":      sub.task == nil || sub.task.Open(),
 	}
 }
 
@@ -563,8 +563,8 @@ func renderDraft(t *template.Template, workflowName string, sub draftSubject, a 
 		return "", nil
 	}
 	data := draftTextData{Workflow: workflowName, Purpose: a.purpose, Unit: sub.unit.String(), Person: draftTextPerson{Key: person.Key, Name: person.Name}}
-	if sub.entry != nil {
-		data.Entry = string(sub.entry.ID)
+	if sub.task != nil {
+		data.Entry = string(sub.task.ID)
 	}
 	for _, it := range its {
 		data.Items = append(data.Items, draftTextItem{ID: it.ID, Summary: it.Summary, Line: strings.Join(strings.Fields(it.Summary), " "),

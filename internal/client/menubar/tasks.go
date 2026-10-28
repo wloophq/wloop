@@ -17,17 +17,17 @@ var coreSections = []struct {
 	label string
 }{{task.ViewFocus, "Focus"}, {task.ViewInbox, "Inbox"}, {task.ViewOutbox, "Outbox"}}
 
-// pullEntries reads each core view whole: an entry's attention also moves
+// pullTasks reads each core view whole: an entry's attention also moves
 // with its row's notice and its proposed draft, which no entry write marks,
 // so a delta would miss it. The badge comes with the Inbox's page, so the
 // title and the Inbox agree.
-func (c *Controller) pullEntries(ctx context.Context) error {
+func (c *Controller) pullTasks(ctx context.Context) error {
 	for _, sec := range coreSections {
-		page, err := c.cfg.Daemon.EntriesSince(ctx, client.EntryQuery{View: string(sec.view)}, api.Since{})
+		page, err := c.cfg.Daemon.TasksSince(ctx, client.TaskQuery{View: string(sec.view)}, api.Since{})
 		if err != nil {
 			return err
 		}
-		c.entries[sec.view] = page.Entries
+		c.tasks[sec.view] = page.Tasks
 		if sec.view == task.ViewInbox {
 			counters := page.Counters
 			c.counters = &counters
@@ -36,7 +36,7 @@ func (c *Controller) pullEntries(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) viewEntries(v task.View) []api.EntryView { return c.entries[v] }
+func (c *Controller) viewTasks(v task.View) []api.TaskView { return c.tasks[v] }
 
 func (c *Controller) title() string {
 	badge := 0
@@ -46,27 +46,27 @@ func (c *Controller) title() string {
 	return fmt.Sprintf("PR %d", badge)
 }
 
-func (c *Controller) entrySection(label string, view task.View) []MenuItem {
-	entries := c.viewEntries(view)
-	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(entries))}}
-	for i, e := range entries {
+func (c *Controller) taskSection(label string, view task.View) []MenuItem {
+	tasks := c.viewTasks(view)
+	items := []MenuItem{{Title: fmt.Sprintf("%s (%d)", label, len(tasks))}}
+	for i, e := range tasks {
 		if i == perSection {
 			items = append(items, MenuItem{Title: "more…", Enabled: true, Action: c.later(func(context.Context) error { return c.open("view=" + string(view)) })})
 			break
 		}
-		items = append(items, MenuItem{Title: entryLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(entryRoute(e.ID)) })})
+		items = append(items, MenuItem{Title: taskLabel(e), Enabled: true, Action: c.later(func(context.Context) error { return c.open(taskRoute(e.ID)) })})
 	}
 	return items
 }
 
-func entryLabel(e api.EntryView) string {
+func taskLabel(e api.TaskView) string {
 	if len(e.Units) == 0 {
 		return e.Title
 	}
 	return e.UnitLabel(0) + " · " + e.Title
 }
 
-func entryRoute(id string) string { return "entry=" + id }
+func taskRoute(id string) string { return "entry=" + id }
 
 func viewRoute(v string) string { return "view=" + url.QueryEscape(v) }
 

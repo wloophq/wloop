@@ -33,7 +33,7 @@ func newWorkflowProposer(r *replay) *workflowProposer {
 	mods := []source.Module{m}
 	ledger := te.itemsLedger(r.db, te.cfg, r.t.Logf)
 	r.svc.Applier = outbox.EffectApplier{Store: r.db.DraftEffects(), Clock: clock,
-		Effects: effectLookup(effectDeps{Nudges: te.entries(r.db, te.cfg, ledger), Modules: mods})}
+		Effects: effectLookup(effectDeps{Nudges: te.newTasks(r.db, te.cfg, ledger), Modules: mods})}
 	te.Env.outbox = r.svc
 	ed := engineDeps{DB: r.db, Modules: mods, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}, Log: r.t.Logf}
 	w := &serveWiring{DB: r.db, Cfg: te.cfg, Modules: mods, Log: r.t.Logf, Engine: &ed}

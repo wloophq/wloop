@@ -15,7 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Messages stores the Inbox messages; a write notes TopicEntries for the message's unit, since each message is
+// Messages stores the Inbox messages; a write notes TopicTasks for the message's unit, since each message is
 // served on its entry.
 type Messages struct{ db *sqlite.DB }
 
@@ -26,10 +26,10 @@ func NewMessages(db *sqlite.DB) *Messages { return &Messages{db: db} }
 const (
 	messageColumns = `id, entry_id, provider, unit_key, kind, text, options, recommend, confirm,
 		origin_kind, turn_seq, session, workflow, proposal, state, answer, created_at, closed_at`
-	messagesOpenSQL   = `SELECT ` + messageColumns + ` FROM messages WHERE state = 'open' ORDER BY id`
-	messageByIDSQL    = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
-	messageByEntrySQL = `SELECT ` + messageColumns + ` FROM messages WHERE entry_id = ? ORDER BY id DESC LIMIT 1`
-	openQuestionSQL   = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
+	messagesOpenSQL  = `SELECT ` + messageColumns + ` FROM messages WHERE state = 'open' ORDER BY id`
+	messageByIDSQL   = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
+	messageByTaskSQL = `SELECT ` + messageColumns + ` FROM messages WHERE entry_id = ? ORDER BY id DESC LIMIT 1`
+	openQuestionSQL  = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND turn_seq = ? AND kind = ?`
 	openWorkflowSQL = `SELECT id FROM messages WHERE state = 'open' AND provider = ? AND unit_key = ?
 		AND origin_kind = ? AND workflow = ?`
@@ -77,7 +77,7 @@ func (s *Messages) Upsert(ctx context.Context, m message.Message) (message.Messa
 			if m.State == "" {
 				m.State = message.Open
 			}
-			res, err := tx.ExecContext(ctx, insertMessageSQL, m.EntryID, string(m.Unit.Provider), m.Unit.Key, string(m.Kind), m.Text,
+			res, err := tx.ExecContext(ctx, insertMessageSQL, m.TaskID, string(m.Unit.Provider), m.Unit.Key, string(m.Kind), m.Text,
 				string(options), m.Recommend, m.Confirm, m.Origin.Kind, m.Origin.TurnSeq, m.Origin.Session, m.Origin.Workflow,
 				m.Origin.Proposal, string(m.State), m.Answer, ts(m.CreatedAt), ts(m.ClosedAt))
 			if err != nil {
@@ -86,26 +86,26 @@ func (s *Messages) Upsert(ctx context.Context, m message.Message) (message.Messa
 			if id, err = res.LastInsertId(); err != nil {
 				return err
 			}
-			tx.Touch(port.TopicEntries, m.Unit)
+			tx.Touch(port.TopicTasks, m.Unit)
 		} else {
 			old, err := scanMessage(tx.QueryRowContext(ctx, messageByIDSQL, id))
 			if err != nil {
 				return err
 			}
-			entry := m.EntryID
-			if entry == "" {
-				entry = old.EntryID
+			task := m.TaskID
+			if task == "" {
+				task = old.TaskID
 			}
 			res, err := tx.ExecContext(ctx, updateMessageSQL+` AND (entry_id, text, options, recommend, confirm, session) IS NOT (?, ?, ?, ?, ?, ?)`,
-				entry, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session, id,
-				entry, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session)
+				task, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session, id,
+				task, m.Text, string(options), m.Recommend, m.Confirm, m.Origin.Session)
 			if err != nil {
 				return err
 			}
 			if n, err := res.RowsAffected(); err != nil {
 				return err
 			} else if n > 0 {
-				tx.Touch(port.TopicEntries, m.Unit)
+				tx.Touch(port.TopicTasks, m.Unit)
 			}
 		}
 		got, err := scanMessage(tx.QueryRowContext(ctx, messageByIDSQL, id))
@@ -126,8 +126,8 @@ func (s *Messages) Message(ctx context.Context, id int64) (message.Message, bool
 	return oneMessage(scanMessage(s.db.R().QueryRowContext(ctx, messageByIDSQL, id)))
 }
 
-func (s *Messages) ByEntry(ctx context.Context, entry string) (message.Message, bool, error) {
-	return oneMessage(scanMessage(s.db.R().QueryRowContext(ctx, messageByEntrySQL, entry)))
+func (s *Messages) ByTask(ctx context.Context, task string) (message.Message, bool, error) {
+	return oneMessage(scanMessage(s.db.R().QueryRowContext(ctx, messageByTaskSQL, task)))
 }
 
 func oneMessage(m message.Message, err error) (message.Message, bool, error) {
@@ -175,7 +175,7 @@ func (s *Messages) Close(ctx context.Context, id int64, st message.State, answer
 		if n, err := res.RowsAffected(); err != nil {
 			return err
 		} else if n > 0 {
-			tx.Touch(port.TopicEntries, u)
+			tx.Touch(port.TopicTasks, u)
 		}
 		return nil
 	})
@@ -187,7 +187,7 @@ type rowScanner interface{ Scan(dest ...any) error }
 func scanMessage(row rowScanner) (message.Message, error) {
 	var m message.Message
 	var provider, kind, options, state, created, closed string
-	if err := row.Scan(&m.ID, &m.EntryID, &provider, &m.Unit.Key, &kind, &m.Text, &options, &m.Recommend, &m.Confirm,
+	if err := row.Scan(&m.ID, &m.TaskID, &provider, &m.Unit.Key, &kind, &m.Text, &options, &m.Recommend, &m.Confirm,
 		&m.Origin.Kind, &m.Origin.TurnSeq, &m.Origin.Session, &m.Origin.Workflow, &m.Origin.Proposal, &state, &m.Answer,
 		&created, &closed); err != nil {
 		return message.Message{}, err

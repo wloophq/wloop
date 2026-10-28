@@ -20,16 +20,16 @@ func (c *Client) Drafts(ctx context.Context, states ...string) ([]api.Draft, err
 	return res.Drafts, err
 }
 
-// EntryDrafts are the drafts made for entry in any state, newest first.
-func (c *Client) EntryDrafts(ctx context.Context, entry string) ([]api.Draft, error) {
-	path := api.Drafts + "?" + url.Values{"entry": {entry}, "state": {strings.Join(entryDraftStates, ",")}}.Encode()
+// TaskDrafts are the drafts made for task in any state, newest first.
+func (c *Client) TaskDrafts(ctx context.Context, task string) ([]api.Draft, error) {
+	path := api.Drafts + "?" + url.Values{"entry": {task}, "state": {strings.Join(taskDraftStates, ",")}}.Encode()
 	var res api.DraftsResponse
 	err := c.do(ctx, ReadTimeout, http.MethodGet, path, nil, &res)
 	return res.Drafts, err
 }
 
-// entryDraftStates are every draft state but discarded.
-var entryDraftStates = []string{"proposed", "approved", "sending", "sent", "failed"}
+// taskDraftStates are every draft state but discarded.
+var taskDraftStates = []string{"proposed", "approved", "sending", "sent", "failed"}
 
 // CreateDraft holds a draft the user wrote in the Outbox, or approves it at once with req.Send.
 func (c *Client) CreateDraft(ctx context.Context, req api.DraftCreate) (api.Draft, error) {

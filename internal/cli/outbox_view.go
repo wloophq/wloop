@@ -23,7 +23,7 @@ func itemsVerb(d api.Draft) string {
 	switch {
 	case closes(d):
 		return "Closes"
-	case slices.Contains(d.Effects, builtin.EffectEntryNudged):
+	case slices.Contains(d.Effects, builtin.EffectTaskNudged):
 		return "Asks about"
 	}
 	return "Answers"

@@ -65,7 +65,7 @@ func TestClassifyAndNotifyReadFiles(t *testing.T) {
 }
 
 func TestEffectsIsAList(t *testing.T) {
-	const closeEntry = `summary = "Close"
+	const closeTask = `summary = "Close"
 provider = "entry"
 when = 'entry.items_resolved > 0'
 
@@ -81,7 +81,7 @@ purpose = "close"
 		`["unit.close"]`:                  `step[0].effects[0]: "unit.close" is not one of`,
 	} {
 		root := t.TempDir()
-		writeWorkflow(t, root, "close", closeEntry+"effects = "+effects+"\n")
+		writeWorkflow(t, root, "close", closeTask+"effects = "+effects+"\n")
 		l, problems := Load(userLayer(root), nil, testBase(), nil)
 		if problem == "" {
 			if len(problems) > 0 {

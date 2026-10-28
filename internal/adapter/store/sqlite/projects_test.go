@@ -24,18 +24,18 @@ func TestProjectStoreContract(t *testing.T) {
 	t.Parallel()
 	taskstest.ProjectsContract(t, func(t *testing.T) (coretasks.Store, coretasks.ProjectStore) {
 		db, _ := openTemp(t)
-		return db.Entries(), db.Projects()
+		return db.Tasks(), db.Projects()
 	})
 }
 
-func TestProjectRowsFollowTheirEntries(t *testing.T) {
+func TestProjectRowsFollowTheirTasks(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	p := task.Entry{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p", ReviewEvery: 36 * time.Hour, Origin: task.OriginUser, Created: at, Updated: at}
-	a := task.Entry{ID: "e-a", Kind: task.KindCapture, State: task.Next, Title: "A", Slug: "ignored", Project: "e-p", Position: 1, Origin: task.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: p}, {Op: task.OpCreate, Entry: a}}); err != nil {
+	p := task.Task{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p", ReviewEvery: 36 * time.Hour, Origin: task.OriginUser, Created: at, Updated: at}
+	a := task.Task{ID: "e-a", Kind: task.KindCapture, State: task.Next, Title: "A", Slug: "ignored", Project: "e-p", Position: 1, Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: p}, {Op: task.OpCreate, Task: a}}); err != nil {
 		t.Fatal(err)
 	}
 	var rows int
@@ -47,22 +47,22 @@ func TestProjectRowsFollowTheirEntries(t *testing.T) {
 	}
 	for i := range 3 {
 		p.Title, p.Updated = "P again", at.Add(time.Duration(i+1)*time.Minute)
-		if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: p}}); err != nil {
+		if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	got, err := db.Entries().Entry(ctx, "e-p")
+	got, err := db.Tasks().Task(ctx, "e-p")
 	if err != nil || got.Slug != "p" || got.ReviewEvery != 36*time.Hour {
 		t.Errorf("after rewrites %+v, %v", got, err)
 	}
-	q := task.Entry{ID: "e-q", Kind: task.KindProject, State: task.Next, Title: "Q", Slug: "p", Origin: task.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: q}}); err == nil {
+	q := task.Task{ID: "e-q", Kind: task.KindProject, State: task.Next, Title: "Q", Slug: "p", Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: q}}); err == nil {
 		t.Error("two projects share a slug")
 	}
-	r := task.Entry{ID: "e-r", Kind: task.KindProject, State: task.Next, Title: "R", Origin: task.OriginUser, Created: at, Updated: at}
+	r := task.Task{ID: "e-r", Kind: task.KindProject, State: task.Next, Title: "R", Origin: task.OriginUser, Created: at, Updated: at}
 	s := r
 	s.ID = "e-s"
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: r}, {Op: task.OpCreate, Entry: s}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: r}, {Op: task.OpCreate, Task: s}}); err != nil {
 		t.Errorf("two projects without a slug: %v", err)
 	}
 }

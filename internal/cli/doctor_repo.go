@@ -460,7 +460,7 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 		}
 		mark = api.DoctorInfo
 		info = fmt.Sprintf("observe, %s, %d item(s) planned and none run; see %s plan --workflow %s; set %s in %s to run them",
-			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowEntry(w.Name, "observe", "false"), e.ConfigPath)
+			w.Trigger.Kind, len(items), brand.Command, w.Name, workflowTask(w.Name, "observe", "false"), e.ConfigPath)
 	} else {
 		last := "never ran"
 		if !a.LastRun.IsZero() {
@@ -470,13 +470,13 @@ func (e *Env) workflowLine(ctx context.Context, db workflowReads, w workflow.Wor
 	}
 	if w.Approval.Mode == workflow.ApprovalWait {
 		info += fmt.Sprintf("; each item waits for you to apply it; set %s in %s to run them without you",
-			workflowEntry(w.Name, "approval.mode", `"run"`), e.ConfigPath)
+			workflowTask(w.Name, "approval.mode", `"run"`), e.ConfigPath)
 	}
 	return api.DoctorCheck{Mark: mark, Info: info}, nil
 }
 
-// workflowEntry is the config.toml line that sets field of workflow name to value.
-func workflowEntry(name, field, value string) string {
+// workflowTask is the config.toml line that sets field of workflow name to value.
+func workflowTask(name, field, value string) string {
 	return config.Key("workflows", name) + "." + field + " = " + value
 }
 

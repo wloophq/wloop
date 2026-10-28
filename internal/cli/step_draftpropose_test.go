@@ -31,22 +31,22 @@ import (
 
 var (
 	draftThread = unit.Unit{Provider: "slack", Key: "T000AAA/C000AAA/1.1"}
-	draftEntry  = unit.Unit{Provider: unit.Entry, Key: "e1"}
+	draftTask   = unit.Unit{Provider: unit.Task, Key: "e1"}
 	ana         = items.Person{Key: "slack:U000ANA", Name: "Ana"}
 	bob         = items.Person{Key: "slack:U000BOB", Name: "Bob"}
 )
 
-type memEntries struct {
+type memTasks struct {
 	mu sync.Mutex
-	m  map[task.ID]task.Entry
+	m  map[task.ID]task.Task
 }
 
-func (m *memEntries) Entry(_ context.Context, id task.ID) (task.Entry, error) {
+func (m *memTasks) Task(_ context.Context, id task.ID) (task.Task, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e, ok := m.m[id]
 	if !ok {
-		return task.Entry{}, fmt.Errorf("entry %s: %w", id, coretasks.ErrNoEntry)
+		return task.Task{}, fmt.Errorf("entry %s: %w", id, coretasks.ErrNoTask)
 	}
 	return e, nil
 }
@@ -81,18 +81,18 @@ func (okEffects) Verify(context.Context, draft.Draft, time.Time) (draft.Evidence
 // draftRig runs draft.propose over a real store's Outbox, a user profile
 // layer in a temporary directory and fake entries and items.
 type draftRig struct {
-	t       *testing.T
-	s       *stepSet
-	db      *sqlite.DB
-	svc     *outbox.Service
-	entries *memEntries
-	items   *memItems
-	units   *automationtest.Units
-	deps    *draftDeps
-	wf      workflow.Workflow
-	cfg     config.Config
-	now     time.Time
-	writes  int
+	t      *testing.T
+	s      *stepSet
+	db     *sqlite.DB
+	svc    *outbox.Service
+	tasks  *memTasks
+	items  *memItems
+	units  *automationtest.Units
+	deps   *draftDeps
+	wf     workflow.Workflow
+	cfg    config.Config
+	now    time.Time
+	writes int
 }
 
 func newDraftRig(t *testing.T, wf workflow.Workflow, text string) *draftRig {
@@ -114,12 +114,12 @@ func newDraftRig(t *testing.T, wf workflow.Workflow, text string) *draftRig {
 		}
 	}
 	r := &draftRig{t: t, db: db, wf: wf, cfg: te.cfg, now: time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC),
-		entries: &memEntries{m: map[task.ID]task.Entry{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
+		tasks: &memTasks{m: map[task.ID]task.Task{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
 	r.cfg.Profile = dir
 	clock := clockFunc(func() time.Time { return r.now })
 	r.svc = &outbox.Service{Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
 		Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil }}
-	r.deps = &draftDeps{Outbox: func() draftOutbox { return r.svc }, Entries: r.entries, Items: r.items,
+	r.deps = &draftDeps{Outbox: func() draftOutbox { return r.svc }, Tasks: r.tasks, Items: r.items,
 		Workflow: func(name string) (workflow.Workflow, bool) { return r.wf, name == r.wf.Name },
 		Config:   func() config.Config { return r.cfg }, Now: func() time.Time { return r.now }}
 	r.s = newStepSet(te.Env, stepDeps{Units: r.units, Rounds: te.Rounds, Drafts: r.deps})
@@ -212,11 +212,11 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
 	wf.Steps[0].Args["effects"] = []any{"entry.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
-	r.entries.m["e1"] = task.Entry{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
+	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
 		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
 		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
-	r.run(draftEntry)
+	r.run(draftTask)
 	ds := r.drafts()
 	if len(ds) != 2 {
 		t.Fatalf("%d drafts, want one per person", len(ds))
@@ -226,10 +226,10 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 		byKey[d.Origin.Key] = d
 	}
 	anas := byKey["e1:"+ana.Key]
-	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Entry != "e1" || len(anas.Effects) != 1 {
+	if anas.Text != "@{"+ana.Key+"}, any news?\n- The deck" || anas.Task != "e1" || len(anas.Effects) != 1 {
 		t.Fatalf("ana's draft %+v", anas)
 	}
-	if got := r.check(draftEntry); !strings.Contains(got, "held by draft") {
+	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
 		t.Fatalf("an open draft does not hold: %q", got)
 	}
 	if _, err := r.svc.Approve(context.Background(), anas.ID, nil); err != nil {
@@ -242,7 +242,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.now = r.now.Add(time.Hour)
-	r.run(draftEntry)
+	r.run(draftTask)
 	if ds := r.drafts(); len(ds) != 3 || ds[0].Origin.Key != "e1:"+bob.Key {
 		t.Fatalf("a withdrawn draft held its person, or a sent one did not: %+v", ds)
 	}
@@ -255,12 +255,12 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(r.cfg.Profile, "workflows", other.Name, defaultDraftText), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.check(draftEntry); got != "" {
+	if got := r.check(draftTask); got != "" {
 		t.Fatalf("another workflow's drafts hold this one: %q", got)
 	}
 	r.wf.Name = "nudges"
 	r.now = r.now.Add(24 * time.Hour)
-	r.run(draftEntry)
+	r.run(draftTask)
 	if ds := r.drafts(); len(ds) != 4 || ds[0].Origin.Key != "e1:"+ana.Key {
 		t.Fatalf("past ana's hold, only ana is asked again: %+v", ds)
 	}
@@ -355,7 +355,7 @@ func TestASubjectMatchingWhenAndWithdrawWhenIsProposedOnce(t *testing.T) {
 	}
 }
 
-func TestUnitClosedClosesTheEntryAndUnwatchesAfterWarmFor(t *testing.T) {
+func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "s.db"), nil)
@@ -384,7 +384,7 @@ func TestUnitClosedClosesTheEntryAndUnwatchesAfterWarmFor(t *testing.T) {
 		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
 		return task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, now)
 	}
-	if cs := closeOf(false); len(cs) != 1 || cs[0].Entry.Kind != task.KindClose {
+	if cs := closeOf(false); len(cs) != 1 || cs[0].Task.Kind != task.KindClose {
 		t.Fatalf("no close entry before the closure: %+v", cs)
 	}
 	plain, err := svc.Propose(ctx, outbox.Proposal{Unit: draftThread, Kind: draft.Close, Text: "Closing.", Origin: draft.Origin{Kind: draft.OriginUser}})

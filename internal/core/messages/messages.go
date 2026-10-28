@@ -42,11 +42,11 @@ type Ledger interface {
 	Decide(ctx context.Context, id int64, accept bool) (coreitems.Result, error)
 }
 
-// Entries opens and closes the Inbox entry of each message, as task.Service does.
-type Entries interface {
-	Open(ctx context.Context, r coretasks.OpenRequest) (task.Entry, error)
+// Tasks opens and closes the Inbox entry of each message, as task.Service does.
+type Tasks interface {
+	Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error)
 	Close(ctx context.Context, id task.ID, to task.State) error
-	Entry(ctx context.Context, id task.ID) (task.Entry, error)
+	Task(ctx context.Context, id task.ID) (task.Task, error)
 	Retitle(ctx context.Context, id task.ID, title string) error
 }
 
@@ -82,7 +82,7 @@ type Service struct {
 	Books   Books
 	Turns   Turns
 	Ledger  Ledger // nil: no proposal messages
-	Entries Entries
+	Tasks   Tasks
 	Intents Intents
 	Clock   port.Clock
 	Log     func(format string, args ...any)
@@ -146,10 +146,10 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 			continue
 		}
 		delete(want, k)
-		w.ID, w.EntryID, w.CreatedAt = m.ID, m.EntryID, m.CreatedAt
+		w.ID, w.TaskID, w.CreatedAt = m.ID, m.TaskID, m.CreatedAt
 		if !sameContent(w, m) {
-			if w.EntryID != "" {
-				if err := s.Entries.Retitle(ctx, task.ID(w.EntryID), title(w.Text)); err != nil && !errors.Is(err, coretasks.ErrNoEntry) {
+			if w.TaskID != "" {
+				if err := s.Tasks.Retitle(ctx, task.ID(w.TaskID), title(w.Text)); err != nil && !errors.Is(err, coretasks.ErrNoTask) {
 					errs = append(errs, err)
 					continue
 				}
@@ -159,7 +159,7 @@ func (s *Service) Reconcile(ctx context.Context, units ...unit.Unit) error {
 				continue
 			}
 		}
-		if _, err := s.ensureEntry(ctx, m); err != nil {
+		if _, err := s.ensureTask(ctx, m); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -287,41 +287,41 @@ func (s *Service) create(ctx context.Context, m message.Message) (message.Messag
 	if err != nil {
 		return message.Message{}, err
 	}
-	return s.ensureEntry(ctx, got)
+	return s.ensureTask(ctx, got)
 }
 
-// ensureEntry opens the Inbox entry of an open message that has none yet.
-func (s *Service) ensureEntry(ctx context.Context, m message.Message) (message.Message, error) {
-	if m.EntryID != "" || m.State != message.Open {
+// ensureTask opens the Inbox entry of an open message that has none yet.
+func (s *Service) ensureTask(ctx context.Context, m message.Message) (message.Message, error) {
+	if m.TaskID != "" || m.State != message.Open {
 		return m, nil
 	}
 	var u *unit.Unit
 	if !m.Unit.IsZero() {
 		u = &m.Unit
 	}
-	e, err := s.Entries.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: title(m.Text), Unit: u, Origin: task.OriginMessage})
+	e, err := s.Tasks.Open(ctx, coretasks.OpenRequest{Kind: task.KindMessage, Title: title(m.Text), Unit: u, Origin: task.OriginMessage})
 	if err != nil {
 		return m, fmt.Errorf("opening the entry of message %d: %w", m.ID, err)
 	}
-	m.EntryID = string(e.ID)
+	m.TaskID = string(e.ID)
 	return s.Store.Upsert(ctx, m)
 }
 
 // close closes m and the entry it opened: Done when answered, Trash otherwise. An entry that refuses to move
 // keeps the message open, so the next reconcile tries again.
 func (s *Service) close(ctx context.Context, m message.Message, st message.State, answer string) error {
-	if m.EntryID != "" {
+	if m.TaskID != "" {
 		to := task.Trash
 		if st == message.Answered {
 			to = task.Done
 		}
-		e, err := s.Entries.Entry(ctx, task.ID(m.EntryID))
+		e, err := s.Tasks.Task(ctx, task.ID(m.TaskID))
 		switch {
-		case errors.Is(err, coretasks.ErrNoEntry):
+		case errors.Is(err, coretasks.ErrNoTask):
 		case err != nil:
 			return err
 		case e.Kind == task.KindMessage:
-			if err := s.Entries.Close(ctx, e.ID, to); err != nil {
+			if err := s.Tasks.Close(ctx, e.ID, to); err != nil {
 				return fmt.Errorf("closing the entry of message %d: %w", m.ID, err)
 			}
 		}
@@ -358,7 +358,7 @@ func (s *Service) ReconcileProposals(ctx context.Context) error {
 		have[m.Origin.Proposal] = true
 		if !pending[m.Origin.Proposal] {
 			stale = append(stale, m)
-		} else if _, err := s.ensureEntry(ctx, m); err != nil {
+		} else if _, err := s.ensureTask(ctx, m); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -371,7 +371,7 @@ func (s *Service) ReconcileProposals(ctx context.Context) error {
 			errs = append(errs, err)
 			continue
 		}
-		if _, err := s.ensureEntry(ctx, m); err != nil {
+		if _, err := s.ensureTask(ctx, m); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -484,7 +484,7 @@ func checkPost(p PostRequest) error {
 }
 
 // Propose opens a proposal message of a workflow or core rule, one per unit and rule while it is open; with
-// EntryID it attaches to that entry instead of opening one.
+// TaskID it attaches to that entry instead of opening one.
 func (s *Service) Propose(ctx context.Context, p ProposeRequest) (message.Message, error) {
 	if p.Origin.Kind != message.OriginCore && p.Origin.Kind != message.OriginWorkflow {
 		return message.Message{}, fmt.Errorf("a proposal comes from a core rule or a workflow, not %q", p.Origin.Kind)
@@ -497,12 +497,12 @@ func (s *Service) Propose(ctx context.Context, p ProposeRequest) (message.Messag
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	m, err := s.Store.Upsert(ctx, message.Message{Unit: p.Unit, EntryID: p.EntryID, Kind: message.Proposal, Text: clean(p.Text),
+	m, err := s.Store.Upsert(ctx, message.Message{Unit: p.Unit, TaskID: p.TaskID, Kind: message.Proposal, Text: clean(p.Text),
 		Options: slices.Clone(p.Options), Origin: p.Origin, State: message.Open, CreatedAt: s.now()})
 	if err != nil {
 		return message.Message{}, err
 	}
-	return s.ensureEntry(ctx, m)
+	return s.ensureTask(ctx, m)
 }
 
 // Answer answers an open message: a question through turns.Service.Answer unchanged, an agent post into the
@@ -767,7 +767,7 @@ type PostRequest struct {
 
 type ProposeRequest struct {
 	Unit    unit.Unit
-	EntryID string // attach to an existing entry; "" opens a new Inbox entry
+	TaskID  string // attach to an existing entry; "" opens a new Inbox entry
 	Text    string
 	Options []record.Option // answering an option calls OnAnswer
 	Origin  message.Origin  // Kind core or workflow; Workflow names the rule (dedupe key with Unit)

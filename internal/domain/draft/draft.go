@@ -150,7 +150,7 @@ type Draft struct {
 	ID       ID
 	Unit     unit.Unit
 	Items    []string // item ids of Unit; may be empty
-	Entry    string   // the entry it serves, "" none; the Outbox entry itself is "draft:<ID>"
+	Task     string   // the entry it serves, "" none; the Outbox entry itself is "draft:<ID>"
 	Kind     Kind
 	Purpose  string   // what it is for: "nudge", "close", "ask_owner", or any label its proposer names
 	Delivery Delivery // how it is posted

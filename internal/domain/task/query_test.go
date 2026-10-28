@@ -8,7 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-func ids(es []task.Entry) []task.ID {
+func ids(es []task.Task) []task.ID {
 	out := []task.ID{}
 	for _, e := range es {
 		out = append(out, e.ID)
@@ -19,7 +19,7 @@ func ids(es []task.Entry) []task.ID {
 func at(min int) time.Time { return now.Add(time.Duration(min) * time.Minute) }
 
 func TestAreaSparesTheInbox(t *testing.T) {
-	all := []task.Entry{
+	all := []task.Task{
 		{ID: "e-in-oss", State: task.Inbox, Area: "OSS", Created: at(1)},
 		{ID: "e-in-hire", State: task.Inbox, Area: "Hiring", Created: at(2)},
 		{ID: "e-next-oss", State: task.Next, Area: "OSS", Created: at(3)},
@@ -43,7 +43,7 @@ func TestAreaSparesTheInbox(t *testing.T) {
 }
 
 func TestContextsCombineWithAnd(t *testing.T) {
-	all := []task.Entry{
+	all := []task.Task{
 		{ID: "e-both", State: task.Next, Contexts: []string{"@reply", "@decide"}},
 		{ID: "e-decide", State: task.Next, Contexts: []string{"@decide"}},
 		{ID: "e-reply", State: task.Next, Contexts: []string{"@reply", "@agent"}},
@@ -55,7 +55,7 @@ func TestContextsCombineWithAnd(t *testing.T) {
 }
 
 func TestSequentialProjectShowsFirstAction(t *testing.T) {
-	all := []task.Entry{
+	all := []task.Task{
 		{ID: "e-seq", Kind: task.KindProject, State: task.Next, Sequential: true, Created: at(0)},
 		{ID: "e-s3", State: task.Next, Project: "e-seq", Position: 3, Created: at(1)},
 		{ID: "e-s1", State: task.Next, Project: "e-seq", Position: 1, Created: at(2)},
@@ -75,12 +75,12 @@ func TestSequentialProjectShowsFirstAction(t *testing.T) {
 }
 
 func TestViewPredicates(t *testing.T) {
-	var all []task.Entry
+	var all []task.Task
 	for i, s := range []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash} {
 		all = append(all,
-			task.Entry{ID: task.ID("e-" + string(s)), State: s, Created: at(i), Updated: at(i)},
-			task.Entry{ID: task.ID("e-star-" + string(s)), State: s, Focus: task.Focus{On: true}, Created: at(10 + i), Updated: at(10 + i)},
-			task.Entry{ID: task.ID("e-proj-" + string(s)), Kind: task.KindProject, State: s, Created: at(20 + i), Updated: at(20 + i)},
+			task.Task{ID: task.ID("e-" + string(s)), State: s, Created: at(i), Updated: at(i)},
+			task.Task{ID: task.ID("e-star-" + string(s)), State: s, Focus: task.Focus{On: true}, Created: at(10 + i), Updated: at(10 + i)},
+			task.Task{ID: task.ID("e-proj-" + string(s)), Kind: task.KindProject, State: s, Created: at(20 + i), Updated: at(20 + i)},
 		)
 	}
 	cases := []struct {

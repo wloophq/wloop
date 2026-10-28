@@ -12,7 +12,7 @@ const ViewOpen View = "open"
 var StoredViews = []View{ViewFocus, ViewInbox, ViewNext, ViewWaiting, ViewProjects, ViewSomeday, ViewLogbook}
 
 // inState is the view predicate of #entries before the sequential project rule.
-func inState(e Entry, v View) bool {
+func inState(e Task, v View) bool {
 	switch v {
 	case ViewFocus:
 		return e.Focus.On && e.Live()
@@ -35,7 +35,7 @@ func inState(e Entry, v View) bool {
 }
 
 // Matches says whether e passes q's area and contexts; the Inbox ignores the area.
-func (q Query) Matches(e Entry) bool {
+func (q Query) Matches(e Task) bool {
 	if q.Area != "" && q.View != ViewInbox && e.Area != q.Area {
 		return false
 	}
@@ -50,12 +50,12 @@ func (q Query) Matches(e Entry) bool {
 // Select is q's view of all, in the view's order: the predicate of #entries, then area and contexts; in Next a
 // sequential project shows only its first open action by Position. all must hold every entry the predicate
 // may need: the projects and their actions.
-func Select(all []Entry, q Query) []Entry {
+func Select(all []Task, q Query) []Task {
 	var first map[ID]ID
 	if q.View == ViewNext {
 		first = firstActions(all)
 	}
-	var out []Entry
+	var out []Task
 	for _, e := range all {
 		if !inState(e, q.View) || !q.Matches(e) {
 			continue
@@ -70,14 +70,14 @@ func Select(all []Entry, q Query) []Entry {
 }
 
 // firstActions maps each sequential project to its open action with the lowest Position.
-func firstActions(all []Entry) map[ID]ID {
+func firstActions(all []Task) map[ID]ID {
 	seq := map[ID]bool{}
 	for _, e := range all {
 		if e.Kind == KindProject && e.Sequential {
 			seq[e.ID] = true
 		}
 	}
-	first := map[ID]Entry{}
+	first := map[ID]Task{}
 	for _, e := range all {
 		if !seq[e.Project] || !e.Open() {
 			continue
@@ -94,8 +94,8 @@ func firstActions(all []Entry) map[ID]ID {
 }
 
 // Sort orders a view's entries: the Logbook by reference first, then the newest; the others the oldest first.
-func Sort(es []Entry, v View) {
-	slices.SortStableFunc(es, func(a, b Entry) int {
+func Sort(es []Task, v View) {
+	slices.SortStableFunc(es, func(a, b Task) int {
 		if v == ViewLogbook {
 			return cmp.Or(cmp.Compare(rank(a), rank(b)), b.Updated.Compare(a.Updated), cmp.Compare(a.ID, b.ID))
 		}
@@ -103,7 +103,7 @@ func Sort(es []Entry, v View) {
 	})
 }
 
-func rank(e Entry) int {
+func rank(e Task) int {
 	if e.State == Reference {
 		return 0
 	}
@@ -111,7 +111,7 @@ func rank(e Entry) int {
 }
 
 // CountsOf is the counters of the stored views over all, each the length of Select for its view.
-func CountsOf(all []Entry, area string) Counters {
+func CountsOf(all []Task, area string) Counters {
 	c := Counters{Area: area, Views: map[View]int{ViewOutbox: 0}, Areas: map[string]int{}, Contexts: map[string]int{}}
 	for _, v := range StoredViews {
 		c.Views[v] = len(Select(all, Query{View: v, Area: area}))

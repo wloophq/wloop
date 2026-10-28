@@ -32,10 +32,10 @@ var notifiedDrafts = []draft.State{draft.Proposed, draft.Failed}
 // attention is e's notification, nil when it posts none: an Inbox entry notifies once, a draft of the Outbox
 // once unless it serves an Inbox entry, whose id the draft then keys. A draft is never approved from a
 // notification, which shows its text cut. Nothing of a disabled plugin notifies.
-func (ev *entryViewer) attention(ctx context.Context, e task.Entry) *api.Attention {
+func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention {
 	a := ev.notice(ctx, e)
 	if a != nil {
-		words := ev.s.loaded().GTD
+		words := ev.s.loaded().Lists
 		a.Actions = slices.DeleteFunc(a.Actions, func(act api.AttentionAction) bool {
 			v, ok := strings.CutPrefix(act.ID, verbAction(""))
 			return ok && !offers(words, e, task.Verb(v))
@@ -45,7 +45,7 @@ func (ev *entryViewer) attention(ctx context.Context, e task.Entry) *api.Attenti
 }
 
 // notice is e's notification before the profile's offers drop the buttons of verbs it does not offer.
-func (ev *entryViewer) notice(ctx context.Context, e task.Entry) *api.Attention {
+func (ev *taskViewer) notice(ctx context.Context, e task.Task) *api.Attention {
 	if e.Kind == task.KindDraft {
 		return ev.draftAttention(ctx, e)
 	}
@@ -75,7 +75,7 @@ func verbAction(v task.Verb) string { return "gtd:" + string(v) }
 // an entry derived from a pull request's items notify only through the row's notice, when the entry is the one
 // that notice stands for (the question's message, the derived item of a round, a hold, a block or a waiting
 // agent), so they notify what the row did and only once. Any other entry notifies what it says of itself.
-func (ev *entryViewer) inboxNotice(ctx context.Context, e task.Entry) (api.Category, string, api.Attention, bool) {
+func (ev *taskViewer) inboxNotice(ctx context.Context, e task.Task) (api.Category, string, api.Attention, bool) {
 	m, isMsg := ev.message(ctx, e)
 	question := isMsg && m.Kind == dmessage.Question
 	record := int64(-1)
@@ -105,7 +105,7 @@ func (ev *entryViewer) inboxNotice(ctx context.Context, e task.Entry) (api.Categ
 
 // inboxActions are Draft for me when the entry's delegate runs an action that drafts headless, and Reply and
 // Send reply when the entry takes a reply.
-func (ev *entryViewer) inboxActions(ctx context.Context, e task.Entry) []api.AttentionAction {
+func (ev *taskViewer) inboxActions(ctx context.Context, e task.Task) []api.AttentionAction {
 	out := []api.AttentionAction{}
 	if ev.s.draftsHeadless(ctx, ev.g, e) {
 		out = append(out, api.AttentionAction{ID: api.AttentionDraftForMe, Title: "Draft for me"})
@@ -118,7 +118,7 @@ func (ev *entryViewer) inboxActions(ctx context.Context, e task.Entry) []api.Att
 }
 
 // draftsHeadless says whether e's delegate runs one enabled action that runs headless.
-func (s *Server) draftsHeadless(ctx context.Context, g *coretasks.Service, e task.Entry) bool {
+func (s *Server) draftsHeadless(ctx context.Context, g *coretasks.Service, e task.Task) bool {
 	b, ok := s.bridge(ctx, g, e, task.VerbDelegate)
 	if !ok {
 		return false
@@ -129,7 +129,7 @@ func (s *Server) draftsHeadless(ctx context.Context, g *coretasks.Service, e tas
 
 // rowNotice is the notice of e's first unit's row; served says the unit is a pull request the read model
 // serves, ok that its row notifies.
-func (ev *entryViewer) rowNotice(ctx context.Context, e task.Entry) (n prrow.Notice, row api.Row, served, ok bool) {
+func (ev *taskViewer) rowNotice(ctx context.Context, e task.Task) (n prrow.Notice, row api.Row, served, ok bool) {
 	if len(e.Units) == 0 || !isPullRequest(e.Units[0]) {
 		return prrow.Notice{}, api.Row{}, false, false
 	}
@@ -144,13 +144,13 @@ func (ev *entryViewer) rowNotice(ctx context.Context, e task.Entry) (n prrow.Not
 	return n, rd.Row, true, ok
 }
 
-func holdsItem(e task.Entry, prefix string) bool {
+func holdsItem(e task.Task, prefix string) bool {
 	return prefix != "" && slices.ContainsFunc(e.Items, func(r task.ItemRef) bool { return strings.HasPrefix(r.Item, prefix) })
 }
 
 // asVerbs names an action the entry's verb runs, as the bridge would pick it, by that verb: the entry's
 // button then moves the entry as its verb does.
-func (ev *entryViewer) asVerbs(e task.Entry, row api.Row, acts []api.AttentionAction) []api.AttentionAction {
+func (ev *taskViewer) asVerbs(e task.Task, row api.Row, acts []api.AttentionAction) []api.AttentionAction {
 	served := ev.s.servedSpecs()
 	verbOf := map[string]task.Verb{}
 	for _, sp := range served {
@@ -170,11 +170,11 @@ func (ev *entryViewer) asVerbs(e task.Entry, row api.Row, acts []api.AttentionAc
 	return out
 }
 
-func (ev *entryViewer) message(ctx context.Context, e task.Entry) (dmessage.Message, bool) {
+func (ev *taskViewer) message(ctx context.Context, e task.Task) (dmessage.Message, bool) {
 	if e.Kind != task.KindMessage || ev.s.deps.Messages == nil {
 		return dmessage.Message{}, false
 	}
-	m, ok, err := ev.s.deps.Messages.Store.ByEntry(ctx, string(e.ID))
+	m, ok, err := ev.s.deps.Messages.Store.ByTask(ctx, string(e.ID))
 	if err != nil {
 		ev.s.logf("notifications: the message of %s: %v", e.ID, err)
 	}
@@ -183,7 +183,7 @@ func (ev *entryViewer) message(ctx context.Context, e task.Entry) (dmessage.Mess
 
 // recordOf is the turn record a question message asks from: its turn's last record, 0 when the turn holds
 // none.
-func (ev *entryViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
+func (ev *taskViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
 	if m.Unit.IsZero() || ev.s.deps.Messages.Books == nil {
 		return 0
 	}
@@ -203,7 +203,7 @@ func (ev *entryViewer) recordOf(ctx context.Context, m dmessage.Message) int64 {
 }
 
 // messageNotice is a message entry's notification from the message alone.
-func messageNotice(e task.Entry, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
+func messageNotice(e task.Task, m dmessage.Message, record int64) (api.Category, string, api.Attention) {
 	a := api.Attention{Subtitle: unitsLabel(e.Units), Body: m.Text, Image: "ask"}
 	if a.Subtitle == "" {
 		a.Subtitle = m.Unit.Label()
@@ -267,7 +267,7 @@ func hashToken(parts ...string) string {
 }
 
 // openDrafts are the drafts that notify, read once per viewer.
-func (ev *entryViewer) openDrafts(ctx context.Context) []draft.Draft {
+func (ev *taskViewer) openDrafts(ctx context.Context) []draft.Draft {
 	if ev.drafts != nil || ev.s.deps.Drafts == nil {
 		return ev.drafts
 	}
@@ -283,11 +283,11 @@ func (ev *entryViewer) openDrafts(ctx context.Context) []draft.Draft {
 }
 
 // proposedFor is the newest proposed draft that serves entry id.
-func (ev *entryViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft, bool) {
+func (ev *taskViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft, bool) {
 	var best draft.Draft
 	found := false
 	for _, d := range ev.openDrafts(ctx) {
-		if d.Entry == string(id) && d.State == draft.Proposed && ev.s.pluginEnabled(d.Unit.Provider) && (!found || d.ID > best.ID) {
+		if d.Task == string(id) && d.State == draft.Proposed && ev.s.pluginEnabled(d.Unit.Provider) && (!found || d.ID > best.ID) {
 			best, found = d, true
 		}
 	}
@@ -296,7 +296,7 @@ func (ev *entryViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft
 
 // draftAttention is a draft entry's notification, nil when the draft serves an Inbox entry that notifies, which
 // then notifies for both.
-func (ev *entryViewer) draftAttention(ctx context.Context, e task.Entry) *api.Attention {
+func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Attention {
 	n, err := strconv.ParseInt(strings.TrimPrefix(string(e.ID), draftPrefix), 10, 64)
 	if err != nil {
 		return nil
@@ -319,12 +319,12 @@ func (ev *entryViewer) draftAttention(ctx context.Context, e task.Entry) *api.At
 	return &a
 }
 
-func (ev *entryViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
-	if d.Entry == "" {
+func (ev *taskViewer) servesInbox(ctx context.Context, d draft.Draft) bool {
+	if d.Task == "" {
 		return false
 	}
-	e, err := ev.g.Entry(ctx, task.ID(d.Entry))
-	if err != nil && !errors.Is(err, coretasks.ErrNoEntry) {
+	e, err := ev.g.Task(ctx, task.ID(d.Task))
+	if err != nil && !errors.Is(err, coretasks.ErrNoTask) {
 		ev.s.logf("notifications: the entry of draft %d: %v", d.ID, err)
 	}
 	return err == nil && e.Kind != task.KindDraft && ev.attention(ctx, e) != nil

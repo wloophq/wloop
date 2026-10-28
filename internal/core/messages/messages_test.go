@@ -30,7 +30,7 @@ func TestAskedRecordBecomesAMessage(t *testing.T) {
 		m.Origin != (message.Origin{Kind: message.OriginTurn, TurnSeq: 1, Session: "term_1"}) || m.State != message.Open {
 		t.Fatalf("message %+v", m)
 	}
-	e := r.entry(t, m.EntryID)
+	e := r.task(t, m.TaskID)
 	if e.Kind != task.KindMessage || e.State != task.Inbox || e.Origin != task.OriginMessage || e.Title != q.Text || !slices.Equal(e.Units, []unit.Unit{r7}) {
 		t.Fatalf("entry %+v", e)
 	}
@@ -44,7 +44,7 @@ func TestAskedRecordBecomesAMessage(t *testing.T) {
 	}
 }
 
-func TestAskedTurnIsOneEntry(t *testing.T) {
+func TestAskedTurnIsOneTask(t *testing.T) {
 	r := newRig(t)
 	r.asked(t, r7)
 	r.items.byUnit[r7] = []items.Item{{ID: "gh:review", Unit: r7, Kind: "request", Summary: "review it", State: "open",
@@ -52,17 +52,17 @@ func TestAskedTurnIsOneEntry(t *testing.T) {
 	ctx := context.Background()
 	for range 2 {
 		r.reconcile(t, r7)
-		if err := r.gtd.Sync(ctx, []unit.Unit{r7}); err != nil {
+		if err := r.tasks.Sync(ctx, []unit.Unit{r7}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	var questions []task.Entry
+	var questions []task.Task
 	for _, e := range r.inbox(t) {
 		if e.Kind == task.KindMessage {
 			questions = append(questions, e)
 		}
 	}
-	if len(questions) != 1 || questions[0].ID != task.ID(r.only(t).EntryID) {
+	if len(questions) != 1 || questions[0].ID != task.ID(r.only(t).TaskID) {
 		t.Fatalf("question entries %+v", questions)
 	}
 }
@@ -97,7 +97,7 @@ func TestReaskedTurnUpdatesItsMessage(t *testing.T) {
 	r.record(t, r7, 1, askedRecord(again))
 	r.reconcile(t, r7)
 	m := r.only(t)
-	if m.ID != first.ID || m.EntryID != first.EntryID || m.Text != again.Text {
+	if m.ID != first.ID || m.TaskID != first.TaskID || m.Text != again.Text {
 		t.Fatalf("re-asked %+v, first %+v", m, first)
 	}
 	if n := len(r.inbox(t)); n != 1 {
@@ -111,7 +111,7 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 		event  func(t *testing.T, r *rig)
 		state  message.State
 		answer string
-		entry  task.State
+		task   task.State
 	}{
 		{"answered", func(t *testing.T, r *rig) {
 			r.live()
@@ -144,8 +144,8 @@ func TestTurnEventsCloseTheMessage(t *testing.T) {
 			if got.State != c.state || got.Answer != c.answer || got.ClosedAt.IsZero() {
 				t.Fatalf("closed %+v", got)
 			}
-			if e := r.entry(t, m.EntryID); e.State != c.entry {
-				t.Fatalf("entry %s, want %s", e.State, c.entry)
+			if e := r.task(t, m.TaskID); e.State != c.task {
+				t.Fatalf("entry %s, want %s", e.State, c.task)
 			}
 			if open := r.open(t); len(open) != 0 {
 				t.Fatalf("open %+v", open)
@@ -205,7 +205,7 @@ func TestReconcileRepairsAMissedEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	lost.reconcile(t, r7)
-	if got := lost.only(t); got.ID != m.ID || got.EntryID == "" || len(got.Options) != 2 {
+	if got := lost.only(t); got.ID != m.ID || got.TaskID == "" || len(got.Options) != 2 {
 		t.Fatalf("a message left without its entry was not repaired: %+v", got)
 	}
 }
@@ -221,7 +221,7 @@ func TestDismissingAQuestionMessageDismissesTheTurn(t *testing.T) {
 	if b := r.book(t, r7); b.Turns[0].State != turn.Dismissed {
 		t.Fatalf("turn %s", b.Turns[0].State)
 	}
-	if got := r.message(t, m.ID); got.State != message.Dismissed || r.entry(t, m.EntryID).State != task.Trash {
+	if got := r.message(t, m.ID); got.State != message.Dismissed || r.task(t, m.TaskID).State != task.Trash {
 		t.Fatalf("message %+v", got)
 	}
 	if err := r.svc.Dismiss(context.Background(), m.ID); !errors.Is(err, messages.ErrClosed) {
@@ -289,7 +289,7 @@ func TestAgentPostAnswerRouting(t *testing.T) {
 				t.Fatalf("book %+v %+v", b.Answers, b.Turns)
 			}
 			closed := r.message(t, m.ID)
-			if closed.State != message.Answered || closed.Answer != "Old column (option old). and drop the index" || r.entry(t, m.EntryID).State != task.Done {
+			if closed.State != message.Answered || closed.Answer != "Old column (option old). and drop the index" || r.task(t, m.TaskID).State != task.Done {
 				t.Fatalf("message %+v", closed)
 			}
 			if c.route == turn.Queued {
@@ -376,7 +376,7 @@ func TestLedgerProposalBecomesAMessage(t *testing.T) {
 		len(m.Options) != 2 || m.Options[0].ID != messages.OptionAccept || m.Options[1].ID != messages.OptionReject {
 		t.Fatalf("message %+v", m)
 	}
-	if e := r.entry(t, m.EntryID); e.Kind != task.KindMessage || e.State != task.Inbox {
+	if e := r.task(t, m.TaskID); e.Kind != task.KindMessage || e.State != task.Inbox {
 		t.Fatalf("entry %+v", e)
 	}
 	if n := len(r.inbox(t)); n != 1 {
@@ -404,7 +404,7 @@ func TestAcceptingAProposalDecidesIt(t *testing.T) {
 		if !slices.Equal(r.ledger.decided, []decision{{4, c.accept}}) {
 			t.Fatalf("decided %+v", r.ledger.decided)
 		}
-		if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != c.answer.OptionID || r.entry(t, m.EntryID).State != task.Done {
+		if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != c.answer.OptionID || r.task(t, m.TaskID).State != task.Done {
 			t.Fatalf("message %+v", got)
 		}
 	}
@@ -424,7 +424,7 @@ func TestDecidedProposalClosesItsMessage(t *testing.T) {
 	if err := r.svc.ReconcileProposals(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != messages.OptionAccept || r.entry(t, m.EntryID).State != task.Done {
+	if got := r.message(t, m.ID); got.State != message.Answered || got.Answer != messages.OptionAccept || r.task(t, m.TaskID).State != task.Done {
 		t.Fatalf("message %+v", got)
 	}
 }
@@ -439,16 +439,16 @@ func TestProposeDedupesAndAttaches(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, err := r.svc.Propose(ctx, req)
-	if err != nil || b.ID != a.ID || b.EntryID != a.EntryID || len(r.inbox(t)) != 1 {
+	if err != nil || b.ID != a.ID || b.TaskID != a.TaskID || len(r.inbox(t)) != 1 {
 		t.Fatalf("second propose %+v %v", b, err)
 	}
-	capture, err := r.gtd.Capture(ctx, "follow up", "", &r8)
+	capture, err := r.tasks.Capture(ctx, "follow up", "", &r8)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attached, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r8, EntryID: string(capture.ID), Text: "Close it?",
+	attached, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r8, TaskID: string(capture.ID), Text: "Close it?",
 		Origin: message.Origin{Kind: message.OriginCore, Workflow: "close"}})
-	if err != nil || attached.EntryID != string(capture.ID) || len(r.inbox(t)) != 2 {
+	if err != nil || attached.TaskID != string(capture.ID) || len(r.inbox(t)) != 2 {
 		t.Fatalf("attached %+v %v, inbox %d", attached, err, len(r.inbox(t)))
 	}
 	var answered []message.Message
@@ -459,7 +459,7 @@ func TestProposeDedupesAndAttaches(t *testing.T) {
 	if _, err := r.svc.Answer(ctx, attached.ID, messages.Answer{Text: "yes, close it"}); err != nil {
 		t.Fatal(err)
 	}
-	if len(answered) != 1 || r.entry(t, string(capture.ID)).State != task.Inbox {
+	if len(answered) != 1 || r.task(t, string(capture.ID)).State != task.Inbox {
 		t.Fatalf("answered %+v; an attached entry another owner holds was closed", answered)
 	}
 	if _, err := r.svc.Propose(ctx, messages.ProposeRequest{Unit: r7, Text: "x", Origin: message.Origin{Kind: message.OriginLedger}}); err == nil {
@@ -477,7 +477,7 @@ func TestDisabledPluginKeepsTheMessageOpen(t *testing.T) {
 	if err := r.svc.Reconcile(context.Background(), r7); err == nil {
 		t.Fatal("closing the entry of a disabled plugin did not fail")
 	}
-	if got := r.message(t, m.ID); got.State != message.Open || r.entry(t, m.EntryID).State != task.Inbox {
+	if got := r.message(t, m.ID); got.State != message.Open || r.task(t, m.TaskID).State != task.Inbox {
 		t.Fatalf("message %+v", got)
 	}
 	r.facts.off[unit.GitHub] = false
@@ -520,7 +520,7 @@ func TestAnAgentPostClosesWhenItsTurnEnds(t *testing.T) {
 	r.record(t, r7, 1, askedRecord(question()))
 	r.reconcile(t, r7)
 	got := r.message(t, p.ID)
-	if got.State != message.Superseded || r.entry(t, p.EntryID).State != task.Trash {
+	if got.State != message.Superseded || r.task(t, p.TaskID).State != task.Trash {
 		t.Fatalf("the post of an ended turn is %+v", got)
 	}
 	if _, err := r.svc.Answer(ctx, p.ID, messages.Answer{Text: "old"}); !errors.Is(err, messages.ErrClosed) {
@@ -556,13 +556,13 @@ func TestAnAgentPostOfAnEndedTurnRefusesAnAnswerBeforeReconcile(t *testing.T) {
 	}
 }
 
-func TestReaskRetitlesTheEntry(t *testing.T) {
+func TestReaskRetitlesTheTask(t *testing.T) {
 	r := newRig(t)
 	ctx := context.Background()
 	r.asked(t, r7)
 	r.reconcile(t, r7)
 	first := r.only(t)
-	page, err := r.entries.EntriesSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
+	page, err := r.taskStore.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,11 +570,11 @@ func TestReaskRetitlesTheEntry(t *testing.T) {
 	again.Text = "Hold the review instead?"
 	r.record(t, r7, 1, askedRecord(again))
 	r.reconcile(t, r7)
-	if e := r.entry(t, first.EntryID); e.Title != again.Text {
+	if e := r.task(t, first.TaskID); e.Title != again.Text {
 		t.Fatalf("entry title %q", e.Title)
 	}
-	next, err := r.entries.EntriesSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev})
-	if err != nil || next.Full || len(next.Entries) != 1 || next.Entries[0].Title != again.Text {
+	next, err := r.taskStore.TasksSince(ctx, task.Query{View: task.ViewInbox}, coretasks.Since{Epoch: page.Epoch, Rev: page.Rev})
+	if err != nil || next.Full || len(next.Tasks) != 1 || next.Tasks[0].Title != again.Text {
 		t.Fatalf("page %+v %v", next, err)
 	}
 }
@@ -587,7 +587,7 @@ func TestCleanDropsBidiOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := r.only(t)
-	if strings.ContainsAny(m.Text, "\u202e\u2066") || strings.ContainsAny(r.entry(t, m.EntryID).Title, "\u202e\u2066") {
+	if strings.ContainsAny(m.Text, "\u202e\u2066") || strings.ContainsAny(r.task(t, m.TaskID).Title, "\u202e\u2066") {
 		t.Fatalf("text %q", m.Text)
 	}
 }
@@ -623,7 +623,7 @@ func TestAnAgentPostWhoseTurnEndsMidAnswerIsClosed(t *testing.T) {
 
 // failingRetitle fails the next Retitle once.
 type failingRetitle struct {
-	messages.Entries
+	messages.Tasks
 	fail bool
 }
 
@@ -632,13 +632,13 @@ func (f *failingRetitle) Retitle(ctx context.Context, id task.ID, title string) 
 		f.fail = false
 		return errors.New("store busy")
 	}
-	return f.Entries.Retitle(ctx, id, title)
+	return f.Tasks.Retitle(ctx, id, title)
 }
 
 func TestFailedRetitleIsRetried(t *testing.T) {
 	r := newRig(t)
-	flaky := &failingRetitle{Entries: r.gtd}
-	r.svc.Entries = flaky
+	flaky := &failingRetitle{Tasks: r.tasks}
+	r.svc.Tasks = flaky
 	r.asked(t, r7)
 	r.reconcile(t, r7)
 	first := r.only(t)
@@ -650,7 +650,7 @@ func TestFailedRetitleIsRetried(t *testing.T) {
 		t.Fatal("the failed retitle was not reported")
 	}
 	r.reconcile(t, r7)
-	if e := r.entry(t, first.EntryID); e.Title != again.Text {
+	if e := r.task(t, first.TaskID); e.Title != again.Text {
 		t.Fatalf("entry title %q after the retry", e.Title)
 	}
 	if m := r.only(t); m.Text != again.Text {

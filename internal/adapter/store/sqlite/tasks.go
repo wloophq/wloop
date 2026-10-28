@@ -18,31 +18,31 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-type entryStore struct{ db *DB }
+type taskStore struct{ db *DB }
 
-var _ coretasks.Store = entryStore{}
+var _ coretasks.Store = taskStore{}
 
-func (db *DB) Entries() coretasks.Store { return entryStore{db} }
+func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
-const entryColumns = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
+const taskColumns = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
 	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated`
 
-// upsertEntrySQL updates an existing entry in place: a REPLACE would delete
+// upsertTaskSQL updates an existing entry in place: a REPLACE would delete
 // the row first and cascade into its projects row.
-var upsertEntrySQL = func() string {
-	cols := strings.Split(entryColumns+`, rev`, ",")
+var upsertTaskSQL = func() string {
+	cols := strings.Split(taskColumns+`, rev`, ",")
 	set := make([]string, 0, len(cols)-1)
 	for _, c := range cols[1:] {
 		c = strings.TrimSpace(c)
 		set = append(set, c+` = excluded.`+c)
 	}
-	return `INSERT INTO entries (` + entryColumns + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
+	return `INSERT INTO entries (` + taskColumns + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
 		`) ON CONFLICT (id) DO UPDATE SET ` + strings.Join(set, `, `)
 }()
 
 const (
 	notEnded     = `state NOT IN ('done', 'trash')`
-	entryOrder   = ` ORDER BY created, id`
+	taskOrder    = ` ORDER BY created, id`
 	changedSince = `rev > ?`
 	ofUnit       = `id IN (SELECT entry_id FROM entry_units WHERE provider = ? AND unit_key = ?
 		UNION SELECT entry_id FROM entry_items WHERE provider = ? AND unit_key = ?)`
@@ -72,52 +72,52 @@ func candidates(v task.View) string {
 	return `0`
 }
 
-func entryTime(s string) (time.Time, error) {
+func taskTime(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, nil
 	}
 	return time.Parse(event.TimeLayout, s)
 }
 
-func scanEntry(row scanner) (task.Entry, error) {
-	var e task.Entry
+func scanTask(row scanner) (task.Task, error) {
+	var e task.Task
 	var focusAt, snoozeUntil, waiting, deadline, seenAt, created, updated string
 	var kind, state, project, ret string
 	if err := row.Scan(&e.ID, &kind, &state, &e.Title, &e.Notes, &e.Focus.On, &e.Focus.Auto, &focusAt, &e.Area, &project,
 		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute, &waiting, &deadline,
 		&e.Changed, &seenAt, &e.Origin, &created, &updated); err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	e.Kind, e.State, e.Project, e.Snooze.Return = task.Kind(kind), task.State(state), task.ID(project), task.State(ret)
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
 	}{{&e.Focus.At, focusAt}, {&e.Snooze.Until, snoozeUntil}, {&e.Deadline, deadline}, {&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}} {
-		t, err := entryTime(f.raw)
+		t, err := taskTime(f.raw)
 		if err != nil {
-			return task.Entry{}, fmt.Errorf("a time of entry %s: %w", e.ID, err)
+			return task.Task{}, fmt.Errorf("a time of entry %s: %w", e.ID, err)
 		}
 		*f.dst = t
 	}
 	if waiting != "" {
 		e.Waiting = &task.WaitingOn{}
 		if err := json.Unmarshal([]byte(waiting), e.Waiting); err != nil {
-			return task.Entry{}, fmt.Errorf("the waiting of entry %s: %w", e.ID, err)
+			return task.Task{}, fmt.Errorf("the waiting of entry %s: %w", e.ID, err)
 		}
 	}
 	return e, nil
 }
 
-// loadEntries reads the entries matching where, with their items, units and contexts, oldest first.
-func loadEntries(ctx context.Context, q querier, where string, args ...any) ([]task.Entry, error) {
-	rows, err := q.QueryContext(ctx, `SELECT `+entryColumns+` FROM entries WHERE `+where+entryOrder, args...)
+// loadTasks reads the entries matching where, with their items, units and contexts, oldest first.
+func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]task.Task, error) {
+	rows, err := q.QueryContext(ctx, `SELECT `+taskColumns+` FROM entries WHERE `+where+taskOrder, args...)
 	if err != nil {
 		return nil, err
 	}
-	var out []task.Entry
+	var out []task.Task
 	at := map[task.ID]int{}
 	for rows.Next() {
-		e, err := scanEntry(rows)
+		e, err := scanTask(rows)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -199,17 +199,17 @@ func readPosition(ctx context.Context, q querier) (epoch string, rev uint64, err
 	return epoch, rev, errors.Join(err, rows.Err())
 }
 
-func (s entryStore) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
-	var out []task.Entry
+func (s taskStore) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
+	var out []task.Task
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		all, err := loadEntries(ctx, tx, candidates(q.View))
+		all, err := loadTasks(ctx, tx, candidates(q.View))
 		out = task.Select(all, q)
 		return err
 	})
 	return out, err
 }
 
-func (s entryStore) EntriesSince(ctx context.Context, q task.Query, since coretasks.Since) (coretasks.Page, error) {
+func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks.Since) (coretasks.Page, error) {
 	var p coretasks.Page
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -221,15 +221,15 @@ func (s entryStore) EntriesSince(ctx context.Context, q task.Query, since coreta
 		}
 		if since.Epoch != p.Epoch || since.Rev > p.Rev {
 			p.Full = true
-			all, err := loadEntries(ctx, tx, candidates(q.View))
-			p.Entries = task.Select(all, q)
+			all, err := loadTasks(ctx, tx, candidates(q.View))
+			p.Tasks = task.Select(all, q)
 			return err
 		}
-		all, err := loadEntries(ctx, tx, candidates(q.View))
+		all, err := loadTasks(ctx, tx, candidates(q.View))
 		if err != nil {
 			return err
 		}
-		changed, err := loadEntries(ctx, tx, changedSince, since.Rev)
+		changed, err := loadTasks(ctx, tx, changedSince, since.Rev)
 		if err != nil {
 			return err
 		}
@@ -244,34 +244,34 @@ func (s entryStore) EntriesSince(ctx context.Context, q task.Query, since coreta
 				all = append(all, e)
 			}
 		}
-		p.Entries, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return revs[id] })
+		p.Tasks, p.Removed = coretasks.Delta(all, q, func(id task.ID) bool { return revs[id] })
 		return nil
 	})
 	return p, err
 }
 
-func (s entryStore) Entry(ctx context.Context, id task.ID) (task.Entry, error) {
-	es, err := loadEntries(ctx, s.db.R(), `id = ?`, string(id))
+func (s taskStore) Task(ctx context.Context, id task.ID) (task.Task, error) {
+	es, err := loadTasks(ctx, s.db.R(), `id = ?`, string(id))
 	if err != nil {
-		return task.Entry{}, err
+		return task.Task{}, err
 	}
 	if len(es) == 0 {
-		return task.Entry{}, fmt.Errorf("%w: %s", coretasks.ErrNoEntry, id)
+		return task.Task{}, fmt.Errorf("%w: %s", coretasks.ErrNoTask, id)
 	}
 	return es[0], nil
 }
 
-func (s entryStore) EntriesOf(ctx context.Context, u unit.Unit) ([]task.Entry, error) {
-	var out []task.Entry
+func (s taskStore) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
+	var out []task.Task
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
 		var err error
-		out, err = loadEntries(ctx, tx, ofUnit, string(u.Provider), u.Key, string(u.Provider), u.Key)
+		out, err = loadTasks(ctx, tx, ofUnit, string(u.Provider), u.Key, string(u.Provider), u.Key)
 		return err
 	})
 	return out, err
 }
 
-func (s entryStore) Counts(ctx context.Context, area string) (task.Counters, error) {
+func (s taskStore) Counts(ctx context.Context, area string) (task.Counters, error) {
 	var c task.Counters
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
 		var err error
@@ -345,21 +345,21 @@ func newEpoch() string {
 	return hex.EncodeToString(b[:])
 }
 
-func (s entryStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error {
+func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Event) error {
 	for _, ev := range evs {
 		if ev.At.IsZero() {
 			return fmt.Errorf("the %s event has no time", ev.Kind)
 		}
 	}
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
-		changed := map[task.ID]task.Entry{}
+		changed := map[task.ID]task.Task{}
 		var order []task.ID
 		for _, c := range cs {
-			e := c.Entry
+			e := c.Task
 			if e.ID == "" {
 				return errors.New("an entry without an id")
 			}
-			old, err := loadEntries(ctx, tx, `id = ?`, string(e.ID))
+			old, err := loadTasks(ctx, tx, `id = ?`, string(e.ID))
 			if err != nil {
 				return err
 			}
@@ -395,17 +395,17 @@ func (s entryStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Eve
 			if !ok {
 				continue
 			}
-			if err := writeEntry(ctx, tx, e, rev); err != nil {
+			if err := writeTask(ctx, tx, e, rev); err != nil {
 				return err
 			}
-			tx.Touch(port.TopicEntries, entryUnits(e)...)
+			tx.Touch(port.TopicTasks, taskUnits(e)...)
 		}
 		return writeEvents(ctx, tx, evs)
 	})
 	return err
 }
 
-func entryUnits(e task.Entry) []unit.Unit {
+func taskUnits(e task.Task) []unit.Unit {
 	out := append([]unit.Unit(nil), e.Units...)
 	for _, r := range e.Items {
 		out = append(out, r.Unit)
@@ -413,7 +413,7 @@ func entryUnits(e task.Entry) []unit.Unit {
 	return out
 }
 
-func writeEntry(ctx context.Context, tx *Tx, e task.Entry, rev uint64) error {
+func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 	waiting := ""
 	if e.Waiting != nil {
 		b, err := json.Marshal(e.Waiting)
@@ -427,7 +427,7 @@ func writeEntry(ctx context.Context, tx *Tx, e task.Entry, rev uint64) error {
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, upsertEntrySQL,
+	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
 		string(e.ID), string(e.Kind), string(e.State), e.Title, e.Notes, e.Focus.On, e.Focus.Auto, eventTime(e.Focus.At),
 		e.Area, string(e.Project), e.Position, e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity,
 		string(e.Snooze.Return), e.Snooze.Mute, waiting, eventTime(e.Deadline), e.Changed, eventTime(e.SeenAt), e.Origin,

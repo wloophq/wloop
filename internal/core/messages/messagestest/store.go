@@ -58,8 +58,8 @@ func (s *Store) Upsert(_ context.Context, m message.Message) (message.Message, e
 		return m, nil
 	}
 	r := &s.rows[i]
-	if m.EntryID != "" {
-		r.EntryID = m.EntryID
+	if m.TaskID != "" {
+		r.TaskID = m.TaskID
 	}
 	r.Text, r.Recommend, r.Confirm, r.Origin.Session = m.Text, m.Recommend, m.Confirm, m.Origin.Session
 	r.Options = slices.Clone(m.Options)
@@ -79,11 +79,11 @@ func (s *Store) Message(_ context.Context, id int64) (message.Message, bool, err
 	return s.rows[i], true, nil
 }
 
-func (s *Store) ByEntry(_ context.Context, entry string) (message.Message, bool, error) {
+func (s *Store) ByTask(_ context.Context, task string) (message.Message, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := len(s.rows) - 1; i >= 0; i-- {
-		if s.rows[i].EntryID == entry {
+		if s.rows[i].TaskID == task {
 			return s.rows[i], true, nil
 		}
 	}

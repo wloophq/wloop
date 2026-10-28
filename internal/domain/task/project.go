@@ -20,7 +20,7 @@ const DefaultReviewEvery = 7 * 24 * time.Hour
 
 const slugMax = 48
 
-func (e Entry) ReviewInterval() time.Duration {
+func (e Task) ReviewInterval() time.Duration {
 	if e.ReviewEvery > 0 {
 		return e.ReviewEvery
 	}
@@ -29,7 +29,7 @@ func (e Entry) ReviewInterval() time.Duration {
 
 // ReviewDue says whether project e's interval passed at now since its last review, or since it was created when
 // it was never reviewed.
-func (e Entry) ReviewDue(now time.Time) bool {
+func (e Task) ReviewDue(now time.Time) bool {
 	since := e.ReviewedAt
 	if since.IsZero() {
 		since = e.Created
@@ -46,7 +46,7 @@ type ProjectStatus struct {
 }
 
 // ProjectsOf is the status of each project in all over the actions in all.
-func ProjectsOf(all []Entry) map[ID]ProjectStatus {
+func ProjectsOf(all []Task) map[ID]ProjectStatus {
 	out := map[ID]ProjectStatus{}
 	seq := map[ID]bool{}
 	for _, e := range all {
@@ -55,7 +55,7 @@ func ProjectsOf(all []Entry) map[ID]ProjectStatus {
 			seq[e.ID] = e.Sequential
 		}
 	}
-	acts := map[ID][]Entry{}
+	acts := map[ID][]Task{}
 	for _, e := range all {
 		if _, ok := out[e.Project]; ok && e.Open() {
 			acts[e.Project] = append(acts[e.Project], e)
@@ -79,7 +79,7 @@ func ProjectsOf(all []Entry) map[ID]ProjectStatus {
 }
 
 // NeedsReview says whether the Review lists project p: open, and due or, unless in Someday, without a next action.
-func NeedsReview(p Entry, st ProjectStatus, now time.Time) bool {
+func NeedsReview(p Task, st ProjectStatus, now time.Time) bool {
 	if p.Kind != KindProject || !p.Open() {
 		return false
 	}
@@ -136,8 +136,8 @@ func NumberedSlug(slug string, n int) string {
 
 // Place puts e among its project's other actions at position pos (1 first; past the end, last) and numbers
 // them all from 1 in that order.
-func Place(others []Entry, e Entry, pos int) []Entry {
-	out := slices.DeleteFunc(slices.Clone(others), func(o Entry) bool { return o.ID == e.ID })
+func Place(others []Task, e Task, pos int) []Task {
+	out := slices.DeleteFunc(slices.Clone(others), func(o Task) bool { return o.ID == e.ID })
 	sortByPosition(out)
 	at := min(max(pos-1, 0), len(out))
 	out = slices.Insert(out, at, e)
@@ -147,6 +147,6 @@ func Place(others []Entry, e Entry, pos int) []Entry {
 	return out
 }
 
-func sortByPosition(es []Entry) {
-	slices.SortStableFunc(es, func(a, b Entry) int { return cmp.Or(cmp.Compare(a.Position, b.Position), cmp.Compare(a.ID, b.ID)) })
+func sortByPosition(es []Task) {
+	slices.SortStableFunc(es, func(a, b Task) int { return cmp.Or(cmp.Compare(a.Position, b.Position), cmp.Compare(a.ID, b.ID)) })
 }

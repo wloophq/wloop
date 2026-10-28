@@ -42,7 +42,7 @@ func webBindings(t *testing.T) []api.KeyView {
 
 func TestKeysFixtureHoldsTheCoreWebMap(t *testing.T) {
 	help, _ := intentload.BundledKeys(os.DirFS("../../profiles/default"))
-	words, _ := intentload.BundledGTD(os.DirFS("../../profiles/default"))
+	words, _ := intentload.BundledLists(os.DirFS("../../profiles/default"))
 	var want, got []api.KeyView
 	for _, b := range keys.Core {
 		if slices.Contains(b.Surfaces, keys.Web) {
@@ -131,7 +131,7 @@ func keysRun(t *testing.T, prelude, main string, in, out any) {
 	nodeScript(t, b.String(), in, out)
 }
 
-func entryFixture() map[string]any {
+func taskFixture() map[string]any {
 	var verbs []map[string]any
 	for _, v := range []string{"next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss", "seen", "reply"} {
 		verbs = append(verbs, map[string]any{"verb": v, "enabled": true})
@@ -153,7 +153,7 @@ func TestMoveOpenClose(t *testing.T) {
 	keysRun(t, "", `
 const k = harness({ selected: input });
 for (const key of ["j", "j", "k", "Enter", "Escape"]) await k.press(key);
-return k.log;`, entryFixture(), &got)
+return k.log;`, taskFixture(), &got)
 	if !reflect.DeepEqual(got.Moves, []int{1, 1, -1}) || got.Detail != 1 || got.Closed != 1 {
 		t.Fatalf("%+v", got)
 	}
@@ -199,7 +199,7 @@ func TestVerbKeysPostVerbs(t *testing.T) {
 			keysRun(t, "", `
 const k = harness({ selected: input.entry, answers: input.answers });
 await k.press(input.key);
-return k.log;`, map[string]any{"entry": entryFixture(), "key": c.key, "answers": answers}, &got)
+return k.log;`, map[string]any{"entry": taskFixture(), "key": c.key, "answers": answers}, &got)
 			if len(got.Posts) != 1 {
 				t.Fatalf("%+v", got)
 			}
@@ -225,13 +225,13 @@ const k = harness({ selected: input });
 await k.press("s");
 await k.press("p");
 await k.press("r");
-return k.log;`, entryFixture(), &got)
+return k.log;`, taskFixture(), &got)
 		if len(got.Posts) != 0 {
 			t.Fatalf("%+v", got.Posts)
 		}
 	})
 	t.Run("a refused verb sends nothing", func(t *testing.T) {
-		e := entryFixture()
+		e := taskFixture()
 		e["verbs"] = []map[string]any{{"verb": "done", "enabled": false, "reason": "a draft waits"}}
 		var got struct {
 			Posts []posted `json:"posts"`
@@ -255,7 +255,7 @@ func TestCaptureAndOpenSource(t *testing.T) {
 const k = harness({ selected: input, answers: ["  Buy the domain  "] });
 await k.press("n");
 await k.press("o");
-return k.log;`, entryFixture(), &got)
+return k.log;`, taskFixture(), &got)
 	if len(got.Posts) != 1 || got.Posts[0].URL != "/api/entries" || got.Posts[0].Body["title"] != "Buy the domain" {
 		t.Fatalf("%+v", got.Posts)
 	}
@@ -283,14 +283,14 @@ await k.press("g"); await k.press("g");
 await k.press("g"); k.tick(1001); await k.press("i");
 await k.press("g"); k.tick(1001);
 await k.press("g"); await k.press("x");
-return k.log;`, map[string]any{"entry": entryFixture(), "views": viewsFixture}, &got)
+return k.log;`, map[string]any{"entry": taskFixture(), "views": viewsFixture}, &got)
 	if !reflect.DeepEqual(got.Nav, []string{"inbox", "needs-me"}) || len(got.Posts) != 0 {
 		t.Fatalf("%+v", got)
 	}
 }
 
 func TestDigitsAnswerOnlyInAQuestion(t *testing.T) {
-	e := entryFixture()
+	e := taskFixture()
 	q := map[string]any{"kind": "choice", "recommend": "b", "options": []map[string]string{{"id": "a"}, {"id": "b"}, {"id": "c"}}}
 	var got struct {
 		Posts []posted `json:"posts"`
@@ -353,7 +353,7 @@ for (const target of [{ tagName: "INPUT", type: "search" }, { tagName: "TEXTAREA
 }
 await k.press("Escape", { target: { tagName: "INPUT", type: "text" } });
 await k.press("x", { target: { tagName: "INPUT", type: "checkbox" } });
-return { ...k.log, took };`, entryFixture(), &got)
+return { ...k.log, took };`, taskFixture(), &got)
 	if slices.Contains(got.Took, true) || len(got.Moves)+len(got.Nav)+got.Filter+got.Closed != 0 || got.Palette != nil {
 		t.Fatalf("a key went through while typing: %+v", got)
 	}
@@ -408,7 +408,7 @@ await act(input.row, "hold");
 const byRow = calls.splice(0);
 await k.press("X", { shift: true });
 await k.press("M", { shift: true });
-return { byKey, byRow, posts: k.log.posts, others: calls };`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+return { byKey, byRow, posts: k.log.posts, others: calls };`, map[string]any{"entry": taskFixture(), "row": row}, &got)
 	if len(got.ByKey) != 1 || !reflect.DeepEqual(got.ByKey, got.ByRow) {
 		t.Fatalf("key %v, row %v", got.ByKey, got.ByRow)
 	}
@@ -537,7 +537,7 @@ func TestCapsLockKeepsCoreKeys(t *testing.T) {
 	keysRun(t, "", `
 const k = harness({ selected: input.entry, rows: [input.row] });
 for (const c of ["X", "H", "A"]) await k.press(c, { code: "Key" + c });
-return k.log;`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+return k.log;`, map[string]any{"entry": taskFixture(), "row": row}, &got)
 	if len(got.Unit) != 0 || len(got.Posts) != 2 || got.Posts[0].URL != "/api/entries/e-1/next" || got.Posts[1].URL != "/api/entries/e-1/approve" {
 		t.Fatalf("Caps Lock letters must stay core keys: %+v", got)
 	}
@@ -557,7 +557,7 @@ const took = [];
 took.push(await k.press("X", { shift: true }));
 took.push(await k.press("j"));
 took.push(await k.press("x"));
-return { ...k.log, took };`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+return { ...k.log, took };`, map[string]any{"entry": taskFixture(), "row": row}, &got)
 	if len(got.Posts)+len(got.Unit)+len(got.Moves) != 0 || slices.Contains(got.Took, true) {
 		t.Fatalf("a key went under the overlay: %+v", got)
 	}
@@ -604,7 +604,7 @@ await h.press("g"); await h.press("i");
 await h.press("Q", { shift: true, target: { tagName: "INPUT", type: "text" } });
 view = "needs-me";
 await h.press("Q", { shift: true });
-return { ran, posts: h.log.posts, unit: h.log.unit, nav: h.log.nav };`, map[string]any{"entry": entryFixture(), "row": row}, &got)
+return { ran, posts: h.log.posts, unit: h.log.unit, nav: h.log.nav };`, map[string]any{"entry": taskFixture(), "row": row}, &got)
 	if !reflect.DeepEqual(got.Ran, []string{"H", "Q"}) {
 		t.Fatalf("plugin keys ran %v", got.Ran)
 	}
@@ -613,7 +613,7 @@ return { ran, posts: h.log.posts, unit: h.log.unit, nav: h.log.nav };`, map[stri
 	}
 }
 
-func TestEntryVerbsKeepThePickedEntry(t *testing.T) {
+func TestTaskVerbsKeepThePickedTask(t *testing.T) {
 	var got struct {
 		Acted []string `json:"acted"`
 		Posts []any    `json:"posts"`
@@ -629,7 +629,7 @@ await k.press("w");
 const q = { kind: "confirm", options: [] };
 const plain = harness({ question: { entry: a, question: q } });
 await plain.press("1", { code: "Digit1", target: { inQuestion: true } });
-return { acted, posts: plain.log.posts.map((p) => [p.url, p.body]) };`, entryFixture(), &got)
+return { acted, posts: plain.log.posts.map((p) => [p.url, p.body]) };`, taskFixture(), &got)
 	if len(got.Acted) != 1 || got.Acted[0] != `waiting e-a {"on":"dana"}` {
 		t.Errorf("acted %v, want waiting on the entry picked when the key was pressed", got.Acted)
 	}

@@ -99,8 +99,8 @@ type Loaded struct {
 	Actions map[string]BuiltinAction
 	// Tools are the MCP tools' texts from tools.toml, by tool name.
 	Tools map[string]ToolText
-	// GTD are the GTD verbs' and views' texts from gtd.toml.
-	GTD GTDTexts
+	// Lists are the GTD verbs' and views' texts from gtd.toml.
+	Lists ListTexts
 	// Keys are the core keys' help from keys.toml.
 	Keys KeyTexts
 	// Notices are what the loop tells a session, from notices.toml, by notice name.
@@ -185,11 +185,11 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		if len(broken) == 0 {
 			actions, actionProblems := loadActions(layers, bundled)
 			tools, toolProblems := loadTools(layers, bundled)
-			gtdTexts, gtdProblems := loadGTD(layers, bundled)
+			listTexts, listProblems := loadLists(layers, bundled)
 			keyTexts, keyProblems := loadKeys(layers, bundled)
 			notices, noticeProblems := loadNotices(layers, bundled)
-			l.Actions, l.Tools, l.GTD, l.Keys, l.Notices = actions, tools, gtdTexts, keyTexts, notices
-			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, gtdProblems, keyProblems, noticeProblems)
+			l.Actions, l.Tools, l.Lists, l.Keys, l.Notices = actions, tools, listTexts, keyTexts, notices
+			l.Problems = slices.Concat(partials.problems(), problems, reverted.problems(), l.Problems, actionProblems, toolProblems, listProblems, keyProblems, noticeProblems)
 			l.Reverted = map[dintent.Name]Problems{}
 			for n, r := range reverted {
 				l.Reverted[n] = r.problems

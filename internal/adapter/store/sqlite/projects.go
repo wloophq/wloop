@@ -27,7 +27,7 @@ func (db *DB) Projects() coretasks.ProjectStore { return projectStore{db} }
 
 // loadProjects sets the project fields of the entries of out that the projects table holds, sub selecting
 // their ids with args.
-func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Entry, at map[task.ID]int) error {
+func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Task, at map[task.ID]int) error {
 	return eachRow(ctx, q, `SELECT entry_id, slug, review_every, reviewed_at FROM projects WHERE entry_id IN `+sub, args,
 		func(r *sql.Rows) error {
 			var id, slug, reviewed string
@@ -36,7 +36,7 @@ func loadProjects(ctx context.Context, q querier, sub string, args []any, out []
 				return err
 			}
 			e := &out[at[task.ID(id)]]
-			t, err := entryTime(reviewed)
+			t, err := taskTime(reviewed)
 			if err != nil {
 				return fmt.Errorf("the review time of project %s: %w", id, err)
 			}
@@ -46,7 +46,7 @@ func loadProjects(ctx context.Context, q querier, sub string, args []any, out []
 }
 
 // writeProject keeps a project's row; other kinds have none.
-func writeProject(ctx context.Context, tx *Tx, e task.Entry) error {
+func writeProject(ctx context.Context, tx *Tx, e task.Task) error {
 	if e.Kind != task.KindProject {
 		return nil
 	}
@@ -72,7 +72,7 @@ func (s projectStore) CurrentRun(ctx context.Context) (task.ReviewRun, bool, err
 	if err != nil {
 		return task.ReviewRun{}, false, err
 	}
-	if r.StartedAt, err = entryTime(started); err != nil {
+	if r.StartedAt, err = taskTime(started); err != nil {
 		return task.ReviewRun{}, false, fmt.Errorf("review run %s: %w", r.ID, err)
 	}
 	if done != "" {

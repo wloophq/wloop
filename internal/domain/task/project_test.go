@@ -11,32 +11,32 @@ func TestReviewDue(t *testing.T) {
 	day := 24 * time.Hour
 	for _, c := range []struct {
 		name string
-		p    Entry
+		p    Task
 		want bool
 	}{
-		{"reviewed 6 days ago, default interval", Entry{ReviewedAt: now.Add(-6 * day)}, false},
-		{"reviewed exactly 7 days ago", Entry{ReviewedAt: now.Add(-7 * day)}, true},
-		{"reviewed 8 days ago", Entry{ReviewedAt: now.Add(-8 * day)}, true},
-		{"own interval of 14 days", Entry{ReviewEvery: 14 * day, ReviewedAt: now.Add(-8 * day)}, false},
-		{"own interval of 1 day", Entry{ReviewEvery: day, ReviewedAt: now.Add(-day)}, true},
-		{"never reviewed, created 2 days ago", Entry{Created: now.Add(-2 * day)}, false},
-		{"never reviewed, created 9 days ago", Entry{Created: now.Add(-9 * day)}, true},
+		{"reviewed 6 days ago, default interval", Task{ReviewedAt: now.Add(-6 * day)}, false},
+		{"reviewed exactly 7 days ago", Task{ReviewedAt: now.Add(-7 * day)}, true},
+		{"reviewed 8 days ago", Task{ReviewedAt: now.Add(-8 * day)}, true},
+		{"own interval of 14 days", Task{ReviewEvery: 14 * day, ReviewedAt: now.Add(-8 * day)}, false},
+		{"own interval of 1 day", Task{ReviewEvery: day, ReviewedAt: now.Add(-day)}, true},
+		{"never reviewed, created 2 days ago", Task{Created: now.Add(-2 * day)}, false},
+		{"never reviewed, created 9 days ago", Task{Created: now.Add(-9 * day)}, true},
 	} {
 		c.p.Kind, c.p.State = KindProject, Next
 		if got := c.p.ReviewDue(now); got != c.want {
 			t.Errorf("%s: due %v, want %v", c.name, got, c.want)
 		}
 	}
-	if (Entry{}).ReviewInterval() != DefaultReviewEvery || DefaultReviewEvery != 7*day {
+	if (Task{}).ReviewInterval() != DefaultReviewEvery || DefaultReviewEvery != 7*day {
 		t.Errorf("default interval %v", DefaultReviewEvery)
 	}
 }
 
 func TestProjectsOf(t *testing.T) {
-	seq := Entry{ID: "p-seq", Kind: KindProject, State: Next, Sequential: true}
-	par := Entry{ID: "p-par", Kind: KindProject, State: Next}
-	empty := Entry{ID: "p-empty", Kind: KindProject, State: Next}
-	all := []Entry{seq, par, empty,
+	seq := Task{ID: "p-seq", Kind: KindProject, State: Next, Sequential: true}
+	par := Task{ID: "p-par", Kind: KindProject, State: Next}
+	empty := Task{ID: "p-empty", Kind: KindProject, State: Next}
+	all := []Task{seq, par, empty,
 		{ID: "a1", State: Waiting, Project: "p-seq", Position: 1},
 		{ID: "a2", State: Next, Project: "p-seq", Position: 2},
 		{ID: "b1", State: Someday, Project: "p-par", Position: 1},
@@ -53,13 +53,13 @@ func TestProjectsOf(t *testing.T) {
 		}
 	}
 	now := time.Now()
-	if !NeedsReview(seq, got["p-seq"], now) || NeedsReview(Entry{ID: "x", Kind: KindProject, State: Next, Created: now}, ProjectStatus{Next: "a", Open: 1}, now) {
+	if !NeedsReview(seq, got["p-seq"], now) || NeedsReview(Task{ID: "x", Kind: KindProject, State: Next, Created: now}, ProjectStatus{Next: "a", Open: 1}, now) {
 		t.Error("a project without a next action needs review; one with a next action and not due does not")
 	}
-	if NeedsReview(Entry{Kind: KindProject, State: Someday, Created: now}, ProjectStatus{}, now) {
+	if NeedsReview(Task{Kind: KindProject, State: Someday, Created: now}, ProjectStatus{}, now) {
 		t.Error("a Someday project needs no next action")
 	}
-	if NeedsReview(Entry{Kind: KindProject, State: Done}, ProjectStatus{}, now) {
+	if NeedsReview(Task{Kind: KindProject, State: Done}, ProjectStatus{}, now) {
 		t.Error("a done project is not reviewed")
 	}
 }
@@ -95,19 +95,19 @@ func TestNumberedSlugStaysWithinTheCap(t *testing.T) {
 }
 
 func TestPlace(t *testing.T) {
-	acts := []Entry{{ID: "a", Position: 1}, {ID: "b", Position: 2}, {ID: "c", Position: 3}}
-	pos := func(es []Entry) []string {
+	acts := []Task{{ID: "a", Position: 1}, {ID: "b", Position: 2}, {ID: "c", Position: 3}}
+	pos := func(es []Task) []string {
 		var out []string
 		for _, e := range es {
 			out = append(out, string(e.ID)+":"+string(rune('0'+e.Position)))
 		}
 		return out
 	}
-	got := pos(Place(acts, Entry{ID: "x", Position: 9}, 2))
+	got := pos(Place(acts, Task{ID: "x", Position: 9}, 2))
 	if want := []string{"a:1", "x:2", "b:3", "c:4"}; !slices.Equal(got, want) {
 		t.Errorf("insert at 2: %v, want %v", got, want)
 	}
-	got = pos(Place(acts, Entry{ID: "x"}, 99))
+	got = pos(Place(acts, Task{ID: "x"}, 99))
 	if want := []string{"a:1", "b:2", "c:3", "x:4"}; !slices.Equal(got, want) {
 		t.Errorf("insert past the end: %v, want %v", got, want)
 	}

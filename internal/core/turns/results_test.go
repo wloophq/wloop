@@ -21,8 +21,8 @@ type results struct {
 }
 
 type attached struct {
-	entry task.ID
-	u     unit.Unit
+	task task.ID
+	u    unit.Unit
 }
 
 func (r *results) UnitOf(url string) (unit.Unit, bool) {
@@ -30,8 +30,8 @@ func (r *results) UnitOf(url string) (unit.Unit, bool) {
 	return u, ok
 }
 
-func (r *results) Attach(_ context.Context, entry task.ID, u unit.Unit) error {
-	r.attached = append(r.attached, attached{entry, u})
+func (r *results) Attach(_ context.Context, tk task.ID, u unit.Unit) error {
+	r.attached = append(r.attached, attached{tk, u})
 	return r.err
 }
 
@@ -74,7 +74,7 @@ func recordBegin(t *testing.T, s *turns.Service, rec record.Record) {
 	}
 }
 
-func TestADoneRecordAttachesItsURLToTheTurnsEntry(t *testing.T) {
+func TestADoneRecordAttachesItsURLToTheTurnsTask(t *testing.T) {
 	s, r := beginService(t, true)
 	beginOn(t, s, brief)
 	recordBegin(t, s, record.Record{State: record.Done, Summary: "opened the pull request", Outcome: &record.Outcome{URL: prURL}})

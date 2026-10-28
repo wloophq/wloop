@@ -17,7 +17,7 @@ import (
 // wireDrafts wires draft.propose's reads and the workflows' draft
 // withdrawals; the effects' applier is the Outbox's (serveOutbox).
 func (e *Env) wireDrafts(w *serveWiring) {
-	d := e.draftDeps(w.DB.Entries(), e.itemsLedger(w.DB, w.Cfg, w.Log))
+	d := e.draftDeps(w.DB.Tasks(), e.itemsLedger(w.DB, w.Cfg, w.Log))
 	var codecs []unit.Codec
 	for _, m := range w.Modules {
 		if m.Codec != nil {
@@ -29,7 +29,7 @@ func (e *Env) wireDrafts(w *serveWiring) {
 	w.Engine.Withdrawals = draftWithdrawals{d: d}
 }
 
-func (e *Env) draftDeps(entries draftEntries, its draftItems) *draftDeps {
+func (e *Env) draftDeps(tasks draftTasks, its draftItems) *draftDeps {
 	return &draftDeps{
 		Outbox: func() draftOutbox {
 			if e.outbox == nil {
@@ -37,7 +37,7 @@ func (e *Env) draftDeps(entries draftEntries, its draftItems) *draftDeps {
 			}
 			return e.outbox
 		},
-		Entries: entries, Items: its,
+		Tasks: tasks, Items: its,
 		Workflow: func(name string) (workflow.Workflow, bool) {
 			for _, w := range e.loadedIntents().Workflows {
 				if w.Name == name {
@@ -73,13 +73,13 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 			continue
 		}
 		subject := d.Unit
-		if d.Entry != "" {
-			subject = task.UnitOf(task.ID(d.Entry))
+		if d.Task != "" {
+			subject = task.UnitOf(task.ID(d.Task))
 		}
 		pd := automation.ProposedDraft{ID: int64(d.ID), Workflow: d.Origin.Workflow, Subject: subject}
 		sub, err := w.d.subject(ctx, subject)
 		switch {
-		case err != nil && d.Entry != "" && errors.Is(err, coretasks.ErrNoEntry):
+		case err != nil && d.Task != "" && errors.Is(err, coretasks.ErrNoTask):
 			pd.Facts = workflow.Facts{"draft.person_waited": false, "draft.items_owed": 0, "draft.items_assigned": 0, "draft.unit_open": false}
 		case err != nil:
 			return nil, err

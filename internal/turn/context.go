@@ -168,9 +168,9 @@ type Request struct {
 	BriefMissing string
 	// Why is the workflow that started the turn; nil for a turn started by hand.
 	Why *workflow.Why
-	// Items and Entry are the unit's item ids and the GTD entry the turn was asked about.
+	// Items and Task are the unit's item ids and the GTD entry the turn was asked about.
 	Items []string
-	Entry string
+	Task  string
 }
 
 // TurnFacts are the facts of a turn Build reads besides the request.

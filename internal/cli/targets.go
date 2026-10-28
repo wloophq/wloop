@@ -22,7 +22,7 @@ func (e *Env) unitTarget(ctx context.Context, arg string) (unit.Unit, error) {
 // resolveTarget is unitTarget over the providers, their resolvers and
 // their codecs.
 func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID, resolvers map[unit.ProviderID]unit.Resolver, codecs *unit.Registry) (unit.Unit, error) {
-	if u, ok := explicitEntry(arg); ok {
+	if u, ok := explicitTask(arg); ok {
 		return u, nil
 	}
 	if p, key, ok := strings.Cut(arg, ":"); ok && key != "" && !strings.HasPrefix(key, "//") && slices.Contains(providers, unit.ProviderID(p)) {
@@ -50,9 +50,9 @@ func resolveTarget(ctx context.Context, arg string, providers []unit.ProviderID,
 	return unit.Unit{}, fmt.Errorf("%s names no unit: give a Slack message ref or permalink, a pull request URL or owner/repo#n, or <provider>:<key>", arg)
 }
 
-// explicitEntry is the GTD entry arg names as entry:<id>, the only way an
+// explicitTask is the GTD entry arg names as entry:<id>, the only way an
 // argument names one.
-func explicitEntry(arg string) (unit.Unit, bool) {
+func explicitTask(arg string) (unit.Unit, bool) {
 	key, ok := strings.CutPrefix(arg, string(task.Codec{}.Provider())+":")
 	if !ok || (task.Codec{}).Valid(key) != nil {
 		return unit.Unit{}, false

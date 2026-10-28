@@ -9,15 +9,15 @@ import (
 )
 
 // outboxList lays the drafts out: their age, target, text and state.
-func (m *Model) outboxList(entries []api.EntryView, cur, width, height int, now time.Time) []string {
+func (m *Model) outboxList(tasks []api.TaskView, cur, width, height int, now time.Time) []string {
 	t := m.t
 	cols := []termfmt.Column{{Right: true}, {Max: min(max((width-2)/4, 12), 32)}, {Flex: true}}
 	if width >= 80 {
 		cols = append(cols, termfmt.Column{Max: 18})
 	}
-	cells := make([][]termfmt.Cell, len(entries))
-	for i, e := range entries {
-		age, style := m.entryAge(e, now)
+	cells := make([][]termfmt.Cell, len(tasks))
+	for i, e := range tasks {
+		age, style := m.taskAge(e, now)
 		target, text := draftTarget(e), oneLine(e.Title)
 		if d := e.Draft; d != nil {
 			text = oneLine(d.Text)
@@ -29,16 +29,16 @@ func (m *Model) outboxList(entries []api.EntryView, cur, width, height int, now 
 		cells[i] = c
 	}
 	laid := t.Columns(width-3, 2, cols, cells)
-	out := make([]string, len(entries))
-	for i, e := range entries {
-		out[i] = m.entryLine(e, laid[i], i == cur, width)
+	out := make([]string, len(tasks))
+	for i, e := range tasks {
+		out[i] = m.taskLine(e, laid[i], i == cur, width)
 	}
 	return window(out, cur, height)
 }
 
 // draftTarget is where the draft goes as its publisher named it, else its raw target or unit, marked
 // unknown while the draft is still to be posted.
-func draftTarget(e api.EntryView) string {
+func draftTarget(e api.TaskView) string {
 	d := e.Draft
 	if d != nil && d.Where != "" {
 		return oneLine(d.Where)
@@ -57,7 +57,7 @@ func draftTarget(e api.EntryView) string {
 }
 
 // draftState is the draft's state and how it is approved.
-func draftState(e api.EntryView) string {
+func draftState(e api.TaskView) string {
 	d := e.Draft
 	if d == nil {
 		return e.State
@@ -73,7 +73,7 @@ func draftState(e api.EntryView) string {
 // paragraphs, and why it failed or what it would do.
 func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
-	fact("to", draftTarget(api.EntryView{Draft: d}), plain)
+	fact("to", draftTarget(api.TaskView{Draft: d}), plain)
 	head := d.Purpose
 	if d.Edited {
 		head += " · edited"

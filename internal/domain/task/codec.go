@@ -10,7 +10,7 @@ import (
 // Codec is the codec of the entry provider: a unit's key is an entry's ID.
 type Codec struct{}
 
-func (Codec) Provider() unit.ProviderID { return unit.Entry }
+func (Codec) Provider() unit.ProviderID { return unit.Task }
 
 // Valid accepts a non-blank key without spaces or line breaks.
 func (Codec) Valid(key string) error {
@@ -22,11 +22,11 @@ func (Codec) Valid(key string) error {
 
 // IDOf is the entry u names; false for a unit of another provider.
 func IDOf(u unit.Unit) (ID, bool) {
-	if u.Provider != unit.Entry {
+	if u.Provider != unit.Task {
 		return "", false
 	}
 	return ID(u.Key), true
 }
 
 // UnitOf is the entry provider's unit of id.
-func UnitOf(id ID) unit.Unit { return unit.Unit{Provider: unit.Entry, Key: string(id)} }
+func UnitOf(id ID) unit.Unit { return unit.Unit{Provider: unit.Task, Key: string(id)} }

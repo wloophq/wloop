@@ -28,9 +28,9 @@ type effectDeps struct {
 // sent, by name; a plugin's own come from its Module.OnPosted and win.
 func draftEffects(d effectDeps) map[string]outbox.Effect {
 	return map[string]outbox.Effect{
-		builtin.EffectEntryNudged: d.entryNudged,
-		builtin.EffectUnitClosed:  noPluginClosure,
-		builtin.EffectPRNudged:    appliedByPublisher,
+		builtin.EffectTaskNudged: d.taskNudged,
+		builtin.EffectUnitClosed: noPluginClosure,
+		builtin.EffectPRNudged:   appliedByPublisher,
 	}
 }
 
@@ -41,15 +41,15 @@ func appliedByPublisher(context.Context, draft.Draft) error { return nil }
 // noPluginClosure is unit.closed on a unit whose built plugin records no closure.
 func noPluginClosure(context.Context, draft.Draft) error { return nil }
 
-// entryNudged stamps the draft's entry, or every live waiting entry of its
+// taskNudged stamps the draft's entry, or every live waiting entry of its
 // unit when it names none.
-func (d effectDeps) entryNudged(ctx context.Context, dr draft.Draft) error {
+func (d effectDeps) taskNudged(ctx context.Context, dr draft.Draft) error {
 	if d.Nudges == nil {
 		return nil
 	}
 	var ids []task.ID
-	if dr.Entry != "" {
-		ids = []task.ID{task.ID(dr.Entry)}
+	if dr.Task != "" {
+		ids = []task.ID{task.ID(dr.Task)}
 	}
 	at := dr.Evidence.At
 	if at.IsZero() {

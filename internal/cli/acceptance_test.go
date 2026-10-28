@@ -767,7 +767,7 @@ func (f *fixtureEnv) engine(t *testing.T) *automation.Engine {
 		Rounds: sqlite.NewRounds(f.db), Git: factsgithub.LocalGit(te.Env.Git), Branches: te.Env.Git, Cfg: te.currentConfig, Clock: clock, Changes: te.changes,
 		Teams: func(context.Context) ([]string, error) { return nil, nil }, Intents: func() *dintent.Registry { return te.loadedIntents().Registry }})
 	return te.newEngine(engineDeps{DB: f.db, Modules: []source.Module{{ID: unit.GitHub, Codec: pr.Codec{}, Facts: gh}}, SessionFacts: sf, WorkspaceFacts: wf, Snapshot: f.snap,
-		Subjects: map[unit.ProviderID]automation.Units{unit.Entry: noUnits{}, dslack.Provider: noUnits{}}})
+		Subjects: map[unit.ProviderID]automation.Units{unit.Task: noUnits{}, dslack.Provider: noUnits{}}})
 }
 
 func (f *fixtureEnv) setApply(name string) {

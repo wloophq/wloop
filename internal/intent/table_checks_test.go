@@ -123,7 +123,7 @@ when = 'pr.repo == "acme/api" && pr.repo_name == "api" && pr.state == "OPEN"'
 
 func TestAWorkflowNamesOnlyItsProvidersEffects(t *testing.T) {
 	t.Parallel()
-	entry := `summary = "Nudge a waiting entry"
+	task := `summary = "Nudge a waiting entry"
 provider = "entry"
 when = 'entry.waiting_days > 2'
 
@@ -132,5 +132,5 @@ use = "draft.propose"
 purpose = "nudge"
 effects = ["pr.nudged"]
 `
-	wantProblem(t, workflowProblems(t, entry), "step[0].effects[0]: pr.nudged applies to github units only; a entry workflow cannot name it")
+	wantProblem(t, workflowProblems(t, task), "step[0].effects[0]: pr.nudged applies to github units only; a entry workflow cannot name it")
 }

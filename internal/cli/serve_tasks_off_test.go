@@ -27,18 +27,18 @@ func TestAPluginRefusedAtBuildCountsAsOff(t *testing.T) {
 	ctx := context.Background()
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	u := unit.Unit{Provider: "slack", Key: "C1/1.1"}
-	e := task.Entry{ID: "e-00000000000000ab", Kind: task.KindAction, State: task.Inbox, Title: "reply", Units: []unit.Unit{u},
+	e := task.Task{ID: "e-00000000000000ab", Kind: task.KindAction, State: task.Inbox, Title: "reply", Units: []unit.Unit{u},
 		Origin: task.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
+	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
 	d := daemon.Deps{Plugins: []api.Plugin{{ID: unit.GitHub, Enabled: true}, {ID: "slack"}}}
-	d = te.Env.serveGTD(d, db, te.cfg, nil, t.Logf)
-	c, err := d.GTD.Counts(ctx, "")
+	d = te.Env.serveTasks(d, db, te.cfg, nil, t.Logf)
+	c, err := d.Tasks.Counts(ctx, "")
 	if err != nil || c.Views[task.ViewInbox] != 0 || c.Badge != 0 {
 		t.Fatalf("counts %+v %v", c, err)
 	}
-	if _, err := d.GTD.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
+	if _, err := d.Tasks.Do(ctx, e.ID, coretasks.Request{Verb: task.VerbNext}); !errors.Is(err, coretasks.ErrPluginDisabled) {
 		t.Fatalf("next on a refused plugin's entry: %v", err)
 	}
 }

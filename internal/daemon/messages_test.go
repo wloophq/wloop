@@ -98,9 +98,9 @@ func actionLines(t *testing.T, body []byte) []string {
 	return res.Output
 }
 
-func entryLines(t *testing.T, body []byte) []string {
+func taskLines(t *testing.T, body []byte) []string {
 	t.Helper()
-	var res api.EntryResult
+	var res api.TaskResult
 	if err := json.Unmarshal(body, &res); err != nil {
 		t.Fatalf("%v: %s", err, body)
 	}
@@ -127,20 +127,20 @@ func TestMessageAnswerDifferential(t *testing.T) {
 					r := newMessageRig(t)
 					m := r.question(t)
 					arrange(r)
-					rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"`+source+`"}`)
-					return r.outcome(rec.Code, entryLines(t, rec.Body.Bytes()))
+					rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"publish","guidance":"say thanks"},"source":"`+source+`"}`)
+					return r.outcome(rec.Code, taskLines(t, rec.Body.Bytes()))
 				}
-				byEntry := func(t *testing.T) outcome {
+				byTask := func(t *testing.T) outcome {
 					r := newMessageRig(t)
 					m := r.question(t)
 					arrange(r)
-					res, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer,
+					res, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer,
 						Args: map[string]string{"option_id": "publish", "guidance": "say thanks"}, Source: source})
 					if err != nil {
 						t.Fatal(err)
 					}
-					if res.Entry.State != task.Done {
-						t.Fatalf("the entry is %s after its answer", res.Entry.State)
+					if res.Task.State != task.Done {
+						t.Fatalf("the entry is %s after its answer", res.Task.State)
 					}
 					return r.outcome(200, res.Lines)
 				}
@@ -148,7 +148,7 @@ func TestMessageAnswerDifferential(t *testing.T) {
 				if want.Code != 200 || len(want.Answers) != 1 || want.Answers[0].Source != turn.Source(source) || want.Answers[0].Route != routes[name] {
 					t.Fatalf("unit path %+v", want)
 				}
-				for path, got := range map[string]outcome{"entry route": byRoute(t), "entry": byEntry(t)} {
+				for path, got := range map[string]outcome{"entry route": byRoute(t), "entry": byTask(t)} {
 					if !reflect.DeepEqual(got, want) {
 						t.Errorf("%s path\n got %+v\nwant %+v", path, got, want)
 					}
@@ -165,7 +165,7 @@ func TestMessageAnswerRefusesAnUnknownOption(t *testing.T) {
 	want := post(t, ref.s, "/api/units/github/acme%2Fapi%238/answer", `{"option_id":"nope"}`)
 	r := newMessageRig(t)
 	m := r.question(t)
-	got := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"nope"}}`)
+	got := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"nope"}}`)
 	if got.Code != 400 || want.Code != 400 || got.Body.String() != want.Body.String() {
 		t.Fatalf("entry %d %s; unit %d %s", got.Code, got.Body, want.Code, want.Body)
 	}
@@ -182,10 +182,10 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 			r := newMessageRig(t)
 			m := r.question(t)
 			if via == "route" {
-				if rec := post(t, r.s, api.EntryPath(m.EntryID, "dismiss"), ``); rec.Code != 200 {
+				if rec := post(t, r.s, api.TaskPath(m.TaskID, "dismiss"), ``); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbDismiss, Source: "tui"}); err != nil {
+			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbDismiss, Source: "tui"}); err != nil {
 				t.Fatal(err)
 			}
 			books, _ := r.store.Books(context.Background(), r8u.Unit())
@@ -195,7 +195,7 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 			if got, _, _ := r.msgs.Message(context.Background(), m.ID); got.State != dmessage.Dismissed {
 				t.Fatalf("message %+v", got)
 			}
-			if e, _ := r.entries.Entry(context.Background(), task.ID(m.EntryID)); e.State != task.Trash {
+			if e, _ := r.tasks.Task(context.Background(), task.ID(m.TaskID)); e.State != task.Trash {
 				t.Fatalf("entry %s", e.State)
 			}
 		})
@@ -211,19 +211,19 @@ func getRaw(t *testing.T, s *Server, path string) string {
 	return string(raw) + "\n"
 }
 
-func TestEntryCarriesItsMessage(t *testing.T) {
+func TestTaskCarriesItsMessage(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
-	got, err := r.s.entryMessage(context.Background(), m.EntryID)
-	if err != nil || got == nil || !reflect.DeepEqual(*got, messageView(m)) || got.EntryID != m.EntryID {
+	got, err := r.s.taskMessage(context.Background(), m.TaskID)
+	if err != nil || got == nil || !reflect.DeepEqual(*got, messageView(m)) || got.TaskID != m.TaskID {
 		t.Fatalf("%+v %v", got, err)
 	}
-	capture, err := r.s.deps.GTD.Capture(context.Background(), "call Ana", "", nil)
+	capture, err := r.s.deps.Tasks.Capture(context.Background(), "call Ana", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := r.s.entryMessage(context.Background(), string(capture.ID)); got != nil || err != nil {
+	if got, err := r.s.taskMessage(context.Background(), string(capture.ID)); got != nil || err != nil {
 		t.Fatalf("a capture carries %+v %v", got, err)
 	}
 }
@@ -238,10 +238,10 @@ func TestMessageAnswerKeepsItsSource(t *testing.T) {
 			r := newMessageRig(t)
 			m := r.question(t)
 			if c.via == "route" {
-				if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"hold"},"source":"`+c.source+`"}`); rec.Code != 200 {
+				if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"},"source":"`+c.source+`"}`); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer,
+			} else if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer,
 				Args: map[string]string{"option_id": "hold"}, Source: c.source}); err != nil {
 				t.Fatal(err)
 			}
@@ -253,7 +253,7 @@ func TestMessageAnswerKeepsItsSource(t *testing.T) {
 	}
 	r := newMessageRig(t)
 	m := r.question(t)
-	if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"hold"},"source":"bogus"}`); rec.Code != 400 {
+	if rec := post(t, r.s, api.TaskPath(m.TaskID, "answer"), `{"args":{"option_id":"hold"},"source":"bogus"}`); rec.Code != 400 {
 		t.Fatalf("a bogus source: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -264,12 +264,12 @@ func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
 	m := r.question(t)
 	r.s.deps.PluginEnabled = func(p unit.ProviderID) bool { return p != unit.GitHub }
 	for _, verb := range []string{"answer", "dismiss"} {
-		if rec := post(t, r.s, api.EntryPath(m.EntryID, verb), `{"args":{"option_id":"hold"}}`); rec.Code != 409 || !slices.Contains([]string{`{"error":"github is disabled","plugin":"github"}` + "\n"}, rec.Body.String()) {
+		if rec := post(t, r.s, api.TaskPath(m.TaskID, verb), `{"args":{"option_id":"hold"}}`); rec.Code != 409 || !slices.Contains([]string{`{"error":"github is disabled","plugin":"github"}` + "\n"}, rec.Body.String()) {
 			t.Fatalf("%s: %d %s", verb, rec.Code, rec.Body)
 		}
 	}
 	r.facts.off[unit.GitHub] = true
-	if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
+	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
 		t.Fatal("the entry verb answered a disabled plugin's message")
 	}
 	if books, _ := r.store.Books(context.Background(), r8u.Unit()); len(books[r8u.Unit()].Answers) != 0 {
@@ -286,7 +286,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 		t.Fatal(err)
 	}
 	open, _ := r.msgs.Open(ctx)
-	if _, err := r.s.deps.GTD.Do(ctx, task.ID(open[0].EntryID), coretasks.Request{Verb: task.VerbApprove, Source: "tui"}); err != nil {
+	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(open[0].TaskID), coretasks.Request{Verb: task.VerbApprove, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
 	books, _ := r.store.Books(ctx, r8u.Unit())
@@ -297,7 +297,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.s.deps.GTD.Do(ctx, task.ID(m.EntryID), coretasks.Request{Verb: task.VerbApprove}); !errors.Is(err, coretasks.ErrVerb) {
+	if _, err := r.s.deps.Tasks.Do(ctx, task.ID(m.TaskID), coretasks.Request{Verb: task.VerbApprove}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("approve on a proposal with no accept option: %v", err)
 	}
 }
@@ -305,7 +305,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 func TestAClosedTurnAnswers409(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	writeGTDError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
+	writeTasksError(rec, fmt.Errorf("%w: turn 1", turn.ErrClosed))
 	if rec.Code != 409 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}

@@ -43,26 +43,26 @@ func unitsEnded(mods []source.Module) func(ctx context.Context, u unit.Unit) (bo
 	}
 }
 
-// entryResults attaches to an entry what the turns on it produced: a done
+// taskResults attaches to an entry what the turns on it produced: a done
 // record's url (turns.Results) and their posts (outbox.Results).
-type entryResults struct {
-	entries *coretasks.Service
+type taskResults struct {
+	tasks   *coretasks.Service
 	units   *unit.Registry
 	intents func() *dintent.Registry
 }
 
 var (
-	_ turns.Results  = entryResults{}
-	_ outbox.Results = entryResults{}
+	_ turns.Results  = taskResults{}
+	_ outbox.Results = taskResults{}
 )
 
-func (r entryResults) UnitOf(url string) (unit.Unit, bool) { return r.units.ParseURL(url) }
+func (r taskResults) UnitOf(url string) (unit.Unit, bool) { return r.units.ParseURL(url) }
 
-func (r entryResults) Attach(ctx context.Context, entry task.ID, u unit.Unit) error {
-	return r.entries.Attach(ctx, entry, u)
+func (r taskResults) Attach(ctx context.Context, tk task.ID, u unit.Unit) error {
+	return r.tasks.Attach(ctx, tk, u)
 }
 
-func (r entryResults) AttachesPosts(intent string) bool {
+func (r taskResults) AttachesPosts(intent string) bool {
 	reg := r.intents()
 	if reg == nil {
 		return false
@@ -71,14 +71,14 @@ func (r entryResults) AttachesPosts(intent string) bool {
 	return ok && d.AttachPosts
 }
 
-// newEntryResults attaches through g, resolving addresses with the codecs of
+// newTaskResults attaches through g, resolving addresses with the codecs of
 // mods.
-func (e *Env) newEntryResults(g *coretasks.Service, mods []source.Module) entryResults {
+func (e *Env) newTaskResults(g *coretasks.Service, mods []source.Module) taskResults {
 	codecs := make([]unit.Codec, 0, len(mods))
 	for _, m := range mods {
 		if m.Codec != nil {
 			codecs = append(codecs, m.Codec)
 		}
 	}
-	return entryResults{entries: g, units: unit.NewRegistry(codecs...), intents: func() *dintent.Registry { return e.loadedIntents().Registry }}
+	return taskResults{tasks: g, units: unit.NewRegistry(codecs...), intents: func() *dintent.Registry { return e.loadedIntents().Registry }}
 }
