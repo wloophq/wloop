@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // workflowGrammar is the workflow manifest's keys.
@@ -35,53 +34,7 @@ var workflowGrammar = slices.Concat([]Key{
 	{Path: "drafts.withdraw", In: SurfaceWorkflow, Kind: KindTable, Doc: "When an open draft the workflow proposed is withdrawn."},
 	{Path: "drafts.withdraw.when", In: SurfaceWorkflow, Kind: KindPred, Doc: "When an open draft the workflow proposed is withdrawn, over the unit's facts and the draft's."},
 	{Path: "drafts.withdraw.reason", In: SurfaceWorkflow, Kind: KindEnum, Values: withdrawValues, Default: draft.WithdrawMoot, Doc: "The reason the withdrawn draft stores."},
-},
-	approvalRows("approval", RunModes, string(workflow.ApprovalRun), "The run approval: how a matched item runs.", "the item runs"),
-	approvalRows("drafts.approval", DraftModes, string(draft.Wait), "The approval of the drafts the workflow's steps and turns propose.", "the draft is sent"),
-)
-
-// approvalRows are an approval table's keys at at: one shape for runs and
-// drafts, a mode set per object.
-func approvalRows(at string, modes func() []Value, def, doc, what string) []Key {
-	return []Key{
-		{Path: at, In: SurfaceWorkflow, Kind: KindTable, Doc: doc},
-		{Path: at + ".mode", In: SurfaceWorkflow, Kind: KindEnum, Values: modes, Default: def, Doc: "The mode when no rule matches."},
-		{Path: at + ".window", In: SurfaceWorkflow, Kind: KindDur, Doc: "How long a person has before " + what + "; only with mode delay, which needs it."},
-		{Path: at + ".rule[]", In: SurfaceWorkflow, Kind: KindTable, Doc: "A rule tried in order; the first whose when holds gives the mode."},
-		{Path: at + ".rule[].when", In: SurfaceWorkflow, Kind: KindPred, Doc: "When the rule applies."},
-		{Path: at + ".rule[].mode", In: SurfaceWorkflow, Kind: KindEnum, Values: modes, Doc: "The mode when the rule applies."},
-		{Path: at + ".rule[].window", In: SurfaceWorkflow, Kind: KindDur, Doc: "The rule's window; only with mode delay, which needs it."},
-	}
-}
-
-// RunModes are the run approval's modes, from workflow.ApprovalModes.
-func RunModes() []Value {
-	doc := map[workflow.ApprovalMode]string{
-		workflow.ApprovalRun:   "Runs at once.",
-		workflow.ApprovalDelay: "Runs when the window ends unless a person stops it.",
-		workflow.ApprovalWait:  "Waits for a person; a matched wait rule also holds an item a guard refuses.",
-	}
-	out := make([]Value, len(workflow.ApprovalModes))
-	for i, m := range workflow.ApprovalModes {
-		out[i] = Value{Name: string(m), Doc: doc[m], Releases: m.Releases()}
-	}
-	return out
-}
-
-// DraftModes are the draft approval's modes, from draft.ApprovalModes.
-func DraftModes() []Value {
-	doc := map[draft.ApprovalMode]string{
-		draft.Send:   "Posts at once.",
-		draft.Delay:  "Posts when the window ends unless a person stops it.",
-		draft.Wait:   "Waits for a person.",
-		draft.DryRun: "Stores the draft and never sends it; nobody can release it.",
-	}
-	out := make([]Value, len(draft.ApprovalModes))
-	for i, m := range draft.ApprovalModes {
-		out[i] = Value{Name: string(m), Doc: doc[m], Releases: m.Releases()}
-	}
-	return out
-}
+})
 
 func withdrawValues() []Value {
 	return []Value{

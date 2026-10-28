@@ -8,9 +8,9 @@ schedule = "0 9 * * 1-5"
 [[step]]
 use = "workspace.remove"
 
-[approval]
+[gates.approval]
 mode = "delay"
 window = "1d"
-[[approval.rule]]
+[[gates.approval.rule]]
 when = 'workspace.untracked > 0'
 mode = "wait"

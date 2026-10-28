@@ -34,6 +34,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		}
 	}
 	e.outbox = &outbox.Service{Store: db.Drafts(), Effects: publishers(pubs, cfg), Targets: targets, Policies: e.outboxPolicies(), Facts: e.draftFacts,
+		Posts:  deliveryPosts,
 		Broken: e.brokenWorkflows,
 		Evidence: outbox.EvidenceTo(func(ctx context.Context, prov items.Provenance, ops []items.Op) error {
 			_, err := ledger.Apply(ctx, prov, ops)
@@ -47,6 +48,10 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	return d
 }
+
+// deliveryPosts says whether a draft of d reaches people, as the plugins'
+// manifests declare it.
+func deliveryPosts(d draft.Delivery) bool { return builtin.DeliveryPosts(string(d)) }
 
 var errNoEngine = errors.New("no workflow engine reads the unit's facts")
 

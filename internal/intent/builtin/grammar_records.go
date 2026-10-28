@@ -1,8 +1,7 @@
 package builtin
 
 import (
-	"slices"
-
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -38,14 +37,18 @@ func actorValues() []Value {
 	return out
 }
 
-// GateModes are the modes of a [gates.approval] table: the draft modes, and
-// run for a plan gate's run.
+// GateModes are the modes of a [gates.approval] table, gate.Modes.
 func GateModes() []Value {
-	out := DraftModes()
-	for _, v := range RunModes() {
-		if !slices.ContainsFunc(out, func(o Value) bool { return o.Name == v.Name }) {
-			out = append(out, v)
-		}
+	doc := map[gate.Mode]string{
+		gate.ModeWait:   "Waits for you.",
+		gate.ModeDelay:  "Resolves the gate to its approving intent when the window ends, unless you resolve it first.",
+		gate.ModeSend:   "Releases the gate at once: a draft is sent, a run runs.",
+		gate.ModeDryRun: "A draft gate only: stores the draft and never sends it; nobody can release it. A gate of another kind takes the next rule or its default.",
+		gate.ModeRun:    "Releases the gate at once, as send.",
+	}
+	out := make([]Value, len(gate.Modes))
+	for i, m := range gate.Modes {
+		out[i] = Value{Name: string(m), Doc: doc[m], Releases: m.Releases() || m == gate.ModeDelay}
 	}
 	return out
 }
@@ -54,8 +57,8 @@ func GateModes() []Value {
 func gateApprovalRows(surface Surface) []Key {
 	return []Key{
 		{Path: "gates", In: surface, Kind: KindTable, Doc: "The gates its runs and drafts open."},
-		{Path: "gates.approval", In: surface, Kind: KindTable, Doc: "The approval of its gates."},
-		{Path: "gates.approval.mode", In: surface, Kind: KindEnum, Values: GateModes, Doc: "The mode when no rule holds."},
+		{Path: "gates.approval", In: surface, Kind: KindTable, Doc: "The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does."},
+		{Path: "gates.approval.mode", In: surface, Kind: KindEnum, Values: GateModes, Doc: "The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind."},
 		{Path: "gates.approval.window", In: surface, Kind: KindDur, Doc: "With mode delay only: how long a person has to stop the gate's consequence."},
 		{Path: "gates.approval.rule[]", In: surface, Kind: KindTable, Doc: "A rule; the first whose when holds gives the mode."},
 		{Path: "gates.approval.rule[].when", In: surface, Kind: KindPred, Doc: "When the rule applies to a gate."},

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -9,7 +10,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/workflow"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -32,18 +33,19 @@ type PluginApproval struct {
 
 // Approval is a as a draft's approval.
 func (a PluginApproval) Approval() draft.Approval {
-	return draft.Approval{Mode: draft.ApprovalMode(a.Mode), Window: time.Duration(a.Window)}
+	return draft.Approval{Mode: draft.ModeOf(gate.Mode(a.Mode)), Window: time.Duration(a.Window)}
 }
 
 var pluginGatesType = reflect.TypeFor[PluginGates]()
 
 // PluginDraftApproval is the approval of the drafts plugin id's own rules
-// propose: its plugins.<id>.gates.approval, wait when the config sets none.
-func (c Config) PluginDraftApproval(id string) draft.Approval {
+// propose: its plugins.<id>.gates.approval; false when the config sets
+// none, and the profile's default applies.
+func (c Config) PluginDraftApproval(id string) (draft.Approval, bool) {
 	if a := c.pluginGates()[id].Approval; a != nil {
-		return a.Approval()
+		return a.Approval(), true
 	}
-	return draft.Approval{Mode: draft.Wait}
+	return draft.Approval{}, false
 }
 
 // pluginGates are the gates of each bundled plugin's table.
@@ -61,6 +63,9 @@ func (c Config) validatePluginDrafts() error {
 	gates := c.pluginGates()
 	for _, id := range slices.Sorted(maps.Keys(gates)) {
 		if a := gates[id].Approval; a != nil {
+			if err := oneOf("plugins."+id+".gates.approval.mode", a.Mode, gateModes...); err != nil {
+				return err
+			}
 			if err := a.Approval().Validate(); err != nil {
 				return fmt.Errorf("plugins.%s.gates.approval: %w", id, err)
 			}
@@ -69,64 +74,77 @@ func (c Config) validatePluginDrafts() error {
 	return nil
 }
 
-// DraftApproval is the workflow's drafts.approval, nil when unset.
-func (w WorkflowConfig) DraftApproval() *ApprovalConfig {
-	if w.Drafts == nil {
+// GateApproval is the workflow's gates.approval, nil when unset.
+func (w WorkflowConfig) GateApproval() *ApprovalConfig {
+	if w.Gates == nil {
 		return nil
 	}
-	return w.Drafts.Approval
+	return w.Gates.Approval
 }
 
-var (
-	runModes   = builtin.ValueNames(builtin.RunModes())
-	draftModes = builtin.ValueNames(builtin.DraftModes())
-)
+var gateModes = builtin.ValueNames(builtin.GateModes())
 
-// validateRun checks a run approval overlay at key as far as it holds
+// validateGates checks a gates approval overlay at key as far as it holds
 // without the manifest it overlays: what it sets, and each of its rules
-// whole. A rule that runs (mode run or delay) may not read an untrusted
-// fact. The merged block is checked where the profile is loaded.
-func (a ApprovalConfig) validateRun(key string) error {
-	if err := a.validateOverlay(key, runModes); err != nil {
+// whole, over a draft's facts, every unit's and the gate's. A rule that
+// releases a gate (send, run or delay) may not read an untrusted fact; one
+// that reads task.prop.* is checked where the profile is loaded, which
+// says who writes the property, unless it releases: config.toml refuses
+// that here. dry_run pinned to a kind but draft is refused. The merged
+// block is checked where the profile is loaded.
+func (a ApprovalConfig) validateGates(key string) error {
+	if err := a.validateOverlay(key, gateModes); err != nil {
 		return err
 	}
+	env := gateRuleEnv()
 	for i, r := range a.Rule {
 		at := fmt.Sprintf("%s.rule[%d]", key, i)
-		if err := r.validate(at, runModes); err != nil {
+		if err := r.validate(at, gateModes); err != nil {
 			return err
 		}
-		if err := workflowRule(at+".when", r.When, workflow.ApprovalMode(r.Mode).Releases()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// validateDrafts checks a draft approval overlay at key as validateRun
-// does a run one; every draft rule refuses an untrusted fact. A rule that
-// reads task.prop.* is checked where the profile is loaded, which says who
-// writes the property, unless it releases: config.toml refuses that here.
-func (a ApprovalConfig) validateDrafts(key string) error {
-	if err := a.validateOverlay(key, draftModes); err != nil {
-		return err
-	}
-	env := builtin.ApprovalEnv(true, builtin.UnitSlots()...)
-	for i, r := range a.Rule {
-		at := fmt.Sprintf("%s.rule[%d]", key, i)
-		if err := r.validate(at, draftModes); err != nil {
-			return err
-		}
-		if prop, ok := onlyProps(r.When); ok {
-			if (draft.Approval{Mode: draft.ApprovalMode(r.Mode)}).Releases() {
-				return fmt.Errorf("%s.when reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that sends here may not read it; a wait rule may", at, prop)
+		releases := gate.Mode(r.Mode) != gate.ModeWait
+		if names := builtin.DynamicFacts(r.When); len(names) > 0 {
+			prop, ok := onlyProps(r.When)
+			switch {
+			case ok && releases:
+				return fmt.Errorf("%s.when reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that releases a gate here may not read it; a wait rule may", at, prop)
+			case releases:
+				return fmt.Errorf("%s.when reads %s, which a rule that releases a gate may not: a third party's text or an agent sets its value; a wait rule may read it", at, names[0])
 			}
 			continue
 		}
-		if _, err := builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ApprovalMode(r.Mode), Window: time.Duration(r.Window)}, env); err != nil {
+		p, err := expr.CompileWorkflow(r.When, env)
+		if err != nil {
 			return fmt.Errorf("%s.when: %w", at, err)
+		}
+		var subjects *builtin.SubjectsError
+		if _, err := builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ModeOf(gate.Mode(r.Mode)), Window: time.Duration(r.Window)}, env); errors.As(err, &subjects) {
+			return fmt.Errorf("%s.when: %w", at, err)
+		}
+		if gate.Mode(r.Mode) == gate.ModeDryRun {
+			for _, k := range gate.Kinds {
+				if k != gate.KindDraft && expr.Requires(p, builtin.GateSlot+".kind", string(k)) {
+					return fmt.Errorf("%s.when pins gate.kind to %s with mode dry_run, which applies to draft gates only", at, k)
+				}
+			}
+		}
+		if releases {
+			for _, name := range p.Reads() {
+				if builtin.IsUntrusted(name) {
+					return fmt.Errorf("%s.when reads %s, which a rule that releases a gate may not: a third party's text or an agent sets its value; a wait rule may read it", at, name)
+				}
+			}
 		}
 	}
 	return nil
+}
+
+// gateRuleEnv is what a config rule of [gates.approval] may read: a
+// draft's facts, every unit's, the trigger's, the config's and the gate's.
+func gateRuleEnv() expr.Env {
+	env := builtin.WorkflowEnvAll()
+	maps.Copy(env, builtin.ApprovalEnv(true, builtin.UnitSlots()...))
+	return env
 }
 
 // validateOverlay refuses a mode outside modes and a window beside a mode
@@ -138,7 +156,7 @@ func (a ApprovalConfig) validateOverlay(key string, modes []string) error {
 	switch {
 	case a.Window != nil && *a.Window <= 0:
 		return fmt.Errorf("%s.window must be positive, got %s", key, time.Duration(*a.Window))
-	case a.Window != nil && a.Mode != "" && a.Mode != string(draft.Delay):
+	case a.Window != nil && a.Mode != "" && a.Mode != string(gate.ModeDelay):
 		return fmt.Errorf("%s.window is read only with mode delay, not with %s", key, a.Mode)
 	}
 	return nil
@@ -153,7 +171,7 @@ func (r ApprovalRuleConfig) validate(at string, modes []string) error {
 	if err := oneOf(at+".mode", r.Mode, modes...); err != nil {
 		return err
 	}
-	switch delay := r.Mode == string(draft.Delay); {
+	switch delay := r.Mode == string(gate.ModeDelay); {
 	case delay && r.Window <= 0:
 		return fmt.Errorf("%s.window is required with mode delay", at)
 	case !delay && r.Window != 0:
@@ -163,29 +181,14 @@ func (r ApprovalRuleConfig) validate(at string, modes []string) error {
 }
 
 // workflowRule checks a predicate of a workflow's config over the workflow
-// facts; one that releases may not read an untrusted fact. One that names
-// a fact the profile declares (brief.extra.*, classify.*) is checked where
-// the profile is loaded.
-func workflowRule(at, src string, releases bool) error {
-	if names := builtin.DynamicFacts(src); len(names) > 0 {
-		if prop, ok := onlyProps(src); ok && releases {
-			return fmt.Errorf("%s reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that runs here may not read it; a wait rule may", at, prop)
-		}
-		if releases {
-			return fmt.Errorf("%s reads %s, which a rule that runs may not: a third party's text or an agent sets its value; a wait rule may read it", at, names[0])
-		}
+// facts. One that names a fact the profile declares (brief.extra.*,
+// classify.*) is checked where the profile is loaded.
+func workflowRule(at, src string) error {
+	if len(builtin.DynamicFacts(src)) > 0 {
 		return nil
 	}
-	p, err := expr.CompileWorkflow(src, builtin.WorkflowEnvAll())
-	if err != nil {
+	if _, err := expr.CompileWorkflow(src, builtin.WorkflowEnvAll()); err != nil {
 		return fmt.Errorf("%s: %w", at, err)
-	}
-	if releases {
-		for _, name := range p.Reads() {
-			if builtin.IsUntrusted(name) {
-				return fmt.Errorf("%s reads %s, which a rule that runs may not: a third party's text or an agent sets its value; a wait rule may read it", at, name)
-			}
-		}
 	}
 	return nil
 }
@@ -205,20 +208,21 @@ func onlyProps(src string) (string, bool) {
 	return names[0], true
 }
 
-// DraftApprovalWarnings name each rule of a workflows.<name>.drafts.approval
-// that releases, reads draft.delivery and never releases a comment draft.
-func (c Config) DraftApprovalWarnings() []string {
+// GateApprovalWarnings name each rule of a workflows.<name>.gates.approval
+// that releases, reads draft.delivery and names no delivery, so it never
+// releases a draft whose delivery posts.
+func (c Config) GateApprovalWarnings() []string {
 	var out []string
 	env := builtin.ApprovalEnv(true, builtin.UnitSlots()...)
 	for _, name := range slices.Sorted(maps.Keys(c.Workflows)) {
-		a := c.Workflows[name].DraftApproval()
+		a := c.Workflows[name].GateApproval()
 		if a == nil {
 			continue
 		}
 		for i, rc := range a.Rule {
-			r, err := builtin.ApprovalRule(rc.When, draft.Approval{Mode: draft.ApprovalMode(rc.Mode), Window: time.Duration(rc.Window)}, env)
-			if err == nil && builtin.NeverReleasesComment(r) {
-				out = append(out, fmt.Sprintf("workflows.%s.drafts.approval.rule[%d].when reads draft.delivery but never releases a comment draft; to release one, write %s", name, i, builtin.CommentForm))
+			r, err := builtin.ApprovalRule(rc.When, draft.Approval{Mode: draft.ModeOf(gate.Mode(rc.Mode)), Window: time.Duration(rc.Window)}, env)
+			if err == nil && builtin.NeverNamesADelivery(r) {
+				out = append(out, fmt.Sprintf("workflows.%s.gates.approval.rule[%d].when reads draft.delivery but names none, so it never releases a draft whose delivery posts; to release one, write %s", name, i, builtin.DeliveryForm))
 			}
 		}
 	}

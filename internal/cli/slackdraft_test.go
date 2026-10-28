@@ -540,9 +540,9 @@ func TestASlackDraftOfAnIntentTakesTheRuleItsUnitMatches(t *testing.T) {
 	files := bundledIntentAs(t, "act", "quick-act")
 	m := strings.Replace(files["intents/quick-act/intent.toml"], "role    = \"headless\"\n", "", 1)
 	files["intents/quick-act/intent.toml"] = m + `
-[drafts.approval]
+[gates.approval]
 mode = "wait"
-[[drafts.approval.rule]]
+[[gates.approval.rule]]
 when = 'draft.delivery == "message" && slack.channel == "` + sessChannel + `"'
 mode = "delay"
 window = "10m"
@@ -581,7 +581,7 @@ func TestSlackDraftTellsTheAgentWhatItsApprovalPolicyDid(t *testing.T) {
 			w := newSessionWiring(t)
 			files := bundledIntentAs(t, "act", "policy-act")
 			m := strings.Replace(files["intents/policy-act/intent.toml"], "role    = \"headless\"\n", "", 1)
-			files["intents/policy-act/intent.toml"] = m + "\n[drafts.approval]\nmode = \"" + mode + "\"\n"
+			files["intents/policy-act/intent.toml"] = m + "\n[[gates.approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"" + mode + "\"\n"
 			userProfile(t, w.te, files)
 			u := slackThreadUnit("T000", sessChannel, sessParent)
 			if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: u, Turns: []dturn.Turn{

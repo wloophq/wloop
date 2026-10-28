@@ -1,0 +1,80 @@
+package cli
+
+import (
+	"context"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
+)
+
+const diffWorkflow = `summary = "Ask to review the diff of a next action"
+provider = "task"
+when = 'task.state == "next"'
+
+[[step]]
+use = "gate.open"
+name = "review-diff"
+`
+
+func TestGateOpenStepOpensAProfileGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	approved := diffWorkflow + "\n[[gates.approval.rule]]\nwhen = 'gate.kind == \"step\" && task.id == \"t-02\"'\nmode = \"run\"\n"
+	r := newTaskRig(t, map[string]string{"workflows/my-diff/workflow.toml": diffWorkflow, "workflows/my-auto-diff/workflow.toml": approved})
+	r.put(t, "t-01", task.State("next"))
+	r.te.newGates(r.db, r.te.tasks, t.Logf)
+	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
+	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
+	eng := r.te.newEngine(ed)
+	for range 2 {
+		if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gs, err := r.db.Gates(r.te.Now).OfTask(ctx, "t-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(gs) != 2 {
+		t.Fatalf("gates %+v, want one per workflow", gs)
+	}
+	byWorkflow := map[string]gate.Gate{}
+	for _, g := range gs {
+		byWorkflow[g.Subject] = g
+	}
+	g := byWorkflow["my-diff"]
+	if g.Name != "review-diff" || g.Kind != gate.KindStep || g.Status != gate.Open || g.Task != "t-01" || g.Unit != task.UnitOf("t-01") ||
+		!slices.Equal(g.Intents, []string{"approve", "dismiss"}) {
+		t.Fatalf("the gate gates.toml words: %+v", g)
+	}
+	if auto := byWorkflow["my-auto-diff"]; auto.Status != gate.Open {
+		t.Fatalf("a rule that does not hold released the gate: %+v", auto)
+	}
+
+	r2 := newTaskRig(t, map[string]string{"workflows/my-auto-diff/workflow.toml": approved})
+	if err := r2.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "t-02", Kind: task.KindCapture, State: "next",
+		Title: "Approve me", Origin: task.OriginUser, Created: testNow, Updated: testNow}}}); err != nil {
+		t.Fatal(err)
+	}
+	r2.te.newGates(r2.db, r2.te.tasks, t.Logf)
+	ed2 := engineDeps{DB: r2.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
+	r2.te.wireSubjects(&serveWiring{DB: r2.db, Cfg: r2.te.cfg, Engine: &ed2})
+	if _, _, err := r2.te.newEngine(ed2).Sweep(ctx, &sync.Mutex{}); err != nil {
+		t.Fatal(err)
+	}
+	gs, err = r2.db.Gates(r2.te.Now).OfTask(ctx, "t-02")
+	if err != nil || len(gs) != 1 || gs[0].Status != gate.Approved || gs[0].Intent != "approve" || gs[0].By != task.ActorWorkflow ||
+		!strings.Contains(gs[0].Rule, "my-auto-diff") {
+		t.Fatalf("a rule of the workflow that holds releases the gate: %+v %v", gs, err)
+	}
+
+	te := newTestEnv(t, nil)
+	userProfile(t, te, map[string]string{"workflows/my-diff/workflow.toml": strings.Replace(diffWorkflow, `"review-diff"`, `"review-dif"`, 1)})
+	if p := te.loadedIntents().Problems.Error(); !strings.Contains(p, `step[0].name: names no gate of gates.toml; did you mean "review-diff"?`) {
+		t.Fatalf("a gate.open naming no gate: %s", p)
+	}
+}

@@ -695,6 +695,9 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.brief(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	if err := ev.openGates(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
 	if err := ev.s.withDraft(whereBy(ctx, ev.whereBy), e, &v); err != nil {
 		return api.TaskView{}, err
 	}

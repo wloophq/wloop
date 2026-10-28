@@ -29,8 +29,11 @@ func bare(s string) string { return strings.ReplaceAll(s, "[]", "") }
 
 func check(all []Key, surface Surface, doc map[string]any) []Problem {
 	w := walker{rows: rowsOf(all, surface)}
-	if surface == SurfaceConfig {
+	switch surface {
+	case SurfaceConfig:
 		w.renamed = KeyRenamedTo
+	case SurfaceIntent, SurfaceWorkflow:
+		w.renamed = ManifestKeyRenamedTo
 	}
 	w.table(nil, "", doc)
 	return w.problems
@@ -281,10 +284,6 @@ func (w *walker) moved(path string, v any) bool {
 	if w.renamed == nil {
 		return false
 	}
-	n := w.renamed(path)
-	if n == "" {
-		return false
-	}
 	var deeper []string
 	var walk func(at string, v any)
 	walk = func(at string, v any) {
@@ -302,6 +301,9 @@ func (w *walker) moved(path string, v any) bool {
 		}
 	}
 	walk(path, v)
+	if len(deeper) == 0 && w.renamed(path) == "" {
+		return false
+	}
 	if len(deeper) == 0 {
 		deeper = []string{path}
 	}

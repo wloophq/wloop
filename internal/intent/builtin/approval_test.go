@@ -45,19 +45,20 @@ func TestAnApprovalEnvReadsItsSlotsAndNeverABrief(t *testing.T) {
 	}
 }
 
-func TestAnApprovalRuleNamesCommentDeliveryByItsConjunction(t *testing.T) {
+func TestAnApprovalRuleNamesADeliveryByItsConjunction(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
 	none := draft.Approval{Mode: draft.Send}
-	for when, want := range map[string]bool{
-		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: true,
-		`pr.repo == "acme/docs"`:                                false,
-		`draft.delivery == "comment" || pr.repo == "acme/docs"`: false,
+	for when, want := range map[string]draft.Delivery{
+		`draft.delivery == "comment" && pr.author == "dependabot[bot]"`: draft.CommentDelivery,
+		`draft.delivery == "message"`:                                   draft.Message,
+		`pr.repo == "acme/docs"`:                                        "",
+		`draft.delivery == "comment" || pr.repo == "acme/docs"`:         "",
 	} {
 		r, err := ApprovalRule(when, none, env)
 		if err != nil {
 			t.Fatalf("%s: %v", when, err)
 		}
-		if r.NamesComment != want || r.Approval != none {
+		if r.Names != want || r.Approval != none {
 			t.Errorf("%s: %+v", when, r)
 		}
 	}
@@ -139,7 +140,7 @@ func zeroLiteral(f Fact) string {
 	return `""`
 }
 
-func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *testing.T) {
+func TestNeverNamesADeliveryFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *testing.T) {
 	env := ApprovalEnv(false, "pr")
 	for when, want := range map[string]bool{
 		`draft.delivery in ["comment"]`:                         true,
@@ -153,11 +154,11 @@ func TestNeverReleasesCommentFlagsAReleasingRuleThatReadsDeliveryAndPinsNone(t *
 		if err != nil {
 			t.Fatalf("%s: %v", when, err)
 		}
-		if got := NeverReleasesComment(r); got != want {
+		if got := NeverNamesADelivery(r); got != want {
 			t.Errorf("%s: %v", when, got)
 		}
 		r.Approval = draft.Approval{Mode: draft.Wait}
-		if NeverReleasesComment(r) {
+		if NeverNamesADelivery(r) {
 			t.Errorf("%s holding: flagged", when)
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 )
@@ -18,9 +19,9 @@ when = '!workspace.main'
 [[step]]
 use = "workspace.remove"
 
-[approval]
+[gates.approval]
 mode = "wait"
-[[approval.rule]]
+[[gates.approval.rule]]
 when = 'size(workspace.pendency) == 0'
 `
 
@@ -30,7 +31,7 @@ func TestReleasingRunRuleRefusesUntrustedFacts(t *testing.T) {
 		writeWorkflow(t, root, "remove", removeWorkspace+"mode = "+mode+"\n")
 		l, problems := Load(userLayer(root), nil, testBase(), nil)
 		got := problems.Error()
-		if refused != strings.Contains(got, "approval.rule[0].when: reads workspace.pendency, which a rule that runs") {
+		if refused != strings.Contains(got, "gates.approval.rule[0].when: reads workspace.pendency, which a rule that releases a gate") {
 			t.Errorf("mode %s: %s", mode, got)
 		}
 		if !refused && (len(l.Workflows) != 1 || l.Workflows[0].Approval.Rules[0].Mode != workflow.ApprovalWait) {
@@ -41,13 +42,13 @@ func TestReleasingRunRuleRefusesUntrustedFacts(t *testing.T) {
 
 func TestARunRuleNeedsAWhenAndAMode(t *testing.T) {
 	for block, want := range map[string]string{
-		"[[approval.rule]]\nmode = \"wait\"\n":                                                "approval.rule[0].when: is required",
-		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\n":                                   "approval.rule[0].mode: is required",
-		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"send\"\n":                  `approval.rule[0].mode: "send" is not one of "run", "delay" or "wait"`,
-		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"delay\"\n":                 "approval.rule[0].window: is required with mode delay",
-		"[[approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"wait\"\nwindow = \"1m\"\n": "approval.rule[0].window: is read only with mode delay",
-		"[approval]\nmode = \"delay\"\n":                                                      "approval.window: is required with mode delay",
-		"[[approval.rule]]\nwhen = 'draft.delivery == \"comment\"'\nmode = \"run\"\n":         "approval.rule[0].when: 1: unknown field draft.delivery",
+		"[[gates.approval.rule]]\nmode = \"wait\"\n":                                                                      "gates.approval.rule[0].when: is required",
+		"[[gates.approval.rule]]\nwhen = 'workspace.dirty > 0'\n":                                                         "gates.approval.rule[0].mode: is required",
+		"[[gates.approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"later\"\n":                                       `gates.approval.rule[0].mode: "later" is not one of`,
+		"[[gates.approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"delay\"\n":                                       "gates.approval.rule[0].window: is required with mode delay",
+		"[[gates.approval.rule]]\nwhen = 'workspace.dirty > 0'\nmode = \"wait\"\nwindow = \"1m\"\n":                       "gates.approval.rule[0].window: is read only with mode delay",
+		"[gates.approval]\nmode = \"delay\"\n":                                                                            "gates.approval.window: is required with mode delay",
+		"[[gates.approval.rule]]\nwhen = 'gate.kind == \"question\" && draft.delivery == \"comment\"'\nmode = \"wait\"\n": "gates.approval.rule[0].when: 28: unknown field draft.delivery",
 	} {
 		root := t.TempDir()
 		writeWorkflow(t, root, "remove", strings.SplitAfter(removeWorkspace, "[[step]]\nuse = \"workspace.remove\"\n")[0]+"\n"+block)
@@ -82,7 +83,7 @@ func TestConfigOverlaysFieldByField(t *testing.T) {
 		"a releasing rule reading an untrusted fact fails": {ApprovalOverlay{Rules: []RuleOverlay{{When: "size(workspace.pendency) == 0", Mode: "run"}}}, "", 0, 0, "workspace.pendency"},
 		"a rule that does not compile fails":               {ApprovalOverlay{Rules: []RuleOverlay{{When: "pr.mine", Mode: "wait"}}}, "", 0, 0, "rule[0].when"},
 	} {
-		got, err := OverlayRunApproval(manifest, c.o, env)
+		got, err := OverlayRunApproval(manifest, gate.KindPlan, c.o, ApprovalEnvs{Unit: env})
 		switch {
 		case c.err != "":
 			if err == nil || !strings.Contains(err.Error(), c.err) {
@@ -97,7 +98,7 @@ func TestConfigOverlaysFieldByField(t *testing.T) {
 	}
 
 	denv := builtin.ApprovalEnv(true, "slack")
-	base, err := OverlayDraftApproval(nil, ApprovalOverlay{Mode: "delay", Window: &min, Rules: []RuleOverlay{{When: `slack.conversation == "dm"`, Mode: "send"}}}, denv)
+	base, err := OverlayDraftApproval(nil, draft.Approval{Mode: draft.Wait}, ApprovalOverlay{Mode: "delay", Window: &min, Rules: []RuleOverlay{{When: `slack.conversation == "dm"`, Mode: "send"}}}, ApprovalEnvs{Draft: denv})
 	if err != nil || base.Default != (draft.Approval{Mode: draft.Delay, Window: min}) || len(base.Rules) != 1 {
 		t.Fatalf("over no manifest block: %+v, %v", base, err)
 	}
@@ -113,7 +114,7 @@ func TestConfigOverlaysFieldByField(t *testing.T) {
 		"a window left off delay fails":  {ApprovalOverlay{Mode: "send", Window: &hour}, draft.Approval{}, 0, "window"},
 		"an untrusted fact fails":        {ApprovalOverlay{Rules: []RuleOverlay{{When: `slack.conversation == "dm"`, Mode: "wait"}, {When: `brief.kind == "request"`, Mode: "wait"}}}, draft.Approval{}, 0, "brief.kind"},
 	} {
-		got, err := OverlayDraftApproval(&base, c.o, denv)
+		got, err := OverlayDraftApproval(&base, draft.Approval{Mode: draft.Wait}, c.o, ApprovalEnvs{Draft: denv})
 		switch {
 		case c.err != "":
 			if err == nil || !strings.Contains(err.Error(), c.err) {

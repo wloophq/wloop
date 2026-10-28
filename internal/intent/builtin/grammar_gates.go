@@ -13,6 +13,13 @@ var gatesGrammar = []Key{
 	{Path: "gates.*.intents.*.label", In: SurfaceGates, Kind: KindText, Doc: "The name people read on its button."},
 	{Path: "gates.*.intents.*.status", In: SurfaceGates, Kind: KindEnum, Values: gateStatusValues, Required: true, Doc: "The status the intent resolves the gate to; required for a new intent."},
 	{Path: "gates.*.intents.*.answer", In: SurfaceGates, Kind: KindBool, Default: "false", Doc: "The intent takes text, such as a question's answer."},
+	{Path: "approval", In: SurfaceGates, Kind: KindTable, Doc: "How a gate is decided when no manifest or configuration says: the default of each kind. A user layer's mode replaces the mode and its window, its rules replace the rules."},
+	{Path: "approval.mode", In: SurfaceGates, Kind: KindEnum, Values: GateModes, Doc: "The mode when no rule holds; the bundled file sets it. send and run release a gate at once, delay when its window ends unless you resolve it first, wait holds it for you, dry_run rejects a draft gate."},
+	{Path: "approval.window", In: SurfaceGates, Kind: KindDur, Doc: "With mode delay only: how long you have to resolve the gate."},
+	{Path: "approval.rule[]", In: SurfaceGates, Kind: KindTable, Doc: "A rule; the first whose when holds gives the mode."},
+	{Path: "approval.rule[].when", In: SurfaceGates, Kind: KindPred, Doc: "When the rule applies, over the gate's facts: gate.kind and gate.name."},
+	{Path: "approval.rule[].mode", In: SurfaceGates, Kind: KindEnum, Values: GateModes, Doc: "The rule's mode; dry_run with a when that pins gate.kind to any kind but draft fails to load."},
+	{Path: "approval.rule[].window", In: SurfaceGates, Kind: KindDur, Doc: "With mode delay only: how long you have to resolve the gate."},
 }
 
 func gateKindValues() []Value {

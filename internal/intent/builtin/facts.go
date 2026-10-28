@@ -45,7 +45,8 @@ func dim(f Fact) Fact {
 	return f
 }
 
-// untrusted flags f as a fact no [drafts.approval] rule reads.
+// untrusted flags f as a fact no rule of a draft gate, nor a rule that
+// releases a gate, reads.
 func untrusted(f Fact) Fact {
 	f.Untrusted = true
 	return f
@@ -303,7 +304,7 @@ func Narrow(env expr.Env, providers []unit.ProviderID) {
 	}
 }
 
-// approvalFact is a fact of the draft a [drafts.approval] rule reads,
+// approvalFact is a fact of the draft a draft gate's rule reads,
 // named draft.<name>.
 func approvalFact(name string, t expr.Type, doc string) Fact {
 	return Fact{Name: DraftSlot + "." + name, Type: t, Slots: []FactSlot{ApprovalSlot}, Doc: doc}
@@ -320,11 +321,11 @@ const (
 // configuration's read.
 var AutoOnly = []string{DraftPurpose, DraftEffects}
 
-// DraftDelivery is the approval fact a rule must pin to "comment" to release
-// a comment draft.
+// DraftDelivery is the approval fact a rule must pin to a delivery to
+// release a draft of it whose delivery posts.
 const DraftDelivery = "draft.delivery"
 
-// ApprovalEnv is the env of a [drafts.approval] rule's when: the approval
+// ApprovalEnv is the env of a draft gate's rule's when: the approval
 // slot's facts, without AutoOnly unless auto, and the facts of each of
 // slots, never a brief's, which an agent writes.
 func ApprovalEnv(auto bool, slots ...string) expr.Env {

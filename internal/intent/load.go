@@ -373,7 +373,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	defaults, defaultProblems := readDefaults(layers, bundled)
 	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
-		u.load(base, defaults, tasks.Facts())
+		u.load(base, defaults, tasks.Facts(), decl.gates)
 		if u.defined {
 			u.sheet.declaredRecord(u.def.Record, decl)
 		}
@@ -390,6 +390,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		EmptyRefusal: defaults.Refusal,
 		Tasks:        tasks,
 		Records:      decl.records,
+		Gates:        decl.gates,
 		layers:       layers,
 	}
 	var defs []dintent.Def
@@ -411,7 +412,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	}
 	l.Registry = dintent.NewRegistry(defs)
 	var wfProblems, wfWarnings Problems
-	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks)
+	l.Workflows, l.BrokenWorkflows, l.RevertedWorkflows, wfProblems, wfWarnings = loadWorkflows(layers, bundled, l.turnProblem, l.profileFacts, l.Tasks, l.Gates)
 	l.Problems = append(l.Problems, wfProblems...)
 	l.Warnings = append(l.Warnings, wfWarnings...)
 	return l, broken
@@ -466,9 +467,9 @@ func (l *Loaded) Rules(intent string) (dintent.RecordRules, error) {
 	return l.Registry.Rules(intent)
 }
 
-func (u *unit) load(base *template.Template, defaults manifestDefaults, taskFacts expr.Env) {
+func (u *unit) load(base *template.Template, defaults manifestDefaults, taskFacts expr.Env, gates GatesDef) {
 	file := u.files.path("intent.toml")
-	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts}
+	s := &sheet{file: file, defaults: defaults, taskFacts: taskFacts, gates: gates}
 	u.sheet = s
 	if !nameRe.MatchString(string(u.name)) {
 		s.problems = append(s.problems, Problem{File: u.dir, Msg: "an intent name is 2 to 24 lowercase letters, digits and -, starting with a letter"})

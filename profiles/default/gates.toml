@@ -103,3 +103,12 @@ answer = true
 [gates.missing-record.intents.dismiss]
 label = "Dismiss"
 status = "dismissed"
+
+# How a gate is decided when no workflow, intent or configuration says: a
+# run starts at once, every other decision waits for you.
+[approval]
+mode = "wait"
+
+[[approval.rule]]
+when = 'gate.kind == "plan"'
+mode = "run"

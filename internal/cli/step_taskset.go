@@ -61,16 +61,6 @@ func (s *stepSet) taskSetRun(ctx context.Context, c stepCall, _ automation.RunOp
 	return fmt.Sprintf("set %s of %s", prop, id), nil
 }
 
-var errGateOpenG2 = fmt.Errorf("not implemented: G2: %w", errors.ErrUnsupported)
-
-func (s *stepSet) gateOpenCheck(context.Context, stepCall, automation.CheckOpts) (string, error) {
-	return "", errGateOpenG2
-}
-
-func (s *stepSet) gateOpenRun(context.Context, stepCall, automation.RunOpts) (string, error) {
-	return "", errGateOpenG2
-}
-
 // serviceProps writes the properties through the daemon's tasks service, under the lock its other writes take.
 type serviceProps struct{ e *Env }
 

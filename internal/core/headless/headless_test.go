@@ -127,7 +127,8 @@ func newRig(t *testing.T, script ...scripted) *rig {
 	r := &rig{db: db, store: sqlite.New(db), ledger: &turnstest.Ledger{Open: map[unit.Unit][]items.Item{thread: {{ID: "i1", Unit: thread}, {ID: "i2", Unit: thread}}}},
 		asker: &asker{script: script}, clock: &clock{t: t0}, sess: turnstest.NewSessions()}
 	r.turns = r.newTurns()
-	r.outbox = &outbox.Service{Store: db.Drafts(), Effects: func(unit.ProviderID) (port.Effects, error) { return effects{}, nil }, Clock: r.clock}
+	r.outbox = &outbox.Service{Store: db.Drafts(), Effects: func(unit.ProviderID) (port.Effects, error) { return effects{}, nil }, Clock: r.clock,
+		Posts: func(draft.Delivery) bool { return false }}
 	reg := turnstest.Intents()
 	r.svc = &headless.Service{Turns: r.turns, Build: builder{}, Place: placer{dir: "/work/checkout"}, Asker: r.asker, Ledger: r.ledger, Outbox: r.outbox,
 		Intents: func(n turn.Intent) (dintent.Def, bool) { return reg.Get(dintent.Name(n)) },

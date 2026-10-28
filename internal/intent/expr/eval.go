@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"cel.dev/cel-go/common/types"
@@ -132,6 +133,22 @@ func (w predicate) Reads() []string { return w.p.reads }
 func (w predicate) Source() string { return w.p.src }
 
 func (w predicate) MarkNames() []string { return w.p.marks }
+
+// Pinned are the literals p's top-level conjunction pins field to, as
+// Requires reads them.
+func Pinned(p workflow.Predicate, field string) []string {
+	w, ok := p.(predicate)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, pin := range w.p.pins {
+		if v, ok := strings.CutPrefix(pin, field+"="); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
 
 // Requires says whether every match of p has field equal to value: a term
 // field == "value" of p's top-level conjunction, which no other term can

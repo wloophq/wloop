@@ -32,8 +32,8 @@ func TestCleanupDefaults(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		`workflows = {x = {approval = {mode = "never"}}}`: `workflows.x.approval.mode: "never" is not one of "run", "delay" or "wait"`,
-		`workflows = {x = {approval = {window = "0s"}}}`:  `workflows.x.approval.window: a duration must be longer than zero`,
+		`workflows = {x = {gates = {approval = {mode = "never"}}}}`: `workflows.x.gates.approval.mode: "never" is not one of "wait", "delay", "send", "dry_run" or "run"`,
+		`workflows = {x = {gates = {approval = {window = "0s"}}}}`:  `workflows.x.gates.approval.window: a duration must be longer than zero`,
 	}
 	for body, want := range refused {
 		path := filepath.Join(t.TempDir(), "config.toml")
@@ -112,7 +112,7 @@ per_day = 5
 observe = true
 enabled = false
 
-[workflows.x.approval]
+[workflows.x.gates.approval]
 mode = "delay"
 window = "10m"
 `
@@ -128,8 +128,8 @@ window = "10m"
 		!slices.Equal(c.Cleanup.Disposable, []string{"tmp"}) || c.GitHub.Nudge.SilentDays != 10 || c.Classify.PerDay != 5 {
 		t.Errorf("config = %+v %+v %+v", c.Cleanup, c.GitHub.Nudge, c.Classify)
 	}
-	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.Approval == nil || x.Approval.Mode != "delay" ||
-		x.Approval.Window == nil || time.Duration(*x.Approval.Window) != 10*time.Minute {
+	if x.Observe == nil || !*x.Observe || x.Enabled == nil || *x.Enabled || x.GateApproval() == nil || x.GateApproval().Mode != "delay" ||
+		x.GateApproval().Window == nil || time.Duration(*x.GateApproval().Window) != 10*time.Minute {
 		t.Errorf("workflows.x = %+v", x)
 	}
 }

@@ -3,108 +3,10 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
-    "approval": {
-      "additionalProperties": false,
-      "description": "The run approval: how a matched item runs.",
-      "properties": {
-        "mode": {
-          "default": "run",
-          "description": "The mode when no rule matches.",
-          "enum": [
-            "run",
-            "delay",
-            "wait"
-          ],
-          "type": "string"
-        },
-        "rule": {
-          "description": "A rule tried in order; the first whose when holds gives the mode.",
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "mode": {
-                "description": "The mode when the rule applies.",
-                "enum": [
-                  "run",
-                  "delay",
-                  "wait"
-                ],
-                "type": "string"
-              },
-              "when": {
-                "description": "When the rule applies.",
-                "type": "string"
-              },
-              "window": {
-                "description": "The rule's window; only with mode delay, which needs it.",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "window": {
-          "description": "How long a person has before the item runs; only with mode delay, which needs it.",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
     "drafts": {
       "additionalProperties": false,
       "description": "The drafts the workflow's steps and turns propose.",
       "properties": {
-        "approval": {
-          "additionalProperties": false,
-          "description": "The approval of the drafts the workflow's steps and turns propose.",
-          "properties": {
-            "mode": {
-              "default": "wait",
-              "description": "The mode when no rule matches.",
-              "enum": [
-                "send",
-                "delay",
-                "wait",
-                "dry_run"
-              ],
-              "type": "string"
-            },
-            "rule": {
-              "description": "A rule tried in order; the first whose when holds gives the mode.",
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "mode": {
-                    "description": "The mode when the rule applies.",
-                    "enum": [
-                      "send",
-                      "delay",
-                      "wait",
-                      "dry_run"
-                    ],
-                    "type": "string"
-                  },
-                  "when": {
-                    "description": "When the rule applies.",
-                    "type": "string"
-                  },
-                  "window": {
-                    "description": "The rule's window; only with mode delay, which needs it.",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "window": {
-              "description": "How long a person has before the draft is sent; only with mode delay, which needs it.",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
         "withdraw": {
           "additionalProperties": false,
           "description": "When an open draft the workflow proposed is withdrawn.",
@@ -134,14 +36,14 @@
       "properties": {
         "approval": {
           "additionalProperties": false,
-          "description": "The approval of its gates.",
+          "description": "The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does.",
           "properties": {
             "mode": {
-              "description": "The mode when no rule holds.",
+              "description": "The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind.",
               "enum": [
-                "send",
-                "delay",
                 "wait",
+                "delay",
+                "send",
                 "dry_run",
                 "run"
               ],
@@ -155,9 +57,9 @@
                   "mode": {
                     "description": "The rule's mode.",
                     "enum": [
-                      "send",
-                      "delay",
                       "wait",
+                      "delay",
+                      "send",
                       "dry_run",
                       "run"
                     ],

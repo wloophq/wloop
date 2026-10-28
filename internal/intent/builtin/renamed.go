@@ -36,6 +36,12 @@ var Renamed = []Rename{
 // with the key that replaced it, the most specific first. An Old ending in
 // "." renames every key it prefixes.
 var RenamedKeys = []Rename{
+	{"workflows.*.approval", "workflows.*.gates.approval"},
+	{"workflows.*.approval.", "workflows.*.gates.approval."},
+	{"workflows.*.drafts.approval", "workflows.*.gates.approval"},
+	{"workflows.*.drafts.approval.", "workflows.*.gates.approval."},
+	{"plugins.*.drafts.approval", "plugins.*.gates.approval"},
+	{"plugins.*.drafts.approval.", "plugins.*.gates.approval."},
 	{"github.drafts.approval", "plugins.github.gates.approval"},
 	{"github.drafts.approval.", "plugins.github.gates.approval."},
 	{"slack.drafts.approval", "plugins.slack.gates.approval"},
@@ -46,9 +52,22 @@ var RenamedKeys = []Rename{
 	{"slack.", "plugins.slack."},
 }
 
+// ManifestRenamedKeys are the keys of an intent's or a workflow's manifest
+// a release renamed, as RenamedKeys.
+var ManifestRenamedKeys = []Rename{
+	{"drafts.approval", "gates.approval"},
+	{"drafts.approval.", "gates.approval."},
+	{"approval", "gates.approval"},
+	{"approval.", "gates.approval."},
+}
+
 // KeyRenamedTo is the configuration key that replaced old, "" when old was
 // never renamed.
 func KeyRenamedTo(old string) string { return renamedIn(RenamedKeys, old) }
+
+// ManifestKeyRenamedTo is the manifest key that replaced old, "" when old
+// was never renamed.
+func ManifestKeyRenamedTo(old string) string { return renamedIn(ManifestRenamedKeys, old) }
 
 // RenamedFiles are the profile files a release renamed or split, and where
 // what each held is read now.
@@ -61,14 +80,38 @@ func RenamedTo(old string) string { return renamedIn(Renamed, old) }
 
 func renamedIn(table []Rename, old string) string {
 	for _, r := range table {
-		if r.Old == old {
-			return r.New
-		}
-		if strings.HasSuffix(r.Old, ".") && strings.HasPrefix(old, r.Old) {
-			return r.New + strings.TrimPrefix(old, r.Old)
+		if n, ok := renamedBy(r, old); ok {
+			return n
 		}
 	}
 	return ""
+}
+
+// renamedBy is old renamed by r: a * segment of r.Old matches any one
+// segment, which the * of r.New takes.
+func renamedBy(r Rename, old string) (string, bool) {
+	pat, segs := strings.Split(strings.TrimSuffix(r.Old, "."), "."), strings.Split(old, ".")
+	prefix := strings.HasSuffix(r.Old, ".")
+	if len(segs) < len(pat) || !prefix && len(segs) != len(pat) || prefix && len(segs) == len(pat) {
+		return "", false
+	}
+	var wild []string
+	for i, p := range pat {
+		switch {
+		case p == "*":
+			wild = append(wild, segs[i])
+		case p != segs[i]:
+			return "", false
+		}
+	}
+	n := r.New
+	for _, w := range wild {
+		n = strings.Replace(n, "*", w, 1)
+	}
+	if prefix {
+		n += strings.Join(segs[len(pat):], ".")
+	}
+	return n, true
 }
 
 func init() { expr.Renamed = RenamedTo }

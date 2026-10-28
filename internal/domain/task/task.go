@@ -21,6 +21,7 @@ const (
 	OriginUser    = "user"
 	OriginMessage = "message"
 	OriginDraft   = "draft"
+	OriginGate    = "gate"
 )
 
 // DerivedID is the id of the entry of kind derived from u's items for group, so a re-derivation finds it again.

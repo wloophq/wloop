@@ -7,7 +7,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 
 | Test | Rule |
 |---|---|
-| `TestApprovalRulesReadTrustedFacts` | No approval rule that releases (a draft rule of any mode, a run rule of mode run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's [drafts.approval], a workflow's [approval], and the config's workflows.<name>.drafts.approval and workflows.<name>.approval. The untrusted facts are the table's, the brief's extra fields, a classification's output and a task property an agent or a plugin writes, so an agent or a thread's text never releases a send or a run. |
+| `TestApprovalRulesReadTrustedFacts` | No [gates.approval] rule that releases a gate (a draft gate's rule of any mode, any other gate's of mode send, run or delay) loads when it reads an untrusted fact, in each object that holds one: an intent's and a workflow's manifest, for its plan gates and its draft gates, and the config's workflows.<name>.gates.approval. The untrusted facts are the table's, the brief's extra fields, a classification's output and a task property an agent or a plugin writes, so an agent or a thread's text never releases a send or a run. |
 | `TestArchitecture` | Only the store imports the SQLite driver; clients import only the API, the domain and `termfmt`; the domain imports only the domain; the brief reaches agents and the store only through its ports; the API imports only the domain; only `intent/expr` imports cel-go; a core interface has at most five methods. |
 | `TestBoundaryImports` | The catalog, the intent vocabulary's leaves, the loader and `termfmt` import only their allowed sets. |
 | `TestBrandLiteralOnlyInBrand` | The default product name appears only in `internal/brand` and the exempt metadata. |
@@ -34,7 +34,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
 | `TestNoProviderKindsInAPI` | A provider's kinds live in its own package, never in the API. |
 | `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store`, and no transaction (a function literal passed to `Write`, or a function taking a `*Tx`, with the functions it hands the transaction to), names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call, and a write of both becomes two. The migrations, history of the shared file, are exempt. |
-| `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
+| `TestNothingImportsTheGate` | Nothing imports `internal/gate`, the old round gate: the workflow engine is the only planner of automatic rounds. |
 | `TestOnlyClaudeDesktopManagerReachesDesktop` | Only the Claude Desktop manager's package reaches Claude Desktop's control surface. |
 | `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it imports `ghcli`. |
 | `TestOnlyOrcaAdapterReachesOrca` | Only the Orca manager's package reaches Orca's control surface. |
@@ -43,6 +43,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheCatalogBuildsActions` | Only the catalog builds action specs. |
 | `TestOnlyTheCatalogEvaluatesIntentPredicates` | Only the loader and the catalog read an intent's predicates. |
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
+| `TestOnlyTheGatesServiceResolvesAGate` | Outside the gates service, the sqlite gates store and the version 7 migration no code calls Resolve on a gates.Store or writes gates.status in SQL: every decision is closed by the service, which accepts only a person, a trusted policy rule or a passed window. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
 | `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/` and a plugin's profile layer, `plugins/<id>/profile/`, except the allowlisted ones. |

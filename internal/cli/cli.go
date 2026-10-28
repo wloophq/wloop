@@ -33,6 +33,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/change"
 	"github.com/wloophq/wloop/internal/core/dossiers"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/intake"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
@@ -227,6 +228,10 @@ type Env struct {
 	messages   *messages.Service
 	// outbox is the daemon's drafts, built once per daemon by serveOutbox.
 	outbox *outbox.Service
+	// gates are the daemon's decisions waiting on the user, built once per daemon by newGates; gateReader
+	// reads them.
+	gates      *gates.Service
+	gateReader gates.Reader
 	// headlessSwept is set once the headless turns a stop cut short were ended, so a later serve of
 	// this process never ends a run it started.
 	headlessSwept bool

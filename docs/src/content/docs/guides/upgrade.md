@@ -62,6 +62,13 @@ Each plugin's settings live in its `[plugins.<id>]` table, and each old key fail
 - the effects `guidance.handed` and `pr.guidance_handed` are `turn.guidance_handed`, and `pr.round_sent` is `turn.round_sent`;
 - the events of a pull request and its rounds (`opened`, `merged`, `round_sent`, `review_ended` and the others) are the GitHub plugin's, so a workflow whose trigger names one needs `provider = "github"`, and an intent reads `pr.adopted`, `pr.held`, `pr.muted`, `pr.nudge.*` and `pr.last_review.*` only on GitHub units: a manifest of another provider that names one, which never fired or read an empty value, fails at load naming the provider.
 
+Every approval is a `[gates.approval]` table, and each old one fails at load naming it:
+
+- a manifest's `[drafts.approval]` and a workflow's `[approval]` are `[gates.approval]`; in `config.toml`, `workflows.<name>.approval` and `workflows.<name>.drafts.approval` are `workflows.<name>.gates.approval`;
+- one table decides every gate its manifest opens: a mode set in it applies to the workflow's runs and its drafts alike, so to set one kind only, write a rule whose `when` pins it, such as `gate.kind == "plan"` for a workflow's runs, as the bundled review and address workflows do for their `60s` window; a rule that reads a draft's facts applies to drafts alone;
+- what no table decides, `gates.toml`'s `[approval]` does: a run starts at once, every other decision waits for you;
+- a draft whose delivery posts, as its plugin's manifest marks it, waits for you unless a rule that names its delivery releases it: a Slack message now needs `draft.delivery == "message"` in a rule that sends it, as a GitHub comment needed `draft.delivery == "comment"`.
+
 ## Going back to an earlier release
 
 A release can declare that earlier releases keep reading the store after its migration, when it only adds what they ignore; such a downgrade needs nothing more. Otherwise the earlier release's daemon refuses the newer store and serves only its health, naming `{{command}} store restore`, which puts back the newest backup it can read and keeps the replaced store in `<state>/backups` as a pre-restore copy. What changed since that backup is lost: sessions, notes, ledger entries and drafts; pull requests come back from GitHub on the next sync. Restoring a backup below version 7 moves the tasks' dossiers back to `dossiers/entry/`, but not the dossiers version 7 gave to a task (a project's, a pull request's or a thread's): they stay under `dossiers/task/`, where the earlier release does not look; copy them back from a backup of the state directory.

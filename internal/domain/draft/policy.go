@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"maps"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/gate"
 )
 
 // Policy is the approval of a proposer's drafts: the first Rule whose When
@@ -23,13 +25,14 @@ type Subject struct {
 	Facts map[string]any
 }
 
-// Rule is one [drafts.approval] rule.
+// Rule is one [gates.approval] rule of a draft gate.
 type Rule struct {
 	When     Condition
 	Approval Approval
-	// NamesComment says that When holds only for a draft whose delivery is
-	// comment, so the rule may release one.
-	NamesComment bool
+	// Names is the delivery When holds for alone, which its top-level
+	// conjunction pins; "" for none. A rule releases a draft whose delivery
+	// posts only when it names that delivery.
+	Names Delivery
 	// Subjects are the slots of the subject facts When reads; the rule
 	// applies only to a draft whose subject is of that slot.
 	Subjects []string
@@ -79,21 +82,22 @@ type Decision struct {
 	Approval Approval
 	// Rule is the index of the rule that matched; -1 for none.
 	Rule int
-	// CommentReleased says that a rule naming comment delivery released a
-	// comment draft, the only way one is sent with no person approving it.
-	CommentReleased bool
+	// PostReleased says that a rule naming d's delivery released a draft
+	// whose delivery posts, the only way one is sent with no person
+	// approving it.
+	PostReleased bool
 }
 
-// Decide is d's approval under p over the facts of its subject s: a rule
-// applies only when the facts it reads are of s's slot, a rule that
-// releases applies to a comment draft only when it names comment delivery,
-// and a comment draft no such rule releases waits for a person unless the
-// approval is dry_run.
-func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
-	comment := d.Delivery == CommentDelivery
+// Decide is d's approval under p over the facts of its subject s; posts
+// says that d's delivery reaches people, as its plugin's manifest declares
+// it. A rule applies only when the facts it reads are of s's slot, a rule
+// that releases applies to a draft that posts only when it names d's
+// delivery, and a draft that posts no such rule releases waits for a
+// person unless the approval is dry_run.
+func (p Policy) Decide(d Draft, s Subject, posts bool, now time.Time) (Decision, error) {
 	var all map[string]any
 	for i, r := range p.Rules {
-		if comment && r.Approval.Releases() && !r.NamesComment || !ofSlot(r.Subjects, s.Slot) {
+		if posts && r.Approval.Releases() && r.Names != d.Delivery || !ofSlot(r.Subjects, s.Slot) {
 			continue
 		}
 		if all == nil {
@@ -104,10 +108,10 @@ func (p Policy) Decide(d Draft, s Subject, now time.Time) (Decision, error) {
 			return Decision{Approval: Approval{Mode: Wait}, Rule: i}, fmt.Errorf("draft approval rule %d: %w", i, err)
 		}
 		if ok {
-			return Decision{Approval: r.Approval, Rule: i, CommentReleased: comment && r.Approval.Releases()}, nil
+			return Decision{Approval: r.Approval, Rule: i, PostReleased: posts && r.Approval.Releases()}, nil
 		}
 	}
-	if comment && p.Default.Releases() {
+	if posts && p.Default.Releases() {
 		return Decision{Approval: Approval{Mode: Wait}, Rule: -1}, nil
 	}
 	return Decision{Approval: p.Default, Rule: -1}, nil
@@ -162,4 +166,17 @@ func (o Origin) Proposer() string {
 		return "intent:" + o.Intent
 	}
 	return string(o.Kind)
+}
+
+// ModeOf is a gate's approval mode as a draft's: send and run send it.
+func ModeOf(m gate.Mode) ApprovalMode {
+	switch m {
+	case gate.ModeSend, gate.ModeRun:
+		return Send
+	case gate.ModeDelay:
+		return Delay
+	case gate.ModeDryRun:
+		return DryRun
+	}
+	return Wait
 }

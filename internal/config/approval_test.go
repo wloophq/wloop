@@ -48,14 +48,16 @@ func TestPluginDraftApprovalRefusesABadApproval(t *testing.T) {
 func TestAWorkflowsApprovalLoadsAsAnOverlay(t *testing.T) {
 	t.Parallel()
 	for _, raw := range []string{
-		`workflows = {w = {drafts = {approval = {rule = [{when = "slack.conversation == \"dm\"", mode = "send"}]}}}}`,
-		`workflows = {w = {drafts = {approval = {rule = []}}}}`,
-		`workflows = {w = {drafts = {approval = {window = "30m"}}}}`,
-		`workflows = {w = {drafts = {approval = {mode = "delay"}}}}`,
-		`workflows = {w = {approval = {window = "5m"}}}`,
-		`workflows = {w = {approval = {mode = "delay"}}}`,
-		`workflows = {w = {approval = {rule = [{when = "brief.extra.ship == true", mode = "wait"}]}}}`,
-		`workflows = {w = {approval = {rule = [{when = "classify.urgent == true", mode = "wait"}]}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "slack.conversation == \"dm\"", mode = "send"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = []}}}}`,
+		`workflows = {w = {gates = {approval = {window = "30m"}}}}`,
+		`workflows = {w = {gates = {approval = {mode = "delay"}}}}`,
+		`workflows = {w = {gates = {approval = {mode = "send"}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\"", mode = "run"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "draft.delivery == \"message\"", mode = "dry_run"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "brief.kind == \"request\"", mode = "wait"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "brief.extra.ship == true", mode = "wait"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "classify.urgent == true", mode = "wait"}]}}}}`,
 		`workflows = {w = {only_when = "brief.extra.ship == true"}}`,
 	} {
 		if err := loadErr(t, raw); err != nil {
@@ -67,17 +69,15 @@ func TestAWorkflowsApprovalLoadsAsAnOverlay(t *testing.T) {
 func TestAWorkflowsApprovalOverlayRefusesWhatNoManifestFixes(t *testing.T) {
 	t.Parallel()
 	for raw, msg := range map[string]string{
-		`workflows = {w = {drafts = {approval = {mode = "sometimes"}}}}`:                                                   "workflows.w.drafts.approval.mode",
-		`workflows = {w = {drafts = {approval = {mode = "send", window = "1h"}}}}`:                                         "workflows.w.drafts.approval.window",
-		`workflows = {w = {drafts = {approval = {rule = [{when = "true"}]}}}}`:                                             "workflows.w.drafts.approval.rule[0].mode",
-		`workflows = {w = {drafts = {approval = {rule = [{when = "true", mode = "delay"}]}}}}`:                             "workflows.w.drafts.approval.rule[0]",
-		`workflows = {w = {drafts = {approval = {rule = [{when = "brief.kind == \"request\"", mode = "wait"}]}}}}`:         "brief.kind",
-		`workflows = {w = {drafts = {approval = {rule = [{when = "brief.extra.ship == true", mode = "wait"}]}}}}`:          "brief.extra.ship",
-		`workflows = {w = {approval = {mode = "wait", window = "5m"}}}`:                                                    "workflows.w.approval.window",
-		`workflows = {w = {approval = {rule = [{when = "true", mode = "delay"}]}}}`:                                        "workflows.w.approval.rule[0]",
-		`workflows = {w = {approval = {rule = [{when = "brief.risk == \"low\"", mode = "run"}]}}}`:                         "brief.risk",
-		`workflows = {w = {approval = {rule = [{when = "brief.extra.ship == true", mode = "run"}]}}}`:                      "brief.extra.ship",
-		`workflows = {w = {approval = {rule = [{when = "trigger.event.data == \"go\"", mode = "delay", window = "1m"}]}}}`: "trigger.event.data",
+		`workflows = {w = {gates = {approval = {mode = "sometimes"}}}}`:                                                              "workflows.w.gates.approval.mode",
+		`workflows = {w = {gates = {approval = {mode = "send", window = "1h"}}}}`:                                                    "workflows.w.gates.approval.window",
+		`workflows = {w = {gates = {approval = {mode = "wait", window = "5m"}}}}`:                                                    "workflows.w.gates.approval.window",
+		`workflows = {w = {gates = {approval = {rule = [{when = "true"}]}}}}`:                                                        "workflows.w.gates.approval.rule[0].mode",
+		`workflows = {w = {gates = {approval = {rule = [{when = "true", mode = "delay"}]}}}}`:                                        "workflows.w.gates.approval.rule[0]",
+		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\"", mode = "dry_run"}]}}}}`:                     "dry_run, which applies to draft gates only",
+		`workflows = {w = {gates = {approval = {rule = [{when = "brief.risk == \"low\"", mode = "run"}]}}}}`:                         "brief.risk",
+		`workflows = {w = {gates = {approval = {rule = [{when = "brief.extra.ship == true", mode = "send"}]}}}}`:                     "brief.extra.ship",
+		`workflows = {w = {gates = {approval = {rule = [{when = "trigger.event.data == \"go\"", mode = "delay", window = "1m"}]}}}}`: "trigger.event.data",
 	} {
 		if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), msg) {
 			t.Errorf("%s: %v, want %q", raw, err, msg)

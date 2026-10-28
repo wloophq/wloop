@@ -9,9 +9,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Manifests reads the [drafts.approval] blocks of the loaded intents and
-// workflows, and the turns book.
+// Manifests reads the [gates.approval] of the loaded intents and workflows
+// for their draft gates, the profile's default for one, and the turns book.
 type Manifests interface {
+	// DefaultApproval is gates.toml's default for a draft gate, which a
+	// draft no manifest's block decides takes.
+	DefaultApproval() draft.Approval
 	// IntentApproval is the block of intent name, nil when it declares none; known is false for an unknown intent.
 	IntentApproval(name string) (p *draft.Policy, known bool)
 	// WorkflowApproval is the policy of the drafts of a turn workflow name
@@ -28,7 +31,7 @@ var ErrUnknownOrigin = errors.New("unknown proposer")
 
 // Resolver is the Policies of the manifests, for turn and session drafts only:
 // the proposing turn's workflow's policy laid over its intent's block, else
-// wait. The
+// the profile's default. The
 // intent and workflow come from the turn in the book; an Origin that names
 // others than the book's resolves to wait. Every other origin resolves to
 // wait, so a rule's policy reaches a draft only through Proposal.Policy.
@@ -75,7 +78,7 @@ func (r Resolver) For(ctx context.Context, u unit.Unit, o draft.Origin) (draft.P
 			return waitPol, fmt.Errorf("workflow %s: %w", workflow, ErrUnknownOrigin)
 		}
 	}
-	out := waitPol
+	out := draft.Policy{Default: r.Manifests.DefaultApproval()}
 	if p != nil {
 		out = *p
 	}

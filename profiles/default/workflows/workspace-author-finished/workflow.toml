@@ -11,6 +11,6 @@ use = "workspace.remove"
 per_run = 5
 per_day = 30
 
-[[approval.rule]]
+[[gates.approval.rule]]
 when = 'size(workspace.pendency) > 0'
 mode = "wait"

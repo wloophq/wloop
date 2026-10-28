@@ -313,11 +313,8 @@ func approvalModes(k builtin.Key, all []builtin.Key) (string, bool) {
 			mode = all[i]
 		}
 	}
-	switch names := values(mode); {
-	case slices.Equal(names, builtin.ValueNames(builtin.RunModes())):
-		return "run", true
-	case slices.Equal(names, builtin.ValueNames(builtin.DraftModes())):
-		return "draft", true
+	if slices.Equal(values(mode), builtin.ValueNames(builtin.GateModes())) {
+		return "gate", true
 	}
 	return "", false
 }
@@ -349,28 +346,22 @@ func lines(keys []builtin.Key) []string {
 	return out
 }
 
-// approvalSection states the approval table's shape once, with its two
-// mode sets.
+// approvalSection states the approval table's shape once, with its modes.
 func approvalSection() []string {
 	out := []string{"", "## Approval tables", "",
-		"An approval table that links here has these keys; a run approval takes the run modes, a draft approval the draft modes.", ""}
+		"An approval table that links here has these keys, and takes the gate modes.", ""}
 	for _, r := range rows(builtin.SurfaceWorkflow) {
-		if sub, ok := strings.CutPrefix(r.Path, "approval."); ok && slices.Contains(approvalKeys, sub) {
+		if sub, ok := strings.CutPrefix(r.Path, "gates.approval."); ok && slices.Contains(approvalKeys, sub) {
 			k := r
 			k.Path, k.Values, k.Default = sub, nil, ""
-			k.Doc = strings.Replace(k.Doc, "the item runs", "the item runs or the draft is sent", 1)
 			if sub == "mode" || sub == "rule[].mode" {
 				k.Kind = builtin.KindText
 			}
 			out = append(out, line(k))
 		}
 	}
-	out = append(out, "", "The run modes:", "")
-	for _, v := range builtin.RunModes() {
-		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
-	}
-	out = append(out, "", "The draft modes:", "")
-	for _, v := range builtin.DraftModes() {
+	out = append(out, "", "The gate modes:", "")
+	for _, v := range builtin.GateModes() {
 		out = append(out, fmt.Sprintf("- `%s`: %s", v.Name, cell(v.Doc)))
 	}
 	return out

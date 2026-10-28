@@ -122,18 +122,18 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.managed` | bool | The session was started by the loop (sessions.managed). |
 | `session.listed` | bool | The session's manager lists its process as usable. |
 | `session.orphaned` | bool | The session's manager lists its process as not usable. |
-| `session.agent_state` | string | The agent's state as the manager reports it. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.agent_state` | string | The agent's state as the manager reports it. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.user_active` | bool | The user acts in the session now. |
 | `session.user_typed_after_turn` | bool | The user typed in the session after the loop's last turn. |
 | `session.prompt_knowable` | bool | Whether the user typed can be known, from the hook or the transcript. |
-| `session.prompted_while_idle` | bool | A manual session got a prompt during its idle period. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `session.open_turn` | string | The state of the session's open turn; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `session.newest_state` | string | The state of the session's newest turn. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.prompted_while_idle` | bool | A manual session got a prompt during its idle period. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `session.open_turn` | string | The state of the session's open turn; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `session.newest_state` | string | The state of the session's newest turn. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.newest_age` | duration | Time since the newest turn was sent or started. |
 | `session.newest_intent` | string | The intent of the newest turn. |
 | `session.closes_when_done` | bool | The newest turn's intent closes its session when done. |
-| `session.idle_since` | timestamp | When the current idle period started. Zero when unset; test with `> timestamp(0)`. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.idle_since` | timestamp | When the current idle period started. Zero when unset; test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `session.idle_for` | duration | Time since idle_since. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.unread_answers` | int | Answers the user gave to the session's turns whose notice reached the session and that its agent has not read with inbox_read. |
 | `session.unread_since` | timestamp | When the notice of the oldest of unread_answers reached the session; zero when none. Test with `> timestamp(0)`. |
 | `session.unread_for` | duration | Time since unread_since; 0 when none. |
@@ -143,7 +143,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `session.closed_by_manager` | bool | The dormant session's manager keeps its own record of it, and the user closed it there, such as archiving it in Claude Desktop. |
 | `session.transcript_gone` | bool | The agent's transcript of the session, as its hooks reported it, no longer exists. |
 | `session.process_gone` | bool | The active session's process was missed by two complete censuses of its manager. |
-| `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `session.fingerprint` | string | The session id, its state, the start of the idle period and the newest turn's sequence. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `session.repo` | string | owner/repo of the book's pull request; empty when none. |
 
 ### Workspaces (`workspace.*`)
@@ -158,17 +158,17 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `workspace.path_exists` | bool | The worktree path exists. |
 | `workspace.temporary` | bool | The worktree lives under a temporary path. |
 | `workspace.duplicate` | bool | Neither a main checkout nor the workspace the manager links to its pull request, while another non-main workspace is. |
-| `workspace.dirty` | int | Modified tracked files. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.untracked` | int | Untracked files outside cleanup.disposable. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.unpushed` | int | Commits on no remote. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.newest_turn_state` | string | The state of the newest turn of the linked pull request's book; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.open_turn` | bool | The linked pull request's book has an open turn. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.pendency` | list | What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `workspace.dirty` | int | Modified tracked files. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.untracked` | int | Untracked files outside cleanup.disposable. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.unpushed` | int | Commits on no remote. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.newest_turn_state` | string | The state of the newest turn of the linked pull request's book; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.open_turn` | bool | The linked pull request's book has an open turn. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.pendency` | list | What holds work: modified files, untracked files, commits on no remote, turn asked unanswered, turn failed, turn unrecorded, turn open. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `workspace.sessions` | int | Agent sessions in the workspace that are active, or dormant and active within cleanup.idle. |
 | `workspace.manager` | string | The workspace manager that owns the worktree. |
-| `workspace.last_activity` | timestamp | The newest activity in the workspace. Zero when unset; test with `> timestamp(0)`. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.quiet_for` | duration | Time since last_activity. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `workspace.fingerprint` | string | The worktree path and its head. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `workspace.last_activity` | timestamp | The newest activity in the workspace. Zero when unset; test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.quiet_for` | duration | Time since last_activity. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `workspace.fingerprint` | string | The worktree path and its head. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `workspace.repo` | string | owner/repo; empty when unknown. |
 
 ### Tasks (`task.*`)
@@ -176,13 +176,13 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task` fact (provider `task`) | Type | Meaning |
 |---|---|---|
 | `task.id` | string | The task's id. |
-| `task.kind` | string | The task's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.state` | string | The task's state, one of the states tasks.toml declares. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.waiting_on` | list | The person keys the task waits on, such as slack:U0123. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.kind` | string | The task's kind, such as action, waiting, close, message, capture or project. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.state` | string | The task's state, one of the states tasks.toml declares. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.waiting_on` | list | The person keys the task waits on, such as slack:U0123. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.resurface_at` | timestamp | When the task resurfaces; zero when it has no date. Test with `> timestamp(0)`. |
-| `task.waiting_days` | int | Working days the task has waited, in the configured location, as the waiting rules count them. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.waiting_days` | int | Working days the task has waited, in the configured location, as the waiting rules count them. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.since_nudge` | duration | Time since the task's last nudge; very large when it was never nudged. |
-| `task.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled. Test with `> timestamp(0)`. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.nudge_due_at` | timestamp | When a stalled nudge is due: the resurface date when set, else tasks.stale_waiting_days working days after the task started waiting, then drafts.repeat_after after the last nudge; zero when the task is not stalled. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.muted` | bool | The task is muted. |
 | `task.unit` | string | The task's first unit as provider:key: the unit it was captured or derived on, else its first attachment; empty for a task with none. |
 | `task.unit_provider` | string | The provider of task.unit; empty for a task with none. |
@@ -191,30 +191,30 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `task.link_ended` | bool | The task has a unit, and every one of task.units has ended as its plugin says (pr.ended, slack.ended); a unit of a plugin that says nothing never ends. |
 | `task.turns` | int | Turns run on the task itself, such as a start; turns on its units are not counted. |
 | `task.captured_by_user` | bool | The user captured the task: origin user and kind capture. False for a task derived from a unit's items, such as one from a Slack thread, or opened by another service. |
-| `task.link_started_by_me` | bool | The viewer started task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.link_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.items_owed` | int | Open items of the task's units that the task holds. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.link_started_by_me` | bool | The viewer started task.unit, from the facts the tasks receive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_closure_posted` | bool | A closure was posted on task.unit, from the facts the tasks receive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.items_open` | int | Open items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.items_resolved` | int | Resolved items of the task's units. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.items_owed` | int | Open items of the task's units that the task holds. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the task, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
-| `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.category` | string | The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.owed_by` | string | Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.owed_since` | timestamp | Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.fingerprint` | string | The task's id, state and update time. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.category` | string | The category of the task's state: inbox, ready, active, waiting, deferred, done or dropped. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.owed_by` | string | Who owes the task's next step, as tasks.toml's owed_by says: me, a person's key, or empty when nobody does. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.owed_since` | timestamp | Since when task.owed_by has owed the next step; zero when nobody does. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.since_movement` | duration | Time since the task, or a unit linked to it, last moved: a state change, a source event, a run. |
 | `task.check_on` | timestamp | When to check on the task, its check_on property; zero when unset. Test with `> timestamp(0)`. |
 | `task.gates_open` | int | The task's open gates. |
 | `task.runs_live` | int | The task's runs whose session is live. |
-| `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.wake_when` | string | The condition the task's wake waits on; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.wake_until` | timestamp | When the task's wake wakes it; zero when it has none, or one that waits on events or a condition only. Test with `> timestamp(0)`. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.wake_when` | string | The condition the task's wake waits on; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.repo` | string | owner/repo of the task's work: its placement, else its pull request's; empty when unknown. |
-| `task.sequential_next` | bool | The task is the first open child of a sequential parent. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.review_due` | bool | The task is a parent whose review is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.children_ready` | bool | The task has a child in the ready category. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.ask_age` | duration | The age of the task's oldest unanswered ask; zero when none is. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.sequential_next` | bool | The task is the first open child of a sequential parent. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.review_due` | bool | The task is a parent whose review is due. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.children_ready` | bool | The task has a child in the ready category. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.ask_age` | duration | The age of the task's oldest unanswered ask; zero when none is. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `task.promised` | timestamp | The date the user promised the task by, its promised property; zero when unset. Test with `> timestamp(0)`. |
-| `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `task.link_owes` | list | The people the task's links owe a step to, as the plugins report them, each once. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `task.extraction_lag` | duration | How long the oldest message of a unit linked to the task has waited to be extracted; zero when none waits. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `task.link_owes` | list | The people the task's links owe a step to, as the plugins report them, each once. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Pull requests (`pr.*`)
 
@@ -233,9 +233,9 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.visibility` | string | The repository's visibility: public, private or internal, from the Basics read; empty before it. |
 | `pr.requested_teams` | list | The teams a review of the pull request was requested through, as <org>-<slug>. |
 | `pr.labels` | list | The pull request's labels, from the Basics read. |
-| `pr.address.reviewers` | list | The reviewers the address round answers: on its turn, those it answers, empty on any other; in a workflow, those it would answer. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.checks` | list | The failing checks the address round fixes: on its turn, those it fixes, empty on any other; in a workflow, those it would fix. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.conflict` | bool | The head conflicts with the base past the conflict window and the address round resolves it: on its turn, it does, false on any other; in a workflow, it would. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.address.reviewers` | list | The reviewers the address round answers: on its turn, those it answers, empty on any other; in a workflow, those it would answer. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.address.checks` | list | The failing checks the address round fixes: on its turn, those it fixes, empty on any other; in a workflow, those it would fix. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.address.conflict` | bool | The head conflicts with the base past the conflict window and the address round resolves it: on its turn, it does, false on any other; in a workflow, it would. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `pr.draft` | bool | The pull request is a draft, from the inventory row. |
 | `pr.review_requested_me` | bool | A review is requested from the viewer, from the inventory row. |
 | `pr.adopted` | bool | The pull request was taken over into the loop. |
@@ -258,22 +258,22 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `pr.age` | duration | Time since the pull request opened. |
 | `pr.has_workspace` | bool | A linked workspace holds the pull request. |
 | `pr.stale` | bool | The stored detail is older than sweep.slow + 2 x sweep.fast. |
-| `pr.open_turn` | string | The state of the book's open turn; empty when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.reason` | string | Why the review rules decide so. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.review.observed` | bool | The review rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.first.due` | bool | A first round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.first.reason` | string | Why a first round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.due` | bool | An address round is due. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.reason` | string | Why an address round is due or not. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `pr.address.observed` | bool | The address rules observe without acting. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.open_turn` | string | The state of the book's open turn; empty when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.open_turn_seq` | int | The sequence of the book's open turn; 0 when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.orphan_answer_id` | int | The id of an answer whose turn ended; 0 when none. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.review.action` | string | What the review rules decide: empty, follow-up or complete. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.review.reason` | string | Why the review rules decide so. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.review.observed` | bool | The review rules observe without acting. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.first.due` | bool | A first round is due. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.first.reason` | string | Why a first round is due or not. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.address.due` | bool | An address round is due. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.address.reason` | string | Why an address round is due or not. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `pr.address.observed` | bool | The address rules observe without acting. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `pr.last_interaction_at` | timestamp | The newest comment, review, push or review request, by anyone. Zero when unset; test with `> timestamp(0)`. |
 | `pr.silent_days` | int | Calendar days since last_interaction_at. |
-| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.waits_on_user` | bool | The row waits on the user, per situation.Derive. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `pr.mute.refusal` | string | Why the pull request is muted, such as muted until its state changes; empty when it is not. |
-| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `pr.fingerprint` | string | What the sweep records as handled until something new happens: recorded heads, review and check fingerprints, skips. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Slack conversations (`slack.*`)
 
@@ -281,26 +281,26 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 |---|---|---|
 | `slack.channel` | string | The conversation's channel id. |
 | `slack.conversation` | string | The conversation's kind: channel, dm or group. |
-| `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.live_task` | bool | A live task, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `slack.started_by_me` | bool | The viewer started the thread. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.closure_posted` | bool | A closure was posted on the unit, by the extraction or a sent draft's unit.closed. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.live_task` | bool | A live task, neither done nor in the trash and not muted, is attached to the unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.items_open` | int | Open items whose unit is this unit. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.items_unowned` | int | Open items of the unit with no assignee, nobody waited on and no basis. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `slack.items_unowned_age_days` | int | Working days, in the configured location, since the oldest unowned item appeared. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `slack.ended` | bool | The Slack plugin's word that the unit has ended: a closure was posted or marked (unit.closed), or its newest stored message is older than plugins.slack.ended_after. |
 | `slack.settled_at` | timestamp | The newest update of a settled draft the workflow proposed on the unit, withdrawn ones included; zero when none. Test with `> timestamp(0)`. |
-| `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `slack.fingerprint` | string | The unit, its newest message and the update time of its items. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Briefs (`brief.*`)
 
 | `brief` fact | Type | Meaning |
 |---|---|---|
-| `brief.goal` | string | The brief's goal; empty when the unit has no brief. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `brief.risk` | string | The brief's risk: low, medium or high. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `brief.kind` | string | The brief's kind, from the provider's taxonomy. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `brief.size` | string | The brief's size; GitHub briefs only. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `brief.tags` | list | The brief's normalized key:value tags. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
-| `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `brief.goal` | string | The brief's goal; empty when the unit has no brief. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `brief.risk` | string | The brief's risk: low, medium or high. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `brief.kind` | string | The brief's kind, from the provider's taxonomy. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `brief.size` | string | The brief's size; GitHub briefs only. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `brief.tags` | list | The brief's normalized key:value tags. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
+| `brief.missing` | list | The brief intent's extra fields the unit's brief lacks: new or changed since it was written. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 
 ### Drafts (`draft.*`)
 
@@ -328,7 +328,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 | `trigger.event.kind` | string | The event's kind; empty unless kind is event. |
 | `trigger.event.key` | string | The event's key. |
 | `trigger.event.id` | int | The event's id, unique and growing; 0 unless kind is event. |
-| `trigger.event.data` | string | The event's data: a person's or an agent's text, such as an intake's note, an answer or the mentions of a sent nudge. **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it. |
+| `trigger.event.data` | string | The event's data: a person's or an agent's text, such as an intake's note, an answer or the mentions of a sent nudge. **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it. |
 | `trigger.fired_at` | timestamp | When the schedule fired; zero unless kind is schedule. Test with `> timestamp(0)`. |
 
 ### The configuration (`config.*`)
@@ -347,7 +347,7 @@ A workflow's `when` reads the facts of its provider's slot, plus `trigger.*`, `c
 
 ## Draft approval facts
 
-A `[drafts.approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == "comment"` as a term of its top-level `&&`.
+A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts of the draft, plus the gate's (`gate.kind`, `gate.name`) and the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule that reads a draft's facts applies to draft gates alone. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when its `when` has `draft.delivery == "<delivery>"` as a term of its top-level `&&`.
 
 | Approval fact | Type | Meaning |
 |---|---|---|

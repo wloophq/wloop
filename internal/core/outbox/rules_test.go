@@ -24,7 +24,7 @@ func (f factIs) Holds(facts map[string]any, _ time.Time) (bool, error) {
 // commentRule is a rule whose when names comment delivery, as the loader
 // marks one that tests draft.delivery == "comment".
 func commentRule(when draft.Condition, a draft.Approval) draft.Rule {
-	return draft.Rule{When: when, Approval: a, NamesComment: true, Subjects: []string{"pr"}}
+	return draft.Rule{When: when, Approval: a, Names: draft.CommentDelivery, Subjects: []string{"pr"}}
 }
 
 var (
@@ -93,6 +93,33 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 			t.Fatalf("%+v", d)
 		}
 	})
+}
+
+func TestADeliveryThatPostsWaitsUnlessARuleNamesIt(t *testing.T) {
+	dm := subjectOf("slack", map[string]any{"slack.conversation": "dm"})
+	for name, c := range map[string]struct {
+		rule draft.Rule
+		want draft.State
+	}{
+		"a rule that names no delivery":  {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}, draft.Proposed},
+		"a rule that names its delivery": {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Names: draft.Message, Subjects: slackSubject}, draft.Approved},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv()
+			e.svc.Posts = func(d draft.Delivery) bool { return d == draft.Message }
+			e.svc.Facts = dm
+			withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{c.rule}})
+			if d := e.propose(reply("x")); d.State != c.want {
+				t.Fatalf("%+v, want %s", d, c.want)
+			}
+		})
+	}
+	e := newEnv()
+	e.svc.Posts = nil
+	withPolicy(e, draft.Fixed(noneA))
+	if d := e.propose(reply("x")); d.State != draft.Proposed {
+		t.Fatalf("with no manifest to read, every delivery posts: %+v", d)
+	}
 }
 
 func TestRulesPickTheModeByTheUnitsFacts(t *testing.T) {

@@ -26,7 +26,7 @@ func userWorkflowProblems(t *testing.T, name, manifest string) string {
 	t.Helper()
 	root := t.TempDir()
 	writeWorkflow(t, root, name, manifest)
-	_, broken, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t))
+	_, broken, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t), bundledGates(t))
 	out := problems.Error()
 	for _, ps := range broken {
 		out += "\n" + ps.Error()
@@ -75,7 +75,7 @@ func TestAnEntryResultsEndedOverrideNamesTaskResultsEnded(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeWorkflow(t, root, "entry-results-ended", string(b))
-	loaded, _, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t))
+	loaded, _, _, problems, _ := loadWorkflows(userLayer(root), bundledDefault(t), nil, nil, bundledTasks(t), bundledGates(t))
 	if !strings.Contains(problems.Error(), `entry-results-ended was renamed; did you mean "task-results-ended"?`) {
 		t.Fatal(problems.Error())
 	}
@@ -122,6 +122,15 @@ func TestAnEntryNameFactInASessionNameNamesItsTaskName(t *testing.T) {
 	if !strings.Contains(problems.Error(), `session.name: `) || !strings.Contains(problems.Error(), `did you mean "task.title"?`) {
 		t.Fatal(problems.Error())
 	}
+}
+
+func bundledGates(t *testing.T) GatesDef {
+	t.Helper()
+	d, problems := BundledGates(bundledDefault(t))
+	if len(problems) > 0 {
+		t.Fatal(problems.Error())
+	}
+	return d
 }
 
 func bundledTasks(t *testing.T) TasksDef {

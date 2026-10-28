@@ -46,7 +46,8 @@ Some decisions stay in Go as mechanism and are exposed as facts for the profile 
 - working-day arithmetic and who owes an item;
 - the GitHub round planners' due logic (`pr.first.due`, `pr.review.action`, `pr.address.due`);
 - injection markers, JSON schemas and limits;
-- the guard on draft approval: a draft's delivery is what its plugin posts it as (every GitHub draft but a reaction or an edit is a comment), a comment waits for your approval unless a rule of yours that names comment delivery releases it, and no agent or thread text sets an approval (no draft rule, nor a run rule that runs, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's approval).
+- the gate guard: every decision waiting on you is a gate, which only the gates service resolves, by you, a trusted policy rule or a passed window; a draft's delivery is what its plugin posts it as, a delivery its plugin's manifest marks `posts` waits for your approval unless a rule of yours that names that delivery releases it, and no agent or thread text resolves a gate (no rule of a draft gate, nor a rule that releases a gate, reads an untrusted fact; a workflow's `when` may, and a run it starts releases a draft only through that draft's gate);
+- the gates' consequences, one per kind, and how a mode applies to each kind: `send` and `run` release, `delay` is the window, `wait` holds, `dry_run` is a draft gate's only; the default of each kind is `gates.toml`'s `[approval]`.
 
 ## The rules that keep the line
 

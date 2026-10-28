@@ -117,13 +117,13 @@ func workflowTable(slot string) string {
 	return b.String()
 }
 
-// untrusted marks a fact no [drafts.approval] rule, nor a run rule that
+// untrusted marks a fact no rule of a draft gate, nor a rule that releases a gate,
 // runs, may read.
 func untrusted(f builtin.Fact) string {
 	if !f.Untrusted {
 		return ""
 	}
-	return " **Untrusted**: no `[drafts.approval]` rule, nor an `[approval]` rule that runs, reads it."
+	return " **Untrusted**: no `[gates.approval]` rule of a draft gate, nor one that releases a gate, reads it."
 }
 
 func approvalTable() string {
@@ -209,7 +209,7 @@ func page() (string, error) {
 	out = append(out, sections...)
 	out = append(out,
 		"## Draft approval facts", "",
-		"A `[drafts.approval]` rule's `when` reads these, the facts of the draft, plus the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send` or `delay`) applies to a comment draft only when its `when` has `draft.delivery == \"comment\"` as a term of its top-level `&&`.",
+		"A `[gates.approval]` rule of a draft gate reads these in its `when`, the facts of the draft, plus the gate's (`gate.kind`, `gate.name`) and the facts of the unit the draft is on (a workflow's: its provider's), never `brief.*`, `trigger.*`, `config.*` or a fact marked **Untrusted**, whose value a third party's text, read by the extraction, or the proposing turn itself sets. A rule that reads a draft's facts applies to draft gates alone. A rule over the facts of another provider than the draft's unit's does not apply to it. A rule that releases a draft on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when its `when` has `draft.delivery == \"<delivery>\"` as a term of its top-level `&&`.",
 		"", approvalTable(),
 		"## Workflow steps", "",
 		"The steps a `[[step]]` may name with `use`. `{{command}} workflows steps` prints them with their arguments.",

@@ -23,6 +23,8 @@ type fakeManifests struct {
 	on unit.Unit
 }
 
+func (fakeManifests) DefaultApproval() draft.Approval { return draft.Approval{Mode: draft.Wait} }
+
 func (f fakeManifests) IntentApproval(name string) (*draft.Policy, bool) {
 	a, ok := f.intents[name]
 	return a, ok

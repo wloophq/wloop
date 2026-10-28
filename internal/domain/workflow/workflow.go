@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/mark"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -254,13 +255,19 @@ type Workflow struct {
 	Key     []string // fact names; empty means the slot's fingerprint fact
 	// Marks are the facts whose values a done or dismissed item records as
 	// the unit's marks, by the mark's name under the workflow (mark.Of).
-	Marks    map[string]string
+	Marks map[string]string
+	// Approval is the approval of its runs' plan gates.
 	Approval Approval
-	Source   string // manifest path
-	Bundled  bool
+	// Gates are the approval of the gates its gate.open steps open, by
+	// kind, every kind but draft and plan.
+	Gates   map[gate.Kind]Approval
+	Source  string // manifest path
+	Bundled bool
 	// Overrides are the files of a bundled workflow a user directory replaces.
 	Overrides []string
-	// DraftApproval is the manifest's [drafts.approval] block; nil when absent.
+	// DraftApproval is the approval of the drafts its steps and turns
+	// propose, from its [gates.approval]; nil when that names none for a
+	// draft gate.
 	DraftApproval *draft.Policy
 	// Withdraw is the manifest's [drafts.withdraw] when, over the subject's facts
 	// and each draft's (the draft slot): an open draft the workflow proposed
@@ -413,3 +420,15 @@ const (
 
 // EngineKinds are the engine's own event kinds; a workflow's `on` may not name them.
 var EngineKinds = []string{KindPlanned, KindStepRan, KindStepRefused, KindStepFailed, KindItemDismissed, KindItemDropped}
+
+// ModeOf is a gate's approval mode as a run's: send and run run it; dry_run,
+// a draft gate's only, waits.
+func ModeOf(m gate.Mode) ApprovalMode {
+	switch m {
+	case gate.ModeSend, gate.ModeRun:
+		return ApprovalRun
+	case gate.ModeDelay:
+		return ApprovalDelay
+	}
+	return ApprovalWait
+}

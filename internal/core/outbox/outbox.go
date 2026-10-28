@@ -110,7 +110,11 @@ type Service struct {
 	// draft's target.
 	Targets  []unit.ProviderID
 	Policies Policies // nil resolves every proposal to wait
-	Facts    Facts    // nil: a policy whose rules read the unit's facts resolves to wait
+	// Posts says whether a draft of a delivery reaches people, as the
+	// plugins' manifests declare it, so a policy releases one only by a rule
+	// that names that delivery; nil: every delivery does.
+	Posts func(d draft.Delivery) bool
+	Facts Facts // nil: a policy whose rules read the unit's facts resolves to wait
 	// Broken names the workflows that failed to load; a delay draft of one
 	// waits for a person until it loads again.
 	Broken   func() []string
@@ -319,7 +323,7 @@ func (s *Service) decide(ctx context.Context, p Proposal, d draft.Draft, now tim
 			return held, nil
 		}
 	}
-	dec, err := pol.Decide(d, sub, now)
+	dec, err := pol.Decide(d, sub, s.posts(d), now)
 	if err != nil {
 		s.logf("draft approval of a %s proposal on %s resolved to wait: %v", d.Purpose, d.Unit, err)
 		return held, nil
@@ -356,8 +360,13 @@ func targetsOutside(d draft.Draft) bool {
 	return (d.Origin.Kind == draft.OriginTurn || d.Origin.Kind == draft.OriginSession) && t != "" && !strings.EqualFold(t, d.Unit.Key)
 }
 
-// would is what auto-send would do with d: a comment only once a rule that
-// names comment delivery released it. outside is targetsOutside of d as proposed, before its placement.
+// posts says whether d's delivery reaches people.
+func (s *Service) posts(d draft.Draft) bool {
+	return s.Posts == nil || s.Posts(d.Delivery)
+}
+
+// would is what auto-send would do with d: a draft whose delivery posts
+// only once a rule that names its delivery released it. outside is targetsOutside of d as proposed, before its placement.
 func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision, outside bool) draft.Would {
 	hold := func(reason string) draft.Would { return draft.Would{Policy: draft.WouldWait, Reason: reason} }
 	switch {
@@ -365,8 +374,8 @@ func (s *Service) would(ctx context.Context, d draft.Draft, dec draft.Decision, 
 		return hold("targets outside its unit")
 	case d.Origin.Kind != draft.OriginTurn && d.Origin.Kind != draft.OriginAuto:
 		return hold(fmt.Sprintf("proposed by %s", d.Origin.Kind))
-	case d.Delivery == draft.CommentDelivery && !dec.CommentReleased:
-		return hold("a comment is sent on its own only by a rule that names comment delivery")
+	case s.posts(d) && !dec.PostReleased:
+		return hold(fmt.Sprintf("a %s is sent on its own only by a rule that names its delivery", d.Delivery))
 	}
 	if len(d.Items) > 0 && s.Items != nil {
 		its, err := s.Items.Items(ctx, d.Unit)

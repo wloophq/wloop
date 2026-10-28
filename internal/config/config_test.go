@@ -553,7 +553,7 @@ fsat = "1m"
 match = "a/*"
 agent_hom = "/h"
 
-[workflows.address.approval]
+[workflows.address.gates.approval]
 windw = "1m"
 
 [plugins.github.gates.aproval]
@@ -566,7 +566,7 @@ windw = "1m"
 	if !errors.As(err, &unknown) || unknown.File != path {
 		t.Fatalf("err %v", err)
 	}
-	want := []string{"agnet", "plugins.github.gates.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.approval.windw"}
+	want := []string{"agnet", "plugins.github.gates.aproval", "projects[0].agent_hom", "sweep.fsat", "workflows.address.gates.approval.windw"}
 	if !slices.Equal(unknown.Keys, want) || !strings.Contains(err.Error(), path+": unknown keys agnet, ") || !strings.Contains(err.Error(), "; sweep.fsat: did you mean \"fast\"?") {
 		t.Fatalf("keys %v, error %q", unknown.Keys, err)
 	}
@@ -600,7 +600,7 @@ func TestTurnsAndAWorkflowsDraftApprovalLoad(t *testing.T) {
 	if err := os.WriteFile(file, []byte(`[turns]
 per_day = 7
 
-[workflows.slack-closure.drafts.approval]
+[workflows.slack-closure.gates.approval]
 mode = "delay"
 window = "10m"
 `), 0o600); err != nil {
@@ -613,7 +613,7 @@ window = "10m"
 	if c.Turns.PerDay != 7 {
 		t.Errorf("turns %+v", c.Turns)
 	}
-	if a := c.Workflows["slack-closure"].DraftApproval(); a.Mode != "delay" || time.Duration(*a.Window) != 10*time.Minute {
+	if a := c.Workflows["slack-closure"].GateApproval(); a.Mode != "delay" || time.Duration(*a.Window) != 10*time.Minute {
 		t.Errorf("draft approval %+v", a)
 	}
 	if Defaults().Turns.PerDay != 20 {
@@ -647,7 +647,7 @@ agent_home = "/w"
 [workflows.workspace-review-finished]
 observe = false
 
-[[workflows.address.approval.rule]]
+[[workflows.address.gates.approval.rule]]
 when = "true"
 mode = "delay"
 window = "1h"
@@ -655,7 +655,7 @@ window = "1h"
 	if time.Duration(c.Sweep.Fast) != 5*time.Minute || c.For("acme", "api").AgentHome != "/w" || *c.Workflows["workspace-review-finished"].Observe {
 		t.Fatalf("config = %+v", c)
 	}
-	if r := c.Workflows["address"].Approval.Rule; len(r) != 1 || r[0].Mode != "delay" || time.Duration(r[0].Window) != time.Hour {
+	if r := c.Workflows["address"].GateApproval().Rule; len(r) != 1 || r[0].Mode != "delay" || time.Duration(r[0].Window) != time.Hour {
 		t.Fatalf("rules = %+v", r)
 	}
 }

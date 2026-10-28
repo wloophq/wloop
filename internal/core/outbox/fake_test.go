@@ -148,6 +148,7 @@ func newEnv() *env {
 			return e.fx, nil
 		},
 		Clock: e.clock,
+		Posts: func(d draft.Delivery) bool { return d == draft.CommentDelivery },
 		Log: func(format string, args ...any) {
 			e.logMu.Lock()
 			defer e.logMu.Unlock()

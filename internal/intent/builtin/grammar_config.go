@@ -137,12 +137,9 @@ var configGrammar = slices.Concat(
 		cfgKey("workflows.*.enabled", KindBool, "", "Switches the workflow; left out, it is on."),
 		cfgKey("workflows.*.observe", KindBool, "", "Plans the workflow's items pending, for you to run; left out, the manifest's."),
 		cfgKey("workflows.*.only_when", KindPred, "", "A condition ANDed with the workflow's when."),
-		cfgKey("workflows.*.drafts", KindTable, "", "The drafts the workflow proposes."),
 	},
-	cfgApproval("workflows.*.approval", RunModes, "the workflow's runs"),
-	cfgApproval("workflows.*.drafts.approval", DraftModes, "the workflow's drafts"),
-	[]Key{cfgKey("workflows.*.gates", KindTable, "", "The gates the workflow opens.")},
-	cfgApproval("workflows.*.gates.approval", GateModes, "the workflow's gates"),
+	[]Key{cfgKey("workflows.*.gates", KindTable, "", "The gates the workflow opens: its runs' plan gates, its drafts', its turns' drafts' and its gate.open steps'.")},
+	cfgApproval("workflows.*.gates.approval", GateModes, "the workflow's gates, a rule for the kinds its when pins gate.kind to"),
 	[]Key{
 		cfgKey("intents", KindMap, "", "Each intent's settings, by intent name."),
 		cfgKey("intents.*", KindTable, "", "One intent's settings."),
@@ -226,7 +223,7 @@ const trustPath = "path"
 func cfgPluginGates(id string) []Key {
 	return []Key{
 		cfgKey(id+".gates", KindTable, "", "The gates the plugin's own rules open."),
-		cfgKey(id+".gates.approval", KindTable, "", "Their approval; left out, each waits for you."),
+		cfgKey(id+".gates.approval", KindTable, "", "Their approval; left out, the default gates.toml gives a draft gate."),
 		cfgEnum(id+".gates.approval.mode", GateModes, "", "The approval mode."),
 		cfgKey(id+".gates.approval.window", KindDur, "", "How long a delay waits before the gate's consequence; only with mode delay."),
 	}

@@ -4,7 +4,8 @@ when = 'slack.live_task && slack.items_unowned > 0 && slack.items_unowned_age_da
 order = 52
 key = ["slack.settled_at"]
 
-[drafts.approval]
+[[gates.approval.rule]]
+when = 'gate.kind == "draft"'
 mode = "wait"
 
 [[step]]

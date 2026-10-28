@@ -13,6 +13,7 @@ import (
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/source"
 )
@@ -45,7 +46,7 @@ func (e *Env) serveProposals(ctx context.Context, db *sqlite.DB, cfg config.Conf
 func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Module, logf func(string, ...any)) *proposals.Job {
 	repeatAfter := time.Duration(cfg.Drafts.RepeatAfter)
 	svc := &outbox.Service{Store: db.Drafts(), Effects: publishersOf(mods), Items: e.itemsLedger(db, cfg, logf), Clock: clockFunc(e.Now), Log: logf,
-		RepeatAfter: repeatAfter}
+		RepeatAfter: repeatAfter, Posts: deliveryPosts}
 	var srcs []proposals.Source
 	for _, m := range mods {
 		if m.Proposals != nil {
@@ -55,8 +56,13 @@ func (e *Env) proposalsJob(db *sqlite.DB, cfg config.Config, mods []source.Modul
 	enabled := func(p unit.ProviderID) bool { return cfg.PluginEnabled(string(p)) }
 	return &proposals.Job{
 		Outbox: svc, Sources: srcs, Enabled: enabled,
-		Facts:       coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
-		Approval:    func(p unit.ProviderID) draft.Approval { return cfg.PluginDraftApproval(string(p)) },
+		Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled},
+		Approval: func(p unit.ProviderID) draft.Approval {
+			if a, ok := cfg.PluginDraftApproval(string(p)); ok {
+				return a
+			}
+			return intentload.DefaultDraftApproval(e.loadedIntents().Gates)
+		},
 		RepeatAfter: repeatAfter,
 		Clock:       clockFunc(e.Now), Log: logf,
 	}

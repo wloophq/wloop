@@ -189,12 +189,12 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `gates` | table |  | The gates its runs and drafts open. |
-| `gates.approval` | table |  | The approval of its gates. |
-| `gates.approval.mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The mode when no rule holds. |
+| `gates.approval` | table |  | The approval of its gates: a rule applies to the kinds its when pins gate.kind to, else to draft gates alone when it reads a draft's facts, else to every kind; what no rule or mode here decides, gates.toml's [approval] does. |
+| `gates.approval.mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The mode of every kind of gate when no rule holds; left out, gates.toml's default of the kind. |
 | `gates.approval.window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 | `gates.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
 | `gates.approval.rule[].when` | predicate |  | When the rule applies to a gate. |
-| `gates.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run`, `run` |  | The rule's mode. |
+| `gates.approval.rule[].mode` | one of `wait`, `delay`, `send`, `dry_run`, `run` |  | The rule's mode. |
 | `gates.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the gate's consequence. |
 
 ### Effects and drafts
@@ -205,13 +205,6 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `drafts` | table |  | The drafts its turns' agents propose. |
 | `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
 | `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |
-| `drafts.approval` | table |  | The approval of its drafts; wait when absent. |
-| `drafts.approval.mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The approval when no rule holds. |
-| `drafts.approval.window` | duration |  | With mode delay only: how long a person has to stop the draft. |
-| `drafts.approval.rule[]` | table |  | A rule; the first whose when holds gives the mode. |
-| `drafts.approval.rule[].when` | predicate |  | When the approval rule applies to a draft. |
-| `drafts.approval.rule[].mode` | one of `send`, `delay`, `wait`, `dry_run` |  | The rule's approval. |
-| `drafts.approval.rule[].window` | duration |  | With mode delay only: how long a person has to stop the draft. |
 
 An intent with `builds` is a builder: it needs `prompt` and holds no role. Any other needs `workspace`, `[session]`, `[headline]` and `[record]`.
 
@@ -227,19 +220,16 @@ Adds another intent's judgment to the turn: `profile` and `when` (a predicate ov
 
 Makes the intent an action on rows. Its description is the intent's `summary`. `when` offers it, `primary = { when = ... }` makes it the row's first, and each `[[action.refuse]]` whose `when` holds offers it disabled with its `why`. `note`, `warning` and `confirm` are templates over the action facts.
 
-### `[drafts.approval]`
+### `[gates.approval]`
 
 ```toml
-[drafts.approval]
-mode = "wait"
-
-[[drafts.approval.rule]]
+[[gates.approval.rule]]
 when = 'draft.delivery == "comment" && pr.repo_name == "docs"'
 mode = "delay"
 window = "10m"
 ```
 
-The policy of the drafts the intent's turns propose: the first rule whose `when` holds gives the mode, else `mode`; `wait` when the table is absent. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send` or `delay`) applies to a comment draft only when `draft.delivery == "comment"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment. `dry_run` stores the draft and never sends it. A workflow's own `[drafts.approval]` wins over the intent's for the turns it starts; the configuration's `workflows.<name>.drafts.approval` is laid over the workflow's, or over the intent's when the workflow has none. See [the Outbox](/concepts/approval/#the-outbox).
+The policy of the drafts the intent's turns propose, its draft gates: the first rule whose `when` holds gives the mode, else `mode`, else `gates.toml`'s default for a draft gate when the table names none. A rule pinned to another `gate.kind` than `draft` fails to load: an intent's turns open draft gates only. A rule's `when` reads `draft.delivery`, `draft.proposer` and the [facts](/reference/facts/) of the unit the draft is on, for every provider the intent serves; never `draft.purpose` or `draft.effects`, which the turn's agent names, nor `brief.*` or a fact marked **Untrusted**. A rule over one provider's facts applies only to drafts on that provider's units; a rule over two providers' facts is refused. When the unit's facts cannot be read, a draft whose rules read them waits for you. A rule that sends on its own (`send`, `run` or `delay`) applies to a draft whose delivery posts, as its plugin's manifest marks it, only when `draft.delivery == "<delivery>"` is a term of its `when`'s top-level `&&`; `mode` alone never releases a comment or a message. `dry_run` stores the draft and never sends it. A workflow's own `[gates.approval]`, when it names a draft gate, wins over the intent's for the turns it starts; the configuration's `workflows.<name>.gates.approval` is laid over the workflow's, or over the intent's when the workflow names none. See [the Outbox](/concepts/approval/#the-outbox).
 
 ## Providers
 

@@ -52,8 +52,8 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	cfg.Workflows = map[string]config.WorkflowConfig{
 		"gone":    {Enabled: &off},
 		"watched": {Observe: &on},
-		"waits":   {Approval: &config.ApprovalConfig{Mode: "delay", Window: &window}},
-		"refused": {Approval: &config.ApprovalConfig{Mode: "run", Window: &window}},
+		"waits":   {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "delay", Window: &window}}},
+		"refused": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "run", Window: &window}}},
 	}
 	clean := workflow.Workflow{Name: "watched", Observe: false, Approval: workflow.Approval{Mode: workflow.ApprovalRun}}
 	in := []workflow.Workflow{{Name: "gone", Observe: false}, clean, turnStartWorkflow("waits"), turnStartWorkflow("refused"), {Name: "kept", Observe: false}}
@@ -71,7 +71,7 @@ func TestApplyConfigOverridesModeApprovalAndDisables(t *testing.T) {
 	if a := out[1].Approval; a.Mode != workflow.ApprovalDelay || a.Window != 10*time.Minute {
 		t.Errorf("approval %+v", a)
 	}
-	if ok, err := out[2].When.Match(workflow.Vars{}); ok || err == nil || !strings.Contains(err.Error(), "workflows.refused.approval") {
+	if ok, err := out[2].When.Match(workflow.Vars{}); ok || err == nil || !strings.Contains(err.Error(), "workflows.refused.gates.approval") {
 		t.Errorf("a window left on run matched: %v, %v", ok, err)
 	}
 	if in[1].Observe {
@@ -397,8 +397,8 @@ func TestTurnStartWindowsComeFromTheManifest(t *testing.T) {
 	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, Defaults())[0]; w.Approval.Window != time.Minute {
 		t.Fatalf("window %v", w.Approval.Window)
 	}
-	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; w.Approval.Window != 0 {
-		t.Fatalf("window with approval.mode run %v", w.Approval.Window)
+	if w := applyConfig([]workflow.Workflow{turnStartWorkflow("review-follow-up")}, withoutWindows(Defaults()))[0]; len(w.Approval.Rules) == 0 || w.Approval.Rules[0].Mode != workflow.ApprovalRun {
+		t.Fatalf("a plan gate with a run rule first: %+v", w.Approval)
 	}
 }
 
@@ -549,13 +549,13 @@ func TestThePlanEnginesWorkspaceFactsAreASibling(t *testing.T) {
 func TestTheConfigsDraftApprovalIsLaidOnce(t *testing.T) {
 	t.Parallel()
 	cfg := Defaults()
-	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
+	cfg.Workflows = map[string]config.WorkflowConfig{"drafts": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{Mode: "delay", Window: new(config.Days(5 * time.Minute))}}}}
 	manifest := draft.Fixed(draft.Approval{Mode: draft.Wait})
 	out := applyConfig([]workflow.Workflow{{Name: "drafts", Slot: "slack", Observe: false, DraftApproval: manifest}}, cfg)
 	if out[0].DraftApproval != manifest {
 		t.Fatalf("applyConfig laid the drafts approval its resolver lays: %+v", out[0].DraftApproval)
 	}
-	if a := draftApproval(cfg, out[0], nil); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
+	if a := draftApproval(cfg, out[0], nil, draft.Approval{Mode: draft.Wait}); a.Default.Mode != draft.Delay || a.Default.Window != 5*time.Minute {
 		t.Fatalf("draft approval %+v", a)
 	}
 	if manifest.Default.Mode != draft.Wait {
@@ -608,7 +608,7 @@ func TestApplyConfigOnlyWhenReadsTheTaskProperties(t *testing.T) {
 // slack-stalled-nudge workflow, whose units are tasks.
 func nudgeDraftRule(when, mode string) config.Config {
 	cfg := Defaults()
-	cfg.Workflows = map[string]config.WorkflowConfig{"slack-stalled-nudge": {Drafts: &config.WorkflowDrafts{Approval: &config.ApprovalConfig{
+	cfg.Workflows = map[string]config.WorkflowConfig{"slack-stalled-nudge": {Gates: &config.WorkflowGates{Approval: &config.ApprovalConfig{
 		Mode: string(draft.Wait), Rule: []config.ApprovalRuleConfig{{When: when, Mode: mode}}}}}}
 	return cfg
 }
@@ -621,7 +621,7 @@ func TestAConfigDraftWaitRuleReadsATrustedProperty(t *testing.T) {
 		t.Fatalf("%v", errs)
 	}
 	file := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.drafts.approval.rule]]\nwhen = 'task.prop.owner == \"slack:U0AAA\"'\nmode = \"wait\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.owner == \"slack:U0AAA\"'\nmode = \"wait\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(file, Defaults()); err != nil {
@@ -634,11 +634,11 @@ func TestAConfigDraftRuleReadingAnAgentWrittenPropertyIsRefused(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	cfg := nudgeDraftRule(`task.prop.risk == "low"`, string(draft.Send))
 	errs := configWorkflowProblems(cfg, te.loadedIntents())
-	if len(errs) != 1 || !strings.Contains(errs[0].Error(), "task.prop.risk") {
+	if len(errs) == 0 || slices.ContainsFunc(errs, func(err error) bool { return !strings.Contains(err.Error(), "task.prop.risk") }) {
 		t.Fatalf("%v", errs)
 	}
 	file := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.drafts.approval.rule]]\nwhen = 'task.prop.risk == \"low\"'\nmode = \"send\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(file, []byte("[[workflows.slack-stalled-nudge.gates.approval.rule]]\nwhen = 'task.prop.risk == \"low\"'\nmode = \"send\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := config.LoadFile(file, Defaults()); err == nil || !strings.Contains(err.Error(), "config.toml cannot see who writes it") {

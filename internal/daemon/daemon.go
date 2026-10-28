@@ -37,6 +37,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/lock"
@@ -329,6 +330,10 @@ type Deps struct {
 	// keep, a task's brief among them; nil serves no Brief.
 	Timeline    timeline.Reader
 	TaskRecords timeline.Records
+	// Gates resolves the decisions waiting on the user and GateReader lists them; nil answers 503 to the gate
+	// routes and serves no TaskView.Gates.
+	Gates      *gates.Service
+	GateReader gates.Reader
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;
@@ -863,6 +868,15 @@ func (s *Server) Run(ctx context.Context) error {
 			select {
 			case <-s.reconcile.ready:
 				s.syncTasks(jctx)
+			case <-jctx.Done():
+			}
+		})
+	}
+	if d.Gates != nil {
+		wg.Go(func() {
+			select {
+			case <-s.reconcile.done:
+				s.tickGates(jctx)
 			case <-jctx.Done():
 			}
 		})
