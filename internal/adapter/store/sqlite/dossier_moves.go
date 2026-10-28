@@ -2,29 +2,35 @@ package sqlite
 
 import "context"
 
-// DossierMoves are the dossier directories a merge of tasks moved in the store and that still wait to move
-// on disk, from the path under the dossiers root to the path they go to.
-func (db *DB) DossierMoves(ctx context.Context) (map[string]string, error) {
-	rows, err := db.R().QueryContext(ctx, `SELECT from_path, to_path FROM dossier_moves`)
+// DossierMove is a dossier directory a merge of tasks moved in the store and that waits to move on disk,
+// from the path under the dossiers root to the path it goes to. Seq is the order the moves apply in.
+type DossierMove struct {
+	Seq      int64
+	From, To string
+}
+
+// DossierMoves are the dossier moves still to do on disk, in the order they apply.
+func (db *DB) DossierMoves(ctx context.Context) ([]DossierMove, error) {
+	rows, err := db.R().QueryContext(ctx, `SELECT seq, from_path, to_path FROM dossier_moves ORDER BY seq`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]string{}
+	var out []DossierMove
 	for rows.Next() {
-		var from, to string
-		if err := rows.Scan(&from, &to); err != nil {
+		var m DossierMove
+		if err := rows.Scan(&m.Seq, &m.From, &m.To); err != nil {
 			return nil, err
 		}
-		out[from] = to
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }
 
-// DossierMoved forgets the move of the dossier directory at from, done on disk.
-func (db *DB) DossierMoved(ctx context.Context, from string) error {
+// DossierMoved forgets the dossier move seq, done on disk.
+func (db *DB) DossierMoved(ctx context.Context, seq int64) error {
 	_, err := db.Write(ctx, func(tx *Tx) error {
-		_, err := tx.ExecContext(ctx, `DELETE FROM dossier_moves WHERE from_path = ?`, from)
+		_, err := tx.ExecContext(ctx, `DELETE FROM dossier_moves WHERE seq = ?`, seq)
 		return err
 	})
 	return err

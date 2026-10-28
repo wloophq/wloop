@@ -17,7 +17,7 @@ var golden = []string{
 	"brief_runs: id, trigger, intake, version, attempt_of, started_at, ended_at, input_ms, call_ms, agent_ms, outcome, error, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, input_bytes, input_cut, brief, tags, dropped_tags, input_sha, reused_from, provider, unit_key, revision, input, intent",
 	"classifications: provider, unit_key, fingerprint, workflow, output, at",
 	"classify_days: day, total",
-	"dossier_moves: from_path, to_path",
+	"dossier_moves: seq, from_path, to_path",
 	"dossiers: owner, rel_path, status, bytes, files, last_write_at, resolved_at, archived_at, purge_after",
 	"drafts: id, provider, unit_key, items, task, kind, target, text, reaction, original, edited, origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state, evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome, created_at, updated_at, sending_at, rev, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced",
 	"events: id, provider, unit_key, kind, key, actor, at, data",

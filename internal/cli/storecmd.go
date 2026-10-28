@@ -6,11 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -180,26 +178,28 @@ func dossierMoveFix(stateDir string) string {
 // dossierMovesFix is what finishes a dossier move a merge of tasks recorded when it could not be done.
 var dossierMovesFix = "move the directory to the path named, and its archive under " + dossier.ArchiveDir + " likewise, resolving a name both sides hold; " + brand.Name + " retries the move at every start"
 
-// moveDossierDirs moves dossier directories under the dossiers root of stateDir: each key of moves is a
-// directory's path under the root, and its value the path it moves to, parents created. An archived
-// dossier moves the same way under the archive directory, as the path plus .tar.gz. A move whose source is
-// gone counts as done, so a retry finishes what an interrupted run left; a move onto a path that exists is
-// left in place and reported, and the other moves still run.
-func moveDossierDirs(stateDir string, moves map[string]string) error {
+// dossierMove is a dossier directory's move: from and to are paths under the dossiers root.
+type dossierMove struct{ from, to string }
+
+// moveDossierDirs moves dossier directories under the dossiers root of stateDir, in the order of moves,
+// so a move can carry what an earlier one put in place (a merge into a task that is merged next). Parents
+// are created. An archived dossier moves the same way under the archive directory, as the path plus
+// .tar.gz. A move whose source is gone counts as done, so a retry finishes what an interrupted run left. A
+// move onto a path that exists stops the run there and is reported, since the moves after it may build on
+// it.
+func moveDossierDirs(stateDir string, moves []dossierMove) error {
 	root := dossier.Root(stateDir)
-	var errs []error
-	for _, from := range slices.Sorted(maps.Keys(moves)) {
-		to := moves[from]
+	for _, m := range moves {
 		for _, p := range [][2]string{
-			{filepath.Join(root, from), filepath.Join(root, to)},
-			{filepath.Join(root, dossier.ArchiveDir, from+".tar.gz"), filepath.Join(root, dossier.ArchiveDir, to+".tar.gz")},
+			{filepath.Join(root, m.from), filepath.Join(root, m.to)},
+			{filepath.Join(root, dossier.ArchiveDir, m.from+".tar.gz"), filepath.Join(root, dossier.ArchiveDir, m.to+".tar.gz")},
 		} {
 			if err := moveOne(p[0], p[1]); err != nil {
-				errs = append(errs, err)
+				return err
 			}
 		}
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 func moveOne(src, dst string) error {
@@ -215,18 +215,22 @@ func moveOne(src, dst string) error {
 	return os.Rename(src, dst)
 }
 
-// applyDossierMoves moves the dossier directories db records as moved and forgets each move once its
-// source is gone.
+// applyDossierMoves moves the dossier directories db records as moved, in the order they were recorded,
+// and forgets each move once its source is gone.
 func (e *Env) applyDossierMoves(ctx context.Context, db *sqlite.DB) error {
-	moves, err := db.DossierMoves(ctx)
-	if err != nil || len(moves) == 0 {
+	recorded, err := db.DossierMoves(ctx)
+	if err != nil || len(recorded) == 0 {
 		return err
+	}
+	moves := make([]dossierMove, len(recorded))
+	for i, m := range recorded {
+		moves[i] = dossierMove{m.From, m.To}
 	}
 	err = moveDossierDirs(e.StateDir, moves)
 	root := dossier.Root(e.StateDir)
-	for from := range moves {
-		if !pathExists(filepath.Join(root, from)) && !pathExists(filepath.Join(root, dossier.ArchiveDir, from+".tar.gz")) {
-			err = errors.Join(err, db.DossierMoved(ctx, from))
+	for _, m := range recorded {
+		if !pathExists(filepath.Join(root, m.From)) && !pathExists(filepath.Join(root, dossier.ArchiveDir, m.From+".tar.gz")) {
+			err = errors.Join(err, db.DossierMoved(ctx, m.Seq))
 		}
 	}
 	return err
@@ -245,9 +249,9 @@ func pendingDossierMoves(ctx context.Context, stateDir string, db *sqlite.DB) []
 	}
 	root := dossier.Root(stateDir)
 	var out []check
-	for _, from := range slices.Sorted(maps.Keys(moves)) {
-		info := filepath.Join(root, from) + " waits to move to " + filepath.Join(root, moves[from])
-		if pathExists(filepath.Join(root, moves[from])) {
+	for _, m := range moves {
+		info := filepath.Join(root, m.From) + " waits to move to " + filepath.Join(root, m.To)
+		if pathExists(filepath.Join(root, m.To)) {
 			info += ", which exists"
 		}
 		out = append(out, check{markMissing, "dossiers", info, dossierMovesFix})

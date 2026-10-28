@@ -465,11 +465,13 @@ CREATE TABLE dossiers (
 ) WITHOUT ROWID;
 
 -- A dossier directory a merge of tasks moved in the store and not yet on disk: paths under the dossiers
--- root, an archive at the same path under .archive with .tar.gz.
+-- root, an archive at the same path under .archive with .tar.gz. Moves apply in seq order, a later one
+-- moving what an earlier one put in place.
 CREATE TABLE dossier_moves (
-  from_path TEXT PRIMARY KEY,
+  seq INTEGER PRIMARY KEY,
+  from_path TEXT NOT NULL,
   to_path TEXT NOT NULL
-) WITHOUT ROWID;
+);
 
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,

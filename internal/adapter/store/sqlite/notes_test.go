@@ -67,7 +67,7 @@ func loopEvent(kind string) port.Event {
 var writes = []writeCase{
 	{
 		method: "DB.DossierMoved",
-		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, "task/t-1#") },
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, 1) },
 	},
 	{
 		method: "DB.SaveAgentSession",

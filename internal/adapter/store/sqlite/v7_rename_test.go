@@ -703,9 +703,9 @@ func TestRekeyTaskOntoATaskWithADossierMergesTheFiles(t *testing.T) {
 		t.Errorf("recorded moves %q, want %q", got, want)
 	}
 	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, to, next) })
-	want = []string{"task/" + from + "# > task/" + next + "#/merged/" + from, "task/" + to + "# > task/" + next + "#"}
-	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY from_path`); !slices.Equal(got, want) {
-		t.Errorf("recorded moves after a second merge %q, want %q", got, want)
+	want = []string{"task/" + from + "# > task/" + to + "#/merged/" + from, "task/" + to + "# > task/" + next + "#"}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY seq`); !slices.Equal(got, want) {
+		t.Errorf("recorded moves after a second merge %q, want %q in the order they apply", got, want)
 	}
 }
 
@@ -762,4 +762,8 @@ func TestDropTaskKeepsAnAliasOfTheDroppedTask(t *testing.T) {
 	if err := dropTask(ctx, tx, keep); err == nil || !strings.Contains(err.Error(), "task_aliases.new_id") {
 		t.Fatalf("dropping the task an alias leads to: %v", err)
 	}
+}
+
+func TestAnArchivedMergedDossierHasARow(t *testing.T) {
+	t.Skip("carried from R4 review: D1 tracks an archived merged dossier")
 }

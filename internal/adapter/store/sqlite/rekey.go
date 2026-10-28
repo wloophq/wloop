@@ -319,14 +319,9 @@ func moveDossier(ctx context.Context, tx *sql.Tx, from, to string) error {
 	return recordDossierMove(ctx, tx, fromRel, toRel)
 }
 
-// recordDossierMove records that the dossier directory at from goes to to; a pending move that ends at
-// from, or inside it, now ends at to.
+// recordDossierMove records that the dossier directory at from goes to to, after every move recorded
+// before it.
 func recordDossierMove(ctx context.Context, tx *sql.Tx, from, to string) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE dossier_moves SET to_path = ?2 || substr(to_path, ?3)
-		WHERE to_path = ?1 OR substr(to_path, 1, ?3) = ?1 || '/'`, from, to, len(from)+1); err != nil {
-		return err
-	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO dossier_moves (from_path, to_path) VALUES (?, ?)
-		ON CONFLICT (from_path) DO UPDATE SET to_path = excluded.to_path`, from, to)
+	_, err := tx.ExecContext(ctx, `INSERT INTO dossier_moves (from_path, to_path) VALUES (?, ?)`, from, to)
 	return err
 }

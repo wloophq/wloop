@@ -240,10 +240,10 @@ func TestMoveDossierDirsIsIdempotent(t *testing.T) {
 		"task/t-3#/notes.md",
 		".archive/task/t-4#.tar.gz",
 	)
-	moves := map[string]string{
-		"task/t-1#": "task/t-9#",
-		"task/t-2#": "task/t-3#/merged/t-2",
-		"task/t-4#": "task/t-8#",
+	moves := []dossierMove{
+		{"task/t-1#", "task/t-9#"},
+		{"task/t-2#", "task/t-3#/merged/t-2"},
+		{"task/t-4#", "task/t-8#"},
 	}
 	want := []string{
 		".archive/task/t-8#.tar.gz",
@@ -260,9 +260,33 @@ func TestMoveDossierDirsIsIdempotent(t *testing.T) {
 		}
 	}
 	writeTree(t, dir, "task/t-5#/notes.md", "task/t-6#/notes.md")
-	err := moveDossierDirs(dir, map[string]string{"task/t-5#": "task/t-6#"})
+	err := moveDossierDirs(dir, []dossierMove{{"task/t-5#", "task/t-6#"}})
 	if err == nil || !strings.Contains(err.Error(), filepath.Join(dossier.Root(dir), "task", "t-6#")) {
 		t.Fatalf("a move onto a directory that exists: %v", err)
+	}
+}
+
+func TestMoveDossierDirsAppliesADoubleMergeInRecordedOrder(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.noDaemon(t)
+	// t-z merged into t-b, then t-b into t-c: sorted by name, t-b's move would run first.
+	setStore(t, te.storePath(), `INSERT INTO dossier_moves (seq, from_path, to_path) VALUES
+		(1, 'task/t-z#', 'task/t-b#/merged/t-z'), (2, 'task/t-b#', 'task/t-c#')`)
+	writeTree(t, te.StateDir, "task/t-z#/notes.md", "task/t-b#/notes.md")
+	db, err := sqlite.Open(te.storePath(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := te.applyDossierMoves(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	if got := dossierTree(t, te.StateDir); !slices.Equal(got, []string{"task/t-c#/merged/t-z/notes.md", "task/t-c#/notes.md"}) {
+		t.Fatalf("dossiers %q", got)
+	}
+	if moves, err := db.DossierMoves(context.Background()); err != nil || len(moves) != 0 {
+		t.Fatalf("moves left %v %v", moves, err)
 	}
 }
 
