@@ -32,12 +32,12 @@ func Module(cfg config.Config, d sourcereg.Deps) (sourcereg.Module, error) {
 		Codec:  pr.Codec{},
 		Ingest: idleJob(cfg),
 		Rows: n.rows(func(rd readmodel.RowDeps) readmodel.Provider {
-			return prrow.New(prrow.Source{RowDeps: rd, Store: d.Inventory, Briefs: briefs})
+			return prrow.New(prrow.Source{RowDeps: rd, Reports: d.Reports, Store: d.Inventory, Briefs: briefs})
 		}),
 		Facts:      factsOf(cfg, d),
 		Slow:       func(context.Context) (string, string, error) { return "skipped", "the GitHub plugin does not run", nil },
-		Items:      Items,
-		Card:       Card,
+		Items:      Cards{Reports: d.Reports}.Items,
+		Card:       Cards{Reports: d.Reports}.Card,
 		Identity:   identity(d.Inventory),
 		UnitEvents: unitEvents{d.Inventory},
 		UI:         UI(),
@@ -61,6 +61,7 @@ func factsOf(cfg config.Config, d sourcereg.Deps) *factsgithub.Provider {
 		Clock:    d.Clock,
 		Teams:    func(ctx context.Context) ([]string, error) { return MyTeams(ctx, d.Inventory) },
 		Intents:  d.Intents,
+		Reports:  d.Reports,
 	}
 	if d.Changes != nil {
 		fd.Changes = d.Changes

@@ -27,6 +27,11 @@ const (
 	KindMerged               = "merged" // Actor = the merger, Data = the merge commit oid
 	KindClosed               = "closed"
 	KindRoundSent            = "round_sent"
+	KindRoundHeld            = "round_held"
+	KindRoundBlocked         = "round_blocked"
+	KindRoundUnblocked       = "round_unblocked" // Data = what cleared it
+	KindWouldAddress         = "would_address"
+	KindNudged               = "nudged" // Data = who was asked
 	KindTracked              = "tracked"
 	KindUntracked            = "untracked"
 	KindStatus               = "status"     // Data = board column

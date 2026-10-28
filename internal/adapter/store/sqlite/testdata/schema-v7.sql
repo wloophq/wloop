@@ -40,7 +40,7 @@ CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
   kind TEXT NOT NULL, key TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '',
-  at TEXT NOT NULL, data TEXT NOT NULL DEFAULT ''
+  at TEXT NOT NULL, data TEXT NOT NULL DEFAULT '', anchor TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX events_keyed ON events(provider, unit_key, kind, key) WHERE key != '';
 CREATE UNIQUE INDEX events_unkeyed ON events(provider, unit_key, kind, at) WHERE key = '';

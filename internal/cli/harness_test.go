@@ -44,6 +44,8 @@ import (
 	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/gitx"
+	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -646,6 +648,9 @@ func newTestEnv(t *testing.T, ws workspace.Manager) *testEnv {
 	te.db = db
 	te.Rounds = sqlite.NewRounds(db)
 	te.Store = inventory.New(db)
+	te.Env.reports = func(st *inventory.Store) readmodel.Reports {
+		return ghreporttest.Inventory{Store: st, Now: func() time.Time { return te.Env.Now() }, Config: func() config.Config { return te.cfg }}
+	}
 	te.repo, te.sink = sqlite.New(db), testsink.New("test")
 	te.reg = &testRegistry{Registry: te.repo, Handles: te.repo, noMCP: map[string]bool{}}
 	clock := clockFunc(func() time.Time { return te.Env.Now() })
@@ -808,7 +813,7 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState,
 		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
-	d = withGitHub(d, present.Deps{Store: te.Store, Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh}})
+	d = withGitHub(d, present.Deps{Store: te.Store, Reports: te.Env.reports(te.Store), Host: te.moduleHost(te.db)(unit.GitHub), Explorer: derivedRows{te.gh}})
 	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
 	if with != nil {
 		d = with(d)

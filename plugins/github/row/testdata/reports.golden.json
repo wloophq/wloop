@@ -1,0 +1,6440 @@
+[
+  {
+    "name": "review asked of me",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-14T02:00:00Z",
+        "changed_files": 1,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "review",
+        "waiting_on": "me",
+        "since": "2026-10-14T02:00:00Z",
+        "reason": "review requested, no review on the head",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-14T02:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#1",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "review",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "review requested, no review on the head",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T02:00:00Z",
+        "link": "https://github.com/acme/api/pull/1",
+        "turns_link": "#unit=github/acme/api#1",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:review",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#1"
+          },
+          "kind": "request",
+          "summary": "Review acme/api#1: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/1"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#1"
+            },
+            "ref": "situation:review",
+            "permalink": "https://github.com/acme/api/pull/1"
+          },
+          "requester": {
+            "key": "github:ana",
+            "name": "ana"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "explicit_mention",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#1"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-14T02:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-11T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 3
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-14T02:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me"
+      ]
+    }
+  },
+  {
+    "name": "review asked of a team",
+    "payload": {
+      "author": "bob",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-13T13:00:00Z",
+        "changed_files": 2,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "review",
+        "waiting_on": "me",
+        "since": "2026-10-13T13:00:00Z",
+        "reason": "review requested, no review on the head",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-13T13:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#2",
+        "title": "change bob",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "review",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "review requested, no review on the head",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-13T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/2",
+        "turns_link": "#unit=github/acme/api#2",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:review",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#2"
+          },
+          "kind": "request",
+          "summary": "Review acme/api#2: change bob",
+          "urls": [
+            "https://github.com/acme/api/pull/2"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#2"
+            },
+            "ref": "situation:review",
+            "permalink": "https://github.com/acme/api/pull/2"
+          },
+          "requester": {
+            "key": "github:bob",
+            "name": "bob"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "explicit_mention",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#2"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "bob"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4,
+            "list": [
+              "acme-core"
+            ]
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-13T13:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-13T13:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 1
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "bob",
+        "ci": "success",
+        "opened": "2026-10-13T13:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me"
+      ]
+    }
+  },
+  {
+    "name": "review asked of another",
+    "payload": {
+      "author": "bob",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-13T00:00:00Z",
+        "changed_files": 3,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "review",
+        "waiting_on": "carol",
+        "since": "2026-10-13T00:00:00Z",
+        "reason": "review requested, no review on the head",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-13T00:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#3",
+        "title": "change bob",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "review",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "review requested, no review on the head",
+        "waits_on": [
+          {
+            "key": "github:carol",
+            "name": "carol"
+          }
+        ],
+        "since": "2026-10-13T00:00:00Z",
+        "link": "https://github.com/acme/api/pull/3",
+        "turns_link": "#unit=github/acme/api#3",
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#3"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "bob"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-13T00:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-13T00:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 2
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "bob",
+        "ci": "success",
+        "opened": "2026-10-13T00:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      }
+    }
+  },
+  {
+    "name": "mine without reviewer",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-12T11:00:00Z",
+        "changed_files": 4,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "no_reviewer",
+        "waiting_on": "author",
+        "since": "2026-10-12T11:00:00Z",
+        "reason": "no reviewer requested",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-12T11:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#4",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "no_reviewer",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "why": "no reviewer requested",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-12T11:00:00Z",
+        "link": "https://github.com/acme/api/pull/4",
+        "turns_link": "#unit=github/acme/api#4",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:reviewer",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#4"
+          },
+          "kind": "decision",
+          "summary": "Pick a reviewer for acme/api#4: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/4"
+          ],
+          "contexts": [
+            "@decide"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#4"
+            },
+            "ref": "situation:no_reviewer",
+            "permalink": "https://github.com/acme/api/pull/4"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#4"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-12T11:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-12T11:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 2
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-14T11:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-12T11:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "stalled",
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "mine draft",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-a",
+        "display_name": "author",
+        "status": "in-progress",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-11T22:00:00Z",
+        "changed_files": 5,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "draft",
+        "waiting_on": "author",
+        "since": "2026-10-11T22:00:00Z",
+        "reason": "draft"
+      },
+      "card": {
+        "label": "acme/api#5",
+        "title": "change me-login",
+        "state": "draft",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "draft",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "draft",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-11T22:00:00Z",
+        "link": "https://github.com/acme/api/pull/5",
+        "turns_link": "#unit=github/acme/api#5",
+        "started_by_me": true,
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#5"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-11T22:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-11T22:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 3
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-11T22:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-progress"
+      },
+      "views": [
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "mine checks failing",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-11T09:00:00Z",
+        "changed_files": 6,
+        "checks": {
+          "state": "FAILURE",
+          "failing": [
+            "lint",
+            "unit"
+          ]
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "checks",
+        "waiting_on": "author",
+        "since": "2026-10-11T09:00:00Z",
+        "reason": "checks failing: lint, unit",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-11T09:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#6",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "checks",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "failing: lint, unit",
+            "tone": "bad"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "why": "checks failing: lint, unit",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-11T09:00:00Z",
+        "link": "https://github.com/acme/api/pull/6",
+        "turns_link": "#unit=github/acme/api#6",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:address",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#6"
+          },
+          "kind": "todo",
+          "summary": "Address acme/api#6: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/6"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#6"
+            },
+            "ref": "situation:checks",
+            "permalink": "https://github.com/acme/api/pull/6"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#6"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "failure"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-11T09:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-11T09:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 3
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-13T00:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "opened": "2026-10-11T09:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me",
+        "stalled",
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ],
+        "ci": [
+          "failure",
+          "lint",
+          "unit"
+        ]
+      }
+    }
+  },
+  {
+    "name": "mine changes asked",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-10T20:00:00Z",
+        "changed_files": 7,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login",
+      "last_human": {
+        "who": "carol",
+        "what": "review",
+        "at": "2026-10-05T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/7"
+      }
+    },
+    "report": {
+      "situation": {
+        "kind": "changes",
+        "waiting_on": "author",
+        "since": "2026-10-05T15:00:00Z",
+        "reason": "changes requested by carol",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-05T15:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#7",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "changes",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "review",
+            "value": "changes requested",
+            "tone": "warn"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "last_human": {
+          "who": {
+            "key": "github:carol",
+            "name": "carol"
+          },
+          "what": "review",
+          "at": "2026-10-05T15:00:00Z",
+          "link": "https://github.com/acme/api/pull/7"
+        },
+        "why": "changes requested by carol",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-05T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/7",
+        "turns_link": "#unit=github/acme/api#7",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:address",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#7"
+          },
+          "kind": "todo",
+          "summary": "Address acme/api#7: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/7"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#7"
+            },
+            "ref": "situation:changes",
+            "permalink": "https://github.com/acme/api/pull/7"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#7"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-10T20:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-05T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 9
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-06T15:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-10T20:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me",
+        "stalled",
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "mine can merge",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": true,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-a",
+        "display_name": "author",
+        "status": "in-progress",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-10T07:00:00Z",
+        "changed_files": 8,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login",
+      "last_human": {
+        "who": "carol",
+        "what": "review",
+        "at": "2026-10-14T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/8"
+      }
+    },
+    "report": {
+      "situation": {
+        "kind": "merge",
+        "waiting_on": "author",
+        "since": "2026-10-14T13:00:00Z",
+        "reason": "approved and green",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-14T13:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#8",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "merge",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "review",
+            "value": "approved",
+            "tone": "good"
+          }
+        ],
+        "last_human": {
+          "who": {
+            "key": "github:carol",
+            "name": "carol"
+          },
+          "what": "review",
+          "at": "2026-10-14T13:00:00Z",
+          "link": "https://github.com/acme/api/pull/8"
+        },
+        "why": "approved and green",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/8",
+        "turns_link": "#unit=github/acme/api#8",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:merge",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#8"
+          },
+          "kind": "todo",
+          "summary": "Merge acme/api#8: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/8"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#8"
+            },
+            "ref": "situation:merge",
+            "permalink": "https://github.com/acme/api/pull/8"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#8"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-10T07:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-14T13:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready",
+          "on": true
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-10T07:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-progress"
+      },
+      "views": [
+        "mine",
+        "approved"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "mine conflicts",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-09T18:00:00Z",
+        "changed_files": 9,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "conflicts",
+        "waiting_on": "author",
+        "since": "2026-10-14T14:00:00Z",
+        "reason": "merge conflicts with main",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-14T14:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#9",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "conflicts",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "merge",
+            "value": "conflicts",
+            "tone": "bad"
+          }
+        ],
+        "why": "merge conflicts with main",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T14:00:00Z",
+        "link": "https://github.com/acme/api/pull/9",
+        "turns_link": "#unit=github/acme/api#9",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:address",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#9"
+          },
+          "kind": "todo",
+          "summary": "Address acme/api#9: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/9"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#9"
+            },
+            "ref": "situation:conflicts",
+            "permalink": "https://github.com/acme/api/pull/9"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#9"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-14T14:00:00Z"
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-09T18:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-09T18:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 5
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-09T18:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me",
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "reply due on theirs",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-09T05:00:00Z",
+        "changed_files": 10,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "reply",
+        "waiting_on": "author",
+        "since": "2026-10-09T15:00:00Z",
+        "reason": "me-login commented, no reply",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-09T15:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#10",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "reply",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "why": "me-login commented, no reply",
+        "waits_on": [
+          {
+            "key": "github:ana",
+            "name": "ana"
+          }
+        ],
+        "since": "2026-10-09T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/10",
+        "turns_link": "#unit=github/acme/api#10",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:fix",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#10"
+          },
+          "kind": "request",
+          "summary": "Wait for ana's fix on acme/api#10: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/10"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#10"
+            },
+            "ref": "situation:reply",
+            "permalink": "https://github.com/acme/api/pull/10"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "basis": "explicit_mention",
+          "waiting_on": [
+            {
+              "key": "github:ana",
+              "name": "ana"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#10"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-09T05:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-09T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 5
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-12T15:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-09T05:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "stalled"
+      ]
+    }
+  },
+  {
+    "name": "reviewer back",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-08T16:00:00Z",
+        "changed_files": 11,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login",
+      "last_human": {
+        "who": "ana",
+        "what": "comment",
+        "at": "2026-10-09T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/11"
+      }
+    },
+    "report": {
+      "situation": {
+        "kind": "no_reviewer",
+        "waiting_on": "author",
+        "since": "2026-10-08T16:00:00Z",
+        "reason": "no reviewer requested",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-08T16:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#11",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "no_reviewer",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "last_human": {
+          "who": {
+            "key": "github:ana",
+            "name": "ana"
+          },
+          "what": "comment",
+          "at": "2026-10-09T15:00:00Z",
+          "link": "https://github.com/acme/api/pull/11"
+        },
+        "why": "no reviewer requested",
+        "waits_on": [
+          {
+            "key": "github:ana",
+            "name": "ana"
+          }
+        ],
+        "since": "2026-10-08T16:00:00Z",
+        "link": "https://github.com/acme/api/pull/11",
+        "turns_link": "#unit=github/acme/api#11",
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#11"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-08T16:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-09T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 5
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-12T16:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-08T16:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "stalled"
+      ]
+    }
+  },
+  {
+    "name": "merged",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-r",
+        "display_name": "review",
+        "status": "in-review",
+        "is_review": true,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-07T14:00:00Z",
+        "changed_files": 13,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "done",
+        "waiting_on": "nobody",
+        "since": "2026-10-13T15:00:00Z",
+        "reason": "merged"
+      },
+      "card": {
+        "label": "acme/api#13",
+        "title": "change ana",
+        "state": "merged",
+        "outcome": "done",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "done",
+            "tone": "neutral"
+          }
+        ],
+        "why": "merged",
+        "since": "2026-10-13T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/13",
+        "turns_link": "#unit=github/acme/api#13",
+        "closure_posted": true,
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#13"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "MERGED"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.merged_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-13T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-07T14:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-07T14:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 7
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop",
+          "on": true
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-07T14:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-review"
+      },
+      "views": [
+        "loop",
+        "done"
+      ]
+    }
+  },
+  {
+    "name": "closed without workspace",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-07T01:00:00Z",
+        "changed_files": 14,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "done",
+        "waiting_on": "nobody",
+        "since": "2026-10-13T15:00:00Z",
+        "reason": "closed"
+      },
+      "card": {
+        "label": "acme/api#14",
+        "title": "change ana",
+        "state": "closed",
+        "outcome": "moot",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "done",
+            "tone": "neutral"
+          }
+        ],
+        "why": "closed",
+        "since": "2026-10-13T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/14",
+        "turns_link": "#unit=github/acme/api#14",
+        "closure_posted": true,
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#14"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "CLOSED"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.closed_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-13T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-07T01:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-07T01:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 8
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-07T01:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      }
+    }
+  },
+  {
+    "name": "held by the cap",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-r",
+        "display_name": "review",
+        "status": "in-review",
+        "is_review": true,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-04T21:00:00Z",
+        "changed_files": 18,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "held",
+        "waiting_on": "me",
+        "since": "2026-10-14T14:00:00Z",
+        "reason": "automatic round held: cap reached"
+      },
+      "card": {
+        "label": "acme/api#18",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "held",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "automatic round held: cap reached",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T14:00:00Z",
+        "link": "https://github.com/acme/api/pull/18",
+        "turns_link": "#unit=github/acme/api#18",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:held:2026-10-14",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#18"
+          },
+          "kind": "decision",
+          "summary": "Decide the held round on acme/api#18: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/18"
+          ],
+          "contexts": [
+            "@decide"
+          ],
+          "category": "inbox",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#18"
+            },
+            "ref": "situation:held",
+            "permalink": "https://github.com/acme/api/pull/18"
+          },
+          "requester": {
+            "key": "system:the loop",
+            "name": "the loop"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#18"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-04T21:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-04T21:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 10
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop",
+          "on": true
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-04T21:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-review"
+      },
+      "views": [
+        "needs-me",
+        "loop"
+      ]
+    }
+  },
+  {
+    "name": "round blocked",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-04T08:00:00Z",
+        "changed_files": 19,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "blocked",
+        "waiting_on": "me",
+        "since": "2026-10-14T13:00:00Z",
+        "reason": "round blocked: no access"
+      },
+      "card": {
+        "label": "acme/api#19",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "blocked",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "round blocked: no access",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/19",
+        "turns_link": "#unit=github/acme/api#19",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:blocked",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#19"
+          },
+          "kind": "decision",
+          "summary": "Unblock the round on acme/api#19: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/19"
+          ],
+          "contexts": [
+            "@decide"
+          ],
+          "category": "inbox",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#19"
+            },
+            "ref": "situation:blocked",
+            "permalink": "https://github.com/acme/api/pull/19"
+          },
+          "requester": {
+            "key": "system:the loop",
+            "name": "the loop"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#19"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-04T08:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-04T08:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 10
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-04T08:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me"
+      ]
+    }
+  },
+  {
+    "name": "to address",
+    "payload": {
+      "author": "me-login",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-03T19:00:00Z",
+        "changed_files": 20,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "to_address",
+        "waiting_on": "me",
+        "since": "2026-10-14T12:00:00Z",
+        "reason": "review to address, no workspace: carol asked"
+      },
+      "card": {
+        "label": "acme/api#20",
+        "title": "change me-login",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "to_address",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "review to address, no workspace: carol asked",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-10-14T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/20",
+        "turns_link": "#unit=github/acme/api#20",
+        "started_by_me": true,
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:address",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#20"
+          },
+          "kind": "todo",
+          "summary": "Address acme/api#20: change me-login",
+          "urls": [
+            "https://github.com/acme/api/pull/20"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#20"
+            },
+            "ref": "situation:to_address",
+            "permalink": "https://github.com/acme/api/pull/20"
+          },
+          "requester": {
+            "key": "github:me-login",
+            "name": "me-login"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "self_assigned",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#20"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "me-login"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-03T19:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-03T19:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 11
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "ci": "success",
+        "opened": "2026-10-03T19:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me",
+        "mine"
+      ],
+      "facet_values": {
+        "author": [
+          "me",
+          "me-login"
+        ]
+      }
+    }
+  },
+  {
+    "name": "workspace agent waiting",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-r",
+        "display_name": "review",
+        "status": "in-review",
+        "is_review": true,
+        "agent_states": [
+          "waiting"
+        ],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-10-01T02:00:00Z",
+        "changed_files": 25,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "loop_waiting",
+        "waiting_on": "me",
+        "reason": "the agent asked you something"
+      },
+      "card": {
+        "label": "acme/api#25",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "loop_waiting",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          }
+        ],
+        "why": "the agent asked you something",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "link": "https://github.com/acme/api/pull/25",
+        "turns_link": "#unit=github/acme/api#25",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:wait",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#25"
+          },
+          "kind": "todo",
+          "summary": "Answer the agent on acme/api#25: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/25"
+          ],
+          "contexts": [
+            "@agent"
+          ],
+          "category": "inbox",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#25"
+            },
+            "ref": "situation:loop_waiting",
+            "permalink": "https://github.com/acme/api/pull/25"
+          },
+          "requester": {
+            "key": "system:the loop",
+            "name": "the loop"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "none",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#25"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-10-01T02:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-01T02:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 14
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop",
+          "on": true
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-10-01T02:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-review"
+      },
+      "views": [
+        "needs-me",
+        "loop"
+      ]
+    }
+  },
+  {
+    "name": "adopted outside scope",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "adopted": true
+      },
+      "facts": {
+        "created_at": "2026-09-30T13:00:00Z",
+        "changed_files": 26,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "review",
+        "waiting_on": "carol",
+        "since": "2026-09-30T13:00:00Z",
+        "reason": "review requested, no review on the head",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-09-30T13:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#26",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "review",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "why": "review requested, no review on the head",
+        "waits_on": [
+          {
+            "key": "github:carol",
+            "name": "carol"
+          }
+        ],
+        "since": "2026-09-30T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/26",
+        "turns_link": "#unit=github/acme/api#26",
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#26"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-09-30T13:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-09-30T13:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 14
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-02T13:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-09-30T13:00:00Z",
+        "repo": "acme/api",
+        "status": "none"
+      },
+      "views": [
+        "mine"
+      ]
+    }
+  },
+  {
+    "name": "tracked",
+    "payload": {
+      "author": "bob",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "tracked"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "override": {
+        "tracked": true
+      },
+      "facts": {
+        "created_at": "2026-09-30T00:00:00Z",
+        "changed_files": 27,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "no_reviewer",
+        "waiting_on": "author",
+        "since": "2026-09-30T00:00:00Z",
+        "reason": "no reviewer requested",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-09-30T00:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#27",
+        "title": "change bob",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "no_reviewer",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "why": "no reviewer requested",
+        "waits_on": [
+          {
+            "key": "github:bob",
+            "name": "bob"
+          }
+        ],
+        "since": "2026-09-30T00:00:00Z",
+        "link": "https://github.com/acme/api/pull/27",
+        "turns_link": "#unit=github/acme/api#27",
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#27"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "bob"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-09-30T00:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-09-30T00:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 15
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-10-02T00:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "bob",
+        "ci": "success",
+        "opened": "2026-09-30T00:00:00Z",
+        "repo": "acme/api",
+        "scope": "tracked",
+        "status": "none"
+      },
+      "views": [
+        "stalled"
+      ]
+    }
+  },
+  {
+    "name": "approved review head",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": true,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "ws-r",
+        "display_name": "review",
+        "status": "in-review",
+        "is_review": true,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-09-29T11:00:00Z",
+        "changed_files": 28,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login"
+    },
+    "report": {
+      "situation": {
+        "kind": "merge",
+        "waiting_on": "author",
+        "since": "2026-10-13T15:00:00Z",
+        "reason": "approved and green",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-10-13T15:00:00Z",
+          "threshold": 86400000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#28",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "merge",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "review",
+            "value": "approved",
+            "tone": "good"
+          }
+        ],
+        "why": "approved and green",
+        "waits_on": [
+          {
+            "key": "github:ana",
+            "name": "ana"
+          }
+        ],
+        "since": "2026-10-13T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/28",
+        "turns_link": "#unit=github/acme/api#28",
+        "cares": true
+      },
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#28"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-09-29T11:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-10-13T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 1
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled"
+        },
+        {
+          "name": "in_loop",
+          "on": true
+        },
+        {
+          "name": "ready",
+          "on": true
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-09-29T11:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "in-review"
+      },
+      "views": [
+        "loop",
+        "approved"
+      ]
+    }
+  },
+  {
+    "name": "old stalled review",
+    "payload": {
+      "author": "ana",
+      "repo": "acme/api",
+      "head": "feat/x",
+      "approved": false,
+      "reasons": [
+        "involved"
+      ],
+      "workspace": {
+        "id": "",
+        "display_name": "",
+        "status": "",
+        "is_review": false,
+        "agent_states": [],
+        "comment": "",
+        "is_main": false
+      },
+      "facts": {
+        "created_at": "2026-08-15T15:00:00Z",
+        "changed_files": 31,
+        "checks": {
+          "state": "SUCCESS"
+        }
+      },
+      "viewer": "me-login",
+      "last_human": {
+        "who": "ana",
+        "what": "opened",
+        "at": "2026-08-15T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/31"
+      }
+    },
+    "report": {
+      "situation": {
+        "kind": "review",
+        "waiting_on": "me",
+        "since": "2026-08-15T15:00:00Z",
+        "reason": "review requested, no review on the head",
+        "stalled": {
+          "kind": 9,
+          "time": "2026-08-15T15:00:00Z",
+          "threshold": 172800000000000,
+          "unit": 1
+        }
+      },
+      "card": {
+        "label": "acme/api#31",
+        "title": "change ana",
+        "state": "open",
+        "signals": [
+          {
+            "key": "situation",
+            "value": "review",
+            "tone": "neutral"
+          },
+          {
+            "key": "checks",
+            "value": "passing",
+            "tone": "good"
+          },
+          {
+            "key": "stalled",
+            "value": "stalled",
+            "tone": "warn"
+          }
+        ],
+        "last_human": {
+          "who": {
+            "key": "github:ana",
+            "name": "ana"
+          },
+          "what": "opened",
+          "at": "2026-08-15T15:00:00Z",
+          "link": "https://github.com/acme/api/pull/31"
+        },
+        "why": "review requested, no review on the head",
+        "waits_on": [
+          {
+            "key": "github:me-login",
+            "name": "me-login"
+          }
+        ],
+        "since": "2026-08-15T15:00:00Z",
+        "link": "https://github.com/acme/api/pull/31",
+        "turns_link": "#unit=github/acme/api#31",
+        "cares": true
+      },
+      "items": [
+        {
+          "id": "gh:review",
+          "unit": {
+            "provider": "github",
+            "key": "acme/api#31"
+          },
+          "kind": "request",
+          "summary": "Review acme/api#31: change ana",
+          "urls": [
+            "https://github.com/acme/api/pull/31"
+          ],
+          "contexts": [
+            "@repo-api"
+          ],
+          "category": "ready",
+          "origin": {
+            "unit": {
+              "provider": "github",
+              "key": "acme/api#31"
+            },
+            "ref": "situation:review",
+            "permalink": "https://github.com/acme/api/pull/31"
+          },
+          "requester": {
+            "key": "github:ana",
+            "name": "ana"
+          },
+          "assignees": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "basis": "explicit_mention",
+          "waiting_on": [
+            {
+              "key": "github:me-login",
+              "name": "me-login"
+            }
+          ],
+          "state": "open",
+          "confidence": "high",
+          "provenance": "derived"
+        }
+      ],
+      "facts": [
+        {
+          "name": "pr.repo",
+          "value": {
+            "kind": 3,
+            "string": "acme/api"
+          }
+        },
+        {
+          "name": "pr.repo_name",
+          "value": {
+            "kind": 3,
+            "string": "api"
+          }
+        },
+        {
+          "name": "pr.owner",
+          "value": {
+            "kind": 3,
+            "string": "acme"
+          }
+        },
+        {
+          "name": "pr.slug",
+          "value": {
+            "kind": 3,
+            "string": "acme/api#31"
+          }
+        },
+        {
+          "name": "pr.author",
+          "value": {
+            "kind": 3,
+            "string": "ana"
+          }
+        },
+        {
+          "name": "pr.state",
+          "value": {
+            "kind": 3,
+            "string": "OPEN"
+          }
+        },
+        {
+          "name": "pr.ended",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.draft",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.head",
+          "value": {
+            "kind": 3,
+            "string": "h1"
+          }
+        },
+        {
+          "name": "pr.conflicting_for",
+          "value": {
+            "kind": 5
+          }
+        },
+        {
+          "name": "pr.mine",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.base",
+          "value": {
+            "kind": 3,
+            "string": "main"
+          }
+        },
+        {
+          "name": "pr.cross_repository",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.requested_teams",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.review_requested_me",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.checks",
+          "value": {
+            "kind": 3,
+            "string": "success"
+          }
+        },
+        {
+          "name": "pr.age",
+          "value": {
+            "kind": 7,
+            "time": "2026-08-15T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.adopted",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.stale",
+          "value": {
+            "kind": 1,
+            "bool": true
+          }
+        },
+        {
+          "name": "pr.visibility",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.association",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.labels",
+          "value": {
+            "kind": 4
+          }
+        },
+        {
+          "name": "pr.last_review.exists",
+          "value": {
+            "kind": 1
+          }
+        },
+        {
+          "name": "pr.last_review.verdict",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_review.decision",
+          "value": {
+            "kind": 3
+          }
+        },
+        {
+          "name": "pr.last_interaction_at",
+          "value": {
+            "kind": 6,
+            "time": "2026-08-15T15:00:00Z"
+          }
+        },
+        {
+          "name": "pr.silent_days",
+          "value": {
+            "kind": 2,
+            "int": 60
+          }
+        }
+      ],
+      "signals": [
+        {
+          "name": "stalled",
+          "on": true,
+          "since": "2026-08-19T00:00:00.000000001Z"
+        },
+        {
+          "name": "in_loop"
+        },
+        {
+          "name": "ready"
+        }
+      ],
+      "facets": {
+        "author": "ana",
+        "ci": "success",
+        "opened": "2026-08-15T15:00:00Z",
+        "repo": "acme/api",
+        "scope": "involved",
+        "status": "none"
+      },
+      "views": [
+        "needs-me",
+        "stalled"
+      ]
+    }
+  }
+]

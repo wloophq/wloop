@@ -168,7 +168,7 @@ func (e *Env) workspaceFacts() automation.Units {
 	if snap == nil || e.Store == nil {
 		return nil
 	}
-	d := factworkspace.Deps{Snapshot: snap, Sessions: e.planSessions(), PRs: e.planInputs(), Overrides: inventory.ByUnit{Store: e.Store}, Books: e.planBooks(),
+	d := factworkspace.Deps{Snapshot: snap, Sessions: e.planSessions(), Holdings: e.workspaceHoldings(), Books: e.planBooks(),
 		Git: factworkspace.LocalGit{R: e.Git.R}, Disk: factworkspace.OS{}, Cfg: e.currentConfig, Clock: clockFunc(func() time.Time { return e.Now() })}
 	if e.changes != nil {
 		d.Changes = e.changes

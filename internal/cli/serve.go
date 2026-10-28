@@ -277,7 +277,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
-	sd := e.withGitHubClient(source.Deps{DB: db, Inventory: store, Host: host, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
+	sd := e.withGitHubClient(source.Deps{DB: db, Inventory: store, Host: host, Reports: e.sourceReports(store), WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
 		Changes: e.changes, Clock: clockFunc(e.Now), Log: logf, Git: e.Git, Agents: e.Agents,
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {

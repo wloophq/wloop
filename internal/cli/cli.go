@@ -21,6 +21,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/brief"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/pkg/plugin"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
@@ -183,6 +184,9 @@ type Env struct {
 	pluginKind *psource.Kind
 	// pluginLauncher starts serve's plugins; nil starts their binaries.
 	pluginLauncher plugin.Launcher
+	// reports are what the source plugins last reported, as a test derives
+	// them over a store; nil reads the running plugins' reports.
+	reports func(store *inventory.Store) readmodel.Reports
 	// briefsHeard holds the brief queue that hears of each brief a plugin
 	// writes through its broker; nil outside serve.
 	briefsHeard *atomic.Pointer[brief.Queue]

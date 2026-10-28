@@ -60,7 +60,7 @@ type Module struct {
 	// The optional capabilities below are nil when absent.
 
 	// Items are the derived items of a row: deterministic, stable ids, no I/O; the viewer comes from the row's payload.
-	Items func(row api.Row) []items.Item
+	Items func(ctx context.Context, row api.Row) ([]items.Item, error)
 	// Card is required when Items is set or the plugin's units carry items.
 	Card func(ctx context.Context, row api.Row) (card.Card, error)
 	// Identity is the user as this plugin knows them.
@@ -201,6 +201,9 @@ type Deps struct {
 	// host's events, marks and drafts the module writes and reads; nil
 	// reaches them in DB.
 	Host func(id unit.ProviderID) src.Host
+	// Reports are what the source plugins last reported of their units;
+	// nil reports none.
+	Reports readmodel.Reports
 }
 
 // Build makes a source's module from the config and the shared handles.

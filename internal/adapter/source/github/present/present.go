@@ -63,6 +63,9 @@ type Budget interface {
 // broker the host serves it, and GitHub.
 type Deps struct {
 	Store *inventory.Store
+	// Reports are what the GitHub plugin last reported of its pull
+	// requests, which a row derives from.
+	Reports readmodel.Reports
 	// Host is the broker: the host's overrides and round state.
 	Host src.Host
 	// Explorer nil answers Explore as unavailable; Briefs nil shows no

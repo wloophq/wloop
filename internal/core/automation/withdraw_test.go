@@ -124,7 +124,8 @@ func TestWithdrawWhenReadsTheFactsScopedToItsWorkflow(t *testing.T) {
 	}, "session.settled")
 	r := newRig(t, w)
 	ws := withWithdrawals(r)
-	r.e.Units = scopedUnits{Units: r.units, settled: map[string]time.Time{"ask": t0}}
+	su := scopedUnits{Units: r.units, settled: map[string]time.Time{"ask": t0}}
+	r.e.Units, r.e.Keep = su, su
 	r.put(s1, "a")
 	ws.Put("ask", owned(1, s1, 0))
 	r.sweep()

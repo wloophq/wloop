@@ -49,6 +49,9 @@ const stepClassify = "classify"
 // fills the removal ports the Env has.
 type stepDeps struct {
 	Units automation.Units
+	// Keep is the host's bookkeeping of Units, which scopes a workflow's
+	// facts; nil scopes none.
+	Keep any
 	// Planners plan the rounds of their plugin's units, by provider.
 	Planners map[unit.ProviderID]roundPlanner
 	// Overrides are the host's overrides a plan reads; nil reads none.

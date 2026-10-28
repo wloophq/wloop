@@ -15,8 +15,12 @@ type Engine struct {
 	Workflows func() []workflow.Workflow
 	// Broken names the workflows that failed to load; their proposed drafts
 	// stay until they load again or are gone. Nil: none failed.
-	Broken   func() []string
-	Units    Units
+	Broken func() []string
+	Units  Units
+	// Keep is the host's own bookkeeping of the units, which no unit
+	// reports: a value implementing any of Refresher, Settler, Gainer,
+	// Owner, Seener, Scoper and EventFacts; nil keeps none.
+	Keep     any
 	Events   Events
 	Steps    Steps
 	Ledger   Ledger

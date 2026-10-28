@@ -40,12 +40,10 @@ func (noUnits) Facts(context.Context, unit.Unit) (workflow.Facts, error) {
 	return nil, automation.ErrUnitGone
 }
 
-var _ automation.Scoper = (*unitSet)(nil)
-
 // Scope is the scoped facts of u's provider; f unchanged when it scopes
 // none.
-func (s *unitSet) Scope(ctx context.Context, wf string, u unit.Unit, f workflow.Facts) (workflow.Facts, error) {
-	if sc, ok := s.providers[u.Provider].(automation.Scoper); ok {
+func (k unitKeeping) Scope(ctx context.Context, wf string, u unit.Unit, f workflow.Facts) (workflow.Facts, error) {
+	if sc, ok := k.s.providers[u.Provider].(automation.Scoper); ok {
 		return sc.Scope(ctx, wf, u, f)
 	}
 	return f, nil

@@ -27,6 +27,7 @@ import (
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -52,7 +53,7 @@ func seededNudges(t testing.TB, f *storetest.Fixture) (*nudges, readmodel.RowDep
 	n := &nudges{viewer: func(ctx context.Context) (string, error) { return f.Inventory.Viewer(ctx, unit.GitHub) },
 		teams: func(ctx context.Context) ([]string, error) { return MyTeams(ctx, f.Inventory) }}
 	n.rows(func(rd readmodel.RowDeps) readmodel.Provider {
-		return prrow.New(prrow.Source{RowDeps: rd, Store: f.Inventory})
+		return prrow.New(prrow.Source{RowDeps: rd, Reports: ghreporttest.Inventory{Store: f.Inventory, Now: f.Inventory.Now}, Store: f.Inventory})
 	})(rd)
 	return n, rd
 }
@@ -185,7 +186,8 @@ func propose(s ghsourcetest.Situation) (outbox.Proposal, bool) {
 		return outbox.Proposal{}, false
 	}
 	s.Override = dinv.Override{}
-	return nudgeProposal(row, ghsourcetest.Derive(s), s.Events, nil, ghsourcetest.Viewer, nil, nowOf(s))
+	unmuted, rep := ghsourcetest.DeriveReport(s)
+	return nudgeProposal(row, unmuted, rep, s.Events, nil, ghsourcetest.Viewer, nil, nowOf(s))
 }
 
 func nowOf(s ghsourcetest.Situation) time.Time {

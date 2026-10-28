@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
+
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -42,12 +44,18 @@ import (
 // withRows is d with every inventory role on st and the sources' codecs and
 // rows; it reads nothing from GitHub: no ingestion, slow job or track.
 func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
-	mods, err := buildSources(plugins, d.Cfg, source.Deps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now)})
+	cfg := d.Cfg
+	now := d.Now
+	if now == nil {
+		now = st.Now
+	}
+	reports := ghreporttest.Inventory{Store: st, Now: now, Config: func() config.Config { return cfg }, Identity: d.Identity}
+	mods, err := buildSources(plugins, d.Cfg, source.Deps{Inventory: st, Turns: d.Turns, Clock: clockFunc(time.Now), Reports: reports})
 	if err != nil {
 		panic(err)
 	}
 	d = withSources(withStore(d, st), plugins, mods)
-	d = withGitHub(d, present.Deps{Store: st, Host: moduleBroker(d.Units, st.DB())})
+	d = withGitHub(d, present.Deps{Store: st, Reports: reports, Host: moduleBroker(d.Units, st.DB())})
 	d.Ingest, d.Collector = nil, nil
 	d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
 	d.Track = func(_ context.Context, u unit.Unit) (port.TrackRead, error) {
@@ -165,9 +173,9 @@ func carded(p source.Plugin) source.Plugin {
 		m.Card = func(_ context.Context, r api.Row) (card.Card, error) {
 			return card.Card{Unit: r.Unit, Title: r.Title, State: "thread"}, nil
 		}
-		m.Items = func(r api.Row) []items.Item {
+		m.Items = func(_ context.Context, r api.Row) ([]items.Item, error) {
 			return []items.Item{{ID: "th:ask", Unit: r.Unit, Kind: items.Request, Summary: r.Title, Requester: items.Person{Key: "thread:U000AAA"},
-				Origin: unit.Anchor{Unit: r.Unit, Ref: "m:1"}, State: items.Open, Confidence: items.High, Basis: items.NoBasis}}
+				Origin: unit.Anchor{Unit: r.Unit, Ref: "m:1"}, State: items.Open, Confidence: items.High, Basis: items.NoBasis}}, nil
 		}
 		return m, err
 	}

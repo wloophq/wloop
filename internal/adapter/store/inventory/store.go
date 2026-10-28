@@ -80,6 +80,9 @@ func touchChanged(tx *sqlite.Tx, res sql.Result, err error, t port.Topic, ref gi
 // by now.
 func (s *Store) UseClock(now func() time.Time) { s.clock = now }
 
+// Now is the store's clock.
+func (s *Store) Now() time.Time { return s.clock() }
+
 func ts(t time.Time) string {
 	if t.IsZero() {
 		return ""

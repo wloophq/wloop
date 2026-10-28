@@ -23,8 +23,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/plugins/source/value"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
-	"github.com/wloophq/wloop/internal/situation"
 )
 
 // authorLookback is how long after it ended a pull request of mine still
@@ -557,54 +558,26 @@ func (pl *planner) facts(ref pr.Ref, r result) workflow.Facts {
 	f := workflow.Facts{"pr.repo": ref.Owner + "/" + ref.Repo, "pr.repo_name": ref.Repo, "pr.owner": ref.Owner, "pr.author": "", "pr.visibility": "", "pr.ended": false,
 		"pr.slug": ref.String(), "pr.association": "", "pr.labels": []string{}, "pr.last_review.exists": false, "pr.last_review.verdict": "",
 		"pr.last_review.decision": "", "pr.nudge.who": []string{}, "pr.nudge.why": ""}
-	if pf, read := v.factsOf(ref); read {
-		f["pr.visibility"] = pf.Visibility
-		f["pr.association"], f["pr.labels"] = pf.AuthorAssociation, nonNil(pf.Labels)
-		prior, reviewed := pr.PriorReview(pf.Reviews)
-		f["pr.last_review.exists"], f["pr.last_review.verdict"], f["pr.last_review.decision"] = reviewed, pr.LastReviewVerdict(pf.Reviews), prior.Verdict
+	rep := v.reportOf(ref)
+	if rep != nil {
+		for _, x := range rep.Facts {
+			f[x.Name] = value.Fact(x.Value)
+		}
 	}
 	row, ok := v.byRef[ref]
 	if ok {
 		o := v.overrides[ref]
-		f["pr.state"] = row.State
-		f["pr.ended"] = row.State == dgh.StateMerged || row.State == dgh.StateClosed
-		if !row.MergedAt.IsZero() {
-			f["pr.merged_at"] = row.MergedAt
-		}
-		if !row.ClosedAt.IsZero() {
-			f["pr.closed_at"] = row.ClosedAt
-		}
 		f["pr.finished_for"] = finishedFor(row, now)
-		f["pr.draft"] = row.IsDraft
-		f["pr.head"] = row.HeadOid
-		f["pr.conflicting_for"] = time.Duration(0)
-		if since, ok := row.ConflictingSince(); ok {
-			f["pr.conflicting_for"] = now.Sub(since)
-		}
-		f["pr.author"] = row.Author
-		f["pr.mine"] = v.viewer != "" && strings.EqualFold(row.Author, v.viewer)
-		f["pr.base"], f["pr.cross_repository"] = row.BaseBranch, row.IsFork
-		f["pr.requested_teams"] = nonNil(pr.RequestedTeams(row.ReviewRequests))
-		f["pr.review_requested_me"] = v.viewer != "" && slices.ContainsFunc(row.ReviewRequests, func(r string) bool { return strings.EqualFold(r, v.viewer) })
-		f["pr.checks"] = strings.ToLower(row.ChecksState)
-		if !row.CreatedAt.IsZero() {
-			f["pr.age"] = now.Sub(row.CreatedAt)
-		}
 		f["pr.held"], f["pr.adopted"] = o.Hold, o.Adopted
 		f["pr.muted"] = o.MuteUntilStateChange || o.MutedUntil.After(now)
 		f["pr.mute.refusal"] = o.MuteRefusal(now)
-		f["pr.stale"] = r.stale
-		evs := v.eventsOf(ref)
-		if at := lastInteraction(row, evs); !at.IsZero() {
-			f["pr.last_interaction_at"] = at
-			f["pr.silent_days"] = calendarDays(at, now)
+		if rep != nil {
+			sit, nudge := v.situation(*rep, row, v.eventsOf(ref), o, now)
+			f["pr.nudge.who"], f["pr.nudge.why"] = nonNil(nudge.who), nudge.why
+			f["pr.stalled"] = sit.Stalled
+			f["pr.waits_on_user"] = sit.WaitingOn == "me" || (sit.WaitingOn == "author" && strings.EqualFold(row.Author, v.viewer) && v.viewer != "")
+			f["pr.nudge.refusal"] = nudge.refusal
 		}
-		sit, nudge := v.situation(row, evs, o, now)
-		refusal := nudge.refusal
-		f["pr.nudge.who"], f["pr.nudge.why"] = nonNil(nudge.who), nudge.why
-		f["pr.stalled"] = sit.Stalled
-		f["pr.waits_on_user"] = sit.WaitingOn == "me" || (sit.WaitingOn == "author" && strings.EqualFold(row.Author, v.viewer) && v.viewer != "")
-		f["pr.nudge.refusal"] = refusal
 	}
 	_, hasReview := pl.targets.review[ref]
 	_, hasAuthor := pl.targets.author[ref]
@@ -661,33 +634,6 @@ func finishedFor(row dinv.PR, now time.Time) time.Duration {
 	return workday.Between(ended, now)
 }
 
-// interactions are the events by anyone a nudge's silence counts from.
-var interactions = []string{dinv.KindComment, dinv.KindReview, dinv.KindPush, dinv.KindReviewRequest}
-
-// lastInteraction is the newest comment, review, push or review request on
-// the pull request, by anyone; its opening without one.
-func lastInteraction(row dinv.PR, evs []dinv.Event) time.Time {
-	var at time.Time
-	for _, e := range evs {
-		if slices.Contains(interactions, e.Kind) && e.At.After(at) {
-			at = e.At
-		}
-	}
-	if at.IsZero() {
-		return row.CreatedAt
-	}
-	return at
-}
-
-// calendarDays counts the local midnights between from and to.
-func calendarDays(from, to time.Time) int {
-	y1, m1, d1 := from.Local().Date()
-	y2, m2, d2 := to.Local().Date()
-	a := time.Date(y1, m1, d1, 12, 0, 0, 0, time.UTC)
-	b := time.Date(y2, m2, d2, 12, 0, 0, 0, time.UTC)
-	return int(b.Sub(a).Hours() / 24)
-}
-
 // situation is the row's situation without a pending round, and the text a
 // nudge would be refused with now.
 // nudgeOf is whom a nudge on a pull request would address, why, and what
@@ -697,28 +643,23 @@ type nudgeOf struct {
 	why, refusal string
 }
 
-func (v *view) situation(row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (situation.Result, nudgeOf) {
-	in := situation.Input{PR: row, Events: evs, Override: o, Viewer: v.viewer, MyTeams: v.teams, Ignore: prrow.IgnoreOf(v.cfg), Now: now, Stalled: v.cfg.GitHub.Stalled}
+func (v *view) situation(rep prrow.Report, row dinv.PR, evs []dinv.Event, o dinv.Override, now time.Time) (overlay.Situation, nudgeOf) {
+	var tf *prrow.TurnFact
 	var unstarted map[string]bool
 	if b, ok := v.books[row.Ref.Unit()]; ok {
-		if tf, ok := prrow.TurnFacts(map[unit.Unit]turn.Book{row.Ref.Unit(): b}, v.registry)[row.Ref]; ok {
-			in.Turn = &tf.Facts
+		if f, ok := prrow.TurnFacts(map[unit.Unit]turn.Book{row.Ref.Unit(): b}, v.registry)[row.Ref]; ok {
+			tf = &f
 		}
 		unstarted = prrow.Unstarted(b)
 	}
-	res := situation.Derive(in)
-	unmuted := res
-	if res.Kind == situation.KindMuted {
-		in.Override = dinv.Override{PR: row.Ref}
-		unmuted = situation.Derive(in)
-	}
+	res, unmuted := prrow.SituationOf(rep, tf, o, evs, now)
 	who, why := prrow.NudgeTargets(apiRow(unmuted), row.Author, v.viewer, prrow.IgnoreOf(v.cfg))
 	return res, nudgeOf{who: who, why: why, refusal: prrow.NudgeRefusal(row.Ref, who, why, unmuted.Since, evs, unstarted, now)}
 }
 
-// apiRow is the row situation.Derive's result gives, as nudge.targets reads it.
-func apiRow(r situation.Result) api.Row {
-	return api.Row{Kind: api.Kind(r.Kind), Summary: api.Summary{WaitsOn: r.WaitingOn, Reason: r.Reason, Since: r.Since}}
+// apiRow is the row of situation s, as nudge.targets reads it.
+func apiRow(s overlay.Situation) api.Row {
+	return api.Row{Kind: api.Kind(s.Kind), Summary: api.Summary{WaitsOn: s.WaitingOn, Reason: s.Reason, Since: s.Since}}
 }
 
 // orphanAnswer is the id of an answer still waiting whose turn ended; 0 when

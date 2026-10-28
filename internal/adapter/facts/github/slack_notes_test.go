@@ -15,7 +15,7 @@ func TestSlackNotesCostGitHubNothing(t *testing.T) {
 	r := w.requested(1, nil)
 	log := change.NewLog(change.DefaultWindow, nil)
 	p := w.providerWith(log)
-	before := facts(t, p, r.Unit())
+	before := w.facts(t, p, r.Unit())
 	rows := w.rows[r]
 	thread := unit.Unit{Provider: "slack", Key: "T0001/C0001/1700000001.000100"}
 	log.Note(port.TopicSourceEvents, thread)

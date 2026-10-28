@@ -1,0 +1,7658 @@
+[
+  {
+    "name": "merged/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#1"
+      },
+      "label": "acme/api#1",
+      "title": "Change 1",
+      "state": "merged",
+      "outcome": "done",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "merged",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/1",
+      "turns_link": "#unit=github/acme/api#1",
+      "started_by_me": true,
+      "closure_posted": true,
+      "cares": true
+    }
+  },
+  {
+    "name": "merged/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#2"
+      },
+      "label": "acme/api#2",
+      "title": "Change 2",
+      "state": "merged",
+      "outcome": "done",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "merged",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/2",
+      "turns_link": "#unit=github/acme/api#2",
+      "started_by_me": true,
+      "closure_posted": true,
+      "cares": false
+    }
+  },
+  {
+    "name": "merged/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#3"
+      },
+      "label": "acme/api#3",
+      "title": "Change 3",
+      "state": "merged",
+      "outcome": "done",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "merged",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/3",
+      "turns_link": "#unit=github/acme/api#3",
+      "started_by_me": false,
+      "closure_posted": true,
+      "cares": true
+    }
+  },
+  {
+    "name": "merged/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#4"
+      },
+      "label": "acme/api#4",
+      "title": "Change 4",
+      "state": "merged",
+      "outcome": "done",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "merged",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/4",
+      "turns_link": "#unit=github/acme/api#4",
+      "started_by_me": false,
+      "closure_posted": true,
+      "cares": false
+    }
+  },
+  {
+    "name": "closed/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#5"
+      },
+      "label": "acme/api#5",
+      "title": "Change 5",
+      "state": "closed",
+      "outcome": "moot",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "closed",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/5",
+      "turns_link": "#unit=github/acme/api#5",
+      "started_by_me": true,
+      "closure_posted": true,
+      "cares": true
+    }
+  },
+  {
+    "name": "closed/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#6"
+      },
+      "label": "acme/api#6",
+      "title": "Change 6",
+      "state": "closed",
+      "outcome": "moot",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "closed",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/6",
+      "turns_link": "#unit=github/acme/api#6",
+      "started_by_me": true,
+      "closure_posted": true,
+      "cares": false
+    }
+  },
+  {
+    "name": "closed/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#7"
+      },
+      "label": "acme/api#7",
+      "title": "Change 7",
+      "state": "closed",
+      "outcome": "moot",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "closed",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/7",
+      "turns_link": "#unit=github/acme/api#7",
+      "started_by_me": false,
+      "closure_posted": true,
+      "cares": true
+    }
+  },
+  {
+    "name": "closed/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#8"
+      },
+      "label": "acme/api#8",
+      "title": "Change 8",
+      "state": "closed",
+      "outcome": "moot",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "closed",
+          "tone": "neutral"
+        }
+      ],
+      "why": "closed",
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/8",
+      "turns_link": "#unit=github/acme/api#8",
+      "started_by_me": false,
+      "closure_posted": true,
+      "cares": false
+    }
+  },
+  {
+    "name": "held/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#9"
+      },
+      "label": "acme/api#9",
+      "title": "Change 9",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "held (cap)",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "automatic round held: cap reached",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/9",
+      "turns_link": "#unit=github/acme/api#9",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "held/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#10"
+      },
+      "label": "acme/api#10",
+      "title": "Change 10",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/10",
+      "turns_link": "#unit=github/acme/api#10",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "held/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#11"
+      },
+      "label": "acme/api#11",
+      "title": "Change 11",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "held (cap)",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "automatic round held: cap reached",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/11",
+      "turns_link": "#unit=github/acme/api#11",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "held/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#12"
+      },
+      "label": "acme/api#12",
+      "title": "Change 12",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/12",
+      "turns_link": "#unit=github/acme/api#12",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "held/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#13"
+      },
+      "label": "acme/api#13",
+      "title": "Change 13",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "held (cap)",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "automatic round held: cap reached",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/13",
+      "turns_link": "#unit=github/acme/api#13",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "held/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#14"
+      },
+      "label": "acme/api#14",
+      "title": "Change 14",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/14",
+      "turns_link": "#unit=github/acme/api#14",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "held/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#15"
+      },
+      "label": "acme/api#15",
+      "title": "Change 15",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "held (cap)",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "automatic round held: cap reached",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/15",
+      "turns_link": "#unit=github/acme/api#15",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "held/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#16"
+      },
+      "label": "acme/api#16",
+      "title": "Change 16",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/16",
+      "turns_link": "#unit=github/acme/api#16",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "blocked/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#17"
+      },
+      "label": "acme/api#17",
+      "title": "Change 17",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round blocked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "round blocked: no access",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/17",
+      "turns_link": "#unit=github/acme/api#17",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "blocked/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#18"
+      },
+      "label": "acme/api#18",
+      "title": "Change 18",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/18",
+      "turns_link": "#unit=github/acme/api#18",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "blocked/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#19"
+      },
+      "label": "acme/api#19",
+      "title": "Change 19",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round blocked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "round blocked: no access",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/19",
+      "turns_link": "#unit=github/acme/api#19",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "blocked/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#20"
+      },
+      "label": "acme/api#20",
+      "title": "Change 20",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/20",
+      "turns_link": "#unit=github/acme/api#20",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "blocked/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#21"
+      },
+      "label": "acme/api#21",
+      "title": "Change 21",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round blocked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "round blocked: no access",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/21",
+      "turns_link": "#unit=github/acme/api#21",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "blocked/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#22"
+      },
+      "label": "acme/api#22",
+      "title": "Change 22",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/22",
+      "turns_link": "#unit=github/acme/api#22",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "blocked/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#23"
+      },
+      "label": "acme/api#23",
+      "title": "Change 23",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round blocked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "round blocked: no access",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/23",
+      "turns_link": "#unit=github/acme/api#23",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "blocked/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#24"
+      },
+      "label": "acme/api#24",
+      "title": "Change 24",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/24",
+      "turns_link": "#unit=github/acme/api#24",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "to_address/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#25"
+      },
+      "label": "acme/api#25",
+      "title": "Change 25",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "to address",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review to address, no workspace: bob asked",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/25",
+      "turns_link": "#unit=github/acme/api#25",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "to_address/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#26"
+      },
+      "label": "acme/api#26",
+      "title": "Change 26",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/26",
+      "turns_link": "#unit=github/acme/api#26",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "to_address/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#27"
+      },
+      "label": "acme/api#27",
+      "title": "Change 27",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "to address",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review to address, no workspace: bob asked",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/27",
+      "turns_link": "#unit=github/acme/api#27",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "to_address/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#28"
+      },
+      "label": "acme/api#28",
+      "title": "Change 28",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/28",
+      "turns_link": "#unit=github/acme/api#28",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "to_address/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#29"
+      },
+      "label": "acme/api#29",
+      "title": "Change 29",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "to address",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review to address, no workspace: bob asked",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/29",
+      "turns_link": "#unit=github/acme/api#29",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "to_address/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#30"
+      },
+      "label": "acme/api#30",
+      "title": "Change 30",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/30",
+      "turns_link": "#unit=github/acme/api#30",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "to_address/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#31"
+      },
+      "label": "acme/api#31",
+      "title": "Change 31",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "to address",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review to address, no workspace: bob asked",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/31",
+      "turns_link": "#unit=github/acme/api#31",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "to_address/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#32"
+      },
+      "label": "acme/api#32",
+      "title": "Change 32",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/32",
+      "turns_link": "#unit=github/acme/api#32",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "round_pending/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#33"
+      },
+      "label": "acme/api#33",
+      "title": "Change 33",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round soon",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review waiting for your answer: new push",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/33",
+      "turns_link": "#unit=github/acme/api#33",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "round_pending/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#34"
+      },
+      "label": "acme/api#34",
+      "title": "Change 34",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/34",
+      "turns_link": "#unit=github/acme/api#34",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "round_pending/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#35"
+      },
+      "label": "acme/api#35",
+      "title": "Change 35",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round soon",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review waiting for your answer: new push",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/35",
+      "turns_link": "#unit=github/acme/api#35",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "round_pending/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#36"
+      },
+      "label": "acme/api#36",
+      "title": "Change 36",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/36",
+      "turns_link": "#unit=github/acme/api#36",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "round_pending/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#37"
+      },
+      "label": "acme/api#37",
+      "title": "Change 37",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round soon",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review waiting for your answer: new push",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/37",
+      "turns_link": "#unit=github/acme/api#37",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "round_pending/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#38"
+      },
+      "label": "acme/api#38",
+      "title": "Change 38",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/38",
+      "turns_link": "#unit=github/acme/api#38",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "round_pending/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#39"
+      },
+      "label": "acme/api#39",
+      "title": "Change 39",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "round soon",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review waiting for your answer: new push",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/39",
+      "turns_link": "#unit=github/acme/api#39",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "round_pending/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#40"
+      },
+      "label": "acme/api#40",
+      "title": "Change 40",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/40",
+      "turns_link": "#unit=github/acme/api#40",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_working/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#41"
+      },
+      "label": "acme/api#41",
+      "title": "Change 41",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent working",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review round in progress",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/41",
+      "turns_link": "#unit=github/acme/api#41",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_working/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#42"
+      },
+      "label": "acme/api#42",
+      "title": "Change 42",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/42",
+      "turns_link": "#unit=github/acme/api#42",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_working/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#43"
+      },
+      "label": "acme/api#43",
+      "title": "Change 43",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent working",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review round in progress",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/43",
+      "turns_link": "#unit=github/acme/api#43",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_working/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#44"
+      },
+      "label": "acme/api#44",
+      "title": "Change 44",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/44",
+      "turns_link": "#unit=github/acme/api#44",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_working/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#45"
+      },
+      "label": "acme/api#45",
+      "title": "Change 45",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent working",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review round in progress",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/45",
+      "turns_link": "#unit=github/acme/api#45",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_working/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#46"
+      },
+      "label": "acme/api#46",
+      "title": "Change 46",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/46",
+      "turns_link": "#unit=github/acme/api#46",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_working/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#47"
+      },
+      "label": "acme/api#47",
+      "title": "Change 47",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent working",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review round in progress",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/47",
+      "turns_link": "#unit=github/acme/api#47",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_working/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#48"
+      },
+      "label": "acme/api#48",
+      "title": "Change 48",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/48",
+      "turns_link": "#unit=github/acme/api#48",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_waiting/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#49"
+      },
+      "label": "acme/api#49",
+      "title": "Change 49",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent asks",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/49",
+      "turns_link": "#unit=github/acme/api#49",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_waiting/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#50"
+      },
+      "label": "acme/api#50",
+      "title": "Change 50",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/50",
+      "turns_link": "#unit=github/acme/api#50",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_waiting/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#51"
+      },
+      "label": "acme/api#51",
+      "title": "Change 51",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent asks",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/51",
+      "turns_link": "#unit=github/acme/api#51",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_waiting/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#52"
+      },
+      "label": "acme/api#52",
+      "title": "Change 52",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/52",
+      "turns_link": "#unit=github/acme/api#52",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_waiting/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#53"
+      },
+      "label": "acme/api#53",
+      "title": "Change 53",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent asks",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/53",
+      "turns_link": "#unit=github/acme/api#53",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_waiting/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#54"
+      },
+      "label": "acme/api#54",
+      "title": "Change 54",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/54",
+      "turns_link": "#unit=github/acme/api#54",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_waiting/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#55"
+      },
+      "label": "acme/api#55",
+      "title": "Change 55",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent asks",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/55",
+      "turns_link": "#unit=github/acme/api#55",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_waiting/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#56"
+      },
+      "label": "acme/api#56",
+      "title": "Change 56",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/56",
+      "turns_link": "#unit=github/acme/api#56",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_stopped/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#57"
+      },
+      "label": "acme/api#57",
+      "title": "Change 57",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent stopped",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/57",
+      "turns_link": "#unit=github/acme/api#57",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_stopped/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#58"
+      },
+      "label": "acme/api#58",
+      "title": "Change 58",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/58",
+      "turns_link": "#unit=github/acme/api#58",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_stopped/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#59"
+      },
+      "label": "acme/api#59",
+      "title": "Change 59",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent stopped",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/59",
+      "turns_link": "#unit=github/acme/api#59",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_stopped/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#60"
+      },
+      "label": "acme/api#60",
+      "title": "Change 60",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/60",
+      "turns_link": "#unit=github/acme/api#60",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_stopped/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#61"
+      },
+      "label": "acme/api#61",
+      "title": "Change 61",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent stopped",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/61",
+      "turns_link": "#unit=github/acme/api#61",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_stopped/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#62"
+      },
+      "label": "acme/api#62",
+      "title": "Change 62",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/62",
+      "turns_link": "#unit=github/acme/api#62",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "loop_stopped/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#63"
+      },
+      "label": "acme/api#63",
+      "title": "Change 63",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "agent stopped",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "which branch?",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:30:00Z",
+      "link": "https://github.com/acme/api/pull/63",
+      "turns_link": "#unit=github/acme/api#63",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "loop_stopped/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#64"
+      },
+      "label": "acme/api#64",
+      "title": "Change 64",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/64",
+      "turns_link": "#unit=github/acme/api#64",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "draft/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#65"
+      },
+      "label": "acme/api#65",
+      "title": "Change 65",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "draft",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "draft",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/65",
+      "turns_link": "#unit=github/acme/api#65",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "draft/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#66"
+      },
+      "label": "acme/api#66",
+      "title": "Change 66",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/66",
+      "turns_link": "#unit=github/acme/api#66",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "draft/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#67"
+      },
+      "label": "acme/api#67",
+      "title": "Change 67",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "draft",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "draft",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/67",
+      "turns_link": "#unit=github/acme/api#67",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "draft/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#68"
+      },
+      "label": "acme/api#68",
+      "title": "Change 68",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/68",
+      "turns_link": "#unit=github/acme/api#68",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "draft/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#69"
+      },
+      "label": "acme/api#69",
+      "title": "Change 69",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "draft",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "draft",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/69",
+      "turns_link": "#unit=github/acme/api#69",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "draft/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#70"
+      },
+      "label": "acme/api#70",
+      "title": "Change 70",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/70",
+      "turns_link": "#unit=github/acme/api#70",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "draft/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#71"
+      },
+      "label": "acme/api#71",
+      "title": "Change 71",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "draft",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "draft",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/71",
+      "turns_link": "#unit=github/acme/api#71",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "draft/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#72"
+      },
+      "label": "acme/api#72",
+      "title": "Change 72",
+      "state": "draft",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/72",
+      "turns_link": "#unit=github/acme/api#72",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "checks/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#73"
+      },
+      "label": "acme/api#73",
+      "title": "Change 73",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "checks failing",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "checks failing: lint, unit",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/73",
+      "turns_link": "#unit=github/acme/api#73",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "checks/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#74"
+      },
+      "label": "acme/api#74",
+      "title": "Change 74",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/74",
+      "turns_link": "#unit=github/acme/api#74",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "checks/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#75"
+      },
+      "label": "acme/api#75",
+      "title": "Change 75",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "checks failing",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "checks failing: lint, unit",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/75",
+      "turns_link": "#unit=github/acme/api#75",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "checks/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#76"
+      },
+      "label": "acme/api#76",
+      "title": "Change 76",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/76",
+      "turns_link": "#unit=github/acme/api#76",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "checks/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#77"
+      },
+      "label": "acme/api#77",
+      "title": "Change 77",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "checks failing",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "checks failing: lint, unit",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/77",
+      "turns_link": "#unit=github/acme/api#77",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "checks/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#78"
+      },
+      "label": "acme/api#78",
+      "title": "Change 78",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/78",
+      "turns_link": "#unit=github/acme/api#78",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "checks/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#79"
+      },
+      "label": "acme/api#79",
+      "title": "Change 79",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "checks failing",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "checks failing: lint, unit",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/79",
+      "turns_link": "#unit=github/acme/api#79",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "checks/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#80"
+      },
+      "label": "acme/api#80",
+      "title": "Change 80",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "failing: lint, unit",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/80",
+      "turns_link": "#unit=github/acme/api#80",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#81"
+      },
+      "label": "acme/api#81",
+      "title": "Change 81",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/81",
+      "turns_link": "#unit=github/acme/api#81",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "changes_by_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#82"
+      },
+      "label": "acme/api#82",
+      "title": "Change 82",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/82",
+      "turns_link": "#unit=github/acme/api#82",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#83"
+      },
+      "label": "acme/api#83",
+      "title": "Change 83",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/83",
+      "turns_link": "#unit=github/acme/api#83",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "changes_by_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#84"
+      },
+      "label": "acme/api#84",
+      "title": "Change 84",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/84",
+      "turns_link": "#unit=github/acme/api#84",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#85"
+      },
+      "label": "acme/api#85",
+      "title": "Change 85",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/85",
+      "turns_link": "#unit=github/acme/api#85",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "changes_by_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#86"
+      },
+      "label": "acme/api#86",
+      "title": "Change 86",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/86",
+      "turns_link": "#unit=github/acme/api#86",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#87"
+      },
+      "label": "acme/api#87",
+      "title": "Change 87",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/87",
+      "turns_link": "#unit=github/acme/api#87",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "changes_by_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#88"
+      },
+      "label": "acme/api#88",
+      "title": "Change 88",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/88",
+      "turns_link": "#unit=github/acme/api#88",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_other/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#89"
+      },
+      "label": "acme/api#89",
+      "title": "Change 89",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/89"
+      },
+      "why": "changes requested by bob",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/89",
+      "turns_link": "#unit=github/acme/api#89",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "changes_by_other/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#90"
+      },
+      "label": "acme/api#90",
+      "title": "Change 90",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/90"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/90",
+      "turns_link": "#unit=github/acme/api#90",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_other/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#91"
+      },
+      "label": "acme/api#91",
+      "title": "Change 91",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/91"
+      },
+      "why": "changes requested by bob",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/91",
+      "turns_link": "#unit=github/acme/api#91",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "changes_by_other/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#92"
+      },
+      "label": "acme/api#92",
+      "title": "Change 92",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/92"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/92",
+      "turns_link": "#unit=github/acme/api#92",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_other/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#93"
+      },
+      "label": "acme/api#93",
+      "title": "Change 93",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/93"
+      },
+      "why": "changes requested by bob",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/93",
+      "turns_link": "#unit=github/acme/api#93",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "changes_by_other/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#94"
+      },
+      "label": "acme/api#94",
+      "title": "Change 94",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/94"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/94",
+      "turns_link": "#unit=github/acme/api#94",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "changes_by_other/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#95"
+      },
+      "label": "acme/api#95",
+      "title": "Change 95",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/95"
+      },
+      "why": "changes requested by bob",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/95",
+      "turns_link": "#unit=github/acme/api#95",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "changes_by_other/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#96"
+      },
+      "label": "acme/api#96",
+      "title": "Change 96",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/96"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/96",
+      "turns_link": "#unit=github/acme/api#96",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "merge/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#97"
+      },
+      "label": "acme/api#97",
+      "title": "Change 97",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/97"
+      },
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/97",
+      "turns_link": "#unit=github/acme/api#97",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "merge/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#98"
+      },
+      "label": "acme/api#98",
+      "title": "Change 98",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/98"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/98",
+      "turns_link": "#unit=github/acme/api#98",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "merge/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#99"
+      },
+      "label": "acme/api#99",
+      "title": "Change 99",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/99"
+      },
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/99",
+      "turns_link": "#unit=github/acme/api#99",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "merge/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#100"
+      },
+      "label": "acme/api#100",
+      "title": "Change 100",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/100"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/100",
+      "turns_link": "#unit=github/acme/api#100",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "merge/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#101"
+      },
+      "label": "acme/api#101",
+      "title": "Change 101",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/101"
+      },
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/101",
+      "turns_link": "#unit=github/acme/api#101",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "merge/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#102"
+      },
+      "label": "acme/api#102",
+      "title": "Change 102",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/102"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/102",
+      "turns_link": "#unit=github/acme/api#102",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "merge/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#103"
+      },
+      "label": "acme/api#103",
+      "title": "Change 103",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/103"
+      },
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T13:00:00Z",
+      "link": "https://github.com/acme/api/pull/103",
+      "turns_link": "#unit=github/acme/api#103",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "merge/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#104"
+      },
+      "label": "acme/api#104",
+      "title": "Change 104",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "review",
+        "at": "2026-10-22T13:00:00Z",
+        "link": "https://github.com/acme/api/pull/104"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/104",
+      "turns_link": "#unit=github/acme/api#104",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "conflicts/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#105"
+      },
+      "label": "acme/api#105",
+      "title": "Change 105",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "merge conflicts",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "merge conflicts with main",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/105",
+      "turns_link": "#unit=github/acme/api#105",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "conflicts/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#106"
+      },
+      "label": "acme/api#106",
+      "title": "Change 106",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/106",
+      "turns_link": "#unit=github/acme/api#106",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "conflicts/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#107"
+      },
+      "label": "acme/api#107",
+      "title": "Change 107",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "merge conflicts",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "merge conflicts with main",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/107",
+      "turns_link": "#unit=github/acme/api#107",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "conflicts/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#108"
+      },
+      "label": "acme/api#108",
+      "title": "Change 108",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/108",
+      "turns_link": "#unit=github/acme/api#108",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "conflicts/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#109"
+      },
+      "label": "acme/api#109",
+      "title": "Change 109",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "merge conflicts",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "merge conflicts with main",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/109",
+      "turns_link": "#unit=github/acme/api#109",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "conflicts/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#110"
+      },
+      "label": "acme/api#110",
+      "title": "Change 110",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/110",
+      "turns_link": "#unit=github/acme/api#110",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "conflicts/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#111"
+      },
+      "label": "acme/api#111",
+      "title": "Change 111",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "merge conflicts",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "merge conflicts with main",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/111",
+      "turns_link": "#unit=github/acme/api#111",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "conflicts/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#112"
+      },
+      "label": "acme/api#112",
+      "title": "Change 112",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "merge",
+          "value": "conflicts",
+          "tone": "bad"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/112",
+      "turns_link": "#unit=github/acme/api#112",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#113"
+      },
+      "label": "acme/api#113",
+      "title": "Change 113",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/113",
+      "turns_link": "#unit=github/acme/api#113",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reply_to_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#114"
+      },
+      "label": "acme/api#114",
+      "title": "Change 114",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/114",
+      "turns_link": "#unit=github/acme/api#114",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#115"
+      },
+      "label": "acme/api#115",
+      "title": "Change 115",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/115",
+      "turns_link": "#unit=github/acme/api#115",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reply_to_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#116"
+      },
+      "label": "acme/api#116",
+      "title": "Change 116",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/116",
+      "turns_link": "#unit=github/acme/api#116",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#117"
+      },
+      "label": "acme/api#117",
+      "title": "Change 117",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "octocat commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/117",
+      "turns_link": "#unit=github/acme/api#117",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reply_to_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#118"
+      },
+      "label": "acme/api#118",
+      "title": "Change 118",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/118",
+      "turns_link": "#unit=github/acme/api#118",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#119"
+      },
+      "label": "acme/api#119",
+      "title": "Change 119",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "octocat commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/119",
+      "turns_link": "#unit=github/acme/api#119",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reply_to_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#120"
+      },
+      "label": "acme/api#120",
+      "title": "Change 120",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/120",
+      "turns_link": "#unit=github/acme/api#120",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_other/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#121"
+      },
+      "label": "acme/api#121",
+      "title": "Change 121",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/121"
+      },
+      "why": "bob commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/121",
+      "turns_link": "#unit=github/acme/api#121",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reply_to_other/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#122"
+      },
+      "label": "acme/api#122",
+      "title": "Change 122",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/122"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/122",
+      "turns_link": "#unit=github/acme/api#122",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_other/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#123"
+      },
+      "label": "acme/api#123",
+      "title": "Change 123",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/123"
+      },
+      "why": "bob commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/123",
+      "turns_link": "#unit=github/acme/api#123",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reply_to_other/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#124"
+      },
+      "label": "acme/api#124",
+      "title": "Change 124",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/124"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/124",
+      "turns_link": "#unit=github/acme/api#124",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_other/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#125"
+      },
+      "label": "acme/api#125",
+      "title": "Change 125",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/125"
+      },
+      "why": "bob commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/125",
+      "turns_link": "#unit=github/acme/api#125",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reply_to_other/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#126"
+      },
+      "label": "acme/api#126",
+      "title": "Change 126",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/126"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/126",
+      "turns_link": "#unit=github/acme/api#126",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reply_to_other/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#127"
+      },
+      "label": "acme/api#127",
+      "title": "Change 127",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reply due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/127"
+      },
+      "why": "bob commented, no reply",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/127",
+      "turns_link": "#unit=github/acme/api#127",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reply_to_other/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#128"
+      },
+      "label": "acme/api#128",
+      "title": "Change 128",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/128"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/128",
+      "turns_link": "#unit=github/acme/api#128",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#129"
+      },
+      "label": "acme/api#129",
+      "title": "Change 129",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/129",
+      "turns_link": "#unit=github/acme/api#129",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#130"
+      },
+      "label": "acme/api#130",
+      "title": "Change 130",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/130",
+      "turns_link": "#unit=github/acme/api#130",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#131"
+      },
+      "label": "acme/api#131",
+      "title": "Change 131",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/131",
+      "turns_link": "#unit=github/acme/api#131",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#132"
+      },
+      "label": "acme/api#132",
+      "title": "Change 132",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/132",
+      "turns_link": "#unit=github/acme/api#132",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#133"
+      },
+      "label": "acme/api#133",
+      "title": "Change 133",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/133"
+      },
+      "why": "alice replied, octocat has not returned",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/133",
+      "turns_link": "#unit=github/acme/api#133",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#134"
+      },
+      "label": "acme/api#134",
+      "title": "Change 134",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/134"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/134",
+      "turns_link": "#unit=github/acme/api#134",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#135"
+      },
+      "label": "acme/api#135",
+      "title": "Change 135",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/135"
+      },
+      "why": "alice replied, octocat has not returned",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/135",
+      "turns_link": "#unit=github/acme/api#135",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reviewer_back_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#136"
+      },
+      "label": "acme/api#136",
+      "title": "Change 136",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/136"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/136",
+      "turns_link": "#unit=github/acme/api#136",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_other/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#137"
+      },
+      "label": "acme/api#137",
+      "title": "Change 137",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T11:00:00Z",
+        "link": "https://github.com/acme/api/pull/137"
+      },
+      "why": "octocat replied, bob has not returned",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/137",
+      "turns_link": "#unit=github/acme/api#137",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reviewer_back_other/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#138"
+      },
+      "label": "acme/api#138",
+      "title": "Change 138",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T11:00:00Z",
+        "link": "https://github.com/acme/api/pull/138"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/138",
+      "turns_link": "#unit=github/acme/api#138",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_other/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#139"
+      },
+      "label": "acme/api#139",
+      "title": "Change 139",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T11:00:00Z",
+        "link": "https://github.com/acme/api/pull/139"
+      },
+      "why": "octocat replied, bob has not returned",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/139",
+      "turns_link": "#unit=github/acme/api#139",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reviewer_back_other/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#140"
+      },
+      "label": "acme/api#140",
+      "title": "Change 140",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:bob",
+          "name": "bob"
+        },
+        "what": "comment",
+        "at": "2026-10-22T11:00:00Z",
+        "link": "https://github.com/acme/api/pull/140"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/140",
+      "turns_link": "#unit=github/acme/api#140",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_other/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#141"
+      },
+      "label": "acme/api#141",
+      "title": "Change 141",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/141"
+      },
+      "why": "alice replied, bob has not returned",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/141",
+      "turns_link": "#unit=github/acme/api#141",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "reviewer_back_other/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#142"
+      },
+      "label": "acme/api#142",
+      "title": "Change 142",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/142"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/142",
+      "turns_link": "#unit=github/acme/api#142",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "reviewer_back_other/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#143"
+      },
+      "label": "acme/api#143",
+      "title": "Change 143",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "reviewer due",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/143"
+      },
+      "why": "alice replied, bob has not returned",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/143",
+      "turns_link": "#unit=github/acme/api#143",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "reviewer_back_other/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#144"
+      },
+      "label": "acme/api#144",
+      "title": "Change 144",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "last_human": {
+        "who": {
+          "key": "github:alice",
+          "name": "alice"
+        },
+        "what": "comment",
+        "at": "2026-10-22T12:00:00Z",
+        "link": "https://github.com/acme/api/pull/144"
+      },
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/144",
+      "turns_link": "#unit=github/acme/api#144",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#145"
+      },
+      "label": "acme/api#145",
+      "title": "Change 145",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/145",
+      "turns_link": "#unit=github/acme/api#145",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#146"
+      },
+      "label": "acme/api#146",
+      "title": "Change 146",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/146",
+      "turns_link": "#unit=github/acme/api#146",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#147"
+      },
+      "label": "acme/api#147",
+      "title": "Change 147",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/147",
+      "turns_link": "#unit=github/acme/api#147",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#148"
+      },
+      "label": "acme/api#148",
+      "title": "Change 148",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/148",
+      "turns_link": "#unit=github/acme/api#148",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#149"
+      },
+      "label": "acme/api#149",
+      "title": "Change 149",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/149",
+      "turns_link": "#unit=github/acme/api#149",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#150"
+      },
+      "label": "acme/api#150",
+      "title": "Change 150",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/150",
+      "turns_link": "#unit=github/acme/api#150",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#151"
+      },
+      "label": "acme/api#151",
+      "title": "Change 151",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-22T12:00:00Z",
+      "link": "https://github.com/acme/api/pull/151",
+      "turns_link": "#unit=github/acme/api#151",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#152"
+      },
+      "label": "acme/api#152",
+      "title": "Change 152",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/152",
+      "turns_link": "#unit=github/acme/api#152",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_team/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#153"
+      },
+      "label": "acme/api#153",
+      "title": "Change 153",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/153",
+      "turns_link": "#unit=github/acme/api#153",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_team/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#154"
+      },
+      "label": "acme/api#154",
+      "title": "Change 154",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/154",
+      "turns_link": "#unit=github/acme/api#154",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_team/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#155"
+      },
+      "label": "acme/api#155",
+      "title": "Change 155",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/155",
+      "turns_link": "#unit=github/acme/api#155",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_team/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#156"
+      },
+      "label": "acme/api#156",
+      "title": "Change 156",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/156",
+      "turns_link": "#unit=github/acme/api#156",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_team/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#157"
+      },
+      "label": "acme/api#157",
+      "title": "Change 157",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/157",
+      "turns_link": "#unit=github/acme/api#157",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_team/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#158"
+      },
+      "label": "acme/api#158",
+      "title": "Change 158",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/158",
+      "turns_link": "#unit=github/acme/api#158",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_team/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#159"
+      },
+      "label": "acme/api#159",
+      "title": "Change 159",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/159",
+      "turns_link": "#unit=github/acme/api#159",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_team/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#160"
+      },
+      "label": "acme/api#160",
+      "title": "Change 160",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/160",
+      "turns_link": "#unit=github/acme/api#160",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_other/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#161"
+      },
+      "label": "acme/api#161",
+      "title": "Change 161",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/161",
+      "turns_link": "#unit=github/acme/api#161",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_other/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#162"
+      },
+      "label": "acme/api#162",
+      "title": "Change 162",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/162",
+      "turns_link": "#unit=github/acme/api#162",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_other/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#163"
+      },
+      "label": "acme/api#163",
+      "title": "Change 163",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/163",
+      "turns_link": "#unit=github/acme/api#163",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_other/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#164"
+      },
+      "label": "acme/api#164",
+      "title": "Change 164",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/164",
+      "turns_link": "#unit=github/acme/api#164",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_other/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#165"
+      },
+      "label": "acme/api#165",
+      "title": "Change 165",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/165",
+      "turns_link": "#unit=github/acme/api#165",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "review_of_other/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#166"
+      },
+      "label": "acme/api#166",
+      "title": "Change 166",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/166",
+      "turns_link": "#unit=github/acme/api#166",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "review_of_other/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#167"
+      },
+      "label": "acme/api#167",
+      "title": "Change 167",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/167",
+      "turns_link": "#unit=github/acme/api#167",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "review_of_other/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#168"
+      },
+      "label": "acme/api#168",
+      "title": "Change 168",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/168",
+      "turns_link": "#unit=github/acme/api#168",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "no_reviewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#169"
+      },
+      "label": "acme/api#169",
+      "title": "Change 169",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/169",
+      "turns_link": "#unit=github/acme/api#169",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "no_reviewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#170"
+      },
+      "label": "acme/api#170",
+      "title": "Change 170",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/170",
+      "turns_link": "#unit=github/acme/api#170",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "no_reviewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#171"
+      },
+      "label": "acme/api#171",
+      "title": "Change 171",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/171",
+      "turns_link": "#unit=github/acme/api#171",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "no_reviewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#172"
+      },
+      "label": "acme/api#172",
+      "title": "Change 172",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/172",
+      "turns_link": "#unit=github/acme/api#172",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "no_reviewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#173"
+      },
+      "label": "acme/api#173",
+      "title": "Change 173",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/173",
+      "turns_link": "#unit=github/acme/api#173",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "no_reviewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#174"
+      },
+      "label": "acme/api#174",
+      "title": "Change 174",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/174",
+      "turns_link": "#unit=github/acme/api#174",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "no_reviewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#175"
+      },
+      "label": "acme/api#175",
+      "title": "Change 175",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "no reviewer",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "no reviewer requested",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-20T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/175",
+      "turns_link": "#unit=github/acme/api#175",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "no_reviewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#176"
+      },
+      "label": "acme/api#176",
+      "title": "Change 176",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/176",
+      "turns_link": "#unit=github/acme/api#176",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_review_of_other/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#177"
+      },
+      "label": "acme/api#177",
+      "title": "Change 177",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-12T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/177",
+      "turns_link": "#unit=github/acme/api#177",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "stalled_review_of_other/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#178"
+      },
+      "label": "acme/api#178",
+      "title": "Change 178",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/178",
+      "turns_link": "#unit=github/acme/api#178",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_review_of_other/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#179"
+      },
+      "label": "acme/api#179",
+      "title": "Change 179",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-12T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/179",
+      "turns_link": "#unit=github/acme/api#179",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "stalled_review_of_other/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#180"
+      },
+      "label": "acme/api#180",
+      "title": "Change 180",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/180",
+      "turns_link": "#unit=github/acme/api#180",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_review_of_other/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#181"
+      },
+      "label": "acme/api#181",
+      "title": "Change 181",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-12T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/181",
+      "turns_link": "#unit=github/acme/api#181",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "stalled_review_of_other/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#182"
+      },
+      "label": "acme/api#182",
+      "title": "Change 182",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/182",
+      "turns_link": "#unit=github/acme/api#182",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_review_of_other/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#183"
+      },
+      "label": "acme/api#183",
+      "title": "Change 183",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "review",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "review requested, no review on the head",
+      "waits_on": [
+        {
+          "key": "github:bob",
+          "name": "bob"
+        }
+      ],
+      "since": "2026-10-12T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/183",
+      "turns_link": "#unit=github/acme/api#183",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "stalled_review_of_other/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#184"
+      },
+      "label": "acme/api#184",
+      "title": "Change 184",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/184",
+      "turns_link": "#unit=github/acme/api#184",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#185"
+      },
+      "label": "acme/api#185",
+      "title": "Change 185",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-14T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/185",
+      "turns_link": "#unit=github/acme/api#185",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#186"
+      },
+      "label": "acme/api#186",
+      "title": "Change 186",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/186",
+      "turns_link": "#unit=github/acme/api#186",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#187"
+      },
+      "label": "acme/api#187",
+      "title": "Change 187",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-14T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/187",
+      "turns_link": "#unit=github/acme/api#187",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#188"
+      },
+      "label": "acme/api#188",
+      "title": "Change 188",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/188",
+      "turns_link": "#unit=github/acme/api#188",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#189"
+      },
+      "label": "acme/api#189",
+      "title": "Change 189",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-14T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/189",
+      "turns_link": "#unit=github/acme/api#189",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#190"
+      },
+      "label": "acme/api#190",
+      "title": "Change 190",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/190",
+      "turns_link": "#unit=github/acme/api#190",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#191"
+      },
+      "label": "acme/api#191",
+      "title": "Change 191",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "changes asked",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        },
+        {
+          "key": "stalled",
+          "value": "stalled",
+          "tone": "warn"
+        }
+      ],
+      "why": "changes requested by octocat",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-14T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/191",
+      "turns_link": "#unit=github/acme/api#191",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false
+    }
+  },
+  {
+    "name": "stalled_changes_by_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#192"
+      },
+      "label": "acme/api#192",
+      "title": "Change 192",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "changes requested",
+          "tone": "warn"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/192",
+      "turns_link": "#unit=github/acme/api#192",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": false,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "approved_by_viewer/mine/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#193"
+      },
+      "label": "acme/api#193",
+      "title": "Change 193",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/193",
+      "turns_link": "#unit=github/acme/api#193",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "approved_by_viewer/mine/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#194"
+      },
+      "label": "acme/api#194",
+      "title": "Change 194",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/194",
+      "turns_link": "#unit=github/acme/api#194",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "approved_by_viewer/mine/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#195"
+      },
+      "label": "acme/api#195",
+      "title": "Change 195",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:octocat",
+          "name": "octocat"
+        }
+      ],
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/195",
+      "turns_link": "#unit=github/acme/api#195",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "approved_by_viewer/mine/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#196"
+      },
+      "label": "acme/api#196",
+      "title": "Change 196",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/196",
+      "turns_link": "#unit=github/acme/api#196",
+      "started_by_me": true,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "approved_by_viewer/theirs/in",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#197"
+      },
+      "label": "acme/api#197",
+      "title": "Change 197",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/197",
+      "turns_link": "#unit=github/acme/api#197",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "approved_by_viewer/theirs/in/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#198"
+      },
+      "label": "acme/api#198",
+      "title": "Change 198",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/198",
+      "turns_link": "#unit=github/acme/api#198",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "approved_by_viewer/theirs/out",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#199"
+      },
+      "label": "acme/api#199",
+      "title": "Change 199",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "can merge",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "approved and green",
+      "waits_on": [
+        {
+          "key": "github:alice",
+          "name": "alice"
+        }
+      ],
+      "since": "2026-10-21T15:00:00Z",
+      "link": "https://github.com/acme/api/pull/199",
+      "turns_link": "#unit=github/acme/api#199",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true
+    }
+  },
+  {
+    "name": "approved_by_viewer/theirs/out/muted",
+    "card": {
+      "unit": {
+        "provider": "github",
+        "key": "acme/api#200"
+      },
+      "label": "acme/api#200",
+      "title": "Change 200",
+      "state": "open",
+      "signals": [
+        {
+          "key": "situation",
+          "value": "muted",
+          "tone": "neutral"
+        },
+        {
+          "key": "checks",
+          "value": "passing",
+          "tone": "good"
+        },
+        {
+          "key": "review",
+          "value": "approved",
+          "tone": "good"
+        }
+      ],
+      "why": "muted",
+      "since": "2026-10-22T14:00:00Z",
+      "link": "https://github.com/acme/api/pull/200",
+      "turns_link": "#unit=github/acme/api#200",
+      "started_by_me": false,
+      "closure_posted": false,
+      "cares": true,
+      "mute": {
+        "until": "2026-10-22T20:00:00Z"
+      }
+    }
+  }
+]

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/adapter/store/storetest"
 	"github.com/wloophq/wloop/internal/api"
@@ -26,6 +27,10 @@ import (
 func newLiveServer(t *testing.T) (*Server, *storetest.Fixture) {
 	t.Helper()
 	f := storetest.Seeded(t, storetest.Live)
+	if err := ghsource.KeepIdentity(context.Background(), f.Inventory, identityOf("user-01")); err != nil {
+		t.Fatal(err)
+	}
+	keepReports(t, f.Inventory)
 	now := f.Now
 	sessions := turnstest.NewSessions()
 	d := withStore(Deps{Activity: f.DB, Changes: f.Log, Snapshot: f.DB, Intakes: f.DB.Intakes(), Pauses: f.Rounds, Cfg: config.Defaults(), Version: "test",
@@ -163,7 +168,8 @@ func TestCheckReportsAStaleRowInDoctorAndHealth(t *testing.T) {
 		t.Fatalf("a clean read model: %+v", c)
 	}
 	ref := f.Open[0]
-	sqlitetest.Exec(t, f.DB, `UPDATE pull_requests SET title = 'Written behind the log' WHERE owner = ? AND repo = ? AND number = ?`, ref.Owner, ref.Repo, ref.Number)
+	sqlitetest.Exec(t, f.DB, `UPDATE unit_snapshots SET snapshot = json_set(snapshot, '$.data.pr.Title', 'Written behind the log') WHERE provider = ? AND unit_key = ?`,
+		string(unit.GitHub), ref.String())
 	get(t, s, api.AdminDoctor, &rep)
 	if c := checkNamed(rep, "read model"); c.Mark != api.DoctorMissing || !strings.Contains(c.Info, ref.String()) || !strings.Contains(c.Info, "title") {
 		t.Fatalf("a row written without a note: %+v", c)

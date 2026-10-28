@@ -223,7 +223,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 	policy := draftApproval(deps.Config(), w, briefExtrasOf(l), intentload.DefaultDraftApproval(l.Gates))
 	var subject *draft.Subject
 	if w.Withdraw != nil || len(policy.Rules) > 0 {
-		read, err := subjectFacts(ctx, s.d.Units, c.u, w.Name)
+		read, err := subjectFacts(ctx, s.d.Units, s.d.Keep, c.u, w.Name)
 		if err != nil {
 			return nil, err
 		}

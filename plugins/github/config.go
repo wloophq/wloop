@@ -12,6 +12,7 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/collect"
 	"github.com/wloophq/wloop/plugins/github/scope"
+	"github.com/wloophq/wloop/plugins/github/situation"
 )
 
 // Defaults the configuration falls back to when it says nothing.
@@ -19,6 +20,10 @@ const (
 	defaultFast     = 2 * time.Minute
 	defaultSlow     = time.Hour
 	defaultFraction = 0.5
+
+	defaultStalledReview = 48 * time.Hour
+	defaultStalledReply  = 24 * time.Hour
+	defaultStalledMerge  = 24 * time.Hour
 )
 
 // needsMeColumn is the semantic status of the board column a workspace
@@ -31,12 +36,23 @@ const needsMeColumn = "needs-me"
 type settings struct {
 	Collect collect.Config
 	Fast    time.Duration
+	// Ignore are who a row never waits on: the automated reviewers and the
+	// reviewers an address round skips.
+	Ignore  []string
+	Stalled situation.Thresholds
 }
 
 type pluginTable struct {
-	ReviewPrefix      *string      `json:"review_prefix"`
-	RateLimitFraction float64      `json:"rate_limit_fraction"`
-	Scope             scope.Config `json:"scope"`
+	ReviewPrefix         *string      `json:"review_prefix"`
+	RateLimitFraction    float64      `json:"rate_limit_fraction"`
+	Scope                scope.Config `json:"scope"`
+	AutomatedReviewers   []string     `json:"automated_reviewers"`
+	AddressSkipReviewers []string     `json:"address_skip_reviewers"`
+	Stalled              struct {
+		Review string `json:"review"`
+		Reply  string `json:"reply"`
+		Merge  string `json:"merge"`
+	} `json:"stalled"`
 }
 
 type hostKeys struct {
@@ -83,6 +99,18 @@ func settingsOf(cfg src.Config) (settings, error) {
 		}
 	}
 	slices.Sort(out.Collect.NeedsMe)
+	out.Ignore = slices.Concat(t.AutomatedReviewers, t.AddressSkipReviewers)
+	for _, th := range []struct {
+		key  string
+		raw  string
+		def  time.Duration
+		into *time.Duration
+	}{{"stalled.review", t.Stalled.Review, defaultStalledReview, &out.Stalled.Review}, {"stalled.reply", t.Stalled.Reply, defaultStalledReply, &out.Stalled.Reply},
+		{"stalled.merge", t.Stalled.Merge, defaultStalledMerge, &out.Stalled.Merge}} {
+		if *th.into, err = durationOr(th.raw, th.def); err != nil {
+			return settings{}, fmt.Errorf("[plugins.github] %s: %w", th.key, err)
+		}
+	}
 	return out, nil
 }
 

@@ -161,3 +161,18 @@ func opOf(w src.ItemOp) items.Op {
 	}
 	return out
 }
+
+// ItemOf is the item w carries, as the host's ledger keeps it.
+func ItemOf(w src.Item) items.Item {
+	out := items.Item{ID: w.ID, Unit: rawUnit(w.Unit), Kind: items.Kind(w.Kind), Summary: w.Summary, Context: w.Context,
+		Options: optionsOf(w.Options), Deadline: w.Deadline, URLs: slices.Clone(w.URLs), Contexts: slices.Clone(w.Contexts),
+		Initial: initial(w.Category), Origin: anchorOf(w.Origin), Requester: personOf(w.Requester), Assignees: peopleOf(w.Assignees),
+		AssignedAt: anchorOf(w.AssignedAt), Basis: items.Basis(w.Basis), WaitingOn: peopleOf(w.WaitingOn), State: items.State(w.State),
+		Resolution: items.Resolution(w.Resolution), Evidence: evidenceOf(w.Evidence), Confidence: items.Confidence(w.Confidence),
+		Ambiguity: w.Ambiguity, Provenance: items.Provenance(w.Provenance), Confirmed: w.Confirmed, UserAt: w.UserAt,
+		CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}
+	for _, e := range w.Trail {
+		out.Trail = append(out.Trail, evidenceOf(e))
+	}
+	return out
+}

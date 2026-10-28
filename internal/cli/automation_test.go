@@ -272,7 +272,7 @@ func TestUnitsRouteByProvider(t *testing.T) {
 	var refreshed []string
 	gh.OnRefresh(func(context.Context) error { refreshed = append(refreshed, "github"); return nil })
 	sess.OnRefresh(func(context.Context) error { refreshed = append(refreshed, "session"); return nil })
-	if err := set.Refresh(context.Background()); err != nil || !slices.Equal(refreshed, []string{"github", "session"}) {
+	if err := (unitKeeping{set}).Refresh(context.Background()); err != nil || !slices.Equal(refreshed, []string{"github", "session"}) {
 		t.Fatalf("refreshed %v %v", refreshed, err)
 	}
 	st := round.New()
@@ -281,11 +281,11 @@ func TestUnitsRouteByProvider(t *testing.T) {
 		settled = s.(interface{ Rounds() *round.Store }).Rounds()
 		return nil
 	})
-	if err := set.Settle(context.Background(), &roundState{st: st}); err != nil || settled != st {
+	if err := (unitKeeping{set}).Settle(context.Background(), &roundState{st: st}); err != nil || settled != st {
 		t.Fatalf("settled %p, want %p: %v", settled, st, err)
 	}
 	sess.SetSeen(7)
-	if got := set.Seen(); got != 7 {
+	if got := (unitKeeping{set}).Seen(); got != 7 {
 		t.Fatalf("seen %d", got)
 	}
 }
@@ -387,7 +387,7 @@ func TestThePlanEngineKeepsItsOwnSeen(t *testing.T) {
 	if _, err := plan.Evaluate(context.Background(), ""); err != nil {
 		t.Fatal(err)
 	}
-	if got := eng.Units.(*unitSet).Seen(); got != seen {
+	if got := eng.Keep.(unitKeeping).Seen(); got != seen {
 		t.Fatalf("a plan moved the sweep's Seen from %d to %d", seen, got)
 	}
 }

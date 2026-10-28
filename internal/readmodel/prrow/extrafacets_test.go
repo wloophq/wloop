@@ -35,11 +35,11 @@ func TestAnExtraEnumIsAFacet(t *testing.T) {
 	}
 	d := Deriver{Loaded: loaded}
 	got := d.facetValues(api.Row{}, Payload{Brief: &api.BriefSummary{Extra: map[string]any{
-		"approach": "rewrite", "areas": []any{"ui", "elsewhere"}, "solution": "split the cache"}}})
+		"approach": "rewrite", "areas": []any{"ui", "elsewhere"}, "solution": "split the cache"}}}, nil)
 	if !slices.Equal(got["extra.approach"], []string{"rewrite"}) || !slices.Equal(got["extra.areas"], []string{"ui"}) || got["extra.solution"] != nil {
 		t.Fatalf("%v", got)
 	}
-	if got := d.facetValues(api.Row{}, Payload{}); got["extra.approach"] != nil {
+	if got := d.facetValues(api.Row{}, Payload{}, nil); got["extra.approach"] != nil {
 		t.Fatalf("without a brief: %v", got)
 	}
 }

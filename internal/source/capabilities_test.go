@@ -14,7 +14,7 @@ import (
 
 func TestItemsNeedCard(t *testing.T) {
 	m := complete()
-	m.Items = func(api.Row) []items.Item { return nil }
+	m.Items = func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }
 	if err := m.Valid(); err == nil || !strings.Contains(err.Error(), "card") {
 		t.Fatalf("items without a card: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestCapabilitiesListWhatAModuleOffers(t *testing.T) {
 		t.Fatalf("a bare module offers %v", got)
 	}
 	m.Checkouts, m.Reacts = checkouts{}, true
-	m.Items = func(api.Row) []items.Item { return nil }
+	m.Items = func(context.Context, api.Row) ([]items.Item, error) { return nil, nil }
 	if got := strings.Join(m.Capabilities(), ","); got != "checkouts,reacts,items" {
 		t.Fatalf("capabilities %s", got)
 	}

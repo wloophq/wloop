@@ -30,7 +30,7 @@ type Rows interface {
 // a capability the plugin lacks.
 type Provider struct {
 	Card  func(ctx context.Context, row api.Row) (card.Card, error)
-	Items func(row api.Row) []items.Item
+	Items func(ctx context.Context, row api.Row) ([]items.Item, error)
 }
 
 // OpenItems finds the open items of units that may have no row.
@@ -208,7 +208,11 @@ func (j *Job) apply(ctx context.Context, batch map[unit.Unit]revRow) {
 		at := unit.Anchor{Unit: u, Ref: "row:" + strconv.FormatUint(rr.rev, 10)}
 		var desired []items.Item
 		if !rr.gone {
-			desired = p.Items(rr.row)
+			var err error
+			if desired, err = p.Items(ctx, rr.row); err != nil {
+				j.logf("cards: items of %s: %v", u.Label(), err)
+				continue
+			}
 		}
 		if _, err := j.Ledger.Reconcile(ctx, u, desired, at, absent); err != nil {
 			j.logf("cards: items of %s: %v", u.Label(), err)

@@ -65,17 +65,17 @@ func (e *Env) draftFacts(ctx context.Context, u unit.Unit, workflow string) (dra
 	if e.engine == nil || e.engine.Units == nil {
 		return draft.Subject{}, errNoEngine
 	}
-	return subjectFacts(ctx, e.engine.Units, u, workflow)
+	return subjectFacts(ctx, e.engine.Units, e.engine.Keep, u, workflow)
 }
 
 // subjectFacts are u's facts as the subject of its provider's slot, scoped
-// by workflow when it is set.
-func subjectFacts(ctx context.Context, units automation.Units, u unit.Unit, workflow string) (draft.Subject, error) {
+// by workflow through keep, the host's bookkeeping, when it is set.
+func subjectFacts(ctx context.Context, units automation.Units, keep any, u unit.Unit, workflow string) (draft.Subject, error) {
 	facts, err := units.Facts(ctx, u)
 	if err != nil {
 		return draft.Subject{}, err
 	}
-	if sc, ok := units.(automation.Scoper); ok && workflow != "" {
+	if sc, ok := keep.(automation.Scoper); ok && workflow != "" {
 		if facts, err = sc.Scope(ctx, workflow, u, facts); err != nil {
 			return draft.Subject{}, err
 		}

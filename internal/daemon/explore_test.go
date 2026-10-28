@@ -15,6 +15,7 @@ import (
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -559,7 +560,9 @@ func TestExploreStoreBudget(t *testing.T) {
 		want := d.UntrackedRow(c, o).Actions
 		if tracked {
 			evs, _ := st.Events(ctx, c.Ref)
-			want = d.Row(pr, evs, o).Actions
+			rep, _, _ := prrow.ReportOf(ghreporttest.Snapshot(ghreporttest.Env{Viewer: base.Viewers[unit.GitHub], Teams: base.Teams[unit.GitHub], Now: at},
+				ghreporttest.Input{PR: pr, Events: evs, Adopted: o.Adopted, Tracked: o.Tracked}))
+			want = d.Row(rep, evs, o).Actions
 		}
 		if !reflect.DeepEqual(got[i].Actions, want) {
 			t.Fatalf("%s: actions\n got %+v\nwant %+v", c.Ref, got[i].Actions, want)

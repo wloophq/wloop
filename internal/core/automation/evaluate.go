@@ -372,7 +372,7 @@ func (p *planner) decide(w workflow.Workflow, c candidate, stored map[string]wor
 	if runsAlone(pl.item) {
 		p.count(pl.item)
 	}
-	if g, ok := p.e.Units.(Gainer); ok {
+	if g, ok := p.e.Keep.(Gainer); ok {
 		if gain, err := g.Gain(p.ctx, c.u); err == nil {
 			pl.item.Gain = gain
 		}

@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,9 +26,10 @@ import (
 	"github.com/wloophq/wloop/internal/situation"
 )
 
-// Store is what the rows read of the inventory.
+// Store is what the rows read of the host's own state of pull requests:
+// their overrides, events and brief records.
 type Store interface {
-	PRsWithOverrides(ctx context.Context) ([]dinv.PR, map[github.Ref]dinv.Override, error)
+	Overrides(ctx context.Context) (map[github.Ref]dinv.Override, error)
 	EventsByPR(ctx context.Context, refs []github.Ref) (map[github.Ref][]dinv.Event, error)
 	BriefRecords(ctx context.Context, refs ...github.Ref) (map[github.Ref]dinv.BriefRecord, error)
 }
@@ -39,15 +42,17 @@ type Briefs interface {
 }
 
 // Source is where the provider reads rows from: the daemon's RowDeps, the
-// inventory and the brief queue. Briefs may be nil: the brief off.
+// GitHub plugin's reports, the host's state of pull requests and the brief
+// queue. Briefs may be nil: the brief off.
 type Source struct {
 	readmodel.RowDeps
-	Store  Store
-	Briefs Briefs
+	Reports readmodel.Reports
+	Store   Store
+	Briefs  Briefs
 }
 
 // Provider is the github provider of the read model: one row per pull
-// request of the inventory, but lapsed ones nobody adopted.
+// request the GitHub plugin reported, but lapsed ones nobody adopted.
 type Provider struct {
 	src Source
 
@@ -56,7 +61,7 @@ type Provider struct {
 }
 
 type listing struct {
-	prs       map[unit.Unit]dinv.PR
+	reports   map[unit.Unit]Report
 	overrides map[github.Ref]dinv.Override
 }
 
@@ -72,31 +77,59 @@ var _ readmodel.Provider = (*Provider)(nil)
 
 func (p *Provider) Provider() unit.ProviderID { return unit.GitHub }
 
-// Listed lists every pull request of the inventory but the lapsed ones
+// Listed lists every pull request the plugin reported but the lapsed ones
 // nobody adopted, the most recently updated first.
 func (p *Provider) Listed(ctx context.Context) ([]unit.Unit, error) {
-	prs, overrides, err := p.src.Store.PRsWithOverrides(ctx)
+	if p.src.Reports == nil {
+		return nil, nil
+	}
+	units, err := p.src.Reports.Units(ctx, unit.GitHub)
 	if err != nil {
 		return nil, err
 	}
-	l := &listing{prs: make(map[unit.Unit]dinv.PR, len(prs)), overrides: overrides}
-	units := make([]unit.Unit, 0, len(prs))
-	for _, pr := range prs {
-		if pr.Lapsed() && !overrides[pr.Ref].Adopted {
+	snaps, err := p.src.Reports.Reported(ctx, units)
+	if err != nil {
+		return nil, err
+	}
+	overrides, err := p.src.Store.Overrides(ctx)
+	if err != nil {
+		return nil, err
+	}
+	l := &listing{reports: make(map[unit.Unit]Report, len(snaps)), overrides: overrides}
+	var reps []Report
+	for _, s := range snaps {
+		rep, ok, err := ReportOf(s)
+		if err != nil {
+			p.src.Logf("rows: %v", err)
 			continue
 		}
-		u := pr.Ref.Unit()
-		l.prs[u] = pr
-		units = append(units, u)
+		if !ok || rep.PR.Lapsed() && !overrides[rep.PR.Ref].Adopted && !rep.Payload.Override.Adopted {
+			continue
+		}
+		reps = append(reps, rep)
+	}
+	slices.SortFunc(reps, func(a, b Report) int {
+		if c := b.PR.UpdatedAt.Compare(a.PR.UpdatedAt); c != 0 {
+			return c
+		}
+		return cmp.Or(strings.Compare(a.PR.Ref.Owner, b.PR.Ref.Owner), strings.Compare(a.PR.Ref.Repo, b.PR.Ref.Repo),
+			cmp.Compare(b.PR.Ref.Number, a.PR.Ref.Number))
+	})
+	out := make([]unit.Unit, 0, len(reps))
+	for _, rep := range reps {
+		u := rep.PR.Ref.Unit()
+		l.reports[u] = rep
+		out = append(out, u)
 	}
 	p.mu.Lock()
 	p.listed = l
 	p.mu.Unlock()
-	return units, nil
+	return out, nil
 }
 
 // input is what one pull request's row derives from.
 type input struct {
+	rep      Report
 	pr       dinv.PR
 	events   []dinv.Event
 	override dinv.Override
@@ -133,20 +166,24 @@ func (p *Provider) Load(ctx context.Context, units []unit.Unit) (map[unit.Unit]a
 		l, p.listed = p.listed, nil
 		p.mu.Unlock()
 	}
+	if l == nil {
+		return nil, nil
+	}
 	set := &shared{RowSettings: p.src.Settings(), briefOn: p.src.Briefs != nil}
 
 	ins := make(map[unit.Unit]*input, len(units))
 	refs := make([]github.Ref, 0, len(units))
 	for _, u := range units {
-		pr, ok := l.prs[u]
+		rep, ok := l.reports[u]
 		if !ok {
 			continue
 		}
+		pr := rep.PR
 		o, ok := l.overrides[pr.Ref]
 		if !ok {
 			o.PR = pr.Ref
 		}
-		ins[u] = &input{pr: pr, override: o, set: set}
+		ins[u] = &input{rep: rep, pr: pr, override: o, set: set}
 		refs = append(refs, pr.Ref)
 	}
 	events, err := p.src.Store.EventsByPR(ctx, refs)
@@ -313,7 +350,7 @@ func (p *Provider) Derive(base readmodel.Base, in any, at time.Time) (api.Row, e
 	if len(x.intakes) > 0 {
 		d.Intakes = map[github.Ref][]intake.Intake{ref: x.intakes}
 	}
-	r, pl := d.Parts(x.pr, x.events, x.override)
+	r, pl := d.Parts(x.rep, x.events, x.override)
 	pl.Brief = x.brief
 	pl.Intake = x.intake
 	if x.activity != nil {
@@ -337,6 +374,15 @@ func PROf(in any) (dinv.PR, bool) {
 		return dinv.PR{}, false
 	}
 	return x.pr, true
+}
+
+// ReportIn is the plugin's report a row's input derives from.
+func ReportIn(in any) (Report, bool) {
+	x, ok := in.(*input)
+	if !ok {
+		return Report{}, false
+	}
+	return x.rep, true
 }
 
 // EventsOf are the events a row's input holds, oldest first; the caller

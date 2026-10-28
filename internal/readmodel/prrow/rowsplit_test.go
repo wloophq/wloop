@@ -13,7 +13,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand/brandtest"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/plugins/source/fakesource"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/situation"
@@ -28,7 +27,7 @@ func deriveCases(t *testing.T, at time.Time) []api.Row {
 	d := fixtureDeriver(t, at, cases)
 	out := make([]api.Row, len(cases))
 	for i, c := range cases {
-		r, p := d.Parts(c.pr, c.events, c.override)
+		r, p := d.Parts(c.report(t), c.events, c.override)
 		p.Brief, p.Intake = c.brief, c.intake
 		if c.activity != nil {
 			d.AddActivity(&p, *c.activity)
@@ -331,7 +330,7 @@ func TestMutedRowKeepsItsUnmutedSituation(t *testing.T) {
 			continue
 		}
 		d := fixtureDeriver(t, fixtureNow, []rowCase{c})
-		r := d.Row(c.pr, c.events, c.override)
+		r := d.Row(c.report(t), c.events, c.override)
 		p := payloadOf(t, r)
 		if situation.Kind(r.Kind) != situation.KindMuted || p.Mute == nil || p.UnmutedKind != string(situation.KindReview) || p.UnmutedWaitingOn != "me" {
 			t.Errorf("%s: kind %s, payload %+v", c.name, r.Kind, p)
@@ -358,26 +357,6 @@ func TestNeedsMeAndInScopeMatchTheDeriver(t *testing.T) {
 		if want := len(p.Reasons) > 0 || p.Workspace.IsReview || p.Override.Adopted || p.Override.Tracked; InScope(r) != want {
 			t.Errorf("%s: InScope %v, want %v", r.Label, InScope(r), want)
 		}
-	}
-}
-
-func TestLastHumanSkipsViewerAndBots(t *testing.T) {
-	c := rowCases()[0]
-	d := fixtureDeriver(t, fixtureNow, nil)
-	d.Ignore = []string{"copilot"}
-	ev := func(kind, actor string, at time.Time) dinv.Event {
-		return dinv.Event{PR: c.pr.Ref, Kind: kind, Key: actor + at.String(), Actor: actor, At: at}
-	}
-	only := []dinv.Event{ev(dinv.KindComment, fixtureViewer, ago(time.Hour)), ev(dinv.KindReview, "renovate[bot]", ago(time.Minute)),
-		ev(dinv.KindComment, "Copilot", ago(time.Second)), ev(dinv.KindMuted, "ana", ago(time.Second))}
-	if p := payloadOf(t, d.Row(c.pr, only, c.override)); p.LastHuman != nil {
-		t.Errorf("viewer and bots only: %+v", p.LastHuman)
-	}
-	evs := append(only, ev(dinv.KindComment, "bia", ago(2*time.Hour)), ev(dinv.KindReview, "carol", ago(30*time.Minute)))
-	r := d.Row(c.pr, evs, c.override)
-	p := payloadOf(t, r)
-	if h := p.LastHuman; h == nil || h.Who != "carol" || h.What != dinv.KindReview || !h.At.Equal(ago(30*time.Minute)) || h.Link != r.Link || h.Link == "" {
-		t.Errorf("last human %+v", h)
 	}
 }
 

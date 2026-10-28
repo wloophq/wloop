@@ -2,14 +2,18 @@ package source_test
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/codec"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
@@ -140,7 +144,32 @@ func TestAWiderPauseReachesThePluginAsPaused(t *testing.T) {
 }
 
 func TestRecordEventsKeepsTheAnchor(t *testing.T) {
-	t.Skip("X8b: the events table has no anchor column, so RecordEvents drops Event.Anchor; add the column when GitHub reports anchored events, or drop Anchor from Event")
+	t.Parallel()
+	b, _ := brokerOver(t)
+	stub := sourcetest.NewStub()
+	sourcetest.Launch(t, "acme", stub, b.Host())
+	h := stub.Host()
+	ctx := context.Background()
+	own := plugin.Unit{Provider: "acme", Key: "t1"}
+	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
+	anchor := src.Anchor{Unit: own, Ref: "comment:c7", Permalink: "https://example.com/t1#c7", At: at.Add(-time.Minute)}
+	evs := []src.Event{{Unit: own, Kind: "comment", Key: "c7", Actor: "bruno", At: at, Anchor: anchor}, {Unit: own, Kind: "push", Key: "h2", At: at}}
+	if err := h.Recorder.RecordEvents(ctx, evs); err != nil {
+		t.Fatal(err)
+	}
+	got, err := h.History.Events(ctx, src.EventQuery{Units: []plugin.Unit{own}})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("events %+v %v", got, err)
+	}
+	for _, e := range got {
+		want := src.Anchor{}
+		if e.Kind == "comment" {
+			want = anchor
+		}
+		if e.Anchor.Unit != want.Unit || e.Anchor.Ref != want.Ref || e.Anchor.Permalink != want.Permalink || !e.Anchor.At.Equal(want.At) {
+			t.Errorf("%s: anchor %+v, want %+v", e.Kind, e.Anchor, want)
+		}
+	}
 }
 
 func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
@@ -175,5 +204,39 @@ func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
 	}
 	if got.Overrides[port.OverrideMutedKind] != "waiting" || !got.Paused {
 		t.Errorf("overrides %v, paused %v; want them over the bookkeeping", got.Overrides, got.Paused)
+	}
+}
+
+func TestBooksServeEachTurnAtWhenItReachedItsState(t *testing.T) {
+	t.Parallel()
+	b, _ := brokerOver(t)
+	sent := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
+	t1 := unit.Unit{Provider: "acme", Key: "t1"}
+	b.Books = func(_ context.Context, units ...unit.Unit) (map[unit.Unit]turn.Book, error) {
+		if !slices.Equal(units, []unit.Unit{t1}) {
+			return nil, fmt.Errorf("books of %v", units)
+		}
+		return map[unit.Unit]turn.Book{t1: {Unit: t1, Turns: []turn.Turn{
+			{Seq: 1, ID: "a", Intent: "address", Role: "pr.address", State: turn.Done, SentAt: sent, StartedAt: sent.Add(time.Minute)},
+			{Seq: 2, ID: "b", Intent: "review", Role: "pr.review", State: turn.Started, SentAt: sent.Add(time.Hour), StartedAt: sent.Add(61 * time.Minute)},
+			{Seq: 3, ID: "c", Intent: "review", Role: "pr.review", State: turn.Sent, SentAt: sent.Add(2 * time.Hour)},
+		}, Records: []turn.Record{{ID: 9, TurnSeq: 1, Head: "h7", At: sent.Add(30 * time.Minute), Record: record.Record{Summary: "pushed"}}}}}, nil
+	}
+	stub := sourcetest.NewStub()
+	sourcetest.Launch(t, "acme", stub, b.Host())
+	books, err := stub.Host().Reader.Books(context.Background(), []plugin.Unit{{Provider: "acme", Key: "t1"}})
+	if err != nil || len(books) != 1 || len(books[0].Turns) != 3 || len(books[0].Records) != 1 {
+		t.Fatalf("books %+v %v", books, err)
+	}
+	for i, want := range []time.Time{sent.Add(30 * time.Minute), sent.Add(61 * time.Minute), sent.Add(2 * time.Hour)} {
+		if got := books[0].Turns[i]; !got.At.Equal(want) || got.Role == "" {
+			t.Errorf("turn %d at %v, want %v: %+v", got.Seq, got.At, want, got)
+		}
+	}
+	if s := books[0].Turns[0].Summary; s != "pushed" {
+		t.Errorf("summary %q", s)
+	}
+	if _, err := stub.Host().Reader.Books(context.Background(), []plugin.Unit{{Provider: "slack", Key: "T/C/1"}}); err == nil {
+		t.Error("a plugin read another provider's books")
 	}
 }

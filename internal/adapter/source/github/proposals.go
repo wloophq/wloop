@@ -95,7 +95,8 @@ func (n *nudges) Proposals(ctx context.Context, now time.Time) ([]outbox.Proposa
 		if err != nil {
 			return nil, err
 		}
-		if prop, ok := nudgeProposal(row, unmuted, prrow.EventsOf(in), unstartedOf(in), viewer, ignore, now); ok {
+		rep, _ := prrow.ReportIn(in)
+		if prop, ok := nudgeProposal(row, unmuted, rep, prrow.EventsOf(in), unstartedOf(in), viewer, ignore, now); ok {
 			out = append(out, prop)
 		}
 	}
@@ -125,7 +126,7 @@ func unstartedOf(in any) map[string]bool {
 
 // nudgeProposal is the nudge of row, whom the nudge intent would ask from
 // its unmuted row, when that intent would not refuse it now.
-func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, unstarted map[string]bool, viewer string, ignore []string, now time.Time) (outbox.Proposal, bool) {
+func nudgeProposal(row, unmuted api.Row, rep prrow.Report, evs []dinv.Event, unstarted map[string]bool, viewer string, ignore []string, now time.Time) (outbox.Proposal, bool) {
 	ref, err := pr.ParseKey(row.Unit.Key)
 	if err != nil {
 		return outbox.Proposal{}, false
@@ -137,7 +138,7 @@ func nudgeProposal(row, unmuted api.Row, evs []dinv.Event, unstarted map[string]
 	}
 	return outbox.Proposal{
 		Unit:    row.Unit,
-		Items:   waitingItems(row, who),
+		Items:   waitingItems(row, rep, who),
 		Purpose: nudgePurpose,
 		Effects: []string{EffectNudged, builtin.EffectTaskNudged},
 		Text:    nudgeText(who, unmuted),
@@ -169,7 +170,7 @@ func nudgeText(who []string, r api.Row) string {
 }
 
 // waitingItems are the row's open derived items waiting on someone the nudge asks.
-func waitingItems(row api.Row, who []string) []string {
+func waitingItems(row api.Row, rep prrow.Report, who []string) []string {
 	keys := make([]string, 0, len(who))
 	for _, w := range who {
 		login := strings.TrimPrefix(w, "@")
@@ -180,7 +181,7 @@ func waitingItems(row api.Row, who []string) []string {
 		}
 	}
 	var out []string
-	for _, it := range Items(row) {
+	for _, it := range ItemsOf(row, rep) {
 		if it.State == items.Open && slices.ContainsFunc(it.WaitingOn, func(x items.Person) bool {
 			return slices.ContainsFunc(keys, func(k string) bool { return strings.EqualFold(k, x.Key) })
 		}) {

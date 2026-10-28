@@ -41,6 +41,7 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/internal/web"
 )
 
@@ -114,10 +115,17 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Forge == "" {
 		d.Forge = unit.GitHub
 	}
+	if d.Identity != nil {
+		if id, err := d.Identity(context.Background()); err == nil {
+			if err := ghsource.KeepIdentity(context.Background(), st, id); err != nil {
+				panic(err)
+			}
+		}
+	}
 	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
 	d.RowProviders = prRows(st, nil)
 	d.Repo = present.Repo
-	g := &githubTest{deps: present.Deps{Store: st}}
+	g := &githubTest{deps: present.Deps{Store: st, Reports: ghreporttest.Inventory{Store: st, Now: st.Now}}}
 	d.Presenters = map[unit.ProviderID]func(PresenterHost) Presenter{unit.GitHub: func(h PresenterHost) Presenter {
 		g.deps.Host = (&psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: h.Units}, Events: sqlite.New(st.DB()), Marks: st.DB(),
 			Drafts: st.DB(), Overrides: st.DB()}).Host()
@@ -142,10 +150,42 @@ func withStore(d Deps, st *inventory.Store) Deps {
 
 // prRows are the pull request rows over st with the brief queue b, as the
 // github source builds them.
-func prRows(st prrow.Store, b prrow.Briefs) []func(readmodel.RowDeps) readmodel.Provider {
+func prRows(st *inventory.Store, b prrow.Briefs) []func(readmodel.RowDeps) readmodel.Provider {
 	return []func(readmodel.RowDeps) readmodel.Provider{func(rd readmodel.RowDeps) readmodel.Provider {
-		return prrow.New(prrow.Source{RowDeps: rd, Store: st, Briefs: b})
+		var reports readmodel.Reports = ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return rd.Settings().Cfg }}
+		if kept, ok := keptReports.Load(st); ok {
+			reports = kept.(readmodel.Reports)
+		}
+		return prrow.New(prrow.Source{RowDeps: rd, Reports: reports, Store: st, Briefs: b})
 	}}
+}
+
+// cards are the GitHub cards and items over the reports the rows of s
+// read.
+func (s *Server) cards() ghsource.Cards {
+	st := s.store()
+	if kept, ok := keptReports.Load(st); ok {
+		return ghsource.Cards{Reports: kept.(readmodel.Reports)}
+	}
+	return ghsource.Cards{Reports: ghreporttest.Inventory{Store: st, Now: st.Now, Config: func() config.Config { return s.deps.Cfg }}}
+}
+
+// keptReports are the reports a test kept in its store, by the store whose
+// rows read them; a store absent derives them from its inventory at each
+// read.
+var keptReports sync.Map
+
+// keepReports keeps the plugin's reports of st's pull requests in its
+// snapshot store, as the host keeps a running plugin's, and has the rows
+// over st read them there.
+func keepReports(t *testing.T, st *inventory.Store) {
+	t.Helper()
+	snaps := psource.NewSnapshots(st.DB().Snapshots())
+	if err := (ghreporttest.Inventory{Store: st, Now: st.Now}).Keep(context.Background(), snaps); err != nil {
+		t.Fatal(err)
+	}
+	keptReports.Store(st, readmodel.Reports(snaps))
+	t.Cleanup(func() { keptReports.Delete(st) })
 }
 
 // newServerWith is newServer with change applied to the Deps before New.
@@ -193,6 +233,13 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 		d.Changes = log
 	}
 	change(&d)
+	if d.Identity != nil {
+		if id, err := d.Identity(ctx); err == nil {
+			if err := ghsource.KeepIdentity(ctx, st, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	s := New(d)
 	s.token = ""
 	stopOnCleanup(t, s)

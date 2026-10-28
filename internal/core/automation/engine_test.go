@@ -74,7 +74,7 @@ func newRig(t *testing.T, wfs ...workflow.Workflow) *rig {
 func (r *rig) restart() {
 	r.e = &automation.Engine{
 		Workflows: func() []workflow.Workflow { return r.wfs },
-		Units:     r.units, Events: r.events, Steps: r.steps, Ledger: r.ledger, Guidance: r.guidance,
+		Units:     r.units, Keep: r.units, Events: r.events, Steps: r.steps, Ledger: r.ledger, Guidance: r.guidance,
 		Changes: r.log, Clock: r.clock, State: r.state, RetryBase: time.Minute,
 		Pause:     func(context.Context) (automation.Pause, error) { return r.pause, nil },
 		Config:    func() workflow.Facts { return workflow.Facts{"config.cleanup.idle": 2 * time.Hour} },

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -771,7 +770,7 @@ func sameFailed(stored []pr.FailingCheck, names []string) bool {
 	return slices.Equal(have, want)
 }
 
-func failedName(name string) string { return oneLine(name, 100) }
+func failedName(name string) string { return pr.OneLine(name, 100) }
 
 func (c *Collector) fetch(ctx context.Context, refs []api.Ref, resolved scope.Resolved, now time.Time, rep *Report) error {
 	_, err := c.read(ctx, refs, resolved, now, rep)
@@ -1000,7 +999,7 @@ func snapshotPR(s api.Snapshot, resolved scope.Resolved) pr.PR {
 			continue
 		}
 		// 200 is the host's longest situation reason.
-		fc := pr.FailingCheck{Name: failedName(ch.Name), Summary: oneLine(ch.Summary, 200)}
+		fc := pr.FailingCheck{Name: failedName(ch.Name), Summary: pr.OneLine(ch.Summary, 200)}
 		// Some apps (Cloud Build) title every run "Summary".
 		if strings.EqualFold(fc.Summary, "summary") {
 			fc.Summary = ""
@@ -1025,23 +1024,4 @@ func merges(evs []pr.Event, f store.StoredFacts) []pr.Event {
 		}
 	}
 	return out
-}
-
-// oneLine is s on one line: control and invisible characters dropped or
-// blanked, whitespace collapsed, cut to max runes.
-func oneLine(s string, max int) string {
-	s = strings.Map(func(r rune) rune {
-		switch {
-		case r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0):
-			return ' '
-		case unicode.Is(unicode.Bidi_Control, r), r == 0x200b, r == 0x200c, r == 0x2060, r == 0xfeff:
-			return -1
-		}
-		return r
-	}, s)
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > max {
-		s = strings.TrimRight(string(r[:max]), " ")
-	}
-	return s
 }
