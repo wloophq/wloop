@@ -446,12 +446,16 @@ func inTx(t *testing.T, db *sql.DB, fn func(ctx context.Context, tx *sql.Tx) err
 	}
 }
 
-// mentions counts the rows of every table with a column holding s.
+// mentions counts the rows of every table with a column holding s. A recorded dossier move is left out:
+// it names the directories on disk, a merged task's under merged/<id>.
 func mentions(t *testing.T, db *sql.DB, s string) []string {
 	t.Helper()
 	var out []string
 	for table, cols := range liveTables(t, db) {
 		for _, c := range cols {
+			if table == "dossier_moves" {
+				continue
+			}
 			if n := strings1(t, db, `SELECT count(*) FROM `+table+` WHERE instr(`+c.name+`, ?) > 0`, s); n[0] != "0" {
 				out = append(out, fmt.Sprintf("%s.%s (%s rows)", table, c.name, n[0]))
 			}
@@ -650,5 +654,112 @@ func TestV7RenameRewritesTheRenamedWorkflowName(t *testing.T) {
 	}
 	if got := strings1(t, rawDB(t, path), `SELECT id FROM plan_items`); !slices.Equal(got, []string{"task-results-ended/task/" + tk.Key + "/v"}) {
 		t.Errorf("plan items %q", got)
+	}
+}
+
+func dossierOf(t *testing.T, db *sql.DB, id string) {
+	t.Helper()
+	if _, err := db.Exec(`INSERT INTO dossiers (owner, rel_path, status, files) VALUES ('task/' || ?1, 'task/' || ?1 || '#', 'live', 2)`, id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func bareTask(t *testing.T, db *sql.DB, id string) {
+	t.Helper()
+	if _, err := db.Exec(`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', 't', 't', 1)`, id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRekeyTaskMovesTheDossierWithItsFiles(t *testing.T) {
+	t.Parallel()
+	from, to := "t-"+hexA, "t-"+hexB
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, from)
+	dossierOf(t, db, from)
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, from, to) })
+	if got := strings1(t, db, `SELECT owner || ' ' || rel_path || ' ' || files FROM dossiers`); !slices.Equal(got, []string{"task/" + to + " task/" + to + "# 2"}) {
+		t.Errorf("dossiers %q", got)
+	}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves`); !slices.Equal(got, []string{"task/" + from + "# > task/" + to + "#"}) {
+		t.Errorf("recorded moves %q, want the directory of the dossier to follow its row", got)
+	}
+}
+
+func TestRekeyTaskOntoATaskWithADossierMergesTheFiles(t *testing.T) {
+	t.Parallel()
+	from, to, next := "t-"+hexA, "t-"+hexB, "t-"+hexP
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, from)
+	bareTask(t, db, to)
+	dossierOf(t, db, from)
+	dossierOf(t, db, to)
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, from, to) })
+	if got := strings1(t, db, `SELECT owner FROM dossiers`); !slices.Equal(got, []string{"task/" + to}) {
+		t.Errorf("dossiers %q, want the target's alone", got)
+	}
+	want := []string{"task/" + from + "# > task/" + to + "#/merged/" + from}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves`); !slices.Equal(got, want) {
+		t.Errorf("recorded moves %q, want %q", got, want)
+	}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, to, next) })
+	want = []string{"task/" + from + "# > task/" + next + "#/merged/" + from, "task/" + to + "# > task/" + next + "#"}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY from_path`); !slices.Equal(got, want) {
+		t.Errorf("recorded moves after a second merge %q, want %q", got, want)
+	}
+}
+
+func TestDropTaskRefusesAHistoryTableAndADossier(t *testing.T) {
+	t.Parallel()
+	gone := "t-" + hexA
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, gone)
+	dossierOf(t, db, gone)
+	for _, q := range []string{
+		`CREATE TABLE task_history (task_id TEXT NOT NULL, at TEXT NOT NULL)`,
+		`INSERT INTO task_history (task_id, at) VALUES ('` + gone + `', 't')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = dropTask(ctx, tx, gone)
+	tx.Rollback()
+	if err == nil || !strings.Contains(err.Error(), "task_history.task_id") || !strings.Contains(err.Error(), "dossiers.owner") {
+		t.Fatalf("dropTask = %v, want a refusal naming the history table and the dossier", err)
+	}
+}
+
+func TestDropTaskKeepsAnAliasOfTheDroppedTask(t *testing.T) {
+	t.Parallel()
+	gone, keep := "t-"+hexA, "t-"+hexB
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, gone)
+	bareTask(t, db, keep)
+	for _, q := range []string{
+		`CREATE TABLE task_aliases (old_id TEXT PRIMARY KEY, new_id TEXT NOT NULL)`,
+		`INSERT INTO task_aliases (old_id, new_id) VALUES ('` + gone + `', '` + keep + `')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return dropTask(ctx, tx, gone) })
+	if got := strings1(t, db, `SELECT old_id || ' ' || new_id FROM task_aliases`); !slices.Equal(got, []string{gone + " " + keep}) {
+		t.Errorf("aliases %q, want the dropped task's alias kept", got)
+	}
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if err := dropTask(ctx, tx, keep); err == nil || !strings.Contains(err.Error(), "task_aliases.new_id") {
+		t.Fatalf("dropping the task an alias leads to: %v", err)
 	}
 }

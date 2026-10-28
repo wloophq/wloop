@@ -44,6 +44,10 @@ func v7Rename(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX task_units_unit ON task_units (provider, unit_key)`,
 		`CREATE INDEX messages_task ON messages (task_id)`,
 		`CREATE INDEX drafts_task ON drafts (task, id)`,
+		`CREATE TABLE dossier_moves (
+  from_path TEXT PRIMARY KEY,
+  to_path TEXT NOT NULL
+) WITHOUT ROWID`,
 		`UPDATE drafts SET effects = replace(effects, '"entry.nudged"', '"task.nudged"') WHERE instr(effects, '"entry.nudged"') > 0`,
 	} {
 		if _, err := tx.ExecContext(ctx, q); err != nil {

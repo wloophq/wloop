@@ -230,3 +230,75 @@ func TestDoctorNamesALeftoverEntryDossierDir(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveDossierDirsIsIdempotent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTree(t, dir,
+		"task/t-1#/notes.md",
+		"task/t-2#/notes.md",
+		"task/t-3#/notes.md",
+		".archive/task/t-4#.tar.gz",
+	)
+	moves := map[string]string{
+		"task/t-1#": "task/t-9#",
+		"task/t-2#": "task/t-3#/merged/t-2",
+		"task/t-4#": "task/t-8#",
+	}
+	want := []string{
+		".archive/task/t-8#.tar.gz",
+		"task/t-3#/merged/t-2/notes.md",
+		"task/t-3#/notes.md",
+		"task/t-9#/notes.md",
+	}
+	for range 2 {
+		if err := moveDossierDirs(dir, moves); err != nil {
+			t.Fatal(err)
+		}
+		if got := dossierTree(t, dir); !slices.Equal(got, want) {
+			t.Fatalf("dossiers %q, want %q", got, want)
+		}
+	}
+	writeTree(t, dir, "task/t-5#/notes.md", "task/t-6#/notes.md")
+	err := moveDossierDirs(dir, map[string]string{"task/t-5#": "task/t-6#"})
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(dossier.Root(dir), "task", "t-6#")) {
+		t.Fatalf("a move onto a directory that exists: %v", err)
+	}
+}
+
+func TestDaemonStartAppliesARecordedDossierMove(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.noDaemon(t)
+	setStore(t, te.storePath(), `INSERT INTO dossier_moves (from_path, to_path) VALUES ('task/t-1#', 'task/t-2#/merged/t-1')`)
+	writeTree(t, te.StateDir, "task/t-1#/notes.md", "task/t-2#/notes.md")
+	db, unlock, _, err := te.tryStore(context.Background(), t.Logf)
+	if err != nil || db == nil {
+		t.Fatalf("the store did not open: %v", err)
+	}
+	defer unlock()
+	defer db.Close()
+	if got := dossierTree(t, te.StateDir); !slices.Equal(got, []string{"task/t-2#/merged/t-1/notes.md", "task/t-2#/notes.md"}) {
+		t.Fatalf("dossiers %q", got)
+	}
+	if moves, err := db.DossierMoves(context.Background()); err != nil || len(moves) != 0 {
+		t.Fatalf("moves left %v %v", moves, err)
+	}
+}
+
+func TestDoctorNamesAPendingDossierMove(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	setStore(t, te.storePath(), `INSERT INTO dossier_moves (from_path, to_path) VALUES ('task/t-5#', 'task/t-6#')`)
+	writeTree(t, te.StateDir, "task/t-5#/notes.md", "task/t-6#/notes.md")
+	root := dossier.Root(te.StateDir)
+	for _, c := range te.diskChecks(context.Background(), Defaults()) {
+		if c.mark == markMissing && strings.Contains(c.info, filepath.Join(root, "task", "t-5#")) && strings.Contains(c.info, filepath.Join(root, "task", "t-6#")) {
+			if c.fix != dossierMovesFix {
+				t.Fatalf("fix %q", c.fix)
+			}
+			return
+		}
+	}
+	t.Fatal("doctor does not name the pending dossier move")
+}

@@ -66,6 +66,10 @@ func loopEvent(kind string) port.Event {
 // writes is every exported write method of the sqlite store types.
 var writes = []writeCase{
 	{
+		method: "DB.DossierMoved",
+		call:   func(ctx context.Context, e *noteEnv) error { return e.db.DossierMoved(ctx, "task/t-1#") },
+	},
+	{
 		method: "DB.SaveAgentSession",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.SaveAgentSession(ctx, AgentSession{ID: "a1", Kind: "claude", Handle: "term_1", FirstSeen: noteAt})
@@ -295,7 +299,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 // reads are the exported methods of the sqlite store types that note
 // nothing: reads, and the handle's own plumbing.
 var reads = []string{
-	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys",
+	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
 	"Store.Books", "Store.BookOf", "Store.UnitsOf", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",

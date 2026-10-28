@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -139,6 +141,9 @@ func (e *Env) tryStore(ctx context.Context, logf func(string, ...any)) (*sqlite.
 		if err := renameDossierDirs(e.StateDir, "entry", "task"); err != nil {
 			logf("store: %v; %s", err, dossierMoveFix(e.StateDir))
 		}
+		if err := e.applyDossierMoves(ctx, db); err != nil {
+			logf("store: %v; %s", err, dossierMovesFix)
+		}
 	}
 	st := e.storeOK(s)
 	e.storeStatus = &st
@@ -170,6 +175,84 @@ func dossierMoveFix(stateDir string) string {
 	return fmt.Sprintf("move each %s to %s, and each %s to %s, resolving a name both sides hold; %s retries the move at every start",
 		filepath.Join(root, "entry", "e-<id>#"), filepath.Join(root, "task", "t-<id>#"),
 		filepath.Join(root, dossier.ArchiveDir, "entry", "e-<id>#.tar.gz"), filepath.Join(root, dossier.ArchiveDir, "task", "t-<id>#.tar.gz"), brand.Name)
+}
+
+// dossierMovesFix is what finishes a dossier move a merge of tasks recorded when it could not be done.
+var dossierMovesFix = "move the directory to the path named, and its archive under " + dossier.ArchiveDir + " likewise, resolving a name both sides hold; " + brand.Name + " retries the move at every start"
+
+// moveDossierDirs moves dossier directories under the dossiers root of stateDir: each key of moves is a
+// directory's path under the root, and its value the path it moves to, parents created. An archived
+// dossier moves the same way under the archive directory, as the path plus .tar.gz. A move whose source is
+// gone counts as done, so a retry finishes what an interrupted run left; a move onto a path that exists is
+// left in place and reported, and the other moves still run.
+func moveDossierDirs(stateDir string, moves map[string]string) error {
+	root := dossier.Root(stateDir)
+	var errs []error
+	for _, from := range slices.Sorted(maps.Keys(moves)) {
+		to := moves[from]
+		for _, p := range [][2]string{
+			{filepath.Join(root, from), filepath.Join(root, to)},
+			{filepath.Join(root, dossier.ArchiveDir, from+".tar.gz"), filepath.Join(root, dossier.ArchiveDir, to+".tar.gz")},
+		} {
+			if err := moveOne(p[0], p[1]); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func moveOne(src, dst string) error {
+	if _, err := os.Lstat(src); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if _, err := os.Lstat(dst); err == nil {
+		return fmt.Errorf("moving the dossier %s: %s exists", src, dst)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+		return err
+	}
+	return os.Rename(src, dst)
+}
+
+// applyDossierMoves moves the dossier directories db records as moved and forgets each move once its
+// source is gone.
+func (e *Env) applyDossierMoves(ctx context.Context, db *sqlite.DB) error {
+	moves, err := db.DossierMoves(ctx)
+	if err != nil || len(moves) == 0 {
+		return err
+	}
+	err = moveDossierDirs(e.StateDir, moves)
+	root := dossier.Root(e.StateDir)
+	for from := range moves {
+		if !pathExists(filepath.Join(root, from)) && !pathExists(filepath.Join(root, dossier.ArchiveDir, from+".tar.gz")) {
+			err = errors.Join(err, db.DossierMoved(ctx, from))
+		}
+	}
+	return err
+}
+
+func pathExists(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
+}
+
+// pendingDossierMoves names the dossier moves db records and that are not done on disk.
+func pendingDossierMoves(ctx context.Context, stateDir string, db *sqlite.DB) []check {
+	moves, err := db.DossierMoves(ctx)
+	if err != nil {
+		return []check{{markInfo, "dossier moves", err.Error(), ""}}
+	}
+	root := dossier.Root(stateDir)
+	var out []check
+	for _, from := range slices.Sorted(maps.Keys(moves)) {
+		info := filepath.Join(root, from) + " waits to move to " + filepath.Join(root, moves[from])
+		if pathExists(filepath.Join(root, moves[from])) {
+			info += ", which exists"
+		}
+		out = append(out, check{markMissing, "dossiers", info, dossierMovesFix})
+	}
+	return out
 }
 
 // leftoverEntryDossiers names the directories of entries' dossiers a store at version 7 or later left
@@ -398,6 +481,16 @@ func (e *Env) migrateStore(ctx context.Context, path, backup string) error {
 	}
 	if err := e.renameTaskDossiers(p.From, p.To); err != nil {
 		fmt.Fprintf(e.Err, "warning: %v; %s\n", err, dossierMoveFix(e.StateDir))
+	}
+	if p.To >= taskRenamedAt {
+		db, err := sqlite.Open(path, e.changes)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		if err := e.applyDossierMoves(ctx, db); err != nil {
+			fmt.Fprintf(e.Err, "warning: %v; %s\n", err, dossierMovesFix)
+		}
 	}
 	return nil
 }

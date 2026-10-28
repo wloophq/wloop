@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -141,7 +142,13 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 	if err != nil {
 		return err
 	}
+	if err := moveDossier(ctx, tx, from, to); err != nil {
+		return err
+	}
 	for _, r := range refs {
+		if r.table == "dossiers" {
+			continue
+		}
 		if r.form == refText {
 			if err := rewriteText(ctx, tx, r, func(s string) string { return replaceID(s, from, to) }); err != nil {
 				return err
@@ -158,14 +165,16 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 	return nil
 }
 
-// taskStateTables hold a task's own state, besides every table named task_*: dropping the task deletes its
-// rows there. A row of any other table that names the task is history, kept forever, so dropTask refuses
-// until rekeyTask moved it.
-var taskStateTables = []string{"tasks", "projects", "dossiers", "unit_marks", "overrides", "unit_cards"}
+// taskStateTables hold a task's own state: dropping the task deletes its rows there. A row of any other
+// table that names the task is history, kept forever, so dropTask refuses until rekeyTask moved it; a
+// dossier is refused too, since its files would be left behind.
+var taskStateTables = []string{"tasks", "task_items", "task_units", "task_contexts", "projects", "unit_marks", "overrides", "unit_cards"}
 
-func ownState(table string) bool {
-	return strings.HasPrefix(table, "task_") || slices.Contains(taskStateTables, table)
-}
+// keptOnDrop are the references a dropped task leaves as they are: an alias from a former id keeps
+// re-derivation idempotent after the task it named is gone.
+var keptOnDrop = []string{"task_aliases.old_id"}
+
+func ownState(table string) bool { return slices.Contains(taskStateTables, table) }
 
 // dropTask deletes task id's own state and empties the link columns of other rows that name it. It refuses,
 // changing nothing, while any other row names the task: the caller rekeys that history first.
@@ -176,7 +185,7 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 	}
 	var held []string
 	for _, r := range refs {
-		if ownState(r.table) || r.clear {
+		if ownState(r.table) || r.clear || slices.Contains(keptOnDrop, r.table+"."+r.column) {
 			continue
 		}
 		n, err := namingRows(ctx, tx, r, id)
@@ -191,7 +200,7 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 		return fmt.Errorf("task %s is still named by %s; rekey them onto another task first", id, strings.Join(held, ", "))
 	}
 	for _, r := range refs {
-		if r.form == refText {
+		if r.form == refText || slices.Contains(keptOnDrop, r.table+"."+r.column) {
 			continue
 		}
 		q := `DELETE FROM ` + r.table + ` WHERE ` + r.where() //nolint:gosec // the names come from the store's own schema
@@ -281,4 +290,43 @@ func replaceID(s, id, to string) string {
 
 func idByte(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c == '-'
+}
+
+// moveDossier gives task to the dossier of task from and records the move of its directory in
+// dossier_moves, which the CLI applies on disk: the whole directory when to has no dossier, else into
+// merged/<from> of to's directory, dropping from's row.
+func moveDossier(ctx context.Context, tx *sql.Tx, from, to string) error {
+	var fromRel, toRel string
+	err := tx.QueryRowContext(ctx, `SELECT rel_path FROM dossiers WHERE owner = ?`, refOwner.spell(from)).Scan(&fromRel)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = tx.QueryRowContext(ctx, `SELECT rel_path FROM dossiers WHERE owner = ?`, refOwner.spell(to)).Scan(&toRel)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		toRel = refDossierPath.spell(to)
+		_, err = tx.ExecContext(ctx, `UPDATE dossiers SET owner = ?, rel_path = ? WHERE owner = ?`, refOwner.spell(to), toRel, refOwner.spell(from))
+	case err == nil:
+		toRel += "/merged/" + from
+		_, err = tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, refOwner.spell(from))
+	}
+	if err != nil {
+		return fmt.Errorf("moving the dossier of task %s: %w", from, err)
+	}
+	return recordDossierMove(ctx, tx, fromRel, toRel)
+}
+
+// recordDossierMove records that the dossier directory at from goes to to; a pending move that ends at
+// from, or inside it, now ends at to.
+func recordDossierMove(ctx context.Context, tx *sql.Tx, from, to string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE dossier_moves SET to_path = ?2 || substr(to_path, ?3)
+		WHERE to_path = ?1 OR substr(to_path, 1, ?3) = ?1 || '/'`, from, to, len(from)+1); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO dossier_moves (from_path, to_path) VALUES (?, ?)
+		ON CONFLICT (from_path) DO UPDATE SET to_path = excluded.to_path`, from, to)
+	return err
 }

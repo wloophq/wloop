@@ -41,6 +41,7 @@ func (e *Env) diskChecks(ctx context.Context, cfg config.Config) []check {
 		if r, err = s.Report(ctx); err != nil {
 			return append(out, check{markInfo, "disk use", err.Error(), ""})
 		}
+		out = append(out, pendingDossierMoves(ctx, e.StateDir, db)...)
 		if worktrees, err = db.AgentWorktrees(ctx); err != nil {
 			return append(out, check{markInfo, "disk use", err.Error(), ""})
 		}

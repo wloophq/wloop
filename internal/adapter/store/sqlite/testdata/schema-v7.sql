@@ -464,6 +464,13 @@ CREATE TABLE dossiers (
   archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 
+-- A dossier directory a merge of tasks moved in the store and not yet on disk: paths under the dossiers
+-- root, an archive at the same path under .archive with .tar.gz.
+CREATE TABLE dossier_moves (
+  from_path TEXT PRIMARY KEY,
+  to_path TEXT NOT NULL
+) WITHOUT ROWID;
+
 CREATE TABLE items (
   provider TEXT NOT NULL, unit_key TEXT NOT NULL, id TEXT NOT NULL,
   body TEXT NOT NULL, state TEXT NOT NULL,
