@@ -152,12 +152,18 @@ func TestInventoryCommandsReachGitHubThroughThePlugin(t *testing.T) {
 		}
 	})
 
-	t.Run("an unavailable plugin is the source unavailable", func(t *testing.T) {
-		te := newTestEnv(t, &fake.Manager{})
-		stub := &pullStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, err: src.ErrUnavailable}
-		te.Env.forge = sourcetest.Launch(t, "github", stub, src.Host{})
-		if _, err := te.Env.basics(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 20}); !errors.Is(err, src.ErrUnavailable) {
-			t.Fatalf("err = %v, want the source unavailable", err)
-		}
-	})
+	for _, want := range []error{src.ErrUnavailable, src.ErrNotFound} {
+		t.Run("the plugin's "+want.Error()+" crosses the wire", func(t *testing.T) {
+			te := newTestEnv(t, &fake.Manager{})
+			stub := &pullStub{forgeStub: &forgeStub{Stub: sourcetest.NewStub(), login: "ana"}, err: want}
+			te.Env.forge = sourcetest.Launch(t, "github", stub, src.Host{})
+			if _, err := te.Env.basics(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 20}); !errors.Is(err, want) {
+				t.Fatalf("err = %v, want %v", err, want)
+			}
+		})
+	}
+}
+
+func TestFetchPRRefreshesThroughThePlugin(t *testing.T) {
+	t.Skip("carried from X5c2 review: X8a2 reads a unit in full through the plugin, not the in-process collector")
 }
