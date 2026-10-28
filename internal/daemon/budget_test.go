@@ -54,11 +54,11 @@ func TestBudgets(t *testing.T) {
 		settle     bool
 		cold, warm metertest.Budget
 	}{
-		{"rows", api.Rows, false, flowBudget(9, 8082, 1), flowBudget(0, 0, 0)},
-		{"unit detail", detail, true, flowBudget(13, 8085, 2), flowBudget(4, 2, 1)},
+		{"rows", api.Rows, false, flowBudget(10, 8082, 1), flowBudget(0, 0, 0)},
+		{"unit detail", detail, true, flowBudget(14, 8085, 2), flowBudget(4, 2, 1)},
 		{"actions", api.Actions, false, flowBudget(0, 0, 0), flowBudget(0, 0, 0)},
-		{"health", "/api/health", false, flowBudget(3, 71, 0), flowBudget(2, 1, 0)},
-		{"activity", "/api/activity", false, flowBudget(1, 200, 0), flowBudget(1, 200, 0)},
+		{"health", "/api/health", false, flowBudget(4, 141, 0), flowBudget(2, 1, 0)},
+		{"activity", "/api/activity", false, flowBudget(2, 266, 0), flowBudget(2, 266, 0)},
 	}
 	for _, fl := range flows {
 		t.Run(fl.name, func(t *testing.T) {

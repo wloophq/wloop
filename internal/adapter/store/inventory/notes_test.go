@@ -33,6 +33,9 @@ type writeCase struct {
 	topics port.Topic
 	refs   []github.Ref
 	all    bool
+	// host says the call records events on the host after its write: a
+	// second note.
+	host bool
 }
 
 // writes is every exported write method of Store; a method may have several
@@ -41,7 +44,7 @@ var writes = []writeCase{
 	{
 		method: "UpsertPR", name: "/new",
 		call:   func(ctx context.Context, s *Store) error { return s.UpsertPR(ctx, openPR(ref, "author")) },
-		topics: port.TopicPRs | port.TopicFollow | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
 	},
 	{
 		method: "UpsertPR", name: "/same reasons",
@@ -73,7 +76,7 @@ var writes = []writeCase{
 			}, noteAt.Add(time.Hour))
 			return err
 		},
-		topics: port.TopicPRs | port.TopicFollow | port.TopicLoopEvents | port.TopicSourceEvents, refs: []github.Ref{ref2},
+		topics: port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref2}, host: true,
 	},
 	{
 		method: "SaveSnapshots", name: "/a merge filled",
@@ -102,13 +105,13 @@ var writes = []writeCase{
 		method: "SetReasons",
 		seed:   seedPRs("author", ref),
 		call:   func(ctx context.Context, s *Store) error { return s.SetReasons(ctx, ref, nil) },
-		topics: port.TopicPRs | port.TopicFollow | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
 	},
 	{
 		method: "SetWorkspace",
 		seed:   seedPRs("", ref),
 		call:   func(ctx context.Context, s *Store) error { return s.SetWorkspace(ctx, ref, dinv.Workspace{ID: "w1"}) },
-		topics: port.TopicPRs | port.TopicFollow | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
 	},
 	{
 		method: "ReplaceWorkspaces",
@@ -172,7 +175,7 @@ var writes = []writeCase{
 		call: func(ctx context.Context, s *Store) error {
 			return s.SetOverride(ctx, dinv.Override{PR: ref, Tracked: true})
 		},
-		topics: port.TopicOverrides | port.TopicPRs | port.TopicFollow | port.TopicLoopEvents, refs: []github.Ref{ref},
+		topics: port.TopicOverrides | port.TopicPRs | port.TopicFollow | port.TopicSourceEvents, refs: []github.Ref{ref}, host: true,
 	},
 	{
 		method: "SetOverride", name: "/pause",
@@ -240,19 +243,6 @@ var writes = []writeCase{
 			return s.RecordSituations(ctx, []dinv.Situation{{PR: ref, Data: "review:me", At: noteAt}})
 		},
 		topics: port.TopicLoopEvents, refs: []github.Ref{ref},
-	},
-	{
-		method: "FillMerged",
-		seed: func(t *testing.T, s *Store) {
-			if _, err := s.AppendEvents(context.Background(), []dinv.Event{{PR: ref, Kind: dinv.KindMerged, At: noteAt}}); err != nil {
-				t.Fatal(err)
-			}
-		},
-		call: func(ctx context.Context, s *Store) error {
-			_, err := s.FillMerged(ctx, dinv.Event{PR: ref, Kind: dinv.KindMerged, At: noteAt, Actor: "bob", Data: "abc"})
-			return err
-		},
-		topics: port.TopicSourceEvents, refs: []github.Ref{ref},
 	},
 	{
 		method: "StartBriefRun",
@@ -374,7 +364,7 @@ var reads = []string{
 }
 
 // silent are the exported write methods that note nothing.
-var silent = []string{"SeeRefs"}
+var silent = []string{"SeeRefs", "UseHost"}
 
 func openNoted(t *testing.T) (*Store, *change.Log) {
 	t.Helper()
@@ -423,8 +413,12 @@ func TestEveryWriteNotes(t *testing.T) {
 				c.seed(t, s)
 			}
 			got, n := noted(t, log, func() error { return c.call(ctx, s) })
-			if n != 1 {
-				t.Fatalf("%d notes, want 1: %+v", n, got)
+			want := 1
+			if c.host {
+				want = 2
+			}
+			if n != want {
+				t.Fatalf("%d notes, want %d: %+v", n, want, got)
 			}
 			if got.Topics != c.topics || got.All != c.all {
 				t.Errorf("noted topics %b all %v, want %b all %v", got.Topics, got.All, c.topics, c.all)
@@ -527,10 +521,6 @@ func TestNoOpWriteNotesNothing(t *testing.T) {
 			}
 		}, func(ctx context.Context, s *Store) error {
 			return s.RecordSituations(ctx, []dinv.Situation{{PR: ref, Data: "review:me", At: noteAt.Add(time.Hour)}})
-		}},
-		{"FillMerged", nil, func(ctx context.Context, s *Store) error {
-			_, err := s.FillMerged(ctx, dinv.Event{PR: ref, Kind: dinv.KindMerged, At: noteAt, Actor: "bob"})
-			return err
 		}},
 		{"InterruptBriefRuns", nil, func(ctx context.Context, s *Store) error {
 			_, err := s.InterruptBriefRuns(ctx, noteAt)

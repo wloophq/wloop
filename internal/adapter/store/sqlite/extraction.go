@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
@@ -45,7 +47,9 @@ type ExtractionRun struct {
 	Error   string
 }
 
-// ExtractionSave is one run's result, written in one transaction.
+// ExtractionSave is one run's result: the briefs in one host transaction,
+// then the cursors and hints in one of the extraction's own, so a crash
+// between them reads the same messages again.
 type ExtractionSave struct {
 	States map[unit.Unit]ExtractionState
 	// Hints replace the hints of the items they name.
@@ -53,13 +57,14 @@ type ExtractionSave struct {
 }
 
 const (
-	extractionStateColumns = `extraction_cursors.provider, extraction_cursors.unit_key, last_ts, last_seq, COALESCE(r.brief, ''),
-		verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, closure_marked, extraction_cursors.at`
-	extractionFrom = ` FROM extraction_cursors LEFT JOIN unit_briefs b ON b.provider = extraction_cursors.provider AND b.unit_key = extraction_cursors.unit_key
-		LEFT JOIN brief_runs r ON b.run != 0 AND r.id = b.run`
-	extractionStatesSQL = `SELECT ` + extractionStateColumns + extractionFrom + `
-		WHERE (extraction_cursors.provider, extraction_cursors.unit_key) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
-	extractionWatchedSQL  = `SELECT ` + extractionStateColumns + extractionFrom + ` WHERE extraction_cursors.provider = ? AND watched = 1`
+	extractionStateColumns = `provider, unit_key, last_ts, last_seq,
+		verdict, verdict_why, viewer_role, topic, started_by_viewer, closure_posted, watched, closure_marked, at`
+	extractionStatesSQL = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors
+		WHERE (provider, unit_key) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
+	extractionWatchedSQL = `SELECT ` + extractionStateColumns + ` FROM extraction_cursors WHERE provider = ? AND watched = 1`
+	// unitBriefsSQL reads the brief in use of each unit of the bound list.
+	unitBriefsSQL = `SELECT b.provider, b.unit_key, r.brief FROM unit_briefs b JOIN brief_runs r ON b.run != 0 AND r.id = b.run
+		WHERE (b.provider, b.unit_key) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
 	putExtractionStateSQL = `INSERT INTO extraction_cursors (provider, unit_key, last_ts, last_seq, verdict, verdict_why,
 		viewer_role, topic, started_by_viewer, closure_posted, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (provider, unit_key) DO UPDATE SET last_ts = excluded.last_ts, last_seq = excluded.last_seq,
@@ -97,7 +102,7 @@ func scanExtractionStates(rows *sql.Rows, err error) (map[unit.Unit]ExtractionSt
 	for rows.Next() {
 		var provider, key, at string
 		var s ExtractionState
-		if err := rows.Scan(&provider, &key, &s.LastTS, &s.LastSeq, &s.Brief, &s.Verdict, &s.VerdictWhy, &s.ViewerRole, &s.Topic,
+		if err := rows.Scan(&provider, &key, &s.LastTS, &s.LastSeq, &s.Verdict, &s.VerdictWhy, &s.ViewerRole, &s.Topic,
 			&s.StartedByViewer, &s.ClosurePosted, &s.Watched, &s.ClosureMarked, &at); err != nil {
 			return nil, err
 		}
@@ -107,36 +112,90 @@ func scanExtractionStates(rows *sql.Rows, err error) (map[unit.Unit]ExtractionSt
 	return out, rows.Err()
 }
 
-// States are the rows of units; a unit without one is missing from the map.
-func (s *ExtractionStore) States(ctx context.Context, units []unit.Unit) (map[unit.Unit]ExtractionState, error) {
-	if len(units) == 0 {
-		return map[unit.Unit]ExtractionState{}, nil
-	}
+// unitList is the bound JSON list of units.
+func unitList(units []unit.Unit) (string, error) {
 	pairs := make([][2]string, len(units))
 	for i, u := range units {
 		pairs[i] = [2]string{string(u.Provider), u.Key}
 	}
 	list, err := json.Marshal(pairs)
+	return string(list), err
+}
+
+// States are the rows of units; a unit without one is missing from the map.
+func (s *ExtractionStore) States(ctx context.Context, units []unit.Unit) (map[unit.Unit]ExtractionState, error) {
+	if len(units) == 0 {
+		return map[unit.Unit]ExtractionState{}, nil
+	}
+	list, err := unitList(units)
 	if err != nil {
 		return nil, err
 	}
-	return scanExtractionStates(s.db.R().QueryContext(ctx, extractionStatesSQL, string(list)))
+	out, err := scanExtractionStates(s.db.R().QueryContext(ctx, extractionStatesSQL, list))
+	if err != nil {
+		return nil, err
+	}
+	return out, s.withBriefs(ctx, out)
 }
 
 // Watched are the rows of provider that SetWatched marked.
 func (s *ExtractionStore) Watched(ctx context.Context, provider unit.ProviderID) (map[unit.Unit]ExtractionState, error) {
-	return scanExtractionStates(s.db.R().QueryContext(ctx, extractionWatchedSQL, string(provider)))
+	out, err := scanExtractionStates(s.db.R().QueryContext(ctx, extractionWatchedSQL, string(provider)))
+	if err != nil {
+		return nil, err
+	}
+	return out, s.withBriefs(ctx, out)
+}
+
+// withBriefs fills the Brief of each of states from the host's briefs.
+func (s *ExtractionStore) withBriefs(ctx context.Context, states map[unit.Unit]ExtractionState) error {
+	if len(states) == 0 {
+		return nil
+	}
+	list, err := unitList(slices.Collect(maps.Keys(states)))
+	if err != nil {
+		return err
+	}
+	rows, err := s.db.R().QueryContext(ctx, unitBriefsSQL, list)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var provider, key, brief string
+		if err := rows.Scan(&provider, &key, &brief); err != nil {
+			return err
+		}
+		u := unit.Unit{Provider: unit.ProviderID(provider), Key: key}
+		st := states[u]
+		st.Brief = brief
+		states[u] = st
+	}
+	return rows.Err()
 }
 
 func (s *ExtractionStore) Save(ctx context.Context, sv ExtractionSave) error {
+	briefed := false
+	for _, st := range sv.States {
+		briefed = briefed || st.Brief != ""
+	}
+	if briefed {
+		if _, err := s.db.Write(ctx, func(tx *Tx) error {
+			for u, st := range sv.States {
+				if err := putExtractionBrief(ctx, tx, u, st); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
 	_, err := s.db.Write(ctx, func(tx *Tx) error {
 		for u, st := range sv.States {
 			tx.Touch(port.TopicSourceEvents, u)
 			if _, err := tx.ExecContext(ctx, putExtractionStateSQL, string(u.Provider), u.Key, st.LastTS, st.LastSeq,
 				st.Verdict, st.VerdictWhy, st.ViewerRole, st.Topic, st.StartedByViewer, st.ClosurePosted, formatTime(st.At)); err != nil {
-				return err
-			}
-			if err := putExtractionBrief(ctx, tx, u, st); err != nil {
 				return err
 			}
 		}

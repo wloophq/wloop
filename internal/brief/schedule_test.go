@@ -198,7 +198,7 @@ func TestStartSleepsUntilTheEarliestDeadline(t *testing.T) {
 				t.Fatalf("%d scans in an hour, want 7", n)
 			}
 			metertest.Within(t, sc, metertest.Budget{
-				{Res: meter.SQL, Op: "query"}: 7,
+				{Res: meter.SQL, Op: "query"}: 14,
 				{Res: meter.SQL, Op: "exec"}:  0,
 				{Res: meter.Tx, Op: "write"}:  0,
 			})
@@ -363,7 +363,7 @@ func TestRunWithNothingDueReadsOnceAndWritesNothing(t *testing.T) {
 		t.Fatalf("%q %v", summary, err)
 	}
 	metertest.Within(t, sc, metertest.Budget{
-		{Res: meter.SQL}:             1,
+		{Res: meter.SQL}:             2,
 		{Res: meter.SQL, Op: "exec"}: 0,
 		{Res: meter.Tx, Op: "write"}: 0,
 	})

@@ -6,16 +6,18 @@ stub reads: []
 branch queries: []
 thread reads: 0
 meter sql/exec: 47 calls, 0 rows
-meter sql/query: 24 calls, 20 rows
-meter tx/write: 6 calls, 0 rows
+meter sql/query: 26 calls, 21 rows
+meter tx/write: 8 calls, 0 rows
 meter workspace/AgentActivity: 1 calls, 0 rows
 meter workspace/List: 1 calls, 0 rows
 meter workspace/Repos: 1 calls, 0 rows
 notes:
   topics 131072 all false units []
-  topics 15 all false units [github:acme/api#7 github:acme/api#8]
+  topics 3 all false units [github:acme/api#7 github:acme/api#8]
+  topics 4 all false units [github:acme/api#7 github:acme/api#8]
   topics 8192 all false units []
-  topics 15 all false units [github:acme/api#11 github:acme/api#9]
+  topics 3 all false units [github:acme/api#11 github:acme/api#9]
+  topics 4 all false units [github:acme/api#11 github:acme/api#9]
   topics 3 all false units [github:acme/api#11 github:acme/api#8]
 pr acme/api#11 "Linked" OPEN reasons [author review-requested] seen 2026-10-05T10:00:00Z workspace "w1" head h2
 pr acme/api#9 "Tracked" OPEN reasons [author review-requested tracked] seen 2026-10-05T10:00:00Z workspace "" head h2

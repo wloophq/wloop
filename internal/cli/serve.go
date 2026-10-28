@@ -257,8 +257,11 @@ func serveDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, lo
 }
 
 func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config, logf func(string, ...any), loopMu *lock.Mutex, app *daemon.AppState) daemon.Deps {
+	forge := unit.GitHub
 	store := inventory.New(db)
 	store.UseClock(e.Now)
+	host := e.moduleHost(db)
+	store.UseHost(host(forge))
 	sessions := e.serveTurns(ctx, db, store, cfg, logf)
 	var queue *brief.Queue
 	var briefs *interruptFirst
@@ -270,7 +273,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
-	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
+	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, Host: host, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
 		Changes: e.changes, Clock: clockFunc(e.Now), Log: logf, Git: e.Git, Agents: e.Agents,
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
@@ -310,7 +313,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Intents:  e.loadedIntents,
 		Cfg:      cfg,
 		Viewer: func(ctx context.Context) (string, []string, error) {
-			login, err := store.Viewer(ctx, unit.GitHub)
+			login, err := store.Viewer(ctx, forge)
 			if err != nil {
 				return "", nil, err
 			}
@@ -318,14 +321,14 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 				if login, err = e.GitHub.Viewer(ctx); err != nil {
 					return "", nil, err
 				}
-				if err := store.SetViewer(ctx, unit.GitHub, login); err != nil {
+				if err := store.SetViewer(ctx, forge, login); err != nil {
 					logf("viewer: %v", err)
 				}
 			}
 			teams, err := githubTeams(ctx, store)
 			return login, teams, err
 		},
-		Forge:    unit.GitHub,
+		Forge:    forge,
 		Now:      e.Now,
 		Version:  Version,
 		Log:      logf,

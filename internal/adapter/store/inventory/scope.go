@@ -64,14 +64,21 @@ func scopes(ctx context.Context, tx *sqlite.Tx, refs ...github.Ref) (map[github.
 	return out, rows.Err()
 }
 
-// recordScope writes a followed or unfollowed event for each pull request
+// flipping is a pull request whose followed state flipped in a write.
+type flipping struct {
+	ref      github.Ref
+	was, now scope
+	at       time.Time
+}
+
+// scopeFlips are the pull requests among refs, every one when empty,
 // whose followed state flipped since before, at seen, else now.
-func (s *Store) recordScope(ctx context.Context, tx *sqlite.Tx, before map[github.Ref]scope, seen time.Time, refs ...github.Ref) error {
+func (s *Store) scopeFlips(ctx context.Context, tx *sqlite.Tx, before map[github.Ref]scope, seen time.Time, refs ...github.Ref) ([]flipping, error) {
 	after, err := scopes(ctx, tx, refs...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var evs []dinv.Event
+	var out []flipping
 	at := seen.UTC()
 	for ref, now := range after {
 		was := before[ref]
@@ -81,15 +88,32 @@ func (s *Store) recordScope(ctx context.Context, tx *sqlite.Tx, before map[githu
 		if at.IsZero() {
 			at = s.clock().UTC()
 		}
-		var followedAt time.Time
-		if was.followed {
-			if followedAt, err = lastFollowed(ctx, tx, ref); err != nil {
-				return err
-			}
-		}
-		evs = append(evs, flip(ref, was, now, at, followedAt))
+		out = append(out, flipping{ref, was, now, at})
 	}
-	return insertEvents(ctx, tx, evs)
+	return out, nil
+}
+
+// recordFlips records the followed or unfollowed event of each of flips on
+// the host, an unfollow dated after the last followed event.
+func (s *Store) recordFlips(ctx context.Context, flips []flipping) error {
+	if len(flips) == 0 {
+		return nil
+	}
+	var unfollowed []github.Ref
+	for _, f := range flips {
+		if f.was.followed {
+			unfollowed = append(unfollowed, f.ref)
+		}
+	}
+	last, err := s.lastFollowed(ctx, unfollowed)
+	if err != nil {
+		return err
+	}
+	evs := make([]dinv.Event, len(flips))
+	for i, f := range flips {
+		evs[i] = flip(f.ref, f.was, f.now, f.at, last[f.ref])
+	}
+	return s.recordEvents(ctx, evs)
 }
 
 // flip is the followed or unfollowed event of ref's scope going from was to
@@ -109,16 +133,6 @@ func flip(ref github.Ref, was, now scope, at, followedAt time.Time) dinv.Event {
 		end = followedAt
 	}
 	return dinv.Event{PR: ref, Kind: dinv.KindUnfollowed, Key: ts(end), At: end, Data: strings.Join(was.reasons, ",")}
-}
-
-func lastFollowed(ctx context.Context, tx *sqlite.Tx, ref github.Ref) (time.Time, error) {
-	var last string
-	err := tx.QueryRowContext(ctx, `SELECT COALESCE(max(at), '') FROM events WHERE provider = ? AND unit_key = ? AND kind = ?`,
-		append(unitArgs(ref), dinv.KindFollowed)...).Scan(&last)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return parseTS(last)
 }
 
 const lastSituationSQL = `SELECT data, CAST(key AS INTEGER) FROM events WHERE provider = ? AND unit_key = ? AND kind = ?

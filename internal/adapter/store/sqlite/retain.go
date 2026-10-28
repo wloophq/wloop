@@ -135,8 +135,7 @@ const (
 	retainInstructionsSQL = `DELETE FROM turn_instructions WHERE created_at < ?`
 	retainPartsSQL        = `DELETE FROM instruction_parts WHERE sha NOT IN
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
-	retainViewRowsSQL = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN
-		(SELECT owner || '/' || repo || '#' || number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?)`
+	retainViewRowsSQL     = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits
 	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
 	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?`
 	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
@@ -145,12 +144,11 @@ const (
 	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
 		(provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE category NOT IN (?, ?)))
 		OR (provider = 'slack'
-			AND NOT EXISTS (SELECT 1 FROM extraction_cursors c WHERE c.provider = 'slack' AND c.unit_key = unit_marks.unit_key)
+			AND (provider, unit_key) NOT IN ` + cursorUnits + `
 			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
 			AND NOT EXISTS (SELECT 1 FROM task_units u WHERE u.provider = 'slack' AND u.unit_key = unit_marks.unit_key))`
 	retainClassificationsSQL = `DELETE FROM classifications WHERE at < ?`
 	retainClassifyDaysSQL    = `DELETE FROM classify_days WHERE day < ?`
-	retainFetchesSQL         = `DELETE FROM fetches WHERE at < ?`
 	unitlessUnitsSQL         = `SELECT unit_key FROM (
 		SELECT unit_key, max(sent_at, started_at, ended_at) AS t FROM turns WHERE provider = 'github'
 		UNION ALL SELECT unit_key, at FROM turn_records WHERE provider = 'github'
@@ -159,7 +157,7 @@ const (
 		UNION ALL SELECT unit_key, at FROM events WHERE provider = 'github'
 		UNION ALL SELECT unit_key, at FROM workflow_runs WHERE provider = 'github'
 		UNION ALL SELECT unit_key, saved_at FROM plan_items WHERE provider = 'github'
-	) WHERE unit_key NOT IN (SELECT owner || '/' || repo || '#' || number FROM pull_requests)
+	) WHERE unit_key NOT IN (SELECT value FROM json_each(?))
 		AND unit_key NOT IN (SELECT unit_key FROM overrides WHERE provider = 'github')
 	GROUP BY unit_key HAVING max(t) != '' AND max(t) < ?`
 )
@@ -179,39 +177,45 @@ var retainSessionEventsSQL = `DELETE FROM events WHERE kind IN (` + strings.Trim
 	`) AND at < ? AND +provider IN ('', 'session')`
 
 // endedUnits and endedRefs read the bound JSON list of the ended pull
-// requests' unit keys, or of their [owner, repo, number] triples.
+// requests' unit keys, or of their [owner, repo, number] triples;
+// cursorUnits reads that of the extraction cursors' [provider, unit_key]
+// pairs.
 const (
-	endedUnits = `(SELECT value FROM json_each(?))`
-	endedRefs  = `(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?))`
+	endedUnits  = `(SELECT value FROM json_each(?))`
+	endedRefs   = `(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?))`
+	cursorUnits = `(SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`
 )
 
 type endedTable struct {
 	table  string
 	topics port.Topic
 	query  string
-	byRef  bool // bound to the triples; otherwise to the unit keys
 }
 
-// endedTables is in delete order: turn_usage goes before the turns it hangs
-// from, pull_requests last.
+// endedTables are the core's rows of an ended pull request, in delete
+// order: turn_usage goes before the turns it hangs from.
 var endedTables = slices.Concat([]endedTable{
-	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits + `)`, false},
-	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"turn_answers", port.TopicTurns, `DELETE FROM turn_answers WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"intakes", port.TopicIntakes, `DELETE FROM intakes WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"events", port.TopicSourceEvents | port.TopicLoopEvents, `DELETE FROM events WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"plan_items", port.TopicPending, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits, false},
-}, briefEndedTables, []endedTable{
-	{"pr_seen", 0, `DELETE FROM pr_seen WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"pr_details", port.TopicPRs, `DELETE FROM pr_details WHERE (owner, repo, number) IN ` + endedRefs, true},
-	{"pull_requests", port.TopicPRs | port.TopicFollow, `DELETE FROM pull_requests WHERE (owner, repo, number) IN ` + endedRefs, true},
-})
+	{"turn_usage", port.TopicUsage, `DELETE FROM turn_usage WHERE turn_seq IN (SELECT seq FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits + `)`},
+	{"turns", port.TopicTurns, `DELETE FROM turns WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"turn_records", port.TopicTurns, `DELETE FROM turn_records WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"turn_answers", port.TopicTurns, `DELETE FROM turn_answers WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"intakes", port.TopicIntakes, `DELETE FROM intakes WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"events", port.TopicSourceEvents | port.TopicLoopEvents, `DELETE FROM events WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"overrides", port.TopicOverrides, `DELETE FROM overrides WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"workflow_runs", 0, `DELETE FROM workflow_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"plan_items", port.TopicPending, `DELETE FROM plan_items WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"unit_marks", port.TopicRounds, `DELETE FROM unit_marks WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"round_state", port.TopicRounds, `DELETE FROM round_state WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"view_applied", port.TopicViews, `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+}, briefEndedTables)
+
+// endedPluginTables are the GitHub plugin's rows of an ended pull request,
+// deleted after the core's, pull_requests last.
+var endedPluginTables = []endedTable{
+	{"pr_seen", 0, `DELETE FROM pr_seen WHERE (owner, repo, number) IN ` + endedRefs},
+	{"pr_details", port.TopicPRs, `DELETE FROM pr_details WHERE (owner, repo, number) IN ` + endedRefs},
+	{"pull_requests", port.TopicPRs | port.TopicFollow, `DELETE FROM pull_requests WHERE (owner, repo, number) IN ` + endedRefs},
+}
 
 // Retain applies p as of now in one write transaction, noting Change.All
 // with the topics of the tables it changed, then runs incremental_vacuum and
@@ -219,12 +223,35 @@ var endedTables = slices.Concat([]endedTable{
 // the sessions and runs only an ended pull request's turns held, and a
 // second pass at the same now changes nothing and notes nothing.
 func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained, error) {
+	plugins := pluginRows{db}
+	var in retainInputs
+	var err error
+	if p.EndedPRs > 0 {
+		if in.ended, err = plugins.endedPRs(ctx, cutoff(now, p.EndedPRs)); err != nil {
+			return nil, err
+		}
+	}
+	if p.ViewRows > 0 {
+		if in.viewEnded, err = plugins.endedPRs(ctx, cutoff(now, p.ViewRows)); err != nil {
+			return nil, err
+		}
+	}
+	if p.UnitlessLoopRows > 0 {
+		if in.prKeys, err = plugins.prKeys(ctx); err != nil {
+			return nil, err
+		}
+	}
+	if p.BriefBodies > 0 || p.SubjectMarks {
+		if in.cursors, err = plugins.cursorUnits(ctx); err != nil {
+			return nil, err
+		}
+	}
 	var out Retained
-	_, err := db.Write(ctx, func(tx *Tx) error {
+	_, err = db.Write(ctx, func(tx *Tx) error {
 		out = Retained{}
 		r := &retainer{ctx: ctx, tx: tx, out: out}
 		if p.EndedPRs > 0 {
-			r.endedPRs(cutoff(now, p.EndedPRs))
+			r.endedPRs(in.ended)
 		}
 		if p.SessionEvents > 0 {
 			args := make([]any, 0, len(SessionEventKinds)+1)
@@ -252,10 +279,10 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("instruction_parts", port.TopicRounds, retainPartsSQL)
 		}
 		if p.BriefBodies > 0 {
-			r.briefs(cutoff(now, p.BriefBodies))
+			r.briefs(cutoff(now, p.BriefBodies), in.cursors)
 		}
 		if p.ViewRows > 0 {
-			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, cutoff(now, p.ViewRows))
+			r.exec("view_applied", port.TopicViews, retainViewRowsSQL, keyList(in.viewEnded))
 		}
 		if p.PlanItems > 0 {
 			r.exec("plan_items", 0, retainPlanItemsSQL, cutoff(now, p.PlanItems))
@@ -278,22 +305,26 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec(VerbEventsKey, port.TopicLoopEvents, retainVerbEventsSQL, append(args, cutoff(now, p.VerbEvents))...)
 		}
 		if p.UnitlessLoopRows > 0 {
-			r.unitless(cutoff(now, p.UnitlessLoopRows))
+			r.unitless(cutoff(now, p.UnitlessLoopRows), in.prKeys)
 		}
 		if p.Classifications > 0 {
 			r.exec("classifications", 0, retainClassificationsSQL, cutoff(now, p.Classifications))
 			r.exec("classify_days", 0, retainClassifyDaysSQL, now.Add(-p.Classifications).UTC().Format(time.DateOnly))
 		}
-		if p.Fetches > 0 {
-			r.exec("fetches", 0, retainFetchesSQL, cutoff(now, p.Fetches))
-		}
 		if p.SubjectMarks {
-			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL, openArgs()...)
+			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL, append(openArgs(), in.cursors)...)
 		}
 		return r.err
 	})
 	if err != nil {
 		return nil, err
+	}
+	fetches := ""
+	if p.Fetches > 0 {
+		fetches = cutoff(now, p.Fetches)
+	}
+	if err := plugins.drop(ctx, in.ended, fetches, out); err != nil {
+		return out, err
 	}
 	stmts := []string{`PRAGMA optimize`}
 	if p.VacuumPages > 0 {
@@ -339,51 +370,24 @@ func (r *retainer) exec(table string, topics port.Topic, query string, args ...a
 	}
 }
 
-func (r *retainer) endedPRs(before string) {
-	rows, err := r.tx.QueryContext(r.ctx, endedPRsSQL, before)
-	if err != nil {
-		r.err = err
+// endedPRs deletes the core's rows of the ended pull requests.
+func (r *retainer) endedPRs(ended []pr.Ref) {
+	if len(ended) == 0 {
 		return
 	}
-	var units []string
-	var refs [][3]any
-	for rows.Next() {
-		var ref pr.Ref
-		if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number); err != nil {
-			rows.Close()
-			r.err = err
-			return
-		}
-		units = append(units, ref.String())
-		refs = append(refs, [3]any{ref.Owner, ref.Repo, ref.Number})
-	}
-	if r.err = errors.Join(rows.Err(), rows.Close()); r.err != nil || len(units) == 0 {
-		return
-	}
-	unitList, err := json.Marshal(units)
-	if err != nil {
-		r.err = err
-		return
-	}
-	refList, err := json.Marshal(refs)
-	if err != nil {
-		r.err = err
-		return
-	}
+	list := keyList(ended)
 	for _, t := range endedTables {
-		list := unitList
-		if t.byRef {
-			list = refList
-		}
-		r.exec(t.table, t.topics, t.query, string(list))
+		r.exec(t.table, t.topics, t.query, list)
 	}
 }
 
-func (r *retainer) unitless(before string) {
+// unitless deletes the loop's rows of the github units not among prKeys,
+// the bound list of the stored pull requests' unit keys.
+func (r *retainer) unitless(before, prKeys string) {
 	if r.err != nil {
 		return
 	}
-	rows, err := r.tx.QueryContext(r.ctx, unitlessUnitsSQL, before)
+	rows, err := r.tx.QueryContext(r.ctx, unitlessUnitsSQL, prKeys, before)
 	if err != nil {
 		r.err = err
 		return
@@ -411,4 +415,92 @@ func (r *retainer) unitless(before string) {
 			r.exec(UnitlessLoopRowsKey, t.topics, t.query, string(list))
 		}
 	}
+}
+
+// retainInputs are what a pass reads of the plugins' tables before its
+// own transaction: bound lists for the core's queries.
+type retainInputs struct {
+	ended, viewEnded []pr.Ref
+	prKeys, cursors  string
+}
+
+// keyList is the bound JSON list of refs' unit keys.
+func keyList(refs []pr.Ref) string {
+	keys := make([]string, len(refs))
+	for i, ref := range refs {
+		keys[i] = ref.String()
+	}
+	raw, _ := json.Marshal(keys)
+	return string(raw)
+}
+
+// pluginRows are the plugins' tables as retention reads and deletes them,
+// each call in a transaction of its own: the GitHub plugin's pull requests
+// and fetches, the Slack extraction's cursors.
+type pluginRows struct{ db *DB }
+
+// endedPRs are the pull requests merged or closed before before.
+func (p pluginRows) endedPRs(ctx context.Context, before string) ([]pr.Ref, error) {
+	rows, err := p.db.R().QueryContext(ctx, endedPRsSQL, before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pr.Ref
+	for rows.Next() {
+		var ref pr.Ref
+		if err := rows.Scan(&ref.Owner, &ref.Repo, &ref.Number); err != nil {
+			return nil, err
+		}
+		out = append(out, ref)
+	}
+	return out, rows.Err()
+}
+
+// prKeys is the bound JSON list of every stored pull request's unit key.
+func (p pluginRows) prKeys(ctx context.Context) (string, error) {
+	var list string
+	err := p.db.R().QueryRowContext(ctx, `SELECT COALESCE(json_group_array(owner || '/' || repo || '#' || number), '[]') FROM pull_requests`).Scan(&list)
+	return list, err
+}
+
+// cursorUnits is the bound JSON list of the extraction cursors' units.
+func (p pluginRows) cursorUnits(ctx context.Context) (string, error) {
+	var list string
+	err := p.db.R().QueryRowContext(ctx, `SELECT COALESCE(json_group_array(json_array(provider, unit_key)), '[]') FROM extraction_cursors`).Scan(&list)
+	return list, err
+}
+
+// drop deletes the plugins' rows of the ended pull requests and, with a
+// fetchesBefore, the fetches before it, counting them in out.
+func (p pluginRows) drop(ctx context.Context, ended []pr.Ref, fetchesBefore string, out Retained) error {
+	if len(ended) == 0 && fetchesBefore == "" {
+		return nil
+	}
+	_, err := p.db.Write(ctx, func(tx *Tx) error {
+		r := &retainer{ctx: ctx, tx: tx, out: Retained{}}
+		if len(ended) > 0 {
+			refs := make([][3]any, len(ended))
+			for i, ref := range ended {
+				refs[i] = [3]any{ref.Owner, ref.Repo, ref.Number}
+			}
+			list, err := json.Marshal(refs)
+			if err != nil {
+				return err
+			}
+			for _, t := range endedPluginTables {
+				r.exec(t.table, t.topics, t.query, string(list))
+			}
+		}
+		if fetchesBefore != "" {
+			r.exec("fetches", 0, `DELETE FROM fetches WHERE at < ?`, fetchesBefore)
+		}
+		if r.err == nil {
+			for table, n := range r.out {
+				out[table] += n
+			}
+		}
+		return r.err
+	})
+	return err
 }

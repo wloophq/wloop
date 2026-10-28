@@ -974,7 +974,7 @@ func TestPRsWithOverridesMatchesTheirSeparateReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 2})
 	want, err := s.ListPRs(ctx, false)
 	if err != nil {
 		t.Fatal(err)

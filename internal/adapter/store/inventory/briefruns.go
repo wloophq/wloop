@@ -542,42 +542,41 @@ type BriefState struct {
 	Has bool
 }
 
-type joined struct {
-	scanner
-	more []any
-}
+// briefStateQuery reads the brief state of the pull requests whose unit
+// keys it is bound to, Brief left empty.
+var briefStateQuery = `SELECT p.unit_key, ` + fmt.Sprintf(briefFields, "''") + `
+	FROM unit_briefs p LEFT JOIN brief_runs r ON p.run != 0 AND r.id = p.run LEFT JOIN brief_runs l ON p.last_run != 0 AND l.id = p.last_run
+	WHERE p.provider = '` + githubBriefs + `' AND p.unit_key IN (SELECT value FROM json_each(?))`
 
-func (j joined) Scan(dest ...any) error { return j.scanner.Scan(append(dest, j.more...)...) }
-
-// BriefStates lists the open pull requests with their brief state, in one
-// query that never reads a brief's JSON, newest update first.
+// BriefStates lists the open pull requests with their brief state, newest
+// update first: the pull requests, then the brief states, a read each that
+// never reads a brief's JSON.
 func (s *Store) BriefStates(ctx context.Context) ([]BriefState, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT `+prColumns+`, p.unit_key IS NOT NULL, `+fmt.Sprintf(briefFields, "''")+`
-		FROM pull_requests pr LEFT JOIN unit_briefs p ON p.provider = '`+githubBriefs+`' AND p.unit_key = pr.owner || '/' || pr.repo || '#' || pr.number
-		LEFT JOIN brief_runs r ON p.run != 0 AND r.id = p.run LEFT JOIN brief_runs l ON p.last_run != 0 AND l.id = p.last_run
-		WHERE pr.state = 'OPEN' ORDER BY pr.updated_at DESC, pr.owner, pr.repo, pr.number DESC`)
+	prs, err := s.ListPRs(ctx, true)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []BriefState
-	for rows.Next() {
-		var st BriefState
-		var x briefTimes
-		pr, err := scanPR(joined{rows, append([]any{&st.Has}, x.dests(&st.Rec)...)})
-		if err != nil {
-			return nil, err
-		}
-		if err := x.parse(&st.Rec); err != nil {
-			return nil, err
-		}
-		st.PR, st.Rec.PR = pr, pr.Ref
-		if !st.Has {
-			st.Rec = dinv.BriefRecord{PR: pr.Ref}
-		}
-		out = append(out, st)
+	keys := make([]string, len(prs))
+	for i, p := range prs {
+		keys[i] = p.Ref.String()
 	}
-	return out, rows.Err()
+	list, err := json.Marshal(keys)
+	if err != nil {
+		return nil, err
+	}
+	recs := map[github.Ref]dinv.BriefRecord{}
+	if err := s.readBriefRecords(ctx, recs, briefStateQuery, string(list)); err != nil {
+		return nil, err
+	}
+	out := make([]BriefState, len(prs))
+	for i, p := range prs {
+		rec, has := recs[p.Ref]
+		if !has {
+			rec = dinv.BriefRecord{PR: p.Ref}
+		}
+		out[i] = BriefState{PR: p, Rec: rec, Has: has}
+	}
+	return out, nil
 }
 
 // UnitBrief is the brief in use of a unit of any provider: its run, its

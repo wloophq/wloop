@@ -320,10 +320,10 @@ func TestRetainEndedPR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := metertest.Count(sc, metertest.Limit{Res: meter.Tx}); n != 1 {
-		t.Errorf("%d transactions, want 1\n%s", n, metertest.Report(sc.Tally()))
+	if n := metertest.Count(sc, metertest.Limit{Res: meter.Tx}); n != 2 {
+		t.Errorf("%d transactions, want 2, the core's and the plugin's\n%s", n, metertest.Report(sc.Tally()))
 	}
-	if n, want := metertest.Count(sc, metertest.Limit{Res: meter.SQL}), int64(1+len(endedTables)+1); n != want {
+	if n, want := metertest.Count(sc, metertest.Limit{Res: meter.SQL}), int64(1+len(endedTables)+len(endedPluginTables)+1); n != want {
 		t.Errorf("a pass that removes an ended pull request issued %d statements, want the SELECT, one DELETE per table and optimize: %d\n%s", n, want, metertest.Report(sc.Tally()))
 	}
 	if len(got) != len(prTables) {

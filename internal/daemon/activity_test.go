@@ -176,7 +176,7 @@ func TestActivityBudget(t *testing.T) {
 	if len(items) != activityDefault {
 		t.Fatalf("%d items", len(items))
 	}
-	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 1})
+	metertest.Within(t, sc, metertest.Budget{{Res: meter.SQL}: 2})
 }
 
 func TestActivityListsAnotherProvidersEventsWithItsCard(t *testing.T) {

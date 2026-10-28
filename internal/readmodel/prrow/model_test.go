@@ -277,8 +277,9 @@ func TestRowsWithNoChangeIssueNoQuery(t *testing.T) {
 	}
 }
 
-// rebuildSQL is one rebuild at live size: one statement per input.
-const rebuildSQL = 9
+// rebuildSQL is one rebuild at live size: one statement per input, the
+// pull requests and their overrides apart.
+const rebuildSQL = 10
 
 func TestRebuildAtLiveSize(t *testing.T) {
 	f := storetest.Seeded(t, storetest.Live)

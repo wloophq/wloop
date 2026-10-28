@@ -99,7 +99,9 @@ func batchSnapshots() []Snapshot {
 // upsertOne is UpsertPR as it was before SaveSnapshots: one transaction
 // that reads the stored row and the scope, upserts, and records the flip.
 func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
+	var flips []flipping
 	_, err := s.db.Write(ctx, func(tx *sqlite.Tx) error {
+		flips = nil
 		var stored, storedMergeable, storedMergeableAt string
 		err := tx.QueryRowContext(ctx, `SELECT reasons, mergeable, mergeable_at FROM pull_requests WHERE owner=? AND repo=? AND number=?`, pr.Ref.Owner, pr.Ref.Repo, pr.Ref.Number).
 			Scan(&stored, &storedMergeable, &storedMergeableAt)
@@ -149,9 +151,13 @@ func upsertOne(ctx context.Context, s *Store, pr dinv.PR) error {
 			topics |= port.TopicFollow
 		}
 		tx.Touch(topics, pr.Ref.Unit())
-		return s.recordScope(ctx, tx, before, pr.LastSeenAt, pr.Ref)
+		flips, err = s.scopeFlips(ctx, tx, before, pr.LastSeenAt, pr.Ref)
+		return err
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return s.recordFlips(ctx, flips)
 }
 
 type storedState struct {
@@ -195,8 +201,8 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 		added, err = batch.SaveSnapshots(ctx, batchSnapshots(), seenAt)
 		return err
 	})
-	if notes != 1 {
-		t.Fatalf("SaveSnapshots noted %d times, want once", notes)
+	if notes != 2 {
+		t.Fatalf("SaveSnapshots noted %d times, want twice: its write and the host's events", notes)
 	}
 
 	loop, loopLog := openNoted(t)
@@ -217,10 +223,8 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 		if n > 0 {
 			loopAdded[pr.Ref] += n
 		}
-		for _, m := range snap.Merges {
-			if _, err := loop.FillMerged(ctx, m); err != nil {
-				t.Fatal(err)
-			}
+		if err := loop.recordEvents(ctx, snap.Merges); err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -234,7 +238,7 @@ func TestSaveSnapshotsSameAsUpsertLoop(t *testing.T) {
 	if want := loopLog.Since(loopFrom, all); got.Topics != want.Topics || !slices.Equal(got.Units, want.Units) {
 		t.Fatalf("batch noted %+v, the loop %+v", got, want)
 	}
-	if got := batchLog.Since(from, all); got.Topics&port.TopicLoopEvents == 0 {
+	if got := batchLog.Since(from, all); got.Topics&port.TopicSourceEvents == 0 {
 		t.Fatalf("no followed or unfollowed event noted: %+v", got)
 	}
 	events := stateOf(t, batch).Events

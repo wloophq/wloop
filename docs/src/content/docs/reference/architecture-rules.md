@@ -30,6 +30,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value nor keys a table by it, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
 | `TestNoProviderKindsInAPI` | A provider's kinds live in its own package, never in the API. |
+| `TestNoQueryJoinsPluginAndCoreTables` | No query of `internal/adapter/store` names both a table a source plugin owns and a core table: the plugin tables leave the core store, so a query that joins them with the core's becomes a snapshot read or a broker call. The migrations, history of the shared file, are exempt. |
 | `TestNothingImportsTheGate` | Nothing imports `internal/gate`: the workflow engine is the only planner of automatic rounds. |
 | `TestOnlyClaudeDesktopManagerReachesDesktop` | Only the Claude Desktop manager's package reaches Claude Desktop's control surface. |
 | `TestOnlyGitHubReachesGitHub` | Only `internal/github` reaches GitHub's API, and only it and the composition root import `ghcli`. |
@@ -145,10 +146,10 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 
 | `providerStringAllowlist` entry | Status | Reason |
 |---|---|---|
-| `internal/adapter/store/inventory/store.go` `github` `8` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
+| `internal/adapter/store/inventory/store.go` `github` `5` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/inventory/timings.go` `github` `3` | 🧾 | the inventory keeps GitHub's pull request tables (issue 62) |
 | `internal/adapter/store/sqlite/retain.go` `github` `21` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
-| `internal/adapter/store/sqlite/retain.go` `slack` `4` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
+| `internal/adapter/store/sqlite/retain.go` `slack` `3` | 🧾 | retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62) |
 | `internal/adapter/store/sqlite/retain_briefs.go` `github` `3` | 🧾 | retention drops a pull request's rows once GitHub says it ended (issue 62) |
 | `internal/adapter/store/sqlite/rounds.go` `github` `7` | 🧾 | the round state keeps GitHub's review rounds (issue 62) |
 | `internal/cli/doctor.go` `github` `1` | 🧾 | the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62) |
@@ -197,7 +198,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/adapter/store/inventory/store.go` `Store.Ended` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.FirstRoundBlocks` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Reviewed` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
-| `internal/adapter/store/inventory/store.go` `Store.StoredFacts` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.Tracked` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
 | `internal/adapter/store/inventory/store.go` `Store.UnitlessEvents` `unit.Session` `1` | ✅ | the store keeps the sessions the core keeps |
 | `internal/adapter/store/inventory/store.go` `refOf` `unit.GitHub` `1` | 🧾 | the inventory keeps GitHub's pull request tables |
@@ -215,7 +215,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/help.go` `devCommand` `"slack"` `1` | ✅ | the slack command, the Slack plugin's own commands |
 | `internal/cli/placement.go` `Env.placements` `unit.GitHub` `1` | 🧾 | GitHub's default placement, wired outside the plugin's PlacementDefaults |
 | `internal/cli/placement.go` `githubPlacement.Default` `unit.GitHub` `2` | 🧾 | GitHub's default placement reads the pull request and the viewer outside the plugin |
-| `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `3` | 🧾 | the daemon's wiring of the GitHub viewer and the forge |
+| `internal/cli/serve.go` `serveAllDeps` `unit.GitHub` `1` | 🧾 | the daemon's wiring of the GitHub viewer and the forge |
 | `internal/cli/serve.go` `trackedBooks.Books` `unit.GitHub` `1` | 🧾 | a carded pull request without a turn still gets an empty book, so its card stays |
 | `internal/cli/serve_payloads.go` `Env.payloadReaders` `unit.GitHub` `1` | 🧾 | GitHub's payload reader, wired outside the plugin's Payload |
 | `internal/cli/storedfacts.go` `storedFacts.Facts` `unit.GitHub` `1` | 🧾 | the stored facts of a pull request's turn |

@@ -1,6 +1,9 @@
 package source
 
 import (
+	"context"
+	"time"
+
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -23,6 +26,30 @@ type Broker struct {
 	Config func() config.Config
 	// Note records a change in the host's change log; nil records none.
 	Note func(t port.Topic, units ...unit.Unit)
+	// Events are the host's events; nil serves neither Recorder.RecordEvents
+	// nor History.
+	Events EventLog
+	// Marks are the host's handled marks of units; nil serves no SetMarks.
+	Marks MarkStore
+	// Drafts move drafts between units; nil serves no RehomeDrafts.
+	Drafts DraftHome
+}
+
+// EventLog is the host's event log as a plugin writes and reads it.
+type EventLog interface {
+	RecordSourceEvents(ctx context.Context, evs ...port.Event) error
+	UnitEvents(ctx context.Context, units []unit.Unit, kinds []string, since time.Time) ([]port.Event, error)
+}
+
+// MarkStore sets a unit's handled marks; a value "" removes one.
+type MarkStore interface {
+	SetMarks(ctx context.Context, u unit.Unit, marks map[string]string) error
+}
+
+// DraftHome moves the drafts of each unit of moves onto the unit it maps
+// to, in one transaction, and counts them.
+type DraftHome interface {
+	RehomeDrafts(ctx context.Context, moves map[unit.Unit]unit.Unit) (int, error)
 }
 
 // Host is b as the SDK serves it to the plugin.
