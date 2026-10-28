@@ -30,7 +30,7 @@ func TestAReplyTypedInTheNotificationGoesToTheOutboxOrOut(t *testing.T) {
 	for _, v := range r.d.snapshotVerbs() {
 		got = append(got, fmt.Sprintf("%s %s %v %s", v.id, v.verb, v.req.Args, v.req.Source))
 	}
-	want := []string{"e-8 reply map[text:Friday works] notification", "e-8 reply map[send:now text:Shipped] notification"}
+	want := []string{"e-8 reply map[send:draft text:Friday works] notification", "e-8 reply map[send:now text:Shipped] notification"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("replies %q\nwant    %q", got, want)
 	}

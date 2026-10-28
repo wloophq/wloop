@@ -55,13 +55,13 @@ All three exit at once outside a session of an enabled workspace manager, give t
 
 An `asked` turn shows its question in the cockpit's detail, in a notification (macOS) and in the terminal client (`W`). You can pick an option, answer Yes or No to a confirmation, or write your own answer; text given with an option reaches the agent as a note after the choice.
 
-The question is a message, as is every note an agent posts mid-turn with `inbox_post`, and each waits on its gate (see [Messages](/concepts/tasks/#messages)); every answer names the message and the gate it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that message N was answered, and the agent reads the answer with the `inbox_read` tool, or `{{command}} turn answer <unit> --message N` (or `--gate G`) without the tool:
+The question is a message, as is every note an agent posts mid-turn with `task_post`, and each waits on its gate (see [Messages](/concepts/tasks/#messages)); every answer names the message and the gate it answers. The agent never receives the answer as text typed into its session. {{name}} tells the session that gate G was answered, and the agent reads the answer with the `task_read` tool, or `{{command}} turn answer <unit> --gate G` without the tool:
 
 ```
-agent ──turn_end asked / inbox_post──▶ message N, gate G ◀── you resolve G
+agent ──turn_end asked / task_post──▶ message N, gate G ◀── you resolve G
   ▲                                         │
-  │ notice: "message N answered"            │ answer stored with message N
-  └──── inbox_read ──▶ the answers of N, marked read
+  │ notice: "gate G answered"               │ answer stored with message N and gate G
+  └──── task_read ──▶ the answers of G, marked read
 ```
 
 The notice goes:
@@ -70,7 +70,7 @@ The notice goes:
 - **through the Stop hook** while that session is working or waiting on a permission: the answer waits, and the agent's next stop is blocked with the notice as its reason. A newer answer to the question replaces one still waiting;
 - otherwise, for a question, as a **resume turn**: a new turn of the same intent, in a new session, for the pull request as it is now, with the question, the draft, the notes, the head it worked at and your answer. When the head moved since, it reviews the new commits before publishing an approval. An answer to a post whose session is gone stays stored.
 
-`inbox_read` with a message returns that message, its options and every answer to it; without one, every answer the agent has not read, oldest first. Reading marks an answer read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves an answer unread for 15 minutes. The texts of the notices live in the profile's `notices.toml`.
+`task_read` with a gate returns the message of that gate, its options and every answer that resolved it; without one, every answer the agent has not read, oldest first. It also returns the task the session works on, its brief, its open gates and what you wrote on the task's chat since its agents last read it (see [Chat](/concepts/tasks/#chat)). Reading marks an answer and the chat read: the message's card in the cockpit says whether the agent read each answer, a resume turn's answer counts as read, and the `answer-unread` workflow notifies you when a session leaves a gate's answer unread for 15 minutes (`session.unread_gates`). The texts of the notices live in the profile's `notices.toml`.
 
 **Continue** sends a resume turn with no answer to an `asked`, `failed` or `unrecorded` turn. **Dismiss** closes it as `dismissed`. Answer, Continue and Dismiss are the intents of the question gate open on the unit, the question's or the missing gate of a stopped turn; with none open, Answer answers again a question already answered while its turn still asks. An answer typed directly in the agent's session still works, and closes the question's gate as superseded.
 

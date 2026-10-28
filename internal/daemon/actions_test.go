@@ -1211,7 +1211,7 @@ func TestAnswerTypesIntoAWarmCapableSession(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
+	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=1 Unit=https://github.com/acme/api/pull/8" {
 		t.Fatalf("typed %+v", typed)
 	}
 	var res api.ActionResult
@@ -1254,7 +1254,7 @@ func TestAnAnswerToABusyAgentIsQueuedAndBlocksItsStopWithTheNotice(t *testing.T)
 	}
 	stop := agentCall(t, r.s.Handler(), "POST", api.AgentSessionsStop, "term-1", `{"prompt_id":"p1"}`)
 	var ans api.StopAnswer
-	if stop.Code != 200 || json.Unmarshal(stop.Body.Bytes(), &ans) != nil || !ans.Block || ans.Reason != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
+	if stop.Code != 200 || json.Unmarshal(stop.Body.Bytes(), &ans) != nil || !ans.Block || ans.Reason != "answered Gate=1 Unit=https://github.com/acme/api/pull/8" {
 		t.Fatalf("stop: %d %s", stop.Code, stop.Body)
 	}
 	r.s.driving.Wait()
@@ -1281,7 +1281,7 @@ func TestTheFastJobDeliversAQueuedAnswerOnceTheAgentIsIdle(t *testing.T) {
 		t.Fatalf("delivered while the loop was held: %+v", r.sessions.Typed())
 	}
 	r.s.reconcileTurns(context.Background())
-	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Message=1 Unit=https://github.com/acme/api/pull/8" {
+	if typed := r.sessions.Typed(); len(typed) != 1 || typed[0].Line != "answered Gate=1 Unit=https://github.com/acme/api/pull/8" {
 		t.Fatalf("typed %+v", typed)
 	}
 	if got := r.routes(r8); !slices.Equal(got, []turn.Route{turn.Typed}) {

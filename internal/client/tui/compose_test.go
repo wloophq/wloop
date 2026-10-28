@@ -80,7 +80,7 @@ func TestCtrlEHandsThePromptToTheEditor(t *testing.T) {
 		t.Fatalf("edit %+v, prompt %+v", e, m.prompt)
 	}
 	c, ok := m.Edited(e, "First line\r\n\nSecond line\x07\n", nil)
-	if want := map[string]string{"text": "First line\n\nSecond line"}; !ok || c.verb != "reply" || !reflect.DeepEqual(c.args, want) {
+	if want := map[string]string{"text": "First line\n\nSecond line", "send": "draft"}; !ok || c.verb != "reply" || !reflect.DeepEqual(c.args, want) {
 		t.Fatalf("%+v %v", c, ok)
 	}
 	if _, ok := m.Edited(e, "", errors.New("vi exited 1")); ok || !strings.Contains(m.status, "the editor failed: vi exited 1") {

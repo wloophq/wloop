@@ -342,11 +342,11 @@ func TestTurnAnswerReadsTheUnreadAnswersOfTheCallersTurns(t *testing.T) {
 	if code, text := read("term_1", path); code != 200 || text != "message 0: " {
 		t.Fatalf("read twice: %d %q", code, text)
 	}
-	if code, _ := read("term_1", path+"&message=42"); code != http.StatusNotFound {
-		t.Fatalf("a message of no turn of the session: %d", code)
+	if code, _ := read("term_1", path+"&gate=42"); code != http.StatusNotFound {
+		t.Fatalf("a gate of no turn of the session: %d", code)
 	}
-	if code, _ := read("term_1", path+"&message=x"); code != http.StatusBadRequest {
-		t.Fatalf("a bad message id: %d", code)
+	if code, _ := read("term_1", path+"&gate=x"); code != http.StatusBadRequest {
+		t.Fatalf("a bad gate id: %d", code)
 	}
 }
 

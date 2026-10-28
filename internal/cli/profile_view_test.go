@@ -66,6 +66,7 @@ func TestProfileCheckPipedKeepsItsLines(t *testing.T) {
   ask-author       ` + filepath.Join(dir, "intents", "ask-author", "intent.toml") + `   Ask the author one question
   attach           bundled   Make a session started outside the loop a run of a task, keeping its context
   brief            bundled   One brief per unit: goal, context, kind, size, risk, open questions and tags
+  chat             bundled   Talk with an agent about a task: in the task's last session when it can resume, else in a new one, in a worktree of the task's repository or with no checkout
   nudge            bundled   Ask whoever the pull request waits on for the next step, in a comment; guidance is the topic
   probe            bundled   Check that an agent home can read its turn, record it, take an answer and be resumed
   review           bundled   Start or continue a review round on someone else's pull request, in a dedicated workspace

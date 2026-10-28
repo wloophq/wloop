@@ -454,19 +454,17 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "pr: "+err.Error())
 		return
 	}
-	var id int64
-	if raw := r.URL.Query().Get("message"); raw != "" {
-		if id, err = strconv.ParseInt(raw, 10, 64); err != nil || id <= 0 {
-			writeError(w, http.StatusBadRequest, "message: not a message id: "+raw)
-			return
-		}
-	}
+	var id, gateID int64
 	if s.deps.Messages == nil {
-		writeError(w, http.StatusServiceUnavailable, "the Inbox is not wired")
+		writeError(w, http.StatusServiceUnavailable, "the tasks are not wired")
 		return
 	}
 	if raw := r.URL.Query().Get("gate"); raw != "" {
 		var ok bool
+		if gateID, err = strconv.ParseInt(raw, 10, 64); err != nil || gateID <= 0 {
+			writeError(w, http.StatusBadRequest, "gate: not a gate id: "+raw)
+			return
+		}
 		if id, ok = s.gateMessage(r.Context(), raw); !ok || id == 0 {
 			writeError(w, http.StatusNotFound, "gate: no question or post gate "+raw)
 			return
@@ -479,7 +477,7 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeAgentError(w, err)
 	case s.deps.ReadText != nil:
-		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), convs, id)})
+		writeJSON(w, api.TurnText{Text: s.deps.ReadText(r.Context(), convs, gateID)})
 	default:
 		writeJSON(w, api.TurnText{Text: fmt.Sprint(convs)})
 	}

@@ -100,6 +100,10 @@ func TestAThreadInboxNotificationOffersDraftForMeAndReply(t *testing.T) {
 	if want := []string{api.AttentionDraftForMe, api.AttentionReply, api.AttentionSendReply}; !slices.Equal(ids, want) {
 		t.Fatalf("actions %v, want %v", ids, want)
 	}
+	if a := v.Attention.Actions; a[1].Placeholder != "Your reply, saved for your approval" || a[1].Button != "Save" ||
+		a[2].Placeholder != "Your reply, sent now" || a[2].Button != "Send" || a[0].Placeholder != "" {
+		t.Errorf("the inputs are not worded by the notices: %+v", a)
+	}
 	if get(t, r.s, api.TaskPath("e-n"), &v); v.Attention == nil || len(v.Attention.Actions) != 0 {
 		t.Fatalf("a capture with no unit: %+v", v.Attention)
 	}

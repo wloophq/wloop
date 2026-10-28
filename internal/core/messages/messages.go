@@ -77,7 +77,7 @@ var (
 	ErrNoMessage = errors.New("no such message")
 	// ErrClosed is an answer to a message that is no longer open.
 	ErrClosed = errors.New("the message is closed")
-	// ErrNoStartedTurn refuses inbox_post from a session with no started turn.
+	// ErrNoStartedTurn refuses task_post from a session with no started turn.
 	ErrNoStartedTurn = errors.New("this session has no started turn")
 )
 
@@ -85,7 +85,7 @@ var (
 type Capped struct{ Max int }
 
 func (c Capped) Error() string {
-	return fmt.Sprintf("this turn already has %d open Inbox messages, the most it may have; wait for the user's answers", c.Max)
+	return fmt.Sprintf("this turn already has %d open posts, the most it may have; wait for the user's answers", c.Max)
 }
 
 type Service struct {
@@ -103,6 +103,8 @@ type Service struct {
 	// ProposalText words a ledger proposal's message, as the profile's proposal gate does; nil leaves it
 	// without text.
 	ProposalText func(p coreitems.Proposal) string
+	// ChatDeps serve the chat on the tasks; zero serves none.
+	ChatDeps ChatDeps
 
 	mu sync.Mutex
 	// gating serializes opening the messages' gates, so a message gets one.
@@ -595,7 +597,7 @@ func (s *Service) proposalMessage(p coreitems.Proposal) message.Message {
 	return m
 }
 
-// Post is inbox_post: an open agent_post message, with its gate, on the unit of the session's started turn.
+// Post is task_post: an open agent_post message, with its gate, on the unit of the session's started turn.
 func (s *Service) Post(ctx context.Context, p PostRequest) (message.Message, error) {
 	if err := checkPost(p); err != nil {
 		return message.Message{}, err

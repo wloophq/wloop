@@ -109,11 +109,27 @@ The words of the verbs come from the profile's `tasks.toml`, and those of the vi
 
 Approve (`a`) and delegate (`d`) move nothing themselves: on an action task with units they run that unit's action, such as Run now, a review or address round, or Act. Delegate also runs on a waiting, closure or captured task that has a unit, and takes optional guidance and a mode: `headless` (Draft for me, which proposes drafts for the task) or `session` (Hand to an agent). Without a mode the action picks its own, headless when it can. The task says upfront whether a session can run on its unit, and why not when it cannot; a unit with no placement runs its session in a neutral directory with no checkout. A session started from a task keeps the task and its items, so the drafts it proposes serve that task.
 
-Reply (`r`) writes a draft of your own on the task's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the task and its items. It waits in the Outbox, or goes out at once with Send now. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
+Reply (`r`) writes a draft of your own on the task's first unit, a reply in its conversation (a comment on a pull request) or a reaction, tied to the task and its items. Send posts it at once, as your approval of it; Save as draft holds it on its gate for your approval. A reply that names neither takes the verb's `send` in `tasks.toml`, `now` in the bundled profile; the composer, the TUI and the notifications always name one. The verb is the one whose `handler` is `reply`, whatever the profile calls it. From a terminal, `{{command}} outbox new <unit|message> <markdown>` writes one on any unit. The full key list is on the [Keys](/reference/keys/) page.
 
 ## Messages
 
-A message is what a gate asks you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `inbox_post` tool, or a proposal to change a confirmed item. Each opens a gate of kind `question`, `post` or `proposal` on the task its unit is on, or on a new captured task when no open task holds it; a message on no unit gets a captured task named after its text. You resolve the gate with one of its intents, as `gates.toml` words them: answer, continue or dismiss a question, reply to or dismiss a post, approve or reject a proposal. A task's Answer and Approve resolve its open gate the same way, and Approve answers a question with its recommended option, or a confirmation with Yes. Your answer is stored with the message and the gate it answers, the agent is told which message you answered and reads the answer with `inbox_read`, and the message shows whether it did (see [Turns](/concepts/turns/#answers)). A proposal's gate decides the ledger: approving it applies the change, rejecting it keeps the item as you confirmed it. When the ledger refuses the change you approved, say because the item is gone, the approval answers with why and the proposal stays open on a new gate. The words of an item proposal are the first proposal gate's `text` in `gates.toml`, over the facts `proposal.op`, `proposal.item`, `proposal.unit`, `proposal.reason` and `proposal.provenance`.
+A message is what a gate asks you to decide: an agent's question at the end of its turn (with its options), a post an agent makes mid-turn with the `task_post` tool, or a proposal to change a confirmed item. Each opens a gate of kind `question`, `post` or `proposal` on the task its unit is on, or on a new captured task when no open task holds it; a message on no unit gets a captured task named after its text. You resolve the gate with one of its intents, as `gates.toml` words them: answer, continue or dismiss a question, reply to or dismiss a post, approve or reject a proposal. A task's Answer and Approve resolve its open gate the same way, and Approve answers a question with its recommended option, or a confirmation with Yes. Your answer is stored with the message and the gate it answers, the agent is told which gate you answered and reads the answer with `task_read`, and the message shows whether it did (see [Turns](/concepts/turns/#answers)). A proposal's gate decides the ledger: approving it applies the change, rejecting it keeps the item as you confirmed it. When the ledger refuses the change you approved, say because the item is gone, the approval answers with why and the proposal stays open on a new gate. The words of an item proposal are the first proposal gate's `text` in `gates.toml`, over the facts `proposal.op`, `proposal.item`, `proposal.unit`, `proposal.reason` and `proposal.provenance`.
+
+## Chat
+
+What you write in the task page's composer and Send goes to the task's agent, kept on the task's timeline as a `message` event by you:
+
+```
+you ── Send ──▶ message event on the task
+                  │
+                  ├─ a session of the task is live ──▶ notice typed: "the user wrote on task T"
+                  │                                     agent ── task_read ──▶ the chat since its last read
+                  │
+                  └─ none is live ──▶ a turn of [chat] intent, the message as its guidance,
+                                      resuming the last run on the task that had a session
+```
+
+The live session is any session whose unit is the task or one it holds, a pull request or a thread included, so a task the loop derived from a Slack thread you never captured takes a chat the same way. The notice carries no text: the agent reads it with `task_read`, which marks it read. With no live session, `[chat] intent` in `tasks.toml` names the intent of the turn, `chat` in the bundled profile: a session on the task, in a worktree of the task's repository when it has one, else with no checkout. A message that starts a turn counts as read. An agent's session cannot write on a task's chat.
 
 ## The Outbox
 

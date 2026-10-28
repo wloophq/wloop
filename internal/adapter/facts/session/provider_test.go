@@ -619,11 +619,11 @@ func TestUnreadAnswersAreTheDeliveredAnswersTheAgentHasNotRead(t *testing.T) {
 			{ID: 4, TurnSeq: 1, Text: "still queued", Route: turn.Queued, At: t0.Add(-10 * time.Minute)},
 		}})
 	f := w.facts(t, "term_1")
-	if f["session.unread_answers"] != 2 || f["session.unread_for"] != 30*time.Minute || f["session.unread_since"] != t0.Add(-30*time.Minute) {
-		t.Fatalf("unread %v for %v", f["session.unread_answers"], f["session.unread_for"])
+	if f["session.unread_gates"] != 2 || f["session.unread_for"] != 30*time.Minute || f["session.unread_since"] != t0.Add(-30*time.Minute) {
+		t.Fatalf("unread %v for %v", f["session.unread_gates"], f["session.unread_for"])
 	}
 	w.session("term_2", nil)
-	if f := w.facts(t, "term_2"); f["session.unread_answers"] != 0 || f["session.unread_for"] != time.Duration(0) {
-		t.Fatalf("a session with no answers: %v %v", f["session.unread_answers"], f["session.unread_for"])
+	if f := w.facts(t, "term_2"); f["session.unread_gates"] != 0 || f["session.unread_for"] != time.Duration(0) {
+		t.Fatalf("a session with no answers: %v %v", f["session.unread_gates"], f["session.unread_for"])
 	}
 }

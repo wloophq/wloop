@@ -13,11 +13,11 @@ import (
 
 func TestTheBundledNoticesTellTheAgentHowToReadAnAnswer(t *testing.T) {
 	n := profileNotices{&Env{}}
-	got, err := n.Notice(turns.NoticeAnswered, map[string]any{"Message": int64(5), "Unit": "chat:C1/1700000000.000100", "Command": "'/bin/" + brand.Command + "'"})
+	got, err := n.Notice(turns.NoticeAnswered, map[string]any{"Gate": int64(5), "Unit": "chat:C1/1700000000.000100", "Command": "'/bin/" + brand.Command + "'"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"Inbox message 5", "`inbox_read`", "`'/bin/" + brand.Command + "' turn answer chat:C1/1700000000.000100 --message 5`"} {
+	for _, want := range []string{"gate 5", "`task_read`", "`'/bin/" + brand.Command + "' turn answer chat:C1/1700000000.000100 --gate 5`"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%q lacks %q", got, want)
 		}

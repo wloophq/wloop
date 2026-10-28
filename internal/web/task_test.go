@@ -19,7 +19,7 @@ func taskCatalog() api.ViewsCatalog {
 	return api.ViewsCatalog{
 		Views: []api.TaskViewSpec{{ID: "triage", Label: "Triage", Group: "task.category"}, {ID: "parked", Label: "Parked", Group: "task.state"},
 			{ID: "walk", Label: "Weekly walk"}},
-		Verbs: []api.VerbSpec{{Verb: "finish", Label: "Finish", Summary: "Close it"}, {Verb: "reply", Label: "Reply", Summary: "Hold a reply for approval"}},
+		Verbs: []api.VerbSpec{{Verb: "finish", Label: "Finish", Summary: "Close it"}, {Verb: "reply", Handler: "reply", Label: "Reply", Summary: "Hold a reply for approval"}},
 		States: []api.StateSpec{{Name: "triage", Label: "To sort", Category: "inbox"}, {Name: "doing", Label: "Doing", Category: "active"},
 			{Name: "parked", Label: "Parked", Category: "deferred"}, {Name: "later", Label: "Later", Category: "deferred"}, {Name: "shipped", Label: "Shipped", Category: "done"}},
 		Props:  []api.PropSpec{{Name: "size", Type: "enum", Values: []string{"s", "m", "l"}}, {Name: "owner", Type: "actor"}},
@@ -97,8 +97,13 @@ const done = (v) => process.stdout.write(JSON.stringify(v));
 
 func runTaskPage(t *testing.T, main string, answers map[string]any, out any) {
 	t.Helper()
+	runTaskPageOn(t, taskCatalog(), main, answers, out)
+}
+
+func runTaskPageOn(t *testing.T, cat api.ViewsCatalog, main string, answers map[string]any, out any) {
+	t.Helper()
 	nodeRun(t, cockpitScript(t)+taskPageHarness, nil, "(async () => {\n"+main+"\n})().catch((e) => { console.error(e); process.exit(1); });",
-		map[string]any{"catalog": taskCatalog(), "answers": answers}, out)
+		map[string]any{"catalog": cat, "answers": answers}, out)
 }
 
 func pageAnswers(t *testing.T) map[string]any {
@@ -314,7 +319,7 @@ done({
 	}
 	want := []any{
 		map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
-		map[string]any{"path": "/api/tasks/t-0123456789abcdef/reply", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "text": "We ship Friday."}}},
+		map[string]any{"path": "/api/tasks/t-0123456789abcdef/reply", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."}}},
 	}
 	if mustJS(t, got.Posts) != mustJS(t, want) {
 		t.Errorf("posts %v, want %v", got.Posts, want)
@@ -407,5 +412,44 @@ reviewEnv.notice = () => {}; reviewEnv.render = () => {}; reviewEnv.focusStep = 
 	}
 	if !slices.Equal(got.Posts, []string{"/api/review/steps/sort/done"}) {
 		t.Errorf("posts %v", got.Posts)
+	}
+}
+
+func TestComposerSendIsTheDefault(t *testing.T) {
+	cat := taskCatalog()
+	for i, v := range cat.Verbs {
+		if v.Handler == "reply" {
+			cat.Verbs[i].Verb = "respond"
+		}
+	}
+	answers := pageAnswers(t)
+	e := pageTask(t)
+	e.Verbs = []api.VerbState{{Verb: "finish", Enabled: true}, {Verb: "respond", Enabled: true}}
+	answers["/api/tasks/"+e.ID] = e
+	var got struct {
+		Primary string
+		Posts   []any
+	}
+	runTaskPageOn(t, cat, `
+let box = await page("t-0123456789abcdef");
+const compose = cls(box, "d-compose")[0];
+focus(box, "task:compose:text").on.input({ target: { value: "Take the timeout case first." } });
+focus(box, "task:compose:text").on.keydown({ key: "Enter", ctrlKey: true });
+await new Promise((r) => setTimeout(r, 0));
+box = await page("t-0123456789abcdef");
+focus(box, "task:compose:text").on.input({ target: { value: "Plain enter is a newline." } });
+focus(box, "task:compose:text").on.keydown({ key: "Enter" });
+focus(box, "task:compose:text").on.input({ target: { value: "We ship Friday." } });
+await focus(box, "task:compose:draft").on.click();
+done({ Primary: cls(compose, "primary")[0].textContent, Posts: posts });`, answers, &got)
+	if got.Primary != "Send" {
+		t.Errorf("the composer's primary is %q", got.Primary)
+	}
+	want := []any{
+		map[string]any{"path": "/api/tasks/t-0123456789abcdef/chat", "body": map[string]any{"text": "Take the timeout case first."}},
+		map[string]any{"path": "/api/tasks/t-0123456789abcdef/respond", "body": map[string]any{"source": "cockpit", "args": map[string]any{"kind": "reply", "send": "draft", "text": "We ship Friday."}}},
+	}
+	if mustJS(t, got.Posts) != mustJS(t, want) {
+		t.Errorf("posts %v, want %v", got.Posts, want)
 	}
 }

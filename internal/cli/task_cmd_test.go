@@ -8,7 +8,10 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
+	"github.com/wloophq/wloop/internal/core/messages"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
@@ -111,5 +114,59 @@ func TestTwoSessionsAttachedToATaskAreTwoRuns(t *testing.T) {
 	want := []string{"started " + te.sessionOf(t, "orca", "term_1"), "started " + te.sessionOf(t, "orca", "term_2")}
 	if !slices.Equal(got, want) {
 		t.Fatalf("runs %v, want %v", got, want)
+	}
+}
+
+func TestAChatReachesTheTasksLiveSessionAndItsTaskRead(t *testing.T) {
+	te := attachEnv(t)
+	ctx := context.Background()
+	inSession(te, "term_1")
+	if code := te.run("task", "attach", "task:"+string(attachTask)); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	id := te.sessionOf(t, "orca", "term_1")
+	sessions := te.Turns.Sessions.(*turnstest.Sessions)
+	sent := len(sessions.Typed())
+	res, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: "Take the timeout case first."})
+	if err != nil || len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "live session") {
+		t.Fatalf("chat %+v %v", res, err)
+	}
+	typed := sessions.Typed()[sent:]
+	if len(typed) != 1 || typed[0].Handle != id || !strings.Contains(typed[0].Line, "task_read") || !strings.Contains(typed[0].Line, string(attachTask)) ||
+		strings.Contains(typed[0].Line, "timeout") {
+		t.Fatalf("typed %+v", typed)
+	}
+	got, err := te.messages.ReadTask(ctx, messages.ReadRequest{Session: id})
+	if err != nil || got.Task.ID != attachTask || len(got.Chat) != 1 || !strings.Contains(got.Chat[0].Data, "Take the timeout case first.") ||
+		got.Chat[0].Actor != string(task.ActorPerson) {
+		t.Fatalf("read %+v %v", got, err)
+	}
+	if again, err := te.messages.ReadTask(ctx, messages.ReadRequest{Session: id}); err != nil || len(again.Chat) != 0 {
+		t.Fatalf("read again %+v %v", again.Chat, err)
+	}
+	evs, err := timeline.Merged{Log: te.db, Holdings: te.db}.Of(ctx, attachTask, timeline.Filter{Kinds: []string{messages.KindChat}})
+	if err != nil || len(evs) != 1 {
+		t.Fatalf("timeline %+v %v", evs, err)
+	}
+	if _, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: " "}); err == nil {
+		t.Fatal("an empty message was taken")
+	}
+}
+
+func TestAChatWithNoLiveSessionStartsAChatTurnOnTheTask(t *testing.T) {
+	te := attachEnv(t)
+	ctx := context.Background()
+	res, err := client.New(te.Socket).Chat(ctx, string(attachTask), api.ChatRequest{Text: "What is left before we ship?"})
+	if err != nil || len(res.Lines) != 1 || !strings.Contains(res.Lines[0], "chat turn starts") {
+		t.Fatalf("chat %+v %v", res, err)
+	}
+	u := task.UnitOf(attachTask)
+	books, err := te.Turns.Store.Books(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := books[u]
+	if len(b.Turns) != 1 || b.Turns[0].Intent != "chat" || b.Turns[0].Guidance != "What is left before we ship?" || b.Turns[0].Trigger != dturn.ByHand {
+		t.Fatalf("turns %+v", b.Turns)
 	}
 }

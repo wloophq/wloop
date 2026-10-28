@@ -232,6 +232,12 @@ function askedArgs(verb) {
 }
 
 // verbTask is the catalog's word for verb: its label and summary.
+// handlerVerb is the catalog's verb whose handler is handler, "" when none is.
+function handlerVerb(handler) {
+  const v = ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.handler === handler);
+  return v ? v.verb : "";
+}
+
 function verbTask(verb) {
   return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
 }
@@ -296,7 +302,7 @@ function replyArgs(c, send) {
   const reaction = c.reaction.trim().replace(/^:|:$/g, "");
   if (!text && !reaction) return null;
   const args = text ? { kind: "reply", text } : { kind: "react", reaction };
-  if (send) args.send = "now";
+  args.send = send ? "now" : "draft";
   return args;
 }
 

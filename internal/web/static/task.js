@@ -273,14 +273,14 @@ async function sendChat(e) {
 }
 
 // saveDraft holds the composer's text as a reply in the task's conversation,
-// for approval.
-async function saveDraft(e) {
+// for approval, through the verb whose handler replies.
+async function saveDraft(e, verb) {
   const text = taskState.text.trim();
   if (!text) {
     detailEnv.notice("Write a message first", true);
     return null;
   }
-  const out = await taskAct(e, "reply", { kind: "reply", text });
+  const out = await taskAct(e, verb, { kind: "reply", text, send: "draft" });
   if (out) {
     taskState.text = "";
     detailEnv.render();
@@ -288,16 +288,24 @@ async function saveDraft(e) {
   return out;
 }
 
+// taskComposer writes to the task's agent: Send, the default that Ctrl+Enter
+// runs, posts to its chat; Save as draft holds the text as a reply.
 function taskComposer(e) {
-  const reply = verbState(e, "reply");
+  const verb = handlerVerb("reply");
+  const reply = verb ? verbState(e, verb) : null;
   return h("section", { class: "d-compose", "aria-label": "Message" },
     h("textarea", { rows: 3, "aria-label": "Message", placeholder: "Write to the agent", "data-focus": "task:compose:text",
-      oninput: (ev) => { taskState.text = ev.target.value; } }, taskState.text),
+      oninput: (ev) => { taskState.text = ev.target.value; },
+      onkeydown: (ev) => {
+        if (ev.key !== "Enter" || !(ev.ctrlKey || ev.metaKey)) return;
+        if (ev.preventDefault) ev.preventDefault();
+        sendChat(e);
+      } }, taskState.text),
     h("div", { class: "d-actions" },
       h("button", { type: "button", class: "act primary", "data-focus": "task:compose:send", onclick: () => sendChat(e) }, "Send"),
       h("button", { type: "button", class: "act" + (reply && reply.enabled ? "" : " off"), disabled: !(reply && reply.enabled),
-        title: reply ? (reply.enabled ? verbTask("reply").summary : reply.reason) || undefined : "Not offered here",
-        "data-focus": "task:compose:draft", onclick: () => saveDraft(e) }, "Save as draft")));
+        title: reply ? (reply.enabled ? verbTask(verb).summary : reply.reason) || undefined : "Not offered here",
+        "data-focus": "task:compose:draft", onclick: () => saveDraft(e, verb) }, "Save as draft")));
 }
 
 function taskChildren(e) {

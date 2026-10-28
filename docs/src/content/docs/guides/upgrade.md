@@ -90,3 +90,5 @@ Run `{{command}} uninstall` first, while the newer binary is still installed: it
 ## Rotating the MCP key
 
 The daemon's MCP endpoint requires a per-install secret, `<state>/mcp.key`, which `install` writes into every home's registration as the `X-Loop-Key` header. To rotate it, delete the file and run `{{command}} install` again. Sessions started before keep the old header until they restart.
+
+The agent tools `inbox_post` and `inbox_read` are `task_post` and `task_read`: a post names the gate it waits on, and `task_read` also reads the task, its brief, its open gates and its chat. `{{command}} turn answer` takes `--gate` only; `--message` is gone. The fact `session.unread_answers` is `session.unread_gates`, counting gates, and a user workflow or `tools.toml` that names an old one fails to load naming the new one. A reply that names no `send` takes its verb's `send` in `tasks.toml`, which the bundled profile sets to `now`: set `send = "draft"` under `[verbs.reply]` in your `tasks.toml` to keep replies held for approval by default.

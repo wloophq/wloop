@@ -49,10 +49,12 @@ type VerbText struct {
 // A zero task.Value unsets a property, so an int or a duration property
 // holds no 0: 0 means unset, and Parse refuses it.
 type TasksDef struct {
-	Props            []PropDef
-	States           []StateDef
-	Verbs            map[string]VerbText
-	OwedBy           string
+	Props  []PropDef
+	States []StateDef
+	Verbs  map[string]VerbText
+	OwedBy string
+	// ChatIntent is the intent of the turn a chat message starts on a task with no live session.
+	ChatIntent       string
 	Areas, Contexts  []string
 	StaleWaitingDays int
 }
@@ -403,6 +405,9 @@ func (l *tasksLoad) merge(file string, src []byte) Problems {
 	l.mergeVerbs(s, m.Verbs)
 	if m.OwedBy != nil {
 		text(s, "owed_by.expr", m.OwedBy.Expr, &l.def.OwedBy)
+	}
+	if m.Chat != nil {
+		text(s, "chat.intent", m.Chat.Intent, &l.def.ChatIntent)
 	}
 	if m.Areas != nil {
 		l.def.Areas = slices.Clone(m.Areas)

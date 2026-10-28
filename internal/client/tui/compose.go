@@ -253,7 +253,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 			m.status = "reply " + c.Label + " cancelled: nothing typed"
 			return Command{}, false
 		}
-		c.args = map[string]string{"text": text}
+		c.args = map[string]string{"text": text, "send": "draft"}
 		if !send {
 			return m.send(c)
 		}

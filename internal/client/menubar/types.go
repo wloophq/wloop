@@ -45,6 +45,8 @@ type Notification struct {
 type NotificationAction struct {
 	ID, Title string
 	TextInput bool
+	// Placeholder and Button word a text input, as the daemon serves them.
+	Placeholder, Button string
 }
 
 // Image tells notifications apart at a glance.

@@ -178,6 +178,9 @@ type AttentionAction struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
 	TextInput bool   `json:"text_input,omitempty"`
+	// Placeholder and Button word a text input: the hint in its field and the button that sends it.
+	Placeholder string `json:"placeholder,omitempty"`
+	Button      string `json:"button,omitempty"`
 	// Basis is the row state's basis the action was offered on.
 	Basis string `json:"basis,omitempty"`
 }

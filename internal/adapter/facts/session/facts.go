@@ -164,7 +164,7 @@ type state struct {
 	open      *turn.Turn
 	newest    *turn.Turn
 	idleSince time.Time
-	// unread counts the answers noticed to the session that its agent has not read; unreadSince is when the oldest
+	// unread counts the gates whose answers were noticed to the session and its agent has not read; unreadSince is when the oldest
 	// notice reached it.
 	unread      int
 	unreadSince time.Time
@@ -197,9 +197,10 @@ func (w *world) state(h string) *state {
 	return s
 }
 
-// unreadOf counts the answers to the handle's turns whose notice reached it and that its agent has not read,
-// and when the oldest notice reached it.
+// unreadOf counts the gates whose answers to the handle's turns reached it by a notice and its agent has not
+// read, an answer stored before answers named their gate counting alone, and when the oldest notice reached it.
 func unreadOf(b *turn.Book, handle string) (int, time.Time) {
+	gates := map[int64]bool{}
 	var n int
 	var since time.Time
 	for _, a := range b.Answers {
@@ -207,9 +208,14 @@ func unreadOf(b *turn.Book, handle string) (int, time.Time) {
 		if i < 0 || b.Turns[i].Session != handle || !a.ReadAt.IsZero() || !a.Route.Noticed() {
 			continue
 		}
-		if n++; since.IsZero() || a.NoticedAt.Before(since) {
+		if since.IsZero() || a.NoticedAt.Before(since) {
 			since = a.NoticedAt
 		}
+		if a.Gate != 0 && gates[a.Gate] {
+			continue
+		}
+		gates[a.Gate] = true
+		n++
 	}
 	return n, since
 }
@@ -246,7 +252,7 @@ func (s *state) facts(now time.Time, pf turns.PromptFacts, processGone bool) wor
 		"session.newest_intent":         "",
 		"session.closes_when_done":      false,
 		"session.idle_for":              time.Duration(0),
-		"session.unread_answers":        s.unread,
+		"session.unread_gates":          s.unread,
 		"session.unread_since":          time.Time{},
 		"session.unread_for":            time.Duration(0),
 		"session.pr_state":              w.states[s.unit],

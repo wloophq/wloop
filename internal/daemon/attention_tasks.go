@@ -18,6 +18,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 )
 
@@ -42,8 +43,29 @@ func (ev *taskViewer) attention(ctx context.Context, e task.Task) *api.Attention
 			v, ok := strings.CutPrefix(act.ID, verbAction(""))
 			return ok && !offers(words, e, task.Verb(v))
 		})
+		for i := range a.Actions {
+			ev.s.wordInput(&a.Actions[i])
+		}
 	}
 	return a
+}
+
+// inputNotices are the notices that word a text input's placeholder and button, by its action.
+var inputNotices = map[string][2]string{
+	api.AttentionReply:     {builtin.NoticeReplyPlaceholder, builtin.NoticeReplyButton},
+	api.AttentionSendReply: {builtin.NoticeSendReplyPlaceholder, builtin.NoticeSendReplyButton},
+}
+
+// wordInput gives a text input action its placeholder and button, as the profile's notices word them.
+func (s *Server) wordInput(a *api.AttentionAction) {
+	if !a.TextInput {
+		return
+	}
+	n, ok := inputNotices[a.ID]
+	if !ok {
+		n = [2]string{builtin.NoticeAnswerPlaceholder, builtin.NoticeAnswerButton}
+	}
+	a.Placeholder, a.Button = s.notice(n[0], nil), s.notice(n[1], nil)
 }
 
 // notice is e's notification before the profile's offers drop the buttons of verbs it does not offer.

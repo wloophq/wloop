@@ -734,7 +734,7 @@ func TestSlackDraftResolvesHandlesAndEmailsIntoMentions(t *testing.T) {
 func TestEveryToolIsDescribedByTheBundledProfile(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
-	if w.srv.Inbox == nil || len(w.srv.Plugins) != 6 {
+	if w.srv.Tasks == nil || len(w.srv.Plugins) != 6 {
 		t.Fatal("the wiring serves only some tools")
 	}
 	init := rpc(t, w.srv, "", draftHandle, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)

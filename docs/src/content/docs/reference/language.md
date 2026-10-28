@@ -225,7 +225,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `seen`: Marks the task seen; clients send it when it opens.
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
-- `verbs.<name>.send` (one of `now`, `draft`, default `draft`): With reply: now sends the reply at once, draft proposes it in the Outbox.
+- `verbs.<name>.send` (one of `now`, `draft`, default `draft`): On a verb whose handler is reply: what a reply that names no send does. now sends it at once, as the person approving it; draft holds it on its gate for approval. The composer's Save as draft always holds it.
 - `props` (table by name): The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.&lt;name&gt;, typed from its type.
 - `props.<name>` (table): A property, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.
 - `props.<name>.type` (one of `string`, `string[]`, `int`, `enum`, `date`, `duration`, `actor`, `actor[]`): The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.
@@ -443,8 +443,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 - `<name>` (table): An MCP tool, by its name.
   - `turn_end`: Records how the session's turn ended.
-  - `inbox_post`: Posts a question or a note to the user's Inbox during a turn.
-  - `inbox_read`: Reads the user's answers to the session's Inbox messages, and marks them read.
+  - `task_post`: Posts a question or a note on the session's task during a turn, waiting on a gate.
+  - `task_read`: Reads the session's task: the task, its brief, its open gates, the chat since the last read and the user's answers, and marks them read.
   - `slack_send_message`: Posts to Slack as the user, now.
   - `slack_read`: Reads a Slack thread or conversation.
   - `slack_search`: Searches the Slack messages the user can read.
@@ -476,25 +476,28 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
   - `ledger_proposed` (`Count`: number): A part of the ledger's outcome: ops proposed to the user.
   - `ledger_refused` (`Count`: number, `Why`): A part of the ledger's outcome: ops refused, and why.
   - `ledger_refusal` (`Index`: number, `Reason`): Why one op was refused.
-- `inbox_post`:
+- `task_post`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `text_required`: The text is missing.
-  - `capped` (`Error`): The turn has too many messages waiting.
+  - `capped` (`Error`): The turn has too many posts waiting.
   - `not_in_turn` (`Error`): The session has no started turn.
   - `post_failed` (`Error`): The message could not be posted.
-  - `posted` (`ID`: number): The message is in the Inbox.
-- `inbox_read`:
+  - `posted` (`Gate`: number): The message is on the task, waiting on gate Gate.
+- `task_read`:
   - `refused` (`Error`): The call is refused before the tool runs, such as with no session.
   - `bad_arguments` (`Error`): The arguments do not decode; Error is the decoder's, "" when there is none.
   - `fix_these` (`Problems`): The arguments have problems, one per line.
   - `no_turn` (`Error`): The session has no turn.
-  - `no_message` (`ID`: number): The message is not one of the session's.
-  - `read_failed` (`Error`): The Inbox could not be read.
-  - `nothing` (`ID`: number): No answer to read: of message ID, or of any message when ID is 0.
-  - `read` (`Conversations`): The answers read: the conversations, one after another.
-  - `conversation` (`ID`: number, `Kind`, `Text`, `Options`, `Answers`): A part of read: a message, its kind (question or agent_post), its text and options, and its answers.
+  - `no_gate` (`ID`: number): No answer of the session's resolved gate ID.
+  - `read_failed` (`Error`): The task could not be read.
+  - `nothing` (`ID`: number): Nothing to read: the session's turns are on no task, and no answer of gate ID, or of any gate when ID is 0, waits.
+  - `read` (`Task`, `Brief`, `Gates`, `Chat`, `Conversations`): What was read: the task, its brief record's data, its open gates, the chat since the last read and the conversations, each "" when empty.
+  - `task` (`ID`, `Title`, `State`): A part of read: the task's id, title and state.
+  - `gate` (`ID`: number, `Kind`, `Name`, `Intents`): A part of read: one open gate of the task, its kind, its name in gates.toml and the intents that resolve it.
+  - `chat_message` (`Text`, `At`): A part of read: one message the user wrote on the task's chat, and when.
+  - `conversation` (`Gate`: number, `Kind`, `Text`, `Options`, `Answers`): A part of read: a message, the gate its answers resolved (0 for one stored before answers named their gate), its kind (question or agent_post), its text and options, and its answers.
   - `turn_answers` (`Answers`): A part of read: answers to the session's turns stored before each answer named its message.
   - `option` (`ID`, `Label`): A part of conversation: one option of the message.
   - `answer` (`Option`, `Label`, `Choice`, `Text`, `At`): A part of conversation: one answer, with its option and the option's label, yes or no, its text and when it was given.
@@ -567,13 +570,35 @@ Each tool's answers, under `[<tool>.answers]`, and the fields each reads besides
 ## What the loop tells a session (`notices.toml`)
 
 - `<name>` (template): A notice, by its name: a template over its fields, `Name` and `Command`.
-  - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered an Inbox message, Message, 0 for an answer stored before answers named their message, of the unit named as the loop's commands read it.
+  - `answered`: Typed into an idle session, or the reason that blocks its stop while it works: the user answered Gate of the session's turn, 0 for an answer stored before answers named their gate, of the unit named as the loop's commands read it.
+  - `chat`: Typed into a live session of a task when the user writes on the task's chat: the task's id. The notice carries no message: the agent reads it with task_read.
+  - `chat_typed`: Tells the person that their chat message reached a live session of the task.
+  - `chat_started`: Tells the person that their chat message started a turn of Intent, Resumed when it resumes the task's last session.
+  - `draft_sent`: Tells the person that the reply they sent at once, Draft, is approved and goes out.
+  - `draft_saved`: Tells the person that the reply they wrote, Draft, waits for their approval.
+  - `reply_placeholder`: The placeholder of a notification's input that saves a reply for approval.
+  - `reply_button`: The button of a notification's input that saves a reply for approval.
+  - `send_reply_placeholder`: The placeholder of a notification's input that sends a reply at once.
+  - `send_reply_button`: The button of a notification's input that sends a reply at once.
+  - `answer_placeholder`: The placeholder of a notification's input that answers an agent.
+  - `answer_button`: The button of a notification's input that answers an agent.
   - `record_owed`: The reason that blocks the stop of a session whose turn has no record: the unit, the turn's id and the directory a record file goes in.
   - `attach_needs_session`: Why task attach refuses to run outside an agent session a workspace manager started: the task named as the command reads it, and the enabled workspace managers as displayed.
 
 The fields each notice reads besides `Name` and `Command`:
 
-  - `answered` (`Message`: number, `Unit`)
+  - `answered` (`Gate`: number, `Unit`)
+  - `chat` (`Task`)
+  - `chat_typed`
+  - `chat_started` (`Intent`, `Resumed`)
+  - `draft_sent` (`Draft`: number)
+  - `draft_saved` (`Draft`: number)
+  - `reply_placeholder`
+  - `reply_button`
+  - `send_reply_placeholder`
+  - `send_reply_button`
+  - `answer_placeholder`
+  - `answer_button`
   - `record_owed` (`Unit`, `Turn`, `ScratchDir`)
   - `attach_needs_session` (`Task`, `Managers`)
 

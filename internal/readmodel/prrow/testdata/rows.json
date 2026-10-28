@@ -578,7 +578,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -732,7 +732,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -899,7 +899,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -1063,7 +1063,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -1227,7 +1227,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -1396,7 +1396,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -1876,7 +1876,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -3097,7 +3097,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -3767,7 +3767,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",
@@ -4093,7 +4093,7 @@
       {
         "id": "act",
         "enabled": true,
-        "note": "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval"
+        "note": "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval"
       },
       {
         "id": "nudge",

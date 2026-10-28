@@ -18,9 +18,11 @@ type Notices interface {
 
 // The notices the loop tells a session, and the data each reads besides Name and Command.
 const (
-	// NoticeAnswered tells that the user answered an Inbox message: Message, 0 for an answer that names
-	// none, and Unit.
+	// NoticeAnswered tells that the user answered a gate of the session's turn: Gate, 0 for an answer that
+	// names none, and Unit.
 	NoticeAnswered = "answered"
+	// NoticeChat tells a live session of a task that the user wrote on the task's chat: Task.
+	NoticeChat = "chat"
 	// NoticeRecordOwed blocks a stop whose turn has no record: Unit, Turn and ScratchDir.
 	NoticeRecordOwed = "record_owed"
 )
@@ -45,7 +47,7 @@ func (s *Service) notice(name string, data map[string]any) string {
 }
 
 func (s *Service) answeredNotice(ref unit.Unit, a turn.Answer) string {
-	return s.notice(NoticeAnswered, map[string]any{"Message": a.Message, "Unit": unitArg(ref)})
+	return s.notice(NoticeAnswered, map[string]any{"Gate": a.Gate, "Unit": unitArg(ref)})
 }
 
 func (s *Service) blockReason(ref unit.Unit, id string) string {

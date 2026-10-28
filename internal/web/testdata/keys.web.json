@@ -122,7 +122,7 @@
       "context": "list",
       "owner": "core",
       "help": "reply in the conversation",
-      "summary": "Write a reply on its unit; it waits in the Outbox for your approval."
+      "summary": "Write a reply on its unit; Send posts it now, Save as draft holds it for your approval."
     },
     {
       "key": "o",

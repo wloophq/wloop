@@ -27,7 +27,7 @@ resumed = "act on {{.unit.ref}}"
 line = 'Act on the open items of {{.unit.ref}}, {{template "started_by" .}}.'
 
 [action]
-note = "Runs one read-only agent call on the selected items; replies wait in the Outbox for your approval{{if .row.recommended}} (recommended: {{.row.recommended}}){{end}}"
+note = "Runs one read-only agent call on the selected items; the replies it drafts wait for your approval{{if .row.recommended}} (recommended: {{.row.recommended}}){{end}}"
 
 [[action.refuse]]
 when = "!(row.yours)"

@@ -15,13 +15,15 @@ import (
 // ErrNoTurn refuses a read from a session with no turn on the unit.
 var ErrNoTurn = errors.New("this session has no turn")
 
-// ReadRequest is inbox_read: the answers to the messages of the session's turns.
+// ReadRequest is task_read's answers: the answers to the messages of the session's turns.
 type ReadRequest struct {
 	Session string
 	// Unit is the unit whose turns the session holds; zero is the unit of its newest turn.
 	Unit unit.Unit
 	// Message is the message to read; 0 reads every answer the agent has not read.
 	Message int64
+	// Gate, in place of Message, reads the answers that resolved it.
+	Gate int64
 }
 
 // Read returns the answers the user gave to the messages of the session's turns, oldest first, and marks them
@@ -42,6 +44,11 @@ func (s *Service) Read(ctx context.Context, r ReadRequest) ([]message.Conversati
 	}
 	readable := func(a turn.Answer) bool {
 		return a.Route != turn.Queued && a.Route != turn.Pending && a.Route != turn.Direct && (mine(a.TurnSeq) || (r.Session != "" && a.Session == r.Session))
+	}
+	if r.Message == 0 && r.Gate != 0 {
+		if r.Message = messageOfGate(&b, r.Gate); r.Message == 0 {
+			return nil, fmt.Errorf("%w: no answer resolved gate %d", ErrNoMessage, r.Gate)
+		}
 	}
 	var out []message.Conversation
 	if r.Message != 0 {
@@ -105,6 +112,16 @@ func (s *Service) bookOf(ctx context.Context, r ReadRequest) (turn.Book, error) 
 		return turn.Book{}, ErrNoTurn
 	}
 	return b, nil
+}
+
+// messageOfGate is the message the answers that resolved gate id name, 0 when none did.
+func messageOfGate(b *turn.Book, id int64) int64 {
+	for _, a := range b.Answers {
+		if a.Gate == id && a.Message != 0 {
+			return a.Message
+		}
+	}
+	return 0
 }
 
 // messageOf is message id, zero for 0 or one no longer stored.

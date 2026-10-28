@@ -84,8 +84,8 @@ func TestAToolTextFailsAtLoad(t *testing.T) {
 }
 
 func TestABundledFileMissingAToolFails(t *testing.T) {
-	_, got := toolsProblems(t, strings.ReplaceAll(everyTool(""), "[inbox_read", "[inbox_read_x"), "")
-	if !strings.Contains(got, "inbox_read: is missing") {
+	_, got := toolsProblems(t, strings.ReplaceAll(everyTool(""), "[task_read", "[task_read_x"), "")
+	if !strings.Contains(got, "task_read: is missing") {
 		t.Fatalf("got:\n%s", got)
 	}
 }
