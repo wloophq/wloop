@@ -31,7 +31,7 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get}
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
 			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off, States: profileStates{e},
-			Authority: catalog.Authority(e.loadedIntents), Gates: db.Gates(e.Now)})
+			Authority: catalog.Authority(e.loadedIntents), Gates: serviceTaskGates{e, db}})
 	}
 	return e.tasks
 }

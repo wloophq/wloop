@@ -22,7 +22,7 @@ use = "workspace.remove"
 [gates.approval]
 mode = "wait"
 [[gates.approval.rule]]
-when = 'size(workspace.pendency) == 0'
+when = 'gate.kind == "plan" && size(workspace.pendency) == 0'
 `
 
 func TestReleasingRunRuleRefusesUntrustedFacts(t *testing.T) {
@@ -133,6 +133,27 @@ func TestEveryStepArgumentNamesAStep(t *testing.T) {
 		}
 		if !slices.ContainsFunc(builtin.Steps, func(s builtin.StepDef) bool { return s.Name == r.Step }) || r.Doc == "" {
 			t.Errorf("row %s names no step, or has no doc: %q", r.Path, r.Step)
+		}
+	}
+}
+
+func TestAnUntrustedWaitRuleThatReachesDraftGatesIsALoadProblem(t *testing.T) {
+	head := strings.SplitAfter(removeWorkspace, "[[step]]\nuse = \"workspace.remove\"\n")[0]
+	for when, refused := range map[string]bool{
+		`size(workspace.pendency) > 0`:                         true,
+		`gate.kind == "draft" && size(workspace.pendency) > 0`: true,
+		`gate.kind == "plan" && size(workspace.pendency) > 0`:  false,
+		`gate.kind == "step" && workspace.dirty > 0`:           false,
+	} {
+		root := t.TempDir()
+		writeWorkflow(t, root, "remove", head+"\n[[gates.approval.rule]]\nwhen = '"+when+"'\nmode = \"wait\"\n\n[[gates.approval.rule]]\nwhen = 'draft.delivery == \"comment\"'\nmode = \"send\"\n")
+		l, problems := Load(userLayer(root), nil, testBase(), nil)
+		got := strings.Contains(problems.Error(), "gates.approval.rule[0].when: reads ") && strings.Contains(problems.Error(), `pin it to the other kinds, such as gate.kind == "plan"`)
+		if got != refused {
+			t.Errorf("%s: %s", when, problems.Error())
+		}
+		if !refused && (len(l.Workflows) != 1 || len(l.Workflows[0].DraftApproval.Rules) != 1) {
+			t.Errorf("%s: %+v", when, l.Workflows)
 		}
 	}
 }

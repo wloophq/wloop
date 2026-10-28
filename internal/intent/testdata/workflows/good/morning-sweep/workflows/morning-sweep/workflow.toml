@@ -12,5 +12,5 @@ use = "workspace.remove"
 mode = "delay"
 window = "1d"
 [[gates.approval.rule]]
-when = 'workspace.untracked > 0'
+when = 'gate.kind == "plan" && (workspace.untracked > 0)'
 mode = "wait"

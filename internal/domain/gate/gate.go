@@ -76,3 +76,8 @@ type Gate struct {
 // ProposalSubject is the Subject of a gate on item proposal id when no
 // message mirrors it, so it never reads as a message id.
 func ProposalSubject(id int64) string { return "proposal/" + strconv.FormatInt(id, 10) }
+
+// EventResolved is the event a resolved step gate records on its task, or
+// its unit with none: Key "<name>/<id>", Data the intent it was resolved
+// with, Actor who resolved it.
+const EventResolved = "gate_resolved"

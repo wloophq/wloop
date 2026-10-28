@@ -55,9 +55,9 @@ func TestAWorkflowsApprovalLoadsAsAnOverlay(t *testing.T) {
 		`workflows = {w = {gates = {approval = {mode = "send"}}}}`,
 		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\"", mode = "run"}]}}}}`,
 		`workflows = {w = {gates = {approval = {rule = [{when = "draft.delivery == \"message\"", mode = "dry_run"}]}}}}`,
-		`workflows = {w = {gates = {approval = {rule = [{when = "brief.kind == \"request\"", mode = "wait"}]}}}}`,
-		`workflows = {w = {gates = {approval = {rule = [{when = "brief.extra.ship == true", mode = "wait"}]}}}}`,
-		`workflows = {w = {gates = {approval = {rule = [{when = "classify.urgent == true", mode = "wait"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\" && brief.kind == \"request\"", mode = "wait"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\" && brief.extra.ship == true", mode = "wait"}]}}}}`,
+		`workflows = {w = {gates = {approval = {rule = [{when = "gate.kind == \"plan\" && classify.urgent == true", mode = "wait"}]}}}}`,
 		`workflows = {w = {only_when = "brief.extra.ship == true"}}`,
 	} {
 		if err := loadErr(t, raw); err != nil {
@@ -81,6 +81,21 @@ func TestAWorkflowsApprovalOverlayRefusesWhatNoManifestFixes(t *testing.T) {
 	} {
 		if err := loadErr(t, raw); err == nil || !strings.Contains(err.Error(), msg) {
 			t.Errorf("%s: %v, want %q", raw, err, msg)
+		}
+	}
+}
+
+func TestAnUntrustedWaitRuleThatReachesDraftGatesIsRefusedByTheConfig(t *testing.T) {
+	t.Parallel()
+	for when, refused := range map[string]bool{
+		`brief.kind == \"request\"`:                          true,
+		`brief.extra.ship == true`:                           true,
+		`gate.kind == \"plan\" && brief.kind == \"request\"`: false,
+		`gate.kind == \"plan\" && brief.extra.ship == true`:  false,
+	} {
+		err := loadErr(t, `workflows = {w = {gates = {approval = {rule = [{when = "`+when+`", mode = "wait"}, {when = "draft.delivery == \"comment\"", mode = "send"}]}}}}`)
+		if got := err != nil && strings.Contains(err.Error(), "workflows.w.gates.approval.rule[0].when") && strings.Contains(err.Error(), "pin it to the other kinds"); got != refused {
+			t.Errorf("%s: %v", when, err)
 		}
 	}
 }

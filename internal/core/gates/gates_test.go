@@ -3,12 +3,14 @@ package gates_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/gates/gatestest"
+	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -305,4 +307,39 @@ func equal(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+type eventLog struct{ evs []port.Event }
+
+func (l *eventLog) RecordEvents(_ context.Context, evs ...port.Event) error {
+	l.evs = append(l.evs, evs...)
+	return nil
+}
+
+func TestResolvingAStepGateRecordsAnEvent(t *testing.T) {
+	store := gatestest.NewStore(fixedNow)
+	log := &eventLog{}
+	svc := gates.New(gates.Deps{Store: store, Reader: store, Profile: bundled, Clock: clock{fixedNow}, Events: log})
+	ctx := context.Background()
+	step, err := svc.Open(ctx, gate.Gate{Name: "review-diff", Task: "t-0000000000000001", Unit: acme}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	question, err := svc.Open(ctx, gate.Gate{Kind: gate.KindQuestion, Task: "t-0000000000000001", Unit: acme}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(log.evs) != 0 {
+		t.Fatalf("opening recorded %+v", log.evs)
+	}
+	if err := svc.Resolve(ctx, question.ID, gates.Resolution{Intent: "dismiss", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Resolve(ctx, step.ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	want := port.Event{Unit: task.UnitOf("t-0000000000000001"), Kind: gate.EventResolved, Key: fmt.Sprintf("review-diff/%d", step.ID), Actor: "person", Data: "approve", At: fixedNow()}
+	if len(log.evs) != 1 || log.evs[0] != want {
+		t.Fatalf("events %+v, want only %+v", log.evs, want)
+	}
 }

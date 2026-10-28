@@ -197,6 +197,11 @@ func compileRule(when string, mode gate.Mode, window time.Duration, kinds []gate
 			}
 		}
 	}
+	var untrusted *builtin.UntrustedError
+	var subjects *builtin.SubjectsError
+	if errors.As(draftErr, &untrusted) || errors.As(draftErr, &subjects) {
+		return r, "", fmt.Errorf("%w; %s", draftErr, reachesDrafts)
+	}
 	if failed := cmpErr(unitErr, draftErr); failed != nil && (len(r.kinds) == 0 || len(pinned) > 0) {
 		return r, "", failed
 	}
@@ -211,6 +216,11 @@ func cmpErr(errs ...error) error {
 	}
 	return nil
 }
+
+// reachesDrafts is why a rule a draft gate may not read is refused rather
+// than left to the other kinds: rules are tried in order, so dropping it
+// from draft gates would let a later rule decide the draft in its place.
+const reachesDrafts = `it reaches draft gates, where a later rule would decide in its place; pin it to the other kinds, such as gate.kind == "plan"`
 
 // dryRunSkipped is why a dry_run that pins no kind decides only the draft
 // gates of a manifest that opens others.

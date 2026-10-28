@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
@@ -26,7 +27,7 @@ func TestGateOpenStepOpensAProfileGate(t *testing.T) {
 	approved := diffWorkflow + "\n[[gates.approval.rule]]\nwhen = 'gate.kind == \"step\" && task.id == \"t-02\"'\nmode = \"run\"\n"
 	r := newTaskRig(t, map[string]string{"workflows/my-diff/workflow.toml": diffWorkflow, "workflows/my-auto-diff/workflow.toml": approved})
 	r.put(t, "t-01", task.State("next"))
-	r.te.newGates(r.db, r.te.tasks, t.Logf)
+	r.te.newGates(r.db, t.Logf)
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
@@ -60,7 +61,7 @@ func TestGateOpenStepOpensAProfileGate(t *testing.T) {
 		Title: "Approve me", Origin: task.OriginUser, Created: testNow, Updated: testNow}}}); err != nil {
 		t.Fatal(err)
 	}
-	r2.te.newGates(r2.db, r2.te.tasks, t.Logf)
+	r2.te.newGates(r2.db, t.Logf)
 	ed2 := engineDeps{DB: r2.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r2.te.wireSubjects(&serveWiring{DB: r2.db, Cfg: r2.te.cfg, Engine: &ed2})
 	if _, _, err := r2.te.newEngine(ed2).Sweep(ctx, &sync.Mutex{}); err != nil {
@@ -76,5 +77,51 @@ func TestGateOpenStepOpensAProfileGate(t *testing.T) {
 	userProfile(t, te, map[string]string{"workflows/my-diff/workflow.toml": strings.Replace(diffWorkflow, `"review-diff"`, `"review-dif"`, 1)})
 	if p := te.loadedIntents().Problems.Error(); !strings.Contains(p, `step[0].name: names no gate of gates.toml; did you mean "review-diff"?`) {
 		t.Fatalf("a gate.open naming no gate: %s", p)
+	}
+}
+
+const afterDiffWorkflow = `summary = "Star a task once its diff is approved"
+provider = "task"
+when = 'trigger.event.kind == "gate_resolved" && trigger.event.data == "approve"'
+key = ["trigger.event.id"]
+
+[trigger]
+on = ["gate_resolved"]
+
+[[step]]
+use = "task.verb"
+verb = "focus"
+`
+
+func TestAWorkflowTriggersOnAResolvedStepGate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	r := newTaskRig(t, map[string]string{"workflows/my-diff/workflow.toml": diffWorkflow, "workflows/my-after-diff/workflow.toml": afterDiffWorkflow})
+	r.put(t, "t-01", task.State("next"))
+	svc := r.te.newGates(r.db, t.Logf)
+	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
+	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
+	eng := r.te.newEngine(ed)
+	if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+		t.Fatal(err)
+	}
+	gs, err := r.db.Gates(r.te.Now).OfTask(ctx, "t-01")
+	if err != nil || len(gs) != 1 {
+		t.Fatalf("gates %+v %v", gs, err)
+	}
+	if e, _ := r.db.Tasks().Task(ctx, "t-01"); e.Starred() {
+		t.Fatal("starred before the gate was resolved")
+	}
+	if err := svc.Resolve(ctx, gs[0].ID, gates.Resolution{Intent: "approve", By: task.ActorPerson}); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, _, err := eng.Sweep(ctx, &sync.Mutex{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if e, _ := r.db.Tasks().Task(ctx, "t-01"); !e.Starred() {
+		evs, _ := r.db.Events().Since(ctx, 0, []string{gate.EventResolved})
+		t.Fatalf("the workflow on gate_resolved did not run; events %+v", evs)
 	}
 }

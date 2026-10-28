@@ -12,5 +12,5 @@ per_run = 5
 per_day = 30
 
 [[gates.approval.rule]]
-when = 'size(workspace.pendency) > 0'
+when = 'gate.kind == "plan" && (size(workspace.pendency) > 0)'
 mode = "wait"

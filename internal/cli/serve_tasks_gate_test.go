@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -36,5 +38,27 @@ func TestAGatedVerbOpensItsGateThroughServe(t *testing.T) {
 	}
 	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorAgent, Source: "claude"}); !errors.Is(err, coretasks.ErrForbidden) {
 		t.Errorf("an agent on done, which no by.agent lets: %v", err)
+	}
+}
+
+func TestAGatedVerbOpensItsGateThroughTheService(t *testing.T) {
+	const tasksTOML = "[verbs.done]\nby = { person = \"gate\" }\ngate = \"proposal\"\n"
+	r := newProfileRig(t, tasksTOML)
+	if err := os.WriteFile(filepath.Join(r.dir, "gates.toml"), []byte("[[approval.rule]]\nwhen = 'gate.kind == \"proposal\"'\nmode = \"send\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r.write(t, tasksTOML)
+	ctx := context.Background()
+	r.put(t, "t-0000000000000001", "next", task.CategoryReady)
+	g := r.te.newTasks(r.db, r.te.cfg, nil)
+	if _, err := g.Do(ctx, "t-0000000000000001", coretasks.Request{Verb: task.VerbDone, Actor: task.ActorPerson, Source: "cockpit"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.db.Gates(func() time.Time { return testNow }).OfTask(ctx, "t-0000000000000001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Status != gate.Approved || got[0].By != task.ActorWorkflow || got[0].Rule != "gates.toml approval.rule[0]" {
+		t.Fatalf("a policy that releases proposals releases the gate at open: %+v", got)
 	}
 }

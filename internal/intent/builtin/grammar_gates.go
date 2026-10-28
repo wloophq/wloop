@@ -30,7 +30,7 @@ func gateKindValues() []Value {
 		gate.KindPost:     "An agent's post: resolving it delivers the reply to its session.",
 		gate.KindProposal: "Proposed task or item operations: resolving it applies them.",
 		gate.KindTrust:    "A repository's first run: resolving it unblocks the run.",
-		gate.KindStep:     "A workflow's gate.open: resolving it is an event workflows react to.",
+		gate.KindStep:     "A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.",
 	}
 	out := make([]Value, len(gate.Kinds))
 	for i, k := range gate.Kinds {

@@ -67,6 +67,7 @@ Every approval is a `[gates.approval]` table, and each old one fails at load nam
 - a manifest's `[drafts.approval]` and a workflow's `[approval]` are `[gates.approval]`; in `config.toml`, `workflows.<name>.approval` and `workflows.<name>.drafts.approval` are `workflows.<name>.gates.approval`;
 - one table decides every gate its manifest opens: a mode set in it applies to the workflow's runs and its drafts alike, so to set one kind only, write a rule whose `when` pins it, such as `gate.kind == "plan"` for a workflow's runs, as the bundled review and address workflows do for their `60s` window; a rule that reads a draft's facts applies to drafts alone;
 - what no table decides, `gates.toml`'s `[approval]` does: a run starts at once, every other decision waits for you;
+- a `wait` rule that reads an untrusted fact, such as `workspace.pendency`, must pin `gate.kind` to the kinds it holds, such as `gate.kind == "plan"`: one that would reach draft gates fails to load, since no rule of a draft gate reads such a fact and leaving it out would let a later rule decide the draft;
 - a draft whose delivery posts, as its plugin's manifest marks it, waits for you unless a rule that names its delivery releases it: a Slack message now needs `draft.delivery == "message"` in a rule that sends it, as a GitHub comment needed `draft.delivery == "comment"`.
 
 ## Going back to an earlier release

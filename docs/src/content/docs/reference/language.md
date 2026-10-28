@@ -275,7 +275,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `post`: An agent's post: resolving it delivers the reply to its session.
   - `proposal`: Proposed task or item operations: resolving it applies them.
   - `trust`: A repository's first run: resolving it unblocks the run.
-  - `step`: A workflow's gate.open: resolving it is an event workflows react to.
+  - `step`: A workflow's gate.open: resolving it records the event gate_resolved on its task, which workflows react to.
 - `gates.<name>.label` (string): What the gate asks of you, as clients list it.
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name. A user layer may set only some keys of an entry declared below it; a new entry sets the required ones.

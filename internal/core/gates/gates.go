@@ -73,6 +73,12 @@ type Tasks interface {
 	Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error)
 }
 
+// Events records the event a resolved step gate is, which workflows
+// trigger on.
+type Events interface {
+	RecordEvents(ctx context.Context, evs ...port.Event) error
+}
+
 // Deps are what the service reads, writes and applies. Every consequence
 // port is optional: a kind whose port is nil resolves with no consequence.
 type Deps struct {
@@ -91,6 +97,8 @@ type Deps struct {
 	Deliverer Deliverer
 	Decider   Decider
 	Unblocker Unblocker
+	// Events records a resolved step gate; nil records none.
+	Events Events
 
 	Log func(format string, args ...any)
 }
@@ -275,6 +283,10 @@ func (s *Service) apply(ctx context.Context, g gate.Gate) error {
 		if s.d.Unblocker != nil {
 			err = s.d.Unblocker.Unblock(ctx, g)
 		}
+	case gate.KindStep:
+		if s.d.Events != nil {
+			err = s.d.Events.RecordEvents(ctx, resolvedEvent(g))
+		}
 	}
 	if err != nil {
 		return fmt.Errorf("gate %d resolved %s, its consequence failed: %w", g.ID, g.Status, err)
@@ -354,4 +366,14 @@ func (s *Service) taskOf(ctx context.Context, u unit.Unit, def Def) (task.ID, er
 	}
 	t, err := s.d.Tasks.Open(ctx, r)
 	return t.ID, err
+}
+
+// resolvedEvent is the event resolved step gate g records: on its task, or
+// its unit when it has none.
+func resolvedEvent(g gate.Gate) port.Event {
+	u := g.Unit
+	if g.Task != "" {
+		u = task.UnitOf(g.Task)
+	}
+	return port.Event{Unit: u, Kind: gate.EventResolved, Key: fmt.Sprintf("%s/%d", g.Name, g.ID), Actor: string(g.By), Data: g.Intent, At: g.ClosedAt}
 }

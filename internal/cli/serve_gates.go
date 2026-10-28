@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"time"
@@ -18,15 +19,36 @@ import (
 
 // newGates is the daemon's one gates service, built on first use: the
 // gates of db, worded and decided by the profile as it loads now, each on
-// the task of its unit.
-func (e *Env) newGates(db *sqlite.DB, tasks *coretasks.Service, logf func(string, ...any)) *gates.Service {
+// the task of its unit, which the daemon's tasks service opens when none is.
+func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service {
 	if e.gates == nil {
 		st := db.Gates(e.Now)
 		e.gateReader = st
-		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), tasks},
-			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf})
+		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
+			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db)})
 	}
 	return e.gates
+}
+
+// serviceTaskGates are the gates a gated verb opens, through the gates
+// service, and reads back.
+type serviceTaskGates struct {
+	e  *Env
+	db *sqlite.DB
+}
+
+func (g serviceTaskGates) Open(ctx context.Context, gt gate.Gate) (gate.Gate, error) {
+	return g.e.newGates(g.db, nil).Open(ctx, gt, nil)
+}
+
+func (g serviceTaskGates) Get(ctx context.Context, id int64) (gate.Gate, error) {
+	g.e.newGates(g.db, nil)
+	return g.e.gateReader.Get(ctx, id)
+}
+
+func (g serviceTaskGates) OfTask(ctx context.Context, id task.ID) ([]gate.Gate, error) {
+	g.e.newGates(g.db, nil)
+	return g.e.gateReader.OfTask(ctx, id)
 }
 
 // profileGates are the gates of gates.toml as the profile loads now.
@@ -103,16 +125,21 @@ func gateMode(m workflow.ApprovalMode) gate.Mode {
 }
 
 // gateTasks finds the task a gate's unit is on in the store and opens one
-// through the tasks service.
+// through the daemon's tasks service.
 type gateTasks struct {
-	store   coretasks.Reader
-	service *coretasks.Service
+	store coretasks.Reader
+	e     *Env
 }
 
 func (g gateTasks) TasksOf(ctx context.Context, u unit.Unit) ([]task.Task, error) {
 	return g.store.TasksOf(ctx, u)
 }
 
+var errNoTasksService = errors.New("no tasks service opens the gate's task: the daemon serves it")
+
 func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error) {
-	return g.service.Open(ctx, r)
+	if g.e.tasks == nil {
+		return task.Task{}, errNoTasksService
+	}
+	return g.e.tasks.Open(ctx, r)
 }

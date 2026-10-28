@@ -2,14 +2,10 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"slices"
-
-	intentload "github.com/wloophq/wloop/internal/intent"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/brief"
-	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -38,21 +34,14 @@ func (e *Env) briefProjection() brief.Projection {
 	}}
 }
 
-// namedGates opens a gate of the loaded gates.toml by its name, of the kind and with the intents it
-// declares.
+// namedGates opens a gate of the loaded gates.toml by its name through the gates service, of the kind
+// and with the intents it declares.
 type namedGates struct {
-	e     *Env
-	store gates.Store
+	e  *Env
+	db *sqlite.DB
 }
 
 func (n namedGates) OpenNamed(ctx context.Context, name string, g gate.Gate) (gate.Gate, error) {
-	def, ok := n.e.loadedIntents().Gates.Gate(name)
-	if !ok {
-		return gate.Gate{}, fmt.Errorf("%s declares no gate %q", intentload.GatesFile, name)
-	}
-	g.Name, g.Kind, g.Intents = name, def.Kind, nil
-	for _, in := range def.Intents {
-		g.Intents = append(g.Intents, in.Name)
-	}
-	return n.store.Open(ctx, g)
+	g.Name, g.Kind, g.Intents = name, "", nil
+	return n.e.newGates(n.db, nil).Open(ctx, g, nil)
 }

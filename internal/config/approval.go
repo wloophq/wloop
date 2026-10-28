@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
@@ -110,6 +111,8 @@ func (a ApprovalConfig) validateGates(key string) error {
 				return fmt.Errorf("%s.when reads %s: config.toml cannot see who writes it, the profile declares it, so a rule that releases a gate here may not read it; a wait rule may", at, prop)
 			case releases:
 				return fmt.Errorf("%s.when reads %s, which a rule that releases a gate may not: a third party's text or an agent sets its value; a wait rule may read it", at, names[0])
+			case !ok && !pinnedAwayFromDrafts(r.When, names, env):
+				return fmt.Errorf("%s.when reads %s, which no rule of a draft gate may: %s", at, names[0], reachesDrafts)
 			}
 			continue
 		}
@@ -118,8 +121,13 @@ func (a ApprovalConfig) validateGates(key string) error {
 			return fmt.Errorf("%s.when: %w", at, err)
 		}
 		var subjects *builtin.SubjectsError
-		if _, err := builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ModeOf(gate.Mode(r.Mode)), Window: time.Duration(r.Window)}, env); errors.As(err, &subjects) {
+		var untrusted *builtin.UntrustedError
+		_, err = builtin.ApprovalRule(r.When, draft.Approval{Mode: draft.ModeOf(gate.Mode(r.Mode)), Window: time.Duration(r.Window)}, env)
+		switch {
+		case errors.As(err, &subjects):
 			return fmt.Errorf("%s.when: %w", at, err)
+		case errors.As(err, &untrusted) && !releases && !pinsAwayFromDrafts(p):
+			return fmt.Errorf("%s.when: %w; %s", at, err, reachesDrafts)
 		}
 		if gate.Mode(r.Mode) == gate.ModeDryRun {
 			for _, k := range gate.Kinds {
@@ -137,6 +145,40 @@ func (a ApprovalConfig) validateGates(key string) error {
 		}
 	}
 	return nil
+}
+
+// reachesDrafts is why a wait rule over an untrusted fact that pins no
+// other kind is refused: rules are tried in order, so dropping it from draft
+// gates would let a later rule release the draft it meant to hold.
+const reachesDrafts = `it reaches draft gates, where a later rule would decide in its place; pin it to the other kinds, such as gate.kind == "plan"`
+
+// pinsAwayFromDrafts says whether p pins gate.kind to kinds that are not draft.
+func pinsAwayFromDrafts(p workflow.Predicate) bool {
+	pinned := false
+	for _, k := range gate.Kinds {
+		if expr.Requires(p, builtin.GateSlot+".kind", string(k)) {
+			if k == gate.KindDraft {
+				return false
+			}
+			pinned = true
+		}
+	}
+	return pinned
+}
+
+// pinnedAwayFromDrafts is pinsAwayFromDrafts of src, whose facts names only
+// the profile types: each is tried as each type a fact may take.
+func pinnedAwayFromDrafts(src string, names []string, env expr.Env) bool {
+	for _, t := range []expr.Type{expr.Bool, expr.String, expr.Int, expr.List, expr.Time, expr.Duration} {
+		with := maps.Clone(env)
+		for _, n := range names {
+			with[n] = t
+		}
+		if p, err := expr.CompileWorkflow(src, with); err == nil {
+			return pinsAwayFromDrafts(p)
+		}
+	}
+	return false
 }
 
 // gateRuleEnv is what a config rule of [gates.approval] may read: a

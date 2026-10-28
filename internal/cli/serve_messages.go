@@ -23,7 +23,7 @@ func (e *Env) serveMessages(ctx context.Context, d daemon.Deps, db *sqlite.DB, c
 			Ledger: ledger, Tasks: tasks, Intents: registryPort{e}, Clock: clockFunc(e.Now), Log: logf}
 	}
 	d.Tasks, d.Messages = tasks, e.messages
-	d.Gates = e.newGates(db, tasks, logf)
+	d.Gates = e.newGates(db, logf)
 	d.GateReader = e.gateReader
 	if e.changes != nil {
 		e.background.Go(func() { e.messages.Run(ctx, e.changes) })
