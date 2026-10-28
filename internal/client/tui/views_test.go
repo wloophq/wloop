@@ -580,7 +580,7 @@ func TestPaletteAndHelp(t *testing.T) {
 
 	press(m, Key{Rune: '?'})
 	screen = squash(screenOf(m, 120, 80))
-	for _, want := range []string{"Keys", "Everywhere", "g i Inbox", "On the selection", "x to Next", "In a question", "1 answer option 1"} {
+	for _, want := range []string{"Keys", "Everywhere", "g i Inbox", "On the selection", "x to Next", "In a question", "1 the gate's intent 1"} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("help lacks %q:\n%s", want, screen)
 		}

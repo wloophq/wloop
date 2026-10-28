@@ -21,7 +21,7 @@ The embedded `profiles/default/` is the lowest layer of every profile. Your prof
 | What an agent reads about each MCP tool: its `description`, its parameters' (`params`, by path) and what it answers (`answers`, by name) | `profiles/default/tools.toml` | a `tools.toml` whose keys replace the bundled ones |
 | The task states and their categories, the task properties with their types and writers, the verbs' words (`label`, `summary`, the button's tooltip, `input`, the question a verb that asks for a value puts first) and where a task offers each (`offer`) | `profiles/default/tasks.toml` | a `tasks.toml` whose keys replace the bundled ones and whose new states and properties come after the bundled ones |
 | The gates: each one's kind, words and the intents it is resolved with | `profiles/default/gates.toml` | a `gates.toml` whose keys replace the bundled ones and whose new gates and intents come after the bundled ones |
-| The labels of the views and of the review's steps | `profiles/default/views.toml` | a `views.toml` whose keys replace the bundled ones |
+| The labels of the views, the keys that jump to them, and the labels of the review's steps | `profiles/default/views.toml` | a `views.toml` whose keys replace the bundled ones |
 | The help line of each core key, by context, then action | `profiles/default/keys.toml` | a `keys.toml` whose keys replace the bundled ones |
 | What the loop tells a session: the notice that the user answered an Inbox message, and the reason a stop is blocked while the turn owes a record | `profiles/default/notices.toml` | a `notices.toml` whose keys replace the bundled ones |
 

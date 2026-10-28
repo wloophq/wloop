@@ -12,7 +12,7 @@
         "description": "The keys of one context, by action.",
         "type": "object"
       },
-      "description": "The help line of each core key, by context (list, global, question, review, plan), then action (`nav:inbox`, `done`); a numbered one as `answer:{n}`, `{n}` its number.",
+      "description": "The help line of each core key, by context (list, global, question, review, plan), then action (`capture`, `done`); a numbered one as `answer:{n}`, `{n}` its number.",
       "type": "object"
     }
   },

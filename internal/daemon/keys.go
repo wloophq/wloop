@@ -18,7 +18,11 @@ func (s *Server) handleKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l := s.loaded()
-	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
+	var views []api.TaskViewSpec
+	if s.deps.Tasks != nil {
+		views = s.servedViews(s.deps.Tasks)
+	}
+	writeJSON(w, api.KeysResponse{Bindings: keyViews(surface, views, s.servedSpecs(), catalog.PlanSpecs(l), coreWords{l.Keys, l.Lists, l.Tasks})})
 }
 
 // coreWords are the profile's words for the core keys: their help, and a
@@ -29,7 +33,8 @@ type coreWords struct {
 	tasks intentload.TasksDef
 }
 
-func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
+// keyViews are the core keys, the keys of views, then the keys of specs and of plan.
+func keyViews(surface keys.Surface, views []api.TaskViewSpec, specs, plan []api.ActionSpec, words coreWords) []api.KeyView {
 	bundled := bundledWords()
 	out := []api.KeyView{}
 	for _, b := range keys.Core {
@@ -40,6 +45,17 @@ func keyViews(surface keys.Surface, specs, plan []api.ActionSpec, words coreWord
 				summary = cmp.Or(words.tasks.Verbs[b.Action].Summary, bundled.tasks.Verbs[b.Action].Summary)
 			}
 			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: help, Summary: summary})
+		}
+	}
+	jumps := make([]keys.View, len(views))
+	label := map[string]string{}
+	for i, v := range views {
+		jumps[i] = keys.View{ID: v.ID, Key: v.Key}
+		label["nav:"+v.ID] = v.Label
+	}
+	for _, b := range keys.Views(jumps) {
+		if slices.Contains(b.Surfaces, surface) {
+			out = append(out, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: label[b.Action]})
 		}
 	}
 	add := func(specs []api.ActionSpec, ctx keys.Context) {

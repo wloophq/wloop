@@ -674,3 +674,67 @@ func TestAPlanItemReadsAsItsServedLabel(t *testing.T) {
 		t.Fatalf("labels %q, want %q", got, want)
 	}
 }
+
+func TestLensViewsAndKeysComeFromTheCatalog(t *testing.T) {
+	lists, problems := intentload.BundledLists(os.DirFS("../../profiles/default"))
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	for _, b := range keys.Core {
+		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && lists.Views[id] != "" {
+			t.Errorf("the core binds %s to the view %s: a view's key is the catalog's", b.Key, id)
+		}
+	}
+	var fixture []string
+	for _, b := range webBindings(t) {
+		if id, ok := strings.CutPrefix(b.Action, "nav:"); ok && lists.Views[id] != "" {
+			if lists.Keys[id] != b.Key || lists.Views[id] != b.Help {
+				t.Errorf("the fixture binds %s to %s (%q); views.toml gives it %q (%q)", b.Key, id, b.Help, lists.Keys[id], lists.Views[id])
+			}
+			fixture = append(fixture, id)
+		}
+	}
+	var keyed []string
+	for id, k := range lists.Keys {
+		if k != "" {
+			keyed = append(keyed, id)
+		}
+	}
+	if slices.Sort(keyed); !slices.Equal(slices.Sorted(slices.Values(fixture)), keyed) {
+		t.Errorf("the fixture jumps to %v, views.toml keys %v", fixture, keyed)
+	}
+
+	catalog := []api.TaskViewSpec{{ID: "needs-me", Label: "Needs me", Key: "g m"}, {ID: "later", Label: "Later"}, {ID: "stalled", Label: "Stalled", Key: "g s"}}
+	jumps := make([]keys.View, len(catalog))
+	label := map[string]string{}
+	for i, v := range catalog {
+		jumps[i], label["nav:"+v.ID] = keys.View{ID: v.ID, Key: v.Key}, v.Label
+	}
+	var served []api.KeyView
+	for _, b := range webBindings(t) {
+		if !strings.HasPrefix(b.Action, "nav:") || b.Action == "nav:github" {
+			served = append(served, b)
+		}
+	}
+	for _, b := range keys.Views(jumps) {
+		served = append(served, api.KeyView{Key: b.Key, Action: b.Action, Context: string(b.Context), Owner: "core", Help: label[b.Action]})
+	}
+	var got struct {
+		Nav  []string `json:"nav"`
+		Help []string `json:"help"`
+	}
+	keysRun(t, "", `
+const k = harness({ views: input.catalog });
+k.keys.setBindings(input.served);
+for (const c of ["g", "m", "g", "i", "g", "s", "g", "n"]) await k.press(c);
+await k.press("?");
+const help = [];
+for (const g of k.log.help || []) for (const b of g.bindings) help.push(b.help);
+return { nav: k.log.nav, help };`, map[string]any{"catalog": catalog, "served": served}, &got)
+	if want := []string{"needs-me", "stalled"}; !slices.Equal(got.Nav, want) {
+		t.Errorf("g m, g i, g s, g n navigated to %q, want %q: only the catalog's keys jump", got.Nav, want)
+	}
+	if !slices.Contains(got.Help, "Needs me") || slices.Contains(got.Help, "Inbox") {
+		t.Errorf("the help lists %q: a view's key reads its catalog label", got.Help)
+	}
+}

@@ -26,13 +26,13 @@ The same keys work in the web cockpit and the terminal client, on the selected t
 | `Backspace` | dismiss |
 | `o` | open the source |
 | `n` | capture |
-| `1`-`9` | answer that option, while a question card is focused; in the terminal, pick a draft the open detail lists when it asks no question |
+| `1`-`9` | the gate's intent of that number, in the order the gate lists them, while a gate is focused; in the terminal, pick a draft the open detail lists when it asks no question |
 
 ## Navigation
 
 | Key | Action |
 |---|---|
-| `g f`, `g i`, `g o`, `g n`, `g w`, `g p`, `g r` | Focus, Inbox, Outbox, Next, Waiting, Projects, Review |
+| `g f`, `g i`, `g o`, `g n`, `g w`, `g p`, `g r` | Focus, Inbox, Outbox, Next, Waiting, Projects, Review: each view's `key` in `views.toml`, and a view of yours adds its own (`g`, a space and a key no core key uses) |
 | `g g` | the GitHub views |
 | `Shift+1`..`9` | switch area |
 | `/` | filter |
