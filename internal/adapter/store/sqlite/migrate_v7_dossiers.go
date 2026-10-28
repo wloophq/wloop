@@ -15,7 +15,9 @@ const v6Project = "project"
 // v7Dossiers gives every dossier to the task that owns it in version 7: a project's, found by its slug, to the
 // project's task, and a unit's to the task holding the unit (an open one first, then the oldest), as
 // dossierStore.Owner finds it. Each directory move is recorded in dossier_moves for the CLI to apply on disk.
-// projects, which kept only the slugs, goes.
+// The active dossier of a task that ended before the upgrade is resolved at the task's last update, with no
+// closing call: version 6 never closed it, and nobody ended the task since. projects, which kept only the
+// slugs, goes.
 func v7Dossiers(ctx context.Context, tx *sql.Tx) error {
 	type give struct{ from, to string }
 	var gives []give
@@ -66,6 +68,10 @@ func v7Dossiers(ctx context.Context, tx *sql.Tx) error {
 		if err := giveDossier(ctx, tx, g.from, g.from, g.to); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE dossiers SET status = 'resolved', resolved_at = e.updated FROM tasks e
+		WHERE dossiers.owner = ?1 || '/' || e.id AND dossiers.status = 'active' AND e.category IN ('done', 'dropped')`, v7Task); err != nil {
+		return err
 	}
 	_, err = tx.ExecContext(ctx, `DROP TABLE projects`)
 	return err

@@ -56,7 +56,11 @@ type turnsEnv struct {
 
 func newTurnsEnv(t *testing.T) *turnsEnv {
 	t.Helper()
-	te := &turnsEnv{env: newEnv(t), asker: &scriptedAsker{}}
+	return turnsOver(newEnv(t))
+}
+
+func turnsOver(e *env) *turnsEnv {
+	te := &turnsEnv{env: e, asker: &scriptedAsker{}}
 	te.turns = &dossiers.Turns{Dossiers: te.svc, Pages: te.files, Events: func(_ context.Context, ev port.Event) error {
 		te.events = append(te.events, ev)
 		return nil

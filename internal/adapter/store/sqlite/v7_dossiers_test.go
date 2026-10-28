@@ -76,3 +76,19 @@ func TestProjectDossiersMoveToTheirTask(t *testing.T) {
 		}
 	}
 }
+
+func TestAMigratedEndedTasksDossierGetsNoClosingCall(t *testing.T) {
+	t.Parallel()
+	path := v6Store(t,
+		`INSERT INTO entries (id, kind, state, origin, created, updated, rev) VALUES
+			('e-`+hexEnded+`', 'capture', 'done', 'user', '2026-10-01T00:00:00Z', '2026-10-04T09:00:00Z', 1),
+			('e-`+hexPull+`', 'capture', 'next', 'user', '2026-10-01T00:00:00Z', '2026-10-04T09:00:00Z', 2)`,
+		`INSERT INTO dossiers (owner, rel_path, status) VALUES
+			('entry/e-`+hexEnded+`', 'entry/e-`+hexEnded+`#', 'active'), ('entry/e-`+hexPull+`', 'entry/e-`+hexPull+`#', 'active')`,
+	)
+	migrateV6(t, path)
+	want := []string{"task/t-" + hexPull + " active ", "task/t-" + hexEnded + " resolved 2026-10-04T09:00:00Z"}
+	if got := strings1(t, rawDB(t, path), `SELECT owner || ' ' || status || ' ' || resolved_at FROM dossiers ORDER BY owner`); !slices.Equal(got, want) {
+		t.Fatalf("dossiers %q, want %q", got, want)
+	}
+}

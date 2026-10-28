@@ -5,7 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -146,4 +149,34 @@ func TestAnArchivedMergedDossierIsPurged(t *testing.T) {
 	if _, p := e.sweep(t); p != 1 || exists(tarball) {
 		t.Fatalf("purged %d, archive left %v", p, exists(tarball))
 	}
+}
+
+func TestAMigratedEndedTasksDossierGetsNoClosingCall(t *testing.T) {
+	const hex = "00000000000000e7"
+	te := turnsOver(newEnvOver(t, func(path string) {
+		sqlitetest.At(t, path, 6,
+			`INSERT INTO entries (id, kind, state, origin, created, updated, rev) VALUES ('e-`+hex+`', 'capture', 'done', 'user', 't', '2026-10-04T09:00:00Z', 1)`,
+			`INSERT INTO dossiers (owner, rel_path, status) VALUES ('entry/e-`+hex+`', 'entry/e-`+hex+`#', 'active')`)
+		if _, err := sqlite.Migrate(context.Background(), path, sqlite.MigrateOptions{Backups: filepath.Join(filepath.Dir(path), "backups"), Now: func() time.Time { return time.Time{} }}); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	dir, err := dossier.Dir(te.state, dossier.Owner{Unit: task.UnitOf("t-" + hex)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := te.files.Ensure(context.Background(), dir); err != nil {
+		t.Fatal(err)
+	}
+	te.asker.answers = []string{closingAnswer}
+	if err := te.res.All(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(te.asker.asked) != 0 {
+		t.Fatalf("%d closing calls for a task that ended before the upgrade", len(te.asker.asked))
+	}
+}
+
+func TestAUnitDossierJoinsTheTaskThatPicksTheUnitUp(t *testing.T) {
+	t.Skip("carried from D1 review: W1a moves a unit's dossier into the task that attaches it")
 }
