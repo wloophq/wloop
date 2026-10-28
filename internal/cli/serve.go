@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/timeline"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/api"
@@ -295,6 +297,9 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		App:       app,
 		Changes:   e.changes,
 		Snapshot:  db,
+
+		Timeline:    timeline.Merged{Log: db, Holdings: db},
+		TaskRecords: db,
 
 		Intakes:           db.Intakes(),
 		IntakeBriefs:      intakeBriefs,
@@ -849,7 +854,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	e.Turns = &turns.Service{Store: repo, Registry: repo, Sessions: sessions, Launcher: cliLauncher{e}, Answers: hostAnswers{events: sqlite.New(db), viewer: store},
 		Changed: v.Changed, Clock: clock, Command: e.loopCommand(), Notices: profileNotices{e}, FastJob: fast,
 		AgentFor:      e.agentFor(served),
-		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e},
+		AgentSessions: agentSessions{db}, Log: logf, Intents: registryPort{e}, Gates: namedGates{e, db.Gates(e.Now)},
 		Prompts: transcriptPrompts(db.AgentTranscript)}
 	e.background.Go(func() {
 		lctx, scope := meter.Start(ctx, meter.Loop("views"))
@@ -1112,6 +1117,7 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 		Now:          e.Now,
 		Log:          logf,
 		Intent:       e.briefIntents(logf),
+		Records:      e.briefRecords(store.DB()),
 	})
 	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
 	if err != nil {

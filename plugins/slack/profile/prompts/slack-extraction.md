@@ -87,7 +87,7 @@ The viewer may appear under other handles (GitHub, Jira, e-mail) that match thei
 
 The reader will NOT read the conversation. Everything they need to act, decide or chase must be in your output:
 
-- `brief`: `goal`, two or three sentences on what the conversation is about and where it stands, naming who and when matters and whether others wait on the viewer; `context`, what else a reader needs, or `""`; `kind`: question, request, incident (broken now), decision or announcement; `risk` and one-line `risk_why`; up to three `open_questions`; `tags` (reuse the vocabulary's domains). `unchanged: true` keeps the previous brief.
+- `brief`: `goal`, two or three sentences on what the conversation is about and where it stands, naming who and when matters and whether others wait on the viewer; `context`, what else a reader needs, or `""`; `kind`: question, request, incident (broken now), decision or announcement; `risk` and one-line `risk_why`; up to three `open_questions`; `tags` (reuse the vocabulary's domains). `unchanged: true` keeps the previous brief. `asks`: per item awaiting the viewer, per its schema.
 - `summary`: the ask itself, specific enough to act on (which PR, which option, which component), with the exact scope, including what is affected and what is kept ("turn off A and B, keeping C"), and the viewer's role (author, reviewer, decider).
 - `context`: the facts the owner needs to act or decide:
   - what was already said or done and by whom: numbers, risks, constraints, prerequisites and ordering with other items, known limits or gaps someone declared; where the ask was made (this DM/thread vs. elsewhere), so the reader knows where to answer;

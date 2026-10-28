@@ -30,6 +30,7 @@ func (s *Service) Stop(ctx context.Context, r StopRequest) (StopAnswer, error) {
 	ans, ref, saved, err := s.stop(ctx, r)
 	s.mu.Unlock()
 	s.publish(saved...)
+	s.openMissing(ctx)
 	if ref != nil {
 		s.changed(ctx, *ref)
 	}
@@ -135,6 +136,7 @@ func (s *Service) stop(ctx context.Context, r StopRequest) (StopAnswer, *unit.Un
 		if err != nil {
 			return StopAnswer{}, nil, evs, err
 		}
+		s.ended(b.Unit, *t, rec)
 		if last, ok := saved.LastRecord(t.Seq); ok {
 			stop.RecordID = last.ID
 		}

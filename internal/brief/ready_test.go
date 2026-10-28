@@ -311,7 +311,7 @@ func TestIntakesAnswerTheIntakesPort(t *testing.T) {
 	r.run.fail["acme/api#1"] = fmt.Errorf("%w: kind %q", ErrInvalid, "epic")
 	a := Intakes{Q: r.q}
 	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 1}
-	changed, release := a.Changed(ref.Unit())
+	changed, release := a.Changed(context.Background(), ref.Unit())
 	defer release()
 	if rd, err := a.Ready(context.Background(), ref.Unit(), true, nil); err != nil || rd != (intake.Readiness{Wait: WaitBriefing, Attempt: 1}) {
 		t.Fatalf("%+v %v", rd, err)

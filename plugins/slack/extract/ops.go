@@ -13,6 +13,22 @@ import (
 	"github.com/wloophq/wloop/plugins/slack/unit"
 )
 
+// itemIDs are the item ids of r's items by ref, as Ops gives them: a ledger
+// item's own, a new item's minted.
+func itemIDs(in Input, r Result) map[string]string {
+	b := opBuilder{in: in, ledger: map[string]items.Item{}, ids: map[string]string{}}
+	out := map[string]string{}
+	for _, it := range in.Ledger {
+		b.ledger[it.ID], out[it.ID] = it, it.ID
+	}
+	for _, it := range r.Items {
+		if isNewRef(it.Ref) {
+			out[it.Ref] = b.mint(it.OriginTS)
+		}
+	}
+	return out
+}
+
 // Ops diffs r against in.Ledger: create, update, assign, resolve, reopen, link. People are
 // items.Person{Key: "slack:<id>", Name, Aliases: ["email:<addr>"] when the cache has an email}.
 // A new item's id is "e<origin ts without its dot>", suffixed ".2", ".3"... while taken, so a

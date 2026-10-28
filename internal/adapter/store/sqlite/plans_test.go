@@ -171,7 +171,7 @@ func TestHotPlans(t *testing.T) {
 // reads; its TestHotPlans covers them.
 var indexesUsedByInventory = []string{
 	"events_keyed", "events_unkeyed", "events_unit", "events_unit_kind", "events_recent", "events_kind",
-	"turns_sent_at", "turn_instructions_kind", "pr_state", "unit_tags_kv", "turn_records_once", "intakes_open",
+	"turns_sent_at", "turn_instructions_kind", "pr_state", "turn_records_once", "intakes_open",
 	"messages_open", "messages_task", "messages_proposal",
 }
 

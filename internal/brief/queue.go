@@ -20,6 +20,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	dpr "github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/tag"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -138,6 +139,9 @@ type Deps struct {
 	// Intent is the brief intent of a provider's units as the profile
 	// resolves it now; nil is the bundled one.
 	Intent func(p unit.ProviderID) Intent
+	// Records projects a pull request's brief record onto the tasks holding
+	// it; nil projects none.
+	Records *Records
 	// Sources are the providers' BriefSources by provider. Pull requests
 	// default to GitHubSource over Store and Source; a GitHub source set
 	// here keeps Retry. A source that is also an OnDemand briefs its units
@@ -550,6 +554,11 @@ func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout t
 	st, change := q.settle(prev, run, err)
 	if serr := q.d.Store.EndBriefRun(ctx, run, st); serr != nil {
 		return q.storeFault(ctx, errors.Join(err, serr))
+	}
+	if run.Outcome == OutcomeOK {
+		if perr := q.d.Records.ProjectHeld(ctx, pr.Ref.Unit(), []byte(run.Brief), task.WriterAgent); perr != nil {
+			q.d.Log("brief %s: the brief's properties: %v", pr.Ref, perr)
+		}
 	}
 	q.recordBreaker(ctx, change, run)
 	return err

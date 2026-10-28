@@ -30,7 +30,7 @@ var providerStringAllowlist = []providerString{
 	{"internal/adapter/store/inventory/timings.go", "github", 3, "debt: the inventory keeps GitHub's pull request tables (issue 62)"},
 	{"internal/adapter/store/sqlite/retain.go", "github", 21, "debt: retention drops a pull request's rows once GitHub says it ended (issue 62)"},
 	{"internal/adapter/store/sqlite/retain.go", "slack", 3, "debt: retention tells a Slack unit gone by the Slack tables; the plugin should say (issue 62)"},
-	{"internal/adapter/store/sqlite/retain_briefs.go", "github", 3, "debt: retention drops a pull request's rows once GitHub says it ended (issue 62)"},
+	{"internal/adapter/store/sqlite/retain_briefs.go", "github", 2, "debt: retention drops a pull request's rows once GitHub says it ended (issue 62)"},
 	{"internal/adapter/store/sqlite/rounds.go", "github", 7, "debt: the round state keeps GitHub's review rounds (issue 62)"},
 	{"internal/cli/doctor.go", "github", 1, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},
 	{"internal/config/config.go", "github", 7, "debt: the central fact and config tables name the plugins' facts and config keys, which the plugins should declare (issue 62)"},

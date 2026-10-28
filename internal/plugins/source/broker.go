@@ -7,6 +7,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -45,6 +46,9 @@ type Broker struct {
 	// PutBrief.
 	Briefs  BriefStore
 	Briefed func(u unit.Unit)
+	// BriefRecords set the properties a task's brief record projects; nil
+	// sets none.
+	BriefRecords *brief.Records
 	// Now is the host's clock; PutBrief needs it.
 	Now func() time.Time
 	// BriefIntent is the brief intent of a provider's units as the loaded
@@ -59,10 +63,14 @@ type Broker struct {
 	Hosted *Hosted
 }
 
-// BriefStore keeps body, the brief JSON a plugin wrote of u at version, as
-// the brief u uses since at.
+// BriefStore keeps the briefs a plugin writes. PutUnitBrief keeps body, the
+// brief JSON a plugin wrote of u at version, as the brief u uses since at;
+// PutRecord keeps a task's brief record. ItemsHeld are the items of u each
+// task holding u or one of its items holds.
 type BriefStore interface {
 	PutUnitBrief(ctx context.Context, u unit.Unit, version, body string, at time.Time) error
+	PutRecord(ctx context.Context, u unit.Unit, kind string, w task.Writer, data []byte, at time.Time) error
+	ItemsHeld(ctx context.Context, u unit.Unit) (map[task.ID][]string, error)
 }
 
 // OverrideStore keeps the host's overrides of units by name

@@ -120,11 +120,18 @@ var writes = []writeCase{
 		topics: port.TopicGates, units: []unit.Unit{term1},
 	},
 	{
+		method: "DB.PutRecord",
+		call: func(ctx context.Context, e *noteEnv) error {
+			return e.db.PutRecord(ctx, u7, "brief", task.WriterAgent, []byte(`{"goal":"g"}`), noteAt)
+		},
+		topics: port.TopicLoopEvents, units: []unit.Unit{u7},
+	},
+	{
 		method: "DB.PutUnitBrief",
 		call: func(ctx context.Context, e *noteEnv) error {
 			return e.db.PutUnitBrief(ctx, u7, "x1", `{"goal":"g"}`, noteAt)
 		},
-		topics: port.TopicBriefs, units: []unit.Unit{u7},
+		topics: port.TopicBriefs | port.TopicLoopEvents, units: []unit.Unit{u7},
 	},
 	{
 		method: "DB.DossierMoved",
@@ -376,6 +383,7 @@ func noteItem(d workflow.Decision) workflow.Item {
 var reads = []string{
 	"DB.Snapshots", "snapshotStore.Get", "snapshotStore.Revs", "snapshotStore.Units",
 	"DB.Close", "DB.R", "reader.QueryContext", "reader.QueryRowContext", "DB.Read", "DB.Snapshot", "DB.Write", "DB.Intakes", "DB.Usage", "DB.HeadlessSpent", "DB.AutomatedTurns", "DB.DossierSpent", "DB.UnitEventKeys", "DB.DossierMoves",
+	"DB.EventsOf", "DB.Records", "DB.UnitsOf", "DB.TasksHolding", "DB.ItemsHeld",
 	"Store.Books", "Store.BookOf", "Store.UnitsOf", "Store.Open", "Store.WithTurns", "Store.Applied", "Store.Session", "Store.Sessions",
 	"Store.LastStops", "Store.SessionOf", "Store.SessionOfHandle",
 	"DB.Worktrees", "Worktrees.Worktree", "Worktrees.Worktrees",

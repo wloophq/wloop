@@ -366,7 +366,9 @@ func (a Intakes) Ready(ctx context.Context, u unit.Unit, first bool, need []stri
 	return readinessOf(rd), err
 }
 
-func (a Intakes) Changed(u unit.Unit) (<-chan struct{}, func()) { return a.Q.Changed(u) }
+func (a Intakes) Changed(_ context.Context, u unit.Unit) (<-chan struct{}, func()) {
+	return a.Q.Changed(u)
+}
 
 func (a Intakes) Unwant(ctx context.Context, u unit.Unit) error { return a.Q.Unwant(ctx, u) }
 

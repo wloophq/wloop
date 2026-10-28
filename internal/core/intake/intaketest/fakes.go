@@ -199,7 +199,7 @@ func (b *Briefs) Answer(answers ...intake.Readiness) {
 	b.answers = answers
 }
 
-func (b *Briefs) Changed(ref unit.Unit) (<-chan struct{}, func()) {
+func (b *Briefs) Changed(_ context.Context, ref unit.Unit) (<-chan struct{}, func()) {
 	b.mu.Lock()
 	ch, ok := b.changed[ref]
 	if !ok {

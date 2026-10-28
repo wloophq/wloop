@@ -532,7 +532,7 @@
     },
     "record": {
       "additionalProperties": false,
-      "description": "The turn's record.",
+      "description": "The turn's record. Left out, a run records no outcome and owes nothing.",
       "properties": {
         "artifacts": {
           "description": "The artifacts a record may carry.",
@@ -555,7 +555,7 @@
           "type": "string"
         },
         "missing": {
-          "description": "The gate, of gates.toml, a run that ends without the record requires names opens.",
+          "description": "The gate, of gates.toml, a run that ends without the record requires names opens. Required with requires.",
           "type": "string"
         },
         "outcome": {
@@ -603,7 +603,7 @@
           "type": "string"
         },
         "states": {
-          "description": "The states a record may take. Required.",
+          "description": "The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none.",
           "items": {
             "enum": [
               "done",
@@ -621,9 +621,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "states"
-      ],
       "type": "object"
     },
     "refuse": {

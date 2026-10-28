@@ -169,9 +169,9 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `record` | table |  | The turn's record. |
+| `record` | table |  | The turn's record. Left out, a run records no outcome and owes nothing. |
 | `record.when` | predicate | `true` | When the turn records its outcome. |
-| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required. |
+| `record.states` | list of `done`, `settled`, `asked`, `failed` |  | The states a record may take. Required when the table sets when, artifacts, outcome, require or attach_url; a table that only sets requires and missing needs none. |
 | `record.artifacts` | list of `review-draft`, `triage` |  | The artifacts a record may carry. |
 | `record.outcome` | list of `verdict`, `url` |  | The outcome fields a record may carry. |
 | `record.attach_url` | bool | `false` | On a turn whose unit is a task, a done record's outcome url, when it names a unit such as a pull request, attaches that unit to the task; needs url in record.outcome. |
@@ -182,7 +182,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `record.require[].artifact` | string |  | The artifact it must carry. |
 | `record.require[].fields` | list of strings |  | The outcome fields it must carry. |
 | `record.requires` | string |  | The record kind, of records.toml, a run of the intent owes; a run that ends without it opens the gate missing names. Left out, a run owes no record. Not record.require, what a record in a state carries. |
-| `record.missing` | string |  | The gate, of gates.toml, a run that ends without the record requires names opens. |
+| `record.missing` | string |  | The gate, of gates.toml, a run that ends without the record requires names opens. Required with requires. |
 
 ### Gate approval
 

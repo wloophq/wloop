@@ -104,6 +104,8 @@ type Loaded struct {
 	Tasks TasksDef
 	// Gates are the gates of gates.toml.
 	Gates GatesDef
+	// Records are the record kinds of records.toml.
+	Records RecordsDef
 	// Keys are the core keys' help from keys.toml.
 	Keys KeyTexts
 	// Notices are what the loop tells a session, from notices.toml, by notice name.
@@ -181,9 +183,11 @@ func Load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	partials := revertedPartials{}
 	gates, gateProblems := loadGates(layers, bundled)
 	listTexts, tasks, listProblems := loadLists(layers, bundled, &gates)
+	records, recordProblems := loadRecords(layers, bundled, &tasks)
+	listProblems = append(listProblems, recordProblems...)
 	for {
 		set, problems := withPartials(base, layers, partials)
-		l, broken := load(layers, bundled, set, check, reverted, tasks)
+		l, broken := load(layers, bundled, set, check, reverted, declarations{tasks, gates, records})
 		if partials.breaking(layers, append(problems, l.Problems...)) {
 			continue
 		}
@@ -300,7 +304,15 @@ func profilesOf(also []dintent.AlsoProfile) []string {
 
 // load is one pass of Load; the intents in plain are read without their
 // overlay. It returns the overlaid intents that broke.
-func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays, tasks TasksDef) (*Loaded, brokenOverlays) {
+// declarations are the profile files an intent's manifest names into.
+type declarations struct {
+	tasks   TasksDef
+	gates   GatesDef
+	records RecordsDef
+}
+
+func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check TemplateCheck, plain brokenOverlays, decl declarations) (*Loaded, brokenOverlays) {
+	tasks := decl.tasks
 	var units []*unit
 	var dirProblems Problems
 	bundledUnits := map[dintent.Name]*unit{}
@@ -362,6 +374,9 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 	dirProblems = append(dirProblems, defaultProblems...)
 	for _, u := range units {
 		u.load(base, defaults, tasks.Facts())
+		if u.defined {
+			u.sheet.declaredRecord(u.def.Record, decl)
+		}
 		if u.defined && !u.broken() && check != nil && u.tmpl != nil {
 			u.sheet.problems = append(u.sheet.problems, check(u.def, u.tmpl)...)
 		}
@@ -374,6 +389,7 @@ func load(layers []profile.Layer, bundled fs.FS, base *template.Template, check 
 		Problems:     dirProblems,
 		EmptyRefusal: defaults.Refusal,
 		Tasks:        tasks,
+		Records:      decl.records,
 		layers:       layers,
 	}
 	var defs []dintent.Def

@@ -34,7 +34,8 @@ CREATE TABLE pr_details (
   PRIMARY KEY (owner, repo, number)
 ) WITHOUT ROWID;
 
--- An event of no unit (a pause) has an empty provider and unit_key.
+-- An event of no unit (a pause) has an empty provider and unit_key. A record is an event of kind
+-- 'record' keyed by its record kind, its data the record's JSON: a unit keeps one of each kind.
 CREATE TABLE events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,
@@ -248,13 +249,6 @@ CREATE TABLE unit_briefs (
   gave_up_at TEXT NOT NULL DEFAULT '', gave_up_reason TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (provider, unit_key)
 );
-
-CREATE TABLE unit_tags (
-  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
-  key TEXT NOT NULL, value TEXT NOT NULL, run INTEGER NOT NULL,
-  PRIMARY KEY (provider, unit_key, key, value)
-);
-CREATE INDEX unit_tags_kv ON unit_tags(key, value);
 
 CREATE TABLE intakes (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,

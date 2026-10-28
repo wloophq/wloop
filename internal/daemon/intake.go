@@ -20,9 +20,12 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 )
 
@@ -99,7 +102,7 @@ func (s *Server) newIntakes(d Deps) *intake.Service {
 	if d.Intakes == nil {
 		return nil
 	}
-	return &intake.Service{Store: d.Intakes, Briefs: intakeBriefs(d), Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
+	return &intake.Service{Store: d.Intakes, Briefs: taskBriefs{Briefs: intakeBriefs(d), s: s}, Firsts: intakeFirsts{s}, Starter: intakeStarter{s}, Payloads: guidancePayloads{},
 		Clock: clockFunc(d.Now), Pub: intakePub{s}, Lock: d.LoopMu, Log: s.logf, Needs: briefNeeds(d)}
 }
 
@@ -128,6 +131,71 @@ func intakeBriefs(d Deps) intake.Briefs {
 	return offBriefs{}
 }
 
+// taskBriefs waits on a task's brief: its own brief record, else the brief of the unit it holds first, as
+// a pull request task's brief is its pull request's. Every other unit waits on its own.
+type taskBriefs struct {
+	intake.Briefs
+	s *Server
+}
+
+func (b taskBriefs) Ready(ctx context.Context, u unit.Unit, first bool, need []string) (intake.Readiness, error) {
+	id, ok := task.IDOf(u)
+	if !ok {
+		return b.Briefs.Ready(ctx, u, first, need)
+	}
+	if recs := b.s.deps.TaskRecords; recs != nil {
+		own, err := recs.Records(ctx, builtin.BuildsBrief, u)
+		if err != nil {
+			return intake.Readiness{}, err
+		}
+		if _, ok := own[u]; ok {
+			return intake.Readiness{Go: true}, nil
+		}
+	}
+	held, err := b.held(ctx, id)
+	if err != nil {
+		return intake.Readiness{}, err
+	}
+	return b.Briefs.Ready(ctx, held, first, need)
+}
+
+func (b taskBriefs) Changed(ctx context.Context, u unit.Unit) (<-chan struct{}, func()) {
+	if id, ok := task.IDOf(u); ok {
+		if held, err := b.held(ctx, id); err == nil {
+			u = held
+		}
+	}
+	return b.Briefs.Changed(ctx, u)
+}
+
+func (b taskBriefs) Unwant(ctx context.Context, u unit.Unit) error {
+	if id, ok := task.IDOf(u); ok {
+		held, err := b.held(ctx, id)
+		if err != nil {
+			return err
+		}
+		u = held
+	}
+	return b.Briefs.Unwant(ctx, u)
+}
+
+// held is the unit task id holds first, the task's own when it holds none.
+func (b taskBriefs) held(ctx context.Context, id task.ID) (unit.Unit, error) {
+	if b.s.deps.Tasks == nil {
+		return task.UnitOf(id), nil
+	}
+	t, err := b.s.deps.Tasks.Task(ctx, id)
+	switch {
+	case errors.Is(err, coretasks.ErrNoTask):
+		return task.UnitOf(id), nil
+	case err != nil:
+		return unit.Unit{}, err
+	case len(t.Units) == 0:
+		return task.UnitOf(id), nil
+	}
+	return t.Units[0], nil
+}
+
 // unavailableBriefs starts every intake at once without a brief the
 // daemon cannot make, saying why.
 type unavailableBriefs struct {
@@ -146,7 +214,7 @@ func (offBriefs) Ready(context.Context, unit.Unit, bool, []string) (intake.Readi
 	return intake.Readiness{Go: true, Without: true, Cause: intake.CauseOff}, nil
 }
 
-func (offBriefs) Changed(unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
+func (offBriefs) Changed(context.Context, unit.Unit) (<-chan struct{}, func()) { return nil, func() {} }
 
 func (offBriefs) Unwant(context.Context, unit.Unit) error { return nil }
 

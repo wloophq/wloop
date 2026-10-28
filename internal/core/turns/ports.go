@@ -9,6 +9,7 @@ import (
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -90,6 +91,13 @@ type Intents interface {
 	ClosesWhenDone(intent string) bool
 	Reconcile(intent string) string
 	SessionTitles() []string
+}
+
+// Gates opens the gates of gates.toml by name.
+type Gates interface {
+	// OpenNamed opens the gate name declares, of its kind and intents, on g's
+	// task and unit.
+	OpenNamed(ctx context.Context, name string, g gate.Gate) (gate.Gate, error)
 }
 
 // StopsKept is how long the store keeps a stop.

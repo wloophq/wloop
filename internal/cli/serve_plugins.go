@@ -279,7 +279,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
 			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
-				Note: note, Briefs: db, Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
+				Note: note, Briefs: db, BriefRecords: e.briefRecords(db), Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents,
 				Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db, Paused: e.roundsPaused, Rounds: e.storedRoundState,
 				Links: db.Links(), Hosted: hosted(id)}
 		},

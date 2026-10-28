@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/task"
 
@@ -365,4 +366,44 @@ func (s *Service) applySession(ctx context.Context, handle string, apply func(cu
 	kind, key := apply(&cur, now)
 	ev := s.event(unit.Unit{}, kind, key, "")
 	return ev, s.Registry.SaveSession(ctx, cur, ev)
+}
+
+// endedTurn is turn t on u, which ended.
+type endedTurn struct {
+	u unit.Unit
+	t turn.Turn
+}
+
+// ended notes, under s.mu, that turn t on u ended with rec, so that
+// openMissing opens its intent's missing gate when rec is no record.
+func (s *Service) ended(u unit.Unit, t turn.Turn, rec record.Record) {
+	if rec.State == record.UnrecordedState {
+		s.unrecorded = append(s.unrecorded, endedTurn{u, t})
+	}
+}
+
+// openMissing opens, outside s.mu, the gate record.missing names for each
+// turn that ended without a record while its intent's record.requires names
+// one; a turn of an intent that requires none opens nothing.
+func (s *Service) openMissing(ctx context.Context) {
+	s.mu.Lock()
+	ended := s.unrecorded
+	s.unrecorded = nil
+	s.mu.Unlock()
+	if s.Gates == nil || s.Intents == nil {
+		return
+	}
+	for _, e := range ended {
+		rules, err := s.Intents.Rules(string(e.t.Intent))
+		if err != nil || rules.Requires == "" || rules.Missing == "" {
+			continue
+		}
+		g := gate.Gate{Unit: e.u, Name: rules.Missing, Subject: e.t.ID}
+		if id, ok := task.IDOf(e.u); ok {
+			g.Task = id
+		}
+		if _, err := s.Gates.OpenNamed(context.WithoutCancel(ctx), rules.Missing, g); err != nil {
+			s.logf("turn %s on %s ended without its %s: %v", e.t.ID, e.u, rules.Requires, err)
+		}
+	}
 }

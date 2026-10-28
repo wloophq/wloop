@@ -93,7 +93,7 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.EndBriefRun(ctx, dinv.BriefRun{ID: id, PR: active, Trigger: "wanted", StartedAt: in, EndedAt: in.Add(13 * time.Second), Outcome: "ok", Tags: []string{"change:fix"}, Files: []string{"api/export.go"}}, dinv.BriefRecord{PR: active}); err != nil {
+	if err := s.EndBriefRun(ctx, dinv.BriefRun{ID: id, PR: active, Trigger: "wanted", StartedAt: in, EndedAt: in.Add(13 * time.Second), Outcome: "ok", Brief: `{"goal":"g"}`, Tags: []string{"change:fix"}, Files: []string{"api/export.go"}}, dinv.BriefRecord{PR: active}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,7 +106,7 @@ func TestTimingsMaxWindowIntact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["pull_requests"] != 1 || got["turns"] != 1 || got["unit_tags"] != 2 {
+	if got["pull_requests"] != 1 || got["turns"] != 1 {
 		t.Fatalf("retained %v, want the pull request ended 401 days ago", got)
 	}
 	after, err := s.Timings(ctx, since)

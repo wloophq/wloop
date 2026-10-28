@@ -236,12 +236,12 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Join != nil {
 		d.Join.DiffersOn = m.Join.DiffersOn
 	}
-	switch r := m.Record; {
-	case r == nil && d.Builds == "":
-		s.add("record.states", "is required")
-	case r != nil:
-		if r.States == nil {
+	if r := m.Record; r != nil {
+		if r.States == nil && r.outcomes() {
 			s.add("record.states", "is required")
+		}
+		if r.Requires != nil && r.Missing == nil {
+			s.add("record.missing", "is required with record.requires: the gate a run that ends without its record opens")
 		}
 		d.Records = s.pred("record.when", r.When, "true")
 		d.Record = dintent.RecordRules{
@@ -251,6 +251,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			OutcomeDoc:      r.OutcomeDoc,
 			HistoryArtifact: r.HistoryArtifact,
 			AttachURL:       r.AttachURL,
+			Requires:        str(r.Requires, ""),
+			Missing:         str(r.Missing, ""),
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{
@@ -259,6 +261,9 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 				Fields:   q.Fields,
 			})
 		}
+	}
+	if m.Record == nil && d.Builds == "" {
+		d.Records = s.pred("record.when", nil, "false")
 	}
 	if m.Resume != nil {
 		d.Resume.Changed = str(m.Resume.Changed, DefaultChanged)

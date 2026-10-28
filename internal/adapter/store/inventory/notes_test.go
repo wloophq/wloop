@@ -276,7 +276,7 @@ var writes = []writeCase{
 		method: "RefreshBrief",
 		seed:   seedBrief,
 		call:   func(ctx context.Context, s *Store) error { return s.RefreshBrief(ctx, ref) },
-		topics: port.TopicBriefs, refs: []github.Ref{ref},
+		topics: port.TopicBriefs | port.TopicLoopEvents, refs: []github.Ref{ref},
 	},
 	{
 		method: "SetMetas",

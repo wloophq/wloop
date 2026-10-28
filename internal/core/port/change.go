@@ -18,7 +18,7 @@ const (
 	TopicTurns                          // turns, turn_records, turn_answers
 	TopicSessions                       // sessions, agent_sessions, turn_stops
 	TopicIntakes                        // intakes
-	TopicBriefs                         // unit_briefs, brief_runs, unit_tags
+	TopicBriefs                         // unit_briefs, brief_runs, and the brief records
 	TopicUsage                          // turn_usage
 	TopicRounds                         // round_state, round_days, round_day_prs, round_day_notes, turn_instructions, instruction_parts
 	TopicPause                          // pause

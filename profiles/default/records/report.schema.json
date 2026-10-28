@@ -1,0 +1,9 @@
+{
+ "type": "object",
+ "required": ["state", "summary"],
+ "properties": {
+  "state": {"type": "string"},
+  "summary": {"type": "string", "minLength": 1},
+  "url": {"type": "string"}
+ }
+}

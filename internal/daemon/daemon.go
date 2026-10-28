@@ -25,6 +25,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/timeline"
+
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
@@ -323,6 +325,10 @@ type Deps struct {
 	// Inbox messages, whose tasks' verbs it registers on Tasks.
 	Tasks    *coretasks.Service
 	Messages *messages.Service
+	// Timeline reads a task's timeline; nil answers 503 to its route. TaskRecords are the records units
+	// keep, a task's brief among them; nil serves no Brief.
+	Timeline    timeline.Reader
+	TaskRecords timeline.Records
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
 	Drafts Drafts
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;

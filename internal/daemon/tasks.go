@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -641,6 +642,8 @@ type taskViewer struct {
 	children map[task.ID][]task.ID
 	drafts   []draft.Draft
 	status   map[task.ID]coretasks.ProjectState
+	// briefs are the brief records by unit, read once per page.
+	briefs map[unit.Unit]port.Event
 	// whereBy bounds every draft destination lookup of this page.
 	whereBy time.Time
 }
@@ -689,10 +692,43 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.project(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	if err := ev.brief(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
 	if err := ev.s.withDraft(whereBy(ctx, ev.whereBy), e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil
+}
+
+// brief sets the task's brief record: its own, or the first of its units', as a pull request task's is
+// its pull request's. A detail reads its task's; a page reads every brief once.
+func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if ev.s.deps.TaskRecords == nil {
+		return nil
+	}
+	var rec port.Event
+	var ok bool
+	if ev.detail {
+		var err error
+		if rec, ok, err = timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, e.Units); err != nil {
+			return err
+		}
+	} else {
+		if ev.briefs == nil {
+			got, err := ev.s.deps.TaskRecords.Records(ctx, builtin.BuildsBrief)
+			if err != nil {
+				return err
+			}
+			ev.briefs = got
+		}
+		rec, ok = timeline.Pick(ev.briefs, e.ID, e.Units)
+	}
+	if !ok {
+		return nil
+	}
+	v.Brief = &api.RecordView{Kind: rec.Key, At: rec.At, Data: jsonData(rec.Data)}
+	return nil
 }
 
 // childrenOf sets the open children of a project, or of any task in a detail, from one read per page.

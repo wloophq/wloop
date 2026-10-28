@@ -255,6 +255,9 @@ type RecordRules struct {
 	// AttachURL says a done record's outcome url, when it names a unit, is
 	// attached to the turn's entry.
 	AttachURL bool
+	// Requires is the record kind a run owes, "" for none; Missing the gate
+	// a run that ends without it opens.
+	Requires, Missing string
 }
 
 type Require struct {
