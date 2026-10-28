@@ -53,7 +53,8 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if err != nil || len(res.Lines) > 0 {
 		t.Fatalf("project: %+v %v", res, err)
 	}
-	dir, err := dossier.Dir(state, dossier.Owner{Project: "ship-the-v2-api"})
+	project := dossier.Owner{Unit: task.UnitOf(res.Task.Parent)}
+	dir, err := dossier.Dir(state, project)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestProjectDossierOnDisk(t *testing.T) {
 	if _, err := g.Do(ctx, res.Task.Parent, coretasks.Request{Verb: task.VerbDone}); err != nil {
 		t.Fatal(err)
 	}
-	d, ok, err := ds.Get(ctx, dossier.Owner{Project: "ship-the-v2-api"})
+	d, ok, err := ds.Get(ctx, project)
 	if err != nil || !ok || d.Status != dossier.Resolved || !d.ResolvedAt.Equal(now) {
 		t.Fatalf("after done: %+v %v %v", d, ok, err)
 	}

@@ -102,7 +102,7 @@ Their texts are templates of the profile; see [Tune the Slack proposals](/guides
 
 ## Projects
 
-A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one shows only its first open action in Next. Each project has a review interval, 7 days by default, kept on its task, and opens a [dossier](/concepts/turns/#dossiers).
+A project is an outcome that takes more than one action. `p` on a task makes a project of it or attaches it to one. Its actions are its children: each names the project as its parent and keeps its place among them. A project is parallel or sequential; a sequential one shows only its first open action in Next. Each project has a review interval, 7 days by default, kept on its task, and opens its task's [dossier](/concepts/turns/#dossiers).
 
 ## The review
 

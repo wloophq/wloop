@@ -40,11 +40,20 @@ var (
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	return newEnvOver(t, nil)
+}
+
+// newEnvOver is an env whose store seed makes before it is opened; nil starts it empty.
+func newEnvOver(t *testing.T, seed func(path string)) *env {
+	t.Helper()
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	state := filepath.Join(home, ".local", "state", brand.Name)
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
+	}
+	if seed != nil {
+		seed(filepath.Join(state, "store.db"))
 	}
 	db, err := sqlite.Open(filepath.Join(state, "store.db"), nil)
 	if err != nil {

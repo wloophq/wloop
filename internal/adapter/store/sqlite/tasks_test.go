@@ -82,7 +82,7 @@ func TestApplyNotesTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := log.Since(from, ^port.Topic(0))
-	if log.Gen()-from != 1 || !got.Has(port.TopicTasks) || !slices.Equal(got.Units, []unit.Unit{u}) {
+	if log.Gen()-from != 1 || !got.Has(port.TopicTasks) || !slices.Equal(got.Units, []unit.Unit{u, task.UnitOf(e.ID)}) {
 		t.Fatalf("%d notes: %+v", log.Gen()-from, got)
 	}
 	from = log.Gen()

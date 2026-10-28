@@ -107,7 +107,7 @@
       "properties": {
         "archive_after": {
           "default": "30d",
-          "description": "How long after its unit or project resolved a dossier is archived.",
+          "description": "How long after its task or unit resolved a dossier is archived.",
           "type": "string"
         },
         "compact_at_kb": {

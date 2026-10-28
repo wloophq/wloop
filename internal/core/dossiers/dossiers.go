@@ -1,4 +1,4 @@
-// Package dossiers keeps the lifecycle of the unit and project dossiers.
+// Package dossiers keeps the lifecycle of the task and unit dossiers.
 package dossiers
 
 import (
@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // Tree is the working side of Files: a dossier's directory and its history.
@@ -53,8 +54,12 @@ type Store interface {
 	// Get is o's row, with Path empty.
 	Get(ctx context.Context, o dossier.Owner) (dossier.Dossier, bool, error)
 	List(ctx context.Context) ([]dossier.Dossier, error)
-	// Open reports whether o has an open item or a live entry; a project, whether its entry is open.
+	// Open reports whether o still has work: a task, whether it is open; a unit, whether it has an open item
+	// or an open task; a merged dossier never has.
 	Open(ctx context.Context, o dossier.Owner) (bool, error)
+	// Owner is whose dossier u's turns read: the task that holds u, an open one first, then the oldest; u
+	// itself when it is a task or no task holds it.
+	Owner(ctx context.Context, u unit.Unit) (dossier.Owner, error)
 }
 
 type Service struct {
@@ -89,6 +94,15 @@ func (s *Service) Get(ctx context.Context, o dossier.Owner) (dossier.Dossier, bo
 	}
 	d, err = s.located(d)
 	return d, err == nil, err
+}
+
+// Of is the dossier u's turns read, whichever Store.Owner names, with whether it exists.
+func (s *Service) Of(ctx context.Context, u unit.Unit) (dossier.Dossier, bool, error) {
+	o, err := s.Store.Owner(ctx, u)
+	if err != nil {
+		return dossier.Dossier{}, false, err
+	}
+	return s.Get(ctx, o)
 }
 
 // Resolved starts the archive countdown of o's active dossier; it does nothing to an absent one.

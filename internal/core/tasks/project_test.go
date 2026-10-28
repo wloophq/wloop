@@ -13,24 +13,24 @@ import (
 )
 
 type fakeDossiers struct {
-	opened   []string
-	resolved map[string]time.Time
+	opened   []task.ID
+	resolved map[task.ID]time.Time
 	fail     error
 }
 
-func (f *fakeDossiers) Open(ctx context.Context, slug string) error {
+func (f *fakeDossiers) Open(ctx context.Context, id task.ID) error {
 	if f.fail != nil {
 		return f.fail
 	}
-	f.opened = append(f.opened, slug)
+	f.opened = append(f.opened, id)
 	return nil
 }
 
-func (f *fakeDossiers) Resolved(ctx context.Context, slug string, at time.Time) error {
+func (f *fakeDossiers) Resolved(ctx context.Context, id task.ID, at time.Time) error {
 	if f.resolved == nil {
-		f.resolved = map[string]time.Time{}
+		f.resolved = map[task.ID]time.Time{}
 	}
-	f.resolved[slug] = at
+	f.resolved[id] = at
 	return nil
 }
 
@@ -42,7 +42,7 @@ type projectRig struct {
 
 func newProjectRig() *projectRig {
 	r := &projectRig{rig: newRig(), dossiers: &fakeDossiers{}}
-	r.projects = &taskstest.Projects{Tasks: r.store}
+	r.projects = &taskstest.Projects{}
 	r.svc.ServeProjects(coretasks.ProjectDeps{Store: r.projects, Dossiers: r.dossiers})
 	return r
 }
@@ -58,7 +58,7 @@ func (r *projectRig) do(t *testing.T, id task.ID, verb task.Verb, args map[strin
 
 func (r *projectRig) project(t *testing.T, id task.ID, mod func(*task.Task)) task.Task {
 	t.Helper()
-	p := task.Task{ID: id, Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Project " + string(id), Origin: task.OriginUser, Slug: string(id), Created: t0, Updated: t0}
+	p := task.Task{ID: id, Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Project " + string(id), Origin: task.OriginUser, Created: t0, Updated: t0}
 	if mod != nil {
 		mod(&p)
 	}
@@ -88,16 +88,16 @@ func TestProjectFromTask(t *testing.T) {
 		t.Fatalf("attached entry %+v", res.Task)
 	}
 	p := r.task(t, res.Task.Parent)
-	if p.Kind != task.KindProject || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Slug != "ship-the-v2-api" || p.Prop(task.PropArea).Text != "OSS" {
+	if p.Kind != task.KindProject || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Prop(task.PropArea).Text != "OSS" {
 		t.Fatalf("project %+v", p)
 	}
-	if !slices.Equal(r.dossiers.opened, []string{"ship-the-v2-api"}) {
+	if !slices.Equal(r.dossiers.opened, []task.ID{p.ID}) {
 		t.Errorf("dossiers opened %v", r.dossiers.opened)
 	}
 
 	other := r.put(t, task.Task{ID: "e-cap2", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
 	res = r.do(t, other.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API!"})
-	if p2 := r.task(t, res.Task.Parent); p2.Slug != "ship-the-v2-api-2" || p2.ID == p.ID {
+	if p2 := r.task(t, res.Task.Parent); p2.ID == p.ID || !slices.Equal(r.dossiers.opened, []task.ID{p.ID, p2.ID}) {
 		t.Errorf("a second project of the same name: %+v", p2)
 	}
 
@@ -278,8 +278,8 @@ func TestProjectWithoutNextAction(t *testing.T) {
 
 func TestDoneProjectResolvesItsDossier(t *testing.T) {
 	r := newProjectRig()
-	r.project(t, "p", func(e *task.Task) { e.Slug = "ship-it" })
-	r.project(t, "q", func(e *task.Task) { e.Slug = "drop-it" })
+	r.project(t, "p", nil)
+	r.project(t, "q", nil)
 	r.action(t, "a", "p", 1, task.State("next"))
 	r.clock.t = t0.Add(time.Hour)
 	r.do(t, "a", task.VerbDone, nil)
@@ -290,10 +290,10 @@ func TestDoneProjectResolvesItsDossier(t *testing.T) {
 		t.Fatalf("project state %s", got.State)
 	}
 	r.do(t, "q", task.VerbDismiss, nil)
-	want := map[string]time.Time{"ship-it": r.clock.t, "drop-it": r.clock.t}
-	for slug, at := range want {
-		if got, ok := r.dossiers.resolved[slug]; !ok || !got.Equal(at) {
-			t.Errorf("dossier %s resolved %v, %v; want at %v", slug, got, ok, at)
+	want := map[task.ID]time.Time{"p": r.clock.t, "q": r.clock.t}
+	for id, at := range want {
+		if got, ok := r.dossiers.resolved[id]; !ok || !got.Equal(at) {
+			t.Errorf("dossier of %s resolved %v, %v; want at %v", id, got, ok, at)
 		}
 	}
 	if _, err := r.svc.Do(context.Background(), "p", coretasks.Request{Verb: task.VerbDone}); !errors.Is(err, coretasks.ErrVerb) {

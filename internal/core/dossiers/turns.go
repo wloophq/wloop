@@ -95,11 +95,15 @@ func (t *Turns) locker() *sync.Mutex {
 // Violation is a file a turn wrote against the write rules, and the rule.
 type Violation struct{ Rel, Why string }
 
-// Open opens u's dossier for a turn, first settling what was written since its last commit.
+// Open opens the dossier a turn on u reads, its task's when a task holds u, first settling what was
+// written since its last commit.
 func (t *Turns) Open(ctx context.Context, u unit.Unit) (dossier.Dossier, error) {
 	t.locker().Lock()
 	defer t.locker().Unlock()
-	o := dossier.Owner{Unit: u}
+	o, err := t.Dossiers.Store.Owner(ctx, u)
+	if err != nil {
+		return dossier.Dossier{}, err
+	}
 	if d, ok, err := t.Dossiers.Get(ctx, o); err != nil {
 		return dossier.Dossier{}, err
 	} else if ok && d.Status == dossier.Active {
@@ -110,7 +114,7 @@ func (t *Turns) Open(ctx context.Context, u unit.Unit) (dossier.Dossier, error) 
 	return t.Dossiers.Open(ctx, o)
 }
 
-// Check holds u's dossier to the write rules after a turn and commits it with message; a dossier
+// Check holds the dossier u's turns read to the write rules after a turn and commits it with message; a dossier
 // that is absent or neither active nor resolved is left alone.
 func (t *Turns) Check(ctx context.Context, u unit.Unit, message string) ([]Violation, error) {
 	t.locker().Lock()
@@ -123,7 +127,7 @@ func (t *Turns) Check(ctx context.Context, u unit.Unit, message string) ([]Viola
 }
 
 func (t *Turns) live(ctx context.Context, u unit.Unit) (dossier.Dossier, bool, error) {
-	d, ok, err := t.Dossiers.Get(ctx, dossier.Owner{Unit: u})
+	d, ok, err := t.Dossiers.Of(ctx, u)
 	if err != nil || !ok || (d.Status != dossier.Active && d.Status != dossier.Resolved) {
 		return dossier.Dossier{}, false, err
 	}
@@ -166,6 +170,9 @@ func (t *Turns) settle(ctx context.Context, d dossier.Dossier, message string) (
 	var restore []Change
 	var kept []string
 	for _, c := range changes {
+		if merged(c.Rel) {
+			continue
+		}
 		e, err := t.Pages.Stat(ctx, d.Path, strings.TrimSuffix(c.Rel, "/"))
 		if err != nil {
 			return nil, err
@@ -205,6 +212,13 @@ func (t *Turns) settle(ctx context.Context, d dossier.Dossier, message string) (
 		}
 	}
 	return broken, t.Dossiers.refresh(ctx, d, t.now())
+}
+
+// merged says rel lies in a dossier merged into this one, whose files are its own and stay as the merge
+// left them.
+func merged(rel string) bool {
+	top, _, _ := strings.Cut(rel, "/")
+	return top == dossier.MergedDir
 }
 
 func order(c Change) int {

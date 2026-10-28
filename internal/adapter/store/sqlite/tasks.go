@@ -32,7 +32,7 @@ const taskFields = `id, kind, state, category, title, notes, parent, position, s
 	review_every, reviewed_at`
 
 // upsertTaskSQL updates an existing task in place: a REPLACE would delete
-// the row first and cascade into its projects row.
+// the row first and cascade into the rows keyed by it.
 var upsertTaskSQL = func() string {
 	cols := strings.Split(taskFields+`, rev`, ",")
 	set := make([]string, 0, len(cols)-1)
@@ -193,7 +193,7 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	if err != nil {
 		return nil, err
 	}
-	return out, loadProjects(ctx, q, sub, args, out, at)
+	return out, nil
 }
 
 func loadView(ctx context.Context, q querier, v task.View) ([]task.Task, error) {
@@ -440,7 +440,7 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			if err := writeTask(ctx, tx, e, rev); err != nil {
 				return err
 			}
-			tx.Touch(port.TopicTasks, taskUnits(e)...)
+			tx.Touch(port.TopicTasks, append(taskUnits(e), task.UnitOf(e.ID))...)
 		}
 		return writeEvents(ctx, tx, evs)
 	})
@@ -503,7 +503,7 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 			return fmt.Errorf("property %s of %s: %w", name, e.ID, err)
 		}
 	}
-	return writeProject(ctx, tx, e)
+	return nil
 }
 
 var _ coretasks.Recategorizer = taskStore{}

@@ -36,25 +36,26 @@ description: Where the configuration, the state, the logs and the installed piec
 ## Dossiers
 
 ```text
-<state>/dossiers/<provider>/<unit-key>/
-<state>/dossiers/project/<slug>/
+<state>/dossiers/task/<id>#/
+<state>/dossiers/<provider>/<unit-key>#/
   notes.md      curated notes
   sources/      material gathered
   drafts/       drafts being written
   log/          one append-only file per turn
+  merged/       the dossiers of the tasks merged into this one
 <state>/dossiers/.archive/
 ```
 
-Each dossier is a local git repository the daemon commits after every turn, never inside a repository checkout. After each turn the daemon checks the rules (only a compaction or the closing call rewrites `notes.md`, `log/` is append-only, no deletes, links or nested repositories) and restores what broke them.
+A task owns its dossier: a turn on a pull request or a thread reads the dossier of the task that holds it, an open one first, then the oldest, and a unit no task holds keeps its own. Each dossier is a local git repository the daemon commits after every turn, never inside a repository checkout. After each turn the daemon checks the rules (only a compaction or the closing call rewrites `notes.md`, `log/` is append-only, no deletes, links or nested repositories) and restores what broke them.
 
 | Status | When |
 |---|---|
-| active | the unit or project has open work; never archived or purged |
-| resolved | no open item or task is left |
+| active | the task is open, or the unit has open work; never archived or purged |
+| resolved | the task ended, or no open item or task is left on the unit |
 | archived | `dossiers.archive_after` (30 days) after it resolved, as a tarball under `.archive/` |
 | purged | `dossiers.purge_after` (400 days) after the archive |
 
-Open work on the unit again revives the dossier, from its archive if needed.
+Open work again revives the dossier, from its archive if needed. When tasks merge, the dossier of the one that goes moves inside the other's under `merged/<id>/`, which the turns' checks leave as it is; an archived one keeps its own row and is purged on its own schedule.
 
 ## In each workspace
 

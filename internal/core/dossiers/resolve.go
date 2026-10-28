@@ -15,12 +15,14 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/dossier"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// Resolution follows the units' open work into their dossiers: a unit with an active dossier, items,
-// and no open item or entry gets its closing call and is resolved; a resolved or archived one with open work
-// again is reopened. A call the daily cap refuses waits for a later Retry.
+// Resolution follows the open work into the dossiers: an active dossier whose task ended, or whose unit has
+// items and no open item or task, gets its closing call and is resolved; a resolved or archived one with open
+// work again is reopened. A unit's dossier is its task's when a task holds it. A call the daily cap refuses
+// waits for a later Retry.
 type Resolution struct {
 	Calls *Calls
 	// Items are the unit's items the closing call reads; nil reads none.
@@ -46,7 +48,7 @@ func (r *Resolution) Units(ctx context.Context, us ...unit.Unit) error {
 	return errors.Join(errs...)
 }
 
-// All follows every unit dossier.
+// All follows every dossier but the merged ones, which keep their own lifecycle.
 func (r *Resolution) All(ctx context.Context) error {
 	all, err := r.svc().Store.List(ctx)
 	if err != nil {
@@ -54,7 +56,7 @@ func (r *Resolution) All(ctx context.Context) error {
 	}
 	var us []unit.Unit
 	for _, d := range all {
-		if !d.Owner.Unit.IsZero() {
+		if d.Owner.Merged == "" {
 			us = append(us, d.Owner.Unit)
 		}
 	}
@@ -109,11 +111,15 @@ func (r *Resolution) svc() *Service { return r.Calls.Turns.Dossiers }
 
 func (r *Resolution) follow(ctx context.Context, u unit.Unit) error {
 	s := r.svc()
-	o := dossier.Owner{Unit: u}
+	o, err := s.Store.Owner(ctx, u)
+	if err != nil {
+		return err
+	}
 	d, ok, err := s.Get(ctx, o)
 	if err != nil || !ok {
 		return err
 	}
+	_, ofTask := task.IDOf(o.Unit)
 	open, err := s.Store.Open(ctx, o)
 	if err != nil {
 		return err
@@ -121,7 +127,7 @@ func (r *Resolution) follow(ctx context.Context, u unit.Unit) error {
 	switch {
 	case d.Status == dossier.Active && !open:
 		its, err := r.items(ctx, u)
-		if err != nil || (r.Items != nil && len(its) == 0) {
+		if err != nil || (r.Items != nil && len(its) == 0 && !ofTask) {
 			return err
 		}
 		err = r.close(ctx, u, its)

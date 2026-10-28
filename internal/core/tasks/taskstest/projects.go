@@ -9,25 +9,13 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// Projects is an in-memory coretasks.ProjectStore over the projects of Entries.
+// Projects is an in-memory coretasks.ProjectStore: the Review's runs.
 type Projects struct {
-	Tasks *Store
-	mu    sync.Mutex
-	runs  []task.ReviewRun
+	mu   sync.Mutex
+	runs []task.ReviewRun
 }
 
 var _ coretasks.ProjectStore = (*Projects)(nil)
-
-func (p *Projects) SlugTaken(ctx context.Context, slug string) (bool, error) {
-	p.Tasks.mu.Lock()
-	defer p.Tasks.mu.Unlock()
-	for _, e := range p.Tasks.tasks {
-		if e.Kind == task.KindProject && e.Slug == slug {
-			return true, nil
-		}
-	}
-	return false, nil
-}
 
 func (p *Projects) CurrentRun(ctx context.Context) (task.ReviewRun, bool, error) {
 	p.mu.Lock()

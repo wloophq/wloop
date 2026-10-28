@@ -228,9 +228,6 @@ func TestV7RenameLeavesNoEntryReference(t *testing.T) {
 	if got := strings1(t, db, `SELECT id || ' ' || parent FROM tasks ORDER BY id`); !slices.Equal(got, []string{"t-" + hexA + " t-" + hexP, "t-" + hexP + " "}) {
 		t.Errorf("tasks %q", got)
 	}
-	if got := strings1(t, db, `SELECT task_id FROM projects`); !slices.Equal(got, []string{"t-" + hexP}) {
-		t.Errorf("projects %q", got)
-	}
 	if got := strings1(t, db, `SELECT owner || ' ' || rel_path FROM dossiers`); !slices.Equal(got, []string{"task/t-" + hexA + " task/t-" + hexA + "#"}) {
 		t.Errorf("dossiers %q", got)
 	}
@@ -765,5 +762,67 @@ func TestDropTaskKeepsAnAliasOfTheDroppedTask(t *testing.T) {
 }
 
 func TestAnArchivedMergedDossierHasARow(t *testing.T) {
-	t.Skip("carried from R4 review: D1 tracks an archived merged dossier")
+	t.Parallel()
+	from, to, next := "t-"+hexA, "t-"+hexB, "t-"+hexP
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, from)
+	bareTask(t, db, to)
+	dossierOf(t, db, to)
+	if _, err := db.Exec(`INSERT INTO dossiers (owner, rel_path, status, bytes, archived_at, purge_after)
+		VALUES ('task/' || ?1, 'task/' || ?1 || '#', 'archived', 7, '2026-10-01T00:00:00Z', '2027-11-05T00:00:00Z')`, from); err != nil {
+		t.Fatal(err)
+	}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, from, to) })
+	merged := "merged/" + from + "/task/" + to
+	want := []string{merged + " task/" + to + "#/merged/" + from + " archived 7 2027-11-05T00:00:00Z", "task/" + to + " task/" + to + "# live 0 "}
+	got := strings1(t, db, `SELECT owner || ' ' || rel_path || ' ' || status || ' ' || bytes || ' ' || purge_after FROM dossiers ORDER BY owner`)
+	if !slices.Equal(got, want) {
+		t.Fatalf("dossiers %q, want %q", got, want)
+	}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY seq`); !slices.Equal(got, []string{"task/" + from + "# > task/" + to + "#/merged/" + from}) {
+		t.Errorf("moves %q", got)
+	}
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`DELETE FROM dossiers WHERE owner = ?`, "task/"+to); err != nil {
+		t.Fatal(err)
+	}
+	err = dropTask(ctx, tx, to)
+	tx.Rollback()
+	if err == nil || !strings.Contains(err.Error(), "merged") {
+		t.Fatalf("dropping a task a merged dossier hangs on: %v", err)
+	}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, to, next) })
+	got = strings1(t, db, `SELECT owner || ' ' || rel_path FROM dossiers ORDER BY owner`)
+	if want := []string{"merged/" + from + "/task/" + next + " task/" + next + "#/merged/" + from, "task/" + next + " task/" + next + "#"}; !slices.Equal(got, want) {
+		t.Fatalf("after the target merges on: %q, want %q", got, want)
+	}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY seq`); !slices.Equal(got[1:], []string{
+		"task/" + to + "#/merged/" + from + " > task/" + next + "#/merged/" + from, "task/" + to + "# > task/" + next + "#"}) {
+		t.Errorf("moves %q", got)
+	}
+}
+
+func TestALiveDossierMergedIntoAnArchivedOneTakesItsPlace(t *testing.T) {
+	t.Parallel()
+	from, to := "t-"+hexA, "t-"+hexB
+	db := rawDB(t, storeAt(t, current))
+	bareTask(t, db, from)
+	bareTask(t, db, to)
+	dossierOf(t, db, from)
+	if _, err := db.Exec(`INSERT INTO dossiers (owner, rel_path, status, purge_after) VALUES ('task/' || ?1, 'task/' || ?1 || '#', 'archived', '2027-11-05T00:00:00Z')`, to); err != nil {
+		t.Fatal(err)
+	}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return rekeyTask(ctx, tx, from, to) })
+	want := []string{"merged/" + to + "/task/" + to + " task/" + to + "#/merged/" + to + " archived", "task/" + to + " task/" + to + "# live"}
+	if got := strings1(t, db, `SELECT owner || ' ' || rel_path || ' ' || status FROM dossiers ORDER BY owner`); !slices.Equal(got, want) {
+		t.Fatalf("dossiers %q, want %q", got, want)
+	}
+	wantMoves := []string{"task/" + to + "# > task/" + to + "#/merged/" + to, "task/" + from + "# > task/" + to + "#"}
+	if got := strings1(t, db, `SELECT from_path || ' > ' || to_path FROM dossier_moves ORDER BY seq`); !slices.Equal(got, wantMoves) {
+		t.Errorf("moves %q, want %q", got, wantMoves)
+	}
 }

@@ -12,19 +12,18 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// ProjectStore keeps what the projects need beyond their entries: the slugs taken and the Review's runs.
+// ProjectStore keeps what the projects need beyond their tasks: the Review's runs.
 type ProjectStore interface {
-	// SlugTaken says whether a project, done or not, holds slug.
-	SlugTaken(ctx context.Context, slug string) (bool, error)
 	// CurrentRun is the Review run with a step still open.
 	CurrentRun(ctx context.Context) (task.ReviewRun, bool, error)
 	PutRun(ctx context.Context, r task.ReviewRun) error
 }
 
-// ProjectDossiers opens a new project's dossier and starts its lifecycle once the project ends (#dossier).
+// ProjectDossiers opens a new project's dossier, its task's, and starts its lifecycle once the project ends
+// (#dossier).
 type ProjectDossiers interface {
-	Open(ctx context.Context, slug string) error
-	Resolved(ctx context.Context, slug string, at time.Time) error
+	Open(ctx context.Context, id task.ID) error
+	Resolved(ctx context.Context, id task.ID, at time.Time) error
 }
 
 type ProjectDeps struct {
@@ -162,11 +161,7 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			}
 			proj = got
 		case title != "":
-			slug, err := p.slug(ctx, title)
-			if err != nil {
-				return nil, err
-			}
-			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title, Slug: slug,
+			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title,
 				Sequential: req.Args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
 			if err := proj.MoveTo(task.CategoryReady, p.s.d.States); err != nil {
 				return nil, err
@@ -207,23 +202,11 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 	}
 	res := Result{Task: got}
 	if created.ID != "" && p.d.Dossiers != nil {
-		if err := p.d.Dossiers.Open(ctx, created.Slug); err != nil {
-			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not created: %v", created.Slug, err))
+		if err := p.d.Dossiers.Open(ctx, created.ID); err != nil {
+			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not created: %v", created.ID, err))
 		}
 	}
 	return res, nil
-}
-
-// slug is title's slug, numbered from 2 while another project holds it.
-func (p *projects) slug(ctx context.Context, title string) (string, error) {
-	base := task.Slug(title)
-	for n := 1; ; n++ {
-		slug := task.NumberedSlug(base, n)
-		taken, err := p.d.Store.SlugTaken(ctx, slug)
-		if err != nil || !taken {
-			return slug, err
-		}
-	}
 }
 
 // liveProject refuses a project that is done or trashed, naming the verb.
@@ -304,9 +287,9 @@ func (p *projects) end(ctx context.Context, e task.Task, req Request) (Result, e
 		return Result{}, err
 	}
 	res := Result{Task: got}
-	if was.Open() && !got.Open() && got.Slug != "" && p.d.Dossiers != nil {
-		if err := p.d.Dossiers.Resolved(ctx, got.Slug, got.Updated); err != nil {
-			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not resolved: %v", got.Slug, err))
+	if was.Open() && !got.Open() && p.d.Dossiers != nil {
+		if err := p.d.Dossiers.Resolved(ctx, got.ID, got.Updated); err != nil {
+			res.Lines = append(res.Lines, fmt.Sprintf("the dossier of project %s was not resolved: %v", got.ID, err))
 		}
 	}
 	return res, nil

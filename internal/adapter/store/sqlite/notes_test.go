@@ -314,7 +314,7 @@ var writes = []writeCase{
 			return e.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-1", Kind: task.KindCapture,
 				State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{u7}, Origin: task.OriginUser, Created: noteAt, Updated: noteAt}}})
 		},
-		topics: port.TopicTasks, units: []unit.Unit{u7},
+		topics: port.TopicTasks, units: []unit.Unit{u7, task.UnitOf("e-1")},
 	},
 	{
 		method: "taskStore.Recategorize",

@@ -166,7 +166,7 @@ var configGrammar = slices.Concat(
 		cfgKey("notifications", KindTable, "", "The notifications."),
 		cfgKey("notifications.digest_at", KindText, "09:00", "The local HH:MM of the daily digest; empty for none."),
 		cfgKey("dossiers", KindTable, "", "The dossiers' lifecycle and quotas; a value of zero or less keeps its default."),
-		cfgKey("dossiers.archive_after", KindDur, "30d", "How long after its unit or project resolved a dossier is archived."),
+		cfgKey("dossiers.archive_after", KindDur, "30d", "How long after its task or unit resolved a dossier is archived."),
 		cfgKey("dossiers.purge_after", KindDur, "400d", "How long after the archive it is purged."),
 		cfgKey("dossiers.soft_cap_mb", KindInt, "50", "The size per dossier doctor reports."),
 		cfgKey("dossiers.total_cap_mb", KindInt, "2048", "The size of dossiers and archives doctor reports."),

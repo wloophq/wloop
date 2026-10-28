@@ -239,16 +239,22 @@ func TestMoveDossierDirsIsIdempotent(t *testing.T) {
 		"task/t-2#/notes.md",
 		"task/t-3#/notes.md",
 		".archive/task/t-4#.tar.gz",
+		"project/ship-it#/notes.md",
+		".archive/project/drop-it#.tar.gz",
 	)
 	moves := []dossierMove{
 		{"task/t-1#", "task/t-9#"},
 		{"task/t-2#", "task/t-3#/merged/t-2"},
 		{"task/t-4#", "task/t-8#"},
+		{"project/ship-it#", "task/t-7#"},
+		{"project/drop-it#", "task/t-3#/merged/project%2Fdrop-it"},
 	}
 	want := []string{
+		".archive/task/t-3#/merged/project%2Fdrop-it.tar.gz",
 		".archive/task/t-8#.tar.gz",
 		"task/t-3#/merged/t-2/notes.md",
 		"task/t-3#/notes.md",
+		"task/t-7#/notes.md",
 		"task/t-9#/notes.md",
 	}
 	for range 2 {
@@ -263,6 +269,27 @@ func TestMoveDossierDirsIsIdempotent(t *testing.T) {
 	err := moveDossierDirs(dir, []dossierMove{{"task/t-5#", "task/t-6#"}})
 	if err == nil || !strings.Contains(err.Error(), filepath.Join(dossier.Root(dir), "task", "t-6#")) {
 		t.Fatalf("a move onto a directory that exists: %v", err)
+	}
+}
+
+func TestStoreMigrateMovesAProjectDossierToItsTask(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.noDaemon(t)
+	sqlitetest.At(t, te.storePath(), 6,
+		`INSERT INTO entries (id, kind, state, origin, created, updated, rev) VALUES ('e-`+dossierHex+`', 'project', 'next', 'user', 't', 't', 1)`,
+		`INSERT INTO projects (entry_id, slug) VALUES ('e-`+dossierHex+`', 'ship-it')`,
+		`INSERT INTO dossiers (owner, rel_path, status) VALUES ('project/ship-it', 'project/ship-it#', 'active')`)
+	writeTree(t, te.StateDir, "project/ship-it#/notes.md", "project/ship-it#/log/1.md")
+	if code := te.runCLI("store", "migrate", "--yes"); code != 0 {
+		t.Fatalf("exit %d: %s", code, te.err)
+	}
+	want := []string{"task/t-" + dossierHex + "#/log/1.md", "task/t-" + dossierHex + "#/notes.md"}
+	if got := dossierTree(t, te.StateDir); !slices.Equal(got, want) {
+		t.Fatalf("dossiers %q, want %q", got, want)
+	}
+	if got := dossierOwners(t, te.storePath()); !slices.Equal(got, []string{"task/t-" + dossierHex}) {
+		t.Fatalf("owners %q", got)
 	}
 }
 

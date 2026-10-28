@@ -136,7 +136,7 @@ func TestV7PropsKeepsProjectsAsParents(t *testing.T) {
 	path := v6PropsFixture(t)
 	db := migrateV6(t, path)
 	p := migratedTask(t, db, hexProject)
-	if p.Slug != "ship-it" || p.ReviewEvery != 14*24*time.Hour || !p.ReviewedAt.Equal(v6Reviewed) || !p.Sequential {
+	if p.ReviewEvery != 14*24*time.Hour || !p.ReviewedAt.Equal(v6Reviewed) || !p.Sequential {
 		t.Errorf("the project %+v", p)
 	}
 	child := migratedTask(t, db, hexChild)
@@ -144,9 +144,6 @@ func TestV7PropsKeepsProjectsAsParents(t *testing.T) {
 		t.Errorf("the child %+v", child)
 	}
 	raw := rawDB(t, path)
-	if got := strings1(t, raw, `SELECT name FROM pragma_table_info('projects') ORDER BY cid`); !slices.Equal(got, []string{"task_id", "slug"}) {
-		t.Errorf("projects keeps %v", got)
-	}
 	if got := strings1(t, raw, `SELECT review_every || ' ' || reviewed_at FROM tasks WHERE id = ?`, "t-"+hexChild); !slices.Equal(got, []string{"0 "}) {
 		t.Errorf("a child's review %q", got)
 	}
