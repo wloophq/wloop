@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/plugins/bundled"
 	"github.com/wloophq/wloop/internal/plugins/host"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/readmodel/prrow/ghreporttest"
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -112,7 +113,8 @@ func TestAnApprovedDraftIsPostedThroughTheGitHubPlugin(t *testing.T) {
 	m := bundledGitHub(t)
 	kind := &psource.Kind{Snapshots: snaps, StateDir: func(id string) string { return filepath.Join(dir, "state", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
-			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: units, Config: config.Defaults, Events: sqlite.New(db), Overrides: db}
+			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: units, Config: config.Defaults, Events: sqlite.New(db), Overrides: db,
+				Hosted: &psource.Hosted{Profile: ghreporttest.Profile}}
 		}}
 	proc, err := host.ExecLauncher{}.Launch(context.Background(), plugin.Spec{ID: m.ID, Path: bin, Kinds: m.Kinds,
 		Env:      []string{"PATH=" + ghDir, "GH_HOST=" + srv.URL, "GH_CONFIG_DIR=" + dir, plugin.BrandEnv + "=" + brand.Name},

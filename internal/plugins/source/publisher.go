@@ -2,6 +2,8 @@ package source
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // Publisher is a source plugin's Publisher and Lander as the outbox reads
@@ -29,12 +32,19 @@ var (
 	_ port.Deliverer = Publisher{}
 )
 
+// Publish sends d to the plugin once. An error that may follow a post, the
+// plugin's own or a call it never answered, starts with
+// src.ErrMayHavePosted's text, so the outbox asks a person to confirm a
+// retry.
 func (p Publisher) Publish(ctx context.Context, d draft.Draft) (draft.Evidence, error) {
 	c, err := p.Kind.Client(p.ID)
 	if err != nil {
 		return draft.Evidence{}, err
 	}
 	ev, err := c.Publish(ctx, WireDraft(d))
+	if errors.Is(err, src.ErrNoAnswer) && !errors.Is(err, src.ErrMayHavePosted) {
+		err = fmt.Errorf("%w: the plugin did not answer: %w", src.ErrMayHavePosted, err)
+	}
 	return draft.Evidence(ev), err
 }
 

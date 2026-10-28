@@ -44,15 +44,20 @@ func (r *running) prepareNudge(ctx context.Context, u sdk.Unit, raw json.RawMess
 	if err != nil {
 		return nil, err
 	}
-	return PrepareNudge(ctx, r.host, NudgeEnv{Viewer: viewer, Ignore: r.settings().Ignore, Now: r.now()}, u, raw)
+	x, err := r.texts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return PrepareNudge(ctx, r.host, NudgeEnv{Viewer: viewer, Ignore: r.settings().Ignore, Now: r.now(), Texts: x}, u, raw)
 }
 
 // NudgeEnv is what the nudge's prepare reads besides the host: the viewer,
-// who a nudge never mentions, and the time.
+// who a nudge never mentions, the time and the profile's texts.
 type NudgeEnv struct {
 	Viewer string
 	Ignore []string
 	Now    time.Time
+	Texts  nudge.Texts
 }
 
 // PrepareNudge is the nudge's prepare of u with the daemon's args, reading
@@ -90,7 +95,11 @@ func PrepareNudge(ctx context.Context, h src.Host, env NudgeEnv, u sdk.Unit, raw
 	if inputs == nil {
 		inputs = map[string]any{}
 	}
-	inputs["situation"] = nudge.Waiting(who, s)
+	line, err := env.Texts.Waiting(who, s)
+	if err != nil {
+		return nil, err
+	}
+	inputs["situation"] = line
 	inputs["waits_on_maintainers"] = slices.Equal(who, []string{nudge.Maintainers})
 	inputs["who"] = slices.Clone(who)
 	return json.Marshal(prepareResult{Inputs: inputs})

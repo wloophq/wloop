@@ -27,9 +27,10 @@ var draftTextAllowlist = map[string]string{}
 
 // TestDraftTextComesFromTheProfile checks that no Go code outside its
 // allowlist writes a draft's text from prose of its own: the Text of an
-// outbox.Proposal or a draft.Draft is never a string constant, a format, or
-// what a function of the same package builds from string literals. A
-// draft's text comes from a profile template or from whoever wrote it.
+// outbox.Proposal, a draft.Draft or a plugin's source.Draft is never a
+// string constant, a format, or what a function of the same package builds
+// from string literals. A draft's text comes from a profile template or
+// from whoever wrote it.
 func TestDraftTextComesFromTheProfile(t *testing.T) {
 	t.Parallel()
 	fset, files := typedFiles(t)
@@ -117,11 +118,15 @@ func namedOf(info *types.Info, e ast.Expr) (string, string) {
 	return n.Obj().Pkg().Path(), n.Obj().Name()
 }
 
-// textHolder says whether e is an outbox.Proposal or a draft.Draft.
+// textHolder says whether e is an outbox.Proposal, a draft.Draft or a
+// plugin's source.Draft.
 func textHolder(info *types.Info, e ast.Expr) bool {
 	p, n := namedOf(info, e)
-	return p == outboxPkg && n == "Proposal" || p == draftPkg && n == "Draft"
+	return p == outboxPkg && n == "Proposal" || (p == draftPkg || p == sdkSourcePkg) && n == "Draft"
 }
+
+// sdkSourcePkg is the SDK of source plugins, whose Draft a plugin proposes.
+const sdkSourcePkg = module + "pkg/plugin/source"
 
 func draftTextHits(fset *token.FileSet, rel string, info *types.Info, f *ast.File, funcs map[token.Pos]*ast.FuncDecl) []string {
 	var out []string

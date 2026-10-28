@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -61,7 +63,26 @@ func (s pull) row() row.Row {
 		Stalled: situation.Thresholds{Review: 48 * time.Hour, Reply: 24 * time.Hour, Merge: 24 * time.Hour}})
 }
 
-func (s pull) propose() (src.Draft, bool) { return nudge.Propose(s.row(), s.host, nil, s.when()) }
+func (s pull) propose() (src.Draft, bool) {
+	d, ok, err := nudge.Propose(s.row(), s.host, profileTexts(), nil, s.when())
+	if err != nil {
+		panic(err)
+	}
+	return d, ok
+}
+
+// profileTexts are the nudge's texts in the plugin's profile layer.
+func profileTexts() nudge.Texts {
+	raw, err := os.ReadFile(filepath.Join("..", "profile", filepath.FromSlash(nudge.TextsFile)))
+	if err != nil {
+		panic(err)
+	}
+	x, err := nudge.ParseTexts(string(raw))
+	if err != nil {
+		panic(err)
+	}
+	return x
+}
 
 // stalledChanges is the viewer's changes requested on alice's pull request
 // 1, eight days ago: it waits on alice and is stalled.
@@ -158,8 +179,8 @@ func TestNudgeProposalMentionsWhomTheIntentAsks(t *testing.T) {
 	if !ok {
 		t.Fatal("no proposal")
 	}
-	if !strings.Contains(d.Text, "@{github:"+other+"}") || proposedWho(d) != "@"+other {
-		t.Fatalf("text %q", d.Text)
+	if want := "@{github:alice} friendly nudge: this pull request has been waiting on you since 2026-10-14 (changes asked). Could you take a look when you have a moment?"; d.Text != want || proposedWho(d) != "@"+other {
+		t.Fatalf("text %q, want %q", d.Text, want)
 	}
 	if !slices.Equal(d.Items, []string{"gh:fix"}) {
 		t.Fatalf("items %v", d.Items)
@@ -271,14 +292,14 @@ func TestDraftNudgeCommentIsANudgeComment(t *testing.T) {
 
 func TestNudgeSituationWithoutATime(t *testing.T) {
 	t.Parallel()
-	if got := nudge.Waiting([]string{"@ana"}, nudge.Situation{Kind: "draft", Reason: "draft"}); got != "Waiting on: @ana, draft." {
+	if got, err := profileTexts().Waiting([]string{"@ana"}, nudge.Situation{Kind: "draft", Reason: "draft"}); err != nil || got != "Waiting on: @ana, draft." {
 		t.Fatalf("%q", got)
 	}
 }
 
 func TestNudgeSituationCarriesNoCIText(t *testing.T) {
 	t.Parallel()
-	if got := nudge.Waiting([]string{"@ana"}, nudge.Situation{Kind: "checks", Reason: "checks failing: lint, @acme/everyone"}); got != "Waiting on: @ana, checks failing." {
+	if got, err := profileTexts().Waiting([]string{"@ana"}, nudge.Situation{Kind: "checks", Reason: "checks failing: lint, @acme/everyone"}); err != nil || got != "Waiting on: @ana, checks failing." {
 		t.Fatalf("%q", got)
 	}
 }
@@ -303,7 +324,7 @@ func TestProposalsReadTheHostOfTheStalledPullRequestsOnly(t *testing.T) {
 	fresh.events = []pr.Event{ev(4, pr.KindReviewRequest, viewer, now.Add(-time.Hour), reviewer)}
 	held := stalledReview()
 	rd := &fakeReader{overrides: map[string]map[string]string{held.pr.Ref.String(): {"hold": "true"}}}
-	ds, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), fresh.row()}, rd, nil, now)
+	ds, err := nudge.Proposals(context.Background(), []row.Row{stalledChanges().row(), held.row(), fresh.row()}, rd, profileTexts(), nil, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,5 +333,23 @@ func TestProposalsReadTheHostOfTheStalledPullRequestsOnly(t *testing.T) {
 	}
 	if !slices.Equal(rd.asked, []string{ref(1).String(), ref(2).String()}) {
 		t.Fatalf("read the round state of %v", rd.asked)
+	}
+}
+
+func TestTheNudgeTextIsTheProfiles(t *testing.T) {
+	t.Parallel()
+	x, err := nudge.ParseTexts(`{{define "draft"}}Hello {{.Mentions}} ({{template "label" .Kind}}){{end}}{{define "waiting"}}w{{end}}{{define "label"}}<{{.}}>{{end}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := x.Text([]string{"@alice", "@acme/web"}, nudge.Situation{Kind: "review"}); err != nil || got != "Hello @{github:alice} @acme/web (<review>)" {
+		t.Fatalf("%q %v", got, err)
+	}
+	wantMaintainers := "Friendly nudge: this pull request has had no reviewer since 2026-10-12. Could a maintainer take a look or suggest a reviewer?"
+	if got, err := profileTexts().Text([]string{nudge.Maintainers}, nudge.Situation{Kind: "no_reviewer", Since: now.Add(-10 * day)}); err != nil || got != wantMaintainers {
+		t.Fatalf("%q %v", got, err)
+	}
+	if _, err := nudge.ParseTexts(`{{define "draft"}}x{{end}}`); err == nil {
+		t.Fatal("texts with no waiting or label template parsed")
 	}
 }

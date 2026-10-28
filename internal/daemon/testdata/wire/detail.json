@@ -41,7 +41,7 @@
     }
   ],
   "items": [],
-  "profile_chain": "bundled + plugin:slack",
+  "profile_chain": "bundled + plugin:github + plugin:slack",
   "row": {
     "actions": [
       {

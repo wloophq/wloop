@@ -37,7 +37,7 @@ func pluginProposals(t *testing.T, f *storetest.Fixture) []src.Draft {
 		t.Fatal(err)
 	}
 	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: unit.NewRegistry(pr.Codec{})}, Books: f.Turns.Books, Overrides: f.DB}
-	ds, err := nudge.Proposals(ctx, rows, b.Host().Reader, prrow.IgnoreOf(config.Defaults()), f.Now)
+	ds, err := nudge.Proposals(ctx, rows, b.Host().Reader, ghreporttest.NudgeTexts(), prrow.IgnoreOf(config.Defaults()), f.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

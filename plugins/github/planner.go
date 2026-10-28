@@ -45,7 +45,24 @@ func (p *Plugin) Proposals(ctx context.Context, now time.Time) ([]src.Draft, err
 	for i, d := range ds {
 		rows[i] = d.row
 	}
-	return nudge.Proposals(ctx, rows, r.host.Reader, r.settings().Ignore, now)
+	x, err := r.texts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return nudge.Proposals(ctx, rows, r.host.Reader, x, r.settings().Ignore, now)
+}
+
+// texts are the nudge's texts in the plugin's profile layer, read when used
+// so an edit of the user's layer takes at once.
+func (r *running) texts(ctx context.Context) (nudge.Texts, error) {
+	if r.host.Services == nil {
+		return nudge.Texts{}, fmt.Errorf("%w: no profile layer to read %s from", src.ErrUnavailable, nudge.TextsFile)
+	}
+	raw, err := r.host.Services.Profile(ctx, nudge.TextsFile)
+	if err != nil {
+		return nudge.Texts{}, fmt.Errorf("%s: %w", nudge.TextsFile, err)
+	}
+	return nudge.ParseTexts(string(raw))
 }
 
 // ApplyEffect applies a draft's pr.nudged, which the publisher recorded as

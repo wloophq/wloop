@@ -23,10 +23,6 @@ import (
 	"github.com/wloophq/wloop/plugins/github/pr"
 )
 
-// MayHaveBeenPosted starts a Publish error after the request may have
-// reached GitHub; the outbox asks for a confirmation before a retry.
-const MayHaveBeenPosted = "may have been posted"
-
 // The deliveries plugin.toml declares that the publisher refuses.
 const (
 	deliveryReaction = "reaction"
@@ -200,14 +196,14 @@ func (p *Publisher) Publish(ctx context.Context, d src.Draft) (src.Evidence, err
 	if err != nil {
 		if written(err) {
 			p.recordNudge(ctx, d, ref, body, before)
-			return src.Evidence{}, fmt.Errorf("%s on %s: %w", MayHaveBeenPosted, ref, err)
+			return src.Evidence{}, fmt.Errorf("%w on %s: %w", src.ErrMayHavePosted, ref, err)
 		}
 		return src.Evidence{}, fmt.Errorf("commenting on %s: %w", ref, err)
 	}
 	var c issueComment
 	if err := json.Unmarshal(resp.Body, &c); err != nil || c.ID == 0 {
 		p.recordNudge(ctx, d, ref, body, before)
-		return src.Evidence{}, fmt.Errorf("%s on %s: GitHub's answer names no comment", MayHaveBeenPosted, ref)
+		return src.Evidence{}, fmt.Errorf("%w on %s: GitHub's answer names no comment", src.ErrMayHavePosted, ref)
 	}
 	p.recordNudge(ctx, d, ref, body, c.CreatedAt)
 	return evidenceOf(c), nil

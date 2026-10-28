@@ -194,6 +194,12 @@ var (
 	ErrUnsupported = errors.New("not supported")
 	// ErrUnfit: the agent's answer to an Ask does not fit what was asked.
 	ErrUnfit = errors.New("answer does not fit")
+	// ErrMayHavePosted: a Publish failed after its post may have reached
+	// the source; the host asks a person to confirm before a retry.
+	ErrMayHavePosted = errors.New("may have been posted")
+	// ErrNoAnswer: the call was canceled, timed out or lost its connection
+	// before the other side answered, which may have acted on it.
+	ErrNoAnswer = errors.New("no answer")
 )
 
 // Priority orders who may spend a rate-limited budget when it runs low.

@@ -201,7 +201,7 @@ func TestGitHubPublishIsAMutation(t *testing.T) {
 			if err == nil {
 				t.Fatal("published through a failure")
 			}
-			if got := strings.HasPrefix(err.Error(), MayHaveBeenPosted); got != tc.posted {
+			if got := strings.HasPrefix(err.Error(), src.ErrMayHavePosted.Error()); got != tc.posted {
 				t.Fatalf("error %q: may have been posted %v, want %v", err, got, tc.posted)
 			}
 			if n := f.posts(); n != 1 {

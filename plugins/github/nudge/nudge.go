@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	sdk "github.com/wloophq/wloop/pkg/plugin"
@@ -218,15 +219,19 @@ func Stalled(r row.Row) bool {
 
 // Propose is the nudge draft of r, whom it asks, when r is stalled, the
 // host holds no round, mute or loop turn on it, and the nudge would not be
-// refused now.
-func Propose(r row.Row, h Host, ignore []string, now time.Time) (src.Draft, bool) {
+// refused now; its text is x's.
+func Propose(r row.Row, h Host, x Texts, ignore []string, now time.Time) (src.Draft, bool, error) {
 	s := Of(r)
 	if !Stalled(r) || h.Overrides[overrideHold] == overrideTrue || Running(h.Book) || Muted(h.Overrides, s, now) {
-		return src.Draft{}, false
+		return src.Draft{}, false, nil
 	}
 	who, why := Targets(s, r.Payload.Author, r.Payload.Viewer, ignore)
 	if Refusal(r.PR.Ref, who, why, s.Since, r.Events(), Unstarted(h.Book), now) != "" {
-		return src.Draft{}, false
+		return src.Draft{}, false, nil
+	}
+	text, err := x.Text(who, s)
+	if err != nil {
+		return src.Draft{}, false, err
 	}
 	u := r.PR.Ref.Unit()
 	return src.Draft{
@@ -234,9 +239,9 @@ func Propose(r row.Row, h Host, ignore []string, now time.Time) (src.Draft, bool
 		Items:   waitingItems(r, who),
 		Purpose: Purpose,
 		Effects: []string{EffectNudged, EffectTaskNudged},
-		Text:    Text(who, s),
+		Text:    text,
 		Origin:  src.DraftOrigin{Kind: originAuto, Rule: Rule, Key: u.Provider + ":" + u.Key},
-	}, true
+	}, true, nil
 }
 
 // originAuto is the origin kind of a draft a plugin's rule proposes.
@@ -250,7 +255,7 @@ type Reader interface {
 
 // Proposals are the nudge drafts of rows at now, reading the host's
 // overrides and turns of the stalled ones only.
-func Proposals(ctx context.Context, rows []row.Row, rd Reader, ignore []string, now time.Time) ([]src.Draft, error) {
+func Proposals(ctx context.Context, rows []row.Row, rd Reader, x Texts, ignore []string, now time.Time) ([]src.Draft, error) {
 	var candidates []row.Row
 	var units []sdk.Unit
 	for _, r := range rows {
@@ -277,39 +282,52 @@ func Proposals(ctx context.Context, rows []row.Row, rd Reader, ignore []string, 
 		if err != nil {
 			return nil, fmt.Errorf("the round state of %s: %w", r.PR.Ref, err)
 		}
-		if d, ok := Propose(r, Host{Overrides: st.Overrides, Book: books[u]}, ignore, now); ok {
+		d, ok, err := Propose(r, Host{Overrides: st.Overrides, Book: books[u]}, x, ignore, now)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			out = append(out, d)
 		}
 	}
 	return out, nil
 }
 
-// labels word the situations a nudge names.
-var labels = map[situation.Kind]string{
-	situation.KindDone: "closed", situation.KindMuted: "muted", situation.KindHeldByCap: "held (cap)", situation.KindBlocked: "round blocked",
-	situation.KindToAddress: "to address", situation.KindRoundPending: "round soon", situation.KindLoopWorking: "agent working",
-	situation.KindLoopWaiting: "agent asks", situation.KindLoopStopped: "agent stopped", situation.KindDraft: "draft",
-	situation.KindChecks: "checks failing", situation.KindChanges: "changes asked", situation.KindMerge: "can merge",
-	situation.KindConflicts: "merge conflicts", situation.KindReply: "reply due", situation.KindReviewerBack: "reviewer due",
-	situation.KindReview: "review", situation.KindNoReviewer: "no reviewer",
+// TextsFile is the nudge's texts in the plugin's profile layer.
+const TextsFile = "prompts/github-nudge.tmpl"
+
+// Texts are the nudge's texts, as the profile's templates word them: the
+// draft of the github-nudge rule and the situation line of the prepare.
+type Texts struct{ t *template.Template }
+
+// ParseTexts reads raw, the profile's TextsFile.
+func ParseTexts(raw string) (Texts, error) {
+	t, err := template.New(TextsFile).Option("missingkey=error").Parse(raw)
+	if err != nil {
+		return Texts{}, fmt.Errorf("%s: %w", TextsFile, err)
+	}
+	for _, name := range []string{"draft", "waiting", "label"} {
+		if t.Lookup(name) == nil {
+			return Texts{}, fmt.Errorf("%s defines no %q template", TextsFile, name)
+		}
+	}
+	return Texts{t: t}, nil
 }
 
-func label(kind string) string {
-	if l, ok := labels[situation.Kind(kind)]; ok {
-		return l
+func (x Texts) render(name string, data any) (string, error) {
+	var b strings.Builder
+	if err := x.t.ExecuteTemplate(&b, name, data); err != nil {
+		return "", fmt.Errorf("%s: %w", TextsFile, err)
 	}
-	return kind
+	return strings.TrimSpace(b.String()), nil
 }
 
 // Text asks who for the next step; a person is a mention, a team is
 // written as GitHub mentions it, since its key would post as plain text.
-func Text(who []string, s Situation) string {
+func (x Texts) Text(who []string, s Situation) (string, error) {
 	since := ""
 	if !s.Since.IsZero() {
-		since = " since " + s.Since.UTC().Format("2006-01-02")
-	}
-	if slices.Equal(who, []string{Maintainers}) {
-		return fmt.Sprintf("Friendly nudge: this pull request has had no reviewer%s. Could a maintainer take a look or suggest a reviewer?", since)
+		since = s.Since.UTC().Format(time.DateOnly)
 	}
 	mentions := make([]string, len(who))
 	for i, w := range who {
@@ -320,19 +338,19 @@ func Text(who []string, s Situation) string {
 		}
 		mentions[i] = "@{github:" + login + "}"
 	}
-	return fmt.Sprintf("%s friendly nudge: this pull request has been waiting on you%s (%s). Could you take a look when you have a moment?",
-		strings.Join(mentions, " "), since, label(s.Kind))
+	return x.render("draft", map[string]any{"Mentions": strings.Join(mentions, " "), "Since": since, "Kind": s.Kind,
+		"Maintainers": slices.Equal(who, []string{Maintainers})})
 }
 
 // Waiting is the line the nudge intent's prompt reads of whom the pull
-// request waits on and since when.
-func Waiting(who []string, s Situation) string {
+// request waits on and since when, worded by the situation's kind: a
+// reason can carry CI job names.
+func (x Texts) Waiting(who []string, s Situation) (string, error) {
 	since := ""
 	if !s.Since.IsZero() {
-		since = " since " + s.Since.Local().Format(time.RFC3339)
+		since = s.Since.Local().Format(time.RFC3339)
 	}
-	// The kind's label, not the reason: a reason can carry CI job names.
-	return fmt.Sprintf("Waiting on: %s%s, %s.", strings.Join(who, ", "), since, label(s.Kind))
+	return x.render("waiting", map[string]any{"Who": strings.Join(who, ", "), "Since": since, "Kind": s.Kind})
 }
 
 // waitingItems are r's open items waiting on someone the nudge asks.

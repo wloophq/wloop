@@ -21,7 +21,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestDaemonImports` | The daemon reaches adapters, GitHub and Orca only through ports. |
 | `TestDaemonImportsNoPluginDomain` | The daemon's own code imports no plugin package, under no debt: it reaches source logic through the plugins' Action and View only. |
 | `TestDomainImports` | The domain imports no adapter, manager or `internal/github`. |
-| `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
+| `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal, a draft.Draft or a plugin's source.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryDecisionNamesATestThatExists` | Every entry of the decision log names on its Enforced by line at least one test, and only tests the repository declares. |
 | `TestEveryRuleTestStatesItsRule` | Every rule test, a test that does not call flagged, states its rule in a doc comment. |
 | `TestGitHubPluginImportsOnlyTheSDK` | No package under `plugins/github`, tests included, imports a package under `internal/` or a package of another plugin: the GitHub plugin builds against the SDK and its own packages alone. |
