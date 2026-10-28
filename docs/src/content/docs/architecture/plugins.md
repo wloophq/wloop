@@ -128,6 +128,12 @@ The workspace link of a pull request (its `ws_*` columns) is host data: the host
 
 The built-in GitHub module reaches the broker as a plugin process does: `serve` gives the GitHub store the broker of its provider (`source.Deps.Host`); a store opened outside `serve` reaches the same host methods in its database.
 
+## The GitHub plugin binary
+
+`plugins/github` holds the GitHub plugin's binary and store and imports only the SDK (`TestGitHubPluginImportsOnlyTheSDK`); GitHub's module still runs in the daemon. `make build` builds its binary, `<command>-plugin-github`, which no root discovers yet. The binary serves the source kind: `RunCLI` runs the manifest's commands with `gh` (`clone`, `auth`, `reviewed-repos` and `teams`, as `ghsource.Local` does in process), `Identity` names the viewer `gh` reads, and `Start` opens its store.
+
+Its store (`plugins/github/store`, over `pkg/plugin/store`) is `<state>/plugins/github/plugin.db`: `pull_requests`, `pr_seen`, `pr_details`, `fetches`, `meta` and `overrides`, the last keyed by the unit key with the plugin's columns only (`taken_over`, `tracked`). Its times use the host's layout, so imported rows read and sort as its own. On its first start it imports `import.db`: the PR tables and `meta` whole, by the columns both share, and of `overrides` the GitHub rows that set a plugin column. The export decides which `meta` rows are GitHub's (the viewer under `viewer:github`, the sweeps' watermarks, the budget, the resolved scope, Explore's recent list).
+
 ## The Slack plugin
 
 Slack runs as its own process (`plugins/slack`, the binary `<command>-plugin-slack`), and its module in the daemon relays to it (`internal/cli/serve_slack.go`): the manifest's first job is the ingestion job and the others daemon jobs named `<job>:slack`, each an `Ingest` call; rows, cards and workflow facts are its snapshots (`readmodel.Reported`, `psource.SettledFacts`); tracking, resolving an address, the viewer, the health view, publishing, payloads, placement, briefs and the `unit.closed` effect each call the running plugin, which answers `ErrUnavailable` while it is down. The links a snapshot reports are the unit's facts links, resolved with every manifest's codec. The broker serves it the host's ledger, agent (`<state>/plugins/slack/agent`), profile layer, sessions, tasks, outbox and briefs (`internal/cli/serve_hosted.go`).

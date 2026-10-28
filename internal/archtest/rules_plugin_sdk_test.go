@@ -50,6 +50,19 @@ var listedPlugins = sync.OnceValues(func() ([]pkg, error) {
 // the Slack plugin builds against the SDK alone.
 func TestSlackPluginImportsOnlyTheSDK(t *testing.T) {
 	t.Parallel()
+	checkPluginImportsOnlyTheSDK(t, "plugins/slack")
+}
+
+// TestGitHubPluginImportsOnlyTheSDK checks that no package under
+// `plugins/github`, tests included, imports a package under `internal/`:
+// the GitHub plugin builds against the SDK alone.
+func TestGitHubPluginImportsOnlyTheSDK(t *testing.T) {
+	t.Parallel()
+	checkPluginImportsOnlyTheSDK(t, "plugins/github")
+}
+
+func checkPluginImportsOnlyTheSDK(t *testing.T, dir string) {
+	t.Helper()
 	ps, err := listedPlugins()
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +70,7 @@ func TestSlackPluginImportsOnlyTheSDK(t *testing.T) {
 	seen := false
 	for _, p := range ps {
 		self, ok := local(p.ImportPath)
-		if !ok || !under(self, "plugins/slack") {
+		if !ok || !under(self, dir) {
 			continue
 		}
 		seen = true
@@ -66,6 +79,6 @@ func TestSlackPluginImportsOnlyTheSDK(t *testing.T) {
 		}
 	}
 	if !seen {
-		t.Error("plugins/slack is missing from the package list")
+		t.Errorf("%s is missing from the package list", dir)
 	}
 }
