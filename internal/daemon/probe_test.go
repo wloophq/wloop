@@ -54,7 +54,7 @@ func TestProbeAPI(t *testing.T) {
 	}
 	x := l.launches[0]
 	if x.Intent != turn.Intent(dintent.Probe) || x.Trigger != turn.Automated || x.WorkspaceID != "ws-e2e" || x.Home != "/homes/a" || x.Model != "haiku" || x.ResumeOf != 0 ||
-		refOf(x.Unit).Owner != ProbeOwner || refOf(x.Unit).Repo != ProbeRepo || refOf(x.Unit).Number != int(agentNow.Unix()) {
+		refOf(x.Unit).Owner != api.ProbeOwner || refOf(x.Unit).Repo != api.ProbeRepo || refOf(x.Unit).Number != int(agentNow.Unix()) {
 		t.Fatalf("launch %+v", x)
 	}
 	if res.PR != refOf(x.Unit).URL() || res.Turn != "probe1round" || res.Session != "term_probe" {

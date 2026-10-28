@@ -17,13 +17,14 @@ import (
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
-// unitAction refuses an action on u that only a pull request takes. Any
-// other unit takes a turn action, track and untrack when its source follows
-// it, and an intent unitIntent admits. The row of such a unit offers the
+// unitAction refuses an action on u, no unit of the forge when forge is
+// false, that only the forge's units take. Any other unit takes a turn
+// action, track and untrack when its source follows it, and an intent
+// unitIntent admits. The row of such a unit offers the
 // intents serving its provider, but this route does not check their
 // visible and enabled predicates; the tasks' bridge does.
-func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(unit.ProviderID) bool) error {
-	if isPullRequest(u) {
+func unitAction(l *intentload.Loaded, name string, u unit.Unit, forge bool, follows func(unit.ProviderID) bool) error {
+	if forge {
 		return nil
 	}
 	if _, ok := turnActions[name]; ok {
@@ -142,9 +143,9 @@ func (s *Server) unitArg(u unit.Unit) string {
 }
 
 // sourceFollowed says whether the track or untrack of u goes to its source,
-// which keeps its own follows, instead of the pull request overrides.
+// which keeps its own follows.
 func sourceFollowed(name string, u unit.Unit, follows func(unit.ProviderID) bool) bool {
-	return (name == "track" || name == "untrack") && !isPullRequest(u) && follows != nil && follows(u.Provider)
+	return (name == "track" || name == "untrack") && follows != nil && follows(u.Provider)
 }
 
 // sourceFollow runs track or untrack on a unit its source follows.
@@ -153,17 +154,21 @@ func (s *Server) sourceFollow(ctx context.Context, name string, u unit.Unit) err
 		if s.deps.Untrack == nil {
 			return notFound{"untrack " + u.Label() + ": no source untracks it"}
 		}
-		return s.deps.Untrack(ctx, u)
+		return pluginErr(s.deps.Untrack(ctx, u), "untrack "+u.Label()+": no source untracks it")
 	}
 	if s.track == nil {
 		return notFound{"track " + u.Label() + ": no source tracks it"}
 	}
 	read, err := s.track(ctx, u)
-	if errors.Is(err, port.ErrNotFound) {
+	switch {
+	case errors.Is(err, port.ErrNotFound):
 		return notFound{"track " + u.Label() + ": " + err.Error()}
+	case errors.Is(err, port.ErrGitHub):
+		return badGateway{"track " + u.Label() + ": " + err.Error()}
+	case err != nil:
+		return pluginErr(err, "track "+u.Label()+": no source tracks it")
+	case read.Save == nil:
+		return nil
 	}
-	if err != nil || read.Save == nil {
-		return err
-	}
-	return read.Save(ctx)
+	return pluginErr(read.Save(ctx), "track "+u.Label()+": no source tracks it")
 }

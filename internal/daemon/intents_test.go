@@ -483,20 +483,6 @@ func TestAnInvalidUserIntentDisablesOnlyItself(t *testing.T) {
 	}
 }
 
-func TestProbeIsExcludedFromReportsByItsManifest(t *testing.T) {
-	t.Parallel()
-	at := time.Date(2026, 10, 8, 9, 0, 0, 0, time.UTC)
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
-	d := dinv.TimingsData{Turns: []dinv.TimedTurn{
-		{Seq: 1, PR: ref, Intent: "review", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
-		{Seq: 2, PR: ref, Intent: "probe", Trigger: "automated", State: "done", SentAt: at, StartedAt: at, EndedAt: at.Add(time.Minute)},
-	}}
-	rep := timings(d, at.Add(-time.Hour), at.Add(time.Hour), me{login: "me"}, reportsOf((&Server{}).loaded().Registry))
-	if len(rep.TurnList) != 1 || rep.TurnList[0].Intent != "review" {
-		t.Fatalf("turns %+v", rep.TurnList)
-	}
-}
-
 func TestNudgeRecordsOnlyDoneOrFailed(t *testing.T) {
 	t.Parallel()
 	s, svc := agentServer(t)
@@ -568,7 +554,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 		{Intent: turn.Intent(dintent.Nudge), ID: "b", Trigger: turn.ByHand, State: turn.Sent, SentAt: at.Add(time.Minute)},
 	}})
 	bundled := r.s.loaded().Registry
-	facts, err := r.s.turnFacts(context.Background(), bundled)
+	facts, err := turnFacts(r.s, context.Background(), bundled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,7 +566,7 @@ func TestTheRowsNewestTurnIsADrivesRowIntents(t *testing.T) {
 		d.DrivesRow = d.Name == dintent.Nudge
 		defs = append(defs, d)
 	}
-	if facts, _ = r.s.turnFacts(context.Background(), dintent.NewRegistry(defs)); facts[r7].Facts.Intent != "nudge" {
+	if facts, _ = turnFacts(r.s, context.Background(), dintent.NewRegistry(defs)); facts[r7].Facts.Intent != "nudge" {
 		t.Fatalf("with nudge driving the row, it follows the %s turn", facts[r7].Facts.Intent)
 	}
 }

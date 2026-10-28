@@ -48,7 +48,7 @@ func TestDoneViewListsFinishedPullRequestsWithAWorkspace(t *testing.T) {
 	}
 }
 
-func TestRemoveActionRecordsTheEventAndUnlinks(t *testing.T) {
+func TestRemoveActionRecordsTheEvent(t *testing.T) {
 	t.Parallel()
 	s := newServer(t)
 	actions := &fakeActions{}
@@ -58,13 +58,8 @@ func TestRemoveActionRecordsTheEventAndUnlinks(t *testing.T) {
 	if rec := post(t, s, "/api/units/github/acme%2Fapi%238/remove", `{}`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	if !slices.Equal(actions.calls, []string{"remove acme/api#8"}) || removedEvents(t, s, r8) != 1 || !slices.Equal(actions.ids, []string{"ws-acme/api#8"}) {
+	if !slices.Equal(actions.calls, []string{"remove acme/api#8"}) || removedEvents(t, s, r8) != 1 {
 		t.Fatalf("calls %v", actions.calls)
-	}
-	var rows []api.Row
-	get(t, s, "/api/rows?view="+api.ViewDone, &rows)
-	if len(rows) != 0 {
-		t.Fatalf("still in done: %+v", rows)
 	}
 }
 
@@ -224,22 +219,5 @@ func TestForcedRemoveWithoutAStoredLinkLetsTheActionFindTheWorkspace(t *testing.
 	}
 	if !slices.Equal(actions.calls, []string{"remove acme/api#30"}) || !slices.Equal(actions.ids, []string{""}) || !slices.Equal(actions.forced, []bool{true}) {
 		t.Fatalf("calls %v ids %q forced %v", actions.calls, actions.ids, actions.forced)
-	}
-}
-
-func TestRemoveStillRefusesTheMainCheckout(t *testing.T) {
-	t.Parallel()
-	f := newFixture(t)
-	f.open(30, "fer", fixtureNow.Add(-time.Hour), merged)
-	if err := f.st.ReplaceWorkspaces(context.Background(), map[github.Ref]dinv.Workspace{ref(30): {ID: "main", DisplayName: "api", IsMain: true}}); err != nil {
-		t.Fatal(err)
-	}
-	actions := &fakeActions{}
-	f.s.deps.Actions = actions
-	if rec := post(t, f.s, "/api/units/github/acme%2Fapi%2330/remove", `{"force":true}`); rec.Code != 409 {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
-	}
-	if len(actions.calls) != 0 {
-		t.Fatalf("calls %v", actions.calls)
 	}
 }

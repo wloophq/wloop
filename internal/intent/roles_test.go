@@ -9,7 +9,7 @@ func TestARoleImpliesItsRound(t *testing.T) {
 	for _, c := range []struct{ role, workspace, kind, reconcile, prepare string }{
 		{"pr.review", "review", "review", "my_review", ""},
 		{"pr.address", "author", "address", "", ""},
-		{"pr.nudge", "given", "", "", "nudge.prepare"},
+		{"pr.nudge", "given", "", "", "action:nudge.prepare"},
 		{"headless", "given", "", "", ""},
 	} {
 		root := t.TempDir()

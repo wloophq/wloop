@@ -1005,10 +1005,11 @@ func TestAdoptAndMuteClearWriteTheirColumnsAlone(t *testing.T) {
 	if err := s.SetAdopted(ctx, ref); err != nil {
 		t.Fatal(err)
 	}
-	if cleared, err := s.ClearMute(ctx, ref, "waiting", "bob"); err != nil || cleared {
+	clear := map[string]string{port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: "", port.OverrideMutedWaitingOn: ""}
+	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "bob"}); err != nil || cleared {
 		t.Fatalf("cleared another mute: %v %v", cleared, err)
 	}
-	if cleared, err := s.ClearMute(ctx, ref, "waiting", "alice"); err != nil || !cleared {
+	if cleared, err := s.db.SetOverride(ctx, ref.Unit(), clear, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "alice"}); err != nil || !cleared {
 		t.Fatalf("cleared %v %v", cleared, err)
 	}
 	o, err := s.Override(ctx, ref)

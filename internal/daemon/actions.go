@@ -11,24 +11,18 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/duration"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
-	"github.com/wloophq/wloop/internal/situation"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // Actions are the operations with side effects outside the store. The daemon
@@ -86,8 +80,8 @@ type Call struct {
 	AgentHome string
 	// Out receives what the action reports, sent back to the caller.
 	Out io.Writer
-	// WorkspaceID is the workspace the inventory links to the pull request,
-	// "" when none; remove acts on exactly that one.
+	// WorkspaceID is the workspace remove acts on; "" is the one its unit
+	// is linked to.
 	WorkspaceID string
 	// Force lets remove past the workspace manager's terminal check.
 	Force bool
@@ -115,6 +109,7 @@ var (
 	errActionsUnavailable = errors.New("actions unavailable")
 	errTurnsUnavailable   = errors.New("turns unavailable")
 	errPlanUnavailable    = errors.New("the plan is unavailable")
+	errStoreUnavailable   = unavailable{"the daemon has no store"}
 )
 
 type badRequest struct{ msg string }
@@ -136,17 +131,13 @@ type notFound struct{ msg string }
 
 func (e notFound) Error() string { return e.msg }
 
-// situationNow derives the situation the pull request would show unmuted.
-type situationNow func() (api.Kind, string, error)
-
 type delegated struct {
 	call  func(a Actions, ctx context.Context, u unit.Unit, c Call) error
-	loop  bool                   // writes to the loop, so waits on its mutex
-	mark  func(o *dinv.Override) // nil leaves the override alone
-	event string                 // "" records nothing
+	loop  bool   // writes to the loop, so waits on its mutex
+	event string // "" records nothing
 	data  string
-	// unlink clears the workspace link, which the next sweep would clear.
-	unlink bool
+	// remove removes the unit's workspace, which unlinks it.
+	remove bool
 	// force always forces, as remove_force does.
 	force bool
 	// full reads the pull request in full ahead of the loop mutex.
@@ -178,7 +169,7 @@ func (s *Server) readAheadQueued(ctx context.Context, units ...unit.Unit) contex
 		return ctx
 	}
 	for _, u := range units {
-		if !isPullRequest(u) || !queued(books[u]) {
+		if !s.forge(u) || !queued(books[u]) {
 			continue
 		}
 		ctx = s.readAhead(ctx, u, false)
@@ -192,61 +183,26 @@ func queued(b turn.Book) bool {
 
 var delegatedActions = map[string]delegated{
 	"open":         {call: Actions.Open},
-	"take_over":    {loop: true, event: dinv.KindAdopted, mark: func(o *dinv.Override) { o.Adopted = true }, call: Actions.Adopt},
-	"run_now":      {loop: true, full: true, event: dinv.KindRoundSent, data: "run now", call: Actions.Run},
-	"trust_run":    {loop: true, full: true, event: dinv.KindRoundSent, data: "trusted its folder and ran", call: unblocking(Unblocker.TrustAndRun)},
-	"unblock":      {loop: true, event: dinv.KindRoundUnblocked, data: "dismissed by you", call: unblocking(Unblocker.Unblock)},
-	"remove":       {loop: true, event: dinv.KindRemoved, unlink: true, call: Actions.Remove},
-	"remove_force": {loop: true, event: dinv.KindRemoved, unlink: true, force: true, call: Actions.Remove},
+	"take_over":    {loop: true, event: builtin.EventAdopted, call: Actions.Adopt},
+	"run_now":      {loop: true, full: true, event: builtin.EventRoundSent, data: "run now", call: Actions.Run},
+	"trust_run":    {loop: true, full: true, event: builtin.EventRoundSent, data: "trusted its folder and ran", call: unblocking(Unblocker.TrustAndRun)},
+	"unblock":      {loop: true, event: builtin.EventRoundUnblocked, data: "dismissed by you", call: unblocking(Unblocker.Unblock)},
+	"remove":       {loop: true, event: builtin.EventRemoved, remove: true, call: Actions.Remove},
+	"remove_force": {loop: true, event: builtin.EventRemoved, remove: true, force: true, call: Actions.Remove},
 }
 
-var overrideActions = map[string]func(o *dinv.Override, req api.ActionRequest, now time.Time, current situationNow) (event, data string, err error){
-	"mute": func(o *dinv.Override, req api.ActionRequest, now time.Time, current situationNow) (string, string, error) {
-		if req.Until == "" && !req.UntilState {
-			return "", "", badRequest{"mute needs until or until_state"}
-		}
-		if req.Until != "" && req.UntilState {
-			return "", "", badRequest{"mute takes until or until_state, not both"}
-		}
-		clearMute(o)
-		data := "until state change"
-		if req.UntilState {
-			kind, waitingOn, err := current()
-			if err != nil {
-				return "", "", err
-			}
-			o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = true, string(kind), waitingOn
-		} else {
-			d, err := duration.Parse(req.Until)
-			if err != nil {
-				return "", "", badRequest{"mute " + err.Error()}
-			}
-			o.MutedUntil = now.Add(d)
-			data = "for " + req.Until
-		}
-		return dinv.KindMuted, data, nil
-	},
-	"unmute": func(o *dinv.Override, _ api.ActionRequest, _ time.Time, _ situationNow) (string, string, error) {
-		clearMute(o)
-		return dinv.KindUnmuted, "", nil
-	},
-	"pause": func(o *dinv.Override, _ api.ActionRequest, _ time.Time, _ situationNow) (string, string, error) {
-		o.Hold = true
-		return dinv.KindHeld, "", nil
-	},
-	"resume": func(o *dinv.Override, _ api.ActionRequest, _ time.Time, _ situationNow) (string, string, error) {
-		o.Hold = false
-		return dinv.KindReleased, "", nil
-	},
-	"track": func(o *dinv.Override, _ api.ActionRequest, _ time.Time, _ situationNow) (string, string, error) {
-		o.Tracked = true
-		return dinv.KindTracked, "", nil
-	},
-	"untrack": func(o *dinv.Override, _ api.ActionRequest, _ time.Time, _ situationNow) (string, string, error) {
-		o.Tracked = false
-		return dinv.KindUntracked, "", nil
-	},
+// holdActions set or clear the user's hold of a unit's rounds, with the
+// event each records.
+var holdActions = map[string]struct {
+	hold  bool
+	event string
+}{
+	"pause":  {true, builtin.EventHeld},
+	"resume": {false, builtin.EventReleased},
 }
+
+// followActions go to the unit's source, which keeps its follows.
+var followActions = map[string]bool{"track": true, "untrack": true}
 
 // roundActions act on the pending round of the unit's plan.
 var roundActions = map[string]bool{"skip": true, "guide": true}
@@ -309,18 +265,15 @@ func (s *Server) answer(ctx context.Context, u unit.Unit, req api.ActionRequest,
 	return s.answerMessage(ctx, m, req, out)
 }
 
-func clearMute(o *dinv.Override) {
-	o.MutedUntil, o.MuteUntilStateChange, o.MutedKind, o.MutedWaitingOn = time.Time{}, false, "", ""
-}
-
-// isBuiltin tells a built-in action of the catalog's dispatch tables.
+// isBuiltin tells a built-in action the daemon runs itself; any other
+// action a unit's row offers that no intent names is its plugin's.
 func isBuiltin(name string) bool {
-	_, isOverride := overrideActions[name]
+	_, isHold := holdActions[name]
 	_, isDelegated := delegatedActions[name]
-	isRound := roundActions[name]
+	isRound := roundActions[name] || followActions[name]
 	_, isTurn := turnActions[name]
 	_, isIntake := intakeRouteActions[name]
-	return isOverride || isDelegated || isRound || isTurn || isIntake || name == "brief_refresh"
+	return isHold || isDelegated || isRound || isTurn || isIntake || name == "brief_refresh"
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
@@ -339,20 +292,23 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("action")
 	l := s.loaded()
-	if !isBuiltin(name) && !isIntent(l, name) {
+	plugin := !isBuiltin(name) && !isIntent(l, name)
+	if plugin && !s.pluginActs(r.Context(), u, name) {
 		writeError(w, http.StatusNotFound, "no action "+strconv.Quote(name))
 		return
 	}
-	if err := unitAction(l, name, u, s.deps.Follows); err != nil {
-		writeActionError(w, err)
-		return
-	}
-	if why, err := s.taskRefusal(r.Context(), l, name, u); err != nil || why != "" {
-		if err == nil {
-			err = Refusal{Reason: why}
+	if !plugin {
+		if err := unitAction(l, name, u, s.forge(u), s.deps.Follows); err != nil {
+			writeActionError(w, err)
+			return
 		}
-		writeActionError(w, err)
-		return
+		if why, err := s.taskRefusal(r.Context(), l, name, u); err != nil || why != "" {
+			if err == nil {
+				err = Refusal{Reason: why}
+			}
+			writeActionError(w, err)
+			return
+		}
 	}
 	var req api.ActionRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
@@ -365,7 +321,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.WithoutCancel(r.Context())
 	row := api.Row{Unit: u}
-	if _, ok := turnActions[name]; !ok && isPullRequest(u) {
+	if _, ok := turnActions[name]; !ok && (plugin || s.forge(u)) {
 		if intakeIntent(l, name) && !slices.Contains(intakeSources, req.Source) {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("source %q is not one of %s", req.Source, strings.Join(intakeSources, ", ")))
 			return
@@ -412,7 +368,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	if errors.As(err, &refused) {
 		s.logDetail(name, u, refused)
 	}
-	if d := delegatedActions[name]; d.unlink {
+	if d := delegatedActions[name]; d.remove {
 		s.rememberForceable(u, err)
 	}
 	if err != nil {
@@ -424,7 +380,7 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 
 // offered is the state of the action on the pull request's row now; an
 // action the row lacks or disables, or one whose basis changed, is a
-// conflict. A forced remove on a row with no stored workspace link is the
+// conflict. A forced remove on a row that does not offer remove is the
 // CLI's remove --force, which finds the workspace itself.
 func (s *Server) offered(ctx context.Context, u unit.Unit, asked catalog.Asked, req api.ActionRequest) (api.Row, api.ActionState, error) {
 	name, basis := asked.Name, req.Basis
@@ -440,7 +396,7 @@ func (s *Server) offered(ctx context.Context, u unit.Unit, asked catalog.Asked, 
 			c.refusal = st.Refusal
 		}
 		return row, st, c
-	case !ok && name == "remove" && req.Force && workspaceID(row) == "":
+	case !ok && name == "remove" && req.Force:
 		return row, st, nil
 	case !ok:
 		return row, st, conflict{NotOffered(name, u), api.RefusalNotOffered}
@@ -610,7 +566,10 @@ func (s *Server) checkActionInputs(l *intentload.Loaded, name string, req *api.A
 func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.ActionRequest, out io.Writer) error {
 	_, isDelegated := delegatedActions[name]
 	if !isBuiltin(name) {
-		return s.actIntent(ctx, name, u, req, out)
+		if isIntent(s.loaded(), name) {
+			return s.actIntent(ctx, name, u, req, out)
+		}
+		return s.pluginAction(ctx, name, u, req, out)
 	}
 	if isDelegated && s.deps.Actions == nil {
 		return errActionsUnavailable
@@ -631,12 +590,14 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 		}
 		return err
 	}
-	if sourceFollowed(name, u, s.deps.Follows) {
+	if followActions[name] {
+		if !sourceFollowed(name, u, s.deps.Follows) {
+			return notFound{name + " " + u.Label() + ": no source follows it"}
+		}
 		return s.sourceFollow(ctx, name, u)
 	}
-	if _, ok := overrideActions[name]; ok {
-		_, err := s.applyOverride(ctx, name, u, req)
-		return err
+	if _, ok := holdActions[name]; ok {
+		return s.applyHold(ctx, name, u)
 	}
 	d := delegatedActions[name]
 	if d.loop && !LoopHeld(ctx) {
@@ -644,33 +605,17 @@ func (s *Server) act(ctx context.Context, name string, u unit.Unit, req api.Acti
 		s.deps.LoopMu.Lock()
 		defer s.deps.LoopMu.Unlock()
 	}
-	if d.event == dinv.KindRoundSent {
+	if d.event == builtin.EventRoundSent {
 		if err := s.dropPending(ctx, u, askedByYou); err != nil {
 			return err
 		}
 	}
 	call := Call{Guidance: req.Guidance, AgentHome: req.AgentHome, Out: out}
-	if d.unlink {
-		pr, _, err := s.deps.PRs.PR(ctx, u)
-		if err != nil {
-			return err
-		}
-		call.WorkspaceID = pr.Workspace.ID
+	if d.remove {
 		call.Force = req.Force || d.force
 	}
 	if err := d.call(s.deps.Actions, ctx, u, call); err != nil {
 		return err
-	}
-	if d.unlink {
-		if err := s.deps.PRs.SetWorkspace(ctx, u, dinv.Workspace{}); err != nil {
-			return err
-		}
-	}
-	if d.mark != nil {
-		_, err := s.updateOverride(ctx, u, func(o *dinv.Override) error { d.mark(o); return nil })
-		if err != nil {
-			return err
-		}
 	}
 	if d.event == "" {
 		return nil
@@ -715,11 +660,7 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 		}
 	}
 	if d.Prepare != "" {
-		prepare, ok := prepares[d.Prepare]
-		if !ok {
-			return fmt.Errorf("%s: the daemon has no prepare %s", name, d.Prepare)
-		}
-		if err := prepare(s, ctx, u, &call); err != nil {
+		if err := s.prepare(ctx, d, u, &call); err != nil {
 			return err
 		}
 	}
@@ -736,307 +677,65 @@ func (s *Server) actIntent(ctx context.Context, name string, u unit.Unit, req ap
 	return nil
 }
 
-// applyOverride runs an override action under overrideMu and returns the
-// unit it applied to, for track the name GitHub gives the pull request.
-func (s *Server) applyOverride(ctx context.Context, name string, u unit.Unit, req api.ActionRequest) (unit.Unit, error) {
-	apply := overrideActions[name]
-	var read port.TrackRead
-	if name == "track" {
-		var err error
-		if read, err = s.readForTrack(ctx, u); err != nil {
-			return u, err
-		}
-		u = read.Unit
+// applyHold sets or clears the user's hold of u's rounds, records it, and
+// drops the pending round a pause holds.
+func (s *Server) applyHold(ctx context.Context, name string, u unit.Unit) error {
+	if s.deps.Overrides == nil {
+		return errStoreUnavailable
 	}
-	s.overrideMu.Lock()
-	defer s.overrideMu.Unlock()
-	switch name {
-	case "track":
-		var err error
-		if u, err = s.admitTrack(ctx, u, read); err != nil {
-			return u, err
-		}
-	case "untrack":
-		known, tracked, err := s.trackedAs(ctx, u)
-		if err != nil {
-			return u, err
-		}
-		if !tracked {
-			return u, badRequest{u.Label() + " is not tracked"}
-		}
-		u = known
+	a := holdActions[name]
+	hold := ""
+	if a.hold {
+		hold = port.OverrideTrue
 	}
-	var kind, data string
-	changed, err := s.updateOverrideLocked(ctx, u, func(o *dinv.Override) (err error) {
-		kind, data, err = apply(o, req, s.deps.Now(), func() (api.Kind, string, error) { return s.unmutedSituation(ctx, u) })
+	if _, err := s.deps.Overrides.SetOverride(ctx, u, map[string]string{port.OverrideHold: hold}, nil); err != nil {
 		return err
-	})
-	if err != nil || (!changed && (name == "track" || name == "untrack")) {
-		return u, err
 	}
-	if err := s.recordEvent(ctx, u, kind, data); err != nil {
-		return u, err
+	if err := s.recordEvent(ctx, u, a.event, ""); err != nil {
+		return err
 	}
-	if name == "pause" {
+	if a.hold {
 		if err := s.dropPending(ctx, u, "paused by you"); err != nil {
 			s.logf("%s: pause: dropping the pending round: %v", u.Label(), err)
 		}
 	}
-	return u, nil
+	return nil
 }
 
-// trackMax bounds what every fast sweep reads by reference for tracking
-// alone: three batches of InventoryByRef.
-const trackMax = 50
-
-// trackedAs answers the tracked unit that matches u under any case.
-func (s *Server) trackedAs(ctx context.Context, u unit.Unit) (unit.Unit, bool, error) {
-	tracked, err := s.deps.PRs.Tracked(ctx)
-	if err != nil {
-		return u, false, err
-	}
-	known, ok := trackedIn(s.deps.Units, tracked, u)
-	return known, ok, nil
-}
-
-func trackedIn(codecs *unit.Registry, tracked []unit.Unit, u unit.Unit) (unit.Unit, bool) {
-	if i := slices.IndexFunc(tracked, func(t unit.Unit) bool { return codecs.Same(t, u) }); i >= 0 {
-		return tracked[i], true
-	}
-	return u, false
-}
-
-// trackSlot answers the tracked unit that matches u under any case, and
-// refuses a new one past trackMax.
-func (s *Server) trackSlot(ctx context.Context, u unit.Unit) (unit.Unit, bool, error) {
-	tracked, err := s.deps.PRs.Tracked(ctx)
-	if err != nil {
-		return u, false, err
-	}
-	if known, ok := trackedIn(s.deps.Units, tracked, u); ok {
-		return known, true, nil
-	}
-	if len(tracked) >= trackMax {
-		names := make([]string, len(tracked))
-		for i, t := range tracked {
-			names[i] = t.Label()
-		}
-		return u, false, badRequest{fmt.Sprintf("already tracking %d pull requests (%s); untrack one first", len(tracked), strings.Join(names, ", "))}
-	}
-	return u, false, nil
-}
-
-// admitTrack checks, under overrideMu, the slot and the state of a pull
-// request about to be tracked, and only then stores the read, so a refused
-// track leaves no row.
-func (s *Server) admitTrack(ctx context.Context, u unit.Unit, read port.TrackRead) (unit.Unit, error) {
-	u, _, err := s.trackSlot(ctx, u)
-	if err != nil {
-		return u, err
-	}
-	state := read.State
-	if state == "" {
-		pr, ok, err := s.deps.PRs.PR(ctx, u)
-		if err != nil {
-			return u, err
-		}
-		if ok {
-			state = pr.State
-		}
-	}
-	if state != "" && state != dgh.StateOpen {
-		return u, badRequest{fmt.Sprintf("%s is %s; "+brand.Name+" follows open pull requests", u.Label(), strings.ToLower(state))}
-	}
-	if read.Save == nil {
-		return u, nil
-	}
-	return u, read.Save(ctx)
-}
-
-// readForTrack reads a pull request about to be tracked, so a nudge right
-// after the track finds its situation, and returns its name as GitHub gives
-// it. It runs without overrideMu: a slow read must not stall the cockpit.
-// The caller checks the slot again under the lock.
-func (s *Server) readForTrack(ctx context.Context, u unit.Unit) (port.TrackRead, error) {
-	known, tracked, err := s.trackSlot(ctx, u)
-	if err != nil || tracked || s.track == nil {
-		return port.TrackRead{Unit: known}, err
-	}
-	read, err := s.track(ctx, u)
-	var low *dgh.BudgetError
-	switch {
-	case errors.As(err, &low):
-		return read, tooManyRequests{"track " + u.Label() + ": " + low.Error() + "; try again after the reset"}
-	case errors.Is(err, port.ErrNotFound):
-		return read, notFound{"track " + u.Label() + ": " + err.Error()}
-	case errors.Is(err, port.ErrGitHub):
-		return read, badGateway{"track " + u.Label() + ": " + err.Error()}
-	}
-	return read, err
-}
-
-// untrackFinished clears the track of pull requests a read showed merged or
-// closed; from then on they are followed like any finished pull request.
-func (s *Server) untrackFinished(ctx context.Context) {
-	tracked, err := s.deps.PRs.Tracked(ctx)
-	if err != nil {
-		s.logf("untrack finished: %v", err)
-		return
-	}
-	stored, err := s.deps.PRs.PRs(ctx, tracked)
-	if err != nil {
-		s.logf("untrack finished: %v", err)
-		return
-	}
-	for _, u := range tracked {
-		pr, ok := stored[u]
-		if !ok || pr.State == dgh.StateOpen {
-			continue
-		}
-		changed, err := s.updateOverride(ctx, u, func(o *dinv.Override) error { o.Tracked = false; return nil })
-		if err == nil && changed {
-			err = s.recordEvent(ctx, u, dinv.KindUntracked, strings.ToLower(pr.State))
-		}
-		if err != nil {
-			s.logf("%s: untrack finished: %v", u.Label(), err)
-		}
-	}
-}
-
-func (s *Server) unmutedSituation(ctx context.Context, u unit.Unit) (api.Kind, string, error) {
-	um, err := s.unmutedRow(ctx, u)
-	return um.row.Kind, um.row.Summary.WaitsOn, err
-}
-
-// unmutedRow derives the row as it stands without the user's override and
-// pending round, with the events and the deriver it came from.
-func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (unmuted, error) {
+// unmutedRow derives u's row as it stands without the user's mute and
+// pending round.
+func (s *Server) unmutedRow(ctx context.Context, u unit.Unit) (api.Row, error) {
 	rd, ok, err := s.readRow(ctx, u)
 	if err != nil {
-		return unmuted{}, err
+		return api.Row{}, err
 	}
 	if !ok {
-		st, found, err := s.storedRead(ctx, u, catalog.Asked{}, true)
-		if err != nil {
-			return unmuted{}, err
+		row, found, err := s.pluginRow(ctx, api.UnitRowQuery{Unit: u, Unmuted: true, Kept: true})
+		if err == nil && !found {
+			err = notFound{u.Label() + " is not in the inventory"}
 		}
-		if !found {
-			return unmuted{}, notFound{u.Label() + " is not in the inventory"}
-		}
-		var b turn.Book
-		if st.book != nil {
-			b = *st.book
-		}
-		return unmuted{row: st.row, evs: st.evs, book: b, d: st.d}, nil
+		return row, err
 	}
 	base := rd.Base
 	base.Pending, base.Asked = nil, catalog.Asked{}
-	row, err := rd.Derive(base, prrow.Unmuted(rd.In))
-	if err != nil {
-		return unmuted{}, err
-	}
-	b, _ := prrow.BookOf(rd.In)
-	return unmuted{row: row, evs: prrow.EventsOf(rd.In), book: b, d: s.deriverAt(base, rd.At)}, nil
+	return rd.Derive(base, rd.Unmuted())
 }
-
-// unmuted is a pull request's row without the user's mute, with what a
-// nudge reads beside it.
-type unmuted struct {
-	row  api.Row
-	evs  []dinv.Event
-	book turn.Book
-	d    prrow.Deriver
-}
-
-// updateOverride changes the stored override and reports whether it
-// changed. Every writer of overrides in the daemon goes through overrideMu,
-// so none writes back a field another one just changed.
-func (s *Server) updateOverride(ctx context.Context, u unit.Unit, change func(o *dinv.Override) error) (bool, error) {
-	s.overrideMu.Lock()
-	defer s.overrideMu.Unlock()
-	return s.updateOverrideLocked(ctx, u, change)
-}
-
-func (s *Server) updateOverrideLocked(ctx context.Context, u unit.Unit, change func(o *dinv.Override) error) (bool, error) {
-	for range overrideAttempts {
-		o, err := s.deps.Overrides.Override(ctx, u)
-		if err != nil {
-			return false, err
-		}
-		o.PR = refOf(u)
-		before := o
-		if err := change(&o); err != nil {
-			return false, err
-		}
-		if o == before {
-			return false, nil
-		}
-		written, err := s.deps.Overrides.SetOverrideIf(ctx, before, o)
-		if err != nil || written {
-			return written, err
-		}
-	}
-	return false, fmt.Errorf("%s: the override kept changing while it was written", u.Label())
-}
-
-// overrideAttempts bounds the rereads of an override another writer, such
-// as a take-over from a session, changed between read and write.
-const overrideAttempts = 5
 
 func (s *Server) recordEvent(ctx context.Context, u unit.Unit, kind, data string) error {
 	return s.deps.Events.RecordEvent(ctx, port.Event{Unit: u, Kind: kind, At: s.deps.Now(), Data: data})
 }
 
-// prepareNudge refuses when nobody but the user is to be asked, or the
-// same wait was already nudged, and fills who, the situation and whether
-// it asks the maintainers.
-func (s *Server) prepareNudge(ctx context.Context, u unit.Unit, c *Call) error {
-	um, err := s.unmutedRow(ctx, u)
-	if err != nil {
-		return err
-	}
-	r, d := um.row, um.d
-	p, _ := prrow.PayloadOf(r)
-	who, why := prrow.NudgeTargets(r, p.Author, d.Viewer, d.Ignore)
-	if refusal := prrow.NudgeRefusal(refOf(u), who, why, r.Summary.Since, um.evs, prrow.Unstarted(um.book), d.Now); refusal != "" {
-		return badRequest{refusal}
-	}
-	if c.Inputs == nil {
-		c.Inputs = map[string]any{}
-	}
-	c.Inputs["situation"] = nudgeSituation(who, r)
-	c.Inputs["waits_on_maintainers"] = slices.Equal(who, []string{prrow.NudgeMaintainers})
-	c.Inputs["who"] = slices.Clone(who)
-	return nil
-}
-
-func nudgeSituation(who []string, r api.Row) string {
-	since := ""
-	if !r.Summary.Since.IsZero() {
-		since = " since " + r.Summary.Since.Local().Format(time.RFC3339)
-	}
-	// The kind's label, not the reason: a reason can carry CI job names.
-	return fmt.Sprintf("Waiting on: %s%s, %s.", strings.Join(who, ", "), since, situation.Kind(r.Kind).Label())
-}
-
-// refreshBrief drops a pull request's brief and runs the brief job, which
+// refreshBrief drops a unit's brief and runs the brief job, which
 // makes it again first among those due.
 func (s *Server) refreshBrief(w http.ResponseWriter, r *http.Request, u unit.Unit) {
 	if s.deps.Brief == nil {
 		writeError(w, http.StatusConflict, "the brief is off; set brief.enabled in the config")
 		return
 	}
-	if err := s.deps.Brief.Forget(r.Context(), refOf(u)); err != nil {
+	if err := s.deps.Brief.Forget(r.Context(), u); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.RunJob("brief")
 	writeJSON(w, api.ActionResult{OK: true, Output: []string{"brief of " + u.Label() + " requested"}})
-}
-
-// workspaceID is the workspace of a GitHub row, "" for none or another
-// provider's row.
-func workspaceID(r api.Row) string {
-	p, _ := prrow.PayloadOf(r)
-	return p.Workspace.ID
 }

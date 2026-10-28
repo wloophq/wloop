@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -106,11 +107,24 @@ func (c *Client) Catalog(ctx context.Context) (api.CatalogResponse, error) {
 	return res, err
 }
 
+// Explore runs query through the plugin that serves the explore view.
 func (c *Client) Explore(ctx context.Context, query string) (api.ExploreResult, error) {
+	cat, err := c.Catalog(ctx)
+	if err != nil {
+		return api.ExploreResult{}, err
+	}
+	i := slices.IndexFunc(cat.Views, func(v api.ViewSpec) bool { return v.ID == exploreView })
+	if i < 0 || cat.Views[i].Provider == "" {
+		return api.ExploreResult{}, errors.New("no plugin serves the explore view")
+	}
 	var res api.ExploreResult
-	err := c.do(ctx, exploreTimeout, http.MethodPost, "/api/explore", api.ExploreRequest{Query: query}, &res)
+	err = c.do(ctx, exploreTimeout, http.MethodPost, api.PluginViewPath(unit.ProviderID(cat.Views[i].Provider), exploreView), api.ExploreRequest{Query: query}, &res)
 	return res, err
 }
+
+// exploreView is the view Explore searches through, and its plugin's view
+// of the same name.
+const exploreView = "explore"
 
 // Rows is every row.
 func (c *Client) Rows(ctx context.Context) ([]api.Row, error) {

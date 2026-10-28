@@ -4,22 +4,15 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/intent/builtin"
-)
-
-// ProbeOwner and ProbeRepo name the pull request of every probe: one that
-// exists nowhere, so no inventory holds it and no view has a role for it.
-const (
-	ProbeOwner = "loop-e2e"
-	ProbeRepo  = "probe"
 )
 
 // handleProbe launches a probe turn through the launcher, which stores it,
@@ -36,51 +29,53 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "workspace_id is the "+cmp.Or(s.deps.WorkspaceManager, "workspace manager's")+" workspace the probe runs in")
 		return
 	}
-	d, ok := s.probeIntent(pr.Ref{Owner: ProbeOwner, Repo: ProbeRepo}.Unit().Provider)
+	d, ok := s.probeIntent(s.deps.Forge)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "no intent holds the "+builtin.RoleProbe+" role")
 		return
 	}
 	ctx := context.WithoutCancel(r.Context())
 	s.deps.LoopMu.Lock()
-	ref, err := s.probe(ctx, req, d)
+	u, err := s.probe(ctx, req, d)
 	s.deps.LoopMu.Unlock()
 	if err != nil {
 		writeAgentError(w, err)
 		return
 	}
-	b, err := s.deps.Turns.Store.Books(ctx, ref.Unit())
+	b, err := s.deps.Turns.Store.Books(ctx, u)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	book := b[ref.Unit()]
+	book := b[u]
 	t, ok := book.Newest(turn.Intent(d.Name))
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "the probe stored no turn")
 		return
 	}
-	writeJSON(w, api.ProbeResult{PR: ref.URL(), Turn: t.ID, Session: t.SentTo})
+	writeJSON(w, api.ProbeResult{PR: u.Address(), Turn: t.ID, Session: t.SentTo})
 }
 
-// probe picks a pull request number no probe used, from the clock, and
+// probe picks a forge unit no probe used, numbered from the clock, and
 // launches the probe's turn on it.
-func (s *Server) probe(ctx context.Context, req api.ProbeRequest, d dintent.Def) (pr.Ref, error) {
-	ref := pr.Ref{Owner: ProbeOwner, Repo: ProbeRepo, Number: int(s.deps.Now().Unix())}
+func (s *Server) probe(ctx context.Context, req api.ProbeRequest, d dintent.Def) (unit.Unit, error) {
+	n := int(s.deps.Now().Unix())
+	var u unit.Unit
 	for {
-		b, err := s.deps.Turns.Store.Books(ctx, ref.Unit())
+		u = unit.Unit{Provider: s.deps.Forge, Key: fmt.Sprintf("%s/%s#%d", api.ProbeOwner, api.ProbeRepo, n)}
+		b, err := s.deps.Turns.Store.Books(ctx, u)
 		if err != nil {
-			return ref, err
+			return u, err
 		}
-		if len(b[ref.Unit()].Turns) == 0 {
+		if len(b[u].Turns) == 0 {
 			break
 		}
-		ref.Number++
+		n++
 	}
 	if s.deps.Turns.Launcher == nil {
-		return ref, errors.New("the daemon has no launcher")
+		return u, errors.New("the daemon has no launcher")
 	}
-	return ref, s.deps.Turns.Launcher.Launch(ctx, turns.Launch{Unit: ref.Unit(), Intent: turn.Intent(d.Name), Trigger: turn.Automated,
+	return u, s.deps.Turns.Launcher.Launch(ctx, turns.Launch{Unit: u, Intent: turn.Intent(d.Name), Trigger: turn.Automated,
 		WorkspaceID: req.WorkspaceID, Home: req.Home, Model: req.Model})
 }
 

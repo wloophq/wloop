@@ -591,7 +591,7 @@ func TestNoSnapshotMarksWaitingUnread(t *testing.T) {
 	if got := numbers(f.rows("?view=" + api.ViewNeedsMe)); len(got) != 0 {
 		t.Fatalf("needs-me %v while the agents are unknown", got)
 	}
-	facts, err := f.s.turnFacts(ctx, f.s.loaded().Registry)
+	facts, err := turnFacts(f.s, ctx, f.s.loaded().Registry)
 	if err != nil {
 		t.Fatal(err)
 	}

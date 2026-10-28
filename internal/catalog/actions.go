@@ -110,7 +110,7 @@ var builtinActions = []builtinAction{
 			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisPending + p.Since.UTC().Format(time.RFC3339Nano)}, true
 		}
 		if f.HeldByCap {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason}, true
+			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason, Intent: requestIntent(f, "run_now")}, true
 		}
 		return absent()
 	}},

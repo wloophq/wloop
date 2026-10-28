@@ -58,7 +58,7 @@ drives_row = true
 [[source.roles]]
 name = "pr.nudge"
 doc = "The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it."
-prepare = "nudge.prepare"
+prepare = "action:nudge.prepare"
 context = "pr"
 policy = "round"
 

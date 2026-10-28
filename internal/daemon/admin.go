@@ -285,7 +285,7 @@ func (s *Server) handleDryRunTurn(w http.ResponseWriter, r *http.Request) {
 	if !decodeAdmin(w, r, &req) {
 		return
 	}
-	if _, err := parsePRURL(req.PR); err != nil {
+	if _, err := s.parseForgeURL(req.PR); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -300,7 +300,7 @@ func (s *Server) handleDryRunTurn(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDoctor(w http.ResponseWriter, r *http.Request) {
 	q := api.DoctorQuery{Repo: r.URL.Query().Get("repo"), PR: r.URL.Query().Get("pr")}
 	if q.PR != "" {
-		if _, err := parsePRURL(q.PR); err != nil {
+		if _, err := s.parseForgeURL(q.PR); err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -344,7 +344,7 @@ func reconcileChecks(rep api.ReconcileReport, err error) []api.DoctorCheck {
 }
 
 func (s *Server) handleTurnShow(w http.ResponseWriter, r *http.Request) {
-	u, err := parsePRURL(r.URL.Query().Get("pr"))
+	u, err := s.parseForgeURL(r.URL.Query().Get("pr"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

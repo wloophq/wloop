@@ -130,11 +130,11 @@ func TestFastPhasesNest(t *testing.T) {
 			phases++
 		}
 	}
-	if phases != 2 {
-		t.Errorf("%d phases, want 2: turns, untrack", phases)
+	if phases != 1 {
+		t.Errorf("%d phases, want 1: turns", phases)
 	}
-	if got, want := sum.Total(meter.SQL).Calls, fast.Total(meter.SQL).Calls; got != want || want == 0 {
-		t.Fatalf("phases sum %d sql calls, job %d (want equal and above 0)", got, want)
+	if got, want := sum.Total(meter.SQL).Calls, fast.Total(meter.SQL).Calls; got != want {
+		t.Fatalf("phases sum %d sql calls, job %d (want equal)", got, want)
 	}
 }
 

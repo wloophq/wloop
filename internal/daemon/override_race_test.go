@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
 )
@@ -23,7 +24,9 @@ func TestMuteExpiryAndTakeOverKeepBothWrites(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			if _, _, err := s.expireMute(ctx, ref.Unit(), muted); err != nil {
+			cleared := map[string]string{port.OverrideMuteUntilStateChange: "", port.OverrideMutedKind: "", port.OverrideMutedWaitingOn: ""}
+			match := map[string]string{port.OverrideMuteUntilStateChange: port.OverrideTrue, port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "alice"}
+			if _, err := s.deps.Overrides.SetOverride(ctx, ref.Unit(), cleared, match); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -57,7 +60,7 @@ func TestOverrideActionAndTakeOverKeepBothWrites(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			if _, err := s.updateOverride(ctx, ref.Unit(), func(o *dinv.Override) error { o.Hold = true; return nil }); err != nil {
+			if err := s.applyHold(ctx, "pause", ref.Unit()); err != nil {
 				t.Error(err)
 			}
 		}()

@@ -84,6 +84,11 @@ func TestNoMuteNoWork(t *testing.T) {
 	if _, err := s.rows(context.Background(), api.ViewAll); err != nil {
 		t.Fatal(err)
 	}
+	for range 2 {
+		if err := s.expireMutes(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ctx, sc := metertest.Start(t, context.Background())
 	if err := s.expireMutes(ctx); err != nil {
 		t.Fatal(err)

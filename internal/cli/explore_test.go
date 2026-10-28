@@ -14,9 +14,10 @@ func TestExplorePrintsCandidatesThroughTheDaemon(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{
-		"GET /api/health": api.Health{Version: "test"},
-		"GET /api/rows":   api.RowsPage{Full: true, Rows: []api.Row{{Unit: r7.Unit(), Label: r7.String(), Kind: "review", Summary: api.Summary{WaitsOn: "me", Since: testNow.Add(-50 * time.Hour)}}}},
-		"POST /api/explore": api.ExploreResult{Query: "is:pr is:open repo:acme/api", Read: `read "acme/api" as repo:acme/api`, Total: 2, Cost: 1,
+		"GET /api/health":  api.Health{Version: "test"},
+		"GET /api/catalog": exploreCatalog,
+		"GET /api/rows":    api.RowsPage{Full: true, Rows: []api.Row{{Unit: r7.Unit(), Label: r7.String(), Kind: "review", Summary: api.Summary{WaitsOn: "me", Since: testNow.Add(-50 * time.Hour)}}}},
+		"POST /api/plugins/github/views/explore": api.ExploreResult{Query: "is:pr is:open repo:acme/api", Read: `read "acme/api" as repo:acme/api`, Total: 2, Cost: 1,
 			RateLimit: api.RateLimit{Remaining: 4900, Limit: 5000},
 			Candidates: []api.Candidate{
 				{Unit: r7.Unit(), Label: r7.String(), Title: "Batch export", Author: "ana", Additions: 120, Deletions: 4, ChangedFiles: 3,
@@ -47,9 +48,10 @@ func TestExploreSaysAnAuthorHasNothingOpen(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.Socket = serveJSON(t, map[string]any{
-		"GET /api/health": api.Health{Version: "test"},
-		"GET /api/rows":   api.RowsPage{Full: true, Rows: []api.Row{}},
-		"POST /api/explore": api.ExploreResult{Query: "is:pr author:zoe", Read: `read "zoe" as author:zoe`,
+		"GET /api/health":  api.Health{Version: "test"},
+		"GET /api/catalog": exploreCatalog,
+		"GET /api/rows":    api.RowsPage{Full: true, Rows: []api.Row{}},
+		"POST /api/plugins/github/views/explore": api.ExploreResult{Query: "is:pr author:zoe", Read: `read "zoe" as author:zoe`,
 			Empty: "zoe has no open pull requests you did not open", Candidates: []api.Candidate{}},
 	})
 	if code := te.run("explore", "zoe"); code != 0 {
@@ -59,3 +61,6 @@ func TestExploreSaysAnAuthorHasNothingOpen(t *testing.T) {
 		t.Fatalf("output:\n%s", out)
 	}
 }
+
+// exploreCatalog serves the explore view as the GitHub plugin's.
+var exploreCatalog = api.CatalogResponse{Views: []api.ViewSpec{{ID: "explore", Provider: "github"}}}

@@ -24,19 +24,6 @@ var pluginIdentityAllowlist = []providerSite{
 	{"internal/cli/launcher.go", "cliLauncher.Launch", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/launcher.go", "isPR", "pr.RefOf", 1, "debt: the launcher reads a pull request's workspace outside the plugin"},
 	{"internal/cli/serve_ended.go", "openPRBooks.Books", "pr.RefOf", 1, "debt: the ended turns' books are pull requests"},
-	{"internal/daemon/actions.go", "Server.readAheadQueued", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/actions.go", "Server.runAction", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/api.go", "Server.handleRemoveDone", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/api.go", "Server.parsePR", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/attention_tasks.go", "taskViewer.rowNotice", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/briefs.go", "refsOf", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/headless.go", "Server.runHeadless", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/plan.go", "Server.actOnPlanItem", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/refs.go", "isPullRequest", "pr.RefOf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/refs.go", "refOf", "pr.RefOf", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/rows.go", "Server.detail", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/unitactions.go", "sourceFollowed", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
-	{"internal/daemon/unitactions.go", "unitAction", "isPullRequest", 1, "debt: the daemon gates the GitHub-only facilities on a pull request, see prAllowed"},
 }
 
 // pluginIdentity flags, outside the providers' homes and the GitHub

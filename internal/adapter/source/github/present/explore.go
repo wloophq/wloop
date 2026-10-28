@@ -1,4 +1,4 @@
-package daemon
+package present
 
 import (
 	"context"
@@ -17,80 +17,57 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/explore"
+	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-type Explorer interface {
-	explore.Searcher
-	IsUser(ctx context.Context, login string) (bool, error)
-}
-
 const (
-	exploreAttempt    = 25 * time.Second
-	exploreRetryPause = 2 * time.Second
 	userLookupTimeout = 10 * time.Second
 	recentMax         = 8
 	metaExploreRecent = "explore_recent"
 )
 
-// handleExplore runs one search, only when the user asks, never below the
+// explore runs one search, only when the user asks, never below the
 // budget the sweeps keep and never two at once.
-func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
-	if s.refusePlugin(w, unit.Unit{Provider: s.deps.Forge}) {
-		return
+func (p *Presenter) explore(ctx context.Context, req api.ExploreRequest) (api.ExploreResult, error) {
+	if p.d.Explorer == nil {
+		return api.ExploreResult{}, api.Refuse(http.StatusServiceUnavailable, "explore unavailable")
 	}
-	if s.deps.Explorer == nil {
-		writeError(w, http.StatusServiceUnavailable, "explore unavailable")
-		return
-	}
-	var req api.ExploreRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
-		return
-	}
-	ctx := r.Context()
 	if _, err := explore.Parse(ctx, req.Query, explore.Lookup{}); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return api.ExploreResult{}, api.Refuse(http.StatusBadRequest, "%v", err)
 	}
-	if s.rateLimitLow() {
-		rl := s.graphQLBudget()
-		writeError(w, http.StatusTooManyRequests, fmt.Sprintf("GitHub budget low (%d of %d) until %s; explore waits for the reset",
-			rl.Remaining, rl.Limit, rl.ResetAt.Local().Format("15:04")))
-		return
+	if p.d.Budget != nil && p.d.Budget.Low() {
+		rl := p.d.Budget.RateLimit()
+		return api.ExploreResult{}, api.Refuse(http.StatusTooManyRequests, "GitHub budget low (%d of %d) until %s; explore waits for the reset",
+			rl.Remaining, rl.Limit, rl.ResetAt.Local().Format("15:04"))
 	}
-	if !s.exploring.TryLock() {
-		writeError(w, http.StatusConflict, "a search is already running")
-		return
+	if !p.exploring.TryLock() {
+		return api.ExploreResult{}, api.Refuse(http.StatusConflict, "a search is already running")
 	}
-	defer s.exploring.Unlock()
+	defer p.exploring.Unlock()
 	ctx = dgh.WithPriority(ctx, dgh.PriorityBackground)
-	lookup, err := s.exploreLookup(ctx)
+	lookup, err := p.exploreLookup(ctx)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return api.ExploreResult{}, err
 	}
 	parsed, err := explore.Parse(ctx, req.Query, lookup)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return api.ExploreResult{}, api.Refuse(http.StatusBadRequest, "%v", err)
 	}
-	id, _ := s.viewerInfo(ctx)
-	viewer := s.login(id)
+	viewer := p.viewer(ctx)
 	if viewer != "" && strings.EqualFold(parsed.Author, viewer) {
-		writeError(w, http.StatusBadRequest, "Explore leaves out your own pull requests; the My PRs view lists them")
-		return
+		return api.ExploreResult{}, api.Refuse(http.StatusBadRequest, "Explore leaves out your own pull requests; the My PRs view lists them")
 	}
 	var page dgh.CandidatePage
 	asked := parsed.Query
 	if parsed.Ref != nil {
 		asked = parsed.Ref.URL()
-		sctx, cancel := context.WithTimeout(ctx, s.exploreAttempt)
-		page, err = s.deps.Explorer.CandidateByRef(sctx, *parsed.Ref, viewer)
+		sctx, cancel := context.WithTimeout(ctx, p.d.ExploreAttempt)
+		page, err = p.d.Explorer.CandidateByRef(sctx, *parsed.Ref, viewer)
 		cancel()
 	} else {
-		page, err = s.exploreRetry().Search(ctx, s.deps.Explorer, parsed.Query, viewer)
+		page, err = p.exploreRetry().Search(ctx, p.d.Explorer, parsed.Query, viewer)
 	}
 	read := fmt.Sprintf("read %q as %s", strings.Join(strings.Fields(req.Query), " "), parsed.Read)
 	hidden := ""
@@ -98,7 +75,7 @@ func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
 		queries := explore.AuthorInRepos(parsed.Author, lookup.Repos, parsed.Sort, parsed.Keep)
 		var more dgh.CandidatePage
 		var failed []error
-		if more, failed, err = s.exploreRetry().AuthorInRepos(ctx, s.deps.Explorer, queries, parsed.Sort, viewer); err == nil {
+		if more, failed, err = p.exploreRetry().AuthorInRepos(ctx, p.d.Explorer, queries, parsed.Sort, viewer); err == nil {
 			more.RateLimit.Cost += page.RateLimit.Cost
 			page = more
 		}
@@ -115,13 +92,13 @@ func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "GitHub search: "+err.Error())
-		return
+		return api.ExploreResult{}, api.Refuse(http.StatusBadGateway, "GitHub search: %v", err)
 	}
-	res := api.ExploreResult{Query: asked, Read: read, Total: page.Total, Candidates: []api.Candidate{}, Cost: page.RateLimit.Cost, RateLimit: wireRateLimit(page.RateLimit)}
-	if res.Candidates, err = s.wireCandidates(ctx, page.Candidates); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+	rl := page.RateLimit
+	res := api.ExploreResult{Query: asked, Read: read, Total: page.Total, Candidates: []api.Candidate{}, Cost: rl.Cost,
+		RateLimit: api.RateLimit{Cost: rl.Cost, Remaining: rl.Remaining, Limit: rl.Limit, ResetAt: rl.ResetAt}}
+	if res.Candidates, err = p.wireCandidates(ctx, page.Candidates); err != nil {
+		return api.ExploreResult{}, err
 	}
 	switch {
 	case len(res.Candidates) > 0:
@@ -135,34 +112,43 @@ func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
 	if parsed.Ref != nil {
 		remembered = parsed.Ref.URL()
 	}
-	if res.Recent, err = s.rememberSearch(context.WithoutCancel(ctx), remembered); err != nil {
-		s.logf("explore: recent searches: %v", err)
+	if res.Recent, err = p.rememberSearch(context.WithoutCancel(ctx), remembered); err != nil {
+		p.h.Logf("explore: recent searches: %v", err)
 	}
-	writeJSON(w, res)
+	return res, nil
 }
 
-func (s *Server) exploreRetry() explore.Retry {
-	return explore.Retry{Attempt: s.exploreAttempt, Pause: s.exploreRetryPause}
+// viewer is the viewer's GitHub login, "" when unknown.
+func (p *Presenter) viewer(ctx context.Context) string {
+	if p.h.Viewer == nil {
+		return ""
+	}
+	id, _ := p.h.Viewer(ctx)
+	return readmodel.Login(unit.GitHub, id)
+}
+
+func (p *Presenter) exploreRetry() explore.Retry {
+	return explore.Retry{Attempt: p.d.ExploreAttempt, Pause: p.d.ExploreRetryPause}
 }
 
 // exploreLookup reads the repositories and owners the inventory holds, the
 // owners with the most pull requests first.
-func (s *Server) exploreLookup(ctx context.Context) (explore.Lookup, error) {
-	prs, err := s.deps.PRs.ListPRs(ctx, false)
+func (p *Presenter) exploreLookup(ctx context.Context) (explore.Lookup, error) {
+	prs, err := p.d.Store.ListPRs(ctx, false)
 	if err != nil {
 		return explore.Lookup{}, err
 	}
-	l := explore.Lookup{IsUser: s.isUser}
+	l := explore.Lookup{IsUser: p.isUser}
 	count := map[string]int{}
-	for _, pr := range prs {
-		repo := pr.Ref.Owner + "/" + pr.Ref.Repo
+	for _, x := range prs {
+		repo := x.Ref.Owner + "/" + x.Ref.Repo
 		if !slices.Contains(l.Repos, repo) {
 			l.Repos = append(l.Repos, repo)
 		}
-		if count[pr.Ref.Owner] == 0 {
-			l.Owners = append(l.Owners, pr.Ref.Owner)
+		if count[x.Ref.Owner] == 0 {
+			l.Owners = append(l.Owners, x.Ref.Owner)
 		}
-		count[pr.Ref.Owner]++
+		count[x.Ref.Owner]++
 	}
 	slices.SortStableFunc(l.Owners, func(a, b string) int {
 		if count[a] != count[b] {
@@ -173,28 +159,28 @@ func (s *Server) exploreLookup(ctx context.Context) (explore.Lookup, error) {
 	return l, nil
 }
 
-// isUser asks GitHub once per login for the daemon's life; a failure is not
-// kept.
-func (s *Server) isUser(ctx context.Context, login string) (bool, error) {
+// isUser asks GitHub once per login for the presenter's life; a failure is
+// not kept.
+func (p *Presenter) isUser(ctx context.Context, login string) (bool, error) {
 	key := strings.ToLower(login)
-	if v, ok := s.users.Load(key); ok {
+	if v, ok := p.users.Load(key); ok {
 		return v.(bool), nil
 	}
 	lctx, cancel := context.WithTimeout(ctx, userLookupTimeout)
 	defer cancel()
-	ok, err := s.deps.Explorer.IsUser(lctx, login)
+	ok, err := p.d.Explorer.IsUser(lctx, login)
 	if err != nil {
-		s.logf("explore: is %s a user: %v", login, err)
+		p.h.Logf("explore: is %s a user: %v", login, err)
 		return false, err
 	}
-	s.users.Store(key, ok)
+	p.users.Store(key, ok)
 	return ok, nil
 }
 
 // wireCandidates wires each candidate with its brief and the actions it
 // offers: the read model's row for a pull request the inventory lists, a
 // row derived from the snapshot's base for any other.
-func (s *Server) wireCandidates(ctx context.Context, cands []dgh.Candidate) ([]api.Candidate, error) {
+func (p *Presenter) wireCandidates(ctx context.Context, cands []dgh.Candidate) ([]api.Candidate, error) {
 	out := []api.Candidate{}
 	if len(cands) == 0 {
 		return out, nil
@@ -203,7 +189,7 @@ func (s *Server) wireCandidates(ctx context.Context, cands []dgh.Candidate) ([]a
 	for i, c := range cands {
 		units[i] = c.Ref.Unit()
 	}
-	reads, base, at, err := s.readModel().ReadMany(ctx, units)
+	reads, base, at, err := p.h.Model.ReadMany(ctx, units)
 	if err != nil {
 		return nil, err
 	}
@@ -215,28 +201,26 @@ func (s *Server) wireCandidates(ctx context.Context, cands []dgh.Candidate) ([]a
 			continue
 		}
 		rows[c.Ref] = rd.Row
-		if pr, ok := prrow.PROf(rd.In); ok {
-			prs[c.Ref] = pr
+		if x, ok := prrow.PROf(rd.In); ok {
+			prs[c.Ref] = x
 		}
 	}
 	var d prrow.Deriver
-	var overrides map[unit.Unit]dinv.Override
+	var overrides map[pr.Ref]dinv.Override
 	if len(rows) < len(cands) {
-		d = s.deriverAt(base, at)
-		if overrides, err = s.deps.Overrides.Overrides(ctx); err != nil {
+		d = p.deriverAt(base, at)
+		if overrides, err = p.d.Store.Overrides(ctx); err != nil {
 			return nil, err
 		}
 	}
-	briefs := s.candidateBriefs(ctx, prs)
+	briefs := p.candidateBriefs(ctx, prs)
 	for _, c := range cands {
-		c.Title = termfmt.OneLine(c.Title, 300)
-		c.HeadBranch = termfmt.OneLine(c.HeadBranch, 255)
-		c.BaseBranch = termfmt.OneLine(c.BaseBranch, 255)
+		c = cleanCandidate(c)
 		wc := wireCandidate(c, briefs[c.Ref])
 		if row, ok := rows[c.Ref]; ok {
 			wc.Actions = row.Actions
 		} else {
-			o := overrides[c.Ref.Unit()]
+			o := overrides[c.Ref]
 			o.PR = c.Ref
 			wc.Actions = d.UntrackedRow(c, o).Actions
 		}
@@ -245,24 +229,32 @@ func (s *Server) wireCandidates(ctx context.Context, cands []dgh.Candidate) ([]a
 	return out, nil
 }
 
+func wireCandidate(c dgh.Candidate, b *brief.View) api.Candidate {
+	return api.Candidate{Unit: c.Ref.Unit(), Label: c.Ref.String(), URL: c.URL, Title: c.Title, Author: c.Author, State: c.State, IsDraft: c.IsDraft,
+		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, Additions: c.Additions, Deletions: c.Deletions,
+		ChangedFiles: c.ChangedFiles, HeadBranch: c.HeadBranch, BaseBranch: c.BaseBranch, ReviewDecision: c.ReviewDecision,
+		ReviewRequests: c.ReviewRequests, ChecksState: c.ChecksState, Comments: c.Comments, MyReview: c.MyReview,
+		MyReviewOnHead: c.MyReviewOnHead, Brief: WireBriefView(b)}
+}
+
 // candidateBriefs are the sanitized briefs of the pull requests the
 // inventory holds and has not lapsed.
-func (s *Server) candidateBriefs(ctx context.Context, prs map[pr.Ref]dinv.PR) map[pr.Ref]*brief.View {
-	if s.deps.BriefViews == nil {
+func (p *Presenter) candidateBriefs(ctx context.Context, prs map[pr.Ref]dinv.PR) map[pr.Ref]*brief.View {
+	if p.d.Briefs == nil {
 		return nil
 	}
 	var live []dinv.PR
-	for _, pr := range prs {
-		if !pr.Lapsed() {
-			live = append(live, pr)
+	for _, x := range prs {
+		if !x.Lapsed() {
+			live = append(live, x)
 		}
 	}
 	if len(live) == 0 {
 		return nil
 	}
-	views, err := s.deps.BriefViews.Views(ctx, live...)
+	views, err := p.d.Briefs.Views(ctx, live...)
 	if err != nil {
-		s.logf("explore: briefs: %v", err)
+		p.h.Logf("explore: briefs: %v", err)
 		return nil
 	}
 	out := make(map[pr.Ref]*brief.View, len(views))
@@ -278,17 +270,8 @@ func (s *Server) candidateBriefs(ctx context.Context, prs map[pr.Ref]dinv.PR) ma
 	return out
 }
 
-func (s *Server) handleExploreRecent(w http.ResponseWriter, r *http.Request) {
-	list, err := s.recentSearches(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, list)
-}
-
-func (s *Server) recentSearches(ctx context.Context) ([]string, error) {
-	raw, err := s.deps.Meta.Meta(ctx, metaExploreRecent)
+func (p *Presenter) recentSearches(ctx context.Context) ([]string, error) {
+	raw, err := p.d.Store.Meta(ctx, metaExploreRecent)
 	list := []string{}
 	if err != nil || raw == "" {
 		return list, err
@@ -300,8 +283,8 @@ func (s *Server) recentSearches(ctx context.Context) ([]string, error) {
 }
 
 // rememberSearch puts input first among the recent searches, once.
-func (s *Server) rememberSearch(ctx context.Context, input string) ([]string, error) {
-	list, err := s.recentSearches(ctx)
+func (p *Presenter) rememberSearch(ctx context.Context, input string) ([]string, error) {
+	list, err := p.recentSearches(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +297,7 @@ func (s *Server) rememberSearch(ctx context.Context, input string) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	return list, s.deps.Meta.SetMeta(ctx, metaExploreRecent, string(b))
+	return list, p.d.Store.SetMeta(ctx, metaExploreRecent, string(b))
 }
 
 func plural(n int, one, many string) string {

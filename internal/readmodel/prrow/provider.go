@@ -443,3 +443,21 @@ func (p *Provider) activities(ctx context.Context) (map[unit.Unit]turn.Activity,
 	}
 	return p.src.Activity.Activities(ctx, unit.GitHub)
 }
+
+// Unmuted is in as it stands with no override at all.
+func (p *Provider) Unmuted(in any) any { return Unmuted(in) }
+
+// Notice is what row, a row of this provider derived from in, notifies at
+// the minute at.
+func (p *Provider) Notice(base readmodel.Base, row api.Row, in any, at time.Time) (readmodel.Notice, bool) {
+	x, ok := in.(*input)
+	if !ok {
+		return readmodel.Notice{}, false
+	}
+	n, ok := DeriverAt(base, x.set.RowSettings, x.set.briefOn, at).Notice(row, in)
+	return readmodel.Notice{Item: n.Case.Item(), Held: n.Case == NoticeHeld, Question: n.Case == NoticeQuestion, Record: n.Record,
+		Token: n.Token, Attention: n.Attention}, ok
+}
+
+// Book is the turn book of the input's pull request, when it has one.
+func (p *Provider) Book(in any) (turn.Book, bool) { return BookOf(in) }

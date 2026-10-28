@@ -15,6 +15,7 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -31,6 +32,7 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -44,7 +46,8 @@ func withRows(d daemon.Deps, st *inventory.Store) daemon.Deps {
 		panic(err)
 	}
 	d = withSources(withStore(d, st), plugins, mods)
-	d.Ingest, d.Collector, d.Track = nil, nil, nil
+	d = withGitHub(d, present.Deps{Store: st, Host: moduleBroker(d.Units, st.DB())})
+	d.Ingest, d.Collector = nil, nil
 	if d.Forge == "" {
 		d.Forge = unit.GitHub
 	}
@@ -274,4 +277,11 @@ func viewerIs(login string, teams ...string) func(context.Context) (src.Identity
 
 func identityOf(login string, teams ...string) src.Identity {
 	return src.Identity{Viewer: src.Person{Key: "github:" + login, Name: login}, Teams: teams}
+}
+
+// moduleBroker is the broker of the GitHub module over db, as serve's
+// moduleHost builds it, with no pause.
+func moduleBroker(codecs *unit.Registry, db *sqlite.DB) src.Host {
+	b := &psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: codecs}, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db}
+	return b.Host()
 }

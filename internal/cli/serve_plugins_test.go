@@ -62,7 +62,7 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 
 	on := te.serveDeps(context.Background(), db, te.cfg, t.Logf, &lock.Mutex{}, nil)
 	if builds.Load() != 1 || len(on.Ingest) != 1 || len(on.RowProviders) != 1 || on.Collector == nil || len(on.Runtimes) != 1 || on.PluginEnabled != nil ||
-		on.Intakes == nil || on.Explorer == nil || on.Budget == nil || on.Identity == nil || te.Env.viewFacts().p.Load() == nil {
+		on.Intakes == nil || on.Presenters[unit.GitHub] == nil || on.Budget == nil || on.Identity == nil || te.Env.viewFacts().p.Load() == nil {
 		t.Fatalf("github enabled: builds %d, deps %+v", builds.Load(), on)
 	}
 
@@ -73,9 +73,6 @@ func TestDisabledPluginIsNotBuilt(t *testing.T) {
 	}
 	if len(d.Ingest) != 0 || len(d.RowProviders) != 0 || d.Collector != nil || d.Track != nil || len(d.Runtimes) != 0 {
 		t.Fatalf("a disabled plugin's jobs: ingest %d, rows %d, collector %v, runtimes %d", len(d.Ingest), len(d.RowProviders), d.Collector, len(d.Runtimes))
-	}
-	if d.Brief != nil || d.BriefStatus != nil || d.Intakes != nil || d.IntakeBriefs != nil || d.Explorer != nil || d.Budget != nil || d.Identity != nil {
-		t.Fatalf("github's handles stayed: %+v", d)
 	}
 	if te.Env.viewFacts().p.Load() != nil {
 		t.Fatal("the views kept a disabled plugin's workflow facts")

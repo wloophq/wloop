@@ -200,7 +200,24 @@ func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.Pr
 
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.
-var LoopEventKinds = []string{"muted", "unmuted", "held", "released", "adopted", "tracked", "untracked", "nudged", "removed", "status"}
+var LoopEventKinds = []string{EventMuted, EventUnmuted, EventHeld, EventReleased, EventAdopted, EventTracked, EventUntracked, "nudged",
+	EventRemoved, "status"}
+
+// The loop's event kinds the host records itself.
+const (
+	EventMuted     = "muted"
+	EventUnmuted   = "unmuted"
+	EventHeld      = "held"
+	EventReleased  = "released"
+	EventAdopted   = "adopted"
+	EventTracked   = "tracked"
+	EventUntracked = "untracked"
+	EventRemoved   = "removed"
+	// EventRoundSent and EventRoundUnblocked are a round's, which the
+	// host records when a person sends or unblocks it.
+	EventRoundSent      = "round_sent"
+	EventRoundUnblocked = "round_unblocked"
+)
 
 // TriggerEventKinds are the event kinds a workflow's trigger.on names: the
 // loop's, the plugins' and the task's.

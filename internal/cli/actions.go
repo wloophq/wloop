@@ -314,8 +314,10 @@ func (a envActions) Adopt(ctx context.Context, u unit.Unit, c daemon.Call) error
 	if err != nil {
 		return err
 	}
-	_, err = adoptPR(ctx, e, cfg, ref, profile)
-	return err
+	if _, err = adoptPR(ctx, e, cfg, ref, profile); err != nil || a.store == nil {
+		return err
+	}
+	return a.store.SetAdopted(ctx, ref)
 }
 
 func (a envActions) Intent(ctx context.Context, name string, u unit.Unit, c daemon.Call) error {

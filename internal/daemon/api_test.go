@@ -15,10 +15,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
@@ -30,6 +33,7 @@ import (
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/change"
+	"github.com/wloophq/wloop/internal/core/port"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -49,24 +53,60 @@ func newServer(t *testing.T) *Server {
 }
 
 // store is the inventory store a test server runs on.
-func (s *Server) store() *inventory.Store { return s.deps.PRs.(inventory.ByUnit).Store }
+func (s *Server) store() *inventory.Store { return s.deps.Records.(present.Records).Store }
 
-// briefRoles is a fake brief queue in every role.
+// briefRoles is a fake brief queue in every role, keyed by pull request.
 type briefRoles interface {
-	BriefQueue
+	present.Queue
 	BriefHealth
-	BriefReads
+	prrow.Briefs
+	present.Briefs
 }
 
 // withBriefs sets every brief role of d to b; nil turns briefs off.
 func withBriefs(d *Deps, b briefRoles) {
-	d.Brief, d.BriefStatus, d.BriefViews = b, b, b
-	if pr, ok := d.PRs.(inventory.ByUnit); ok {
-		d.RowProviders = prRows(pr.Store, b)
+	q := present.BriefQueue{Q: b}
+	d.Brief, d.BriefStatus, d.BriefAttempts = q, b, q
+	if r, ok := d.Records.(present.Records); ok {
+		d.RowProviders = prRows(r.Store, b)
 	}
+	githubOf(d).Briefs = b
 }
 
-// withStore is d with every inventory role on st.
+// githubDeps are the GitHub presenter's deps by the Presenters map
+// withStore set, which every copy of the Deps shares; a test sets them
+// before the server's first request.
+var githubDeps sync.Map
+
+// githubTest is what a test sets of the GitHub plugin: its presenter's
+// deps, and the read of a pull request about to be tracked.
+type githubTest struct {
+	deps present.Deps
+	read atomic.Pointer[func(context.Context, unit.Unit) (port.TrackRead, error)]
+}
+
+func githubTestOf(d *Deps) *githubTest {
+	g, ok := githubDeps.Load(reflect.ValueOf(d.Presenters).Pointer())
+	if !ok {
+		panic("githubOf: no GitHub presenter on these deps; use withStore")
+	}
+	return g.(*githubTest)
+}
+
+// githubOf is the GitHub presenter's deps of d.
+func githubOf(d *Deps) *present.Deps { return &githubTestOf(d).deps }
+
+// trackReads makes read the read of a pull request s tracks; nil tracks
+// unread.
+func (s *Server) trackReads(read func(context.Context, unit.Unit) (port.TrackRead, error)) {
+	githubTestOf(&s.deps).read.Store(&read)
+}
+
+// github is the GitHub presenter's deps of s.
+func (s *Server) github() *present.Deps { return githubOf(&s.deps) }
+
+// withStore is d with every store role on st and the GitHub plugin's
+// presenter over it.
 func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Units == nil {
 		d.Units = unit.NewRegistry(pr.Codec{})
@@ -74,9 +114,29 @@ func withStore(d Deps, st *inventory.Store) Deps {
 	if d.Forge == "" {
 		d.Forge = unit.GitHub
 	}
-	u := inventory.ByUnit{Store: st}
-	d.PRs, d.Events, d.Overrides, d.Meta, d.Records = u, u, u, st, u
+	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
 	d.RowProviders = prRows(st, nil)
+	d.Repo = present.Repo
+	g := &githubTest{deps: present.Deps{Store: st}}
+	d.Presenters = map[unit.ProviderID]func(PresenterHost) Presenter{unit.GitHub: func(h PresenterHost) Presenter {
+		g.deps.Host = (&psource.Broker{ID: string(unit.GitHub), Units: psource.Units{Codecs: h.Units}, Events: sqlite.New(st.DB()), Marks: st.DB(),
+			Drafts: st.DB(), Overrides: st.DB()}).Host()
+		return present.New(g.deps, present.Host(h))
+	}}
+	githubDeps.Store(reflect.ValueOf(d.Presenters).Pointer(), g)
+	units, now := d.Units, d.Now
+	if now == nil {
+		now = time.Now
+	}
+	d.Track, d.Untrack = ghsource.Follows(st, func(ctx context.Context, ref github.Ref) (port.TrackRead, error) {
+		if read := g.read.Load(); read != nil && *read != nil {
+			return (*read)(ctx, ref.Unit())
+		}
+		return port.TrackRead{Unit: ref.Unit()}, nil
+	}, func() *unit.Registry { return units }, func() time.Time { return now() })
+	if d.Follows == nil {
+		d.Follows = func(p unit.ProviderID) bool { return p == unit.GitHub }
+	}
 	return d
 }
 
@@ -127,7 +187,8 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	st.UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
 		Identity: viewerIs("me", "acme/search"),
-		Log:      func(string, ...any) {}, Explorer: openOnGitHub{}}, st)
+		Log:      func(string, ...any) {}}, st)
+	githubOf(&d).Explorer = openOnGitHub{}
 	if log != nil {
 		d.Changes = log
 	}
@@ -470,6 +531,7 @@ func seedRateLimit(t *testing.T, s *Server, remaining, limit int, resetAt time.T
 		Token: func(context.Context) (string, error) { return "", errors.New("no token in tests") }})
 	c.Restore([]dgh.Limit{{Resource: dgh.ResourceGraphQL, Remaining: remaining, Limit: limit, ResetAt: resetAt}})
 	s.deps.Budget = ghsource.Budget{Limiter: c}
+	s.github().Budget = ghsource.Budget{Limiter: c}
 }
 
 func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
@@ -708,7 +770,7 @@ func TestChecksDetailNamesTheFailedStepsOnce(t *testing.T) {
 	t.Parallel()
 	calls := 0
 	s := newServerWith(t, func(d *Deps) {
-		d.FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
+		githubOf(d).FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
 			calls++
 			if owner != "acme" || repo != "api" || job != 114268776435 {
 				t.Errorf("asked for %s/%s job %d", owner, repo, job)
@@ -751,7 +813,7 @@ func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.
 			defer mu.Unlock()
 			return clock
 		}
-		d.FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
+		githubOf(d).FailedSteps = func(_ context.Context, owner, repo string, job int64) ([]string, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			asked = append(asked, fmt.Sprintf("%s/%s %d", owner, repo, job))
@@ -792,7 +854,7 @@ func TestChecksDetailAsksAtMostFiveJobsAndRemembersAFailureForAWhile(t *testing.
 		t.Fatalf("second load asked %v: a failure or a success was asked again", c)
 	}
 	mu.Lock()
-	clock = clock.Add(stepRetry + time.Second)
+	clock = clock.Add(10*time.Minute + time.Second)
 	mu.Unlock()
 	get(t, s, "/api/units/github/acme%2Fapi%237/checks", &got)
 	if c := calls(); !slices.Equal(c, []string{"acme/api-fork 1"}) {
@@ -1010,4 +1072,10 @@ func viewerIs(login string, teams ...string) func(context.Context) (src.Identity
 
 func identityOf(login string, teams ...string) src.Identity {
 	return src.Identity{Viewer: src.Person{Key: "github:" + login, Name: login}, Teams: teams}
+}
+
+// refOf is the pull request of a github unit, the zero reference for any other.
+func refOf(u unit.Unit) pr.Ref {
+	ref, _ := pr.RefOf(u)
+	return ref
 }

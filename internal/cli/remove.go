@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -18,7 +19,8 @@ import (
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
-// Remove deletes the local workspace of a pull request. It checks what the
+// Remove deletes the local workspace of a pull request, the one the call
+// names or else the one the inventory links, and unlinks it when linked. It checks what the
 // workspace manager's own removal does not: an agent at work, commits GitHub
 // does not hold, and ignored files that may matter; the manager refuses
 // uncommitted and untracked files itself. With force it checks nothing but
@@ -31,7 +33,17 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 	if err != nil {
 		return err
 	}
-	w, err := e.finishedWorkspace(ctx, ref, pr, c.WorkspaceID)
+	linked := ""
+	if a.store != nil {
+		stored, ok, err := a.store.PR(ctx, ref)
+		if err != nil {
+			return err
+		}
+		if ok {
+			linked = stored.Workspace.ID
+		}
+	}
+	w, err := e.finishedWorkspace(ctx, ref, pr, cmp.Or(c.WorkspaceID, linked))
 	if err != nil {
 		return err
 	}
@@ -45,7 +57,10 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 		return err
 	}
 	fmt.Fprintf(e.Out, "removed %s (%s)\n", w.DisplayName, w.Path)
-	return nil
+	if linked == "" || linked != w.ID {
+		return nil
+	}
+	return a.store.SetWorkspace(ctx, ref, dinv.Workspace{})
 }
 
 // finishedWorkspace is the workspace id names, or without one the only local

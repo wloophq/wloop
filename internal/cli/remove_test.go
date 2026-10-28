@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/daemon"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
@@ -431,5 +432,67 @@ func TestRemovePrintsTheToolsMessageOnASecondLine(t *testing.T) {
 	if len(lines) != 3 || !strings.Contains(lines[0], "its terminals could not be stopped") || lines[1] != "orca: runtime_error: Failed to physically stop every PTY" ||
 		lines[2] != "add --force to remove it anyway; that deletes for good what the refusal names" {
 		t.Fatalf("stderr:\n%s", te.err)
+	}
+}
+
+func TestRemoveActsOnTheLinkedWorkspaceAndUnlinksIt(t *testing.T) {
+	t.Parallel()
+	m, te := finishedScenario(t, "MERGED")
+	ctx := context.Background()
+	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Store.SetWorkspace(ctx, r12, dinv.Workspace{ID: doneWS, DisplayName: "REVIEW feat/done"}); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := (envActions{e: te.Env, store: te.Store}).Remove(ctx, r12.Unit(), daemon.Call{Out: &out}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(m.Writes, []string{"remove ws-done"}) {
+		t.Fatalf("writes %v", m.Writes)
+	}
+	if p, _, _ := te.Store.PR(ctx, r12); p.Workspace.ID != "" {
+		t.Fatalf("still linked to %+v", p.Workspace)
+	}
+}
+
+func TestAForcedRemoveRefusesTheLinkedMainCheckout(t *testing.T) {
+	t.Parallel()
+	m, te := finishedScenario(t, "MERGED")
+	ctx := context.Background()
+	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := te.Store.SetWorkspace(ctx, r12, dinv.Workspace{ID: "main", DisplayName: "api", IsMain: true}); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	err := (envActions{e: te.Env, store: te.Store}).Remove(ctx, r12.Unit(), daemon.Call{Out: &out, Force: true})
+	wantRefusal(t, err, "main checkout")
+	if len(m.Writes) != 0 {
+		t.Fatalf("writes %v", m.Writes)
+	}
+}
+
+func TestRemovingAnotherWorkspaceKeepsTheLink(t *testing.T) {
+	t.Parallel()
+	m, te := finishedScenario(t, "MERGED")
+	ctx := context.Background()
+	if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r12, Title: "Done", State: "MERGED", Reasons: []string{"author"}}); err != nil {
+		t.Fatal(err)
+	}
+	linked := dinv.Workspace{ID: "ws-elsewhere", DisplayName: "REVIEW feat/elsewhere"}
+	if err := te.Store.SetWorkspace(ctx, r12, linked); err != nil {
+		t.Fatal(err)
+	}
+	if err := (envActions{e: te.Env, store: te.Store}).Remove(ctx, r12.Unit(), daemon.Call{Out: io.Discard, WorkspaceID: doneWS}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(m.Writes, []string{"remove ws-done"}) {
+		t.Fatalf("writes %v", m.Writes)
+	}
+	if p, _, _ := te.Store.PR(ctx, r12); p.Workspace.ID != linked.ID {
+		t.Fatalf("the link to %s became %+v after removing %s", linked.ID, p.Workspace, doneWS)
 	}
 }

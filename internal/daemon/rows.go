@@ -9,19 +9,14 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/core/turns"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/readmodel"
-	"github.com/wloophq/wloop/internal/readmodel/prrow"
 )
 
 const (
@@ -91,32 +86,6 @@ func (s *Server) viewerFresh(c *viewerCache, now time.Time) bool {
 	return s.deps.Changes.Since(c.gen, port.TopicViewer).Empty()
 }
 
-// turnFacts reads every book once and resolves a started turn against the
-// agents' last known states: whether its session waits is a signal, never
-// the turn's state.
-func (s *Server) turnFacts(ctx context.Context, reg *dintent.Registry) (turnFactMap, error) {
-	if s.deps.Turns == nil {
-		return nil, nil
-	}
-	books, err := s.deps.Turns.Store.Books(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := prrow.TurnFacts(books, reg)
-	if !prrow.Started(out) {
-		return out, nil
-	}
-	var agents []turns.AgentObservation
-	ok := false
-	if s.deps.Agents != nil {
-		agents, ok = s.deps.Agents.Agents()
-	}
-	prrow.Waiting(out, agents, ok, func(handle string) (turn.Session, bool, error) {
-		return s.deps.Turns.Registry.Session(ctx, handle)
-	}, s.logf)
-	return out, nil
-}
-
 // rows are the read model's rows of view.
 func (s *Server) rows(ctx context.Context, view string) ([]api.Row, error) {
 	page, err := s.readModel().Rows(ctx, view, api.Since{})
@@ -129,85 +98,55 @@ func (s *Server) readModel() *readmodel.Model {
 	return s.model
 }
 
-// expireMutes clears every "mute until state change" whose state changed,
-// over every row the read model lists, so the mute does not come back when
-// the situation returns.
+// expireMutes runs the plugins' bookkeeping over every row the read model
+// lists, so a mute whose situation changed does not come back when the
+// situation returns.
 func (s *Server) expireMutes(ctx context.Context) error {
 	k, err := s.readModel().Current(ctx)
 	if err != nil {
 		return err
 	}
-	return s.expireLapsedMutes(ctx, k)
-}
-
-func (s *Server) expireLapsedMutes(ctx context.Context, k readmodel.Kept) error {
-	for _, o := range prrow.LapsedMutes(k) {
-		if _, _, err := s.expireMute(ctx, o.PR.Unit(), o); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// expireMute clears the stored "mute until state change" of ref when it is
-// still the mute o holds, and returns the override as it stands.
-func (s *Server) expireMute(ctx context.Context, u unit.Unit, o dinv.Override) (cleared bool, _ dinv.Override, err error) {
-	s.overrideMu.Lock()
-	cleared, err = s.deps.Overrides.ClearMute(ctx, u, o.MutedKind, o.MutedWaitingOn)
-	if err == nil {
-		o, err = s.deps.Overrides.Override(ctx, u)
-	}
-	s.overrideMu.Unlock()
-	if err != nil {
-		return false, o, err
-	}
-	if cleared {
-		if err := s.recordEvent(ctx, u, dinv.KindUnmuted, "state changed"); err != nil {
-			return false, o, err
-		}
-	}
-	return cleared, o, nil
+	return s.keepPlugins(ctx, k)
 }
 
 func (s *Server) detail(ctx context.Context, u unit.Unit) (api.Detail, bool, error) {
 	var (
 		row  api.Row
-		pr   dinv.PR
-		evs  []dinv.Event
 		book *turn.Book
 	)
 	rd, ok, err := s.readRow(ctx, u)
 	if err != nil {
 		return api.Detail{}, false, err
 	}
+	kept := false
 	if ok {
-		row, evs = rd.Row, prrow.EventsOf(rd.In)
-		pr, _ = prrow.PROf(rd.In)
-		if b, has := prrow.BookOf(rd.In); has {
+		row = rd.Row
+		var b turn.Book
+		var has bool
+		if b, has, kept = rd.Book(); has {
 			book = &b
 		}
 	} else {
-		st, found, err := s.storedRead(ctx, u, catalog.Asked{}, false)
-		if err != nil || !found {
+		var found bool
+		if row, found, err = s.pluginRow(ctx, api.UnitRowQuery{Unit: u, Kept: true}); err != nil || !found {
 			return api.Detail{}, false, err
 		}
-		row, pr, evs, book = st.row, st.pr, st.evs, st.book
 	}
-	timeline := []dinv.Event{}
-	for _, e := range evs {
-		if !dinv.Bookkeeping(e.Kind) {
-			timeline = append(timeline, e)
-		}
-	}
-	var view *brief.View
-	if s.deps.BriefViews != nil && isPullRequest(u) {
-		views, err := s.deps.BriefViews.Views(ctx, pr)
+	if !kept && s.deps.Turns != nil {
+		books, err := s.deps.Turns.Store.Books(ctx, row.Unit)
 		if err != nil {
-			s.logf("detail %s: brief: %v", u.Label(), err)
-		} else if err = s.deps.BriefViews.RefreshIfStale(ctx, pr); err != nil {
-			s.logf("detail %s: brief refresh: %v", u.Label(), err)
+			return api.Detail{}, false, err
 		}
-		view = views[pr.Ref]
+		if b, has := books[row.Unit]; has {
+			book = &b
+		}
+	}
+	pd := api.PluginDetail{Events: []api.Event{}}
+	if _, err := s.pluginViewOf(ctx, row.Unit.Provider, api.ViewUnitDetail, api.UnitQuery{Unit: row.Unit}, &pd); err != nil {
+		s.logf("detail %s: %v", u.Label(), err)
+	}
+	if pd.Events == nil {
+		pd.Events = []api.Event{}
 	}
 	var layers []string
 	for _, l := range profile.Chain(s.deps.Cfg) {
@@ -217,7 +156,7 @@ func (s *Server) detail(ctx context.Context, u unit.Unit) (api.Detail, bool, err
 	if book != nil {
 		tv = wireTurnView(*book, s.loaded().Registry.Answerable())
 	}
-	return api.Detail{Row: row, Events: wireEvents(timeline), Brief: wireBriefView(view), ProfileChain: strings.Join(layers, " + "), Turn: tv}, true, nil
+	return api.Detail{Row: row, Events: pd.Events, Brief: pd.Brief, ProfileChain: strings.Join(layers, " + "), Turn: tv}, true, nil
 }
 
 const (

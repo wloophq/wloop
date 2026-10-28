@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
+	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/plugins/codec"
@@ -16,9 +17,15 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// hostOver is the broker of plugin acme over a fresh store's events, marks
-// and drafts.
+// hostOver is the broker of plugin acme over a fresh store's events, marks,
+// drafts and overrides.
 func hostOver(t *testing.T) (src.Host, *sqlite.DB) {
+	t.Helper()
+	b, db := brokerOver(t)
+	return b.Host(), db
+}
+
+func brokerOver(t *testing.T) (*psource.Broker, *sqlite.DB) {
 	t.Helper()
 	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
@@ -29,8 +36,8 @@ func hostOver(t *testing.T) (src.Host, *sqlite.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)}, Events: sqlite.New(db), Marks: db, Drafts: db}
-	return b.Host(), db
+	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)}, Events: sqlite.New(db), Marks: db, Drafts: db, Overrides: db}
+	return b, db
 }
 
 func TestTheBrokerKeepsAPluginsEventsAndReadsThemBack(t *testing.T) {
@@ -83,6 +90,50 @@ func TestTheBrokerRehomesAPluginsDrafts(t *testing.T) {
 	}
 	if _, err := h.Gates.RehomeDrafts(ctx, []src.UnitMove{{From: plugin.Unit{Provider: "acme", Key: "t2"}, To: plugin.Unit{Provider: "slack", Key: "T/C/1"}}}); err == nil {
 		t.Error("moved a draft onto another provider's unit")
+	}
+}
+
+func TestTheBrokerSetsOverridesCompareAndSetAndReadsThemInTheRoundState(t *testing.T) {
+	t.Parallel()
+	h, db := hostOver(t)
+	ctx := context.Background()
+	own := plugin.Unit{Provider: "acme", Key: "t1"}
+	mute := map[string]string{port.OverrideMuteUntilStateChange: port.OverrideTrue, port.OverrideMutedKind: "waiting", port.OverrideMutedWaitingOn: "ana"}
+	if ok, err := h.Gates.SetOverride(ctx, own, mute, map[string]string{port.OverrideMutedKind: ""}); err != nil || !ok {
+		t.Fatalf("mute %v %v", ok, err)
+	}
+	if ok, err := h.Gates.SetOverride(ctx, own, map[string]string{port.OverrideMutedKind: ""}, map[string]string{port.OverrideMutedWaitingOn: "bruno"}); err != nil || ok {
+		t.Fatalf("a stale match wrote %v %v", ok, err)
+	}
+	st, err := h.Reader.RoundState(ctx, own)
+	if err != nil || st.Overrides[port.OverrideMutedWaitingOn] != "ana" || st.Paused {
+		t.Fatalf("round state %+v %v", st, err)
+	}
+	if _, err := h.Gates.SetOverride(ctx, own, map[string]string{port.OverrideHold: port.OverrideTrue}, nil); err == nil {
+		t.Error("a plugin set the user's hold")
+	}
+	if _, err := h.Gates.SetOverride(ctx, plugin.Unit{Provider: "slack", Key: "T/C/1"}, mute, nil); err == nil {
+		t.Error("a plugin set another provider's override")
+	}
+	if _, err := db.SetOverride(ctx, unit.Unit{Provider: "acme", Key: "t1"}, map[string]string{port.OverrideHold: port.OverrideTrue}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := h.Reader.RoundState(ctx, own); err != nil || !st.Paused {
+		t.Errorf("the hold reaches the plugin as %+v %v, want paused", st, err)
+	}
+}
+
+func TestAWiderPauseReachesThePluginAsPaused(t *testing.T) {
+	t.Parallel()
+	b, _ := brokerOver(t)
+	held := unit.Unit{Provider: "acme", Key: "t1"}
+	b.Paused = func(_ context.Context, u unit.Unit) (bool, error) { return u == held, nil }
+	h := b.Host()
+	ctx := context.Background()
+	for key, want := range map[string]bool{"t1": true, "t2": false} {
+		if st, err := h.Reader.RoundState(ctx, plugin.Unit{Provider: "acme", Key: key}); err != nil || st.Paused != want {
+			t.Errorf("%s: round state %+v %v, want paused %v", key, st, err, want)
+		}
 	}
 }
 

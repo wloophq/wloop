@@ -1,5 +1,13 @@
 package api
 
+// ProbeOwner and ProbeRepo name the forge unit of every probe, keyed
+// <owner>/<repo>#<n>: one that exists nowhere, so no inventory holds it and
+// no view has a role for it.
+const (
+	ProbeOwner = "loop-e2e"
+	ProbeRepo  = "probe"
+)
+
 type ProbeRequest struct {
 	// WorkspaceID is the workspace's id in its manager, or its worktree path.
 	WorkspaceID string `json:"workspace_id"`

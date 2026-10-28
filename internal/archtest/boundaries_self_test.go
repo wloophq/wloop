@@ -168,7 +168,7 @@ func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
 const a = "pr.round_sent"
-const b = "nudge.prepare"
+const b = "pr.addressed"
 const c = "linked_else_main"
 const d = "plan.cleared"
 const e = "review"
@@ -211,7 +211,7 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
 	var missing, extra []string
-	for _, want := range []string{"pr.round_sent", "nudge.prepare", "linked_else_main", "pr.addressed"} {
+	for _, want := range []string{"pr.round_sent", "plan.cleared", "linked_else_main", "pr.addressed"} {
 		if !names[want] {
 			missing = append(missing, want)
 		}

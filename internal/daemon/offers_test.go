@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wloophq/wloop/internal/adapter/source/github/present"
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -113,9 +114,9 @@ func newCatalogRig(t *testing.T) catalogRig {
 		Turns:    ts,
 		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: ts, Tasks: inbox, Intents: turnstest.Intents(), Clock: fixedClock(catalogNow)},
 		Sessions: sessions,
-		Explorer: knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}},
 		StateDir: t.TempDir(),
 	}, st)
+	githubOf(&d).Explorer = knownOnGitHub{mineRef: {Ref: mineRef, URL: mineRef.URL(), Title: "Mine", Author: "me", State: dgh.StateOpen}}
 	withBriefs(&d, stubBriefs{})
 	d.Plan, d.Pending = plan, plan
 	s := New(d)
@@ -393,7 +394,7 @@ func TestAReviewOfAnUntrackedPullRequestIsAccepted(t *testing.T) {
 
 func TestAnUntrackedPullRequestWithoutAnExplorerIs503(t *testing.T) {
 	t.Parallel()
-	s := newServerWith(t, func(d *Deps) { d.Actions, d.Explorer = &fakeActions{}, nil })
+	s := newServerWith(t, func(d *Deps) { d.Actions, githubOf(d).Explorer = &fakeActions{}, nil })
 	rec := post(t, s, "/api/units/github/acme%2Fweb%233/review", `{"source":"cli"}`)
 	if rec.Code != 503 || !strings.Contains(rec.Body.String(), "cannot read acme/web#3 from GitHub") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
@@ -411,11 +412,12 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 			}
 			continue
 		}
-		if !isBuiltin(spec.ID) && !isIntent((&Server{}).loaded(), spec.ID) {
+		plugin := slices.Contains([]string{present.ActionMute, present.ActionUnmute}, spec.ID)
+		if !isBuiltin(spec.ID) && !isIntent((&Server{}).loaded(), spec.ID) && !plugin {
 			t.Errorf("%s has no dispatch", spec.ID)
 		}
 	}
-	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(overrideActions)),
+	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(holdActions)), slices.Collect(maps.Keys(followActions)),
 		slices.Collect(maps.Keys(roundActions)), slices.Collect(maps.Keys(turnActions)), slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
 	for _, id := range dispatched {
 		if !ids[id] {

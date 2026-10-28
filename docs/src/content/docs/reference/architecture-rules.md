@@ -18,6 +18,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestCoreImports` | The core imports only the standard library, the core, the domain and the meter, and nothing that reaches processes, the network or the database. |
 | `TestCoreImportsNoPluginDomain` | The core imports no plugin, no plugin imports another, and `pluginDebt` only shrinks. |
 | `TestDaemonImports` | The daemon reaches adapters, GitHub and Orca only through ports. |
+| `TestDaemonImportsNoPluginDomain` | The daemon's own code imports no plugin package, under no debt: it reaches source logic through the plugins' Action and View only. |
 | `TestDomainImports` | The domain imports no adapter, manager or `internal/github`. |
 | `TestDraftTextComesFromTheProfile` | No Go code outside its allowlist writes a draft's text from prose of its own: the Text of an outbox.Proposal or a draft.Draft is never a string constant, a format, or what a function of the same package builds from string literals. A draft's text comes from a profile template or from whoever wrote it. |
 | `TestEveryDecisionNamesATestThatExists` | Every entry of the decision log names on its Enforced by line at least one test, and only tests the repository declares. |
@@ -63,17 +64,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 |---|---|---|
 | `internal/adapter/source/github/proposals.go` | ✅ | GitHub's nudge text, github-nudge |
 
-### `TestLoopCodeImportsNoPR`
-
-| `prAllowed` entry | Status | Reason |
-|---|---|---|
-| `internal/daemon/briefs.go` | 🧾 | the brief queue is keyed by pull request, not by unit |
-| `internal/daemon/explore.go` | 🧾 | explore lists GitHub search candidates, the GitHub plugin's job |
-| `internal/daemon/probe.go` | ✅ | the e2e probe names a pull request |
-| `internal/daemon/refs.go` | ✅ | the daemon's one edge to pull request references, for the GitHub-only roles keyed by one |
-| `internal/daemon/timings.go` | 🧾 | review timings read pr.Facts, which the plugin's Facts should provide |
-| `internal/daemon/timings_derive.go` | 🧾 | review timings read pr.Facts, which the plugin's Facts should provide |
-
 ### `TestNoIntentEnumerations`
 
 | `intentAllowlist` entry | Status | Reason |
@@ -82,12 +72,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/turns/turnstest/intents.go` | ✅ | the test registry of today's intents |
 | `internal/core/turns/turnstest/store.go` | ✅ | test fixtures of today's intents |
 | `internal/turn/scenarios.go` | ✅ | eval fixtures |
-
-### `TestNoQueryJoinsPluginAndCoreTables`
-
-| `sqlJoinAllowlist` entry | Status | Reason |
-|---|---|---|
-| `internal/adapter/store/inventory/store.go` `writeOverride` | 🧾 | the overrides row, whose mute columns are the core's, and the pull request's reasons are written in one transaction until X4b's SetOverride writes the host's columns through the broker |
 
 ### `TestOnlyTheDraftStepProposes`
 
@@ -117,19 +101,6 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/cli/launcher.go` `githubRef` `pr.Codec{}.Provider` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/launcher.go` `isPR` `pr.RefOf` `1` | 🧾 | the launcher reads a pull request's workspace outside the plugin |
 | `internal/cli/serve_ended.go` `openPRBooks.Books` `pr.RefOf` `1` | 🧾 | the ended turns' books are pull requests |
-| `internal/daemon/actions.go` `Server.readAheadQueued` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/actions.go` `Server.runAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/api.go` `Server.handleRemoveDone` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/api.go` `Server.parsePR` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/attention_tasks.go` `taskViewer.rowNotice` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/briefs.go` `refsOf` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/headless.go` `Server.runHeadless` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/plan.go` `Server.actOnPlanItem` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/refs.go` `isPullRequest` `pr.RefOf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/refs.go` `refOf` `pr.RefOf` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/rows.go` `Server.detail` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/unitactions.go` `sourceFollowed` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
-| `internal/daemon/unitactions.go` `unitAction` `isPullRequest` `1` | 🧾 | the daemon gates the GitHub-only facilities on a pull request, see prAllowed |
 
 ### `TestProviderIdsInStringsOutsideThePluginsOnlyShrink`
 
@@ -213,6 +184,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/client/tui/views.go` `taskProvider` `unit.Task` `1` | 🧾 | the TUI keys its busy map by the task provider; K2 keys it by the served unit |
 | `internal/config/config.go` `Config.ProjectSettingsFor` `unit.GitHub` `1` | 🧾 | an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2) |
 | `internal/config/config.go` `Config.validateWorkflows` `unit.GitHub` `1` | 🧾 | an intent's project settings read the pull request's turn facts, which go with the GitHub plugin (X8c2) |
+| `internal/core/intake/intake.go` `SourceSession` `"session"` `1` | ✅ | the intake source a managed session asks from, which shares the session provider's spelling |
 | `internal/core/turns/headless.go` `taskInput` `"task"` `1` | ✅ | the headless turn's task input, which shares the task provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
 | `internal/workspace/orca/orca.go` `Manager.LinkUnit` `unit.GitHub` `1` | ✅ | Orca's linkedPR holds a GitHub pull request only |
