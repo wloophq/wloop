@@ -12,7 +12,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/domain/pr"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // errDetached is a follow the user interrupted; the intake goes on.
@@ -25,7 +24,7 @@ var followWait = 20 * time.Second
 
 // ask has the daemon accept a review or an address and follows the
 // intake that accepted it, unless noWait.
-func (e *Env) ask(ctx context.Context, ref github.Ref, action string, req api.ActionRequest, noWait bool) error {
+func (e *Env) ask(ctx context.Context, ref pr.Ref, action string, req api.ActionRequest, noWait bool) error {
 	c, err := e.daemonClient(ctx)
 	if err != nil {
 		return err

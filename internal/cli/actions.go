@@ -24,12 +24,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/daemon"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
-	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -58,7 +55,7 @@ func (e *Env) daemonClient(ctx context.Context) (*client.Client, error) {
 
 // action runs a pull request action on the daemon with the caller's agent
 // home and prints its output, then done once it succeeds.
-func (e *Env) action(ctx context.Context, ref github.Ref, action string, req api.ActionRequest, done string) error {
+func (e *Env) action(ctx context.Context, ref pr.Ref, action string, req api.ActionRequest, done string) error {
 	c, err := e.daemonClient(ctx)
 	if err != nil {
 		return err
@@ -68,7 +65,7 @@ func (e *Env) action(ctx context.Context, ref github.Ref, action string, req api
 
 // delegate runs the action on the daemon with the caller's agent home
 // and prints its output, then done once it succeeds.
-func (e *Env) delegate(ctx context.Context, c *client.Client, ref github.Ref, action string, req api.ActionRequest, done string) error {
+func (e *Env) delegate(ctx context.Context, c *client.Client, ref pr.Ref, action string, req api.ActionRequest, done string) error {
 	req.AgentHome = e.callerAgentHome(config.Config{Agent: e.callerKind()})
 	req.Source = sourceCLI
 	out, err := c.Action(ctx, ref.Unit(), action, req)
@@ -92,7 +89,7 @@ func commandOf(id string) string {
 
 // prConfig is the config of ref's project, with profile as the agent home
 // when the project sets none.
-func prConfig(base config.Config, ref github.Ref, profile string) config.Config {
+func prConfig(base config.Config, ref pr.Ref, profile string) config.Config {
 	cfg := base.For(ref.Owner, ref.Repo)
 	if cfg.AgentHome == "" {
 		cfg.AgentHome = profile
@@ -127,7 +124,7 @@ func runPRAction(ctx context.Context, e *Env, name string, args []string) error 
 	if len(pos) != 1 {
 		return errors.New(usage)
 	}
-	ref, err := github.ParseURL(pos[0])
+	ref, err := pr.ParseURL(pos[0])
 	if err != nil {
 		return err
 	}
@@ -167,9 +164,9 @@ func runOpen(ctx context.Context, e *Env, args []string) error {
 	if *view != "" && !slices.Contains(cockpitViews, *view) {
 		return fmt.Errorf("unknown view %q; one of %s", *view, strings.Join(cockpitViews, ", "))
 	}
-	var ref github.Ref
+	var ref pr.Ref
 	if len(pos) == 1 {
-		if ref, err = github.ParseURL(pos[0]); err != nil {
+		if ref, err = pr.ParseURL(pos[0]); err != nil {
 			return err
 		}
 		if !*printURL && *view != "" {
@@ -268,7 +265,7 @@ func (a envActions) call(c daemon.Call) *Env {
 
 // prepare loads the config and picks the agent home: the caller's,
 // else the one remembered for the PR.
-func (a envActions) prepare(ctx context.Context, ref github.Ref, c daemon.Call) (*Env, config.Config, string, error) {
+func (a envActions) prepare(ctx context.Context, ref pr.Ref, c daemon.Call) (*Env, config.Config, string, error) {
 	cfg, err := a.e.loadConfig()
 	if err != nil {
 		return nil, cfg, "", err
@@ -381,7 +378,7 @@ func (e *Env) recordLifted(ctx context.Context, u unit.Unit) {
 // review workspace, else a round of the intent run.resolve picks for the
 // pull request's role. It counts as asked for by the user, so it never
 // counts against the caps.
-func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Ref, profile string) error {
+func runHeldRound(ctx context.Context, e *Env, base config.Config, ref pr.Ref, profile string) error {
 	cfg := prConfig(base, ref, profile)
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
@@ -441,8 +438,8 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 	}
 	if !submitted {
 		verb += " (submission not observed; check the session)"
-	} else if d := dchange.Reviewer(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status, CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}); d.Fingerprint != "" {
-		st.SetMark(ref.String(), round.Reviewed, d.Fingerprint)
+	} else {
+		e.recordReviewed(st, cfg, ref, ws, full, viewer)
 	}
 	fmt.Fprintf(e.Out, "follow-up in %s, %s: %s\n%s\n", ws.DisplayName, verb, pr.Title, ws.Path)
 	return rounds.Save(ctx, st)
@@ -450,7 +447,7 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 
 // fetchPR reads ref in full from GitHub into the inventory and returns it as
 // the sweep reads it, with viewer, else the stored viewer, else GitHub's.
-func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, viewer string) (*pr.PullRequest, string, error) {
+func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref pr.Ref, viewer string) (*pr.PullRequest, string, error) {
 	if e.Store == nil {
 		return nil, "", errNoStore
 	}
@@ -463,7 +460,7 @@ func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, vi
 	}
 	viewer, err = e.Store.Viewer(ctx, unit.GitHub)
 	if err == nil && viewer == "" {
-		viewer, err = e.GitHub.Viewer(ctx)
+		viewer, err = e.forgeViewer(ctx)
 	}
 	if err != nil {
 		return nil, "", err
@@ -473,7 +470,7 @@ func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, vi
 
 // heldRoleFacts are the role facts of a pull request with no review
 // workspace, read up to the first that makes it the author's.
-func (e *Env) heldRoleFacts(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest) (catalog.RoleFacts, error) {
+func (e *Env) heldRoleFacts(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref pr.Ref, pr *pr.PullRequest) (catalog.RoleFacts, error) {
 	var f catalog.RoleFacts
 	var err error
 	mine := e.prOf(ctx, pr)
@@ -495,7 +492,7 @@ func runBrief(ctx context.Context, e *Env, args []string) error {
 	if len(args) != 2 || args[0] != "refresh" {
 		return errors.New("usage: brief refresh <pr-url>")
 	}
-	ref, err := github.ParseURL(args[1])
+	ref, err := pr.ParseURL(args[1])
 	if err != nil {
 		return err
 	}

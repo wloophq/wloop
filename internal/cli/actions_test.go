@@ -20,10 +20,10 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
@@ -192,7 +192,7 @@ func cockpitEnv(t *testing.T) (*testEnv, *[]string) {
 
 func TestOpenPrintShowsTheCockpitURL(t *testing.T) {
 	t.Parallel()
-	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cases := []struct {
 		name string
 		args []string
@@ -232,7 +232,7 @@ func TestCockpitURLTakesARoute(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, httpInfoFile), []byte(`{"port":4321,"token":"tok"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	r7 := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	r7 := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	cases := []struct{ route, want string }{
 		{"", "http://127.0.0.1:4321/?token=tok"},
 		{"view=loop", "http://127.0.0.1:4321/?token=tok#view=loop"},
@@ -451,7 +451,7 @@ func TestDelegatedAdoptUsesTheCallersProfileElseTheRemembered(t *testing.T) {
 			if err := te.Rounds.Save(context.Background(), st); err != nil {
 				t.Fatal(err)
 			}
-			ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+			ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 			var out strings.Builder
 			if err := (envActions{te.Env, nil}).Adopt(context.Background(), ref.Unit(), daemon.Call{AgentHome: c.profile, Out: &out}); err != nil {
 				t.Fatal(err)

@@ -15,14 +15,14 @@ import (
 
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
-var r12 = github.Ref{Owner: "acme", Repo: "api", Number: 12}
+var r12 = pr.Ref{Owner: "acme", Repo: "api", Number: 12}
 
 const doneWS = "ws-done"
 

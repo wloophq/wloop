@@ -17,7 +17,6 @@ import (
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -68,7 +67,7 @@ func (a envActions) Remove(ctx context.Context, u unit.Unit, c daemon.Call) erro
 // finishedWorkspace is the workspace id names, or without one the only local
 // workspace of the pull request: linked to it, else on its branch when the
 // pull request comes from the same repository.
-func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *pr.PullRequest, id string) (wsdomain.Workspace, error) {
+func (e *Env) finishedWorkspace(ctx context.Context, ref pr.Ref, pr *pr.PullRequest, id string) (wsdomain.Workspace, error) {
 	repos, err := e.WS.Repos(ctx)
 	if err != nil {
 		return wsdomain.Workspace{}, err
@@ -131,7 +130,7 @@ func (e *Env) finishedWorkspace(ctx context.Context, ref github.Ref, pr *pr.Pull
 
 // workspaces is the removal use case of a removal by hand of ref's workspace.
 // It reads no fetch log: Remove fetches itself.
-func (e *Env) workspaces(ctx context.Context, ref github.Ref, force bool) *workspaces.Service {
+func (e *Env) workspaces(ctx context.Context, ref pr.Ref, force bool) *workspaces.Service {
 	remote, tree, files := checkouts(e.Git)
 	if e.Files != nil {
 		files = e.Files
@@ -242,7 +241,7 @@ func (r envRounds) SkipFirstRound(ctx context.Context, u unit.Unit) error {
 // when there is one.
 type removalLog struct {
 	e   *Env
-	ref github.Ref
+	ref pr.Ref
 }
 
 func (l removalLog) Publish(evs ...port.Event) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
-	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 )
 
 // rounds is the daemon's round state; a command line process has none and
@@ -32,7 +32,7 @@ func runPause(ctx context.Context, e *Env, paused bool, args []string) error {
 		case isRepoName(a):
 			req.Repos = append(req.Repos, a)
 		case strings.Contains(a, "://"):
-			ref, err := github.ParseURL(a)
+			ref, err := pr.ParseURL(a)
 			if err != nil {
 				return err
 			}

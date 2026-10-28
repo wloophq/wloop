@@ -9,7 +9,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -64,7 +63,7 @@ func TestTakeOverMarksTheInventory(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	st := te.Store
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	ctx := context.Background()
 	if o, err := st.Override(ctx, ref); err != nil || !o.Adopted {
 		t.Fatalf("not adopted: %+v %v", o, err)
@@ -267,7 +266,7 @@ func TestFindAuthorWorkspacePrefersAWorktreeOverTheMainCheckout(t *testing.T) {
 	yes := func() (bool, error) { return true, nil }
 	no := func() (bool, error) { return false, nil }
 	repos := []wsdomain.Repo{{ID: "r1", RemoteKey: "github.com/acme/api"}}
-	pr := &pr.PullRequest{Facts: pr.Facts{Ref: github.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
+	pr := &pr.PullRequest{Facts: pr.Facts{Ref: pr.Ref{Owner: "acme", Repo: "api", Number: 20}, HeadRefName: "feat/theirs"}}
 	for name, worktree := range map[string]wsdomain.Workspace{
 		"on the branch": {ID: "wt", RepoID: "r1", HostID: "local", Branch: "feat/theirs"},
 		"linked":        {ID: "wt", RepoID: "r1", HostID: "local", Branch: "other", LinkedPR: 20},
@@ -312,7 +311,7 @@ func TestTakeOverForgetsOnlyTheReviewsAddressed(t *testing.T) {
 	te := newTestEnv(t, m)
 	te.gh.basics = adoptBasics
 	te.git.branch["/worktrees/feat/theirs"] = "feat/theirs"
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	st := te.loadRounds(t)
 	st.SetMark(ref.String(), round.AddressedReviews, "2026-10-18T10:00:00Z")
 	st.SetMark(ref.String(), round.Reviewed, "2026-10-18T10:00:00Z@c9")

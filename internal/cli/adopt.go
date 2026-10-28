@@ -13,9 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
 )
 
@@ -25,7 +23,7 @@ func runTakeOver(ctx context.Context, e *Env, args []string) error {
 	if len(args) != 1 {
 		return errors.New("usage: " + brand.Command + " take-over <https://github.com/<owner>/<repo>/pull/<n>>")
 	}
-	ref, err := github.ParseURL(args[0])
+	ref, err := pr.ParseURL(args[0])
 	if err != nil {
 		return err
 	}
@@ -34,7 +32,7 @@ func runTakeOver(ctx context.Context, e *Env, args []string) error {
 
 // markAdopted records the adoption in the inventory, as the take-over action
 // does, so the pull request shows in "mine".
-func (e *Env) markAdopted(ctx context.Context, ref github.Ref) error {
+func (e *Env) markAdopted(ctx context.Context, ref pr.Ref) error {
 	store, err := e.store()
 	if err != nil {
 		return err
@@ -47,7 +45,7 @@ func (e *Env) markAdopted(ctx context.Context, ref github.Ref) error {
 
 // adoptPR uses profile as the agent home when no project sets one,
 // and returns the author workspace it settled on.
-func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref github.Ref, profile string) (wsdomain.Workspace, error) {
+func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref pr.Ref, profile string) (wsdomain.Workspace, error) {
 	cfg = prConfig(cfg, ref, profile)
 	pr, err := e.basics(ctx, ref)
 	if err != nil {
@@ -72,25 +70,11 @@ func adoptPR(ctx context.Context, e *Env, cfg config.Config, ref github.Ref, pro
 	return ws, e.clearFingerprint(ctx, ref)
 }
 
-// clearFingerprint forgets the reviews the address rounds on ref covered, so
-// a pull request taken over starts its triage from none of them.
-func (e *Env) clearFingerprint(ctx context.Context, ref github.Ref) error {
-	if e.Rounds == nil {
-		return nil
-	}
-	st, err := e.Rounds.Load(ctx)
-	if err != nil || st.Mark(ref.String(), round.AddressedReviews) == "" {
-		return err
-	}
-	st.SetMark(ref.String(), round.AddressedReviews, "")
-	return e.Rounds.Save(ctx, st)
-}
-
 // authorWorkspace finds the PR's author workspace, else turns its review
 // workspace into one, else creates one at the PR head with an idle agent. It
 // links the workspace to the PR and moves it to in-progress. action says
 // which of the three happened.
-func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref github.Ref, pr *pr.PullRequest, mine func() (bool, error), repos []wsdomain.Repo, all []wsdomain.Workspace) (ws wsdomain.Workspace, action string, err error) {
+func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref pr.Ref, pr *pr.PullRequest, mine func() (bool, error), repos []wsdomain.Repo, all []wsdomain.Workspace) (ws wsdomain.Workspace, action string, err error) {
 	remoteKey := ref.RemoteKey()
 	ws, found, err := findAuthorWorkspace(cfg, repos, all, ref, pr, mine)
 	if err != nil {
@@ -147,7 +131,7 @@ func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref github
 // linked to the PR or sits on its head branch. A main checkout counts, whatever
 // its name, only for a PR of mine from the same repository whose head branch
 // it has checked out, other than the default branch; a worktree wins over it.
-func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, bool, error) {
+func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref pr.Ref, pr *pr.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, bool, error) {
 	ofRepo := reposOf(repos, ref)
 	var main wsdomain.Workspace
 	for _, w := range all {
@@ -189,7 +173,7 @@ func (e *Env) prOf(ctx context.Context, pr *pr.PullRequest) func() (bool, error)
 				viewer, err = e.storedViewer(ctx)
 			}
 			if err != nil || viewer == "" {
-				viewer, err = e.GitHub.Viewer(ctx)
+				viewer, err = e.forgeViewer(ctx)
 			}
 			mine = err == nil && strings.EqualFold(pr.Author, viewer)
 		}
@@ -201,7 +185,7 @@ func (e *Env) prOf(ctx context.Context, pr *pr.PullRequest) func() (bool, error)
 // branch of a PR from the same repository checked out, with its repository:
 // git keeps a branch in one checkout, so the workspace manager would put a new
 // workspace for the PR on a renamed branch.
-func branchHolder(repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest) (wsdomain.Workspace, wsdomain.Repo, bool) {
+func branchHolder(repos []wsdomain.Repo, all []wsdomain.Workspace, ref pr.Ref, pr *pr.PullRequest) (wsdomain.Workspace, wsdomain.Repo, bool) {
 	if pr.IsCrossRepository || pr.HeadRefName == "" {
 		return wsdomain.Workspace{}, wsdomain.Repo{}, false
 	}
@@ -253,7 +237,7 @@ func (e *Env) localBranchProblem(ctx context.Context, dir string, pr *pr.PullReq
 	return "", nil
 }
 
-func reposOf(repos []wsdomain.Repo, ref github.Ref) map[string]wsdomain.Repo {
+func reposOf(repos []wsdomain.Repo, ref pr.Ref) map[string]wsdomain.Repo {
 	remoteKey := ref.RemoteKey()
 	byID := map[string]wsdomain.Repo{}
 	for _, r := range repos {
