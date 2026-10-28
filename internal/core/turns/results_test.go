@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -21,7 +21,7 @@ type results struct {
 }
 
 type attached struct {
-	entry gtd.ID
+	entry task.ID
 	u     unit.Unit
 }
 
@@ -30,7 +30,7 @@ func (r *results) UnitOf(url string) (unit.Unit, bool) {
 	return u, ok
 }
 
-func (r *results) Attach(_ context.Context, entry gtd.ID, u unit.Unit) error {
+func (r *results) Attach(_ context.Context, entry task.ID, u unit.Unit) error {
 	r.attached = append(r.attached, attached{entry, u})
 	return r.err
 }
@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	brief = gtd.UnitOf("e-1")
+	brief = task.UnitOf("e-1")
 	pr9   = unit.Unit{Provider: unit.GitHub, Key: "acme/api#9"}
 )
 

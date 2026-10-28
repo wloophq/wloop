@@ -2,19 +2,20 @@ package daemon
 
 import (
 	"encoding/json"
-	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"slices"
 	"testing"
 	"time"
 
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 func (r *entriesRig) serveProjects() {
-	r.g.ServeProjects(coregtd.ProjectDeps{Store: r.db.Projects()})
+	r.g.ServeProjects(coretasks.ProjectDeps{Store: r.db.Projects()})
 }
 
 func TestReviewViewIsServedOnceRegistered(t *testing.T) {
@@ -30,7 +31,7 @@ func TestReviewViewIsServedOnceRegistered(t *testing.T) {
 		t.Errorf("GET review before it is served: %d, want 404", code)
 	}
 
-	r.put(t, gtd.Entry{ID: "e-in", State: gtd.Inbox, Title: "in"}, gtd.Entry{ID: "e-p", Kind: gtd.KindProject, State: gtd.Next, Title: "P", Slug: "p"})
+	r.put(t, task.Entry{ID: "e-in", State: task.Inbox, Title: "in"}, task.Entry{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p"})
 	r.serveProjects()
 	get(t, r.s, api.GTDPath, &cat)
 	var ids []string
@@ -83,10 +84,10 @@ func TestProjectEntryViews(t *testing.T) {
 	r.serveProjects()
 	old := entriesNow.Add(-10 * 24 * time.Hour)
 	r.put(t,
-		gtd.Entry{ID: "e-p", Kind: gtd.KindProject, State: gtd.Next, Title: "P", Slug: "p", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
-		gtd.Entry{ID: "e-q", Kind: gtd.KindProject, State: gtd.Next, Title: "Q", Slug: "q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
-		gtd.Entry{ID: "e-a", State: gtd.Next, Title: "a", Project: "e-p", Position: 1},
-		gtd.Entry{ID: "e-b", State: gtd.Waiting, Title: "b", Project: "e-p", Position: 2},
+		task.Entry{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
+		task.Entry{ID: "e-q", Kind: task.KindProject, State: task.Next, Title: "Q", Slug: "q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
+		task.Entry{ID: "e-a", State: task.Next, Title: "a", Project: "e-p", Position: 1},
+		task.Entry{ID: "e-b", State: task.Waiting, Title: "b", Project: "e-p", Position: 2},
 	)
 	page := r.page(t, "view=projects")
 	byID := map[string]api.EntryView{}
@@ -119,8 +120,8 @@ func TestProjectEntryViews(t *testing.T) {
 		t.Errorf("action verbs %v, project %q", vs, a[i].ProjectTitle)
 	}
 
-	r.put(t, gtd.Entry{ID: "e-done", Kind: gtd.KindProject, State: gtd.Done, Title: "Done", Slug: "done"},
-		gtd.Entry{ID: "e-trash", Kind: gtd.KindProject, State: gtd.Trash, Title: "Trash", Slug: "trash"})
+	r.put(t, task.Entry{ID: "e-done", Kind: task.KindProject, State: task.Done, Title: "Done", Slug: "done"},
+		task.Entry{ID: "e-trash", Kind: task.KindProject, State: task.Trash, Title: "Trash", Slug: "trash"})
 	for id, want := range map[string]map[string]bool{
 		"e-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
 		"e-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},

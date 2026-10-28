@@ -1,11 +1,11 @@
 package builtin
 
-import "github.com/wloophq/wloop/internal/domain/gtd"
+import "github.com/wloophq/wloop/internal/domain/task"
 
 // GTDVerbs are the verbs gtd.toml words, in the order clients list them.
 var GTDVerbs = func() []string {
-	out := make([]string, len(gtd.Verbs))
-	for i, v := range gtd.Verbs {
+	out := make([]string, len(task.Verbs))
+	for i, v := range task.Verbs {
 		out[i] = string(v)
 	}
 	return out
@@ -13,22 +13,22 @@ var GTDVerbs = func() []string {
 
 // GTDVerbInputs are the verbs that ask for a value before they run.
 var GTDVerbInputs = []string{
-	string(gtd.VerbWaiting), string(gtd.VerbSchedule), string(gtd.VerbProject), string(gtd.VerbContext),
-	string(gtd.VerbArea), string(gtd.VerbDelegate), string(gtd.VerbReply),
+	string(task.VerbWaiting), string(task.VerbSchedule), string(task.VerbProject), string(task.VerbContext),
+	string(task.VerbArea), string(task.VerbDelegate), string(task.VerbReply),
 }
 
 // GTDViews are the views gtd.toml words, in the order clients list them;
 // review is served only when its source is.
 var GTDViews = []string{
-	string(gtd.ViewFocus), string(gtd.ViewInbox), string(gtd.ViewOutbox), string(gtd.ViewNext),
-	string(gtd.ViewWaiting), string(gtd.ViewProjects), string(gtd.ViewSomeday), string(gtd.ViewLogbook),
-	string(gtd.ViewReview),
+	string(task.ViewFocus), string(task.ViewInbox), string(task.ViewOutbox), string(task.ViewNext),
+	string(task.ViewWaiting), string(task.ViewProjects), string(task.ViewSomeday), string(task.ViewLogbook),
+	string(task.ViewReview),
 }
 
 // GTDReviewSteps are the weekly Review's steps, in order.
 var GTDReviewSteps = func() []string {
-	out := make([]string, len(gtd.ReviewSteps))
-	for i, st := range gtd.ReviewSteps {
+	out := make([]string, len(task.ReviewSteps))
+	for i, st := range task.ReviewSteps {
 		out[i] = st.ID
 	}
 	return out

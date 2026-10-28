@@ -3,8 +3,9 @@ package turns
 import (
 	"context"
 	"errors"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"time"
+
+	"github.com/wloophq/wloop/internal/domain/task"
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -76,7 +77,7 @@ type Reports interface {
 type Results interface {
 	// UnitOf is the unit a web address names; false for an address of none.
 	UnitOf(url string) (unit.Unit, bool)
-	Attach(ctx context.Context, entry gtd.ID, u unit.Unit) error
+	Attach(ctx context.Context, entry task.ID, u unit.Unit) error
 }
 
 // Intents is what the turns ask of the loaded intents: the record rules, the

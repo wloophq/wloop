@@ -16,8 +16,8 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -39,7 +39,7 @@ type draftOutbox interface {
 }
 
 type draftEntries interface {
-	Entry(ctx context.Context, id gtd.ID) (gtd.Entry, error)
+	Entry(ctx context.Context, id task.ID) (task.Entry, error)
 }
 
 type draftItems interface {
@@ -129,7 +129,7 @@ type draftCandidate struct {
 // on, and the entry when the subject is one.
 type draftSubject struct {
 	subject, unit unit.Unit
-	entry         *gtd.Entry
+	entry         *task.Entry
 	items         []items.Item
 }
 
@@ -281,7 +281,7 @@ func (s *stepSet) draftCandidates(ctx context.Context, c stepCall) ([]draftCandi
 // entry; else u's items.
 func (d *draftDeps) subject(ctx context.Context, u unit.Unit) (draftSubject, error) {
 	sub := draftSubject{subject: u, unit: u}
-	if id, ok := gtd.IDOf(u); ok {
+	if id, ok := task.IDOf(u); ok {
 		e, err := d.Entries.Entry(ctx, id)
 		if err != nil {
 			return sub, err
@@ -340,7 +340,7 @@ func (s draftSubject) people(per string) []items.Person {
 func (s draftSubject) held() []items.Item {
 	var out []items.Item
 	for _, it := range s.items {
-		if it.State == items.Open && it.Unit == s.unit && (s.entry == nil || slices.Contains(s.entry.Items, gtd.ItemRef{Unit: it.Unit, Item: it.ID})) {
+		if it.State == items.Open && it.Unit == s.unit && (s.entry == nil || slices.Contains(s.entry.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})) {
 			out = append(out, it)
 		}
 	}
@@ -363,7 +363,7 @@ func selectItems(s draftSubject, which string, person items.Person, now time.Tim
 			if !unownedItem(it, s.unit) {
 				continue
 			}
-			if which == "unowned_aged" && (it.CreatedAt.IsZero() || gtd.AddWorkdays(it.CreatedAt, 1, now.Location()).After(now)) {
+			if which == "unowned_aged" && (it.CreatedAt.IsZero() || task.AddWorkdays(it.CreatedAt, 1, now.Location()).After(now)) {
 				continue
 			}
 			out = append(out, it)
@@ -498,7 +498,7 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 	waited := person == ""
 	if !waited && sub.entry != nil {
 		e := sub.entry
-		waited = e.State == gtd.Waiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
+		waited = e.State == task.Waiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
 	}
 	held, owned := 0, 0
 	heldNow := sub.held()

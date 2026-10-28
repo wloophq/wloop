@@ -11,8 +11,8 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -157,14 +157,14 @@ type env struct {
 	ledger   *ledger
 	job      *Job
 	disabled map[unit.ProviderID]bool
-	facts    map[unit.Unit]gtd.UnitFacts
+	facts    map[unit.Unit]task.UnitFacts
 	logs     []string
 }
 
 func newEnv(t *testing.T) *env {
 	e := &env{t: t, clock: &clock{now: t0}, drafts: &memDrafts{},
 		ledger: &ledger{items: map[unit.Unit][]items.Item{}}, disabled: map[unit.ProviderID]bool{},
-		facts: map[unit.Unit]gtd.UnitFacts{}}
+		facts: map[unit.Unit]task.UnitFacts{}}
 	e.pub = &publisher{clock: e.clock}
 	e.svc = &outbox.Service{
 		Store: e.drafts,
@@ -204,8 +204,8 @@ func (e *env) list(rule string, states ...draft.State) []draft.Draft {
 	return got
 }
 
-type factsOf map[unit.Unit]gtd.UnitFacts
+type factsOf map[unit.Unit]task.UnitFacts
 
-func (f factsOf) UnitFacts(ctx context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
+func (f factsOf) UnitFacts(ctx context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
 	return f[u], true, nil
 }

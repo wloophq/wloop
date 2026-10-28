@@ -18,9 +18,9 @@ import (
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
@@ -115,10 +115,10 @@ func (r *subjectsRig) item(t *testing.T, u unit.Unit, id string, s items.State, 
 	return it
 }
 
-func (r *subjectsRig) entry(t *testing.T, e gtd.Entry, op gtd.ChangeOp) {
+func (r *subjectsRig) entry(t *testing.T, e task.Entry, op task.ChangeOp) {
 	t.Helper()
-	e.Origin, e.Created, e.Updated = gtd.OriginUser, testNow.Add(-72*time.Hour), testNow.Add(-72*time.Hour)
-	if err := r.db.Entries().Apply(context.Background(), []gtd.Change{{Op: op, Entry: e}}); err != nil {
+	e.Origin, e.Created, e.Updated = task.OriginUser, testNow.Add(-72*time.Hour), testNow.Add(-72*time.Hour)
+	if err := r.db.Entries().Apply(context.Background(), []task.Change{{Op: op, Entry: e}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -147,9 +147,9 @@ func TestPlanEvaluatesUserWorkflowsOnEntryAndSlackSubjects(t *testing.T) {
 	r := newSubjectsRig(t)
 	owed := r.item(t, subjectThread, "i1", items.Open, items.Person{Key: "slack:U0001"})
 	r.item(t, subjectThread, "i2", items.Open)
-	r.entry(t, gtd.Entry{ID: "e-01", Kind: gtd.KindWaiting, State: gtd.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
-		Items:   []gtd.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
-		Waiting: &gtd.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, gtd.OpCreate)
+	r.entry(t, task.Entry{ID: "e-01", Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{subjectThread},
+		Items:   []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}},
+		Waiting: &task.WaitingOn{On: []items.Person{{Key: "slack:U0001"}}, Since: testNow.Add(-72 * time.Hour)}}, task.OpCreate)
 	want := []string{"my-slack " + subjectThread.String(), "my-waiting entry:e-01"}
 	if got := r.planned(t); !slices.Equal(got, want) {
 		t.Fatalf("planned %v, want %v", got, want)
@@ -178,8 +178,8 @@ func TestTheSweepWakesOnEntryItemAndDraftChanges(t *testing.T) {
 	}
 	var it items.Item
 	woke("a new item", func() { it = r.item(t, subjectThread, "i1", items.Open) })
-	close := gtd.Entry{ID: "e-01", Kind: gtd.KindClose, State: gtd.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
-	woke("a new entry", func() { r.entry(t, close, gtd.OpCreate) })
+	close := task.Entry{ID: "e-01", Kind: task.KindClose, State: task.Inbox, Title: "c", Units: []unit.Unit{subjectThread}}
+	woke("a new entry", func() { r.entry(t, close, task.OpCreate) })
 	if got := r.planned(t); slices.Contains(got, "my-close entry:e-01") {
 		t.Fatalf("nothing resolved yet: %v", got)
 	}
@@ -212,7 +212,7 @@ func TestADisabledSlackPluginListsNoUnits(t *testing.T) {
 			t.Errorf("%s, not built: listed %v, %v", p.ID, us, err)
 		}
 	}
-	if us, err := te.planEngine(ed).Units.List(context.Background(), gtd.Codec{}.Provider()); err != nil || len(us) > 0 {
+	if us, err := te.planEngine(ed).Units.List(context.Background(), task.Codec{}.Provider()); err != nil || len(us) > 0 {
 		t.Errorf("entries of an empty store: %v, %v", us, err)
 	}
 }
@@ -221,10 +221,10 @@ func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newSubjectsRig(t)
-	r.entry(t, gtd.Entry{ID: "e-01", Kind: gtd.KindCapture, State: gtd.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, gtd.OpCreate)
-	derived := gtd.Entry{ID: "e-02", Kind: gtd.KindClose, State: gtd.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
-		Origin: gtd.OriginDerived, Created: testNow, Updated: testNow}
-	if err := r.db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: derived}}); err != nil {
+	r.entry(t, task.Entry{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{subjectThread}}, task.OpCreate)
+	derived := task.Entry{ID: "e-02", Kind: task.KindClose, State: task.Inbox, Title: "close", Units: []unit.Unit{subjectThread},
+		Origin: task.OriginDerived, Created: testNow, Updated: testNow}
+	if err := r.db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: derived}}); err != nil {
 		t.Fatal(err)
 	}
 	closes := func() []string {
@@ -251,7 +251,7 @@ func TestACapturedEntryWhoseUnitsEndedPlansItsClose(t *testing.T) {
 	if got := closes(); len(got) != 0 {
 		t.Fatalf("closes %v, an entry no turn ran on", got)
 	}
-	start := dturn.Book{Unit: gtd.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
+	start := dturn.Book{Unit: task.UnitOf("e-01"), Turns: []dturn.Turn{{Intent: "start", ID: "s1", Trigger: dturn.ByHand, State: dturn.Done, SentAt: testNow}}}
 	if _, err := sqlite.New(r.db).Save(ctx, start); err != nil {
 		t.Fatal(err)
 	}

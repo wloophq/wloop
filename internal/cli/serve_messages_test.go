@@ -20,10 +20,10 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/event"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -125,7 +125,7 @@ func TestOpenQuestionsBecomeMessages(t *testing.T) {
 	if !slices.Equal(units, []unit.Unit{ghUnit(1), ghUnit(2), ghUnit(4)}) {
 		t.Fatalf("units %v", units)
 	}
-	inbox, err := db.Entries().Entries(context.Background(), gtd.Query{View: gtd.ViewInbox})
+	inbox, err := db.Entries().Entries(context.Background(), task.Query{View: task.ViewInbox})
 	if err != nil || len(inbox) != 3 {
 		t.Fatalf("inbox %+v %v", inbox, err)
 	}
@@ -187,7 +187,7 @@ func TestLedgerProposalsReachTheInboxOnARealStore(t *testing.T) {
 	if got.State != message.Answered || got.Answer != messages.OptionReject {
 		t.Fatalf("decided elsewhere %+v", got)
 	}
-	if e, _ := db.Entries().Entry(ctx, gtd.ID(got.EntryID)); e.State != gtd.Done {
+	if e, _ := db.Entries().Entry(ctx, task.ID(got.EntryID)); e.State != task.Done {
 		t.Fatalf("entry %s", e.State)
 	}
 }

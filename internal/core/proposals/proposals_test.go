@@ -10,7 +10,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -100,7 +100,7 @@ func TestProposalsSkipDisabledPlugins(t *testing.T) {
 	e.run()
 	open := e.list("github-nudge", draft.Proposed)
 	e.disabled[unit.GitHub] = true
-	e.facts[pull] = gtd.UnitFacts{Unit: pull, ClosurePosted: true}
+	e.facts[pull] = task.UnitFacts{Unit: pull, ClosurePosted: true}
 	e.clock.set(t0.Add(72 * time.Hour))
 	if sum := e.run(); sum.Proposed+sum.Refused+sum.Held+sum.Discarded != 0 {
 		t.Fatalf("acted on a disabled plugin: %s", sum)
@@ -223,7 +223,7 @@ func TestPluginNudgeWithdrawnWhenTheUnitCloses(t *testing.T) {
 	if sum := e.run(); sum.Discarded != 0 {
 		t.Fatalf("an empty plugin pass withdrew: %s", sum)
 	}
-	e.facts[pull] = gtd.UnitFacts{Unit: pull, ClosurePosted: true}
+	e.facts[pull] = task.UnitFacts{Unit: pull, ClosurePosted: true}
 	if sum := e.run(); sum.Discarded != 1 {
 		t.Fatalf("%s", sum)
 	}

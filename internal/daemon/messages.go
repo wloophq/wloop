@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/messages"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -24,25 +24,25 @@ func (s *Server) registerMessages() {
 	if s.deps.GTD == nil || s.deps.Messages == nil {
 		return
 	}
-	s.deps.GTD.Register(gtd.KindMessage, gtd.VerbAnswer, s.entryVerb(gtd.VerbAnswer))
-	s.deps.GTD.Register(gtd.KindMessage, gtd.VerbDismiss, s.entryVerb(gtd.VerbDismiss))
-	s.deps.GTD.Register(gtd.KindMessage, gtd.VerbApprove, s.entryVerb(gtd.VerbApprove))
+	s.deps.GTD.Register(task.KindMessage, task.VerbAnswer, s.entryVerb(task.VerbAnswer))
+	s.deps.GTD.Register(task.KindMessage, task.VerbDismiss, s.entryVerb(task.VerbDismiss))
+	s.deps.GTD.Register(task.KindMessage, task.VerbApprove, s.entryVerb(task.VerbApprove))
 }
 
-func (s *Server) entryVerb(verb gtd.Verb) coregtd.VerbHandler {
-	return func(ctx context.Context, e gtd.Entry, req coregtd.Request) (coregtd.Result, error) {
+func (s *Server) entryVerb(verb task.Verb) coretasks.VerbHandler {
+	return func(ctx context.Context, e task.Entry, req coretasks.Request) (coretasks.Result, error) {
 		m, ok, err := s.deps.Messages.Store.ByEntry(ctx, string(e.ID))
 		if err != nil {
-			return coregtd.Result{}, err
+			return coretasks.Result{}, err
 		}
 		if !ok {
-			return coregtd.Result{}, fmt.Errorf("%w: entry %s holds no message", coregtd.ErrVerb, e.ID)
+			return coretasks.Result{}, fmt.Errorf("%w: entry %s holds no message", coretasks.ErrVerb, e.ID)
 		}
 		var out bytes.Buffer
 		switch verb {
-		case gtd.VerbDismiss:
+		case task.VerbDismiss:
 			err = s.dismissMessage(ctx, m, &out)
-		case gtd.VerbApprove:
+		case task.VerbApprove:
 			var ar api.ActionRequest
 			switch {
 			case m.Kind == dmessage.Proposal && slices.ContainsFunc(m.Options, func(o record.Option) bool { return o.ID == messages.OptionAccept }):
@@ -50,7 +50,7 @@ func (s *Server) entryVerb(verb gtd.Verb) coregtd.VerbHandler {
 			case m.Confirm:
 				ar.Yes = true
 			default:
-				return coregtd.Result{}, fmt.Errorf("%w: approve takes a proposal or a yes or no question", coregtd.ErrVerb)
+				return coretasks.Result{}, fmt.Errorf("%w: approve takes a proposal or a yes or no question", coretasks.ErrVerb)
 			}
 			ar.Source = req.Source
 			err = s.answerMessage(ctx, m, ar, &out)
@@ -61,25 +61,25 @@ func (s *Server) entryVerb(verb gtd.Verb) coregtd.VerbHandler {
 			}
 		}
 		if err != nil {
-			return coregtd.Result{}, err
+			return coretasks.Result{}, err
 		}
 		s.recordVerb(ctx, s.deps.GTD, e, req)
 		got, err := s.deps.GTD.Entry(ctx, e.ID)
 		if err != nil {
-			return coregtd.Result{}, err
+			return coretasks.Result{}, err
 		}
-		return coregtd.Result{Entry: got, Lines: lines(out.String())}, nil
+		return coretasks.Result{Entry: got, Lines: lines(out.String())}, nil
 	}
 }
 
 // actionArgs reads an entry verb's args as the fields of api.ActionRequest.
-func actionArgs(req coregtd.Request) (api.ActionRequest, error) {
+func actionArgs(req coretasks.Request) (api.ActionRequest, error) {
 	ar := api.ActionRequest{Guidance: req.Args["guidance"], OptionID: req.Args["option_id"], Source: req.Source}
 	for key, dst := range map[string]*bool{"yes": &ar.Yes, "no": &ar.No} {
 		if v, ok := req.Args[key]; ok {
 			b, err := strconv.ParseBool(v)
 			if err != nil {
-				return api.ActionRequest{}, fmt.Errorf("%w: %s is true or false, not %q", coregtd.ErrArgs, key, v)
+				return api.ActionRequest{}, fmt.Errorf("%w: %s is true or false, not %q", coretasks.ErrArgs, key, v)
 			}
 			*dst = b
 		}

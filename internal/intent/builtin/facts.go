@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/domain/facet"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
 	dslack "github.com/wloophq/wloop/internal/domain/slack"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
@@ -83,8 +83,8 @@ var ReviewStates = []string{"", "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "D
 
 // EntryKinds and EntryStates are a GTD entry's kinds and states.
 var (
-	EntryKinds  = []string{string(gtd.KindAction), string(gtd.KindWaiting), string(gtd.KindClose), string(gtd.KindMessage), string(gtd.KindDraft), string(gtd.KindCapture), string(gtd.KindProject), string(gtd.KindReference)}
-	EntryStates = []string{string(gtd.Inbox), string(gtd.Next), string(gtd.Waiting), string(gtd.Scheduled), string(gtd.Someday), string(gtd.Reference), string(gtd.Done), string(gtd.Trash)}
+	EntryKinds  = []string{string(task.KindAction), string(task.KindWaiting), string(task.KindClose), string(task.KindMessage), string(task.KindDraft), string(task.KindCapture), string(task.KindProject), string(task.KindReference)}
+	EntryStates = []string{string(task.Inbox), string(task.Next), string(task.Waiting), string(task.Scheduled), string(task.Someday), string(task.Reference), string(task.Done), string(task.Trash)}
 )
 
 // TurnStates are the states a turn is in, and the empty value of none.

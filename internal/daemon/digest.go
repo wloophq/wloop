@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 // handleDigest serves the daily digest of the query parameter day: the counters, and the entries that moved
@@ -28,8 +28,8 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	start := end.AddDate(0, 0, -1)
 	ctx := r.Context()
 	d := api.Digest{Day: day, Title: "Daily digest"}
-	for _, v := range []gtd.View{gtd.ViewNext, gtd.ViewWaiting} {
-		es, err := g.Entries(ctx, gtd.Query{View: v})
+	for _, v := range []task.View{task.ViewNext, task.ViewWaiting} {
+		es, err := g.Entries(ctx, task.Query{View: v})
 		if err != nil {
 			writeGTDError(w, err)
 			return
@@ -47,7 +47,7 @@ func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	}
 	d.Counts = wireCounters(c)
 	d.Body = fmt.Sprintf("%d new in Next or Waiting · %d in Inbox · %d in Outbox · %d next · %d waiting", len(d.Entries),
-		d.Counts.Views[string(gtd.ViewInbox)], d.Counts.Views[string(gtd.ViewOutbox)], d.Counts.Views[string(gtd.ViewNext)], d.Counts.Views[string(gtd.ViewWaiting)])
+		d.Counts.Views[string(task.ViewInbox)], d.Counts.Views[string(task.ViewOutbox)], d.Counts.Views[string(task.ViewNext)], d.Counts.Views[string(task.ViewWaiting)])
 	writeJSON(w, d)
 }
 

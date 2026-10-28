@@ -17,7 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/menubar"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/github"
@@ -78,7 +78,7 @@ func startDaemon(t *testing.T, actions daemon.Actions) *testDaemon {
 		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil },
 		Sweep:  daemon.SweepFunc(func(context.Context) (string, string, error) { return "", "", nil }),
 		Log:    t.Logf,
-		GTD:    coregtd.New(coregtd.Deps{Store: stDB.Entries(), Clock: clockFunc(func() time.Time { return daemonNow })}),
+		GTD:    coretasks.New(coretasks.Deps{Store: stDB.Entries(), Clock: clockFunc(func() time.Time { return daemonNow })}),
 	}, st))
 	h := srv.Handler()
 	l, err := net.Listen("unix", d.socket)

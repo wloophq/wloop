@@ -11,7 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -23,7 +23,7 @@ var outboxStates = []draft.State{draft.Proposed, draft.Failed, draft.Sending}
 // outboxView serves the Outbox: one virtual entry per draft of an enabled plugin, newest first, never stored.
 type outboxView struct{ s *Server }
 
-func (v outboxView) Entries(ctx context.Context, q gtd.Query) ([]gtd.Entry, error) {
+func (v outboxView) Entries(ctx context.Context, q task.Query) ([]task.Entry, error) {
 	if len(q.Contexts) > 0 {
 		return nil, nil
 	}
@@ -31,7 +31,7 @@ func (v outboxView) Entries(ctx context.Context, q gtd.Query) ([]gtd.Entry, erro
 	if err != nil {
 		return nil, err
 	}
-	out := make([]gtd.Entry, 0, len(ds))
+	out := make([]task.Entry, 0, len(ds))
 	for _, d := range ds {
 		out = append(out, draftEntry(d, v.s.unitLabel(d.Unit)))
 	}
@@ -43,17 +43,17 @@ func (v outboxView) drafts(ctx context.Context) ([]draft.Draft, error) {
 	return slices.DeleteFunc(ds, func(d draft.Draft) bool { return !v.s.pluginEnabled(d.Unit.Provider) }), err
 }
 
-func (v outboxView) Entry(ctx context.Context, id gtd.ID) (gtd.Entry, bool, error) {
+func (v outboxView) Entry(ctx context.Context, id task.ID) (task.Entry, bool, error) {
 	n, ok := draftIDOf(id)
 	if !ok {
-		return gtd.Entry{}, false, nil
+		return task.Entry{}, false, nil
 	}
 	d, err := v.s.deps.Outbox.Store.Get(ctx, n)
 	if errors.Is(err, outbox.ErrNotFound) {
-		return gtd.Entry{}, false, nil
+		return task.Entry{}, false, nil
 	}
 	if err != nil {
-		return gtd.Entry{}, false, err
+		return task.Entry{}, false, err
 	}
 	return draftEntry(d, v.s.unitLabel(d.Unit)), true, nil
 }
@@ -63,7 +63,7 @@ func (v outboxView) Count(ctx context.Context, _ string) (int, error) {
 	return len(ds), err
 }
 
-func draftIDOf(id gtd.ID) (draft.ID, bool) {
+func draftIDOf(id task.ID) (draft.ID, bool) {
 	raw, ok := strings.CutPrefix(string(id), draftPrefix)
 	if !ok {
 		return 0, false
@@ -73,18 +73,18 @@ func draftIDOf(id gtd.ID) (draft.ID, bool) {
 }
 
 // draftEntryStates are the entry states that tell where a draft stands.
-var draftEntryStates = map[draft.State]gtd.State{
-	draft.Proposed: gtd.Inbox, draft.Failed: gtd.Inbox,
-	draft.Approved: gtd.Next, draft.Sending: gtd.Next,
-	draft.Sent: gtd.Done, draft.Discarded: gtd.Trash,
+var draftEntryStates = map[draft.State]task.State{
+	draft.Proposed: task.Inbox, draft.Failed: task.Inbox,
+	draft.Approved: task.Next, draft.Sending: task.Next,
+	draft.Sent: task.Done, draft.Discarded: task.Trash,
 }
 
-func draftEntry(d draft.Draft, where string) gtd.Entry {
-	e := gtd.Entry{ID: gtd.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: gtd.KindDraft, State: draftEntryStates[d.State],
-		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Deadline: d.Deadline, Origin: gtd.OriginDraft,
+func draftEntry(d draft.Draft, where string) task.Entry {
+	e := task.Entry{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: draftEntryStates[d.State],
+		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Deadline: d.Deadline, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
 	for _, it := range d.Items {
-		e.Items = append(e.Items, gtd.ItemRef{Unit: d.Unit, Item: it})
+		e.Items = append(e.Items, task.ItemRef{Unit: d.Unit, Item: it})
 	}
 	return e
 }
@@ -98,8 +98,8 @@ func draftTitle(d draft.Draft, where string) string {
 }
 
 // withDraft sets a draft entry's draft on v, and its verbs from the draft's actions: the others are refused.
-func (s *Server) withDraft(ctx context.Context, e gtd.Entry, v *api.EntryView) error {
-	if e.Kind != gtd.KindDraft || s.deps.Outbox == nil {
+func (s *Server) withDraft(ctx context.Context, e task.Entry, v *api.EntryView) error {
+	if e.Kind != task.KindDraft || s.deps.Outbox == nil {
 		return nil
 	}
 	n, ok := draftIDOf(e.ID)
@@ -117,7 +117,7 @@ func (s *Server) withDraft(ctx context.Context, e gtd.Entry, v *api.EntryView) e
 		actions[strings.TrimPrefix(st.ID, "draft.")] = st
 	}
 	for i, vs := range v.Verbs {
-		action, ok := draftVerbs[gtd.Verb(vs.Verb)]
+		action, ok := draftVerbs[task.Verb(vs.Verb)]
 		if !ok {
 			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Reason: "a draft takes approve, edit, dismiss and retry"}
 			continue

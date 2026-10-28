@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 type projectStore struct{ db *DB }
@@ -19,15 +19,15 @@ const (
 	currentRunSQL = `SELECT id, started_at, done FROM review_runs WHERE finished_at = '' ORDER BY started_at DESC, id DESC LIMIT 1`
 )
 
-var _ coregtd.ProjectStore = projectStore{}
+var _ coretasks.ProjectStore = projectStore{}
 
 // Projects are the projects' slugs and the Review's runs; a project's own fields are read and written with its
 // entry.
-func (db *DB) Projects() coregtd.ProjectStore { return projectStore{db} }
+func (db *DB) Projects() coretasks.ProjectStore { return projectStore{db} }
 
 // loadProjects sets the project fields of the entries of out that the projects table holds, sub selecting
 // their ids with args.
-func loadProjects(ctx context.Context, q querier, sub string, args []any, out []gtd.Entry, at map[gtd.ID]int) error {
+func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Entry, at map[task.ID]int) error {
 	return eachRow(ctx, q, `SELECT entry_id, slug, review_every, reviewed_at FROM projects WHERE entry_id IN `+sub, args,
 		func(r *sql.Rows) error {
 			var id, slug, reviewed string
@@ -35,7 +35,7 @@ func loadProjects(ctx context.Context, q querier, sub string, args []any, out []
 			if err := r.Scan(&id, &slug, &every, &reviewed); err != nil {
 				return err
 			}
-			e := &out[at[gtd.ID(id)]]
+			e := &out[at[task.ID(id)]]
 			t, err := entryTime(reviewed)
 			if err != nil {
 				return fmt.Errorf("the review time of project %s: %w", id, err)
@@ -46,8 +46,8 @@ func loadProjects(ctx context.Context, q querier, sub string, args []any, out []
 }
 
 // writeProject keeps a project's row; other kinds have none.
-func writeProject(ctx context.Context, tx *Tx, e gtd.Entry) error {
-	if e.Kind != gtd.KindProject {
+func writeProject(ctx context.Context, tx *Tx, e task.Entry) error {
+	if e.Kind != task.KindProject {
 		return nil
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO projects (entry_id, slug, review_every, reviewed_at) VALUES (?, ?, ?, ?)
@@ -62,28 +62,28 @@ func (s projectStore) SlugTaken(ctx context.Context, slug string) (bool, error) 
 	return taken, err
 }
 
-func (s projectStore) CurrentRun(ctx context.Context) (gtd.ReviewRun, bool, error) {
-	var r gtd.ReviewRun
+func (s projectStore) CurrentRun(ctx context.Context) (task.ReviewRun, bool, error) {
+	var r task.ReviewRun
 	var started, done string
 	err := s.db.R().QueryRowContext(ctx, currentRunSQL).Scan(&r.ID, &started, &done)
 	if errors.Is(err, sql.ErrNoRows) {
-		return gtd.ReviewRun{}, false, nil
+		return task.ReviewRun{}, false, nil
 	}
 	if err != nil {
-		return gtd.ReviewRun{}, false, err
+		return task.ReviewRun{}, false, err
 	}
 	if r.StartedAt, err = entryTime(started); err != nil {
-		return gtd.ReviewRun{}, false, fmt.Errorf("review run %s: %w", r.ID, err)
+		return task.ReviewRun{}, false, fmt.Errorf("review run %s: %w", r.ID, err)
 	}
 	if done != "" {
 		if err := json.Unmarshal([]byte(done), &r.Done); err != nil {
-			return gtd.ReviewRun{}, false, fmt.Errorf("review run %s: %w", r.ID, err)
+			return task.ReviewRun{}, false, fmt.Errorf("review run %s: %w", r.ID, err)
 		}
 	}
 	return r, true, nil
 }
 
-func (s projectStore) PutRun(ctx context.Context, r gtd.ReviewRun) error {
+func (s projectStore) PutRun(ctx context.Context, r task.ReviewRun) error {
 	if r.ID == "" || r.StartedAt.IsZero() {
 		return errors.New("a review run needs an id and a start")
 	}

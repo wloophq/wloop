@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -20,7 +20,7 @@ func digestRig(t *testing.T) (*entriesRig, time.Time) {
 	return r, time.Date(2026, 10, 8, 9, 0, 0, 0, time.Local)
 }
 
-func at(e gtd.Entry, t time.Time) gtd.Entry {
+func at(e task.Entry, t time.Time) task.Entry {
 	e.Created, e.Updated = t.Add(-48*time.Hour), t
 	return e
 }
@@ -29,12 +29,12 @@ func TestDigestContents(t *testing.T) {
 	t.Parallel()
 	r, end := digestRig(t)
 	r.put(t,
-		at(gtd.Entry{ID: "e-next", State: gtd.Next}, end.Add(-time.Hour)),
-		at(gtd.Entry{ID: "e-wait", Kind: gtd.KindWaiting, State: gtd.Waiting, Waiting: &gtd.WaitingOn{Since: end}}, end.Add(-20*time.Hour)),
-		at(gtd.Entry{ID: "e-old", State: gtd.Next}, end.Add(-25*time.Hour)),
-		at(gtd.Entry{ID: "e-later", State: gtd.Next}, end.Add(time.Minute)),
-		at(gtd.Entry{ID: "e-in", State: gtd.Inbox}, end.Add(-time.Hour)),
-		at(gtd.Entry{ID: "e-off", State: gtd.Next, Units: []unit.Unit{{Provider: "slack", Key: "T000/C000/1.2"}}}, end.Add(-time.Hour)),
+		at(task.Entry{ID: "e-next", State: task.Next}, end.Add(-time.Hour)),
+		at(task.Entry{ID: "e-wait", Kind: task.KindWaiting, State: task.Waiting, Waiting: &task.WaitingOn{Since: end}}, end.Add(-20*time.Hour)),
+		at(task.Entry{ID: "e-old", State: task.Next}, end.Add(-25*time.Hour)),
+		at(task.Entry{ID: "e-later", State: task.Next}, end.Add(time.Minute)),
+		at(task.Entry{ID: "e-in", State: task.Inbox}, end.Add(-time.Hour)),
+		at(task.Entry{ID: "e-off", State: task.Next, Units: []unit.Unit{{Provider: "slack", Key: "T000/C000/1.2"}}}, end.Add(-time.Hour)),
 	)
 	var d api.Digest
 	if code := get(t, r.s, api.DigestPath+"?day=2026-10-08", &d); code != 200 {
@@ -52,7 +52,7 @@ func TestDigestContents(t *testing.T) {
 func TestEmptyDigest(t *testing.T) {
 	t.Parallel()
 	r, end := digestRig(t)
-	r.put(t, at(gtd.Entry{ID: "e-old", State: gtd.Next}, end.Add(-30*time.Hour)))
+	r.put(t, at(task.Entry{ID: "e-old", State: task.Next}, end.Add(-30*time.Hour)))
 	raw := getRaw(t, r.s, api.DigestPath+"?day=2026-10-08")
 	if !strings.Contains(raw, `"entries":null`) {
 		t.Fatalf("%s", raw)

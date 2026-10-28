@@ -103,7 +103,7 @@ var providerHomes = []string{
 	"internal/intent/builtin",
 	"internal/e2e",
 	// The codecs of the providers the core keeps.
-	"internal/domain/gtd/codec.go", "internal/domain/turn/session.go", "internal/domain/workspace",
+	"internal/domain/task/codec.go", "internal/domain/turn/session.go", "internal/domain/workspace",
 }
 
 // providerHome says whether file may spell any provider id.
@@ -376,7 +376,7 @@ var g = "entry"
 `)
 	none := map[int]int{}
 	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none, nil), 4, "the core names no provider")
-	flagged(t, "another core package", coreLiterals(fset, "internal/core/gtd/x.go", f, nil, none, nil), 4, "the core names no provider")
+	flagged(t, "another core package", coreLiterals(fset, "internal/core/tasks/x.go", f, nil, none, nil), 4, "the core names no provider")
 	flagged(t, "a test file", coreLiterals(fset, "internal/core/automation/x_test.go", f, nil, none, nil), 0, "")
 	flagged(t, "the fakes", coreLiterals(fset, "internal/core/automation/automationtest/x.go", f, nil, none, nil), 0, "")
 	outside := map[string]int{"internal/daemon/x.go": 3, "internal/client/tui/x.go": 3, "internal/cli/root.go": 0, "internal/cli/sources.go": 0,
@@ -393,9 +393,9 @@ var g = "https://github.com/a/b"
 `)
 		flagged(t, file, coreLiterals(fset, file, f, nil, none, nil), n, "a provider id lives in its plugin")
 	}
-	allow := []providerSite{{"internal/core/gtd/x.go", "b", "unit.Session", 1, "planted"}, {"internal/core/gtd/x.go", "a", `"slack"`, 1, "stale"}}
+	allow := []providerSite{{"internal/core/tasks/x.go", "b", "unit.Session", 1, "planted"}, {"internal/core/tasks/x.go", "a", `"slack"`, 1, "stale"}}
 	used := map[int]int{}
-	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/gtd/x.go", f, allow, used, nil), 3, "the core names no provider")
+	flagged(t, "allowlisted", coreLiterals(fset, "internal/core/tasks/x.go", f, allow, used, nil), 3, "the core names no provider")
 	flagged(t, "stale", staleSites(allow, used), 1, "matches 0")
 	fset, f = parse(t, `package x
 func (s *server) open() {

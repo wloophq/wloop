@@ -8,8 +8,8 @@ import (
 
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/domain/dossier"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	"github.com/wloophq/wloop/internal/domain/items"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -96,15 +96,15 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 		t.Fatal("an open item does not keep the unit open")
 	}
 
-	e := gtd.Entry{ID: gtd.NewID(), Kind: gtd.KindCapture, State: gtd.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: gtd.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: e}}); err != nil {
+	e := task.Entry{ID: task.NewID(), Kind: task.KindCapture, State: task.Next, Title: "t", Units: []unit.Unit{slackThread}, Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if !open(slackThread) {
 		t.Fatal("a live entry does not keep the unit open")
 	}
-	e.State = gtd.Done
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: e}}); err != nil {
+	e.State = task.Done
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: e}}); err != nil {
 		t.Fatal(err)
 	}
 	if open(slackThread) {
@@ -121,15 +121,15 @@ func TestDossierStoreOpenReadsItemsAndEntries(t *testing.T) {
 	if project() {
 		t.Fatal("a project without an entry is open")
 	}
-	p := gtd.Entry{ID: gtd.NewID(), Kind: gtd.KindProject, State: gtd.Next, Title: "Ship it", Slug: "ship-it", Origin: gtd.OriginUser, Created: at, Updated: at}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: p}}); err != nil {
+	p := task.Entry{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: "Ship it", Slug: "ship-it", Origin: task.OriginUser, Created: at, Updated: at}
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if !project() {
 		t.Fatal("a live project is not open")
 	}
-	p.State = gtd.Done
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: p}}); err != nil {
+	p.State = task.Done
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if project() {

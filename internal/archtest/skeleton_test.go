@@ -83,9 +83,9 @@ var skeleton = map[string][]string{
 	"internal/domain/message": {"Kind", "State", "Origin", "Message", "Store"},
 	"internal/core/messages": {"Service", "Service.Reconcile", "Service.ReconcileProposals", "Service.Post",
 		"Service.Propose", "Service.Answer", "Service.Dismiss", "PostRequest", "ProposeRequest", "Answer"},
-	"internal/domain/gtd": {"State", "Kind", "ID", "ItemRef", "Focus", "Snooze", "WaitingOn", "Entry", "Me", "Mute",
+	"internal/domain/task": {"State", "Kind", "ID", "ItemRef", "Focus", "Snooze", "WaitingOn", "Entry", "Me", "Mute",
 		"UnitFacts", "ChangeOp", "Change", "Reconcile", "Activity", "AutoFocus", "Wake", "Verb", "View", "Query", "Counters", "Codec", "UnitOf"},
-	"internal/core/gtd": {"Store", "Since", "Page", "Items", "Facts", "ViewSource", "VerbHandler", "Request", "Result",
+	"internal/core/tasks": {"Store", "Since", "Page", "Items", "Facts", "ViewSource", "VerbHandler", "Request", "Result",
 		"Service", "Service.Register", "Service.RegisterView", "Service.Do", "Service.Capture", "Service.Open",
 		"Service.Close", "Service.Sync", "Service.Counts", "OpenRequest"},
 	"internal/keys": {"Surface", "Context", "Binding", "Core", "Canonical", "Reserved", "ErrReserved", "Check"},
@@ -105,7 +105,7 @@ var skeleton = map[string][]string{
 	"internal/intent/builtin":      {"Effect", "Effects", "EffectNames", "StepDraftPropose", "Roles", "Builds", "TurnRunners", "DraftDeliveries", "DraftItems", "DraftPer", "DraftTargets", "RepeatForever", "RoundProviders", "ExtraFacts", "WithdrawEnv", "ApprovalEnv", "ApprovalRule", "ApprovalSlot", "DraftDelivery", "DraftPurpose", "DraftEffects", "AutoOnly", "NeverReleasesComment", "UntrustedError", "Fact.Untrusted", "UnitSlots", "DraftSlot", "BriefSubjects", "Fact.Dim", "Fact.Subjects", "IsUntrusted", "ActionFacts", "TurnEffectNames", "Grammar", "Key", "Value", "Kind", "Surface", "Problem", "Check"},
 	"internal/brief":               {"BriefSource", "UnitInput", "Composed", "Compose", "Composed.Validate", "Composed.FieldVersions", "Brief.Extra", "Brief.ExtraVersions", "Summary.Extra"},
 	"internal/profile":             {"Resolve", "Files", "Resolved", "PartialsDir", "PromptsDir"},
-	"internal/adapter/facts/entry": {"Provider"},
+	"internal/adapter/facts/task":  {"Provider"},
 	"internal/adapter/facts/slack": {"Provider"},
 }
 

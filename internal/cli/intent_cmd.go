@@ -12,9 +12,9 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/shell"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/slack/send"
@@ -117,7 +117,7 @@ func runCapturing(ctx context.Context, e *Env, d dintent.Def, args []string) err
 	if err != nil {
 		return err
 	}
-	u := gtd.UnitOf(gtd.ID(entry.ID))
+	u := task.UnitOf(task.ID(entry.ID))
 	fmt.Fprintf(e.Out, "captured %s\n", u)
 	p.guidance = ""
 	if err := askOn(ctx, e, d, u, p); err != nil {

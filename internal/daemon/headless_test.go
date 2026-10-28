@@ -11,13 +11,13 @@ import (
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	"github.com/wloophq/wloop/internal/core/headless"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -85,7 +85,7 @@ func TestGitHubDelegateRunsReviewWithActLoaded(t *testing.T) {
 	if !slices.ContainsFunc(row.Actions, func(st api.ActionState) bool { return st.ID == string(dintent.Act) }) {
 		t.Fatalf("the row does not offer act: %+v", row.Actions)
 	}
-	if st, ok := c.s.offeredFor(row, gtd.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
+	if st, ok := c.s.offeredFor(row, task.VerbDelegate).runs(); !ok || st.ID != string(dintent.Review) {
 		t.Fatalf("delegate runs %q (%v), want review", st.ID, ok)
 	}
 	rec := post(t, c.s, api.EntryPath("e-r", "delegate"), `{"source":"cockpit"}`)
@@ -152,15 +152,15 @@ func TestActRunsOneModeDecisionWhateverTheCaller(t *testing.T) {
 func TestTheBridgeDelegatesActHeadlessWithTheEntrysItems(t *testing.T) {
 	t.Parallel()
 	s, h := newThreadActServer(t)
-	store := gtdtest.New()
-	g := coregtd.New(coregtd.Deps{Store: store, Facts: coregtd.CardFacts{}, Clock: fixedClock(catalogNow)})
-	e := gtd.Entry{ID: "e-t", Kind: gtd.KindAction, State: gtd.Inbox, Units: []unit.Unit{actThread}, Items: []gtd.ItemRef{{Unit: actThread, Item: "i1"}},
-		Origin: gtd.OriginDerived, Created: catalogNow, Updated: catalogNow}
-	if err := store.Apply(context.Background(), []gtd.Change{{Op: gtd.OpCreate, Entry: e}}); err != nil {
+	store := taskstest.New()
+	g := coretasks.New(coretasks.Deps{Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
+	e := task.Entry{ID: "e-t", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{actThread}, Items: []task.ItemRef{{Unit: actThread, Item: "i1"}},
+		Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Entry: e}}); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, gtd.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
+	s.runBridge(rec, apiRequest("POST", api.EntryPath("e-t", "delegate"), nil), g, e, task.VerbDelegate, actThread, api.ActionState{ID: string(dintent.Act), Enabled: true}, api.EntryRequest{Source: "cockpit"})
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "act started headless as turn 42") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}

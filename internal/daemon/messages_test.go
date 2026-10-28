@@ -12,25 +12,25 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	dmessage "github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 type enabledUnits struct{ off map[unit.ProviderID]bool }
 
-func (e enabledUnits) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, !e.off[u.Provider], nil
+func (e enabledUnits) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, !e.off[u.Provider], nil
 }
 
 type itemsNone struct{}
@@ -134,12 +134,12 @@ func TestMessageAnswerDifferential(t *testing.T) {
 					r := newMessageRig(t)
 					m := r.question(t)
 					arrange(r)
-					res, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer,
+					res, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer,
 						Args: map[string]string{"option_id": "publish", "guidance": "say thanks"}, Source: source})
 					if err != nil {
 						t.Fatal(err)
 					}
-					if res.Entry.State != gtd.Done {
+					if res.Entry.State != task.Done {
 						t.Fatalf("the entry is %s after its answer", res.Entry.State)
 					}
 					return r.outcome(200, res.Lines)
@@ -185,7 +185,7 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 				if rec := post(t, r.s, api.EntryPath(m.EntryID, "dismiss"), ``); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbDismiss, Source: "tui"}); err != nil {
+			} else if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbDismiss, Source: "tui"}); err != nil {
 				t.Fatal(err)
 			}
 			books, _ := r.store.Books(context.Background(), r8u.Unit())
@@ -195,7 +195,7 @@ func TestDismissingAQuestionMessageThroughTheDaemon(t *testing.T) {
 			if got, _, _ := r.msgs.Message(context.Background(), m.ID); got.State != dmessage.Dismissed {
 				t.Fatalf("message %+v", got)
 			}
-			if e, _ := r.entries.Entry(context.Background(), gtd.ID(m.EntryID)); e.State != gtd.Trash {
+			if e, _ := r.entries.Entry(context.Background(), task.ID(m.EntryID)); e.State != task.Trash {
 				t.Fatalf("entry %s", e.State)
 			}
 		})
@@ -241,7 +241,7 @@ func TestMessageAnswerKeepsItsSource(t *testing.T) {
 				if rec := post(t, r.s, api.EntryPath(m.EntryID, "answer"), `{"args":{"option_id":"hold"},"source":"`+c.source+`"}`); rec.Code != 200 {
 					t.Fatalf("%d %s", rec.Code, rec.Body)
 				}
-			} else if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer,
+			} else if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer,
 				Args: map[string]string{"option_id": "hold"}, Source: c.source}); err != nil {
 				t.Fatal(err)
 			}
@@ -269,7 +269,7 @@ func TestMessageOfADisabledPluginAnswers409(t *testing.T) {
 		}
 	}
 	r.facts.off[unit.GitHub] = true
-	if _, err := r.s.deps.GTD.Do(context.Background(), gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
+	if _, err := r.s.deps.GTD.Do(context.Background(), task.ID(m.EntryID), coretasks.Request{Verb: task.VerbAnswer, Args: map[string]string{"option_id": "hold"}}); err == nil {
 		t.Fatal("the entry verb answered a disabled plugin's message")
 	}
 	if books, _ := r.store.Books(context.Background(), r8u.Unit()); len(books[r8u.Unit()].Answers) != 0 {
@@ -286,7 +286,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 		t.Fatal(err)
 	}
 	open, _ := r.msgs.Open(ctx)
-	if _, err := r.s.deps.GTD.Do(ctx, gtd.ID(open[0].EntryID), coregtd.Request{Verb: gtd.VerbApprove, Source: "tui"}); err != nil {
+	if _, err := r.s.deps.GTD.Do(ctx, task.ID(open[0].EntryID), coretasks.Request{Verb: task.VerbApprove, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
 	books, _ := r.store.Books(ctx, r8u.Unit())
@@ -297,7 +297,7 @@ func TestApproveAnswersAConfirmWithYes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.s.deps.GTD.Do(ctx, gtd.ID(m.EntryID), coregtd.Request{Verb: gtd.VerbApprove}); !errors.Is(err, coregtd.ErrVerb) {
+	if _, err := r.s.deps.GTD.Do(ctx, task.ID(m.EntryID), coretasks.Request{Verb: task.VerbApprove}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Fatalf("approve on a proposal with no accept option: %v", err)
 	}
 }

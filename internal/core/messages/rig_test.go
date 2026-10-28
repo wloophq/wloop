@@ -7,18 +7,18 @@ import (
 	"testing"
 	"time"
 
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/messages/messagestest"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/record"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -68,8 +68,8 @@ func (n noItems) Items(_ context.Context, u unit.Unit) ([]items.Item, error) { r
 
 type facts struct{ off map[unit.ProviderID]bool }
 
-func (f facts) UnitFacts(_ context.Context, u unit.Unit) (gtd.UnitFacts, bool, error) {
-	return gtd.UnitFacts{Unit: u}, !f.off[u.Provider], nil
+func (f facts) UnitFacts(_ context.Context, u unit.Unit) (task.UnitFacts, bool, error) {
+	return task.UnitFacts{Unit: u}, !f.off[u.Provider], nil
 }
 
 type fakeLedger struct {
@@ -117,8 +117,8 @@ type rig struct {
 	reg     *turnstest.Registry
 	sess    *turnstest.Sessions
 	msgs    *messagestest.Store
-	gtd     *coregtd.Service
-	entries *gtdtest.Store
+	gtd     *coretasks.Service
+	entries *taskstest.Store
 	items   noItems
 	facts   facts
 	ledger  *fakeLedger
@@ -129,11 +129,11 @@ type rig struct {
 func newRig(t *testing.T) *rig {
 	t.Helper()
 	r := &rig{books: turnstest.NewStore(), reg: turnstest.NewRegistry(), sess: turnstest.NewSessions(), msgs: messagestest.New(),
-		entries: gtdtest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
+		entries: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
 	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, GitHub: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
-	r.gtd = coregtd.New(coregtd.Deps{Store: r.entries, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
+	r.gtd = coretasks.New(coretasks.Deps{Store: r.entries, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
 	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Entries: r.gtd, Intents: turnstest.Intents(),
 		Clock: r.clock, Log: t.Logf}
 	return r
@@ -218,18 +218,18 @@ func (r *rig) message(t *testing.T, id int64) message.Message {
 	return m
 }
 
-func (r *rig) entry(t *testing.T, id string) gtd.Entry {
+func (r *rig) entry(t *testing.T, id string) task.Entry {
 	t.Helper()
-	e, err := r.entries.Entry(context.Background(), gtd.ID(id))
+	e, err := r.entries.Entry(context.Background(), task.ID(id))
 	if err != nil {
 		t.Fatal(err)
 	}
 	return e
 }
 
-func (r *rig) inbox(t *testing.T) []gtd.Entry {
+func (r *rig) inbox(t *testing.T) []task.Entry {
 	t.Helper()
-	es, err := r.gtd.Entries(context.Background(), gtd.Query{View: gtd.ViewInbox})
+	es, err := r.gtd.Entries(context.Background(), task.Query{View: task.ViewInbox})
 	if err != nil {
 		t.Fatal(err)
 	}

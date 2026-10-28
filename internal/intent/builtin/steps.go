@@ -1,7 +1,7 @@
 package builtin
 
 import (
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -35,19 +35,19 @@ const (
 // EntryStepVerbs are the verbs entry.verb runs: the moves of an entry
 // between lists and its focus, context and area. Approving, delegating and
 // answering never come from automation.
-var EntryStepVerbs = verbNames(gtd.VerbNext, gtd.VerbWaiting, gtd.VerbSchedule, gtd.VerbSomeday, gtd.VerbReference,
-	gtd.VerbFocus, gtd.VerbContext, gtd.VerbArea, gtd.VerbDone, gtd.VerbDismiss)
+var EntryStepVerbs = verbNames(task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbSomeday, task.VerbReference,
+	task.VerbFocus, task.VerbContext, task.VerbArea, task.VerbDone, task.VerbDismiss)
 
 // EntryVerbArgs are the arguments each verb takes; the loader refuses any
 // other.
 var EntryVerbArgs = map[string][]string{
-	string(gtd.VerbSchedule): {"until", "on_activity"},
-	string(gtd.VerbWaiting):  {"on", "resurface"},
-	string(gtd.VerbContext):  {"set"},
-	string(gtd.VerbArea):     {"set"},
+	string(task.VerbSchedule): {"until", "on_activity"},
+	string(task.VerbWaiting):  {"on", "resurface"},
+	string(task.VerbContext):  {"set"},
+	string(task.VerbArea):     {"set"},
 }
 
-func verbNames(vs ...gtd.Verb) []string {
+func verbNames(vs ...task.Verb) []string {
 	out := make([]string, len(vs))
 	for i, v := range vs {
 		out[i] = string(v)

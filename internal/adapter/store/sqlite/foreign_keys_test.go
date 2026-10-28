@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/core/gtd/gtdtest"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
@@ -29,9 +29,9 @@ func execWrite(db *DB, query string, args ...any) error {
 	return err
 }
 
-func projectEntry(id gtd.ID) gtd.Entry {
-	e := gtdtest.Full(id)
-	e.Kind, e.Project, e.Slug, e.ReviewEvery = gtd.KindProject, "", "p", 36*time.Hour
+func projectEntry(id task.ID) task.Entry {
+	e := taskstest.Full(id)
+	e.Kind, e.Project, e.Slug, e.ReviewEvery = task.KindProject, "", "p", 36*time.Hour
 	return e
 }
 
@@ -43,7 +43,7 @@ func TestDeletingAParentCascades(t *testing.T) {
 	if err := db.Worktrees().Keep(ctx, wsdomain.Custody{Path: "/wt/a", Manager: "orca", Units: []unit.Unit{pr}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: projectEntry("e-p")}}); err != nil {
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: projectEntry("e-p")}}); err != nil {
 		t.Fatal(err)
 	}
 	children := []struct{ table, column, parent string }{
@@ -76,18 +76,18 @@ func TestRewritingAnEntryKeepsItsProjectRow(t *testing.T) {
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	p := projectEntry("e-p")
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpCreate, Entry: p}}); err != nil {
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpCreate, Entry: p}}); err != nil {
 		t.Fatal(err)
 	}
-	p.Kind, p.Title = gtd.KindCapture, "no longer a project"
-	if err := db.Entries().Apply(ctx, []gtd.Change{{Op: gtd.OpUpdate, Entry: p}}); err != nil {
+	p.Kind, p.Title = task.KindCapture, "no longer a project"
+	if err := db.Entries().Apply(ctx, []task.Change{{Op: task.OpUpdate, Entry: p}}); err != nil {
 		t.Fatal(err)
 	}
 	if n := countRows(t, db, "projects", `entry_id = 'e-p' AND slug = 'p' AND review_every = ?`, int64(36*time.Hour/time.Second)); n != 1 {
 		t.Errorf("the project row of a rewritten entry: %d rows, want 1", n)
 	}
 	got, err := db.Entries().Entry(ctx, "e-p")
-	if err != nil || got.Title != p.Title || got.Kind != gtd.KindCapture || len(got.Items) != len(p.Items) {
+	if err != nil || got.Title != p.Title || got.Kind != task.KindCapture || len(got.Items) != len(p.Items) {
 		t.Errorf("rewritten entry %+v, %v", got, err)
 	}
 }

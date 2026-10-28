@@ -9,10 +9,10 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
 	"github.com/wloophq/wloop/internal/core/change"
-	"github.com/wloophq/wloop/internal/domain/gtd"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/message"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -58,7 +58,7 @@ func TestAQuestionOfAPullRequestThatEndsLeavesTheInbox(t *testing.T) {
 	if m, _, _ := d.Messages.Store.Message(ctx, 1); m.Unit != ghUnit(1) || m.State != message.Superseded {
 		t.Fatalf("the merged one's message %+v", m)
 	}
-	inbox, err := db.Entries().Entries(ctx, gtd.Query{View: gtd.ViewInbox})
+	inbox, err := db.Entries().Entries(ctx, task.Query{View: task.ViewInbox})
 	if err != nil || len(inbox) != 2 {
 		t.Fatalf("inbox %+v %v", inbox, err)
 	}

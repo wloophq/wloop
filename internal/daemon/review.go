@@ -9,8 +9,8 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/api"
-	coregtd "github.com/wloophq/wloop/internal/core/gtd"
-	"github.com/wloophq/wloop/internal/domain/gtd"
+	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +18,7 @@ func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !g.Serves(gtd.ViewReview) {
+	if !g.Serves(task.ViewReview) {
 		writeError(w, http.StatusNotFound, "the review is not served")
 		return
 	}
@@ -35,7 +35,7 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !g.Serves(gtd.ViewReview) {
+	if !g.Serves(task.ViewReview) {
 		writeError(w, http.StatusNotFound, "the review is not served")
 		return
 	}
@@ -47,7 +47,7 @@ func (s *Server) handleReviewStepDone(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.wireReview(rv))
 }
 
-func (s *Server) wireReview(rv coregtd.Review) api.Review {
+func (s *Server) wireReview(rv coretasks.Review) api.Review {
 	texts, bundled := s.loaded().GTD, bundledWords().gtd
 	out := api.Review{ID: rv.ID, StartedAt: rv.StartedAt, Done: rv.Done, Steps: []api.ReviewStep{}}
 	for _, st := range rv.Steps {
@@ -61,26 +61,26 @@ func (s *Server) wireReview(rv coregtd.Review) api.Review {
 // project sets a project's next action, open actions and review on v, reading every project's status once per
 // viewer. The verbs a handler takes on a project, and project on any entry, are offered only where the entry's
 // state takes them.
-func (ev *entryViewer) project(ctx context.Context, e gtd.Entry, v *api.EntryView) error {
+func (ev *entryViewer) project(ctx context.Context, e task.Entry, v *api.EntryView) error {
 	for i, st := range v.Verbs {
-		verb := gtd.Verb(st.Verb)
+		verb := task.Verb(st.Verb)
 		if !st.Enabled || !ev.g.Handles(e.Kind, verb) {
 			continue
 		}
 		var err error
 		switch {
-		case verb == gtd.VerbProject && e.Kind == gtd.KindProject:
+		case verb == task.VerbProject && e.Kind == task.KindProject:
 			err = errors.New("a project cannot join a project")
-		case verb == gtd.VerbProject, e.Kind == gtd.KindProject && slices.Contains([]gtd.Verb{gtd.VerbDone, gtd.VerbDismiss, gtd.VerbReference}, verb):
-			err = coregtd.Accepts(e, verb)
-		case e.Kind == gtd.KindProject && (verb == gtd.VerbReviewed || verb == gtd.VerbSequential) && !e.Live():
+		case verb == task.VerbProject, e.Kind == task.KindProject && slices.Contains([]task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}, verb):
+			err = coretasks.Accepts(e, verb)
+		case e.Kind == task.KindProject && (verb == task.VerbReviewed || verb == task.VerbSequential) && !e.Live():
 			err = fmt.Errorf("%s on a %s project", verb, e.State)
 		}
 		if err != nil {
 			v.Verbs[i] = api.VerbState{Verb: st.Verb, Reason: err.Error()}
 		}
 	}
-	if e.Kind != gtd.KindProject {
+	if e.Kind != task.KindProject {
 		return nil
 	}
 	if ev.status == nil {
