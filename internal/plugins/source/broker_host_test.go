@@ -2,6 +2,7 @@ package source_test
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin"
 	"github.com/wloophq/wloop/pkg/plugin/manifest"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
+	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
 // hostOver is the broker of plugin acme over a fresh store's events, marks,
@@ -139,4 +141,39 @@ func TestAWiderPauseReachesThePluginAsPaused(t *testing.T) {
 
 func TestRecordEventsKeepsTheAnchor(t *testing.T) {
 	t.Skip("X8b: the events table has no anchor column, so RecordEvents drops Event.Anchor; add the column when GitHub reports anchored events, or drop Anchor from Event")
+}
+
+func TestTheRoundStateCrossesTheWireWithItsBookkeeping(t *testing.T) {
+	t.Parallel()
+	b, db := brokerOver(t)
+	ctx := context.Background()
+	sent := time.Date(2026, 10, 28, 8, 0, 0, 0, time.UTC)
+	since := sent.Add(30 * time.Minute)
+	want := src.RoundState{Marks: map[string]string{"plugin.x": "1", "reviewed": "f1"}, SentAt: sent, AgentHome: "/homes/ana", Today: 2, DayTotal: 5,
+		Blocked: &src.Blocked{Question: "trust", Root: "/src/api", Folder: "/wt/rev", Since: since}}
+	t1 := unit.Unit{Provider: "acme", Key: "t1"}
+	b.Rounds = func(_ context.Context, u unit.Unit) (src.RoundState, error) {
+		if u != t1 {
+			return src.RoundState{}, nil
+		}
+		return want, nil
+	}
+	if _, err := db.SetOverride(ctx, t1, map[string]string{port.OverrideMutedKind: "waiting", port.OverrideHold: port.OverrideTrue}, nil); err != nil {
+		t.Fatal(err)
+	}
+	stub := sourcetest.NewStub()
+	sourcetest.Launch(t, "acme", stub, b.Host())
+	got, err := stub.Host().Reader.RoundState(ctx, plugin.Unit{Provider: "acme", Key: "t1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(got.Marks, want.Marks) || !got.SentAt.Equal(sent) || got.AgentHome != want.AgentHome || got.Today != 2 || got.DayTotal != 5 {
+		t.Errorf("bookkeeping %+v", got)
+	}
+	if got.Blocked == nil || got.Blocked.Question != "trust" || got.Blocked.Root != "/src/api" || got.Blocked.Folder != "/wt/rev" || !got.Blocked.Since.Equal(since) {
+		t.Errorf("blocked %+v", got.Blocked)
+	}
+	if got.Overrides[port.OverrideMutedKind] != "waiting" || !got.Paused {
+		t.Errorf("overrides %v, paused %v; want them over the bookkeeping", got.Overrides, got.Paused)
+	}
 }

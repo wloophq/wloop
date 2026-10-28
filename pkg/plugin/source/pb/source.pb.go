@@ -5186,8 +5186,11 @@ type Round struct {
 	TurnFacts []*Fact `protobuf:"bytes,6,rep,name=turn_facts,json=turnFacts,proto3" json:"turn_facts,omitempty"`
 	// on_sent and on_skipped are the marks the host writes when it sends or
 	// skips the round; "" removes a mark.
-	OnSent        map[string]string `protobuf:"bytes,7,rep,name=on_sent,json=onSent,proto3" json:"on_sent,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	OnSkipped     map[string]string `protobuf:"bytes,8,rep,name=on_skipped,json=onSkipped,proto3" json:"on_skipped,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	OnSent    map[string]string `protobuf:"bytes,7,rep,name=on_sent,json=onSent,proto3" json:"on_sent,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	OnSkipped map[string]string `protobuf:"bytes,8,rep,name=on_skipped,json=onSkipped,proto3" json:"on_skipped,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// not_due says why the round is not due now; "" is due. A round not due
+	// is not launched, but skipping it still writes on_skipped.
+	NotDue        string `protobuf:"bytes,9,opt,name=not_due,json=notDue,proto3" json:"not_due,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5276,6 +5279,13 @@ func (x *Round) GetOnSkipped() map[string]string {
 		return x.OnSkipped
 	}
 	return nil
+}
+
+func (x *Round) GetNotDue() string {
+	if x != nil {
+		return x.NotDue
+	}
+	return ""
 }
 
 type PayloadRequest struct {
@@ -10242,7 +10252,7 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"\x06rounds\x18\x04 \x03(\v2\x16.wloop.source.v1.RoundR\x06roundsJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\x05factsR\x03dueR\x04rank\"8\n" +
 	"\fWorkspaceRef\x12\x18\n" +
 	"\amanager\x18\x01 \x01(\tR\amanager\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\tR\x02id\"\xd2\x03\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"\xeb\x03\n" +
 	"\x05Round\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12;\n" +
 	"\tworkspace\x18\x02 \x01(\v2\x1d.wloop.source.v1.WorkspaceRefR\tworkspace\x12\x12\n" +
@@ -10253,7 +10263,8 @@ const file_wloop_source_v1_source_proto_rawDesc = "" +
 	"turn_facts\x18\x06 \x03(\v2\x15.wloop.source.v1.FactR\tturnFacts\x12;\n" +
 	"\aon_sent\x18\a \x03(\v2\".wloop.source.v1.Round.OnSentEntryR\x06onSent\x12D\n" +
 	"\n" +
-	"on_skipped\x18\b \x03(\v2%.wloop.source.v1.Round.OnSkippedEntryR\tonSkipped\x1a9\n" +
+	"on_skipped\x18\b \x03(\v2%.wloop.source.v1.Round.OnSkippedEntryR\tonSkipped\x12\x17\n" +
+	"\anot_due\x18\t \x01(\tR\x06notDue\x1a9\n" +
 	"\vOnSentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a<\n" +

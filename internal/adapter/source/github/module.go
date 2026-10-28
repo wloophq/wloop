@@ -82,7 +82,6 @@ func factsOf(cfg config.Config, d sourcereg.Deps) *factsgithub.Provider {
 		Sink:     d.Sink,
 		Clock:    d.Clock,
 		Teams:    func(ctx context.Context) ([]string, error) { return MyTeams(ctx, d.Inventory) },
-		Agents:   d.Agents,
 		Intents:  d.Intents,
 	}
 	if d.Changes != nil {

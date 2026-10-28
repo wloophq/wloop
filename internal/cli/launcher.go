@@ -93,11 +93,8 @@ func (c cliLauncher) Launch(ctx context.Context, l turns.Launch) error {
 		return err
 	}
 	sr := &sentRound{env: e, ctx: ctx, ref: ref, pr: pr, cfg: cfg, inputs: r.Inputs, id: id, submitted: submitted, guidance: r.Guidance}
-	runPhase(routeLaunch, d, sr, sentPhase)
-	if !writesRounds(routeLaunch, d, sr) {
-		return nil
-	}
-	return e.updateRounds(ctx, func(st *round.Store) { runPhase(routeLaunch, d, sr, statePhase(st)) })
+	e.applySentEffects(ctx, routeLaunch, d, sr)
+	return nil
 }
 
 // reviewFingerprint is what the round just sent covers, so the sweep plans
@@ -249,7 +246,7 @@ func (e *Env) askedRound(ctx context.Context, d dintent.Def, base config.Config,
 		id, submitted, err := run(e, ctx, roundRun{def: d, cfg: cfg, r: r, pr: pr, st: st, rememberHome: remember})
 		sr.pr, sr.cfg, sr.inputs, sr.id, sr.submitted = pr, cfg, inputs, id, submitted
 		if err == nil {
-			runPhase(routeAsked, d, sr, sentPhase)
+			e.applySentEffects(ctx, routeAsked, d, sr)
 		}
 		return submitted, err
 	})

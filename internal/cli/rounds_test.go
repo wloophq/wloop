@@ -14,19 +14,15 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // observed makes the rig's round one the github facts observe: its
 // workspace is gone and the config sends none without it.
 func (r *startRig) observed(round string) {
-	cands := r.steps.d.Candidates.(fakeCandidates)
-	key := r.sc.ref.String() + " " + round
-	c := cands[key]
-	c.Observed, c.Workspace = true, wsdomain.Workspace{}
-	cands[key] = c
+	r.planner().edit(r.sc.ref.String(), round, func(r *src.Round) { r.Observed, r.Workspace = true, src.WorkspaceRef{} })
 }
 
 func (r *startRig) count(kind string) int {
@@ -103,7 +99,8 @@ func TestAnUntrustedFolderBlocksTheRoundUntilTheUserUnblocksIt(t *testing.T) {
 	if want := sc.ref.String() + ": the blocked round waits for a new trigger\n"; out.String() != want {
 		t.Fatalf("out %q, want %q", out.String(), want)
 	}
-	fp := r.steps.d.Candidates.(fakeCandidates)[sc.ref.String()+" "+roundAddress].Fingerprint
+	planned, _ := r.planner().round(sc.ref.String(), roundAddress)
+	fp := planned.OnSent[round.AddressedReviews]
 	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.AddressedReviews); fp == "" || got != fp {
 		t.Fatalf("fingerprint %q, want the blocked round's %q", got, fp)
 	}

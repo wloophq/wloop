@@ -41,7 +41,7 @@ func (e *Env) serveOutbox(d daemon.Deps, db *sqlite.DB, cfg config.Config, mods 
 		}),
 		Items: ledger, Clock: clockFunc(e.Now), Log: logf,
 		Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clockFunc(e.Now),
-			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Modules: mods})},
+			Effects: effectLookup(effectDeps{Nudges: e.newTasks(db, cfg, ledger), Modules: mods, Appliers: e.draftAppliers()})},
 		Results: e.newTaskResults(e.newTasks(db, cfg, ledger), mods)}
 	d.Outbox, d.SendDrafts = e.outbox, !e.noJobs
 	return d

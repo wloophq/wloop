@@ -93,6 +93,8 @@ type Event struct {
 	Doc              string `toml:"doc" doc:"What happened. Required."`
 	Resolves         string `toml:"resolves" doc:"The link event the host's resolver reads it as." enum:"review,merged,closed"`
 	AnswersAskedTurn bool   `toml:"answers_asked_turn" doc:"The event answers the turn that asked for it, which my_review reconciles with."`
+	// Verdicts are the record verdicts of an answering event's states.
+	Verdicts map[string]string `toml:"verdicts" doc:"The record verdict of each state an answering event's data starts with (APPROVE, REQUEST_CHANGES or COMMENT); a state it lacks answers nothing."`
 }
 
 // Situation is a situation a plugin derives.

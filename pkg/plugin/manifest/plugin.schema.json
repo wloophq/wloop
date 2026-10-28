@@ -213,6 +213,13 @@
                   "closed"
                 ],
                 "type": "string"
+              },
+              "verdicts": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "The record verdict of each state an answering event's data starts with (APPROVE, REQUEST_CHANGES or COMMENT); a state it lacks answers nothing.",
+                "type": "object"
               }
             },
             "required": [

@@ -383,10 +383,10 @@ What a sent draft applies, once: the names a `draft.propose` step lists in `effe
 | Effect | Unit | Does |
 |---|---|---|
 | `plan.cleared` | any | Drops the unit's pending plan items. |
+| `turn.guidance_handed` | any | Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent. |
+| `turn.round_sent` | any | Records the round-sent event on the unit when a person sends the turn. |
 | `task.nudged` | any | Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none. |
 | `unit.closed` | any | Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin. |
-| `pr.guidance_handed` | github | Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent. |
-| `pr.round_sent` | github | Records the round-sent event on the pull request. |
 | `pr.reviewed` | github | Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted. |
 | `pr.addressed` | github | Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered. |
 | `pr.nudged` | github | Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft. |

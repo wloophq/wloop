@@ -15,6 +15,7 @@ func v7(ctx context.Context, tx *sql.Tx) error {
 	}{
 		{"rename", v7Rename},
 		{"snapshots", v7Snapshots},
+		{"rounds", v7Rounds},
 		{"props", v7Props},
 		{"gates", v7Gates},
 		{"briefs", v7Briefs},

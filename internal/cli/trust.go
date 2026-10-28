@@ -17,7 +17,6 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 type truster interface {
@@ -146,9 +145,7 @@ func (a envActions) Unblock(ctx context.Context, u unit.Unit, c daemon.Call) err
 		return err
 	}
 	err = e.withState(ctx, func(s *sweep) error {
-		if st, ok := blockedStep(ref, b); ok {
-			s.skip(st)
-		}
+		setMarks(s.st, u.Key, b.Skip)
 		return nil
 	})
 	if err != nil {
@@ -171,16 +168,6 @@ func (e *Env) startBlockOf(ctx context.Context, u unit.Unit) (inventory.StartBlo
 		return inventory.StartBlock{}, fmt.Errorf("no round of %s is blocked on the agent's question", u.Label())
 	}
 	return b, nil
-}
-
-// blockedStep is the round b holds, as the sweep marks it handled.
-func blockedStep(ref github.Ref, b inventory.StartBlock) (step, bool) {
-	for _, k := range []stepKind{stepFirstRound, stepAddress, stepFollowup} {
-		if st := (step{kind: k, pr: ref, fingerprint: b.Fingerprint, checksHead: b.ChecksHead, conflictHead: b.ConflictHead}); st.roundKind() == b.Round {
-			return st, true
-		}
-	}
-	return step{}, false
 }
 
 // trustHomes are the agent homes trusting a folder writes in for a session

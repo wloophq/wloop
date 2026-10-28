@@ -548,7 +548,7 @@ func linkGo(l *pb.Link) Link {
 
 func roundPB(r Round) *pb.Round {
 	out := &pb.Round{Name: r.Name, Head: r.Head, Reason: r.Reason, Observed: r.Observed, TurnFacts: factsPB(r.TurnFacts),
-		OnSent: r.OnSent, OnSkipped: r.OnSkipped}
+		OnSent: r.OnSent, OnSkipped: r.OnSkipped, NotDue: r.NotDue}
 	if r.Workspace != (WorkspaceRef{}) {
 		out.Workspace = &pb.WorkspaceRef{Manager: r.Workspace.Manager, Id: r.Workspace.ID}
 	}
@@ -564,7 +564,7 @@ func nonEmpty(m map[string]string) map[string]string {
 
 func roundGo(r *pb.Round) Round {
 	return Round{Name: r.GetName(), Head: r.GetHead(), Reason: r.GetReason(), Observed: r.GetObserved(), TurnFacts: factsGo(r.GetTurnFacts()),
-		OnSent: nonEmpty(r.GetOnSent()), OnSkipped: nonEmpty(r.GetOnSkipped()),
+		OnSent: nonEmpty(r.GetOnSent()), OnSkipped: nonEmpty(r.GetOnSkipped()), NotDue: r.GetNotDue(),
 		Workspace: WorkspaceRef{Manager: r.GetWorkspace().GetManager(), ID: r.GetWorkspace().GetId()}}
 }
 

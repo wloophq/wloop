@@ -420,6 +420,9 @@ type Round struct {
 	// OnSent and OnSkipped are the marks the host writes when it sends or
 	// skips the round; "" removes a mark.
 	OnSent, OnSkipped map[string]string
+	// NotDue says why the round is not due now; "" is due. A round not due
+	// is not launched, but skipping it still writes OnSkipped.
+	NotDue string
 }
 
 // WorkspaceRef names a workspace in its manager.

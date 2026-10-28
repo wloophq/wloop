@@ -16,7 +16,6 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/sweep"
-	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/views"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -24,10 +23,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 )
 
-// The rounds a Candidate names.
+// The rounds a Plan names.
 const (
 	RoundFollowup = "follow-up"
 	RoundFirst    = "first"
@@ -60,7 +58,7 @@ type RoundState interface {
 	Rounds() *round.Store
 }
 
-// Deps are what the provider reads. Changes, Teams, Agents and Intents may be
+// Deps are what the provider reads. Changes, Teams and Intents may be
 // nil: without Changes every call reads the store again.
 type Deps struct {
 	Inputs   dinv.PlanInputs
@@ -76,23 +74,7 @@ type Deps struct {
 	Clock   port.Clock
 	Changes port.Changes
 	Teams   func(ctx context.Context) ([]string, error)
-	// Agents are the agents by name, for the answer a start block waits on.
-	Agents  map[string]turns.Agent
 	Intents func() *dintent.Registry
-}
-
-// Candidate is what a round is planned with.
-type Candidate struct {
-	Round        string
-	Workspace    wsdomain.Workspace
-	Facts        dinv.PlanFacts
-	Fingerprint  string
-	ChecksHead   string
-	ConflictHead string
-	LastReviewAt time.Time
-	Observed     bool
-	// Reason is why the planner plans the round.
-	Reason string
 }
 
 // Provider is the github source's facts.
@@ -106,16 +88,11 @@ type Provider struct {
 }
 
 var (
-	_ automation.Units     = (*Provider)(nil)
-	_ automation.Refresher = (*Provider)(nil)
-	_ automation.Settler   = (*Provider)(nil)
-	_ automation.Dueer     = (*Provider)(nil)
-	_ views.Facts          = (*Provider)(nil)
+	_ automation.Units   = (*Provider)(nil)
+	_ automation.Settler = (*Provider)(nil)
+	_ automation.Dueer   = (*Provider)(nil)
+	_ views.Facts        = (*Provider)(nil)
 )
-
-// dueBlock is the deadline a sweep's evaluation does not recompute: a
-// blind start block's day.
-const dueBlock = "block"
 
 func New(d Deps) *Provider {
 	return &Provider{d: d, dues: map[string]time.Time{}, revs: revs{byUnit: map[unit.Unit]uint64{}}}
@@ -168,9 +145,6 @@ func (p *Provider) List(ctx context.Context, id unit.ProviderID) ([]unit.Unit, e
 		}
 	}
 	p.mu.Lock()
-	if p.dues[dueBlock].After(now) {
-		dues[dueBlock] = earliestOf(dues[dueBlock], p.dues[dueBlock])
-	}
 	p.dues = dues
 	p.mu.Unlock()
 	slices.SortStableFunc(units, func(a, b unit.Unit) int { return ranks[a].compare(ranks[b]) })
@@ -202,48 +176,6 @@ func (p *Provider) Facts(ctx context.Context, u unit.Unit) (workflow.Facts, erro
 	return pl.facts(ref, r), nil
 }
 
-// Candidate is the round of u the facts plan, with what its turn is sent
-// with; false when that round is not due.
-func (p *Provider) Candidate(ctx context.Context, u unit.Unit, round string) (Candidate, bool, error) {
-	ref, err := refOf(u)
-	if err != nil {
-		return Candidate{}, false, err
-	}
-	v, err := p.fresh(ctx, false)
-	if err != nil {
-		return Candidate{}, false, err
-	}
-	if err := v.loadFacts(ctx, []unit.Unit{u}); err != nil {
-		return Candidate{}, false, err
-	}
-	r, err := v.planner(ctx, p.now()).derive(ref)
-	if err != nil {
-		return Candidate{}, false, err
-	}
-	c := Candidate{Round: round}
-	c.Facts, _ = v.factsOf(ref)
-	switch round {
-	case RoundFollowup:
-		if r.review.action != actionFollowup {
-			return Candidate{}, false, nil
-		}
-		c.Workspace, c.Fingerprint, c.LastReviewAt, c.Observed, c.Reason = r.review.ws, r.review.fingerprint, r.review.lastReviewAt, r.review.observed, r.review.reason
-	case RoundFirst:
-		if !r.first.due {
-			return Candidate{}, false, nil
-		}
-		c.Reason = r.first.reason
-	case RoundAddress:
-		if !r.address.due {
-			return Candidate{}, false, nil
-		}
-		c.Workspace, c.Fingerprint, c.ChecksHead, c.ConflictHead, c.Observed, c.Reason = r.address.ws, r.address.fingerprint, r.address.checksHead, r.address.conflictHead, r.address.observed, r.address.reason
-	default:
-		return Candidate{}, false, fmt.Errorf("no round %q of a pull request", round)
-	}
-	return c, true, nil
-}
-
 // Due is the earliest instant after now a decision of the last evaluation
 // changes with no input changing.
 func (p *Provider) Due() time.Time {
@@ -257,15 +189,6 @@ func (p *Provider) Due() time.Time {
 		}
 	}
 	return due
-}
-
-func (p *Provider) dueAt(key string, t time.Time) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if !p.dues[key].After(p.now()) {
-		delete(p.dues, key)
-	}
-	p.dues[key] = earliestOf(p.dues[key], t)
 }
 
 func (p *Provider) now() time.Time { return p.d.Clock.Now() }

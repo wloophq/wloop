@@ -3,6 +3,7 @@ package inventory
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -644,15 +646,20 @@ func TestFirstRoundBlocks(t *testing.T) {
 func TestAStartBlockAnOlderReleaseWroteReadsWithoutAConflictHead(t *testing.T) {
 	key := strings.Join([]string{"2026-10-09T10:00:00Z", "trust", "/src/api", "", "", "", "triage", "f1", "c2"}, "\n")
 	b, ok := StartBlockOf(port.Event{Kind: dinv.KindRoundBlocked, Key: key})
-	if want := (StartBlock{Question: "trust", Root: "/src/api", Round: "triage", Fingerprint: "f1", ChecksHead: "c2"}); !ok || !reflect.DeepEqual(b, want) {
+	want := StartBlock{Question: "trust", Root: "/src/api", Round: "triage", Skip: map[string]string{round.AddressedReviews: "f1", round.AddressedChecks: "c2"}}
+	if !ok || !reflect.DeepEqual(b, want) {
 		t.Fatalf("%+v %v", b, ok)
 	}
 }
 
 func TestAStartBlockWithoutAConflictHeadKeepsTheKeyAnOlderReleaseReads(t *testing.T) {
 	at := time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC)
-	if n := len(strings.Split(StartBlock{Round: "triage", ChecksHead: "c2"}.Key(at), "\n")); n != 9 {
+	if n := len(strings.Split(StartBlock{Round: "triage"}.Key(at), "\n")); n != 9 {
 		t.Fatalf("%d parts", n)
+	}
+	key := StartBlock{Round: "follow-up", Skip: map[string]string{"plugin.x": "1"}}.Key(at)
+	if b, ok := StartBlockOf(port.Event{Kind: dinv.KindRoundBlocked, Key: key}); !ok || !maps.Equal(b.Skip, map[string]string{"plugin.x": "1"}) {
+		t.Fatalf("a block's skip marks: %+v %v", b, ok)
 	}
 }
 
@@ -662,7 +669,7 @@ func TestStoredStartBlocksReadByUnit(t *testing.T) {
 	at := time.Date(2026, 10, 9, 10, 0, 0, 0, time.UTC)
 	pull := github.Ref{Owner: "acme", Repo: "api", Number: 7}
 	thread := unit.Unit{Provider: "thread", Key: "1700000000.1"}
-	want := StartBlock{Question: "project-mcp", Root: "/src/api", Home: "/h", Homes: []string{"/h"}, Round: "first round", Fingerprint: "f1", ConflictHead: "c1"}
+	want := StartBlock{Question: "project-mcp", Root: "/src/api", Home: "/h", Homes: []string{"/h"}, Round: "first round", Skip: map[string]string{"plugin.x": "1", "plugin.y": ""}}
 	if err := s.RecordEvent(ctx, dinv.Event{PR: pull, Kind: dinv.KindRoundBlocked, Key: want.Key(at), At: at, Data: "asked"}); err != nil {
 		t.Fatal(err)
 	}

@@ -7,84 +7,16 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
-	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
-	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 )
 
-// blindBlock is how long a start block holds when the session runs with its
-// terminal's own agent home, which the loop cannot read for the answer.
-const blindBlock = 24 * time.Hour
-
 func startBlock(ev dinv.Event) (inventory.StartBlock, bool) {
 	return inventory.StartBlockOf(port.Event{Unit: ev.PR.Unit(), Kind: ev.Kind, Key: ev.Key, Data: ev.Data, At: ev.At})
-}
-
-// Refresh records, before the plan, the start blocks the agent home
-// answered: a round they held may then be planned in the same sweep.
-func (p *Provider) Refresh(ctx context.Context) error {
-	if p.d.Agents == nil {
-		return nil
-	}
-	now := p.now()
-	v, err := p.build(ctx, now)
-	if err != nil {
-		return err
-	}
-	for ref, ev := range v.blocks {
-		if _, ok := startBlock(ev); !ok || !v.stillOpen(ref) {
-			continue
-		}
-		if blocked, cleared := p.startBlocked(ctx, v, ref, ev, now); !blocked {
-			if err := p.unblock(ctx, v, ref, cleared, now); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// startBlocked says whether the agent home still has no answer to the
-// question a round's start block waits on, for the repository's checkout and
-// for the removed worktree; cleared says what answered it.
-func (p *Provider) startBlocked(ctx context.Context, v *view, ref pr.Ref, ev dinv.Event, now time.Time) (blocked bool, cleared string) {
-	b, _ := startBlock(ev)
-	cleared = "the agent's question is answered"
-	if b.Question == turns.QuestionTrust {
-		cleared = "the agent home trusts its folder"
-	}
-	cfg := v.cfg.For(ref.Owner, ref.Repo)
-	if cfg.AgentHome == "" {
-		cfg.AgentHome = v.rounds.AgentHome(ref.String())
-	}
-	q, isQuestions := p.d.Agents[cfg.Agent].(turns.Questions)
-	if isQuestions && answered(ctx, q, b, cfg.AgentHome) {
-		return false, cleared
-	}
-	if cfg.AgentHome == "" {
-		if now.Sub(ev.At) < blindBlock {
-			p.dueAt(dueBlock, ev.At.Add(blindBlock))
-			return true, ""
-		}
-		return false, "a day passed, and " + brand.Name + " cannot read the agent home of its terminal to see an answer"
-	}
-	return isQuestions, cleared
-}
-
-// answered says whether home, or the checkout for a question the agent
-// records there, answers b's question for its repository root or folder.
-func answered(ctx context.Context, q turns.Questions, b inventory.StartBlock, home string) bool {
-	for _, d := range []string{b.Root, b.Folder} {
-		if d != "" && !q.Unanswered(ctx, turns.AgentSession{Worktree: d, Home: home, Trusted: true}, b.Question) {
-			return true
-		}
-	}
-	return false
 }
 
 // Settle writes, after the steps, what planning leaves behind: the

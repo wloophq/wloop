@@ -50,6 +50,9 @@ type Broker struct {
 	// BriefIntent is the brief intent of a provider's units as the loaded
 	// profile resolves it, which Config hands the plugin; nil hands none.
 	BriefIntent func(p unit.ProviderID) brief.Intent
+	// Rounds is a unit's round bookkeeping: its marks, sends, counts and
+	// start block; nil serves a RoundState of overrides alone.
+	Rounds func(ctx context.Context, u unit.Unit) (src.RoundState, error)
 }
 
 // BriefStore keeps body, the brief JSON a plugin wrote of u at version, as

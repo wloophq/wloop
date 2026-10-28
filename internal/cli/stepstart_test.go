@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,35 +25,79 @@ import (
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/source"
 	"github.com/wloophq/wloop/internal/workspace"
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// fakeCandidates are the rounds the github facts offer, by unit key and round.
-type fakeCandidates map[string]roundCandidate
-
-func (f fakeCandidates) Candidate(_ context.Context, u unit.Unit, round string) (roundCandidate, bool, error) {
-	c, ok := f[u.Key+" "+round]
-	return c, ok, nil
+// fakePlanner is a plugin's planner that plans fixed rounds, by unit key,
+// and reads each pull request as the github planner read it; it keeps the
+// round state each plan read.
+type fakePlanner struct {
+	mu     sync.Mutex
+	rounds map[string][]src.Round
+	reads  map[string]dinv.PlanFacts
+	states []src.RoundState
 }
 
-// plannedCandidates are the rounds the github facts offer on sc's pull
+func (f *fakePlanner) Plan(_ context.Context, u plugin.Unit, st src.RoundState) (src.Plan, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.states = append(f.states, st)
+	return src.Plan{Rounds: slices.Clone(f.rounds[u.Key])}, nil
+}
+
+func (f *fakePlanner) PlanFacts(_ context.Context, u unit.Unit) (dinv.PlanFacts, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads[u.Key], nil
+}
+
+// round is the round name of key's plan; false when it plans none.
+func (f *fakePlanner) round(key, name string) (src.Round, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	i := slices.IndexFunc(f.rounds[key], func(r src.Round) bool { return r.Name == name })
+	if i < 0 {
+		return src.Round{}, false
+	}
+	return f.rounds[key][i], true
+}
+
+// edit changes the round name of key's plan.
+func (f *fakePlanner) edit(key, name string, fn func(r *src.Round)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.rounds[key] {
+		if f.rounds[key][i].Name == name {
+			fn(&f.rounds[key][i])
+		}
+	}
+}
+
+// plannerOf is the fake planner of r's steps.
+func (r *startRig) planner() *fakePlanner { return r.steps.d.Planners[unit.GitHub].(*fakePlanner) }
+
+// plannedRounds are the rounds the github planner plans on sc's pull
 // request; it fails without one.
-func plannedCandidates(t *testing.T, sc sweepCase) fakeCandidates {
+func plannedRounds(t *testing.T, sc sweepCase) *fakePlanner {
 	t.Helper()
 	out := offeredRounds(t, sc)
-	if len(out) == 0 {
-		t.Fatal("the github facts offer no round")
+	if len(out.rounds) == 0 {
+		t.Fatal("the github planner plans no round")
 	}
 	return out
 }
 
-// offeredRounds are the rounds the github facts offer on sc's pull request,
-// once the collector read sc's fake GitHub.
-func offeredRounds(t *testing.T, sc sweepCase) fakeCandidates {
+// livePlanner is the github planner of sc's pull request, once the
+// collector read sc's fake GitHub.
+func livePlanner(t *testing.T, sc sweepCase) roundPlanner {
 	t.Helper()
 	te := sc.te
-	if err := te.syncInventory(context.Background()); err != nil {
+	ctx := context.Background()
+	if err := te.syncInventory(ctx); err != nil {
 		t.Fatal(err)
 	}
 	linkWorkspaces(t, te)
@@ -67,18 +112,33 @@ func offeredRounds(t *testing.T, sc sweepCase) fakeCandidates {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cands := candidatesOf([]source.Module{mod})
-	out := fakeCandidates{}
-	for _, r := range []string{roundFollowup, roundFirst, roundAddress} {
-		c, ok, err := cands.Candidate(context.Background(), sc.ref.Unit(), r)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if ok {
-			out[sc.ref.String()+" "+r] = c
-		}
+	return sc.env.planners([]source.Module{mod})[unit.GitHub]
+}
+
+// offeredRounds are the rounds the github planner plans on sc's pull
+// request over its stored round state, frozen.
+func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
+	t.Helper()
+	ctx := context.Background()
+	gh := livePlanner(t, sc)
+	u := sc.ref.Unit()
+	stored, err := sc.te.Rounds.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return out
+	st, err := sc.env.roundStateOf(ctx, u, stored, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := gh.Plan(ctx, psource.Wire(u), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := gh.(prReader).PlanFacts(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fakePlanner{rounds: map[string][]src.Round{u.Key: plan.Rounds}, reads: map[string]dinv.PlanFacts{u.Key: read}}
 }
 
 // linkWorkspaces runs the collector's fast pass over te's workspaces, which
@@ -135,7 +195,7 @@ func newStartRig(t *testing.T, sc sweepCase, intent, round string) *startRig {
 	t.Helper()
 	rec := &memRecorder{}
 	sc.env.Rec = rec
-	cands := plannedCandidates(t, sc)
+	planner := plannedRounds(t, sc)
 	briefs := &fakeBriefs{rd: intake.Readiness{Go: true}}
 	sc.env.Briefing = briefs
 	u := sc.ref.Unit()
@@ -145,7 +205,7 @@ func newStartRig(t *testing.T, sc sweepCase, intent, round string) *startRig {
 	r := &startRig{sc: sc, rec: rec, units: units, briefs: briefs, u: u,
 		st:  workflow.Step{Use: builtin.StepTurnStart, Args: map[string]any{"intent": intent, "stage": round}},
 		why: workflow.Why{Workflow: "review-follow-up", Trigger: workflow.TriggerSweep, Matched: []workflow.Fact{{Name: "pr.review.action", Value: "follow-up"}}}}
-	r.steps = newStepSet(sc.env, stepDeps{Units: units, Candidates: cands, Briefs: briefs, Rounds: sc.te.Rounds})
+	r.steps = newStepSet(sc.env, stepDeps{Units: units, Planners: map[unit.ProviderID]roundPlanner{unit.GitHub: planner}, Briefs: briefs, Rounds: sc.te.Rounds})
 	return r
 }
 
@@ -229,7 +289,7 @@ func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
 	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), "")
-	cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, roundAddress)
+	planned, _ := r.planner().round(r.u.Key, roundAddress)
 	for name, c := range map[string]struct {
 		a    wsdomain.Activity
 		want string
@@ -238,7 +298,7 @@ func TestAddressRefusesOnlyAWaitingAgent(t *testing.T) {
 		"user active": {wsdomain.Activity{UserActive: true}, ""},
 		"waiting":     {wsdomain.Activity{Waiting: true}, errWaiting.Error()},
 	} {
-		sc.ws.Activity = map[string]wsdomain.Activity{cand.Workspace.ID: c.a}
+		sc.ws.Activity = map[string]wsdomain.Activity{planned.Workspace.ID: c.a}
 		if got := r.check(t, automation.CheckOpts{Observe: false}); got != c.want {
 			t.Errorf("%s: refusal %q, want %q", name, got, c.want)
 		}
@@ -345,16 +405,16 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 	for name, c := range map[string]struct {
 		sc            func(*testing.T) sweepCase
 		intent, round string
-		check         func(*testing.T, *round.Store, roundCandidate, string)
+		check         func(*testing.T, *round.Store, src.Round, string)
 		kind          string
 	}{
-		"follow-up": {followupScenario, string(dintent.Review), roundFollowup, func(t *testing.T, st *round.Store, c roundCandidate, key string) {
-			if st.Mark(key, round.Reviewed) != c.Fingerprint {
-				t.Errorf("fingerprint %q, want %q", st.Mark(key, round.Reviewed), c.Fingerprint)
+		"follow-up": {followupScenario, string(dintent.Review), roundFollowup, func(t *testing.T, st *round.Store, c src.Round, key string) {
+			if want := c.OnSkipped[round.Reviewed]; st.Mark(key, round.Reviewed) != want || want == "" {
+				t.Errorf("fingerprint %q, want %q", st.Mark(key, round.Reviewed), want)
 			}
 		}, "follow-up"},
-		"triage": {addressScenario, string(dintent.Address), "", func(t *testing.T, st *round.Store, c roundCandidate, key string) {
-			if st.Mark(key, round.AddressedReviews) != c.Fingerprint || st.Mark(key, round.AddressedChecks) != c.ChecksHead {
+		"triage": {addressScenario, string(dintent.Address), "", func(t *testing.T, st *round.Store, c src.Round, key string) {
+			if st.Mark(key, round.AddressedReviews) != c.OnSkipped[round.AddressedReviews] || st.Mark(key, round.AddressedChecks) != c.OnSkipped[round.AddressedChecks] {
 				t.Errorf("fingerprint %q, checks head %q; want %+v", st.Mark(key, round.AddressedReviews), st.Mark(key, round.AddressedChecks), c)
 			}
 		}, "triage"},
@@ -362,13 +422,13 @@ func TestDismissWritesSweepSkipsRecords(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			sc := c.sc(t)
 			r := newStartRig(t, sc, c.intent, c.round)
-			cand, _, _ := r.steps.d.Candidates.Candidate(context.Background(), r.u, sc.env.startOf(r.st, r.u.Provider).candidate())
+			planned, _ := r.planner().round(r.u.Key, sc.env.startOf(r.st, r.u.Provider).candidate())
 			r.load(t)
 			if err := r.steps.Dismiss(context.Background(), r.st, r.u, r.why); err != nil {
 				t.Fatal(err)
 			}
 			r.save(t)
-			c.check(t, sc.te.loadRounds(t), cand, sc.ref.String())
+			c.check(t, sc.te.loadRounds(t), planned, sc.ref.String())
 			if !slices.ContainsFunc(r.rec.events, func(e dinv.Event) bool {
 				return e.Kind == dinv.KindRoundSkipped && e.Data == c.kind+": skipped by you"
 			}) {
@@ -387,7 +447,7 @@ func TestASkippedFollowupDoesNotComeBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.save(t)
-	if got := offeredRounds(t, sc); len(got) != 0 {
+	if got := offeredRounds(t, sc).rounds[sc.ref.String()]; len(got) != 0 {
 		t.Fatalf("the skipped follow-up came back: %+v", got)
 	}
 }
@@ -534,11 +594,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), "")
-	cands := r.steps.d.Candidates.(fakeCandidates)
-	key := sc.ref.String() + " " + roundAddress
-	c := cands[key]
-	c.Observed, c.Workspace = true, wsdomain.Workspace{}
-	cands[key] = c
+	r.observed(roundAddress)
 	sc.te.cfg.Turns.PerUnitPerDay = 1
 	st := r.load(t)
 	st.Count(sc.ref.String(), testNow)
@@ -558,11 +614,7 @@ func TestAnObservedRoundKeepsTheBasesCaps(t *testing.T) {
 
 	fsc := followupScenario(t)
 	fr := newStartRig(t, fsc, string(dintent.Review), roundFollowup)
-	fc := fr.steps.d.Candidates.(fakeCandidates)
-	fkey := fsc.ref.String() + " " + roundFollowup
-	f := fc[fkey]
-	f.Observed = true
-	fc[fkey] = f
+	fr.planner().edit(fsc.ref.String(), roundFollowup, func(r *src.Round) { r.Observed = true })
 	fsc.te.cfg.Turns.PerUnitPerDay = 1
 	fst := fr.load(t)
 	fst.Count(fsc.ref.String(), testNow)
@@ -654,8 +706,9 @@ func TestAnAddressRoundSaysWhyNow(t *testing.T) {
 	t.Parallel()
 	sc := addressScenario(t)
 	r := newStartRig(t, sc, string(dintent.Address), roundAddress)
-	r.units.Set(r.u, "pr.address.reviewers", []string{"bob", "jussara-ai"})
-	r.units.Set(r.u, "pr.address.checks", []string{})
+	r.planner().edit(r.u.Key, roundAddress, func(r *src.Round) {
+		r.TurnFacts = []src.Fact{{Name: "pr.address.reviewers", Value: src.List("bob", "jussara-ai")}, {Name: "pr.address.checks", Value: src.List()}}
+	})
 	if _, err := r.run(t, automation.RunOpts{}); err != nil {
 		t.Fatal(err)
 	}

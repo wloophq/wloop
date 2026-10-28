@@ -167,12 +167,12 @@ func TestBuiltinLiteralsFlagsANameOutsideTheTables(t *testing.T) {
 	t.Parallel()
 	fset, f := parse(t, `package daemon
 import "github.com/wloophq/wloop/internal/intent/builtin"
-const a = "pr.round_sent"
+const a = "turn.round_sent"
 const b = "pr.addressed"
 const c = "linked_else_main"
 const d = "plan.cleared"
 const e = "review"
-const g = "pr.round_sent is fine inside a sentence"
+const g = "turn.round_sent is fine inside a sentence"
 var _ = builtin.Names
 `)
 	flagged(t, "daemon", builtinLiterals(fset, "internal/daemon/x.go", f), 4, "a builtin's name lives in its table")
@@ -211,7 +211,7 @@ func TestBuiltinNamesAreTheDottedAndSnakeNames(t *testing.T) {
 	t.Parallel()
 	names := builtinNames()
 	var missing, extra []string
-	for _, want := range []string{"pr.round_sent", "plan.cleared", "linked_else_main", "pr.addressed"} {
+	for _, want := range []string{"turn.round_sent", "plan.cleared", "linked_else_main", "pr.addressed"} {
 		if !names[want] {
 			missing = append(missing, want)
 		}

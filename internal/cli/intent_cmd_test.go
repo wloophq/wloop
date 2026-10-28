@@ -365,7 +365,7 @@ func TestEveryBuiltinNameHasAnImplementation(t *testing.T) {
 	}
 	effects := append(slices.Clone(ours["effects"]), theirs.Effects...)
 	for _, name := range builtin.TurnEffectNames() {
-		if !slices.Contains(effects, name) {
+		if fx, _ := builtin.EffectOf(name); !fx.Plugin && !slices.Contains(effects, name) {
 			t.Errorf("the turn effect %q has no implementation", name)
 		}
 	}

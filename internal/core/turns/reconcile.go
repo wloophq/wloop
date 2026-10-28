@@ -27,7 +27,7 @@ const (
 
 type Report struct {
 	Unrecorded []unit.Unit
-	// Closed are the asked turns my review on GitHub closed.
+	// Closed are the asked turns the user's answer in the source closed.
 	Closed       []unit.Unit
 	GoneSessions []string
 	// Queued are the pull requests with an answer queued for a busy session,
@@ -39,7 +39,7 @@ type Report struct {
 }
 
 // Reconcile closes the open turns whose sessions stopped without a record,
-// that no agent started, or that my review on GitHub answered. At start-up one
+// that no agent started, or that the user's answer in the source closed. At start-up one
 // observation of a done pane suffices and a session a complete census misses
 // counts as stopped; later, only a closed one does.
 func (s *Service) Reconcile(ctx context.Context, startup bool) (Report, error) {
@@ -113,13 +113,13 @@ func (s *Service) Reconcile(ctx context.Context, startup bool) (Report, error) {
 }
 
 // ReconcileMyReview is the reconcile that closes an asked turn as done once
-// the user's review appears on GitHub.
+// the user's answer appears in the unit's source.
 const ReconcileMyReview = "my_review"
 
 func (s *Service) fallback(ctx context.Context, w *world, b *turn.Book, t turn.Turn, startup bool) (record.Record, bool, error) {
 	now := s.now()
 	switch {
-	case t.State == turn.Asked && s.GitHub != nil && s.Intents != nil && s.Intents.Reconcile(string(t.Intent)) == ReconcileMyReview:
+	case t.State == turn.Asked && s.Answers != nil && s.Intents != nil && s.Intents.Reconcile(string(t.Intent)) == ReconcileMyReview:
 		if rec, ok, err := s.myReview(ctx, b, t); err != nil || ok {
 			return rec, ok, err
 		}
@@ -161,20 +161,18 @@ func (s *Service) fallback(ctx context.Context, w *world, b *turn.Book, t turn.T
 	return record.Unrecorded(pane.LastMessage), true, nil
 }
 
-var verdicts = map[string]string{"APPROVED": "APPROVE", "CHANGES_REQUESTED": "REQUEST_CHANGES", "COMMENTED": "COMMENT"}
-
 func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (record.Record, bool, error) {
 	last, ok := b.LastRecord(t.Seq)
 	if !ok {
 		return record.Record{}, false, nil
 	}
-	reviews, err := s.GitHub.MyReviews(ctx, b.Unit, last.At)
+	reviews, err := s.Answers.Answers(ctx, b.Unit, last.At)
 	if err != nil {
 		return record.Record{}, false, err
 	}
-	var newest *MyReview
+	var newest *SourceAnswer
 	for i, r := range reviews {
-		if _, known := verdicts[r.State]; known && r.At.After(last.At) && (newest == nil || r.At.After(newest.At)) {
+		if r.Verdict != "" && r.At.After(last.At) && (newest == nil || r.At.After(newest.At)) {
 			newest = &reviews[i]
 		}
 	}
@@ -182,16 +180,13 @@ func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (reco
 		return record.Record{}, false, nil
 	}
 	url := newest.URL
-	switch {
-	case url == "" && newest.ID != "":
-		url = unitArg(b.Unit) + "#pullrequestreview-" + newest.ID
-	case url == "":
+	if url == "" {
 		url = unitArg(b.Unit)
 	}
 	return record.Record{
 		State:   record.Done,
-		Summary: "my review on GitHub closed the question: " + newest.State,
-		Outcome: &record.Outcome{Verdict: verdicts[newest.State], URL: url},
+		Summary: "my answer closed the question: " + newest.State,
+		Outcome: &record.Outcome{Verdict: newest.Verdict, URL: url},
 	}, true, nil
 }
 

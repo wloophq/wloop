@@ -310,11 +310,12 @@ func TestNewEngineAssemblesOverTheStore(t *testing.T) {
 func TestTheGithubModuleOffersTheRounds(t *testing.T) {
 	t.Parallel()
 	p := factsgithub.New(factsgithub.Deps{})
-	if _, ok := candidatesOf([]source.Module{{ID: unit.GitHub, Facts: p}}).(githubCandidates); !ok {
-		t.Fatal("the github facts provider does not offer its rounds")
+	e := &Env{}
+	if got := e.planners([]source.Module{{ID: unit.GitHub, Facts: p}})[unit.GitHub]; got != roundPlanner(p) {
+		t.Fatalf("the github planner is %T", got)
 	}
-	if candidatesOf(nil) != nil {
-		t.Fatal("no module offers rounds")
+	if len(e.planners(nil)) != 0 {
+		t.Fatal("no module plans rounds")
 	}
 }
 

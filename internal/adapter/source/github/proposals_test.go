@@ -127,7 +127,7 @@ func TestGitHubNudgeDraftsMatchTheNudgeOffer(t *testing.T) {
 		if w := strings.Join(who, ", "); proposedWho(g) != w {
 			t.Errorf("%s: the proposal asks %q, the offer %q", r.Unit.Label(), proposedWho(g), w)
 		}
-		if want := (draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: r.Unit.String()}); g.Origin != want || !slices.Equal(g.Effects, []string{builtin.EffectPRNudged, builtin.EffectTaskNudged}) {
+		if want := (draft.Origin{Kind: draft.OriginAuto, Rule: NudgeRule, Key: r.Unit.String()}); g.Origin != want || !slices.Equal(g.Effects, []string{EffectNudged, builtin.EffectTaskNudged}) {
 			t.Errorf("%s: origin %+v effects %v", r.Unit.Label(), g.Origin, g.Effects)
 		}
 	}

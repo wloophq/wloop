@@ -1,1 +1,1 @@
-testdata/bad/builtin-wrong-slot/intents/ask-author/intent.toml:5:25: effects[1]: "nudge.prepare" is not one of "plan.cleared", "pr.guidance_handed", "pr.round_sent", "pr.reviewed", "pr.addressed" or "pr.nudged"
+testdata/bad/builtin-wrong-slot/intents/ask-author/intent.toml:5:25: effects[1]: "nudge.prepare" is not one of "plan.cleared", "turn.guidance_handed", "turn.round_sent", "pr.reviewed", "pr.addressed" or "pr.nudged"

@@ -187,6 +187,9 @@ type Env struct {
 	// briefsHeard holds the brief queue that hears of each brief a plugin
 	// writes through its broker; nil outside serve.
 	briefsHeard *atomic.Pointer[brief.Queue]
+	// pluginEffects applies a provider's plugin effects in place of its
+	// running plugin; nil asks the plugin.
+	pluginEffects func(p unit.ProviderID) (effectApplier, bool)
 
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.

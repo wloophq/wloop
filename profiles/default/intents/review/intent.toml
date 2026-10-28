@@ -12,7 +12,7 @@ intake    = true
 start_line = "starting the review"
 profile   = "review"
 dims      = ["stage"]
-effects   = ["pr.reviewed", "pr.guidance_handed", "pr.round_sent", "plan.cleared"]
+effects   = ["pr.reviewed", "turn.guidance_handed", "turn.round_sent", "plan.cleared"]
 
 [help]
 target   = "a pull request URL"

@@ -58,7 +58,7 @@ func (l *launcher) Launch(_ context.Context, x turns.Launch) error {
 	return nil
 }
 
-func (l *launcher) MyReviews(context.Context, unit.Unit, time.Time) ([]turns.MyReview, error) {
+func (l *launcher) Answers(context.Context, unit.Unit, time.Time) ([]turns.SourceAnswer, error) {
 	return nil, nil
 }
 
@@ -131,7 +131,7 @@ func newRig(t *testing.T) *rig {
 	r := &rig{books: turnstest.NewStore(), reg: turnstest.NewRegistry(), sess: turnstest.NewSessions(), msgs: messagestest.New(),
 		taskStore: taskstest.New(), items: noItems{map[unit.Unit][]items.Item{}}, facts: facts{map[unit.ProviderID]bool{}},
 		ledger: &fakeLedger{}, clock: &clock{t: t0}, launch: &launcher{}}
-	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, GitHub: r.launch,
+	r.turns = &turns.Service{Intents: turnstest.Intents(), Store: r.books, Registry: r.reg, Sessions: r.sess, Launcher: r.launch, Answers: r.launch,
 		Clock: r.clock, Command: "loop", FastJob: 2 * time.Minute}
 	r.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: r.taskStore, Items: r.items, Facts: r.facts, Clock: r.clock, StaleWaitingDays: 2})
 	r.svc = &messages.Service{Store: r.msgs, Books: r.books, Turns: r.turns, Ledger: r.ledger, Tasks: r.tasks, Intents: turnstest.Intents(),

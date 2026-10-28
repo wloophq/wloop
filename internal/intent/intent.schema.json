@@ -256,8 +256,8 @@
       "items": {
         "enum": [
           "plan.cleared",
-          "pr.guidance_handed",
-          "pr.round_sent",
+          "turn.guidance_handed",
+          "turn.round_sent",
           "pr.reviewed",
           "pr.addressed",
           "pr.nudged"

@@ -643,7 +643,7 @@ func loadFixture(t *testing.T, dir string, now time.Time) *fixtureEnv {
 	prompts := turnstest.NewPrompts()
 	te.Turns.Store, te.Turns.Registry, te.Turns.Prompts = te.repo, te.repo, prompts
 	te.Turns.Sessions = turns.NewRouter(te.repo, handleSessions{f.mgr.Name(), f.sessions})
-	te.Turns.GitHub = inventoryFacts{te.Store}
+	te.Turns.Answers = hostAnswers{events: te.repo, viewer: te.Store}
 	te.Views.Books, te.Views.State = te.repo, te.repo
 
 	if err := te.Store.SetViewer(ctx, unit.GitHub, prf.Viewer); err != nil {

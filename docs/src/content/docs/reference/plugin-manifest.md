@@ -110,6 +110,7 @@ every = "5m"
 | `doc` | string | What happened. Required. |
 | `resolves` | one of `review`, `merged`, `closed` | The link event the host's resolver reads it as. |
 | `answers_asked_turn` | bool | The event answers the turn that asked for it, which my_review reconciles with. |
+| `verdicts` | table of strings | The record verdict of each state an answering event's data starts with (APPROVE, REQUEST_CHANGES or COMMENT); a state it lacks answers nothing. |
 
 ## `[[source.roles]]`
 

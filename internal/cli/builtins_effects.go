@@ -5,6 +5,9 @@ import (
 	"slices"
 	"time"
 
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -22,6 +25,8 @@ type effectNudges interface {
 type effectDeps struct {
 	Nudges  effectNudges // nil stamps nothing
 	Modules []source.Module
+	// Appliers apply each provider's plugin effects; nil applies none.
+	Appliers func(p unit.ProviderID) (effectApplier, bool)
 }
 
 // draftEffects are the draft effects the daemon applies once a draft is
@@ -30,13 +35,8 @@ func draftEffects(d effectDeps) map[string]outbox.Effect {
 	return map[string]outbox.Effect{
 		builtin.EffectTaskNudged: d.taskNudged,
 		builtin.EffectUnitClosed: noPluginClosure,
-		builtin.EffectPRNudged:   appliedByPublisher,
 	}
 }
-
-// appliedByPublisher is an effect its provider's publisher applies as it
-// posts, so applying it after the send does nothing.
-func appliedByPublisher(context.Context, draft.Draft) error { return nil }
 
 // noPluginClosure is unit.closed on a unit whose built plugin records no closure.
 func noPluginClosure(context.Context, draft.Draft) error { return nil }
@@ -58,9 +58,10 @@ func (d effectDeps) taskNudged(ctx context.Context, dr draft.Draft) error {
 	return d.Nudges.Nudged(ctx, ids, dr.Unit, at)
 }
 
-// effectLookup finds an effect for a draft of provider p: its plugin's
-// own, else the daemon's; none when the effect belongs to another provider,
-// or applies through a plugin p has not built.
+// effectLookup finds an effect for a draft of provider p: its built
+// module's own, else the daemon's, else its plugin's ApplyEffect; none when
+// the effect belongs to another provider, or applies through a plugin that
+// p has not built or that does not run.
 func effectLookup(d effectDeps) outbox.EffectLookup {
 	core := draftEffects(d)
 	return func(p unit.ProviderID, name string) (outbox.Effect, bool) {
@@ -78,10 +79,23 @@ func effectLookup(d effectDeps) outbox.EffectLookup {
 				return fx, true
 			}
 		}
-		if i >= 0 && builtin.Effects[i].Plugin && !built {
+		fx, ok := core[name]
+		if i < 0 || !builtin.Effects[i].Plugin {
+			return fx, ok
+		}
+		if ok {
+			return fx, built
+		}
+		if d.Appliers == nil {
 			return nil, false
 		}
-		fx, ok := core[name]
-		return fx, ok
+		a, ok := d.Appliers(p)
+		if !ok {
+			return nil, false
+		}
+		return func(ctx context.Context, dr draft.Draft) error {
+			w := psource.WireDraft(dr)
+			return a.ApplyEffect(ctx, src.EffectRequest{Effect: name, Unit: w.Unit, Draft: &w})
+		}, true
 	}
 }

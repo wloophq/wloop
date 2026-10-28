@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -121,18 +123,20 @@ type StartBlock struct {
 	// Homes are the agent homes trusting the folder writes in: Home, or
 	// the homes the terminal's own one may be.
 	Homes []string
-	// Round, Fingerprint, ChecksHead and ConflictHead name the round the
-	// block holds and the trigger it answered, which dismissing the block
-	// marks handled.
-	Round, Fingerprint, ChecksHead, ConflictHead string
+	// Round names the round the block holds; Skip are the marks dismissing
+	// the block writes, its plan's OnSkipped.
+	Round string
+	Skip  map[string]string
 }
 
-// Key keeps each block its own event: a keyed event is recorded once.
+// Key keeps each block its own event: a keyed event is recorded once. Its
+// eighth and ninth parts, the reviews and checks head an older release
+// wrote, stay empty, and the tenth is Skip as JSON when it holds a mark.
 func (b StartBlock) Key(at time.Time) string {
-	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, b.Fingerprint, b.ChecksHead}
-	// A schema version 2 release reads a key of nine parts only.
-	if b.ConflictHead != "" {
-		parts = append(parts, b.ConflictHead)
+	parts := []string{at.UTC().Format(time.RFC3339Nano), b.Question, b.Root, b.Folder, b.Home, strings.Join(b.Homes, "\t"), b.Round, "", ""}
+	if len(b.Skip) > 0 {
+		skip, _ := json.Marshal(b.Skip)
+		parts = append(parts, string(skip))
 	}
 	return strings.Join(parts, "\n")
 }
@@ -143,12 +147,38 @@ func StartBlockOf(e port.Event) (StartBlock, bool) {
 	if e.Kind != dinv.KindRoundBlocked || (len(parts) != 9 && len(parts) != 10) {
 		return StartBlock{}, false
 	}
-	b := StartBlock{Question: parts[1], Root: parts[2], Folder: parts[3], Home: parts[4], Round: parts[6], Fingerprint: parts[7], ChecksHead: parts[8]}
-	if len(parts) == 10 {
-		b.ConflictHead = parts[9]
-	}
+	b := StartBlock{Question: parts[1], Root: parts[2], Folder: parts[3], Home: parts[4], Round: parts[6]}
 	if parts[5] != "" {
 		b.Homes = strings.Split(parts[5], "\t")
 	}
+	if len(parts) == 10 && strings.HasPrefix(parts[9], "{") {
+		if err := json.Unmarshal([]byte(parts[9]), &b.Skip); err != nil {
+			return StartBlock{}, false
+		}
+		return b, true
+	}
+	conflict := ""
+	if len(parts) == 10 {
+		conflict = parts[9]
+	}
+	b.Skip = olderSkip(b.Round, parts[7], parts[8], conflict)
 	return b, true
+}
+
+// olderSkip are the marks dismissing a block an older release keyed writes:
+// it named the reviews and heads the GitHub round answered, not its marks.
+func olderSkip(kind, reviews, checks, conflict string) map[string]string {
+	switch kind {
+	case "first round":
+		return map[string]string{round.FirstSkipped: "1"}
+	case "triage":
+		out := map[string]string{}
+		for name, v := range map[string]string{round.AddressedReviews: reviews, round.AddressedChecks: checks, round.AddressedConflict: conflict} {
+			if v != "" {
+				out[name] = v
+			}
+		}
+		return out
+	}
+	return map[string]string{round.Reviewed: reviews}
 }

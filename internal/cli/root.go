@@ -7,11 +7,13 @@ import (
 	"time"
 
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/pkg/plugin"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/adapter/agent/claude"
 	acd "github.com/wloophq/wloop/internal/adapter/claudedesktop"
 	adossier "github.com/wloophq/wloop/internal/adapter/dossier"
-	factsgithub "github.com/wloophq/wloop/internal/adapter/facts/github"
 	factsession "github.com/wloophq/wloop/internal/adapter/facts/session"
 	facttask "github.com/wloophq/wloop/internal/adapter/facts/task"
 	factworkspace "github.com/wloophq/wloop/internal/adapter/facts/workspace"
@@ -178,22 +180,45 @@ func siblingFacts(f automation.Units) automation.Units {
 	return nil
 }
 
-// candidatesOf is the rounds the github module's facts plan; nil when no
-// module offers them.
-func candidatesOf(mods []source.Module) roundCandidates {
+// planners are the round planners of the plugins: each built-in module's
+// facts that plan, then each running source plugin that does.
+func (e *Env) planners(mods []source.Module) map[unit.ProviderID]roundPlanner {
+	out := map[unit.ProviderID]roundPlanner{}
 	for _, m := range mods {
-		if p, ok := m.Facts.(*factsgithub.Provider); ok {
-			return githubCandidates{p}
+		if p, ok := m.Facts.(roundPlanner); ok {
+			out[m.ID] = p
 		}
 	}
-	return nil
+	for _, p := range e.plugins {
+		id := unit.ProviderID(p.ID())
+		if _, built := out[id]; built || e.pluginKind == nil {
+			continue
+		}
+		out[id] = runningPlanner{kind: e.pluginKind, id: p.ID()}
+	}
+	return out
 }
 
-type githubCandidates struct{ p *factsgithub.Provider }
+// runningPlanner is the planner of plugin id while it runs.
+type runningPlanner struct {
+	kind *psource.Kind
+	id   string
+}
 
-func (g githubCandidates) Candidate(ctx context.Context, u unit.Unit, r string) (roundCandidate, bool, error) {
-	c, ok, err := g.p.Candidate(ctx, u, r)
-	return roundCandidate(c), ok, err
+func (r runningPlanner) Plan(ctx context.Context, u plugin.Unit, st src.RoundState) (src.Plan, error) {
+	c, err := r.kind.Client(r.id)
+	if err != nil {
+		return src.Plan{}, err
+	}
+	return c.Plan(ctx, u, st)
+}
+
+func (r runningPlanner) ApplyEffect(ctx context.Context, req src.EffectRequest) error {
+	c, err := r.kind.Client(r.id)
+	if err != nil {
+		return err
+	}
+	return c.ApplyEffect(ctx, req)
 }
 
 func sessionAndWorkspaceCodecs() []unit.Codec {
