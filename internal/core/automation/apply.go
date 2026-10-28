@@ -184,7 +184,7 @@ func (e *Engine) Act(ctx context.Context, id string, a workflow.Action, guidance
 // byHand checks every step's guards and that the item's source did not move
 // before running any step, then runs the item.
 func (e *Engine) byHand(ctx context.Context, it workflow.Item, o RunOpts) (workflow.Item, error) {
-	moved, err := e.sourceMoved(ctx, it.Unit)
+	moved, err := e.sourceMoved(ctx, it)
 	if err != nil {
 		return it, err
 	}

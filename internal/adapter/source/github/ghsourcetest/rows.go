@@ -13,8 +13,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
-	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/turn"
 )
 
@@ -163,7 +163,7 @@ func (s *Situation) add(kind, actor string, at time.Time, data string) {
 // reviewTurn is a review turn in state; an asked or stopped one holds its question, as an answerable turn's
 // facts do.
 func reviewTurn(state string) *prrow.TurnFact {
-	f := &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "pr.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
+	f := &prrow.TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: state, Summary: "which branch?", At: ago(30 * time.Minute)}, Session: "s1"}
 	if state != "started" {
 		f.Question = &api.QuestionView{State: state, RecordID: 1, Kind: "choice", Text: "which branch?"}
 	}

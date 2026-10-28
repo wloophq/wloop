@@ -14,6 +14,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 )
 
 var (
@@ -499,7 +500,7 @@ func TestAReviewToAddressWithoutAWorkspaceNeedsMe(t *testing.T) {
 		t.Fatalf("the workspace exists and it still waits: %+v", r)
 	}
 	turn := Derive(Input{PR: pr("me", "bob"), Events: []dinv.Event{review, would}, Viewer: "me", Now: h(5), Stalled: th,
-		Turn: &TurnFacts{Intent: "address", Role: "pr.address", State: "done", At: h(4)}})
+		Turn: &overlay.Turn{Intent: "address", Role: "pr.address", State: "done", At: h(4)}})
 	if turn.Kind == KindToAddress {
 		t.Fatalf("an address turn ran and it still waits: %+v", turn)
 	}
@@ -561,28 +562,28 @@ func TestKindLabel(t *testing.T) {
 	}
 }
 
-func deriveTurn(p dinv.PR, turn *TurnFacts, waiting bool) Result {
+func deriveTurn(p dinv.PR, turn *overlay.Turn, waiting bool) Result {
 	return Derive(Input{PR: p, Viewer: "me", Now: h(10), Stalled: th, Turn: turn, SessionWaiting: waiting})
 }
 
 func TestTheTurnDrivesTheSituation(t *testing.T) {
 	for _, c := range []struct {
 		name    string
-		turn    *TurnFacts
+		turn    *overlay.Turn
 		waiting bool
 		want    Kind
 		reason  string
 	}{
-		{"started", &TurnFacts{Intent: "review", Role: "pr.review", State: "started", At: h(1)}, false, KindLoopWorking, ""},
-		{"started on a permission prompt", &TurnFacts{Intent: "review", Role: "pr.review", State: "started", At: h(1)}, true, KindLoopWaiting, "waiting for a permission in the terminal"},
-		{"asked", &TurnFacts{Intent: "review", Role: "pr.review", State: "asked", Summary: "keep the old column?", At: h(2)}, false, KindLoopWaiting, "keep the old column?"},
-		{"asked and answered", &TurnFacts{Intent: "review", Role: "pr.review", State: "asked", Summary: "s", At: h(2), AnsweredAt: h(3)}, false, KindLoopWorking, "your answer was sent"},
-		{"failed", &TurnFacts{Intent: "review", Role: "pr.review", State: "failed", Summary: "gh api 502", At: h(2)}, false, KindLoopStopped, "gh api 502"},
-		{"unrecorded", &TurnFacts{Intent: "review", Role: "pr.review", State: "unrecorded", Summary: "Should I drop it?", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record: Should I drop it?"},
-		{"unrecorded with no message", &TurnFacts{Intent: "address", Role: "pr.address", State: "unrecorded", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record"},
-		{"done", &TurnFacts{Intent: "review", Role: "pr.review", State: "done", Summary: "pushed", At: h(2)}, false, KindNoReviewer, ""},
-		{"sent", &TurnFacts{Intent: "review", Role: "pr.review", State: "sent", At: h(2)}, false, KindNoReviewer, ""},
-		{"a nudge asks nothing", &TurnFacts{Intent: "nudge", State: "asked", Summary: "s", At: h(2)}, false, KindNoReviewer, ""},
+		{"started", &overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: h(1)}, false, KindLoopWorking, ""},
+		{"started on a permission prompt", &overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: h(1)}, true, KindLoopWaiting, "waiting for a permission in the terminal"},
+		{"asked", &overlay.Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "keep the old column?", At: h(2)}, false, KindLoopWaiting, "keep the old column?"},
+		{"asked and answered", &overlay.Turn{Intent: "review", Role: "pr.review", State: "asked", Summary: "s", At: h(2), AnsweredAt: h(3)}, false, KindLoopWorking, "your answer was sent"},
+		{"failed", &overlay.Turn{Intent: "review", Role: "pr.review", State: "failed", Summary: "gh api 502", At: h(2)}, false, KindLoopStopped, "gh api 502"},
+		{"unrecorded", &overlay.Turn{Intent: "review", Role: "pr.review", State: "unrecorded", Summary: "Should I drop it?", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record: Should I drop it?"},
+		{"unrecorded with no message", &overlay.Turn{Intent: "address", Role: "pr.address", State: "unrecorded", At: h(2)}, false, KindLoopStopped, "the agent ended its turn without a record"},
+		{"done", &overlay.Turn{Intent: "review", Role: "pr.review", State: "done", Summary: "pushed", At: h(2)}, false, KindNoReviewer, ""},
+		{"sent", &overlay.Turn{Intent: "review", Role: "pr.review", State: "sent", At: h(2)}, false, KindNoReviewer, ""},
+		{"a nudge asks nothing", &overlay.Turn{Intent: "nudge", State: "asked", Summary: "s", At: h(2)}, false, KindNoReviewer, ""},
 	} {
 		r := deriveTurn(pr("me"), c.turn, c.waiting)
 		if r.Kind != c.want || (c.reason != "" && r.Reason != c.reason) {
@@ -597,7 +598,7 @@ func TestTheTurnDrivesTheSituation(t *testing.T) {
 func TestTheTurnComesAfterTheHeldRound(t *testing.T) {
 	r := Derive(Input{PR: pr("me"), Viewer: "me", Now: h(10), Stalled: th,
 		Events: []dinv.Event{ev(dinv.KindRoundHeld, "", "me", h(9), "5 rounds today")},
-		Turn:   &TurnFacts{Intent: "address", Role: "pr.address", State: "asked", Summary: "s", At: h(2)}})
+		Turn:   &overlay.Turn{Intent: "address", Role: "pr.address", State: "asked", Summary: "s", At: h(2)}})
 	if r.Kind != KindHeldByCap {
 		t.Fatalf("%+v", r)
 	}
@@ -606,7 +607,7 @@ func TestTheTurnComesAfterTheHeldRound(t *testing.T) {
 func TestACardInNeedsMeIsNotATurnsState(t *testing.T) {
 	p := pr("me")
 	p.Workspace = dinv.Workspace{ID: "ws1", Status: "needs-me", Comment: "triage asks: keep it?"}
-	if r := deriveTurn(p, &TurnFacts{Intent: "address", Role: "pr.address", State: "done", Summary: "pushed", At: h(2)}, false); r.Kind == KindLoopWaiting {
+	if r := deriveTurn(p, &overlay.Turn{Intent: "address", Role: "pr.address", State: "done", Summary: "pushed", At: h(2)}, false); r.Kind == KindLoopWaiting {
 		t.Fatalf("the card overrode "+brand.Name+"'s turn: %+v", r)
 	}
 	if r := deriveTurn(p, nil, false); r.Kind != KindNoReviewer {

@@ -495,7 +495,7 @@ var (
 	_ automation.Settler    = (*unitSet)(nil)
 	_ automation.Gainer     = (*unitSet)(nil)
 	_ automation.Owner      = (*unitSet)(nil)
-	_ automation.Freshener  = (*unitSet)(nil)
+	_ automation.Revisioner = (*unitSet)(nil)
 	_ automation.Seener     = (*unitSet)(nil)
 	_ automation.Dueer      = (*unitSet)(nil)
 	_ automation.EventFacts = (*unitSet)(nil)
@@ -596,22 +596,23 @@ func (s *unitSet) Owners(ctx context.Context, u unit.Unit) ([]unit.Unit, error) 
 	return nil, nil
 }
 
-func (s *unitSet) Moved(ctx context.Context, units []unit.Unit) ([]unit.Unit, error) {
+// Revs are the revs of units whose provider reports them.
+func (s *unitSet) Revs(ctx context.Context, units []unit.Unit) (map[unit.Unit]uint64, error) {
 	byProvider := map[unit.ProviderID][]unit.Unit{}
 	for _, u := range units {
 		byProvider[u.Provider] = append(byProvider[u.Provider], u)
 	}
-	var out []unit.Unit
+	out := map[unit.Unit]uint64{}
 	for _, id := range s.order {
-		f, ok := s.providers[id].(automation.Freshener)
+		r, ok := s.providers[id].(automation.Revisioner)
 		if !ok || len(byProvider[id]) == 0 {
 			continue
 		}
-		moved, err := f.Moved(ctx, byProvider[id])
+		revs, err := r.Revs(ctx, byProvider[id])
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", id, err)
 		}
-		out = append(out, moved...)
+		maps.Copy(out, revs)
 	}
 	return out, nil
 }

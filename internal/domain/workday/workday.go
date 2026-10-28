@@ -24,3 +24,21 @@ func Between(from, to time.Time) time.Duration {
 	}
 	return total
 }
+
+// Add is the earliest instant to with Between(from, to) at least d: from
+// plus d counted in working days. A d of zero or less is from.
+func Add(from time.Time, d time.Duration) time.Time {
+	cur := from.UTC()
+	for d > 0 {
+		next := time.Date(cur.Year(), cur.Month(), cur.Day()+1, 0, 0, 0, 0, time.UTC)
+		if wd := cur.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			span := next.Sub(cur)
+			if span >= d {
+				return cur.Add(d)
+			}
+			d -= span
+		}
+		cur = next
+	}
+	return cur
+}

@@ -56,7 +56,7 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 		if holds(pause, w.Slot, facts) {
 			continue
 		}
-		if moved, err := e.sourceMoved(ctx, it.Unit); err != nil || moved || keyMoved(w, it, facts) {
+		if moved, err := e.sourceMoved(ctx, it); err != nil || moved || keyMoved(w, it, facts) {
 			if err == nil {
 				err = e.dropMoved(ctx, it)
 			}
@@ -84,18 +84,26 @@ func (e *Engine) Pending(ctx context.Context) ([]workflow.Item, error) {
 // whyMoved drops or refuses an item whose source moved since it was planned.
 const whyMoved = "its source moved; planned again on the next sweep"
 
-// sourceMoved asks the Freshener whether u's source moved since its facts
-// were read, as the sweep does before it runs an item.
-func (e *Engine) sourceMoved(ctx context.Context, u unit.Unit) (bool, error) {
-	f, ok := e.Units.(Freshener)
+// sourceMoved says whether it's unit was reported again since the last
+// sweep planned it, as the sweep checks before it runs an item; an item
+// the last sweep did not plan at a rev never moved.
+func (e *Engine) sourceMoved(ctx context.Context, it workflow.Item) (bool, error) {
+	r, ok := e.Units.(Revisioner)
 	if !ok {
 		return false, nil
 	}
-	moved, err := f.Moved(ctx, []unit.Unit{u})
+	e.mu.Lock()
+	planned, ok := e.revs[it.ID]
+	e.mu.Unlock()
+	if !ok {
+		return false, nil
+	}
+	revs, err := r.Revs(ctx, []unit.Unit{it.Unit})
 	if err != nil {
 		return false, fmt.Errorf("checking sources: %w", err)
 	}
-	return slices.Contains(moved, u), nil
+	rev, ok := revs[it.Unit]
+	return !ok || rev != planned, nil
 }
 
 // keyMoved says whether it's key facts changed since it was planned: the

@@ -10,7 +10,7 @@ type Generation uint64
 type Topic uint64
 
 const (
-	TopicPRs          Topic = 1 << iota // pull_requests, pr_details
+	TopicPRs          Topic = 1 << iota // a source's unit data: pull_requests, pr_details, unit_snapshots
 	TopicFollow                         // pull_requests.reasons and ws_*: follow state (noted with TopicPRs)
 	TopicSourceEvents                   // events a source writes (GitHub timeline, Slack changes)
 	TopicLoopEvents                     // events the loop writes: rounds, turns, sessions, situations, views, briefs, would_*

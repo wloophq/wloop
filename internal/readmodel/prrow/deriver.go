@@ -26,6 +26,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -54,7 +55,7 @@ type Deriver struct {
 
 // TurnFact is what a row reads of its pull request's turn book.
 type TurnFact struct {
-	Facts situation.TurnFacts
+	Facts overlay.Turn
 	// Session is the handle of a started turn's session, "" otherwise.
 	Session  string
 	Waiting  bool
@@ -67,18 +68,7 @@ type TurnFact struct {
 
 // Unstarted are the ids of b's turns that ended before their agent started
 // them, which posted nothing.
-func Unstarted(b turn.Book) map[string]bool {
-	var out map[string]bool
-	for _, t := range b.Turns {
-		if !t.State.Open() && t.StartedAt.IsZero() {
-			if out == nil {
-				out = map[string]bool{}
-			}
-			out[t.ID] = true
-		}
-	}
-	return out
-}
+func Unstarted(b turn.Book) map[string]bool { return overlay.Unstarted(b) }
 
 // IgnoreOf is who a row never waits on and a nudge never mentions.
 func IgnoreOf(cfg config.Config) []string {
@@ -89,32 +79,13 @@ func IgnoreOf(cfg config.Config) []string {
 // one; whether that session waits is resolved by Waiting.
 func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.Ref]TurnFact {
 	out := make(map[github.Ref]TurnFact, len(books))
-	drives := drivingIntents(reg)
 	for u, b := range books {
-		t, ok := b.Newest(drives...)
+		run, ok := overlay.RunOf(b, reg)
 		if !ok {
-			if t, ok = b.Newest(); !ok {
-				continue
-			}
-		}
-		f := situation.TurnFacts{Intent: dintent.Name(t.Intent), Role: t.Role, State: string(t.State), At: t.SentAt}
-		if !t.StartedAt.IsZero() {
-			f.At = t.StartedAt
-		}
-		if r, ok := b.LastRecord(t.Seq); ok {
-			f.Summary, f.At = r.Record.Headline(), r.At
-		}
-		f.AnsweredAt, _ = b.AnsweredAt(t.Seq)
-		fact := TurnFact{Facts: f, Unstarted: Unstarted(b)}
-		if q, ok := b.Question(reg.Answerable()); ok {
-			qLast, _ := b.LastRecord(q.Seq)
-			fact.Question, _ = questionOf(q, qLast)
-		}
-		if t.State == turn.Started && t.Session != "" {
-			fact.Session = t.Session
+			continue
 		}
 		ref, _ := port.PROf(port.Event{Unit: u})
-		out[ref] = fact
+		out[ref] = TurnFact{Facts: run.Turn, Session: run.Session, Question: run.Question, Unstarted: run.Unstarted}
 	}
 	return out
 }
@@ -148,37 +119,11 @@ func Waiting(facts map[github.Ref]TurnFact, agents []turns.AgentObservation, age
 			facts[ref] = f
 			continue
 		}
-		if ok && sessionWaiting(sess, agents) {
+		if ok && overlay.SessionWaiting(sess, agents) {
 			f.Waiting = true
 			facts[ref] = f
 		}
 	}
-}
-
-// drivingIntents are the intents whose newest turn drives the row; with
-// none, any turn does.
-func drivingIntents(reg *dintent.Registry) []turn.Intent {
-	var out []turn.Intent
-	for _, d := range reg.All() {
-		if d.DrivesRow {
-			out = append(out, turn.Intent(d.Name))
-		}
-	}
-	return out
-}
-
-// sessionWaiting says whether Orca shows the session's agent waiting; with
-// no known pane, any agent of its workspace counts.
-func sessionWaiting(sess turn.Session, agents []turns.AgentObservation) bool {
-	return slices.ContainsFunc(agents, func(a turns.AgentObservation) bool {
-		if a.State != turn.AgentWaiting {
-			return false
-		}
-		if sess.Pane != "" {
-			return a.Pane == sess.Pane
-		}
-		return sess.WorkspaceID != "" && a.WorkspaceID == sess.WorkspaceID
-	})
 }
 
 // MuteLapsed tells whether o's "mute until state change" lapsed: the pull
@@ -228,11 +173,10 @@ func (d Deriver) Parts(pr dinv.PR, evs []dinv.Event, o dinv.Override) (api.Row, 
 	}
 	if pend, ok := d.Pending[pr.Ref.Unit()]; ok && res.Kind != situation.KindDone {
 		r.Pending = pendingOf(pend)
-		if res.Kind != situation.KindMuted {
-			r.Kind = api.Kind(situation.KindRoundPending)
-			r.Summary.WaitsOn, r.Summary.Stalled = "me", false
-			r.Summary.Reason = pend.Intent + " waiting for your answer: " + pend.Reason
-		}
+		over := overlay.Pending{Intent: pend.Intent, Reason: pend.Reason}.Over(overlay.Situation{Kind: string(r.Kind),
+			WaitingOn: r.Summary.WaitsOn, Since: r.Summary.Since, Reason: r.Summary.Reason, Stalled: r.Summary.Stalled})
+		r.Kind = api.Kind(over.Kind)
+		r.Summary.WaitsOn, r.Summary.Since, r.Summary.Reason, r.Summary.Stalled = over.WaitingOn, over.Since, over.Reason, over.Stalled
 	}
 	if res.Kind == situation.KindMuted {
 		p.UnmutedKind, p.UnmutedWaitingOn, p.UnmutedReason = string(unmuted.Kind), unmuted.WaitingOn, unmuted.Reason
@@ -267,7 +211,7 @@ func (d Deriver) Seal(r api.Row, p Payload) api.Row {
 // summaryLine is the short status the menu bar and the terminal list show.
 func summaryLine(r api.Row, p Payload) string {
 	if i := p.Intake; i != nil && i.Waiting() {
-		return briefingLabel(*i)
+		return overlay.Briefing(*i)
 	}
 	switch k := situation.Kind(r.Kind); k {
 	case situation.KindRoundPending, situation.KindHeldByCap, situation.KindBlocked,
@@ -275,18 +219,6 @@ func summaryLine(r api.Row, p Payload) string {
 		return k.Label()
 	}
 	return r.Summary.Reason
-}
-
-// briefingLabel is a row waiting for its brief: the attempt and the last
-// error.
-func briefingLabel(i api.Intake) string {
-	switch {
-	case i.Attempt > 1 && i.LastError != "":
-		return fmt.Sprintf("briefing… (attempt %d; %s)", i.Attempt, i.LastError)
-	case i.Attempt > 0:
-		return fmt.Sprintf("briefing… (attempt %d)", i.Attempt)
-	}
-	return "briefing…"
 }
 
 // humanEvents are the event kinds a person's own action on GitHub leaves.

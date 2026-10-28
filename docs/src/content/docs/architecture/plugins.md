@@ -56,6 +56,13 @@ The codec of every plugin comes from its manifest (`internal/plugins/codec`), fo
 - **Restart.** A plugin whose process ends is restarted after a backoff that doubles from a second to five minutes, and starts again from a second after a run longer than that; while it is down its units are stale.
 - **Shutdown.** When the daemon stops, each plugin's kinds get `Stop`, then its process is killed and go-plugin's clients cleaned up. There is no reattach.
 
+## Snapshots and overlays
+
+A source plugin reports each unit as a snapshot (`Reporter.Report`), which replaces the unit's last one whole. The host keeps it in the store, as JSON in `unit_snapshots` beside the plugin's `rev` for it, and drops it when the plugin reports the unit gone. The host reads snapshots only; on the hot path it never calls a plugin:
+
+- **Rows.** `readmodel.Reported` derives a unit's row from its snapshot (its situation, card, views, facets, items and data) under the host's own state, which `internal/readmodel/overlay` lays over it and which names no source: the run of the newest turn whose role drives the row (the loop working, waiting on you or stopped, with its question), your mute (by the situation's kind and who it waits on, or until a time), and a pending round. An open intake shows in the row's line. The variant without the mute is an overlay too (`readmodel.Unmuted`). A unit's card is its plugin's, and when an overlay set the row's situation the card says why and on whom as the row does. A turn that ends, a mute or a round changes the row with no new report.
+- **Facts.** `psource.UnitFacts` serves the automation engine each unit's reported facts and its rev. A fact the plugin reports as a temporal value (`Since`, `At`, `After`, in calendar or working days) is a `workflow.Temporal`, which the engine resolves with its clock whenever it reads it; one whose time is zero resolves to its type's zero. The engine's `Due` is the earliest deadline among the temporal facts its last sweep read, an `After` in working days counting forward with `workday.Add`. The engine reads a unit's rev before its facts and drops a run whose unit was reported again before it ran (`automation.Revisioner`).
+
 A plugin's profile layer loads while the plugin is enabled: the plugin's `profile/`, after the bundled profile, then your `plugins/<id>/` beside your profile's own files, after it (`profile.Chain`).
 
 `pkg/plugin/store` is a plugin's own SQLite store in its state directory, `<state>/plugins/<id>/`: it applies the plugin's migrations and imports the `import.db` the host exported for it once.

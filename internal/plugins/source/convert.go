@@ -2,12 +2,10 @@ package source
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/domain/workday"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
@@ -94,43 +92,4 @@ func (c Units) Draft(d src.Draft) (draft.Draft, error) {
 		}
 	}
 	return out, nil
-}
-
-// Resolve is v's value at now, as a predicate reads it: a temporal value
-// resolves with the host's clock, and a zero time resolves to its type's
-// zero.
-func Resolve(v src.Value, now time.Time) any {
-	switch v.Kind {
-	case src.KindBool:
-		return v.Bool
-	case src.KindInt:
-		return v.Int
-	case src.KindString:
-		return v.String
-	case src.KindList:
-		if v.List == nil {
-			return []string{}
-		}
-		return v.List
-	case src.KindDuration:
-		return v.Duration
-	case src.KindTime:
-		return v.Time
-	case src.KindSince:
-		if v.Time.IsZero() {
-			return time.Duration(0)
-		}
-		return now.Sub(v.Time)
-	case src.KindAt:
-		return !v.Time.IsZero() && !now.Before(v.Time)
-	case src.KindAfter:
-		if v.Time.IsZero() {
-			return false
-		}
-		if v.Unit == src.WorkingDays {
-			return workday.Between(v.Time, now) > v.Threshold
-		}
-		return now.Sub(v.Time) > v.Threshold
-	}
-	return nil
 }

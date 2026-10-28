@@ -42,6 +42,8 @@ type Engine struct {
 	due    time.Time
 	seen   port.Generation
 	events heldEvents
+	// revs are the revs the last sweep's items were planned at, by item id.
+	revs map[string]uint64
 }
 
 type Plan struct {
@@ -59,7 +61,8 @@ const DefaultRetryBase = time.Minute
 
 // Due is the earliest instant after the last sweep at which a decision
 // changes with no input changing: a pending deadline, a retry time, the
-// next schedule firing, or a facts provider's own deadline. Zero when none.
+// next schedule firing, the deadline of a temporal fact the sweep read, or
+// a facts provider's own deadline. Zero when none.
 func (e *Engine) Due() time.Time {
 	e.mu.Lock()
 	due := e.due

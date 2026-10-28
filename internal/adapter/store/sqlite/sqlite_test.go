@@ -71,6 +71,7 @@ var golden = []string{
 	"unit_briefs: provider, unit_key, failures, attempt_of, run, last_run, wanted_at, retry_at, gave_up_at, gave_up_reason",
 	"unit_cards: provider, unit_key, card, at",
 	"unit_marks: provider, unit_key, mark, value",
+	"unit_snapshots: provider, unit_key, snapshot, rev, at",
 	"unit_tags: provider, unit_key, key, value, run",
 	"view_applied: sink, provider, unit_key, role, status, unread, summary, col, override, at",
 	"workflow_cursors: workflow, cursor, last_fire",

@@ -432,6 +432,14 @@ CREATE TABLE unit_cards (
   PRIMARY KEY (provider, unit_key)
 ) WITHOUT ROWID;
 
+-- The last snapshot each source plugin reported of each of its units, as JSON; rev grows with every change
+-- the plugin reports.
+CREATE TABLE unit_snapshots (
+  provider TEXT NOT NULL, unit_key TEXT NOT NULL,
+  snapshot TEXT NOT NULL, rev INTEGER NOT NULL, at TEXT NOT NULL,
+  PRIMARY KEY (provider, unit_key)
+) WITHOUT ROWID;
+
 CREATE TABLE drafts (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL, unit_key TEXT NOT NULL,

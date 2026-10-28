@@ -24,6 +24,7 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/readmodel"
+	"github.com/wloophq/wloop/internal/readmodel/overlay"
 	"github.com/wloophq/wloop/internal/readmodel/prrow"
 	"github.com/wloophq/wloop/internal/situation"
 	"github.com/wloophq/wloop/internal/turn"
@@ -260,7 +261,7 @@ func TestTransitionsResolveItems(t *testing.T) {
 		{"closed", func(s *ghsourcetest.Situation) { s.PR.State, s.PR.ClosedAt = "CLOSED", ghsourcetest.Now }, items.Moot},
 		{"loop working", func(s *ghsourcetest.Situation) {
 			s.PR.Workspace = ghsourcetest.ReviewWorkspace
-			s.Turn = &prrow.TurnFact{Facts: situation.TurnFacts{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
+			s.Turn = &prrow.TurnFact{Facts: overlay.Turn{Intent: "review", Role: "pr.review", State: "started", At: ghsourcetest.Now}, Session: "s1"}
 		}, items.Superseded},
 	}
 	for i, tc := range cases {

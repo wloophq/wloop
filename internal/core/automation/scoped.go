@@ -31,8 +31,20 @@ func (e *Engine) factsFor(ctx context.Context, w workflow.Workflow, u unit.Unit)
 	return e.scoped(ctx, w.Name, u, f)
 }
 
-// unitFacts are u's facts, through EventFacts for an event workflow.
+// unitFacts are u's facts, through EventFacts for an event workflow, with
+// their temporal values resolved now.
 func (e *Engine) unitFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
+	f, err := e.reportedFacts(ctx, w, u)
+	if err != nil {
+		return nil, err
+	}
+	f, _ = workflow.Resolve(f, e.now())
+	return f, nil
+}
+
+// reportedFacts are u's facts as its provider reports them, temporal values
+// unresolved.
+func (e *Engine) reportedFacts(ctx context.Context, w workflow.Workflow, u unit.Unit) (workflow.Facts, error) {
 	if ef, ok := e.Units.(EventFacts); ok && w.Trigger.Kind == workflow.TriggerEvent {
 		return ef.EventFacts(ctx, u)
 	}
