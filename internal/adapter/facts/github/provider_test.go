@@ -684,6 +684,40 @@ func TestRefreshUnblocksAnAnsweredStartBlock(t *testing.T) {
 	}
 }
 
+func TestALaterDeadlineIsNotHiddenByAPastOne(t *testing.T) {
+	w := newWorld()
+	r := w.requested(3, nil)
+	key := "2026-10-21T14:00:00Z\ntrust\n/w/app\n/w/app/sub\n\n\nfirst\n\n"
+	block := func(at time.Time) {
+		w.blocks[r] = dinv.Event{PR: r, Kind: dinv.KindRoundBlocked, Key: key, At: at, Data: "folder not trusted"}
+	}
+	p := factsgithub.New(factsgithub.Deps{Inputs: w, Store: w, Snapshot: w, Books: w, Rounds: w, Git: w.git, Cfg: func() config.Config { return w.cfg },
+		Clock: clock{w}, Agents: map[string]turns.Agent{}})
+	ctx := context.Background()
+	due := func(what string, want time.Time) {
+		t.Helper()
+		if !p.Due().Equal(want) {
+			t.Fatalf("%s: due = %v, want %v", what, p.Due(), want)
+		}
+	}
+	block(t0.Add(-time.Hour))
+	if err := p.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	due("blocked", t0.Add(23*time.Hour))
+	if _, err := p.List(ctx, unit.GitHub); err != nil {
+		t.Fatal(err)
+	}
+	due("after a sweep's evaluation", t0.Add(23*time.Hour))
+
+	w.now = t0.Add(30 * time.Hour)
+	block(t0.Add(29 * time.Hour))
+	if err := p.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	due("blocked again after the first day passed", t0.Add(53*time.Hour))
+}
+
 func TestStaleDetailSetsStale(t *testing.T) {
 	w := newWorld()
 	fresh, stale := w.review(7, nil), w.add(8, "alice", nil)

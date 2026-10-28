@@ -1465,6 +1465,28 @@ func TestADueRunDropsAnItemWhoseSourceMoved(t *testing.T) {
 	}
 }
 
+func TestRevsCountedAgainAfterARestartNeitherDropNorRepeatARun(t *testing.T) {
+	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
+	r.put(s1, "a")
+	for range 3 {
+		r.units.Report(t, s1)
+	}
+	r.sweep()
+	r.units.RestartRevs()
+	r.restart()
+	r.clock.Advance(6 * time.Minute)
+	if err := r.e.DueRun(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.ran("session.close"); !slices.Equal(got, []unit.Unit{s1}) {
+		t.Fatalf("ran %v; the item planned before the restart was due", got)
+	}
+	r.sweep()
+	if got := r.ran("session.close"); len(got) != 1 {
+		t.Fatalf("ran %v; the run repeated after the restart", got)
+	}
+}
+
 func TestAnApplyOfAMovedSourceIsRefused(t *testing.T) {
 	r := newRig(t, windowed(sweepWF("close", idle, "session.close"), 5*time.Minute))
 	r.put(s1, "a")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,10 +22,26 @@ import (
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
 )
 
-// reportingStub loads until it has reported its units once.
+// reportingStub loads until it has reported its units once, and records
+// the topics of every Notify.
 type reportingStub struct {
 	*sourcetest.Stub
 	reported atomic.Bool
+	mu       sync.Mutex
+	topics   []plugin.Topic
+}
+
+func (s *reportingStub) Notify(ctx context.Context, units []plugin.Unit, topics []plugin.Topic) error {
+	s.mu.Lock()
+	s.topics = append(s.topics, topics...)
+	s.mu.Unlock()
+	return s.Stub.Notify(ctx, units, topics)
+}
+
+func (s *reportingStub) heard() []plugin.Topic {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.topics)
 }
 
 func (s *reportingStub) Health(context.Context) (plugin.Health, error) {
@@ -88,6 +105,11 @@ func TestServeShowsAPluginsReportsAndNotifiesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "the plugin hears of the pause", func() bool { return len(stub.Notified()) > 0 })
+	for _, tp := range stub.heard() {
+		if tp != plugin.TopicRounds {
+			t.Errorf("the plugin, subscribed to rounds only, heard of %s", tp)
+		}
+	}
 
 	l.Crash("acme")
 	eventually(t, "the crashed plugin's row stale", func() bool {
