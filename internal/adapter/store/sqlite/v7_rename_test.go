@@ -13,6 +13,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/mark"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -144,9 +145,14 @@ func v6Fixture(t *testing.T) string {
 			(20, 'slack', 'T1/C1/1.1', '`+a+`', 'nudge', 'auto', 'stalled', 'stalled', 'entry:`+a+`', 'proposed', 't', 't', '["entry.nudged","unit.closed"]', 'entry', '`+a+`'),
 			(21, 'slack', 'T1/C1/1.1', '`+a+`', 'nudge', 'auto', 'stalled', 'stalled', '`+a+`:chat:U1', 'sent', 't', 't', '["entry.nudged"]', '', '')`,
 		`INSERT INTO links (provider, unit_key, to_provider, to_key, kind, evidence, origin, at) VALUES ('slack', 'T1/C1/1.1', 'entry', '`+a+`', 'mentions', 'e', 'user', 't')`,
+		`INSERT INTO sessions (session_id, manager, agent, pane, workspace_id, worktree, started_at, provider, unit_key) VALUES
+			('s1', 'orca', 'claude', 'p1', 'ws1', '/work/api-1', '2026-10-27T09:00:00Z', 'entry', '`+a+`')`,
+		`INSERT INTO session_handles (session_id, manager, handle, from_at) VALUES ('s1', 'orca', 'h1', '2026-10-27T09:00:00Z')`,
+		`INSERT INTO turn_answers (turn_seq, provider, unit_key, at, text, source, route, session) VALUES
+			(1, 'entry', '`+a+`', '2026-10-27T10:00:00Z', 'Yes, ship it', 'cockpit', 'queued', 's1')`,
 	)
 	db := rawDB(t, path)
-	done := map[string]bool{"turns": true, "messages": true, "drafts": true, "links": true}
+	done := map[string]bool{"turns": true, "messages": true, "drafts": true, "links": true, "sessions": true, "turn_answers": true}
 	for table, cols := range liveTables(t, db) {
 		if done[table] || !slices.ContainsFunc(cols, func(c schemaColumn) bool { return c.name == "provider" }) {
 			continue
@@ -256,6 +262,18 @@ func TestV7RenameKeepsAnOpenQuestionRoutable(t *testing.T) {
 	if len(b.Turns) != 1 || b.Turns[0].Seq != 1 || b.Turns[0].Session != "s1" || string(b.Turns[0].State) != "asked" {
 		t.Fatalf("the turn the question waits on: %+v", b.Turns)
 	}
+	queued := slices.IndexFunc(b.Answers, func(a dturn.Answer) bool { return a.Route == dturn.Queued })
+	if queued < 0 || b.Answers[queued].TurnSeq != 1 || b.Answers[queued].Session != "s1" || b.Answers[queued].Text != "Yes, ship it" {
+		t.Fatalf("the queued answer of the question: %+v", b.Answers)
+	}
+	bySession, ok, err := New(db).BookOf(ctx, turns.Key{Session: "s1"})
+	if err != nil || !ok || bySession.Unit != tk {
+		t.Fatalf("the book of session s1: %v %v %v", bySession.Unit, ok, err)
+	}
+	ses, ok, err := New(db).Session(ctx, "s1")
+	if err != nil || !ok || ses.Unit != tk || ses.WorkspaceID != "ws1" || ses.LastHandle != "h1" {
+		t.Fatalf("session s1: %+v %v %v", ses, ok, err)
+	}
 	if got := strings1(t, rawDB(t, path), `SELECT task_id FROM messages WHERE id = 11`); !slices.Equal(got, []string{tk.Key}) {
 		t.Errorf("the agent post's task %q", got)
 	}
@@ -302,8 +320,21 @@ func TestRetryingAnOldHeadlessTurnFindsItsTask(t *testing.T) {
 	}
 }
 
-// notTaskColumns are the columns whose name looks like a task's and that hold none.
+// notTaskColumns are the columns whose name or JSON default looks like a task reference's and that hold none.
 var notTaskColumns = map[string]string{
+	"pause.repos":                "the owner/repo names a pause holds",
+	"brief_runs.input":           "the provider's own parts of what a brief run read, history",
+	"intakes.log":                "an intake's log lines, history",
+	"plan_items.steps":           "a plan item's step names",
+	"plan_items.why":             "the facts a plan item was decided on, history",
+	"classifications.output":     "a classifier's output about a Slack unit",
+	"messages.options":           "a question's options",
+	"drafts.items":               "the item ids a draft covers",
+	"drafts.effects":             "the effect names of a draft",
+	"slack_objects.reasons":      "why a Slack object is watched",
+	"slack_messages.files":       "a Slack message's files",
+	"slack_messages.links":       "the links in a Slack message",
+	"slack_messages.mentions":    "the users a Slack message mentions",
 	"pull_requests.owner":        "a GitHub repository's owner",
 	"pr_seen.owner":              "a GitHub repository's owner",
 	"pr_details.owner":           "a GitHub repository's owner",
@@ -320,6 +351,45 @@ func taskish(name string) bool {
 		}
 	}
 	return false
+}
+
+// unreached are the columns of tables that look like task references, by name or as JSON (a default of
+// '{}' or '[]'), and that neither reached nor notTaskColumns names.
+func unreached(tables map[string][]schemaColumn, reached map[string]bool) []string {
+	var out []string
+	for table, cols := range tables {
+		for _, c := range cols {
+			name := table + "." + c.name
+			json := c.dflt == "'{}'" || c.dflt == "'[]'"
+			if (taskish(c.name) || json) && !reached[name] && notTaskColumns[name] == "" {
+				out = append(out, name)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestTheReferenceGuardFlagsAJSONColumn(t *testing.T) {
+	t.Parallel()
+	db := rawDB(t, storeAt(t, current))
+	if _, err := db.Exec(`CREATE TABLE unit_cache (provider TEXT NOT NULL, unit_key TEXT NOT NULL, inputs TEXT NOT NULL DEFAULT '{}')`); err != nil {
+		t.Fatal(err)
+	}
+	refs, err := taskRefs(context.Background(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reached := map[string]bool{}
+	for _, r := range refs {
+		reached[r.table+"."+r.column] = true
+		if r.provider != "" {
+			reached[r.table+"."+r.provider] = true
+		}
+	}
+	if got := unreached(liveTables(t, db), reached); !slices.Equal(got, []string{"unit_cache.inputs"}) {
+		t.Errorf("unreached %q, want the planted JSON column alone", got)
+	}
 }
 
 // refFixture is the current store with, for each of ids, one row in every table that holds a task
@@ -342,12 +412,8 @@ func refFixture(t *testing.T, ids ...string) (*sql.DB, []taskRef) {
 		byTable[r.table] = append(byTable[r.table], r)
 	}
 	tables := liveTables(t, db)
-	for table, cols := range tables {
-		for _, c := range cols {
-			if taskish(c.name) && !reached[table+"."+c.name] && notTaskColumns[table+"."+c.name] == "" {
-				t.Errorf("%s.%s looks like a task reference that rekeyTask does not reach: register it in taskColumns, or in notTaskColumns with why it holds none", table, c.name)
-			}
-		}
+	for _, c := range unreached(tables, reached) {
+		t.Errorf("%s looks like a task reference that rekeyTask does not reach: register it in taskColumns, or in notTaskColumns with why it holds none", c)
 	}
 	for i, id := range ids {
 		for table, rs := range byTable {
@@ -437,32 +503,120 @@ func TestRekeyTaskOntoATaskThatExistsKeepsItsRows(t *testing.T) {
 	}
 }
 
+// historyOf plants on task id a turn with its usage, a session with a handle, an event and a plan item.
+func historyOf(t *testing.T, db *sql.DB, id string) {
+	t.Helper()
+	for _, q := range []string{
+		`INSERT INTO sessions (session_id, manager, agent, pane, started_at, provider, unit_key) VALUES ('s9', 'orca', 'claude', 'p', 't', 'task', ?1)`,
+		`INSERT INTO session_handles (session_id, manager, handle, from_at) VALUES ('s9', 'orca', 'h9', 't')`,
+		`INSERT INTO turns (seq, provider, unit_key, intent, turn_id, session, state, sent_at) VALUES (90, 'task', ?1, 'act', 'r9', 's9', 'ended', 't')`,
+		`INSERT INTO turn_usage (turn_seq, model, messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, first_at, last_at) VALUES (90, 'm', 1, 1, 1, 0, 0, 't', 't')`,
+		`INSERT INTO events (provider, unit_key, kind, at) VALUES ('task', ?1, 'verb_done', 't')`,
+		`INSERT INTO plan_items (id, workflow, provider, unit_key, key_value, decision, at) VALUES ('w/task/' || ?1 || '/v', 'w', 'task', ?1, 'v', 'act', 't')`,
+	} {
+		if _, err := db.Exec(q, id); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
+// ownTask plants task id with its own state rows only: units, contexts, a mark, and a Slack message that
+// names it.
+func ownTask(t *testing.T, db *sql.DB, id string) {
+	t.Helper()
+	for _, q := range []string{
+		`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?1, 'close', 'inbox', 'derived', 't', 't', 1)`,
+		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES (?1, 'slack', 'C1/2', 0)`,
+		`INSERT INTO task_contexts (task_id, context, ord) VALUES (?1, '@reply', 0)`,
+		`INSERT INTO unit_marks (provider, unit_key, mark, value) VALUES ('task', ?1, 'w/settled', 'v')`,
+		`INSERT INTO messages (task_id, provider, unit_key, kind, text, origin_kind, state, created_at) VALUES (?1, 'slack', 'C1/2', 'post', 'p', 'agent', 'open', 't')`,
+	} {
+		if _, err := db.Exec(q, id); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+}
+
 func TestDropTaskLeavesNoOrphan(t *testing.T) {
 	t.Parallel()
 	gone := "t-" + hexA
-	db, refs := refFixture(t, gone)
-	keep := "t-" + hexB
-	exec := func(q string, args ...any) {
-		if _, err := db.Exec(q, args...); err != nil {
-			t.Fatal(err)
+	db := rawDB(t, storeAt(t, current))
+	ownTask(t, db, gone)
+	historyOf(t, db, gone)
+	before := mentions(t, db, gone)
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = dropTask(ctx, tx, gone)
+	tx.Rollback()
+	if err == nil {
+		t.Fatal("dropped a task whose turns, events and plan items still name it")
+	}
+	for _, table := range []string{"events", "plan_items", "turns", "sessions"} {
+		if !strings.Contains(err.Error(), table+".") {
+			t.Errorf("the refusal does not name %s: %v", table, err)
 		}
 	}
-	exec(`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', 't', 't', 9)`, keep)
-	exec(`INSERT INTO messages (task_id, provider, unit_key, kind, text, origin_kind, state, created_at) VALUES (?, 'slack', 'C1/2', 'post', 'p', 'agent', 'open', 't')`, gone)
+	if after := mentions(t, db, gone); !slices.Equal(after, before) {
+		t.Errorf("a refused drop changed %v to %v", before, after)
+	}
+}
+
+func TestDropTaskAfterRekeyDeletesOnlyTheTasksOwnRows(t *testing.T) {
+	t.Parallel()
+	gone, keep := "t-"+hexA, "t-"+hexB
+	db := rawDB(t, storeAt(t, current))
+	ownTask(t, db, gone)
+	historyOf(t, db, gone)
+	if _, err := db.Exec(`INSERT INTO tasks (id, kind, state, origin, created, updated, rev) VALUES (?, 'action', 'next', 'user', 't', 't', 2)`, keep); err != nil {
+		t.Fatal(err)
+	}
+	history := []string{"events", "plan_items", "turns", "sessions"}
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error {
+		for _, table := range history {
+			if _, err := tx.ExecContext(ctx, `UPDATE `+table+` SET unit_key = ? WHERE unit_key = ?`, keep, gone); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE plan_items SET id = replace(id, ?, ?)`, gone, keep)
+		return err
+	})
 	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error { return dropTask(ctx, tx, gone) })
-	for _, r := range refs {
-		if r.form == refText {
-			continue
-		}
-		if n := strings1(t, db, `SELECT count(*) FROM `+r.table+` WHERE `+r.column+` = ?`, r.form.spell(gone)); n[0] != "0" {
-			t.Errorf("%s.%s still names the dropped task", r.table, r.column)
+	if left := mentions(t, db, gone); len(left) > 0 {
+		t.Errorf("the dropped task is still named in %v", left)
+	}
+	for q, want := range map[string]string{
+		`SELECT count(*) FROM tasks`:           "1",
+		`SELECT count(*) FROM turns`:           "1",
+		`SELECT count(*) FROM turn_usage`:      "1",
+		`SELECT count(*) FROM sessions`:        "1",
+		`SELECT count(*) FROM session_handles`: "1",
+		`SELECT count(*) FROM events`:          "1",
+		`SELECT count(*) FROM plan_items`:      "1",
+		`SELECT count(*) FROM task_units`:      "0",
+		`SELECT count(*) FROM unit_marks`:      "0",
+		`SELECT task_id FROM messages`:         "",
+	} {
+		if got := strings1(t, db, q); len(got) != 1 || got[0] != want {
+			t.Errorf("%s = %q, want %q", q, got, want)
 		}
 	}
-	if got := strings1(t, db, `SELECT id FROM tasks`); !slices.Equal(got, []string{keep}) {
-		t.Errorf("tasks left %q", got)
-	}
-	if got := strings1(t, db, `SELECT task_id FROM messages WHERE provider = 'slack'`); !slices.Equal(got, []string{""}) {
-		t.Errorf("the Slack message of the dropped task: %q, want it kept without its task", got)
+}
+
+func TestRekeyTaskThenDropTaskLeavesNoReference(t *testing.T) {
+	t.Parallel()
+	gone, keep := "t-"+hexA, "t-"+hexB
+	db, _ := refFixture(t, gone, keep)
+	inTx(t, db, func(ctx context.Context, tx *sql.Tx) error {
+		if err := rekeyTask(ctx, tx, gone, keep); err != nil {
+			return err
+		}
+		return dropTask(ctx, tx, gone)
+	})
+	if left := mentions(t, db, gone); len(left) > 0 {
+		t.Errorf("task %s is still named in %v", gone, left)
 	}
 }
 

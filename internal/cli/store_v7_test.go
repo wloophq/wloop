@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
@@ -182,5 +184,49 @@ func TestDaemonStartRenamesALeftoverEntryDossierDir(t *testing.T) {
 	defer db.Close()
 	if got := dossierTree(t, te.StateDir); !slices.Equal(got, []string{"task/t-" + dossierHex + "#/notes.md"}) {
 		t.Fatalf("dossiers %q", got)
+	}
+}
+
+func TestACollidingDossierMoveLeavesTheMigrationDoneWithItsFix(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	te.noDaemon(t)
+	sqlitetest.At(t, te.storePath(), 6, v6Dossier)
+	writeTree(t, te.StateDir, "entry/e-"+dossierHex+"#/notes.md", "task/t-"+dossierHex+"#/notes.md")
+	var logged []string
+	logf := func(f string, args ...any) { logged = append(logged, fmt.Sprintf(f, args...)) }
+	if err := te.migrateInDaemon(context.Background(), te.storePath(), logf); err != nil {
+		t.Fatalf("a dossier move failed the committed migration: %v", err)
+	}
+	if s, err := sqlite.Inspect(te.storePath()); err != nil || s.Version != sqlite.SchemaVersion {
+		t.Fatalf("the store %+v %v", s, err)
+	}
+	all := strings.Join(logged, "\n")
+	if !strings.Contains(all, dossierMoveFix(te.StateDir)) || strings.Contains(all, restoreCommand) {
+		t.Fatalf("the log does not say how to finish the move:\n%s", all)
+	}
+}
+
+func TestDoctorNamesALeftoverEntryDossierDir(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	writeTree(t, te.StateDir, "entry/e-"+dossierHex+"#/notes.md", "task/t-"+dossierHex+"#/notes.md")
+	var found *check
+	for _, c := range te.diskChecks(context.Background(), Defaults()) {
+		if c.mark == markMissing && strings.Contains(c.info, filepath.Join(dossier.Root(te.StateDir), "entry")) {
+			found = &c
+		}
+	}
+	if found == nil {
+		t.Fatal("doctor does not name the leftover dossiers/entry")
+	}
+	if !strings.Contains(found.info, filepath.Join(dossier.Root(te.StateDir), "task", "t-"+dossierHex+"#")) || found.fix != dossierMoveFix(te.StateDir) {
+		t.Fatalf("check %+v, want the colliding path and the fix", *found)
+	}
+	clean := newTestEnv(t, &fake.Manager{})
+	for _, c := range clean.diskChecks(context.Background(), Defaults()) {
+		if strings.Contains(c.info, "entry") {
+			t.Errorf("a state directory without entry dossiers: %+v", c)
+		}
 	}
 }

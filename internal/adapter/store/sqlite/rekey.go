@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -157,12 +158,37 @@ func rekeyTask(ctx context.Context, tx *sql.Tx, from, to string) error {
 	return nil
 }
 
-// dropTask deletes the rows of task id and empties the references to it of rows that are not its own. Text
-// that mentions it (a turn's inputs, a rule key) stays as history.
+// taskStateTables hold a task's own state, besides every table named task_*: dropping the task deletes its
+// rows there. A row of any other table that names the task is history, kept forever, so dropTask refuses
+// until rekeyTask moved it.
+var taskStateTables = []string{"tasks", "projects", "dossiers", "unit_marks", "overrides", "unit_cards"}
+
+func ownState(table string) bool {
+	return strings.HasPrefix(table, "task_") || slices.Contains(taskStateTables, table)
+}
+
+// dropTask deletes task id's own state and empties the link columns of other rows that name it. It refuses,
+// changing nothing, while any other row names the task: the caller rekeys that history first.
 func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 	refs, err := taskRefs(ctx, tx)
 	if err != nil {
 		return err
+	}
+	var held []string
+	for _, r := range refs {
+		if ownState(r.table) || r.clear {
+			continue
+		}
+		n, err := namingRows(ctx, tx, r, id)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			held = append(held, fmt.Sprintf("%s.%s (%d rows)", r.table, r.column, n))
+		}
+	}
+	if len(held) > 0 {
+		return fmt.Errorf("task %s is still named by %s; rekey them onto another task first", id, strings.Join(held, ", "))
 	}
 	for _, r := range refs {
 		if r.form == refText {
@@ -181,6 +207,27 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 		}
 	}
 	return nil
+}
+
+// namingRows counts the rows of r's column that name task id.
+func namingRows(ctx context.Context, tx *sql.Tx, r taskRef, id string) (int, error) {
+	if r.form != refText {
+		var n int
+		err := tx.QueryRowContext(ctx, `SELECT count(*) FROM `+r.table+` WHERE `+r.where(), r.form.spell(id)).Scan(&n) //nolint:gosec // the names come from the store's own schema
+		return n, err
+	}
+	n := 0
+	err := eachRow(ctx, tx, `SELECT `+r.column+` FROM `+r.table+` WHERE instr(`+r.column+`, ?) > 0`, []any{id}, func(rows *sql.Rows) error {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return err
+		}
+		if replaceID(v, id, "") != v {
+			n++
+		}
+		return nil
+	})
+	return n, err
 }
 
 // rewriteText replaces each value of r's column that holds a task id with what fn makes of it; a row
