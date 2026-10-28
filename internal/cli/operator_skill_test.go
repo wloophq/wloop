@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/skills"
 )
@@ -24,7 +25,7 @@ func TestOperatorSkillNamesOnlyExistingCommands(t *testing.T) {
 	te := newTestEnv(t, nil)
 	names := te.Env.commandNames()
 	topics := allTopics(te.Env.helpGroups())
-	body := string(skills.Operator.Render("wloop", "test"))
+	body := string(skills.Operator.Render(brand.Name, "test"))
 	var tools []string
 	for _, v := range builtin.Tools {
 		tools = append(tools, v.Name)
@@ -36,7 +37,7 @@ func TestOperatorSkillNamesOnlyExistingCommands(t *testing.T) {
 			t.Errorf("the skill names the tool %s, which the MCP server does not serve (%v)", span, tools)
 		}
 		fields := strings.Fields(span)
-		if len(fields) < 2 || fields[0] != "wloop" {
+		if len(fields) < 2 || fields[0] != brand.Name {
 			continue
 		}
 		checked++
