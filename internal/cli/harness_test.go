@@ -29,7 +29,6 @@ import (
 	"github.com/wloophq/wloop/internal/client/harness"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/lock"
-	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	"github.com/wloophq/wloop/internal/core/views"
@@ -370,7 +369,7 @@ func (s syncedInputs) Rows(ctx context.Context) ([]dinv.PR, error) {
 	return storeInputs{s.te.Store}.Rows(ctx)
 }
 
-func (s syncedInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]coresweep.Facts, error) {
+func (s syncedInputs) Facts(ctx context.Context, rows []dinv.PR, viewer string) (map[unit.Unit]dinv.PlanFacts, error) {
 	return storeInputs{s.te.Store}.Facts(ctx, rows, viewer)
 }
 
@@ -832,7 +831,7 @@ func (te *testEnv) serveWith(t *testing.T, with func(daemon.Deps) daemon.Deps) {
 	te.loop = mu
 	d := withRows(daemon.Deps{Pauses: te.Rounds, Turns: te.Turns, Views: te.Views, Actions: envActions{te.Env, te.Store}, Intents: te.loadedIntents, TurnByHand: te.byHand(mu), LoopMu: mu, Facts: te.prFacts(te.cfg),
 		DryRunTurn: te.dryRunTurn, Doctor: te.doctorState, Explorer: derivedRows{te.gh},
-		Cfg: te.cfg, Version: "test", Now: te.Now, Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, te.Store)
+		Cfg: te.cfg, Version: "test", Now: te.Now, Identity: viewerIs("me"), Log: t.Logf}, te.Store)
 	d = te.Env.serveMessages(context.Background(), d, te.db, te.cfg, t.Logf)
 	if with != nil {
 		d = with(d)

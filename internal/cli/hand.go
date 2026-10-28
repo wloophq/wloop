@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
@@ -200,14 +204,19 @@ func (e *Env) handUnit(ctx context.Context, target, cwd string, ws wsdomain.Work
 			return github.Ref{Owner: owner, Repo: name, Number: ws.LinkedPR}.Unit(), nil
 		}
 	}
-	for p, l := range e.locators() {
-		key, ok, err := l.UnitAt(ctx, cwd)
+	var errs []error
+	for _, l := range e.locators() {
+		u, ok, err := l.Locate(ctx, cwd)
 		if err != nil {
-			return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
+			errs = append(errs, err)
+			continue
 		}
 		if ok {
-			return unit.Unit{Provider: p, Key: key}, nil
+			return u, nil
 		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return unit.Unit{}, fmt.Errorf("no unit here; pass its target: %w", err)
 	}
 	return unit.Unit{}, errors.New("no unit here; pass its target")
 }
@@ -398,4 +407,20 @@ func (e *Env) handRound(ctx context.Context, rt route, ref github.Ref, guidance 
 func (e *Env) recordAddressed(st *round.Store, ref github.Ref, head string) {
 	st.SetMark(ref.String(), round.AddressedReviews, e.Now().UTC().Format(time.RFC3339))
 	st.SetHeads(ref.String(), head, head)
+}
+
+// locators know the unit a checkout holds: the built-in modules', then each
+// source plugin's this process runs.
+func (e *Env) locators() []unit.Locator {
+	out := e.githubLocators()
+	if e.pluginKind == nil {
+		return out
+	}
+	units := psource.Units{Codecs: e.unitCodecs()}
+	for _, p := range e.plugins {
+		if slices.Contains(p.Manifest.Kinds, src.Kind) {
+			out = append(out, psource.Checkouts{ID: p.ID(), Units: units, Kind: e.pluginKind})
+		}
+	}
+	return out
 }

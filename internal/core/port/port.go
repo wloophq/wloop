@@ -5,7 +5,6 @@ package port
 import (
 	"time"
 
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
@@ -20,8 +19,20 @@ type Event struct {
 	At        time.Time
 }
 
-// PROf is the pull request of an event on a github unit.
-func PROf(ev Event) (pr.Ref, bool) { return pr.RefOf(ev.Unit) }
+// Activity is an event as a feed shows it, with its unit's title, address,
+// author and state; Mine says the viewer started the unit.
+type Activity struct {
+	Event
+	Title, URL, Author, State string
+	Mine                      bool
+}
+
+// SentText is the text a turn was sent with, kept under its id.
+type SentText struct {
+	ID, Kind, Repo, Text string
+	Sources              []string
+	BundledSHA           string
+}
 
 type Clock interface{ Now() time.Time }
 

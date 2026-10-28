@@ -303,7 +303,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Usage:    e.usageJob(db, logf),
 		Retain:   e.retainJob(db),
 		Explorer: e.GitHub,
-		Budget:   e.GitHub,
+		Budget:   e.githubBudget(),
 		Turns:    e.Turns,
 		Sessions: sessions,
 		Agents:   lastAgents(sessions),
@@ -312,22 +312,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 		Actions:  envActions{e, store},
 		Intents:  e.loadedIntents,
 		Cfg:      cfg,
-		Viewer: func(ctx context.Context) (string, []string, error) {
-			login, err := store.Viewer(ctx, forge)
-			if err != nil {
-				return "", nil, err
-			}
-			if login == "" {
-				if login, err = e.GitHub.Viewer(ctx); err != nil {
-					return "", nil, err
-				}
-				if err := store.SetViewer(ctx, forge, login); err != nil {
-					logf("viewer: %v", err)
-				}
-			}
-			teams, err := githubTeams(ctx, store)
-			return login, teams, err
-		},
+		Identity: e.githubIdentity(store, logf),
 		Forge:    forge,
 		Now:      e.Now,
 		Version:  Version,
@@ -554,7 +539,7 @@ func appendSet(out []string, s string) []string {
 // withStore is d with every inventory role on st.
 func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
 	u := inventory.ByUnit{Store: st}
-	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
+	d.PRs, d.Events, d.Overrides, d.Meta, d.Records = u, u, u, st, u
 	return d
 }
 
@@ -606,7 +591,7 @@ func (e *Env) startup(ctx context.Context, cfg config.Config, logf func(string, 
 	if e.Turns != nil {
 		tr, err := e.Turns.Reconcile(ctx, true)
 		errs = append(errs, err)
-		rep.Unrecorded, rep.Closed, rep.GoneSessions = refsOfUnits(tr.Unrecorded), refsOfUnits(tr.Closed), tr.GoneSessions
+		rep.Unrecorded, rep.Closed, rep.GoneSessions = tr.Unrecorded, tr.Closed, tr.GoneSessions
 		for _, w := range tr.Warnings {
 			logf("reconcile: %s", w)
 		}

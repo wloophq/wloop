@@ -144,3 +144,25 @@ func TestAViewsKeyIsTheOneItsCatalogServes(t *testing.T) {
 		t.Fatalf("no served view has a key: %+v", cat.Views)
 	}
 }
+
+func TestAPluginsViewsKeyIsTheOneItsUIDeclares(t *testing.T) {
+	t.Parallel()
+	plugins := []api.Plugin{{ID: "acme", Name: "Acme", Enabled: true, UI: &api.PluginUI{Key: "g a"}},
+		{ID: "beta", Name: "Beta", UI: &api.PluginUI{Key: "g b"}}, {ID: "gamma", Name: "Gamma", Enabled: true, UI: &api.PluginUI{Key: "g i"}}}
+	views := []api.TaskViewSpec{{ID: "inbox", Label: "Inbox", Key: "g i"}}
+	nav := map[string]api.KeyView{}
+	for _, b := range keyViews(keys.TUI, views, plugins, nil, nil, coreWords{}) {
+		if strings.HasPrefix(b.Action, "nav:") {
+			nav[b.Action] = b
+		}
+	}
+	if b := nav["nav:acme"]; b.Key != "g a" || b.Owner != "acme" || b.Help != "Acme" || b.Context != string(keys.Global) {
+		t.Errorf("an enabled plugin's key: %+v", b)
+	}
+	if _, ok := nav["nav:beta"]; ok {
+		t.Error("a disabled plugin's key is served")
+	}
+	if _, ok := nav["nav:gamma"]; ok || nav["nav:inbox"].Key != "g i" {
+		t.Errorf("a plugin took a view's key: %+v", nav)
+	}
+}

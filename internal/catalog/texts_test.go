@@ -34,7 +34,7 @@ func stateOf(t *testing.T, f Facts, id string) api.ActionState {
 func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	l := bundled(t)
 	base := func() Facts {
-		return Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, GateOn: true, BriefOn: true, NudgeWho: []string{}}
+		return Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, GateOn: true, BriefOn: true, NudgeWho: []string{}}
 	}
 	slug := "acme/api#7"
 	cases := []struct {
@@ -126,7 +126,7 @@ func TestActionRefuseIsTheOldEnabled(t *testing.T) {
 		func(f *Facts) { f.Row.Unit = unit.Unit{Provider: "thread", Key: "1"} },
 	}
 	for i, set := range rows {
-		f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, NudgeWho: []string{"@ana"}}
+		f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, NudgeWho: []string{"@ana"}}
 		set(&f)
 		for _, st := range States(f) {
 			was, ok := old[dintent.Name(st.ID)]
@@ -145,7 +145,7 @@ func TestWarningShowsOnlyOnAQuestion(t *testing.T) {
 	l := bundled(t)
 	const warning = "Starts a new round; the agent's open question is replaced"
 	for _, question := range []bool{false, true} {
-		f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Question: question, NudgeWho: []string{}}
+		f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, Question: question, NudgeWho: []string{}}
 		st := stateOf(t, f, string(dintent.Review))
 		if want := map[bool]string{true: warning}[question]; st.Warning != want {
 			t.Errorf("question %v: review warning %q, want %q", question, st.Warning, want)
@@ -155,7 +155,7 @@ func TestWarningShowsOnlyOnAQuestion(t *testing.T) {
 
 func TestARefusalNamesTheProfileTextItShows(t *testing.T) {
 	l := bundled(t)
-	f := Facts{Intents: l, Ref: r7, Row: api.Row{Unit: r7.Unit()}, Open: true, Tracked: true, Mine: false, NudgeWho: []string{}}
+	f := Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, Mine: false, NudgeWho: []string{}}
 	if st := stateOf(t, f, string(dintent.Address)); st.Enabled || st.Refusal != api.RefuseCase(0) {
 		t.Errorf("address on another's pull request: %+v", st)
 	}

@@ -712,7 +712,7 @@ func TestLensViewsAndKeysComeFromTheCatalog(t *testing.T) {
 	}
 	var served []api.KeyView
 	for _, b := range webBindings(t) {
-		if !strings.HasPrefix(b.Action, "nav:") || b.Action == "nav:github" {
+		if !strings.HasPrefix(b.Action, "nav:") || b.Owner != "core" {
 			served = append(served, b)
 		}
 	}

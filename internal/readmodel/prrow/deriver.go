@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -84,7 +83,7 @@ func TurnFacts(books map[unit.Unit]turn.Book, reg *dintent.Registry) map[github.
 		if !ok {
 			continue
 		}
-		ref, _ := port.PROf(port.Event{Unit: u})
+		ref, _ := pr.RefOf(u)
 		out[ref] = TurnFact{Facts: run.Turn, Session: run.Session, Question: run.Question, Unstarted: run.Unstarted}
 	}
 	return out

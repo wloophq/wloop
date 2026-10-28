@@ -134,7 +134,7 @@ type Env struct {
 	// none, and its rounds keep no turn.
 	Store *inventory.Store
 	// planReads are the pull requests a sweep plans from; nil reads Store.
-	planReads coresweep.Inputs
+	planReads dinv.PlanInputs
 	Turns     *turns.Service
 	Views     *views.Service
 	// Briefing is the daemon's; nil sends every automatic round without

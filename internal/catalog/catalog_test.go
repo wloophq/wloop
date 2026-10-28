@@ -10,7 +10,6 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -18,7 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/turn"
 )
 
-var r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
+var r7 = unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 
 func bundled(t *testing.T) *intentload.Loaded {
 	t.Helper()
@@ -126,10 +125,10 @@ func TestActionFactsCoverTheActionSlot(t *testing.T) {
 		"pr.mine":                               func(f *Facts) { f.Mine = true },
 		"pr.author":                             func(f *Facts) { f.Author = "ana" },
 		"pr.state":                              func(f *Facts) { f.State = "OPEN" },
-		"pr.slug":                               func(f *Facts) { f.Ref = r7 },
-		"pr.owner":                              func(f *Facts) { f.Ref = r7 },
-		"pr.repo":                               func(f *Facts) { f.Ref = r7 },
-		"pr.repo_name":                          func(f *Facts) { f.Ref = r7 },
+		"pr.slug":                               func(f *Facts) { f.PR, f.Owner, f.Repo = r7, "acme", "api" },
+		"pr.owner":                              func(f *Facts) { f.PR, f.Owner, f.Repo = r7, "acme", "api" },
+		"pr.repo":                               func(f *Facts) { f.PR, f.Owner, f.Repo = r7, "acme", "api" },
+		"pr.repo_name":                          func(f *Facts) { f.PR, f.Owner, f.Repo = r7, "acme", "api" },
 		"pr.base":                               func(f *Facts) { f.Base = "main" },
 		"pr.cross_repository":                   func(f *Facts) { f.CrossRepository = true },
 		"pr.draft":                              func(f *Facts) { f.Draft = true },
@@ -208,7 +207,7 @@ func TestCatalogOffersIntentsOfTheRowProvider(t *testing.T) {
 		}
 		return out
 	}
-	if got := ids(api.Row{Unit: r7.Unit()}); len(got) == 0 {
+	if got := ids(api.Row{Unit: r7}); len(got) == 0 {
 		t.Fatal("a github row offers no intent")
 	}
 	if got := ids(api.Row{}); len(got) == 0 {
@@ -222,7 +221,7 @@ func TestCatalogOffersIntentsOfTheRowProvider(t *testing.T) {
 func TestCatalogOffersAnAnyIntentOnEveryRow(t *testing.T) {
 	act := dintent.Def{Name: "act", Label: "Act", Workspace: RoleReview, UserFacing: true, Provider: dintent.AnyProvider, Action: &dintent.Action{Group: "turn"}}
 	l := &intentload.Loaded{Registry: dintent.NewRegistry([]dintent.Def{act}), Programs: map[dintent.Name]intentload.Programs{}}
-	for _, u := range []unit.Unit{r7.Unit(), {Provider: "thread", Key: "1"}} {
+	for _, u := range []unit.Unit{r7, {Provider: "thread", Key: "1"}} {
 		if !slices.ContainsFunc(States(Facts{Intents: l, Open: true, Row: api.Row{Unit: u}, NudgeWho: []string{}}), func(s api.ActionState) bool { return s.ID == "act" }) {
 			t.Errorf("act is not offered on %v", u)
 		}

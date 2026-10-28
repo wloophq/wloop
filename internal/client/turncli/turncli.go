@@ -15,7 +15,6 @@ import (
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/client/harness"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/record"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -133,18 +132,17 @@ func Answer(ctx context.Context, env func(string) string, args []string, out, er
 	return 0
 }
 
-// unitArg reads the unit a turn command names: a pull request URL, sent as
-// its canonical URL, or "<provider>:<key>", sent as given; label is how the
-// command's output names it.
+// unitArg reads the unit a turn command names: a unit's web address, sent
+// as its canonical address, or "<provider>:<key>", sent as given; label is
+// how the command's output names it.
 func unitArg(raw string) (arg, label string, err error) {
-	ref, err := pr.ParseURL(raw)
-	if err == nil {
-		return ref.URL(), ref.String(), nil
+	if u, ok := unit.ParseAddress(strings.TrimSpace(raw)); ok {
+		return u.Address(), u.Label(), nil
 	}
 	if p, key, ok := strings.Cut(raw, ":"); ok && unit.ValidProvider(p) && key != "" && strings.IndexByte(" \t\n\f\r", key[0]) < 0 && !strings.HasPrefix(raw, "http") {
 		return raw, raw, nil
 	}
-	return "", "", err
+	return "", "", fmt.Errorf("not a unit's address or <provider>:<key>: %s", raw)
 }
 
 func handle(env func(string) string, h harness.Set) string {

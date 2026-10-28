@@ -13,7 +13,6 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/domain/card"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
@@ -105,8 +104,8 @@ func TestActivityListsEventsWithTheirPullRequest(t *testing.T) {
 		t.Fatal("ana's pull request marked mine")
 	}
 	for _, it := range items {
-		if it.Event.Unit != it.Event.PR.Unit() {
-			t.Fatalf("event of %s names unit %+v", it.Event.PR, it.Event.Unit)
+		if it.Label != it.Event.Unit.Label() || it.Label == "" {
+			t.Fatalf("event of %+v is labeled %q", it.Event.Unit, it.Label)
 		}
 	}
 }
@@ -138,16 +137,16 @@ func TestActivitySkipsEventsOutsideTheInventoryAndMarksMine(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := s.viewerInfo(ctx); err != nil {
+	if _, err := s.viewerInfo(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var items []api.ActivityItem
 	get(t, s, "/api/activity", &items)
-	if len(items) != 3 || github.Ref(items[0].Event.PR) != mine || !items[0].Mine {
+	if len(items) != 3 || items[0].Event.Unit != mine.Unit() || !items[0].Mine {
 		t.Fatalf("%+v", items)
 	}
 	for _, it := range items {
-		if github.Ref(it.Event.PR) == orphan {
+		if it.Event.Unit == orphan.Unit() {
 			t.Fatal("an event outside the inventory is listed")
 		}
 	}
@@ -197,7 +196,7 @@ func TestActivityListsAnotherProvidersEventsWithItsCard(t *testing.T) {
 		t.Fatalf("%d items: %+v", len(items), items)
 	}
 	got := items[0]
-	if got.Event.Unit != chat || got.Event.PR != (pr.Ref{}) || got.Event.Kind != "turn_sent" || got.Title != "a thread" ||
+	if got.Event.Unit != chat || got.Event.Kind != "turn_sent" || got.Title != "a thread" ||
 		got.URL != "https://chat.example/C1/1.1" || got.State != "thread" || got.Author != "" || !got.Mine {
 		t.Fatalf("%+v", got)
 	}

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -99,13 +101,13 @@ func TestAFailedViewerRecordsNoSituation(t *testing.T) {
 	var down sync.Mutex
 	failing := true
 	s := newServerWith(t, func(d *Deps) {
-		d.Viewer = func(context.Context) (string, []string, error) {
+		d.Identity = func(context.Context) (src.Identity, error) {
 			down.Lock()
 			defer down.Unlock()
 			if failing {
-				return "", nil, errors.New("github is down")
+				return src.Identity{}, errors.New("github is down")
 			}
-			return "me", nil, nil
+			return identityOf("me"), nil
 		}
 	})
 	for range 2 {

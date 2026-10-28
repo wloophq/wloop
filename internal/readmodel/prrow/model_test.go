@@ -105,11 +105,11 @@ func (r *rig) snapshot(ok bool, agents []turns.AgentObservation) {
 	r.agents, r.agentsOK = agents, ok
 }
 
-func intakeView(i intake.Intake, rec dinv.BriefRecord, found bool, _ func() (int, error)) api.Intake {
+func intakeView(i intake.Intake, b intake.BriefState, _ func() (int, error)) api.Intake {
 	ref, _ := pr.ParseKey(i.Unit.Key)
 	w := api.Intake{Seq: i.Seq, PR: ref.URL(), Intent: string(i.Intent), Source: i.Source, State: string(i.State), Attempt: 1}
-	if found {
-		w.Attempt, w.LastError = rec.Failures+1, rec.Error
+	if b.Found {
+		w.Attempt, w.LastError = b.Failures+1, b.LastError
 	}
 	return w
 }

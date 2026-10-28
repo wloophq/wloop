@@ -182,3 +182,12 @@ func TestDraftActionHasNoKey(t *testing.T) {
 		t.Error("an unknown scope passes")
 	}
 }
+
+func TestAPluginsViewsKeyIsAFreeChord(t *testing.T) {
+	if err := CheckPluginKeys("acme", &api.PluginUI{Key: "g a"}); err != nil {
+		t.Errorf("a free chord: %v", err)
+	}
+	if err := CheckPluginKeys("acme", &api.PluginUI{Key: "a"}); err == nil || !strings.Contains(err.Error(), "acme: the key of its views") {
+		t.Errorf("a key that is no chord: %v", err)
+	}
+}

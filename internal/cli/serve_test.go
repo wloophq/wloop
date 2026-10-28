@@ -383,9 +383,9 @@ func TestServeViewerTeamsAreTheOnesIBelongTo(t *testing.T) {
 	store.SetMeta(context.Background(), "scope_resolved", `{"Teams":["acme/platform","acme/search"],"MyTeams":["acme/search"]}`)
 	te.cfg = withoutWindows(te.cfg)
 	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
-	login, teams, err := d.Viewer(context.Background())
-	if err != nil || login != "me" || !slices.Equal(teams, []string{"acme/search"}) {
-		t.Fatalf("%q %v %v", login, teams, err)
+	id, err := d.Identity(context.Background())
+	if err != nil || id.Viewer.Key != "github:me" || !slices.Equal(id.Teams, []string{"acme/search"}) {
+		t.Fatalf("%+v %v", id, err)
 	}
 }
 
@@ -405,8 +405,8 @@ func TestViewerReadsNoGitHub(t *testing.T) {
 	te.cfg = withoutWindows(te.cfg)
 	d := te.serveDeps(context.Background(), storeDB, te.cfg, func(string, ...any) {}, &lock.Mutex{}, nil)
 	for range 100 {
-		if login, _, err := d.Viewer(context.Background()); err != nil || login != "stored" {
-			t.Fatalf("%q %v", login, err)
+		if id, err := d.Identity(context.Background()); err != nil || id.Viewer.Key != "github:stored" {
+			t.Fatalf("%+v %v", id, err)
 		}
 	}
 	te.Env.Store = store

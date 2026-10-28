@@ -88,7 +88,7 @@ func newIntakeServer(t *testing.T, briefs intake.Briefs, change func(*Deps)) (*S
 	}
 	fa := &lockedActions{a: fakeActions{out: "review sent\n"}}
 	d := withStore(Deps{Activity: db, Cfg: config.Defaults(), Version: "test", Actions: fa, Intakes: db.Intakes(), IntakeBriefs: briefs,
-		Viewer: func(context.Context) (string, []string, error) { return "me", nil, nil }, Log: t.Logf}, st)
+		Identity: viewerIs("me"), Log: t.Logf}, st)
 	if change != nil {
 		change(&d)
 	}
@@ -731,7 +731,7 @@ func TestRowIntakeRetryIsAsOfTheMinute(t *testing.T) {
 		d.Now = func() time.Time { return retry.Add(10 * time.Second) }
 	})
 	i := intake.Intake{Unit: r7.Unit(), State: intake.Briefing}
-	got := s.rowIntake(i, dinv.BriefRecord{PR: r7, Failures: 1, RetryAt: retry}, true, func() (int, error) { return 2, nil })
+	got := s.rowIntake(i, intake.BriefState{Found: true, Failures: 1, RetryAt: retry}, func() (int, error) { return 2, nil })
 	if !got.Next.Equal(retry) {
 		t.Fatalf("next %v, want %v as of 10:00", got.Next, retry)
 	}

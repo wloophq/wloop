@@ -76,7 +76,7 @@ func (n *nudges) Proposals(ctx context.Context, now time.Time) ([]outbox.Proposa
 		return nil, err
 	}
 	at := now.Truncate(time.Minute)
-	base := readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: viewer}, Teams: teams}
+	base := readmodel.Base{Viewers: map[unit.ProviderID]string{unit.GitHub: viewer}, Teams: map[unit.ProviderID][]string{unit.GitHub: teams}}
 	ignore := prrow.IgnoreOf(rd.Settings().Cfg)
 	var out []outbox.Proposal
 	for _, u := range units {

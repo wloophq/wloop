@@ -20,7 +20,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
@@ -234,7 +233,7 @@ func (e *Env) briefFacts(ctx context.Context, c *client.Client, ref github.Ref) 
 	if c == nil {
 		return nil, errors.New("the daemon is not running")
 	}
-	f, err := c.Facts(ctx, pr.Ref(ref))
+	f, err := c.Facts(ctx, ref.URL())
 	if err != nil {
 		return nil, err
 	}

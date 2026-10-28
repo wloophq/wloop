@@ -6,7 +6,6 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/intake"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
@@ -21,9 +20,9 @@ type RowDeps struct {
 	Activity Activities
 	// Intakes are the open intakes, the oldest first.
 	Intakes func(ctx context.Context) ([]intake.Intake, error)
-	// Intake is a row's view of an open intake, from its unit's brief record
-	// (found false: none); attempt is the brief attempt the intake waits on.
-	Intake   func(i intake.Intake, rec dinv.BriefRecord, found bool, attempt func() (int, error)) api.Intake
+	// Intake is a row's view of an open intake, from its unit's brief;
+	// attempt is the brief attempt the intake waits on.
+	Intake   func(i intake.Intake, b intake.BriefState, attempt func() (int, error)) api.Intake
 	Settings func() RowSettings
 	Logf     func(format string, args ...any)
 }

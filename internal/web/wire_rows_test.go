@@ -60,9 +60,13 @@ func wireRow(viewer string, now time.Time, old map[string]any) map[string]any {
 		switch {
 		case k == "ref":
 			r["ref"] = v
+			ref := v.(map[string]any)
+			label := str(ref["owner"]) + "/" + str(ref["repo"]) + "#" + fmt.Sprint(ref["number"])
+			if old["label"] == nil {
+				r["label"] = label
+			}
 			if old["unit"] == nil {
-				ref := v.(map[string]any)
-				r["unit"] = map[string]any{"provider": "github", "key": str(ref["owner"]) + "/" + str(ref["repo"]) + "#" + fmt.Sprint(ref["number"])}
+				r["unit"] = map[string]any{"provider": "github", "key": label}
 			}
 		case slices.Contains(payloadKeys, k):
 			payload[k] = v

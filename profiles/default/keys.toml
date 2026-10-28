@@ -26,7 +26,6 @@ open-source = "open the source"
 
 [help.global]
 capture = "capture"
-"nav:github" = "the GitHub views"
 filter = "filter"
 palette = "every action and its key"
 help = "help"

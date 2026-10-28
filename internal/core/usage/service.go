@@ -48,7 +48,7 @@ func (s Service) Run(ctx context.Context) (string, error) {
 			source, rows = SourceUnavailable, nil
 		case err != nil:
 			if !logged && s.Log != nil {
-				s.Log("usage: turn %d of %s: %v", t.Seq, t.PR, err)
+				s.Log("usage: turn %d of %s: %v", t.Seq, t.Unit.Label(), err)
 				logged = true
 			}
 			if t.Attempts+1 < MaxAttempts {
@@ -60,7 +60,7 @@ func (s Service) Run(ctx context.Context) (string, error) {
 			}
 			source, rows = SourceUnavailable, nil
 		}
-		ev := port.Event{Unit: t.PR.Unit(), Kind: KindTurnUsage, Key: strconv.FormatInt(t.Seq, 10), Data: source, At: now}
+		ev := port.Event{Unit: t.Unit, Kind: KindTurnUsage, Key: strconv.FormatInt(t.Seq, 10), Data: source, At: now}
 		if err := s.Store.SaveUsage(ctx, t.Seq, rows, source, now, ev); err != nil {
 			return "", err
 		}

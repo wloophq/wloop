@@ -14,7 +14,6 @@ import (
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/github"
 )
 
@@ -104,9 +103,9 @@ func TestRemoveDoneRemovesTheCleanOnesAndSaysWhyItKeptTheRest(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
 		t.Fatal(err)
 	}
-	slices.SortFunc(res.Kept, func(a, b api.Kept) int { return a.Ref.Number - b.Ref.Number })
-	if !slices.Equal(res.Removed, []pr.Ref{pr.Ref(ref(30))}) || len(res.Kept) != 2 || github.Ref(res.Kept[0].Ref) != ref(31) || res.Kept[0].Reason != "3 commits not pushed" ||
-		github.Ref(res.Kept[1].Ref) != ref(33) || !strings.Contains(res.Kept[1].Reason, "timeout") {
+	slices.SortFunc(res.Kept, func(a, b api.Kept) int { return strings.Compare(a.Label, b.Label) })
+	if !slices.Equal(res.Removed, []api.Named{{Unit: ref(30).Unit(), Label: "acme/api#30"}}) || len(res.Kept) != 2 || res.Kept[0].Unit != ref(31).Unit() || res.Kept[0].Reason != "3 commits not pushed" ||
+		res.Kept[1].Unit != ref(33).Unit() || !strings.Contains(res.Kept[1].Reason, "timeout") {
 		t.Fatalf("%+v", res)
 	}
 	if !slices.Equal(actions.calls, []string{"remove acme/api#30"}) {

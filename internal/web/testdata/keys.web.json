@@ -139,13 +139,6 @@
       "help": "capture"
     },
     {
-      "key": "g g",
-      "action": "nav:github",
-      "context": "global",
-      "owner": "core",
-      "help": "the GitHub views"
-    },
-    {
       "key": "/",
       "action": "filter",
       "context": "global",
@@ -368,6 +361,13 @@
       "context": "global",
       "owner": "core",
       "help": "Review"
+    },
+    {
+      "key": "g g",
+      "action": "nav:github",
+      "context": "global",
+      "owner": "github",
+      "help": "GitHub"
     },
     {
       "key": "R",

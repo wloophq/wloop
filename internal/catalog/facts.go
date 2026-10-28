@@ -7,18 +7,21 @@ import (
 	"slices"
 
 	"github.com/wloophq/wloop/internal/domain/task"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 
 	"github.com/wloophq/wloop/internal/api"
-	"github.com/wloophq/wloop/internal/domain/pr"
 	intentload "github.com/wloophq/wloop/internal/intent"
 )
 
 // Facts are what decides the actions a row offers; the action slot of
 // manifest predicates reads the same values through Get.
 type Facts struct {
-	Ref pr.Ref
-	Row api.Row
+	// PR is the unit of the row's pull request, and Owner and Repo its
+	// repository; zero on a row of any other unit.
+	PR          unit.Unit
+	Owner, Repo string
+	Row         api.Row
 	// Author, Workspace and Override are the pull request's, from its row's
 	// payload.
 	Author    string
@@ -104,13 +107,13 @@ func (f Facts) authorWorkspace() bool {
 // yours says the row's unit is the user's to act on: any unit but a pull request, or a pull request that
 // is the user's, taken over or held by an author workspace.
 func (f Facts) yours() bool {
-	if !f.Row.Unit.IsZero() && f.Row.Unit != f.Ref.Unit() {
+	if !f.Row.Unit.IsZero() && f.Row.Unit != f.PR {
 		return true
 	}
 	return f.Mine || f.Override.Adopted || f.authorWorkspace()
 }
 
-func (f Facts) slug() string { return f.Ref.String() }
+func (f Facts) slug() string { return f.PR.Key }
 
 // Get resolves a fact of the action slot by its dotted name; nil for one
 // the slot does not have.
@@ -126,11 +129,11 @@ func (f Facts) Get(field string) any {
 	case "pr.slug":
 		return f.slug()
 	case "pr.owner":
-		return f.Ref.Owner
+		return f.Owner
 	case "pr.repo":
-		return f.Ref.Owner + "/" + f.Ref.Repo
+		return f.Owner + "/" + f.Repo
 	case "pr.repo_name":
-		return f.Ref.Repo
+		return f.Repo
 	case "pr.base":
 		return f.Base
 	case "pr.cross_repository":

@@ -177,7 +177,7 @@ func (m *memRecorder) Record(_ context.Context, ev dinv.Event) error {
 }
 
 func (m *memRecorder) RecordUnit(ctx context.Context, ev port.Event) error {
-	ref, ok := port.PROf(ev)
+	ref, ok := pr.RefOf(ev.Unit)
 	if !ok {
 		return fmt.Errorf("the memory recorder keeps pull requests only, not %s", ev.Unit)
 	}

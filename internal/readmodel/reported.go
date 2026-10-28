@@ -10,8 +10,8 @@ import (
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
+	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/domain/card"
-	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -199,7 +199,7 @@ func (p *Reported) loadIntakes(ctx context.Context, ins map[unit.Unit]*reported)
 		if !ok || in.intake != nil {
 			continue
 		}
-		w := p.src.Intake(i, dinv.BriefRecord{}, false, func() (int, error) { return 0, errNoBrief })
+		w := p.src.Intake(i, intake.BriefState{}, func() (int, error) { return 0, errNoBrief })
 		in.intake = &w
 	}
 	return nil

@@ -11,6 +11,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -354,7 +355,7 @@ func (s *state) fingerprint() string {
 }
 
 func repoOf(u unit.Unit) string {
-	ref, ok := port.PROf(port.Event{Unit: u})
+	ref, ok := pr.RefOf(u)
 	if !ok {
 		return ""
 	}

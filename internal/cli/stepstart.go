@@ -13,7 +13,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/intake"
-	coresweep "github.com/wloophq/wloop/internal/core/sweep"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
@@ -41,7 +40,7 @@ const (
 type roundCandidate struct {
 	Round        string
 	Workspace    wsdomain.Workspace
-	Facts        coresweep.Facts
+	Facts        dinv.PlanFacts
 	Fingerprint  string
 	ChecksHead   string
 	ConflictHead string

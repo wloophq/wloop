@@ -51,7 +51,7 @@ func agentServer(t *testing.T) (*Server, *turns.Service) {
 	svc := &turns.Service{Intents: turnstest.Intents(), Store: repo, Registry: repo, Sessions: turnstest.NewSessions(), Clock: agentClock{}, Command: brand.Name, FastJob: 2 * time.Minute}
 	inbox := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: itemsNone{}, Facts: enabledUnits{map[unit.ProviderID]bool{}}, Clock: agentClock{}})
 	s := New(withStore(Deps{Turns: svc, Activity: db, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return agentNow },
-		Viewer:   func(context.Context) (string, []string, error) { return "me", nil, nil },
+		Identity: viewerIs("me"),
 		Messages: &messages.Service{Store: inventory.NewMessages(db), Books: repo, Turns: svc, Tasks: inbox, Intents: turnstest.Intents(), Clock: agentClock{}},
 		ReadText: func(_ context.Context, convs []dmessage.Conversation, id int64) string {
 			var texts []string

@@ -45,6 +45,20 @@ func (u Unit) Label() string {
 	return u.String()
 }
 
+// Address names u as a person or an agent types it: as its web address
+// when the codec of its provider in the registry UseLabels set has one,
+// else as provider:key.
+func (u Unit) Address() string {
+	if l, ok := labels.Load().codecOf(u.Provider).(Linker); ok {
+		return l.URL(u.Key)
+	}
+	return u.String()
+}
+
+// ParseAddress is the unit a web address names, as the codecs of the
+// registry UseLabels set read it; false for an address none of them has.
+func ParseAddress(raw string) (Unit, bool) { return labels.Load().ParseURL(raw) }
+
 // Labeler is an optional capability of a Codec: how a person reads a key.
 type Labeler interface {
 	Label(key string) string
@@ -247,8 +261,8 @@ type Resolver interface {
 	Resolve(ctx context.Context, address string) (key string, ok bool, err error)
 }
 
-// Locator is a codec that knows the unit a working directory holds, such as
-// the pull request of a checkout's branch; ok is false when it holds none.
+// Locator knows the unit a local checkout's directory holds, such as the
+// pull request of its branch; ok is false when it holds none.
 type Locator interface {
-	UnitAt(ctx context.Context, dir string) (key string, ok bool, err error)
+	Locate(ctx context.Context, dir string) (u Unit, ok bool, err error)
 }

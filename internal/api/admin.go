@@ -3,8 +3,8 @@ package api
 import (
 	"time"
 
-	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
@@ -12,10 +12,10 @@ import (
 // before it served UserAPI.
 type ReconcileReport struct {
 	// Unrecorded are the pull requests whose turn ended without a record.
-	Unrecorded []pr.Ref `json:"unrecorded"`
+	Unrecorded []unit.Unit `json:"unrecorded"`
 	// Closed are the pull requests whose asked turn my review closed.
-	Closed       []pr.Ref `json:"closed"`
-	GoneSessions []string `json:"gone_sessions"`
+	Closed       []unit.Unit `json:"closed"`
+	GoneSessions []string    `json:"gone_sessions"`
 	// Rewritten counts the view items the sinks were brought back to.
 	Rewritten int       `json:"rewritten"`
 	At        time.Time `json:"at"`
@@ -89,7 +89,7 @@ type DoctorReport struct {
 
 // TurnBook is a pull request's book as `turn show` prints it.
 type TurnBook struct {
-	PR    pr.Ref      `json:"pr"`
+	Unit  Named       `json:"unit"`
 	Turns []TurnShown `json:"turns"`
 }
 

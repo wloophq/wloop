@@ -375,7 +375,7 @@ func bookOf(t *testing.T, url string) liveBook {
 		t.Fatalf("turn show %s: %v\n%.2000s", url, err, raw)
 	}
 	b := liveBook{shown: shown}
-	b.Unit = shown.PR.Unit()
+	b.Unit = shown.Unit.Unit
 	for _, s := range shown.Turns {
 		b.Turns = append(b.Turns, s.Turn)
 		b.Records = append(b.Records, s.Records...)
@@ -385,7 +385,11 @@ func bookOf(t *testing.T, url string) liveBook {
 	slices.SortStableFunc(b.Answers, func(x, y turn.Answer) int { return cmp.Or(x.At.Compare(y.At), cmp.Compare(x.ID, y.ID)) })
 	ctx, cancel := context.WithTimeout(context.Background(), commandWait)
 	defer cancel()
-	b.Events = storetest.Events(ctx, t, filepath.Join(config.StateDir(), "store.db"), shown.PR)
+	ref, ok := pr.RefOf(shown.Unit.Unit)
+	if !ok {
+		t.Fatalf("turn show %s names %s, no pull request", url, shown.Unit.Label)
+	}
+	b.Events = storetest.Events(ctx, t, filepath.Join(config.StateDir(), "store.db"), ref)
 	return b
 }
 

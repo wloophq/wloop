@@ -18,6 +18,10 @@ import (
 	"testing"
 	"time"
 
+	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite"
 	"github.com/wloophq/wloop/internal/adapter/store/sqlite/sqlitetest"
@@ -57,8 +61,8 @@ type briefRoles interface {
 // withBriefs sets every brief role of d to b; nil turns briefs off.
 func withBriefs(d *Deps, b briefRoles) {
 	d.Brief, d.BriefStatus, d.BriefViews = b, b, b
-	if d.Rows != nil {
-		d.RowProviders = prRows(d.Rows, b)
+	if pr, ok := d.PRs.(inventory.ByUnit); ok {
+		d.RowProviders = prRows(pr.Store, b)
 	}
 }
 
@@ -71,7 +75,7 @@ func withStore(d Deps, st *inventory.Store) Deps {
 		d.Forge = unit.GitHub
 	}
 	u := inventory.ByUnit{Store: st}
-	d.Rows, d.PRs, d.Events, d.Overrides, d.Meta, d.Records = st, u, u, u, st, u
+	d.PRs, d.Events, d.Overrides, d.Meta, d.Records = u, u, u, st, u
 	d.RowProviders = prRows(st, nil)
 	return d
 }
@@ -122,8 +126,8 @@ func newServerOn(t *testing.T, stDB *sqlite.DB, log *change.Log, change func(*De
 	r8 := github.Ref{Owner: "acme", Repo: "api", Number: 8}
 	st.UpsertPR(ctx, dinv.PR{Ref: r8, Title: "Done", Author: "me", State: "MERGED", Reasons: []string{"author"}})
 	d := withStore(Deps{Pauses: sqlite.NewRounds(stDB), Activity: stDB, Cfg: config.Defaults(), Version: "test", Now: func() time.Time { return now },
-		Viewer: func(context.Context) (string, []string, error) { return "me", []string{"acme/search"}, nil },
-		Log:    func(string, ...any) {}, Explorer: openOnGitHub{}}, st)
+		Identity: viewerIs("me", "acme/search"),
+		Log:      func(string, ...any) {}, Explorer: openOnGitHub{}}, st)
 	if log != nil {
 		d.Changes = log
 	}
@@ -465,7 +469,7 @@ func seedRateLimit(t *testing.T, s *Server, remaining, limit int, resetAt time.T
 	c := github.NewClient(github.Options{Host: "github.com", Now: s.deps.Now,
 		Token: func(context.Context) (string, error) { return "", errors.New("no token in tests") }})
 	c.Restore([]dgh.Limit{{Resource: dgh.ResourceGraphQL, Remaining: remaining, Limit: limit, ResetAt: resetAt}})
-	s.deps.Budget = c
+	s.deps.Budget = ghsource.Budget{Limiter: c}
 }
 
 func TestHealthSlowSyncFollowsTheRateLimit(t *testing.T) {
@@ -517,7 +521,7 @@ func TestHealthJSONIsSnakeCase(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, apiRequest("GET", "/api/units/github/acme%2Fapi%237", nil))
-	if body := rec.Body.String(); !strings.Contains(body, `"events":[{"pr":{"owner":"acme"`) || !strings.Contains(body, `"kind":"push","key":"h2","actor":"ana","at":`) {
+	if body := rec.Body.String(); !strings.Contains(body, `"events":[{"unit":{"provider":"github","key":"acme/api#7"}`) || !strings.Contains(body, `"kind":"push","key":"h2","actor":"ana","at":`) {
 		t.Fatalf("%s", body)
 	}
 }
@@ -997,4 +1001,13 @@ func TestCatalogRouteServesTheProviders(t *testing.T) {
 	if len(c.Views) != 11 || c.Views[0].ID != api.ViewNeedsMe || len(c.Situations) != 18 || c.Version == "" {
 		t.Fatalf("catalog %+v", c)
 	}
+}
+
+// viewerIs is the forge's Identity of login with teams.
+func viewerIs(login string, teams ...string) func(context.Context) (src.Identity, error) {
+	return func(context.Context) (src.Identity, error) { return identityOf(login, teams...), nil }
+}
+
+func identityOf(login string, teams ...string) src.Identity {
+	return src.Identity{Viewer: src.Person{Key: "github:" + login, Name: login}, Teams: teams}
 }

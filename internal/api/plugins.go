@@ -60,13 +60,16 @@ type SourceHealth struct {
 }
 
 type PluginUI struct {
-	Facets        []Facet          `json:"facets,omitempty"`        // qualifiers over row and item facts
-	Views         []SavedView      `json:"views,omitempty"`         // listed under the plugin in navigation
-	Notifications []Notification   `json:"notifications,omitempty"` // templates keyed by item kind or row kind
-	Keys          []KeyBinding     `json:"keys,omitempty"`          // checked with keys.Check when the catalog loads
-	Web           *WebView         `json:"web,omitempty"`           // tier c
-	TUIViews      []string         `json:"tui_views,omitempty"`     // ids of compiled tui.PluginView
-	Menubar       []MenubarSection `json:"menubar,omitempty"`
+	Facets        []Facet        `json:"facets,omitempty"`        // qualifiers over row and item facts
+	Views         []SavedView    `json:"views,omitempty"`         // listed under the plugin in navigation
+	Notifications []Notification `json:"notifications,omitempty"` // templates keyed by item kind or row kind
+	Keys          []KeyBinding   `json:"keys,omitempty"`          // checked with keys.Check when the catalog loads
+	// Key is the chord that jumps to the plugin's views, checked with
+	// keys.CheckView; "" for none.
+	Key      string           `json:"key,omitempty"`
+	Web      *WebView         `json:"web,omitempty"`       // tier c
+	TUIViews []string         `json:"tui_views,omitempty"` // ids of compiled tui.PluginView
+	Menubar  []MenubarSection `json:"menubar,omitempty"`
 }
 
 // Facet: Field is "row.*", "item.*" or "<provider>.*".

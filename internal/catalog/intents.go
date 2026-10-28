@@ -96,7 +96,7 @@ func pluginOf(d dintent.Def) string {
 func (r registryActions) States(f Facts) []api.ActionState {
 	var out []api.ActionState
 	facts := intentload.ActionFactMap(f.Get)
-	provider := cmp.Or(f.Row.Unit, f.Ref.Unit()).Provider
+	provider := cmp.Or(f.Row.Unit, f.PR).Provider
 	for _, d := range r.offering() {
 		if !d.Serves(provider) {
 			continue

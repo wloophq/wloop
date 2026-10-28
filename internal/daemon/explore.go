@@ -76,7 +76,8 @@ func (s *Server) handleExplore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	viewer, _, _ := s.viewerInfo(ctx)
+	id, _ := s.viewerInfo(ctx)
+	viewer := s.login(id)
 	if viewer != "" && strings.EqualFold(parsed.Author, viewer) {
 		writeError(w, http.StatusBadRequest, "Explore leaves out your own pull requests; the My PRs view lists them")
 		return

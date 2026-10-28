@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/catalog"
@@ -29,52 +31,57 @@ const (
 
 type viewerCache struct {
 	mu       sync.Mutex
-	login    string
-	teams    []string
+	id       src.Identity
 	at       time.Time
 	gen      port.Generation
 	err      error
 	failedAt time.Time
 }
 
-// cachedLogin never asks GitHub, so health stays instant on a cold cache.
-func (c *viewerCache) cachedLogin() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.login
+// cachedLogin never asks the source, so health stays instant on a cold
+// cache.
+func (s *Server) cachedLogin() string {
+	s.viewer.mu.Lock()
+	defer s.viewer.mu.Unlock()
+	return s.login(s.viewer.id)
 }
 
-// viewerInfo serves a stale login when a refresh fails, so a GitHub hiccup
-// does not blank the cockpit, and waits viewerRetry before asking again. The
-// task lasts until a TopicViewer note, or viewerTTL without a change log.
-func (s *Server) viewerInfo(ctx context.Context) (string, []string, error) {
+// login is the viewer's login in the forge from id.
+func (s *Server) login(id src.Identity) string { return readmodel.Login(s.deps.Forge, id) }
+
+// viewerInfo is who the viewer is in the forge, as its plugin's Identity
+// says. It serves a stale identity when a refresh fails, so a source's
+// hiccup does not blank the cockpit, and waits viewerRetry before asking
+// again. The identity lasts until a TopicViewer note, or viewerTTL without
+// a change log.
+func (s *Server) viewerInfo(ctx context.Context) (src.Identity, error) {
 	c := &s.viewer
 	now := s.deps.Now()
 	c.mu.Lock()
 	fresh := !c.at.IsZero() && s.viewerFresh(c, now)
 	failedRecently := !c.failedAt.IsZero() && now.Sub(c.failedAt) < viewerRetry
-	if s.deps.Viewer == nil || fresh || failedRecently {
-		login, teams, err := c.login, c.teams, c.err
+	if s.deps.Identity == nil || fresh || failedRecently {
+		id, err := c.id, c.err
 		c.mu.Unlock()
-		return login, teams, err
+		return id, err
 	}
 	c.mu.Unlock()
 
 	gen := s.changeGen()
-	login, teams, err := s.deps.Viewer(ctx)
+	id, err := s.deps.Identity(ctx)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err != nil {
 		c.failedAt = now
 		if c.at.IsZero() {
 			c.err = err
-			return "", nil, err
+			return src.Identity{}, err
 		}
 		s.logf("viewer: %v", err)
-		return c.login, c.teams, nil
+		return c.id, nil
 	}
-	c.login, c.teams, c.at, c.gen, c.err, c.failedAt = login, teams, now, gen, nil, time.Time{}
-	return login, teams, nil
+	c.id, c.at, c.gen, c.err, c.failedAt = id, now, gen, nil, time.Time{}
+	return id, nil
 }
 
 func (s *Server) viewerFresh(c *viewerCache, now time.Time) bool {
@@ -223,16 +230,15 @@ func (s *Server) activity(ctx context.Context, limit int) ([]api.ActivityItem, e
 	if err != nil {
 		return nil, err
 	}
-	viewer := s.viewer.cachedLogin()
+	viewer := s.cachedLogin()
 	out := []api.ActivityItem{}
 	for _, e := range evs {
-		url := e.URL
-		if url == "" && e.PR.Number != 0 {
-			url = e.PR.URL()
+		ev := e.Event
+		var label string
+		if !ev.Unit.IsZero() {
+			label = ev.Unit.Label()
 		}
-		ev := wireEvent(e.Event)
-		ev.Unit = e.Unit
-		out = append(out, api.ActivityItem{Event: ev, Title: e.Title, URL: url, Author: e.Author, State: e.State,
+		out = append(out, api.ActivityItem{Event: api.Event{Unit: ev.Unit, Kind: ev.Kind, Key: ev.Key, Actor: ev.Actor, At: ev.At, Data: ev.Data}, Label: label, Title: e.Title, URL: e.URL, Author: e.Author, State: e.State,
 			Mine: e.Mine || viewer != "" && strings.EqualFold(e.Author, viewer)})
 	}
 	return out, nil
@@ -266,8 +272,8 @@ func (s *Server) newModel() *readmodel.Model {
 
 // rowIntake is a row's view of an open intake, from the brief record the
 // rebuild read, as of the minute's start like the rest of the row.
-func (s *Server) rowIntake(i intake.Intake, rec dinv.BriefRecord, found bool, attempt func() (int, error)) api.Intake {
-	return s.intakeView(i, rec, found, s.deps.Now().Truncate(time.Minute), attempt)
+func (s *Server) rowIntake(i intake.Intake, b intake.BriefState, attempt func() (int, error)) api.Intake {
+	return s.intakeView(i, b, s.deps.Now().Truncate(time.Minute), attempt)
 }
 
 func (s *Server) rowSettings() readmodel.RowSettings {
@@ -295,14 +301,15 @@ func (noPending) Pending(context.Context) (map[unit.Unit]round.Pending, error) {
 type modelSettings struct{ s *Server }
 
 func (m modelSettings) Settings(ctx context.Context) (readmodel.Base, error) {
-	login, teams, err := m.s.viewerInfo(ctx)
+	id, err := m.s.viewerInfo(ctx)
 	if err != nil {
 		return readmodel.Base{}, err
 	}
 	l := m.s.loaded()
 	off := m.s.disabledPlugins(l)
-	return readmodel.Base{Viewers: map[unit.ProviderID]string{m.s.deps.Forge: login}, Teams: teams, Specs: catalog.SpecsFor(l, off),
-		SpecsVersion: catalog.VersionFor(l, off), Intents: l}, nil
+	b := readmodel.Base{Specs: catalog.SpecsFor(l, off), SpecsVersion: catalog.VersionFor(l, off), Intents: l}
+	b.Identify(m.s.deps.Forge, id)
+	return b, nil
 }
 
 // servedSpecs are the specs of the loaded intents without the disabled
