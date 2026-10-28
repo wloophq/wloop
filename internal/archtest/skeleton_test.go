@@ -96,7 +96,7 @@ var skeleton = map[string][]string{
 	"internal/core/messages": {"Service", "Service.Reconcile", "Service.ReconcileProposals", "Service.Post",
 		"Service.Propose", "Service.Answer", "Service.Dismiss", "PostRequest", "ProposeRequest", "Answer"},
 	"internal/domain/task": {"Category", "Categories", "PropType", "PropTypes", "Writer", "Writers", "Writer.Trusted",
-		"Actor", "Actors", "Value", "Value.IsZero", "Props", "Props.Get", "State", "Kind", "ID", "ItemRef", "Focus", "Snooze", "WaitingOn", "Task", "Me", "Mute",
+		"Actor", "Actors", "Value", "Value.IsZero", "Props", "Props.Get", "State", "Kind", "ID", "ItemRef", "Snooze", "WaitingOn", "Task", "Me", "Mute",
 		"UnitFacts", "ChangeOp", "Change", "Reconcile", "Activity", "AutoFocus", "Wake", "Verb", "View", "Query", "Counters", "Codec", "UnitOf"},
 	"internal/core/tasks": {"PropStore", "PropStore.SetProp", "PropStore.PropsOf", "ViewEval", "Authority", "OwedBy", "Store", "Since", "Page", "Items", "Facts", "ViewSource", "VerbHandler", "Request", "Result",
 		"Service", "Service.Register", "Service.RegisterView", "Service.Do", "Service.Capture", "Service.Open",

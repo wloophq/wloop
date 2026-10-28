@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -50,7 +51,7 @@ func newTaskRig(t *testing.T, files map[string]string) *taskRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	te.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
+	te.tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Facts: coretasks.CardFacts{Cards: db.Cards()}, Clock: clockFunc(func() time.Time { return te.Now() })})
 	return &taskRig{te: te, db: db}
 }
 
@@ -67,7 +68,7 @@ func TestTaskVerbMovesTheTaskAndRecordsNoVerbEvent(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, map[string]string{"workflows/my-someday/workflow.toml": somedayWorkflow})
-	r.put(t, "e-01", task.Next)
+	r.put(t, "e-01", task.State("next"))
 	ed := engineDeps{DB: r.db, SessionFacts: noUnits{}, WorkspaceFacts: noUnits{}}
 	r.te.wireSubjects(&serveWiring{DB: r.db, Cfg: r.te.cfg, Engine: &ed})
 	eng := r.te.newEngine(ed)
@@ -79,7 +80,7 @@ func TestTaskVerbMovesTheTaskAndRecordsNoVerbEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.State != task.Someday {
+	if e.State != task.State("someday") {
 		items, _ := eng.Ledger.Items(ctx, automation.Filter{Workflow: "my-someday"})
 		t.Fatalf("state %s; items %+v", e.State, items)
 	}
@@ -96,7 +97,7 @@ func TestTaskVerbCheckRefusesWhatTheTasksStateRefuses(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
-	r.put(t, "e-01", task.Done)
+	r.put(t, "e-01", task.State("done"))
 	s := newStepSet(r.te.Env, stepDeps{Units: automationtest.NewUnits(), Rounds: r.te.Rounds})
 	u := task.UnitOf("e-01")
 	refusal, err := s.Check(ctx, wfStep("task.verb", "verb", "done"), u, workflow.Why{Workflow: "w"}, automation.CheckOpts{})
@@ -116,7 +117,7 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 	ctx := context.Background()
 	r := newTaskRig(t, nil)
 	at := testNow.Add(-time.Hour)
-	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", Kind: task.KindWaiting, State: task.Waiting,
+	if err := r.db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: task.Task{ID: "e-02", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting,
 		Title: "Waiting on the reviewer", Origin: task.OriginDerived, Created: at, Updated: at}}}); err != nil {
 		t.Fatal(err)
 	}
@@ -135,10 +136,11 @@ func TestTaskVerbLeavesClosingADerivedTaskToItsItems(t *testing.T) {
 
 func TestTaskVerbRunsOnlyVerbsThatMoveAStoredTask(t *testing.T) {
 	t.Parallel()
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates})
 	for _, v := range builtin.TaskStepVerbs {
 		moves := false
-		for _, s := range []task.State{task.Inbox, task.Next, task.Waiting, task.Scheduled, task.Someday, task.Reference, task.Done, task.Trash} {
-			moves = moves || coretasks.Accepts(task.Task{State: s}, task.Verb(v)) == nil
+		for _, s := range []task.State{"inbox", "next", "waiting", "scheduled", "someday", "reference", "done", "trash"} {
+			moves = moves || g.Accepts(task.Task{State: s}, task.Verb(v)) == nil
 		}
 		if !moves {
 			t.Errorf("no state takes %s", v)

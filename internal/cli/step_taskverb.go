@@ -50,7 +50,7 @@ func (s *stepSet) taskVerbCheck(ctx context.Context, c stepCall, _ automation.Ch
 	if g.Handles(e.Kind, v) {
 		return "", nil
 	}
-	if err := coretasks.Accepts(e, v); err != nil {
+	if err := g.Accepts(e, v); err != nil {
 		if r := taskRefusal(err); r != "" {
 			return r, nil
 		}

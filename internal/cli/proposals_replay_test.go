@@ -199,28 +199,28 @@ func (r *replay) scenario(at time.Time) {
 	switch {
 	case at.Equal(replayStart):
 		a1, a2, a3 := r.item(rpA, "a1", items.Open, before, rpAna), r.item(rpA, "a2", items.Open, before, rpBob), r.item(rpA, "a3", items.Open, before, rpAna)
-		r.task(task.Task{ID: "e-a", Kind: task.KindWaiting, State: task.Waiting, Title: "a", Units: []unit.Unit{rpA}, Items: refs(a1, a2, a3),
+		r.task(task.Task{ID: "e-a", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "a", Units: []unit.Unit{rpA}, Items: refs(a1, a2, a3),
 			Waiting: &task.WaitingOn{On: []items.Person{rpAna, rpBob, rpLegal}, Since: before}})
 		b1 := r.item(rpB, "b1", items.Open, before, rpCid)
 		r.item(rpB, "b2", items.Open, before)
-		r.task(task.Task{ID: "e-b", Kind: task.KindWaiting, State: task.Waiting, Title: "b", Units: []unit.Unit{rpB}, Items: refs(b1),
+		r.task(task.Task{ID: "e-b", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "b", Units: []unit.Unit{rpB}, Items: refs(b1),
 			Waiting: &task.WaitingOn{On: []items.Person{rpCid}, Since: before}, Snooze: task.Snooze{Mute: true}})
 		c1 := r.item(rpC, "c1", items.Open, replayStart, rpDan)
-		r.task(task.Task{ID: "e-c", Kind: task.KindWaiting, State: task.Waiting, Title: "c", Units: []unit.Unit{rpC}, Items: refs(c1),
+		r.task(task.Task{ID: "e-c", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "c", Units: []unit.Unit{rpC}, Items: refs(c1),
 			Waiting: &task.WaitingOn{On: []items.Person{rpDan}, Since: replayStart, Resurface: day(2, 14)}})
 		d1, d2, e1 := r.item(rpD, "d1", items.Resolved, before), r.item(rpD, "d2", items.Resolved, before), r.item(rpE, "e1", items.Resolved, before)
 		d2.Resolution = ""
 		r.commit(d2)
 		r.item(rpD, "d3", items.Open, before)
-		r.task(task.Task{ID: "e-d", Kind: task.KindClose, State: task.Inbox, Title: "d", Units: []unit.Unit{rpD, rpE}, Items: refs(d1, d2, e1)})
-		r.task(task.Task{ID: "e-g", Kind: task.KindWaiting, State: task.Waiting, Title: "g", Units: []unit.Unit{rpPR},
+		r.task(task.Task{ID: "e-d", Kind: task.KindClose, State: "inbox", Category: task.CategoryInbox, Title: "d", Units: []unit.Unit{rpD, rpE}, Items: refs(d1, d2, e1)})
+		r.task(task.Task{ID: "e-g", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "g", Units: []unit.Unit{rpPR},
 			Waiting: &task.WaitingOn{On: []items.Person{{Key: "github:octo"}}, Since: before}})
 		f1 := r.item(rpF, "f1", items.Open, replayStart.AddDate(0, 0, -3).Add(9*time.Hour))
 		r.item(rpF, "f2", items.Open, replayStart.Add(time.Hour))
-		r.task(task.Task{ID: "e-f", Kind: task.KindAction, State: task.Next, Title: "f", Units: []unit.Unit{rpF}, Items: refs(f1)})
+		r.task(task.Task{ID: "e-f", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "f", Units: []unit.Unit{rpF}, Items: refs(f1)})
 	case is(day(1, 9)):
 		k1, k2 := r.item(rpK, "k1", items.Open, before, rpEve), r.item(rpK, "k2", items.Open, before, rpFay)
-		r.task(task.Task{ID: "e-k", Kind: task.KindWaiting, State: task.Waiting, Title: "k", Units: []unit.Unit{rpK}, Items: refs(k1, k2),
+		r.task(task.Task{ID: "e-k", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "k", Units: []unit.Unit{rpK}, Items: refs(k1, k2),
 			Waiting: &task.WaitingOn{On: []items.Person{rpEve}, Since: before}})
 	case is(day(1, 15)):
 		r.change("e-k", func(e *task.Task) { e.Waiting.On = append(e.Waiting.On, rpFay) })
@@ -235,17 +235,17 @@ func (r *replay) scenario(at time.Time) {
 		r.item(rpF, "f3", items.Open, day(3, 10))
 	case is(day(4, 12)):
 		h1 := r.item(rpH, "h1", items.Resolved, day(4, 11))
-		r.task(task.Task{ID: "e-h", Kind: task.KindClose, State: task.Next, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
+		r.task(task.Task{ID: "e-h", Kind: task.KindClose, State: "next", Category: task.CategoryReady, Title: "h", Units: []unit.Unit{rpH}, Items: refs(h1)})
 	case is(day(7, 9)):
 		r.change("e-b", func(e *task.Task) { e.Snooze.Mute = false })
-		r.change("e-c", func(e *task.Task) { e.State = task.Done })
+		r.change("e-c", func(e *task.Task) { e.State, e.Category = "done", task.CategoryDone })
 	case is(day(8, 12)):
 		r.change("e-a", func(e *task.Task) { e.Waiting.On = []items.Person{rpBob, rpLegal} })
 		a4 := r.item(rpA, "a4", items.Open, day(8, 12), rpBob)
 		r.change("e-a", func(e *task.Task) { e.Items = append(e.Items, refs(a4)...) })
 	case is(day(9, 15)):
-		r.change("e-d", func(e *task.Task) { e.State = task.Someday })
-		r.change("e-h", func(e *task.Task) { e.State = task.Done })
+		r.change("e-d", func(e *task.Task) { e.State, e.Category = "someday", task.CategoryDeferred })
+		r.change("e-h", func(e *task.Task) { e.State, e.Category = "done", task.CategoryDone })
 	case is(day(10, 9)):
 		f3 := r.items(rpF)["f3"]
 		f3.State, f3.Resolution = items.Resolved, items.Answered

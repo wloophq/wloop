@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-// ViewOpen selects every entry neither done nor trash. It is not a served view and has no counter.
+// ViewOpen selects every open task: its category is neither done nor dropped. It is not a served view and has no counter.
 const ViewOpen View = "open"
 
 // StoredViews are the views whose entries the store holds, in the order counters list them.
@@ -15,32 +15,35 @@ var StoredViews = []View{ViewFocus, ViewInbox, ViewNext, ViewWaiting, ViewProjec
 func inState(e Task, v View) bool {
 	switch v {
 	case ViewFocus:
-		return e.Focus.On && e.Live()
+		return e.Starred() && e.Open()
 	case ViewInbox:
-		return e.State == Inbox
+		return e.Category == CategoryInbox
 	case ViewNext:
-		return e.State == Next
+		return e.Category == CategoryReady
 	case ViewWaiting:
-		return e.State == Waiting
+		return e.Category == CategoryWaiting
 	case ViewProjects:
-		return e.Kind == KindProject && e.Live()
+		return e.Kind == KindProject && e.Open()
 	case ViewSomeday:
-		return e.State == Someday
+		return inSomeday(e)
 	case ViewLogbook:
-		return e.State == Reference || e.State == Done
+		return e.Category == CategoryDone
 	case ViewOpen:
-		return e.Live()
+		return e.Open()
 	}
 	return false
 }
 
+// inSomeday says whether the task is deferred with no snooze to wake it.
+func inSomeday(e Task) bool { return e.Category == CategoryDeferred && !e.Snoozed() }
+
 // Matches says whether e passes q's area and contexts; the Inbox ignores the area.
 func (q Query) Matches(e Task) bool {
-	if q.Area != "" && q.View != ViewInbox && e.Area != q.Area {
+	if q.Area != "" && q.View != ViewInbox && e.Prop(PropArea).Text != q.Area {
 		return false
 	}
 	for _, c := range q.Contexts {
-		if !slices.Contains(e.Contexts, c) {
+		if !slices.Contains(e.Prop(PropContexts).List, c) {
 			return false
 		}
 	}
@@ -60,7 +63,7 @@ func Select(all []Task, q Query) []Task {
 		if !inState(e, q.View) || !q.Matches(e) {
 			continue
 		}
-		if id, ok := first[e.Project]; ok && id != e.ID {
+		if id, ok := first[e.Parent]; ok && id != e.ID {
 			continue
 		}
 		out = append(out, e)
@@ -79,11 +82,11 @@ func firstActions(all []Task) map[ID]ID {
 	}
 	first := map[ID]Task{}
 	for _, e := range all {
-		if !seq[e.Project] || !e.Open() {
+		if !seq[e.Parent] || !e.Open() {
 			continue
 		}
-		if f, ok := first[e.Project]; !ok || cmp.Or(cmp.Compare(e.Position, f.Position), cmp.Compare(e.ID, f.ID)) < 0 {
-			first[e.Project] = e
+		if f, ok := first[e.Parent]; !ok || cmp.Or(cmp.Compare(e.Position, f.Position), cmp.Compare(e.ID, f.ID)) < 0 {
+			first[e.Parent] = e
 		}
 	}
 	out := make(map[ID]ID, len(seq))
@@ -93,21 +96,14 @@ func firstActions(all []Task) map[ID]ID {
 	return out
 }
 
-// Sort orders a view's entries: the Logbook by reference first, then the newest; the others the oldest first.
+// Sort orders a view's entries: the Logbook the newest first; the others the oldest first.
 func Sort(es []Task, v View) {
 	slices.SortStableFunc(es, func(a, b Task) int {
 		if v == ViewLogbook {
-			return cmp.Or(cmp.Compare(rank(a), rank(b)), b.Updated.Compare(a.Updated), cmp.Compare(a.ID, b.ID))
+			return cmp.Or(b.Updated.Compare(a.Updated), cmp.Compare(a.ID, b.ID))
 		}
 		return cmp.Or(a.Created.Compare(b.Created), cmp.Compare(a.ID, b.ID))
 	})
-}
-
-func rank(e Task) int {
-	if e.State == Reference {
-		return 0
-	}
-	return 1
 }
 
 // CountsOf is the counters of the stored views over all, each the length of Select for its view.
@@ -117,13 +113,14 @@ func CountsOf(all []Task, area string) Counters {
 		c.Views[v] = len(Select(all, Query{View: v, Area: area}))
 	}
 	for _, e := range Select(all, Query{View: ViewNext}) {
-		if e.Area != "" {
-			c.Areas[e.Area]++
+		a := e.Prop(PropArea).Text
+		if a != "" {
+			c.Areas[a]++
 		}
-		if area != "" && e.Area != area {
+		if area != "" && a != area {
 			continue
 		}
-		for _, ctx := range e.Contexts {
+		for _, ctx := range e.Prop(PropContexts).List {
 			c.Contexts[ctx]++
 		}
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	coreitems "github.com/wloophq/wloop/internal/core/items"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -101,7 +102,7 @@ func newDerivedRig(t *testing.T, cases []ghsourcetest.Case) derivedRig {
 	clock := clockFunc(func() time.Time { return ghsourcetest.Now })
 	ledger := &coreitems.Ledger{Store: db.Items(), Clock: clock}
 	me := task.Me{Keys: []string{"github:" + ghsourcetest.Viewer}}
-	svc := coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: ledger, Me: me, Clock: clock, StaleWaitingDays: 2,
+	svc := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: ledger, Me: me, Clock: clock, StaleWaitingDays: 2,
 		Facts: coretasks.CardFacts{Cards: db.Cards(), Me: func() task.Me { return me }}})
 	r := derivedRig{db: db, svc: svc, asked: map[unit.Unit]bool{}}
 	var units []unit.Unit
@@ -165,17 +166,17 @@ func TestEveryNeedsMeRowHasAnInboxOrNextTask(t *testing.T) {
 		switch {
 		case r.asked[c.Row.Unit]:
 			questions++
-			if len(es) != 1 || es[0].Kind != task.KindMessage || es[0].State != task.Inbox {
+			if len(es) != 1 || es[0].Kind != task.KindMessage || es[0].State != task.State("inbox") {
 				t.Errorf("%s asked: %+v", c.Name, es)
 			}
 		case situation.Kind(c.Row.Kind) == situation.KindMuted && viewerItem(c.Row):
 			muted++
-			if !in(task.Scheduled) || in(task.Inbox, task.Next) {
+			if !in(task.State("scheduled")) || in(task.State("inbox"), task.State("next")) {
 				t.Errorf("%s muted: %+v", c.Name, es)
 			}
 		case slices.Contains(c.Row.Views, api.ViewNeedsMe):
 			needs++
-			if !in(task.Inbox, task.Next) {
+			if !in(task.State("inbox"), task.State("next")) {
 				t.Errorf("%s needs me: %+v", c.Name, es)
 			}
 		}
@@ -296,7 +297,7 @@ func TestDisabledPluginTasksRefuseOnARealServe(t *testing.T) {
 	}
 	u := unit.Unit{Provider: unit.GitHub, Key: "acme/api#7"}
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	e := task.Task{ID: "e-00000000000000aa", Kind: task.KindAction, State: task.Inbox, Title: "review it", Units: []unit.Unit{u},
+	e := task.Task{ID: "e-00000000000000aa", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "review it", Units: []unit.Unit{u},
 		Items: []task.ItemRef{{Unit: u, Item: "gh:review"}}, Origin: task.OriginDerived, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)

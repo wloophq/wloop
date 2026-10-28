@@ -340,22 +340,25 @@ CREATE TABLE links (
 
 CREATE INDEX links_to ON links (to_provider, to_key);
 
+-- category is the category of state, as the profile declares it; review_every (seconds) and reviewed_at are a
+-- parent's review.
 CREATE TABLE tasks (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL, state TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
-  focus_on INTEGER NOT NULL DEFAULT 0, focus_auto TEXT NOT NULL DEFAULT '', focus_at TEXT NOT NULL DEFAULT '',
-  area TEXT NOT NULL DEFAULT '', project TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
+  parent TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
   sequential INTEGER NOT NULL DEFAULT 0,
   snooze_until TEXT NOT NULL DEFAULT '', snooze_on_activity INTEGER NOT NULL DEFAULT 0,
   snooze_return TEXT NOT NULL DEFAULT '', snooze_mute INTEGER NOT NULL DEFAULT 0,
-  waiting TEXT NOT NULL DEFAULT '', deadline TEXT NOT NULL DEFAULT '',
+  waiting TEXT NOT NULL DEFAULT '',
   changed INTEGER NOT NULL DEFAULT 0, seen_at TEXT NOT NULL DEFAULT '',
   origin TEXT NOT NULL, created TEXT NOT NULL, updated TEXT NOT NULL,
   rev INTEGER NOT NULL,
-  category TEXT NOT NULL DEFAULT ''
+  category TEXT NOT NULL DEFAULT '',
+  review_every INTEGER NOT NULL DEFAULT 0, reviewed_at TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE INDEX tasks_state ON tasks (state);
 CREATE INDEX tasks_rev ON tasks (rev);
+CREATE INDEX tasks_category ON tasks (category);
 
 CREATE TABLE task_items (
   task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
@@ -370,12 +373,6 @@ CREATE TABLE task_units (
   PRIMARY KEY (task_id, provider, unit_key)
 ) WITHOUT ROWID;
 CREATE INDEX task_units_unit ON task_units (provider, unit_key);
-
-CREATE TABLE task_contexts (
-  task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
-  context TEXT NOT NULL, ord INTEGER NOT NULL,
-  PRIMARY KEY (task_id, context)
-) WITHOUT ROWID;
 
 -- task_props.value is the property's task.Value as JSON; writer is who wrote it.
 CREATE TABLE task_props (
@@ -466,9 +463,7 @@ CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
 
 CREATE TABLE projects (
   task_id TEXT PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
-  slug TEXT NOT NULL DEFAULT '',
-  review_every INTEGER NOT NULL DEFAULT 0,
-  reviewed_at TEXT NOT NULL DEFAULT ''
+  slug TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 CREATE UNIQUE INDEX projects_slug ON projects (slug) WHERE slug != '';
 

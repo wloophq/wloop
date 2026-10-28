@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -8,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,8 +27,9 @@ var _ coretasks.Store = taskStore{}
 
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
-const taskFields = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
-	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated`
+const taskFields = `id, kind, state, category, title, notes, parent, position, sequential,
+	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, changed, seen_at, origin, created, updated,
+	review_every, reviewed_at`
 
 // upsertTaskSQL updates an existing task in place: a REPLACE would delete
 // the row first and cascade into its projects row.
@@ -40,36 +44,42 @@ var upsertTaskSQL = func() string {
 		`) ON CONFLICT (id) DO UPDATE SET ` + strings.Join(set, `, `)
 }()
 
+// The SQL conditions on tasks bind every category as a parameter.
 const (
-	notEnded     = `state NOT IN ('done', 'trash')`
 	taskOrder    = ` ORDER BY created, id`
 	changedSince = `rev > ?`
 	ofUnit       = `id IN (SELECT task_id FROM task_units WHERE provider = ? AND unit_key = ?
 		UNION SELECT task_id FROM task_items WHERE provider = ? AND unit_key = ?)`
+	isOpen    = `category NOT IN (?, ?)`
+	isSomeday = `category = ? AND snooze_until = '' AND snooze_on_activity = 0 AND snooze_mute = 0`
+	isStarred = `id IN (SELECT task_id FROM task_props WHERE name = ? AND json_extract(value, '$.text') = ?)`
 )
 
-// candidates is the SQL condition on tasks that holds every task the view predicate of v may select,
-// and what the sequential rule of Next needs.
-func candidates(v task.View) string {
+func openArgs() []any { return []any{string(task.CategoryDone), string(task.CategoryDropped)} }
+
+// candidates is the SQL condition on tasks, with its arguments, that holds every task the view predicate of v may
+// select, and what the sequential rule of Next needs.
+func candidates(v task.View) (string, []any) {
 	switch v {
 	case task.ViewFocus:
-		return `focus_on = 1 AND ` + notEnded
+		return isStarred + ` AND ` + isOpen, append([]any{task.PropFocus, task.FocusOn}, openArgs()...)
 	case task.ViewInbox:
-		return `state = 'inbox'`
+		return `category = ?`, []any{string(task.CategoryInbox)}
 	case task.ViewWaiting:
-		return `state = 'waiting'`
+		return `category = ?`, []any{string(task.CategoryWaiting)}
 	case task.ViewSomeday:
-		return `state = 'someday'`
+		return isSomeday, []any{string(task.CategoryDeferred)}
 	case task.ViewNext:
-		return `state = 'next' OR (project != '' AND state NOT IN ('done', 'trash', 'reference')) OR (kind = 'project' AND sequential = 1)`
+		return `category = ? OR (parent != '' AND ` + isOpen + `) OR (kind = 'project' AND sequential = 1)`,
+			append([]any{string(task.CategoryReady)}, openArgs()...)
 	case task.ViewProjects:
-		return `kind = 'project' AND ` + notEnded
+		return `kind = 'project' AND ` + isOpen, openArgs()
 	case task.ViewLogbook:
-		return `state IN ('reference', 'done')`
+		return `category = ?`, []any{string(task.CategoryDone)}
 	case task.ViewOpen:
-		return notEnded
+		return isOpen, openArgs()
 	}
-	return `0`
+	return `0`, nil
 }
 
 func taskTime(s string) (time.Time, error) {
@@ -79,20 +89,30 @@ func taskTime(s string) (time.Time, error) {
 	return time.Parse(event.TimeLayout, s)
 }
 
+// propTime reads a property's write time, which PropStore and Apply stamp in their layouts.
+func propTime(s string) (time.Time, error) {
+	if s == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse(time.RFC3339Nano, s)
+}
+
 func scanTask(row scanner) (task.Task, error) {
 	var e task.Task
-	var focusAt, snoozeUntil, waiting, deadline, seenAt, created, updated string
-	var kind, state, project, ret string
-	if err := row.Scan(&e.ID, &kind, &state, &e.Title, &e.Notes, &e.Focus.On, &e.Focus.Auto, &focusAt, &e.Area, &project,
-		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute, &waiting, &deadline,
-		&e.Changed, &seenAt, &e.Origin, &created, &updated); err != nil {
+	var snoozeUntil, waiting, seenAt, created, updated, reviewed string
+	var kind, state, category, parent, ret string
+	var every int64
+	if err := row.Scan(&e.ID, &kind, &state, &category, &e.Title, &e.Notes, &parent,
+		&e.Position, &e.Sequential, &snoozeUntil, &e.Snooze.OnActivity, &ret, &e.Snooze.Mute, &waiting,
+		&e.Changed, &seenAt, &e.Origin, &created, &updated, &every, &reviewed); err != nil {
 		return task.Task{}, err
 	}
-	e.Kind, e.State, e.Project, e.Snooze.Return = task.Kind(kind), task.State(state), task.ID(project), task.State(ret)
+	e.Kind, e.State, e.Category, e.Parent, e.Snooze.Return = task.Kind(kind), task.State(state), task.Category(category), task.ID(parent), task.State(ret)
+	e.ReviewEvery = time.Duration(every) * time.Second
 	for _, f := range []struct {
 		dst *time.Time
 		raw string
-	}{{&e.Focus.At, focusAt}, {&e.Snooze.Until, snoozeUntil}, {&e.Deadline, deadline}, {&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}} {
+	}{{&e.Snooze.Until, snoozeUntil}, {&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}, {&e.ReviewedAt, reviewed}} {
 		t, err := taskTime(f.raw)
 		if err != nil {
 			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
@@ -108,7 +128,7 @@ func scanTask(row scanner) (task.Task, error) {
 	return e, nil
 }
 
-// loadTasks reads the tasks matching where, with their items, units and contexts, oldest first.
+// loadTasks reads the tasks matching where, with their items, units and properties, oldest first.
 func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]task.Task, error) {
 	rows, err := q.QueryContext(ctx, `SELECT `+taskFields+` FROM tasks WHERE `+where+taskOrder, args...)
 	if err != nil {
@@ -157,20 +177,36 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	if err != nil {
 		return nil, err
 	}
-	err = eachRow(ctx, q, `SELECT task_id, context FROM task_contexts WHERE task_id IN `+sub+` ORDER BY task_id, ord`,
+	err = eachRow(ctx, q, `SELECT task_id, name, value, writer, at FROM task_props WHERE task_id IN `+sub+` ORDER BY task_id, name`,
 		args, func(r *sql.Rows) error {
-			var id, c string
-			if err := r.Scan(&id, &c); err != nil {
+			var id, name, body, writer, when string
+			if err := r.Scan(&id, &name, &body, &writer, &when); err != nil {
 				return err
 			}
+			var v task.Value
+			if err := json.Unmarshal([]byte(body), &v); err != nil {
+				return fmt.Errorf("property %s of %s: %w", name, id, err)
+			}
+			t, err := propTime(when)
+			if err != nil {
+				return fmt.Errorf("property %s of %s: %w", name, id, err)
+			}
 			e := &out[at[task.ID(id)]]
-			e.Contexts = append(e.Contexts, c)
+			if e.Props == nil {
+				e.Props, e.Written = task.Props{}, map[string]task.Written{}
+			}
+			e.Props[name], e.Written[name] = v, task.Written{By: task.Writer(writer), At: t}
 			return nil
 		})
 	if err != nil {
 		return nil, err
 	}
 	return out, loadProjects(ctx, q, sub, args, out, at)
+}
+
+func loadView(ctx context.Context, q querier, v task.View) ([]task.Task, error) {
+	where, args := candidates(v)
+	return loadTasks(ctx, q, where, args...)
 }
 
 func eachRow(ctx context.Context, q querier, query string, args []any, fn func(*sql.Rows) error) error {
@@ -202,7 +238,7 @@ func readPosition(ctx context.Context, q querier) (epoch string, rev uint64, err
 func (s taskStore) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
 	var out []task.Task
 	err := s.db.Read(ctx, func(tx *sql.Tx) error {
-		all, err := loadTasks(ctx, tx, candidates(q.View))
+		all, err := loadView(ctx, tx, q.View)
 		out = task.Select(all, q)
 		return err
 	})
@@ -221,11 +257,11 @@ func (s taskStore) TasksSince(ctx context.Context, q task.Query, since coretasks
 		}
 		if since.Epoch != p.Epoch || since.Rev > p.Rev {
 			p.Full = true
-			all, err := loadTasks(ctx, tx, candidates(q.View))
+			all, err := loadView(ctx, tx, q.View)
 			p.Tasks = task.Select(all, q)
 			return err
 		}
-		all, err := loadTasks(ctx, tx, candidates(q.View))
+		all, err := loadView(ctx, tx, q.View)
 		if err != nil {
 			return err
 		}
@@ -281,28 +317,41 @@ func (s taskStore) Counts(ctx context.Context, area string) (task.Counters, erro
 	return c, err
 }
 
-// nextIDs selects the tasks Next lists: State next, and of a sequential project only its open action with the
-// lowest Position (then id), as task.Select does over the candidates of ViewNext.
+// nextIDs selects the tasks Next lists: of the ready category, and of a sequential project only its open action
+// with the lowest Position (then id), as task.Select does over the candidates of ViewNext. Its arguments are
+// nextArgs; area is each task's area property.
 const nextIDs = `WITH seq AS (SELECT id FROM tasks WHERE kind = 'project' AND sequential = 1),
-first AS (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY project ORDER BY position, id) AS n
-	FROM tasks WHERE project IN seq AND state NOT IN ('done', 'trash', 'reference')) WHERE n = 1),
-nxt AS (SELECT id, area FROM tasks WHERE state = 'next' AND (project NOT IN seq OR id IN first)) `
+first AS (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY parent ORDER BY position, id) AS n
+	FROM tasks WHERE parent IN seq AND ` + isOpen + `) WHERE n = 1),
+areas AS (SELECT task_id, json_extract(value, '$.text') AS area FROM task_props WHERE name = ?),
+nxt AS (SELECT t.id, COALESCE(a.area, '') AS area FROM tasks t LEFT JOIN areas a ON a.task_id = t.id
+	WHERE t.category = ? AND (t.parent NOT IN seq OR t.id IN first)) `
 
-const inArea = `(? = '' OR area = ?)`
+func nextArgs() []any {
+	return append(openArgs(), task.PropArea, string(task.CategoryReady))
+}
+
+const inArea = `(? = '' OR COALESCE(a.area, '') = ?)`
 
 // countsTx is task.CountsOf over the stored views, one query per map.
 func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, error) {
 	c := task.Counters{Area: area, Views: map[task.View]int{task.ViewOutbox: 0}, Areas: map[string]int{}, Contexts: map[string]int{}}
 	var focus, inbox, next, waiting, projects, someday, logbook int
+	args := nextArgs()
+	args = append(args, task.PropFocus, task.FocusOn)
+	args = append(args, openArgs()...)
+	args = append(args, area, area, string(task.CategoryInbox), area, area, string(task.CategoryWaiting), area, area)
+	args = append(args, openArgs()...)
+	args = append(args, area, area, string(task.CategoryDeferred), area, area, string(task.CategoryDone), area, area)
 	if err := tx.QueryRowContext(ctx, nextIDs+`SELECT
-		COALESCE(SUM(focus_on = 1 AND `+notEnded+` AND `+inArea+`), 0),
-		COALESCE(SUM(state = 'inbox'), 0),
-		(SELECT COUNT(*) FROM nxt WHERE `+inArea+`),
-		COALESCE(SUM(state = 'waiting' AND `+inArea+`), 0),
-		COALESCE(SUM(kind = 'project' AND `+notEnded+` AND `+inArea+`), 0),
-		COALESCE(SUM(state = 'someday' AND `+inArea+`), 0),
-		COALESCE(SUM(state IN ('reference', 'done') AND `+inArea+`), 0)
-		FROM tasks`, area, area, area, area, area, area, area, area, area, area, area, area).
+		COALESCE(SUM(t.`+isStarred+` AND t.`+isOpen+` AND `+inArea+`), 0),
+		COALESCE(SUM(t.category = ?), 0),
+		(SELECT COUNT(*) FROM nxt a WHERE `+inArea+`),
+		COALESCE(SUM(t.category = ? AND `+inArea+`), 0),
+		COALESCE(SUM(t.kind = 'project' AND t.`+isOpen+` AND `+inArea+`), 0),
+		COALESCE(SUM(t.category = ? AND t.snooze_until = '' AND t.snooze_on_activity = 0 AND t.snooze_mute = 0 AND `+inArea+`), 0),
+		COALESCE(SUM(t.category = ? AND `+inArea+`), 0)
+		FROM tasks t LEFT JOIN areas a ON a.task_id = t.id`, args...).
 		Scan(&focus, &inbox, &next, &waiting, &projects, &someday, &logbook); err != nil {
 		return task.Counters{}, err
 	}
@@ -310,7 +359,7 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 		task.ViewProjects: projects, task.ViewSomeday: someday, task.ViewLogbook: logbook} {
 		c.Views[v] = n
 	}
-	err := eachRow(ctx, tx, nextIDs+`SELECT area, COUNT(*) FROM nxt WHERE area != '' GROUP BY area`, nil, func(r *sql.Rows) error {
+	err := eachRow(ctx, tx, nextIDs+`SELECT area, COUNT(*) FROM nxt WHERE area != '' GROUP BY area`, nextArgs(), func(r *sql.Rows) error {
 		var a string
 		var n int
 		if err := r.Scan(&a, &n); err != nil {
@@ -322,8 +371,9 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 	if err != nil {
 		return task.Counters{}, err
 	}
-	err = eachRow(ctx, tx, nextIDs+`SELECT x.context, COUNT(*) FROM nxt JOIN task_contexts x ON x.task_id = nxt.id
-		WHERE `+inArea+` GROUP BY x.context`, []any{area, area}, func(r *sql.Rows) error {
+	err = eachRow(ctx, tx, nextIDs+`SELECT j.value, COUNT(*) FROM nxt
+		JOIN task_props x ON x.task_id = nxt.id AND x.name = ?, json_each(x.value, '$.list') j
+		WHERE (? = '' OR nxt.area = ?) GROUP BY j.value`, append(nextArgs(), task.PropContexts, area, area), func(r *sql.Rows) error {
 		var cx string
 		var n int
 		if err := r.Scan(&cx, &n); err != nil {
@@ -422,16 +472,16 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 		}
 		waiting = string(b)
 	}
-	for _, table := range []string{"task_items", "task_units", "task_contexts"} {
+	for _, table := range []string{"task_items", "task_units", "task_props"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE task_id = ?`, string(e.ID)); err != nil {
 			return err
 		}
 	}
 	if _, err := tx.ExecContext(ctx, upsertTaskSQL,
-		string(e.ID), string(e.Kind), string(e.State), e.Title, e.Notes, e.Focus.On, e.Focus.Auto, eventTime(e.Focus.At),
-		e.Area, string(e.Project), e.Position, e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity,
-		string(e.Snooze.Return), e.Snooze.Mute, waiting, eventTime(e.Deadline), e.Changed, eventTime(e.SeenAt), e.Origin,
-		eventTime(e.Created), eventTime(e.Updated), rev); err != nil {
+		string(e.ID), string(e.Kind), string(e.State), string(e.Category), e.Title, e.Notes, string(e.Parent), e.Position,
+		e.Sequential, eventTime(e.Snooze.Until), e.Snooze.OnActivity, string(e.Snooze.Return), e.Snooze.Mute, waiting,
+		e.Changed, eventTime(e.SeenAt), e.Origin, eventTime(e.Created), eventTime(e.Updated),
+		int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt), rev); err != nil {
 		return err
 	}
 	for _, r := range e.Items {
@@ -446,11 +496,91 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 			return err
 		}
 	}
-	for i, c := range e.Contexts {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_contexts (task_id, context, ord) VALUES (?, ?, ?)`,
-			string(e.ID), c, i); err != nil {
+	for _, name := range slices.Sorted(maps.Keys(e.Props)) {
+		v := e.Props[name]
+		if v.IsZero() {
+			continue
+		}
+		body, err := json.Marshal(v)
+		if err != nil {
 			return err
+		}
+		w := e.Written[name]
+		if _, err := tx.ExecContext(ctx, upsertPropSQL, string(e.ID), name, string(body), string(cmp.Or(w.By, task.WriterPerson)),
+			eventTime(cmp.Or(w.At, e.Updated))); err != nil {
+			return fmt.Errorf("property %s of %s: %w", name, e.ID, err)
 		}
 	}
 	return writeProject(ctx, tx, e)
+}
+
+var _ coretasks.Recategorizer = taskStore{}
+
+const (
+	heldStatesSQL    = `SELECT state, category FROM tasks GROUP BY state, category ORDER BY state, category`
+	recategorizeSQL  = `UPDATE tasks SET category = ?, rev = ? WHERE state = ? AND category != ?`
+	recategorizedSQL = `SELECT id FROM tasks WHERE state = ? AND rev = ?`
+)
+
+// Recategorize gives every stored task the category of its state as of reads it, moving the tasks it changes to
+// a new rev and noting them; a state of says nothing of is unknown, and its tasks keep their category.
+func (s taskStore) Recategorize(ctx context.Context, of func(state string) (task.Category, bool)) ([]string, error) {
+	var unknown []string
+	_, err := s.db.Write(ctx, func(tx *Tx) error {
+		unknown = nil
+		type pair struct{ state, category string }
+		var held []pair
+		if err := eachRow(ctx, tx, heldStatesSQL, nil, func(r *sql.Rows) error {
+			var p pair
+			if err := r.Scan(&p.state, &p.category); err != nil {
+				return err
+			}
+			held = append(held, p)
+			return nil
+		}); err != nil {
+			return err
+		}
+		var rev uint64
+		for _, p := range held {
+			c, ok := of(p.state)
+			if !ok {
+				if !slices.Contains(unknown, p.state) {
+					unknown = append(unknown, p.state)
+				}
+				continue
+			}
+			if string(c) == p.category {
+				continue
+			}
+			if rev == 0 {
+				epoch, at, err := readPosition(ctx, tx)
+				if err != nil {
+					return err
+				}
+				if epoch == "" {
+					epoch = newEpoch()
+				}
+				rev = at + 1
+				if _, err := tx.ExecContext(ctx, `INSERT INTO task_position (only, epoch, rev) VALUES (1, ?, ?)
+					ON CONFLICT (only) DO UPDATE SET epoch = excluded.epoch, rev = excluded.rev`, epoch, rev); err != nil {
+					return err
+				}
+			}
+			if _, err := tx.ExecContext(ctx, recategorizeSQL, string(c), rev, p.state, string(c)); err != nil {
+				return fmt.Errorf("recategorizing %s: %w", p.state, err)
+			}
+			if err := eachRow(ctx, tx, recategorizedSQL, []any{p.state, rev}, func(r *sql.Rows) error {
+				var id string
+				if err := r.Scan(&id); err != nil {
+					return err
+				}
+				tx.Touch(port.TopicTasks, task.UnitOf(task.ID(id)))
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return unknown, err
 }

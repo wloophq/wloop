@@ -152,7 +152,7 @@ func withoutTable(t *testing.T, src, header string) string {
 
 func TestRemovingAStateABundledVerbNeedsIsAProblem(t *testing.T) {
 	t.Parallel()
-	bundled := strings.Replace(defaultTasks(t), "[verbs.dismiss]\n", "[verbs.dismiss]\nto = \"trash\"\nfrom = [\"inbox\", \"next\"]\n", 1)
+	bundled := defaultTasks(t)
 	if _, problems := loadTasksWith(t, bundled, ""); problems != "" {
 		t.Fatalf("with every state: %s", problems)
 	}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +17,8 @@ var prUnit = unit.Unit{Provider: "github", Key: "acme/api#8"}
 
 func questionTask() api.TaskView {
 	return task("e-1", "inbox", func(e *api.TaskView) {
-		e.Title, e.Contexts, e.Changed, e.Category = "Pick a fix", []string{"@decide"}, true, "inbox"
+		e.Title, e.Changed, e.Category = "Pick a fix", true, "inbox"
+		e.Props = map[string]json.RawMessage{"contexts": json.RawMessage(`["@decide"]`)}
 		e.Units = []unit.Unit{prUnit}
 		e.Items = []api.ItemView{{Unit: prUnit, ID: "gh:review", Summary: "Review the retry change", State: "open", Kind: "action"}}
 		e.Message = &api.Message{ID: 3, TaskID: "e-1", Unit: prUnit, Kind: "question", Text: "Retry or revert?", State: "open", Recommend: "b",

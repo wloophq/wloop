@@ -33,8 +33,8 @@ func TestProjectRowsFollowTheirTasks(t *testing.T) {
 	ctx := context.Background()
 	db, _ := openTemp(t)
 	at := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	p := task.Task{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p", ReviewEvery: 36 * time.Hour, Origin: task.OriginUser, Created: at, Updated: at}
-	a := task.Task{ID: "e-a", Kind: task.KindCapture, State: task.Next, Title: "A", Slug: "ignored", Project: "e-p", Position: 1, Origin: task.OriginUser, Created: at, Updated: at}
+	p := task.Task{ID: "e-p", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "P", Slug: "p", ReviewEvery: 36 * time.Hour, Origin: task.OriginUser, Created: at, Updated: at}
+	a := task.Task{ID: "e-a", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "A", Slug: "ignored", Parent: "e-p", Position: 1, Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: p}, {Op: task.OpCreate, Task: a}}); err != nil {
 		t.Fatal(err)
 	}
@@ -55,11 +55,11 @@ func TestProjectRowsFollowTheirTasks(t *testing.T) {
 	if err != nil || got.Slug != "p" || got.ReviewEvery != 36*time.Hour {
 		t.Errorf("after rewrites %+v, %v", got, err)
 	}
-	q := task.Task{ID: "e-q", Kind: task.KindProject, State: task.Next, Title: "Q", Slug: "p", Origin: task.OriginUser, Created: at, Updated: at}
+	q := task.Task{ID: "e-q", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Q", Slug: "p", Origin: task.OriginUser, Created: at, Updated: at}
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: q}}); err == nil {
 		t.Error("two projects share a slug")
 	}
-	r := task.Task{ID: "e-r", Kind: task.KindProject, State: task.Next, Title: "R", Origin: task.OriginUser, Created: at, Updated: at}
+	r := task.Task{ID: "e-r", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "R", Origin: task.OriginUser, Created: at, Updated: at}
 	s := r
 	s.ID = "e-s"
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpCreate, Task: r}, {Op: task.OpCreate, Task: s}}); err != nil {

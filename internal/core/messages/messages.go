@@ -45,7 +45,7 @@ type Ledger interface {
 // Tasks opens and closes the Inbox entry of each message, as task.Service does.
 type Tasks interface {
 	Open(ctx context.Context, r coretasks.OpenRequest) (task.Task, error)
-	Close(ctx context.Context, id task.ID, to task.State) error
+	Close(ctx context.Context, id task.ID, to task.Category) error
 	Task(ctx context.Context, id task.ID) (task.Task, error)
 	Retitle(ctx context.Context, id task.ID, title string) error
 }
@@ -307,13 +307,13 @@ func (s *Service) ensureTask(ctx context.Context, m message.Message) (message.Me
 	return s.Store.Upsert(ctx, m)
 }
 
-// close closes m and the entry it opened: Done when answered, Trash otherwise. An entry that refuses to move
+// close closes m and the entry it opened: done when answered, dropped otherwise. An entry that refuses to move
 // keeps the message open, so the next reconcile tries again.
 func (s *Service) close(ctx context.Context, m message.Message, st message.State, answer string) error {
 	if m.TaskID != "" {
-		to := task.Trash
+		to := task.CategoryDropped
 		if st == message.Answered {
-			to = task.Done
+			to = task.CategoryDone
 		}
 		e, err := s.Tasks.Task(ctx, task.ID(m.TaskID))
 		switch {

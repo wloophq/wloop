@@ -109,13 +109,6 @@ type TaskView struct {
 	Category         string       `json:"category,omitempty"`
 	Title            string       `json:"title"`
 	Notes            string       `json:"notes,omitempty"`
-	Focus            bool         `json:"focus"`
-	FocusAuto        string       `json:"focus_auto,omitempty"`
-	Contexts         []string     `json:"contexts"`
-	Area             string       `json:"area,omitempty"`
-	Project          string       `json:"project,omitempty"`
-	ProjectTitle     string       `json:"project_title,omitempty"`
-	Deadline         time.Time    `json:"deadline,omitzero"`
 	SnoozeUntil      time.Time    `json:"snooze_until,omitzero"`
 	SnoozeOnActivity bool         `json:"snooze_on_activity,omitempty"`
 	Muted            bool         `json:"muted,omitempty"`
@@ -343,4 +336,25 @@ func (e TaskView) UnitLabel(i int) string {
 		return e.UnitLabels[i]
 	}
 	return e.Units[i].Label()
+}
+
+// PropText is the property name's text: a string, an enum or a duration; "" when unset or of another type.
+func (e TaskView) PropText(name string) string {
+	var s string
+	_ = json.Unmarshal(e.Props[name], &s)
+	return s
+}
+
+// PropList is the property name's list of strings; nil when unset or of another type.
+func (e TaskView) PropList(name string) []string {
+	var l []string
+	_ = json.Unmarshal(e.Props[name], &l)
+	return l
+}
+
+// PropTime is the property name's time; zero when unset or of another type.
+func (e TaskView) PropTime(name string) time.Time {
+	var t time.Time
+	_ = json.Unmarshal(e.Props[name], &t)
+	return t
 }

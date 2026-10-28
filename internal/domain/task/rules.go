@@ -17,25 +17,26 @@ type want struct {
 	kind    Kind
 	title   string
 	items   []items.Item
-	initial State
+	initial Category
 	person  *items.Person
 }
 
 // Reconcile is what the items of one unit call for, given the entries that point at them.
 // Rules (spec 5.2): an open item with Me in WaitingOn -> KindAction, created in the state the item proposes
-// (items.Item.Initial: "inbox" or "next"; "" is inbox) with its Contexts; an existing entry keeps the user's state;
+// (items.Item.Initial: "inbox" or "next", the inbox or the ready category; "" is inbox) with its contexts; an
+// existing entry keeps the user's state;
 // open items owed by others with Me as requester or Cares -> one KindWaiting per (unit, waiting person);
 // StartedByMe && all items resolved && !ClosurePosted -> KindClose action; a resolved item drops from its entry,
-// an entry with all items resolved -> Done. Only items create entries. Never changes State, Area, Contexts,
-// Project or Focus set by the user except to Done (resolution), Inbox (activity) and Scheduled (mute).
-// An entry the user dismissed (Trash) or finished is not recreated for the same items until one of them
-// reopens: an open item the entry does not hold returns it to Inbox.
-// Mute: with f.Mute set, every open entry of the unit (new or existing, not Done or Trash) is Scheduled with
+// an entry with all items resolved -> done. Only items create entries. Never changes the state, the parent or
+// a property set by the user except to done (resolution), inbox (activity) and deferred (mute).
+// An entry the user dismissed or finished is not recreated for the same items until one of them
+// reopens: an open item the entry does not hold returns it to the inbox.
+// Mute: with f.Mute set, every open entry of the unit (new or existing) is deferred with
 // Snooze{Until: Mute.Until, OnActivity: Mute.UntilStateChange, Return: its state, Mute: true}; when the mute ends
 // (f.Mute nil) an entry with Snooze.Mute returns to Snooze.Return. A muted entry never enters Inbox on its own.
-// Deadline: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
+// Due: items.Item.Deadline in RFC 3339 is taken as is; "YYYY-MM-DD" is 18:00 in now's location that day;
 // anything else is none.
-func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, now time.Time) []Change {
+func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, st States, now time.Time) []Change {
 	mute := activeMute(f, now)
 	wants := wanted(f, its, me)
 	byID := map[ID]Task{}
@@ -50,13 +51,13 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, now time.Time)
 		seen[w.id] = true
 		old, ok := byID[w.id]
 		if !ok {
-			e := w.task(f, now)
-			e = applyMute(e, mute)
+			e := w.task(f, st, now)
+			e = applyMute(e, mute, st)
 			out = append(out, Change{Op: OpCreate, Task: e, Why: "derived from " + f.Unit.String()})
 			continue
 		}
-		e, op, why := w.update(old, f, now)
-		e = applyMute(e, mute)
+		e, op, why := w.update(old, f, st, now)
+		e = applyMute(e, mute, st)
 		if !e.Same(old) {
 			e.Updated = now
 			out = append(out, Change{Op: op, Task: e, Why: why})
@@ -72,8 +73,9 @@ func Reconcile(f UnitFacts, its []items.Item, me Me, have []Task, now time.Time)
 		e := old
 		e.Items = nil
 		op, why := OpUpdate, "no item calls for it"
-		if e.Live() {
-			e.State, op, why = Done, OpResolve, "its items resolved"
+		if e.Open() {
+			e.MoveTo(CategoryDone, st)
+			op, why = OpResolve, "its items resolved"
 			e.Snooze = Snooze{}
 		}
 		if !e.Same(old) {
@@ -110,7 +112,7 @@ func wanted(f UnitFacts, its []items.Item, me Me) []want {
 			w, ok := waiting[p.Key]
 			if !ok {
 				p := p
-				w = &want{id: DerivedID(KindWaiting, f.Unit, p.Key), kind: KindWaiting, initial: Waiting, person: &p}
+				w = &want{id: DerivedID(KindWaiting, f.Unit, p.Key), kind: KindWaiting, initial: CategoryWaiting, person: &p}
 				waiting[p.Key] = w
 				order = append(order, p.Key)
 			}
@@ -123,17 +125,17 @@ func wanted(f UnitFacts, its []items.Item, me Me) []want {
 		out = append(out, *w)
 	}
 	if f.StartedByMe && allResolved && !f.ClosurePosted {
-		out = append(out, want{id: DerivedID(KindClose, f.Unit, ""), kind: KindClose, initial: Inbox,
+		out = append(out, want{id: DerivedID(KindClose, f.Unit, ""), kind: KindClose, initial: CategoryInbox,
 			title: "Close " + f.Unit.Label()})
 	}
 	return out
 }
 
-func initialState(i items.Initial) State {
-	if i == "next" {
-		return Next
+func initialState(i items.Initial) Category {
+	if i == items.InitialNext {
+		return CategoryReady
 	}
-	return Inbox
+	return CategoryInbox
 }
 
 func waitingTitle(p items.Person, its []items.Item) string {
@@ -179,15 +181,17 @@ func (w want) since(now time.Time) time.Time {
 	return s
 }
 
-func (w want) task(f UnitFacts, now time.Time) Task {
-	e := Task{ID: w.id, Kind: w.kind, State: w.initial, Title: w.title, Items: w.refs(), Units: units(f, w),
-		Deadline: w.deadline(now.Location()), Origin: OriginDerived, Created: now, Updated: now}
+func (w want) task(f UnitFacts, st States, now time.Time) Task {
+	e := Task{ID: w.id, Kind: w.kind, Title: w.title, Items: w.refs(), Units: units(f, w),
+		Origin: OriginDerived, Created: now, Updated: now}
+	e.MoveTo(w.initial, st)
+	e.SetProp(PropDue, Value{Time: w.deadline(now.Location())}, WriterPlugin, now)
 	if w.kind == KindAction {
-		e.Contexts = slices.Clone(w.items[0].Contexts)
+		e.SetProp(PropContexts, Value{List: slices.Clone(w.items[0].Contexts)}, WriterPlugin, now)
 	}
 	if w.person != nil {
 		e.Waiting = &WaitingOn{On: []items.Person{*w.person}, Since: w.since(now)}
-		e.Contexts = contextsOf(w.items)
+		e.SetProp(PropContexts, Value{List: contextsOf(w.items)}, WriterPlugin, now)
 	}
 	return e
 }
@@ -216,10 +220,13 @@ func units(f UnitFacts, w want) []unit.Unit {
 
 // update refreshes what the items own of old and keeps what the user set; a held entry that gains an
 // open item it did not hold returns to Inbox.
-func (w want) update(old Task, f UnitFacts, now time.Time) (Task, ChangeOp, string) {
+func (w want) update(old Task, f UnitFacts, st States, now time.Time) (Task, ChangeOp, string) {
 	e := old
 	refs := w.refs()
-	e.Title, e.Items, e.Deadline = w.title, refs, w.deadline(now.Location())
+	e.Title, e.Items = w.title, refs
+	if e.Written[PropDue].By != WriterPerson {
+		e.SetProp(PropDue, Value{Time: w.deadline(now.Location())}, WriterPlugin, now)
+	}
 	e.Units = mergeUnits(old.Units, units(f, w))
 	if w.person != nil {
 		on := []items.Person{*w.person}
@@ -231,8 +238,9 @@ func (w want) update(old Task, f UnitFacts, now time.Time) (Task, ChangeOp, stri
 			e.Waiting = &wo
 		}
 	}
-	if !old.Live() && reopened(old.Items, refs) {
-		e.State, e.Changed, e.Snooze = Inbox, true, Snooze{}
+	if !old.Open() && reopened(old.Items, refs) {
+		e.MoveTo(CategoryInbox, st)
+		e.Changed, e.Snooze = true, Snooze{}
 		return e, OpReinbox, "an item reopened"
 	}
 	return e, OpUpdate, "items changed"

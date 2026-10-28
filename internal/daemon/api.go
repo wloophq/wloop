@@ -250,7 +250,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Warnings = append(h.Warnings, s.reconcileWarnings()...)
 	h.Warnings = append(h.Warnings, s.homeWarnings()...)
-	if w := profileWarning(s.loaded()); w != "" {
+	l := s.loaded()
+	if w := profileWarning(l, s.heldProblems(l)); w != "" {
 		h.Warnings = append(h.Warnings, w)
 	}
 	for _, src := range s.sourceHealth(r.Context()) {

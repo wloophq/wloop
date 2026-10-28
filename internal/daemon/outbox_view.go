@@ -33,7 +33,7 @@ func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error
 	}
 	out := make([]task.Task, 0, len(ds))
 	for _, d := range ds {
-		out = append(out, draftTask(d, v.s.unitLabel(d.Unit)))
+		out = append(out, draftTask(d, v.s.unitLabel(d.Unit), v.s.loaded().Tasks))
 	}
 	return out, nil
 }
@@ -55,7 +55,7 @@ func (v outboxView) Task(ctx context.Context, id task.ID) (task.Task, bool, erro
 	if err != nil {
 		return task.Task{}, false, err
 	}
-	return draftTask(d, v.s.unitLabel(d.Unit)), true, nil
+	return draftTask(d, v.s.unitLabel(d.Unit), v.s.loaded().Tasks), true, nil
 }
 
 func (v outboxView) Count(ctx context.Context, _ string) (int, error) {
@@ -72,17 +72,19 @@ func draftIDOf(id task.ID) (draft.ID, bool) {
 	return draft.ID(n), err == nil && n > 0
 }
 
-// draftTaskStates are the task states that tell where a draft stands.
-var draftTaskStates = map[draft.State]task.State{
-	draft.Proposed: task.Inbox, draft.Failed: task.Inbox,
-	draft.Approved: task.Next, draft.Sending: task.Next,
-	draft.Sent: task.Done, draft.Discarded: task.Trash,
+// draftCategories are the task categories that tell where a draft stands.
+var draftCategories = map[draft.State]task.Category{
+	draft.Proposed: task.CategoryInbox, draft.Failed: task.CategoryInbox,
+	draft.Approved: task.CategoryReady, draft.Sending: task.CategoryReady,
+	draft.Sent: task.CategoryDone, draft.Discarded: task.CategoryDropped,
 }
 
-func draftTask(d draft.Draft, where string) task.Task {
-	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft, State: draftTaskStates[d.State],
-		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Deadline: d.Deadline, Origin: task.OriginDraft,
+func draftTask(d draft.Draft, where string, st task.States) task.Task {
+	e := task.Task{ID: task.ID(draftPrefix + strconv.FormatInt(int64(d.ID), 10)), Kind: task.KindDraft,
+		Title: draftTitle(d, where), Units: []unit.Unit{d.Unit}, Origin: task.OriginDraft,
 		Created: d.CreatedAt, Updated: d.UpdatedAt}
+	e.MoveTo(draftCategories[d.State], st)
+	e.SetProp(task.PropDue, task.Value{Time: d.Deadline}, task.WriterPlugin, d.UpdatedAt)
 	for _, it := range d.Items {
 		e.Items = append(e.Items, task.ItemRef{Unit: d.Unit, Item: it})
 	}

@@ -234,6 +234,7 @@ function shortDate(t) {
 function taskItem(e, open) {
   const go = () => writeHash({ task: e.id, pr: "" });
   const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
+  const props = e.props || {};
   return h("li", {
     class: "task-row" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
     tabindex: 0,
@@ -248,14 +249,13 @@ function taskItem(e, open) {
     },
   },
     h("div", { class: "task-line" },
-      e.focus ? h("span", { class: "star", title: e.focus_auto ? `Starred: ${e.focus_auto}` : "Starred" }, "★") : null,
+      props.focus === "on" ? h("span", { class: "star", title: "Starred" }, "★") : null,
       h("span", { class: "title" }, e.title || e.id),
       e.changed ? h("span", { class: "flag" }, "changed") : null),
     h("div", { class: "meta" },
-      ...(e.contexts || []).map((c) => h("span", { class: "pill" }, c)),
-      e.area ? h("span", { class: "pill area" }, e.area) : null,
-      e.project_title ? h("span", { class: "proj" }, e.project_title) : null,
-      e.deadline ? h("span", { class: "due" }, "due " + shortDate(e.deadline)) : null,
+      ...(props.contexts || []).map((c) => h("span", { class: "pill" }, c)),
+      props.area ? h("span", { class: "pill area" }, props.area) : null,
+      props.due ? h("span", { class: "due" }, "due " + shortDate(props.due)) : null,
       e.snooze_until ? h("span", { class: "due" }, "until " + shortDate(e.snooze_until)) : null,
       waiting.length ? h("span", { class: "who" }, "on " + waiting.join(", ")) : null,
       ...(e.units || []).map((u, i) => h("span", { class: "ref" }, (e.unit_labels || [])[i] || unitLabel(u)))),
@@ -333,12 +333,13 @@ function contextChips(route) {
 
 
 // taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
-// (api.TaskView.Texts): its title, notes, state, kind, area, project and contexts, its units, the people
-// it waits on, its items, its cards' people, its draft and its message.
+// (api.TaskView.Texts): its title, notes, state, kind, the text and the lists of text of its properties, its
+// units, the people it waits on, its items, its cards' people, its draft and its message.
 function taskHaystack(e) {
   const d = e.draft || {};
   const m = e.message || {};
-  return [e.title, e.notes, e.state, e.kind, e.area, e.project_title, ...(e.contexts || []),
+  const props = Object.values(e.props || {}).flatMap((v) => typeof v === "string" ? [v] : Array.isArray(v) && v.every((x) => typeof x === "string") ? v : []);
+  return [e.title, e.notes, e.state, e.kind, ...props,
     ...(e.units || []).flatMap((u, i) => [(e.unit_labels || [])[i] || unitLabel(u), `${u.provider}:${u.key}`]),
     ...((e.waiting || {}).on || []).map((p) => p.name),
     ...(e.items || []).map((it) => it.summary),

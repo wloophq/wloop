@@ -28,9 +28,22 @@ func (e *Env) newTasks(db *sqlite.DB, cfg config.Config, its coretasks.Items) *c
 		enabled := func(p unit.ProviderID) bool { return !slices.Contains(off(), p) }
 		facts := coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: e.tasksMe.get}
 		e.tasks = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: its, Facts: facts, Clock: clockFunc(e.Now),
-			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off})
+			StaleWaitingDays: cfg.Tasks.StaleWaitingDays, Disabled: off, States: profileStates{e}})
 	}
 	return e.tasks
+}
+
+// profileStates are the states and verbs of the profile as it loads now.
+type profileStates struct{ e *Env }
+
+func (p profileStates) CategoryOf(state string) (task.Category, bool) {
+	return p.e.loadedIntents().Tasks.CategoryOf(state)
+}
+
+func (p profileStates) FirstOf(c task.Category) string { return p.e.loadedIntents().Tasks.FirstOf(c) }
+
+func (p profileStates) Move(verb string) ([]string, string, bool) {
+	return p.e.loadedIntents().Tasks.Move(verb)
 }
 
 // offProviders are the plugins cfg disables and those the daemon serves disabled (built), once serveTasks

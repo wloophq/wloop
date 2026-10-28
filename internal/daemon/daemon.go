@@ -340,19 +340,22 @@ func background(run runFunc) runFunc {
 }
 
 type Server struct {
-	deps      Deps
-	jobs      map[string]*job
-	token     string
-	warnings  *warnings
-	grace     time.Duration
-	hub       *hub
-	model     *readmodel.Model
-	modelOnce sync.Once
-	viewer    viewerCache
-	app       *AppState
-	steps     stepCache
-	exploring sync.Mutex
-	users     sync.Map // lowercase login -> whether GitHub knows it as a user
+	deps Deps
+	// heldStates are the states stored tasks hold that the profile does not declare, as of the last
+	// recategorize pass.
+	heldStates atomic.Pointer[[]string]
+	jobs       map[string]*job
+	token      string
+	warnings   *warnings
+	grace      time.Duration
+	hub        *hub
+	model      *readmodel.Model
+	modelOnce  sync.Once
+	viewer     viewerCache
+	app        *AppState
+	steps      stepCache
+	exploring  sync.Mutex
+	users      sync.Map // lowercase login -> whether GitHub knows it as a user
 	// draftWheres keeps, by draft id, the destination its publisher resolved or when it last failed to.
 	draftWheres sync.Map
 	// whereLookup and wherePage override draftWhereTimeout and draftWhereBudget; zero keeps them.

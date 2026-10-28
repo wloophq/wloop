@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/api"
+	dtask "github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -156,10 +157,10 @@ func (m *Model) grouping(view string) func(api.TaskView) string {
 	switch view {
 	case viewNext:
 		return func(e api.TaskView) string {
-			if len(e.Contexts) == 0 {
-				return ""
+			if cs := e.PropList(dtask.PropContexts); len(cs) > 0 {
+				return cs[0]
 			}
-			return e.Contexts[0]
+			return ""
 		}
 	case viewWaiting:
 		return func(e api.TaskView) string {
@@ -353,7 +354,7 @@ func (m *Model) taskList(view string, tasks []api.TaskView, cur, width, height i
 	for i, e := range tasks {
 		age, style := m.taskAge(e, now)
 		title := oneLine(e.Title)
-		if e.Focus {
+		if e.PropText(dtask.PropFocus) == dtask.FocusOn {
 			title = "★ " + title
 		}
 		c := []termfmt.Cell{{Text: age, Style: style}, {Text: title}}
@@ -419,18 +420,15 @@ func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) str
 	return span(now.Sub(since)), m.t.Dim
 }
 
-// taskWhere is the task's contexts and its first unit, or its project.
+// taskWhere is the task's contexts and its first unit.
 func (m *Model) taskWhere(e api.TaskView) string {
 	var parts []string
-	for _, c := range e.Contexts {
+	for _, c := range e.PropList(dtask.PropContexts) {
 		parts = append(parts, "@"+c)
 	}
 	parts = append(parts, projectFacts(e)...)
-	switch {
-	case len(e.Units) > 0:
+	if len(e.Units) > 0 {
 		parts = append(parts, e.UnitLabel(0))
-	case e.ProjectTitle != "":
-		parts = append(parts, e.ProjectTitle)
 	}
 	return termfmt.Clean(strings.Join(parts, " "))
 }

@@ -143,7 +143,7 @@ const (
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSubjectMarksSQL = `DELETE FROM unit_marks WHERE
-		(provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE state NOT IN ('done', 'trash')))
+		(provider = 'task' AND unit_key NOT IN (SELECT id FROM tasks WHERE category NOT IN (?, ?)))
 		OR (provider = 'slack'
 			AND NOT EXISTS (SELECT 1 FROM extraction_cursors c WHERE c.provider = 'slack' AND c.unit_key = unit_marks.unit_key)
 			AND NOT EXISTS (SELECT 1 FROM items i WHERE i.provider = 'slack' AND i.unit_key = unit_marks.unit_key)
@@ -288,7 +288,7 @@ func (db *DB) Retain(ctx context.Context, now time.Time, p Retention) (Retained,
 			r.exec("fetches", 0, retainFetchesSQL, cutoff(now, p.Fetches))
 		}
 		if p.SubjectMarks {
-			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL)
+			r.exec("unit_marks", port.TopicMarks, retainSubjectMarksSQL, openArgs()...)
 		}
 		return r.err
 	})

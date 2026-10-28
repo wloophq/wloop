@@ -111,7 +111,7 @@ func (e *env) facts(id task.ID) workflow.Facts {
 }
 
 func waiting(id task.ID, u unit.Unit, since time.Time, its ...items.Item) task.Task {
-	en := task.Task{ID: id, Kind: task.KindWaiting, State: task.Waiting, Title: "w", Units: []unit.Unit{u},
+	en := task.Task{ID: id, Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Title: "w", Units: []unit.Unit{u},
 		Waiting: &task.WaitingOn{On: []items.Person{{Key: "chat:U1"}}, Since: since}}
 	for _, it := range its {
 		en.Items = append(en.Items, task.ItemRef{Unit: it.Unit, Item: it.ID})
@@ -123,21 +123,21 @@ func TestTaskListsTheOpenTasksOfEnabledPlugins(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	e.task(waiting("e-01", chatA, monday))
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Units: []unit.Unit{chatB}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
-	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
-	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-06", Kind: task.KindAction, State: task.Trash, Title: "t", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-07", Kind: task.KindReference, State: task.Reference, Title: "r", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a", Units: []unit.Unit{chatB}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-06", Kind: task.KindAction, State: "trash", Category: task.CategoryDropped, Title: "t", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-07", Kind: task.KindReference, State: "reference", Category: task.CategoryDone, Title: "r", Units: []unit.Unit{chatA}})
 	got, err := e.p.List(context.Background(), unit.Task)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []unit.Unit{task.UnitOf("e-01"), task.UnitOf("e-02"), task.UnitOf("e-03"), task.UnitOf("e-07")}
+	want := []unit.Unit{task.UnitOf("e-01"), task.UnitOf("e-02"), task.UnitOf("e-03")}
 	if !slices.Equal(got, want) {
 		t.Fatalf("listed %v, want %v", got, want)
 	}
-	for _, id := range []task.ID{"e-04", "e-05", "e-06", "e-99"} {
+	for _, id := range []task.ID{"e-04", "e-05", "e-06", "e-07", "e-99"} {
 		if _, err := e.p.Facts(context.Background(), task.UnitOf(id)); err != automation.ErrUnitGone {
 			t.Errorf("facts of %s: %v, want ErrUnitGone", id, err)
 		}
@@ -273,9 +273,9 @@ func TestATasksOwnerIsItsUnit(t *testing.T) {
 	e := newEnv(t)
 	i1 := e.item(chatB, "i1", items.Open, monday)
 	e.task(waiting("e-01", chatA, monday))
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Next, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: task.Inbox, Title: "c"})
-	e.task(task.Task{ID: "e-04", Kind: task.KindCapture, State: task.Next, Title: "c", Units: []unit.Unit{chatB, chatA}})
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "a", Items: []task.ItemRef{{Unit: i1.Unit, Item: i1.ID}}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c"})
+	e.task(task.Task{ID: "e-04", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "c", Units: []unit.Unit{chatB, chatA}})
 	for id, want := range map[task.ID][]unit.Unit{"e-01": {chatA}, "e-02": {chatB}, "e-03": nil, "e-04": {chatB, chatA}, "e-99": nil} {
 		got, err := e.p.Owners(context.Background(), task.UnitOf(id))
 		if err != nil || !slices.Equal(got, want) {
@@ -324,8 +324,8 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 func TestATaskThatLeftItsListStillHasEventFacts(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: task.Done, Title: "d", Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: task.Someday, Title: "m", Units: []unit.Unit{mailX}})
+	e.task(task.Task{ID: "e-05", Kind: task.KindAction, State: "done", Category: task.CategoryDone, Title: "d", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-04", Kind: task.KindAction, State: "someday", Category: task.CategoryDeferred, Title: "m", Units: []unit.Unit{mailX}})
 	f, err := e.p.EventFacts(context.Background(), task.UnitOf("e-05"))
 	if err != nil || f["task.state"] != "done" || f["task.unit"] != chatA.String() {
 		t.Fatalf("event facts of a done entry: %v %v", f, err)
@@ -346,7 +346,7 @@ func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 	owed := e.item(chatB, "i2", items.Open, monday, items.Person{Key: "chat:U1"})
 	e.item(chatB, "i3", items.Resolved, monday)
 	onDoc := e.item(docY, "i4", items.Open, monday)
-	en := task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "ship it", Units: []unit.Unit{chatA, chatB},
+	en := task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "ship it", Units: []unit.Unit{chatA, chatB},
 		Items: []task.ItemRef{{Unit: owed.Unit, Item: owed.ID}, {Unit: onDoc.Unit, Item: onDoc.ID}}}
 	e.task(en)
 	f := e.facts("e-01")
@@ -367,8 +367,8 @@ func TestTaskFactsSpanEveryUnitInOrder(t *testing.T) {
 func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "none"})
-	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: task.Next, Title: "two", Units: []unit.Unit{chatA, chatB}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "none"})
+	e.task(task.Task{ID: "e-02", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "two", Units: []unit.Unit{chatA, chatB}})
 	if f := e.facts("e-01"); f["task.link_ended"] != false {
 		t.Error("an entry with no unit has its units ended")
 	}
@@ -385,7 +385,7 @@ func TestTaskUnitsEndedWhenEveryUnitEnded(t *testing.T) {
 func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Next, Title: "tracked", Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "tracked", Units: []unit.Unit{chatA}})
 	e.turns[chatA] = 3
 	if f := e.facts("e-01"); f["task.turns"] != 0 {
 		t.Errorf("task.turns %v, want the turns on its unit left out", f["task.turns"])
@@ -399,9 +399,9 @@ func TestTaskTurnsCountsTheTurnsOnTheTaskItself(t *testing.T) {
 func TestTaskCapturedByUser(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
-	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: task.Inbox, Title: "mine"})
-	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: task.Inbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
-	e.task(task.Task{ID: "e-03", Kind: task.KindMessage, State: task.Inbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-01", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "mine"})
+	e.task(task.Task{ID: "e-02", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Title: "derived", Origin: task.OriginDerived, Units: []unit.Unit{chatA}})
+	e.task(task.Task{ID: "e-03", Kind: task.KindMessage, State: "inbox", Category: task.CategoryInbox, Title: "a message", Origin: task.OriginMessage, Units: []unit.Unit{chatA}})
 	for id, want := range map[task.ID]bool{"e-01": true, "e-02": false, "e-03": false} {
 		if got := e.facts(id)["task.captured_by_user"]; got != want {
 			t.Errorf("%s: captured_by_user %v, want %v", id, got, want)

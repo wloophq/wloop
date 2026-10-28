@@ -68,7 +68,7 @@ func newTasksRig(t *testing.T, edit func(*Deps)) *tasksRig {
 		}
 		enabled := d.PluginEnabled
 		r.ledger.Enabled = enabled
-		r.g = coretasks.New(coretasks.Deps{Store: db.Tasks(), Items: r.ledger,
+		r.g = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: db.Tasks(), Items: r.ledger,
 			Facts: coretasks.CardFacts{Cards: db.Cards(), Enabled: enabled, Me: func() task.Me { return meID }},
 			Me:    meID, Clock: fixedClock(tasksNow), StaleWaitingDays: 2, Disabled: disabledOf(enabled)})
 		d.Tasks = r.g
@@ -139,14 +139,14 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 
 func mixedTasks() []task.Task {
 	return []task.Task{
-		{ID: "e-1", State: task.Next, Area: "OSS", Contexts: []string{"@decide"}},
-		{ID: "e-2", State: task.Next, Area: "Hiring"},
-		{ID: "e-3", State: task.Next, Area: "OSS", Contexts: []string{"@reply"}, Created: tasksNow.Add(-time.Hour)},
-		{ID: "e-4", State: task.Inbox, Area: "Hiring"},
-		{ID: "e-p", Kind: task.KindProject, State: task.Next, Area: "OSS", Sequential: true, Title: "Launch"},
-		{ID: "e-5", State: task.Next, Area: "OSS", Project: "e-p", Position: 1},
-		{ID: "e-6", State: task.Next, Area: "OSS", Project: "e-p", Position: 2},
-		{ID: "e-7", State: task.Someday, Area: "OSS"},
+		{ID: "e-1", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@decide"}}}},
+		{ID: "e-2", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "Hiring"}}},
+		{ID: "e-3", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}, "contexts": {List: []string{"@reply"}}}, Created: tasksNow.Add(-time.Hour)},
+		{ID: "e-4", State: "inbox", Category: task.CategoryInbox, Props: task.Props{"area": {Text: "Hiring"}}},
+		{ID: "e-p", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Sequential: true, Title: "Launch"},
+		{ID: "e-5", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "e-p", Position: 1},
+		{ID: "e-6", State: "next", Category: task.CategoryReady, Props: task.Props{"area": {Text: "OSS"}}, Parent: "e-p", Position: 2},
+		{ID: "e-7", State: "someday", Category: task.CategoryDeferred, Props: task.Props{"area": {Text: "OSS"}}},
 	}
 }
 
@@ -179,7 +179,7 @@ func TestTasksPageMatchesTheQuery(t *testing.T) {
 		}
 	}
 	p := r.page(t, "view=next&area=OSS")
-	if i := slices.Index(taskIDs(p.Tasks), "e-5"); i < 0 || p.Tasks[i].ProjectTitle != "Launch" || len(p.Tasks[i].Verbs) == 0 {
+	if i := slices.Index(taskIDs(p.Tasks), "e-5"); i < 0 || p.Tasks[i].Parent != "e-p" || len(p.Tasks[i].Verbs) == 0 {
 		t.Fatalf("project action %+v", p.Tasks)
 	}
 	if code := get(t, r.s, api.TasksPath+"?view=bogus", nil); code != 400 {
@@ -265,7 +265,7 @@ func nextChange(t *testing.T, sub *subscriber) api.Change {
 func TestVerbPostMovesAndStreams(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: task.Inbox, Units: []unit.Unit{r7u}})
+	r.put(t, task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}})
 	sub := r.subscribe(t)
 	rec := post(t, r.s, api.TaskPath("e-1", "next"), `{"source":"cockpit"}`)
 	var res api.TaskResult
@@ -281,7 +281,7 @@ func TestVerbPostMovesAndStreams(t *testing.T) {
 func TestVerbErrors(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
-	r.put(t, task.Task{ID: "e-1", State: task.Inbox})
+	r.put(t, task.Task{ID: "e-1", State: "inbox", Category: task.CategoryInbox})
 	rec := post(t, r.s, api.TaskPath("e-1", "bogus"), `{}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "next, waiting, schedule") {
 		t.Fatalf("unknown verb: %d %s", rec.Code, rec.Body)
@@ -456,7 +456,7 @@ func TestItemsNoteSyncsTasks(t *testing.T) {
 		t.Fatalf("%+v %+v", c, c.Counters)
 	}
 	es, err := r.db.Tasks().TasksOf(context.Background(), r7u)
-	if err != nil || len(es) != 1 || es[0].State != task.Inbox || es[0].Kind != task.KindAction {
+	if err != nil || len(es) != 1 || es[0].State != task.State("inbox") || es[0].Kind != task.KindAction {
 		t.Fatalf("%+v %v", es, err)
 	}
 }
@@ -466,7 +466,7 @@ func TestSourceActivityReinboxes(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newTasksRig(t, nil)
 		ctx := context.Background()
-		r.put(t, task.Task{ID: "e-s", State: task.Scheduled, Units: []unit.Unit{r7u}, Snooze: task.Snooze{OnActivity: true, Return: task.Next},
+		r.put(t, task.Task{ID: "e-s", State: "scheduled", Category: task.CategoryDeferred, Units: []unit.Unit{r7u}, Snooze: task.Snooze{OnActivity: true, Return: task.State("next")},
 			SeenAt: tasksNow.Add(-time.Hour), Created: tasksNow.Add(-2 * time.Hour), Updated: tasksNow.Add(-2 * time.Hour)})
 		r.startSync(t)
 		r.log.Note(port.TopicSourceEvents, r7u)
@@ -504,7 +504,7 @@ func TestSyncRunsOffTheSubscriber(t *testing.T) {
 	t.Parallel()
 	r := newTasksRig(t, nil)
 	b := &blockingItems{entered: make(chan struct{}), release: make(chan struct{})}
-	r.s.deps.Tasks = coretasks.New(coretasks.Deps{Store: taskstest.New(), Items: b, Facts: coretasks.CardFacts{}, Clock: fixedClock(tasksNow)})
+	r.s.deps.Tasks = coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: taskstest.New(), Items: b, Facts: coretasks.CardFacts{}, Clock: fixedClock(tasksNow)})
 	r.startSync(t)
 	defer close(b.release)
 	noted := make(chan struct{})
@@ -529,9 +529,9 @@ func bridgeRig(t *testing.T) (catalogRig, *coretasks.Service) {
 	t.Helper()
 	c := newCatalogRig(t)
 	store := taskstest.New()
-	g := coretasks.New(coretasks.Deps{Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
+	g := coretasks.New(coretasks.Deps{States: taskstest.BundledStates, Store: store, Facts: coretasks.CardFacts{}, Clock: fixedClock(catalogNow)})
 	c.s.deps.Tasks = g
-	e := task.Task{ID: "e-r", Kind: task.KindAction, State: task.Inbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
+	e := task.Task{ID: "e-r", Kind: task.KindAction, State: "inbox", Category: task.CategoryInbox, Units: []unit.Unit{r7u}, Origin: task.OriginDerived, Created: catalogNow, Updated: catalogNow}
 	if err := store.Apply(context.Background(), []task.Change{{Op: task.OpCreate, Task: e}}); err != nil {
 		t.Fatal(err)
 	}
@@ -586,7 +586,7 @@ func TestBridgeRefusesWhatTheRowDoesNotOffer(t *testing.T) {
 	if len(fa.calls) != 0 || len(c.plan.acted) != 0 {
 		t.Fatalf("dispatched: %v %v", fa.calls, c.plan.acted)
 	}
-	if e, _ := g.Task(context.Background(), "e-r"); e.State != task.Inbox {
+	if e, _ := g.Task(context.Background(), "e-r"); e.State != task.State("inbox") {
 		t.Fatalf("the entry moved: %+v", e)
 	}
 	if rec := post(t, c.s, api.TaskPath("e-r", "dismiss"), `{}`); rec.Code != 409 || !strings.Contains(rec.Body.String(), "no open question") {
@@ -777,7 +777,7 @@ func TestCountersWithTermsCountWhatTheFilteredListsShow(t *testing.T) {
 		}
 	}
 	var c api.Counters
-	if get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersTerm: {"launch"}}.Encode(), &c); c.Areas["OSS"] != 2 || c.Areas["Hiring"] != 0 {
+	if get(t, r.s, api.CountersPath+"?"+url.Values{api.CountersTerm: {"launch"}}.Encode(), &c); c.Areas["OSS"] != 1 || c.Areas["Hiring"] != 0 {
 		t.Errorf("areas under a filter: %v", c.Areas)
 	}
 }
@@ -805,7 +805,7 @@ func TestAVerbTheProfileDoesNotOfferIsNeitherListedNorRun(t *testing.T) {
 	r := newTasksRig(t, func(d *Deps) {
 		d.Intents = func() *intentload.Loaded { return &intentload.Loaded{Tasks: tasks, Registry: dintent.NewRegistry(nil)} }
 	})
-	r.put(t, task.Task{ID: "e-c", Kind: task.KindCapture, State: task.Inbox, Title: "c", Origin: task.OriginUser})
+	r.put(t, task.Task{ID: "e-c", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser})
 	var v api.TaskView
 	if code := get(t, r.s, api.TaskPath("e-c"), &v); code != 200 || slices.ContainsFunc(v.Verbs, func(s api.VerbState) bool { return s.Verb == "someday" }) {
 		t.Fatalf("%d %+v", code, v.Verbs)

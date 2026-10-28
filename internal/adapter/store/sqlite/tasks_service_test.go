@@ -7,6 +7,7 @@ import (
 	"time"
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -51,7 +52,7 @@ func newTaskRig(t testing.TB) *taskRig {
 	store, _ := openTasks(t.(*testing.T))
 	r := &taskRig{store: store, items: taskItems{}, facts: &taskFacts{facts: map[unit.Unit]task.UnitFacts{}}, clock: &taskClock{taskAt}}
 	r.svc = coretasks.New(coretasks.Deps{Store: store, Items: r.items, Facts: r.facts, Me: task.Me{Keys: []string{"github:me"}},
-		Clock: r.clock, StaleWaitingDays: 2})
+		Clock: r.clock, StaleWaitingDays: 2, States: taskstest.BundledStates})
 	return r
 }
 
@@ -83,7 +84,7 @@ func TestServiceOverSqliteReinboxesOnActivity(t *testing.T) {
 	}
 	for _, id := range []task.ID{action, waiting} {
 		e, err := r.store.Task(ctx, id)
-		if err != nil || e.State != task.Inbox || !e.Changed {
+		if err != nil || e.Category != task.CategoryInbox || !e.Changed {
 			t.Fatalf("%s: %+v %v", id, e, err)
 		}
 	}

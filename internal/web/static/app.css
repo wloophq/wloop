@@ -605,7 +605,6 @@ textarea.draft-text { box-sizing: border-box; width: 100%; padding: var(--space-
 .signals .tone-warn { color: var(--late); }
 .signals .tone-good { color: var(--loop-text); }
 .d-items, .d-tasks { margin: var(--space-4) 0 var(--space-12); padding-left: var(--space-16); }
-.d-contexts { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-6) 0; }
 .d-question textarea { box-sizing: border-box; width: 100%; margin: var(--space-6) 0; padding: var(--space-6); font: inherit; background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius-md); }
 .d-compose, .d-gate, .d-run { margin: var(--space-12) 0; padding: var(--space-10) var(--space-12); border: 1px solid var(--rule); border-radius: var(--radius-md); background: var(--bg); }
 .d-compose .d-sub, .d-gate .d-sub { margin-top: 0; }

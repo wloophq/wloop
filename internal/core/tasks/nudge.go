@@ -36,7 +36,7 @@ func (s *Service) Nudged(ctx context.Context, ids []task.ID, u unit.Unit, at tim
 	now := s.now()
 	var cs []task.Change
 	for _, e := range es {
-		if e.Waiting == nil || !e.Live() || !at.After(e.Waiting.LastNudge) {
+		if e.Waiting == nil || !e.Open() || !at.After(e.Waiting.LastNudge) {
 			continue
 		}
 		w := *e.Waiting

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -25,22 +24,16 @@ var _ coretasks.ProjectStore = projectStore{}
 // task.
 func (db *DB) Projects() coretasks.ProjectStore { return projectStore{db} }
 
-// loadProjects sets the project fields of the tasks of out that the projects table holds, sub selecting
-// their ids with args.
+// loadProjects sets the slugs of the tasks of out that the projects table holds, sub selecting their ids with
+// args.
 func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Task, at map[task.ID]int) error {
-	return eachRow(ctx, q, `SELECT task_id, slug, review_every, reviewed_at FROM projects WHERE task_id IN `+sub, args,
+	return eachRow(ctx, q, `SELECT task_id, slug FROM projects WHERE task_id IN `+sub, args,
 		func(r *sql.Rows) error {
-			var id, slug, reviewed string
-			var every int64
-			if err := r.Scan(&id, &slug, &every, &reviewed); err != nil {
+			var id, slug string
+			if err := r.Scan(&id, &slug); err != nil {
 				return err
 			}
-			e := &out[at[task.ID(id)]]
-			t, err := taskTime(reviewed)
-			if err != nil {
-				return fmt.Errorf("the review time of project %s: %w", id, err)
-			}
-			e.Slug, e.ReviewEvery, e.ReviewedAt = slug, time.Duration(every)*time.Second, t
+			out[at[task.ID(id)]].Slug = slug
 			return nil
 		})
 }
@@ -50,9 +43,8 @@ func writeProject(ctx context.Context, tx *Tx, e task.Task) error {
 	if e.Kind != task.KindProject {
 		return nil
 	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO projects (task_id, slug, review_every, reviewed_at) VALUES (?, ?, ?, ?)
-		ON CONFLICT (task_id) DO UPDATE SET slug = excluded.slug, review_every = excluded.review_every, reviewed_at = excluded.reviewed_at`,
-		string(e.ID), e.Slug, int64(e.ReviewEvery/time.Second), eventTime(e.ReviewedAt))
+	_, err := tx.ExecContext(ctx, `INSERT INTO projects (task_id, slug) VALUES (?, ?)
+		ON CONFLICT (task_id) DO UPDATE SET slug = excluded.slug`, string(e.ID), e.Slug)
 	return err
 }
 

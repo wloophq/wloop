@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"slices"
 	"strings"
@@ -44,7 +45,12 @@ func verbs(enabled ...string) []api.VerbState {
 }
 
 func task(id, title, state string, contexts ...string) api.TaskView {
-	return api.TaskView{ID: id, Kind: "action", State: state, Title: title, Contexts: contexts,
+	var props map[string]json.RawMessage
+	if len(contexts) > 0 {
+		b, _ := json.Marshal(contexts)
+		props = map[string]json.RawMessage{"contexts": b}
+	}
+	return api.TaskView{ID: id, Kind: "action", State: state, Title: title, Props: props,
 		Verbs: verbs(allVerbs...), Created: now.Add(-30 * time.Hour), Updated: now.Add(-5 * time.Hour)}
 }
 
@@ -60,7 +66,7 @@ func waitingOn(e api.TaskView, names ...string) api.TaskView {
 // viewTasks are the tasks of each task view.
 func viewTasks() map[string][]api.TaskView {
 	focus := task("e1", "Reply on the batch export review", "next", "computer")
-	focus.Focus, focus.Units = true, []unit.Unit{ref(7).Unit()}
+	focus.Props["focus"], focus.Units = json.RawMessage(`"on"`), []unit.Unit{ref(7).Unit()}
 	asked := task("e2", "Deploy window tonight?", "inbox")
 	asked.Changed, asked.Verbs = true, verbs("next", "someday", "reference", "dismiss", "done", "focus", "waiting", "schedule", "project")
 	asked.Message = &api.Message{ID: 4, TaskID: "e2", Kind: "question", Text: "Which window?", State: "open", Recommend: "late",

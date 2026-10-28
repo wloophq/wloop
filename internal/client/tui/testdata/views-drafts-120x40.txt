@@ -4,7 +4,7 @@
 
 Reply on the batch export review
   state      next · focus
-  where      @computer
+  contexts   computer
   asks       Publish the review?
              1. Comment only
              2. Publish APPROVE (recommended)

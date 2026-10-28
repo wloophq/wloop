@@ -58,7 +58,7 @@ func (r *projectRig) do(t *testing.T, id task.ID, verb task.Verb, args map[strin
 
 func (r *projectRig) project(t *testing.T, id task.ID, mod func(*task.Task)) task.Task {
 	t.Helper()
-	p := task.Task{ID: id, Kind: task.KindProject, State: task.Next, Title: "Project " + string(id), Origin: task.OriginUser, Slug: string(id), Created: t0, Updated: t0}
+	p := task.Task{ID: id, Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Project " + string(id), Origin: task.OriginUser, Slug: string(id), Created: t0, Updated: t0}
 	if mod != nil {
 		mod(&p)
 	}
@@ -68,7 +68,7 @@ func (r *projectRig) project(t *testing.T, id task.ID, mod func(*task.Task)) tas
 func (r *projectRig) action(t *testing.T, id task.ID, project task.ID, pos int, st task.State) task.Task {
 	t.Helper()
 	return r.put(t, task.Task{ID: id, Kind: task.KindCapture, State: st, Title: "Action " + string(id), Origin: task.OriginUser,
-		Project: project, Position: pos, Created: t0.Add(time.Duration(pos) * time.Minute), Updated: t0})
+		Parent: project, Position: pos, Created: t0.Add(time.Duration(pos) * time.Minute), Updated: t0})
 }
 
 func positions(t *testing.T, r *projectRig, ids ...task.ID) map[task.ID]int {
@@ -82,22 +82,22 @@ func positions(t *testing.T, r *projectRig, ids ...task.ID) map[task.ID]int {
 
 func TestProjectFromTask(t *testing.T) {
 	r := newProjectRig()
-	e := r.put(t, task.Task{ID: "e-cap", Kind: task.KindCapture, State: task.Inbox, Title: "Write the RFC", Area: "OSS", Origin: task.OriginUser})
+	e := r.put(t, task.Task{ID: "e-cap", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "Write the RFC", Props: task.Props{"area": {Text: "OSS"}}, Origin: task.OriginUser})
 	res := r.do(t, e.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API"})
-	if res.Task.ID != e.ID || res.Task.Project == "" || res.Task.Position != 1 || res.Task.State != task.Inbox {
+	if res.Task.ID != e.ID || res.Task.Parent == "" || res.Task.Position != 1 || res.Task.Category != task.CategoryInbox {
 		t.Fatalf("attached entry %+v", res.Task)
 	}
-	p := r.task(t, res.Task.Project)
-	if p.Kind != task.KindProject || p.State != task.Next || p.Title != "Ship the v2 API" || p.Slug != "ship-the-v2-api" || p.Area != "OSS" {
+	p := r.task(t, res.Task.Parent)
+	if p.Kind != task.KindProject || p.Category != task.CategoryReady || p.Title != "Ship the v2 API" || p.Slug != "ship-the-v2-api" || p.Prop(task.PropArea).Text != "OSS" {
 		t.Fatalf("project %+v", p)
 	}
 	if !slices.Equal(r.dossiers.opened, []string{"ship-the-v2-api"}) {
 		t.Errorf("dossiers opened %v", r.dossiers.opened)
 	}
 
-	other := r.put(t, task.Task{ID: "e-cap2", Kind: task.KindAction, State: task.Next, Title: "x", Origin: task.OriginDerived})
+	other := r.put(t, task.Task{ID: "e-cap2", Kind: task.KindAction, State: "next", Category: task.CategoryReady, Title: "x", Origin: task.OriginDerived})
 	res = r.do(t, other.ID, task.VerbProject, map[string]string{"title": "Ship the v2 API!"})
-	if p2 := r.task(t, res.Task.Project); p2.Slug != "ship-the-v2-api-2" || p2.ID == p.ID {
+	if p2 := r.task(t, res.Task.Parent); p2.Slug != "ship-the-v2-api-2" || p2.ID == p.ID {
 		t.Errorf("a second project of the same name: %+v", p2)
 	}
 
@@ -109,9 +109,9 @@ func TestProjectFromTask(t *testing.T) {
 	}
 
 	r.dossiers.fail = errors.New("disk full")
-	third := r.put(t, task.Task{ID: "e-cap3", Kind: task.KindCapture, State: task.Inbox, Title: "y", Origin: task.OriginUser})
+	third := r.put(t, task.Task{ID: "e-cap3", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "y", Origin: task.OriginUser})
 	res = r.do(t, third.ID, task.VerbProject, map[string]string{"title": "Broken disk"})
-	if res.Task.Project == "" || len(res.Lines) == 0 {
+	if res.Task.Parent == "" || len(res.Lines) == 0 {
 		t.Errorf("a failed dossier still files the project and says so: %+v", res)
 	}
 }
@@ -119,14 +119,14 @@ func TestProjectFromTask(t *testing.T) {
 func TestAttachAndReorder(t *testing.T) {
 	r := newProjectRig()
 	r.project(t, "p", nil)
-	r.action(t, "a", "p", 1, task.Next)
-	r.action(t, "b", "p", 2, task.Next)
-	r.action(t, "gone", "p", 7, task.Trash)
-	c := r.put(t, task.Task{ID: "c", Kind: task.KindCapture, State: task.Inbox, Title: "c", Origin: task.OriginUser})
-	d := r.put(t, task.Task{ID: "d", Kind: task.KindCapture, State: task.Next, Title: "d", Origin: task.OriginUser})
+	r.action(t, "a", "p", 1, task.State("next"))
+	r.action(t, "b", "p", 2, task.State("next"))
+	r.action(t, "gone", "p", 7, task.State("trash"))
+	c := r.put(t, task.Task{ID: "c", Kind: task.KindCapture, State: "inbox", Category: task.CategoryInbox, Title: "c", Origin: task.OriginUser})
+	d := r.put(t, task.Task{ID: "d", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Title: "d", Origin: task.OriginUser})
 
-	if got := r.do(t, c.ID, task.VerbProject, map[string]string{"id": "p"}).Task; got.Project != "p" || got.Position != 3 {
-		t.Fatalf("attached at %d of %q, want 3 of p", got.Position, got.Project)
+	if got := r.do(t, c.ID, task.VerbProject, map[string]string{"id": "p"}).Task; got.Parent != "p" || got.Position != 3 {
+		t.Fatalf("attached at %d of %q, want 3 of p", got.Position, got.Parent)
 	}
 	r.do(t, d.ID, task.VerbProject, map[string]string{"id": "p", "position": "2"})
 	want := map[task.ID]int{"a": 1, "d": 2, "b": 3, "c": 4}
@@ -161,8 +161,8 @@ func TestToggleSequential(t *testing.T) {
 	r := newProjectRig()
 	ctx := context.Background()
 	r.project(t, "p", nil)
-	r.action(t, "a", "p", 1, task.Next)
-	r.action(t, "b", "p", 2, task.Next)
+	r.action(t, "a", "p", 1, task.State("next"))
+	r.action(t, "b", "p", 2, task.State("next"))
 	next := func() ([]task.ID, int) {
 		t.Helper()
 		es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewNext})
@@ -225,7 +225,7 @@ func TestMarkReviewed(t *testing.T) {
 			t.Errorf("every %q: %v, want ErrArgs", bad, err)
 		}
 	}
-	r.action(t, "a", "p", 1, task.Next)
+	r.action(t, "a", "p", 1, task.State("next"))
 	if _, err := r.svc.Do(ctx, "a", coretasks.Request{Verb: task.VerbReviewed}); !errors.Is(err, coretasks.ErrVerb) {
 		t.Errorf("reviewed on an action: %v, want ErrVerb", err)
 	}
@@ -235,10 +235,10 @@ func TestProjectWithoutNextAction(t *testing.T) {
 	r := newProjectRig()
 	ctx := context.Background()
 	r.project(t, "p", nil)
-	r.action(t, "a", "p", 1, task.Next)
-	r.action(t, "b", "p", 2, task.Next)
+	r.action(t, "a", "p", 1, task.State("next"))
+	r.action(t, "b", "p", 2, task.State("next"))
 	r.project(t, "q", func(e *task.Task) { e.ReviewedAt = t0 })
-	r.action(t, "c", "q", 1, task.Next)
+	r.action(t, "c", "q", 1, task.State("next"))
 	r.clock.t = t0.Add(time.Hour)
 	review := func() []task.ID {
 		t.Helper()
@@ -260,7 +260,7 @@ func TestProjectWithoutNextAction(t *testing.T) {
 	if got := review(); !slices.Equal(got, []task.ID{"p"}) {
 		t.Fatalf("review lists %v, want p", got)
 	}
-	if p := r.task(t, "p"); p.State != task.Next {
+	if p := r.task(t, "p"); p.Category != task.CategoryReady {
 		t.Errorf("a project with every action done was moved to %s", p.State)
 	}
 	rv, err := r.svc.Review(ctx)
@@ -280,13 +280,13 @@ func TestDoneProjectResolvesItsDossier(t *testing.T) {
 	r := newProjectRig()
 	r.project(t, "p", func(e *task.Task) { e.Slug = "ship-it" })
 	r.project(t, "q", func(e *task.Task) { e.Slug = "drop-it" })
-	r.action(t, "a", "p", 1, task.Next)
+	r.action(t, "a", "p", 1, task.State("next"))
 	r.clock.t = t0.Add(time.Hour)
 	r.do(t, "a", task.VerbDone, nil)
 	if len(r.dossiers.resolved) != 0 {
 		t.Fatalf("an action's done resolved %v", r.dossiers.resolved)
 	}
-	if got := r.do(t, "p", task.VerbDone, nil).Task; got.State != task.Done {
+	if got := r.do(t, "p", task.VerbDone, nil).Task; got.Category != task.CategoryDone {
 		t.Fatalf("project state %s", got.State)
 	}
 	r.do(t, "q", task.VerbDismiss, nil)
@@ -304,10 +304,11 @@ func TestDoneProjectResolvesItsDossier(t *testing.T) {
 func TestProjectsViewCounts(t *testing.T) {
 	r := newProjectRig()
 	ctx := context.Background()
-	r.project(t, "p1", func(e *task.Task) { e.Area = "OSS" })
-	r.project(t, "p2", func(e *task.Task) { e.Area = "OSS"; e.State = task.Someday })
-	r.project(t, "p3", func(e *task.Task) { e.Area = "Hiring" })
-	r.project(t, "p4", func(e *task.Task) { e.Area = "OSS"; e.State = task.Done })
+	area := func(e *task.Task, a string) { e.SetProp(task.PropArea, task.Value{Text: a}, task.WriterPerson, t0) }
+	r.project(t, "p1", func(e *task.Task) { area(e, "OSS") })
+	r.project(t, "p2", func(e *task.Task) { area(e, "OSS"); e.State, e.Category = "someday", task.CategoryDeferred })
+	r.project(t, "p3", func(e *task.Task) { area(e, "Hiring") })
+	r.project(t, "p4", func(e *task.Task) { area(e, "OSS"); e.State, e.Category = "done", task.CategoryDone })
 	for area, want := range map[string][]task.ID{"OSS": {"p1", "p2"}, "Hiring": {"p3"}, "": {"p1", "p2", "p3"}} {
 		es, err := r.svc.Tasks(ctx, task.Query{View: task.ViewProjects, Area: area})
 		if err != nil {
@@ -331,8 +332,8 @@ func TestProjectsViewCounts(t *testing.T) {
 func TestProjectStatusOverTheOpenSet(t *testing.T) {
 	r := newProjectRig()
 	r.project(t, "p", nil)
-	r.action(t, "a", "p", 1, task.Waiting)
-	r.action(t, "b", "p", 2, task.Next)
+	r.action(t, "a", "p", 1, task.State("waiting"))
+	r.action(t, "b", "p", 2, task.State("next"))
 	r.project(t, "old", func(e *task.Task) { e.Created = t0.Add(-8 * 24 * time.Hour) })
 	st, err := r.svc.ProjectsStatus(context.Background())
 	if err != nil {

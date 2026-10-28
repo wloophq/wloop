@@ -31,7 +31,7 @@ func TestReviewViewIsServedOnceRegistered(t *testing.T) {
 		t.Errorf("GET review before it is served: %d, want 404", code)
 	}
 
-	r.put(t, task.Task{ID: "e-in", State: task.Inbox, Title: "in"}, task.Task{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p"})
+	r.put(t, task.Task{ID: "e-in", State: "inbox", Category: task.CategoryInbox, Title: "in"}, task.Task{ID: "e-p", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "P", Slug: "p"})
 	r.serveProjects()
 	get(t, r.s, api.ViewsPath, &cat)
 	var ids []string
@@ -84,10 +84,10 @@ func TestProjectTaskViews(t *testing.T) {
 	r.serveProjects()
 	old := tasksNow.Add(-10 * 24 * time.Hour)
 	r.put(t,
-		task.Task{ID: "e-p", Kind: task.KindProject, State: task.Next, Title: "P", Slug: "p", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
-		task.Task{ID: "e-q", Kind: task.KindProject, State: task.Next, Title: "Q", Slug: "q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
-		task.Task{ID: "e-a", State: task.Next, Title: "a", Project: "e-p", Position: 1},
-		task.Task{ID: "e-b", State: task.Waiting, Title: "b", Project: "e-p", Position: 2},
+		task.Task{ID: "e-p", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "P", Slug: "p", Sequential: true, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "e-q", Kind: task.KindProject, State: "next", Category: task.CategoryReady, Title: "Q", Slug: "q", ReviewEvery: 14 * 24 * time.Hour, ReviewedAt: old, Created: old, Updated: old},
+		task.Task{ID: "e-a", State: "next", Category: task.CategoryReady, Title: "a", Parent: "e-p", Position: 1},
+		task.Task{ID: "e-b", State: "waiting", Category: task.CategoryWaiting, Title: "b", Parent: "e-p", Position: 2},
 	)
 	page := r.page(t, "view=projects")
 	byID := map[string]api.TaskView{}
@@ -116,12 +116,12 @@ func TestProjectTaskViews(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("e-a not in Next: %v", taskIDs(a))
 	}
-	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].ProjectTitle != "P" {
-		t.Errorf("action verbs %v, project %q", vs, a[i].ProjectTitle)
+	if vs := verbs(a[i]); vs["reviewed"] || vs["sequential"] || !vs["project"] || a[i].Parent != "e-p" {
+		t.Errorf("action verbs %v, parent %q", vs, a[i].Parent)
 	}
 
-	r.put(t, task.Task{ID: "e-done", Kind: task.KindProject, State: task.Done, Title: "Done", Slug: "done"},
-		task.Task{ID: "e-trash", Kind: task.KindProject, State: task.Trash, Title: "Trash", Slug: "trash"})
+	r.put(t, task.Task{ID: "e-done", Kind: task.KindProject, State: "done", Category: task.CategoryDone, Title: "Done", Slug: "done"},
+		task.Task{ID: "e-trash", Kind: task.KindProject, State: "trash", Category: task.CategoryDropped, Title: "Trash", Slug: "trash"})
 	for id, want := range map[string]map[string]bool{
 		"e-done":  {"done": false, "dismiss": true, "reference": true, "reviewed": false, "sequential": false, "project": false},
 		"e-trash": {"done": false, "dismiss": false, "reference": false, "reviewed": false, "sequential": false, "project": false},

@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -36,15 +37,6 @@ var actionKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose,
 
 // endVerbs end a project, so its dossier's lifecycle starts.
 var endVerbs = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbReference}
-
-func init() {
-	for _, v := range []task.Verb{task.VerbReviewed, task.VerbSequential} {
-		moves[v] = struct {
-			from []task.State
-			to   task.State
-		}{}
-	}
-}
 
 type projects struct {
 	s *Service
@@ -99,6 +91,22 @@ func (s *Service) ProjectsStatus(ctx context.Context) (map[task.ID]ProjectState,
 	return out, nil
 }
 
+// Children are the open children of every parent, in sibling order: by Position, then id.
+func (s *Service) Children(ctx context.Context) (map[task.ID][]task.ID, error) {
+	open, err := s.d.Store.Tasks(ctx, task.Query{View: task.ViewOpen})
+	if err != nil {
+		return nil, err
+	}
+	slices.SortStableFunc(open, func(a, b task.Task) int { return cmp.Or(cmp.Compare(a.Position, b.Position), cmp.Compare(a.ID, b.ID)) })
+	out := map[task.ID][]task.ID{}
+	for _, e := range open {
+		if e.Parent != "" {
+			out[e.Parent] = append(out[e.Parent], e.ID)
+		}
+	}
+	return out, nil
+}
+
 // locked reads e again under the service's lock and runs f on it, applying the changes it returns with the
 // event of req's verb.
 func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e task.Task, now time.Time) ([]task.Change, error)) (task.Task, error) {
@@ -130,7 +138,7 @@ func (p *projects) locked(ctx context.Context, id task.ID, req Request, f func(e
 func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result, error) {
 	var created task.Task
 	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
-		if err := accepts(e, task.VerbProject); err != nil {
+		if err := p.s.accepts(e, task.VerbProject); err != nil {
 			return nil, err
 		}
 		pos := 0
@@ -149,7 +157,7 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			if err != nil {
 				return nil, err
 			}
-			if got.Kind != task.KindProject || !got.Live() {
+			if got.Kind != task.KindProject || !got.Open() {
 				return nil, fmt.Errorf("%w: %s is not a live project", ErrArgs, id)
 			}
 			proj = got
@@ -158,8 +166,10 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 			if err != nil {
 				return nil, err
 			}
-			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, State: task.Next, Title: title, Slug: slug,
-				Sequential: req.Args["sequential"] == "true", Area: e.Area, Origin: task.OriginUser, Created: now, Updated: now}
+			proj = task.Task{ID: task.NewID(), Kind: task.KindProject, Title: title, Slug: slug,
+				Sequential: req.Args["sequential"] == "true", Origin: task.OriginUser, Created: now, Updated: now}
+			proj.MoveTo(task.CategoryReady, p.s.d.States)
+			proj.SetProp(task.PropArea, e.Prop(task.PropArea), task.WriterPerson, now)
 			created = proj
 			cs = append(cs, task.Change{Op: task.OpCreate, Task: proj, Why: "project"})
 		default:
@@ -172,12 +182,12 @@ func (p *projects) attach(ctx context.Context, e task.Task, req Request) (Result
 		var others []task.Task
 		last := 0
 		for _, o := range open {
-			if o.Project == proj.ID && o.ID != e.ID {
+			if o.Parent == proj.ID && o.ID != e.ID {
 				others = append(others, o)
 				last = max(last, o.Position)
 			}
 		}
-		e.Project, e.Updated = proj.ID, now
+		e.Parent, e.Updated = proj.ID, now
 		if pos == 0 {
 			e.Position = last + 1
 			return append(cs, task.Change{Op: task.OpUpdate, Task: e, Why: "project"}), nil
@@ -216,7 +226,7 @@ func (p *projects) slug(ctx context.Context, title string) (string, error) {
 
 // liveProject refuses a project that is done or trashed, naming the verb.
 func liveProject(e task.Task, v task.Verb) error {
-	if !e.Live() {
+	if !e.Open() {
 		return fmt.Errorf("%w: %s on a %s project", ErrVerb, v, e.State)
 	}
 	return nil
@@ -282,7 +292,7 @@ func (p *projects) end(ctx context.Context, e task.Task, req Request) (Result, e
 	var was task.Task
 	got, err := p.locked(ctx, e.ID, req, func(e task.Task, now time.Time) ([]task.Change, error) {
 		was = e
-		next, err := transition(e, req, now)
+		next, err := p.s.transition(e, req, now)
 		if err != nil {
 			return nil, err
 		}

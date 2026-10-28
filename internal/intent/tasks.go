@@ -25,9 +25,13 @@ const TasksFile = "tasks.toml"
 
 // VerbText is a verb's words: Input is the question a verb that asks for
 // a value puts first. Offer, when set, is where a task offers the verb.
+// From are the states it moves a task from, every state when empty; To the
+// state it moves it to, "" for none.
 type VerbText struct {
 	Label, Summary, Input string
 	Offer                 workflow.Predicate
+	From                  []string
+	To                    string
 }
 
 // TasksDef is the profile's tasks.toml over every layer. Props and States
@@ -98,6 +102,37 @@ func (d TasksDef) FirstOf(c task.Category) string {
 		}
 	}
 	return ""
+}
+
+// Move is the states verb moves a task from (every state when empty) and
+// the state it moves it to ("" for none); false when no verb is named so.
+func (d TasksDef) Move(verb string) ([]string, string, bool) {
+	v, ok := d.Verbs[verb]
+	return v.From, v.To, ok
+}
+
+// HeldProblems are the problems of the states stored tasks hold, held, that
+// no layer declares: their tasks keep the category they had, and no verb
+// moves them.
+func (d TasksDef) HeldProblems(held []string) Problems {
+	var out Problems
+	for _, name := range held {
+		if _, ok := d.CategoryOf(name); ok {
+			continue
+		}
+		out = append(out, Problem{File: TasksFile, Field: "states." + name,
+			Msg: fmt.Sprintf("stored tasks hold the state %s, which no layer declares%s; declare it again, or move those tasks to another state first",
+				name, expr.DidYouMean(name, d.stateNames()))})
+	}
+	return out
+}
+
+func (d TasksDef) stateNames() []string {
+	out := make([]string, len(d.States))
+	for i, s := range d.States {
+		out[i] = s.Name
+	}
+	return out
 }
 
 // Untrusted says whether no approval rule that releases may read the
@@ -452,6 +487,12 @@ func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
 			}
 		}
 		l.verbStates(s, path, t)
+		if t.From != nil {
+			w.From = slices.Clone(t.From)
+		}
+		if t.To != nil {
+			w.To = *t.To
+		}
 		l.verbActors(s, path, t.By)
 		if t.Gate != nil {
 			l.gates[path] = ref{s, path + ".gate", *t.Gate}

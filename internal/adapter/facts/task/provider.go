@@ -99,9 +99,9 @@ func (p *Provider) settings() Settings {
 	return p.d.Settings()
 }
 
-// listed says whether e is a subject: a live task of no unit, or of a unit
+// listed says whether e is a subject: an open task of no unit, or of a unit
 // whose plugin is enabled.
-func (p *Provider) listed(e task.Task) bool { return e.Live() && p.enabledFor(e) }
+func (p *Provider) listed(e task.Task) bool { return e.Open() && p.enabledFor(e) }
 
 func (p *Provider) enabledFor(e task.Task) bool {
 	u, ok := e.FirstUnit()
@@ -201,7 +201,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		"task.items_owed":          0,
 		"task.settled_at":          time.Time{},
 		"task.fingerprint":         string(e.ID) + "|" + string(e.State) + "|" + e.Updated.UTC().Format(time.RFC3339Nano),
-		"task.category":            "",
+		"task.category":            string(e.Category),
 		"task.owed_by":             "",
 		"task.owed_since":          time.Time{},
 		"task.since_movement":      time.Duration(0),
@@ -225,7 +225,7 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 			keys = append(keys, p.Key)
 		}
 		f["task.waiting_on"] = keys
-		if e.State == task.Waiting && !w.Since.IsZero() {
+		if e.Category == task.CategoryWaiting && !w.Since.IsZero() {
 			f["task.waiting_days"] = workdaysSince(w.Since, now, loc)
 		}
 		if !w.LastNudge.IsZero() {
@@ -373,7 +373,7 @@ func resurface(e task.Task) time.Time {
 // has no date to wait for.
 func nudgeDue(e task.Task, s Settings, loc *time.Location) time.Time {
 	w := e.Waiting
-	if w == nil || e.State != task.Waiting || len(w.On) == 0 {
+	if w == nil || e.Category != task.CategoryWaiting || len(w.On) == 0 {
 		return time.Time{}
 	}
 	due := w.Resurface

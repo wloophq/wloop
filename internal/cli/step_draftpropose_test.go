@@ -20,6 +20,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
@@ -212,7 +213,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	wf := draftWF("nudges", "purpose", "nudge", "items", "owed", "per", "person", "repeat_after", "24h")
 	wf.Steps[0].Args["effects"] = []any{"task.nudged"}
 	r := newDraftRig(t, wf, "@{{\"{\"}}{{.Person.Key}}{{\"}\"}}, any news?{{range .Items}}\n- {{.Line}}{{end}}")
-	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: task.Waiting, Units: []unit.Unit{draftThread},
+	r.tasks.m["e1"] = task.Task{ID: "e1", Kind: task.KindWaiting, State: "waiting", Category: task.CategoryWaiting, Units: []unit.Unit{draftThread},
 		Items:   []task.ItemRef{{Unit: draftThread, Item: "i1"}, {Unit: draftThread, Item: "i2"}},
 		Waiting: &task.WaitingOn{On: []items.Person{ana, bob}}}
 	r.items.set(draftThread, openItem("i1", "The deck", r.now.Add(-96*time.Hour), ana), openItem("i2", "The budget", r.now.Add(-96*time.Hour), bob))
@@ -382,7 +383,7 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	closeOf := func(closed bool) []task.Change {
 		done := items.Item{ID: "i1", Unit: draftThread, State: items.Resolved, Requester: ana}
 		f := task.UnitFacts{Unit: draftThread, StartedByMe: true, ClosurePosted: closed}
-		return task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, now)
+		return task.Reconcile(f, []items.Item{done}, task.Me{Keys: []string{ana.Key}}, nil, taskstest.BundledStates, now)
 	}
 	if cs := closeOf(false); len(cs) != 1 || cs[0].Task.Kind != task.KindClose {
 		t.Fatalf("no close entry before the closure: %+v", cs)

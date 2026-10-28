@@ -120,3 +120,17 @@ var (
 	// ErrPluginDisabled refuses a change to an entry whose unit's plugin is disabled.
 	ErrPluginDisabled = errors.New("the unit's plugin is disabled")
 )
+
+// States are the profile's states (tasks.toml) and the transitions of its verbs.
+type States interface {
+	task.States
+	// Move is the states verb moves a task from (every state when empty) and the state it moves it to ("" for
+	// none); false when the profile declares no such verb.
+	Move(verb string) (from []string, to string, ok bool)
+}
+
+// Recategorizer rewrites the stored tasks' categories from their states, as of reads them, noting the tasks
+// it moved. Unknown are the states tasks hold that of does not know; their tasks keep their category.
+type Recategorizer interface {
+	Recategorize(ctx context.Context, of func(state string) (task.Category, bool)) (unknown []string, err error)
+}

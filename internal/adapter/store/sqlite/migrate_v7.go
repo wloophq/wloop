@@ -30,3 +30,10 @@ func v7(ctx context.Context, tx *sql.Tx) error {
 	}
 	return nil
 }
+
+// v6States are the states version 6 stored and their categories, as the bundled profile of version 7
+// declares them: the store cannot read the profile, so the migration carries them as history.
+var v6States = []struct{ state, category string }{
+	{"inbox", "inbox"}, {"next", "ready"}, {"waiting", "waiting"}, {"scheduled", "deferred"}, {"someday", "deferred"},
+	{"reference", "done"}, {"done", "done"}, {"trash", "dropped"},
+}

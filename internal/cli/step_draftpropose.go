@@ -317,9 +317,9 @@ func (s draftSubject) people(per string) []items.Person {
 		return []items.Person{{}}
 	}
 	var out []items.Person
-	if s.task != nil {
-		if s.task.Waiting != nil {
-			for _, p := range s.task.Waiting.On {
+	if e := s.task; e != nil {
+		if e.Waiting != nil {
+			for _, p := range e.Waiting.On {
 				if strings.Contains(p.Key, ":") {
 					out = append(out, p)
 				}
@@ -505,7 +505,7 @@ func draftFactsOf(sub draftSubject, person string, ids []string) workflow.Facts 
 	waited := person == ""
 	if !waited && sub.task != nil {
 		e := sub.task
-		waited = e.State == task.Waiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
+		waited = e.Category == task.CategoryWaiting && e.Waiting != nil && slices.ContainsFunc(e.Waiting.On, func(p items.Person) bool { return p.Key == person })
 	}
 	held, owned := 0, 0
 	heldNow := sub.held()

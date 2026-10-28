@@ -31,7 +31,7 @@ func execWrite(db *DB, query string, args ...any) error {
 
 func projectTask(id task.ID) task.Task {
 	e := taskstest.Full(id)
-	e.Kind, e.Project, e.Slug, e.ReviewEvery = task.KindProject, "", "p", 36*time.Hour
+	e.Kind, e.Parent, e.Slug, e.ReviewEvery = task.KindProject, "", "p", 36*time.Hour
 	return e
 }
 
@@ -50,7 +50,7 @@ func TestDeletingAParentCascades(t *testing.T) {
 		{"worktree_units", "path", "/wt/a"},
 		{"task_items", "task_id", "e-p"},
 		{"task_units", "task_id", "e-p"},
-		{"task_contexts", "task_id", "e-p"},
+		{"task_props", "task_id", "e-p"},
 		{"projects", "task_id", "e-p"},
 	}
 	for _, c := range children {
@@ -83,11 +83,11 @@ func TestRewritingATaskKeepsItsProjectRow(t *testing.T) {
 	if err := db.Tasks().Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: p}}); err != nil {
 		t.Fatal(err)
 	}
-	if n := countRows(t, db, "projects", `task_id = 'e-p' AND slug = 'p' AND review_every = ?`, int64(36*time.Hour/time.Second)); n != 1 {
+	if n := countRows(t, db, "projects", `task_id = 'e-p' AND slug = 'p'`); n != 1 {
 		t.Errorf("the project row of a rewritten entry: %d rows, want 1", n)
 	}
 	got, err := db.Tasks().Task(ctx, "e-p")
-	if err != nil || got.Title != p.Title || got.Kind != task.KindCapture || len(got.Items) != len(p.Items) {
+	if err != nil || got.Title != p.Title || got.Kind != task.KindCapture || len(got.Items) != len(p.Items) || got.ReviewEvery != 36*time.Hour {
 		t.Errorf("rewritten entry %+v, %v", got, err)
 	}
 }
@@ -99,7 +99,7 @@ func TestAChildWithoutItsParentIsRefused(t *testing.T) {
 		`INSERT INTO worktree_units (path, provider, unit_key, at) VALUES ('/wt/none', 'github', 'acme/api#7', '')`,
 		`INSERT INTO task_items (task_id, provider, unit_key, item) VALUES ('e-none', 'github', 'acme/api#7', 'a')`,
 		`INSERT INTO task_units (task_id, provider, unit_key, ord) VALUES ('e-none', 'github', 'acme/api#7', 0)`,
-		`INSERT INTO task_contexts (task_id, context, ord) VALUES ('e-none', '@reply', 0)`,
+		`INSERT INTO task_props (task_id, name, value, writer, at) VALUES ('e-none', 'area', '{"text":"OSS"}', 'person', 't')`,
 		`INSERT INTO projects (task_id) VALUES ('e-none')`,
 	} {
 		if err := execWrite(db, insert); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {

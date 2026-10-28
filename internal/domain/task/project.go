@@ -38,8 +38,8 @@ func (e Task) ReviewDue(now time.Time) bool {
 }
 
 type ProjectStatus struct {
-	// Next is the project's next action: the open action with the lowest Position in Next; of a sequential
-	// project, its first open action when that one is in Next. "" none.
+	// Next is the project's next action: the open action with the lowest Position that is ready; of a sequential
+	// project, its first open action when that one is ready. "" none.
 	Next      ID
 	NextTitle string
 	Open      int // its open actions
@@ -57,15 +57,15 @@ func ProjectsOf(all []Task) map[ID]ProjectStatus {
 	}
 	acts := map[ID][]Task{}
 	for _, e := range all {
-		if _, ok := out[e.Project]; ok && e.Open() {
-			acts[e.Project] = append(acts[e.Project], e)
+		if _, ok := out[e.Parent]; ok && e.Open() {
+			acts[e.Parent] = append(acts[e.Parent], e)
 		}
 	}
 	for p, es := range acts {
 		sortByPosition(es)
 		st := ProjectStatus{Open: len(es)}
 		for _, e := range es {
-			if e.State == Next {
+			if e.Category == CategoryReady {
 				st.Next, st.NextTitle = e.ID, e.Title
 				break
 			}
@@ -83,7 +83,7 @@ func NeedsReview(p Task, st ProjectStatus, now time.Time) bool {
 	if p.Kind != KindProject || !p.Open() {
 		return false
 	}
-	return p.ReviewDue(now) || (st.Next == "" && p.State != Someday)
+	return p.ReviewDue(now) || (st.Next == "" && !inSomeday(p))
 }
 
 // accents folds the accents Portuguese and Spanish titles carry.
