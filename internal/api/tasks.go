@@ -92,10 +92,8 @@ type PropSpec struct {
 	Writers []string `json:"writers,omitempty"`
 }
 
-// VerbSpec is a verb a task offers: From are the states it moves a task from (every state when empty), To
-// the state it moves it to ("" for none).
-// VerbSpec is a verb of tasks.toml; Handler is what the verb runs besides its move, as the profile names it, "" for
-// none.
+// VerbSpec is a verb a task offers: Handler is what it runs besides its move, as the profile names it ("" for
+// none), From the states it moves a task from (every state when empty), To the state it moves it to ("" for none).
 type VerbSpec struct {
 	Verb    string   `json:"verb"`
 	Handler string   `json:"handler,omitempty"`
