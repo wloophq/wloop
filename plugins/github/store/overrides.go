@@ -111,3 +111,29 @@ func (db *DB) Tracked(ctx context.Context) ([]pr.Ref, error) {
 	slices.SortFunc(out, pr.Compare)
 	return out, nil
 }
+
+// Track tracks or untracks ref, recording the tracked or untracked event of
+// the move on the host, at at with data, before its write, as a scope flip
+// is: a move the host refused leaves the row as it was, and a retry after a
+// write that failed finds the host's last event of the kind it records and
+// records none. Changed says the override moved.
+func (db *DB) Track(ctx context.Context, ref pr.Ref, tracked bool, at time.Time, data string) (changed bool, err error) {
+	o, err := db.Override(ctx, ref)
+	if err != nil || o.Tracked == tracked {
+		return false, err
+	}
+	kind := pr.KindUntracked
+	if tracked {
+		kind = pr.KindTracked
+	}
+	held, err := db.HostEvents(ctx, []pr.Ref{ref}, time.Time{}, pr.KindTracked, pr.KindUntracked)
+	if err != nil {
+		return false, err
+	}
+	if len(held) == 0 || held[len(held)-1].Kind != kind {
+		if err := db.RecordEvents(ctx, []pr.Event{{PR: ref, Kind: kind, At: at, Data: data}}); err != nil {
+			return false, err
+		}
+	}
+	return db.SetTracked(ctx, ref, tracked)
+}

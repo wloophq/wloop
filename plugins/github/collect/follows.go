@@ -11,7 +11,6 @@ import (
 
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/api"
-	"github.com/wloophq/wloop/plugins/github/pr"
 	"github.com/wloophq/wloop/plugins/github/store"
 )
 
@@ -37,11 +36,7 @@ func UntrackFinished(ctx context.Context, st *store.DB, now func() time.Time, lo
 		if !ok || pull.State == api.StateOpen {
 			continue
 		}
-		changed, err := st.SetTracked(ctx, ref, false)
-		if err == nil && changed {
-			err = st.RecordEvents(ctx, []pr.Event{{PR: ref, Kind: pr.KindUntracked, At: now(), Data: strings.ToLower(pull.State)}})
-		}
-		if err != nil {
+		if _, err := st.Track(ctx, ref, false, now(), strings.ToLower(pull.State)); err != nil {
 			logf("%s: untrack finished: %v", ref, err)
 		}
 	}
@@ -130,10 +125,7 @@ func (f *Follows) Follow(ctx context.Context, ref api.Ref) (src.Tracked, error) 
 			return src.Tracked{}, err
 		}
 	}
-	changed, err := f.Store.SetTracked(ctx, known, true)
-	if err == nil && changed {
-		err = f.Store.RecordEvents(ctx, []pr.Event{{PR: known, Kind: pr.KindTracked, At: f.Now()}})
-	}
+	_, err = f.Store.Track(ctx, known, true, f.Now(), "")
 	return src.Tracked{Unit: known.Unit(), State: state}, err
 }
 
@@ -150,11 +142,8 @@ func (f *Follows) Untrack(ctx context.Context, ref api.Ref) error {
 	if i < 0 {
 		return fmt.Errorf("%w: %s is not tracked", src.ErrUnfit, ref)
 	}
-	changed, err := f.Store.SetTracked(ctx, tracked[i], false)
-	if err != nil || !changed {
-		return err
-	}
-	return f.Store.RecordEvents(ctx, []pr.Event{{PR: tracked[i], Kind: pr.KindUntracked, At: f.Now()}})
+	_, err = f.Store.Track(ctx, tracked[i], false, f.Now(), "")
+	return err
 }
 
 // slot is the tracked pull request that matches ref under any case, and

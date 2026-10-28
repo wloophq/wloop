@@ -312,3 +312,64 @@ func TestTheCheckoutIsTheStoredHeadAndBase(t *testing.T) {
 		t.Fatal("a unit of another provider checks out")
 	}
 }
+
+// gone are the units the plugin reported gone.
+func (h *fakeHost) gone() []sdk.Unit {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var out []sdk.Unit
+	for _, r := range h.reports {
+		for _, s := range r {
+			if s.Gone {
+				out = append(out, s.Unit)
+			}
+		}
+	}
+	return out
+}
+
+func TestAnEndedPullRequestPastTheWindowIsDroppedAndNeverReportedAgain(t *testing.T) {
+	t.Parallel()
+	dir, ctx := t.TempDir(), context.Background()
+	old := pr.Ref{Owner: "acme", Repo: "api", Number: 2}
+	ended := testAt.Add(-401 * 24 * time.Hour)
+	first := &Plugin{GH: &fakeGH{answers: map[string]string{}}, API: apitest.Options(&githubGraphQL{}), Now: func() time.Time { return testAt }}
+	if err := first.Start(ctx, src.StartRequest{StateDir: dir, Host: (&fakeHost{}).host()}); err != nil {
+		t.Fatal(err)
+	}
+	first.loading.Wait()
+	for _, p := range []pr.PR{{Ref: old, State: "MERGED", MergedAt: ended, ClosedAt: ended}, {Ref: ref7, State: "CLOSED", ClosedAt: testAt.Add(-time.Hour)}} {
+		if err := first.store().UpsertPR(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := first.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	h := &fakeHost{}
+	p := &Plugin{GH: &fakeGH{answers: map[string]string{}}, API: apitest.Options(&githubGraphQL{}), Now: func() time.Time { return testAt }}
+	if err := p.Start(ctx, src.StartRequest{StateDir: dir, Host: h.host()}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { p.Stop(context.Background()) })
+	p.loading.Wait()
+	if _, ok, _ := p.store().PR(ctx, old); ok {
+		t.Fatal("the plugin keeps a pull request the host's retention ended")
+	}
+	if len(h.reported(old)) != 0 || !slices.Contains(h.gone(), old.Unit()) {
+		t.Fatalf("the load reported %v of it, gone %v", h.reported(old), h.gone())
+	}
+	if len(h.reported(ref7)) == 0 {
+		t.Fatal("the load did not report a recently closed pull request")
+	}
+	if err := p.store().UpsertPR(ctx, pr.PR{Ref: old, State: "MERGED", MergedAt: ended, ClosedAt: ended}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Ingest(ctx, src.IngestRequest{Job: JobSlow}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := p.store().PR(ctx, old); ok || len(h.reported(old)) != 0 {
+		t.Fatal("the slow job kept or reported a pull request past the window")
+	}
+}

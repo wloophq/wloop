@@ -269,3 +269,85 @@ func TestTouchStubsRefreshesTheLightFacts(t *testing.T) {
 }
 
 var _ Host = (*memHost)(nil)
+
+func TestATrackRecordsItsEventOnTheHostBeforeItsRowAndOnceAcrossAFailedWrite(t *testing.T) {
+	t.Parallel()
+	db := open(t)
+	h := hostOf(db)
+	ctx := context.Background()
+	upsert(t, db, pr.PR{Ref: ref, Title: "one", State: pr.StateOpen})
+	h.fail = errors.New("broker down")
+	if _, err := db.Track(ctx, ref, true, noteAt, ""); err == nil {
+		t.Fatal("want the host's error")
+	}
+	if o, err := db.Override(ctx, ref); err != nil || o.Tracked {
+		t.Fatalf("a track the host refused moved the row: %+v %v", o, err)
+	}
+	heal := failPRWrites(t, db)
+	if _, err := db.Track(ctx, ref, true, noteAt.Add(time.Minute), ""); err == nil {
+		t.Fatal("want the write to fail")
+	}
+	heal()
+	changed, err := db.Track(ctx, ref, true, noteAt.Add(2*time.Minute), "")
+	if err != nil || !changed {
+		t.Fatalf("the retry: changed %v, %v", changed, err)
+	}
+	if got := keptKinds(h, ref); got[pr.KindTracked] != 1 {
+		t.Fatalf("the host holds %v, want one tracked", got)
+	}
+	if changed, err := db.Track(ctx, ref, true, noteAt.Add(3*time.Minute), ""); err != nil || changed {
+		t.Fatalf("tracking a tracked pull request: changed %v, %v", changed, err)
+	}
+	if _, err := db.Track(ctx, ref, false, noteAt.Add(4*time.Minute), "merged"); err != nil {
+		t.Fatal(err)
+	}
+	if got := keptKinds(h, ref); got[pr.KindTracked] != 1 || got[pr.KindUntracked] != 1 {
+		t.Fatalf("after the untrack the host holds %v", got)
+	}
+}
+
+func TestRetainDropsWhatTheHostsRetentionEnds(t *testing.T) {
+	t.Parallel()
+	db := open(t)
+	ctx := context.Background()
+	old, recent, open := pr.Ref{Owner: "acme", Repo: "api", Number: 2}, pr.Ref{Owner: "acme", Repo: "api", Number: 3}, ref
+	upsert(t, db, pr.PR{Ref: old, State: "MERGED", MergedAt: noteAt.Add(-500 * 24 * time.Hour), ClosedAt: noteAt.Add(-500 * 24 * time.Hour), LastSeenAt: noteAt})
+	upsert(t, db, pr.PR{Ref: recent, State: "CLOSED", ClosedAt: noteAt.Add(-10 * 24 * time.Hour), LastSeenAt: noteAt})
+	upsert(t, db, openPR(open, "author"))
+	if err := db.SaveDetail(ctx, old, detail(noteAt, "bug")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SetTracked(ctx, old, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkFetch(ctx, "ws-old", noteAt.Add(-40*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkFetch(ctx, "ws-new", noteAt); err != nil {
+		t.Fatal(err)
+	}
+	dropped, err := db.Retain(ctx, noteAt.Add(-400*24*time.Hour), noteAt.Add(-30*24*time.Hour))
+	if err != nil || !slices.Equal(dropped, []pr.Ref{old}) {
+		t.Fatalf("dropped %v, %v", dropped, err)
+	}
+	if _, ok, _ := db.PR(ctx, old); ok {
+		t.Fatal("the ended pull request is still stored")
+	}
+	if d, _ := db.Details(ctx, []pr.Ref{old}); len(d) != 0 {
+		t.Fatal("its detail is still stored")
+	}
+	if o, _ := db.Override(ctx, old); o.Tracked {
+		t.Fatal("its override is still stored")
+	}
+	for _, r := range []pr.Ref{recent, open} {
+		if _, ok, _ := db.PR(ctx, r); !ok {
+			t.Fatalf("%s was dropped", r)
+		}
+	}
+	if at, _ := db.LastFetch(ctx, "ws-old"); !at.IsZero() {
+		t.Fatal("an old fetch is still stored")
+	}
+	if at, _ := db.LastFetch(ctx, "ws-new"); at.IsZero() {
+		t.Fatal("a recent fetch was dropped")
+	}
+}

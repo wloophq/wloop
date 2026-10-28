@@ -275,10 +275,44 @@ func (r *running) nextRev(ctx context.Context) (uint64, error) {
 	return next, r.db.SetMeta(ctx, metaRev, strconv.FormatUint(next, 10))
 }
 
-// load reports every stored pull request once, which the host waits for
-// before it counts the plugin loaded.
+// The host's retention, which the plugin applies to its own store: a pull
+// request merged or closed that long ago goes with every row of it, and
+// fetches that old.
+const (
+	endedRetention   = 400 * 24 * time.Hour
+	fetchesRetention = 30 * 24 * time.Hour
+)
+
+// retain drops what the host's retention ends from the store and reports
+// each dropped pull request gone.
+func (r *running) retain(ctx context.Context) error {
+	now := r.now()
+	dropped, err := r.db.Retain(ctx, now.Add(-endedRetention), now.Add(-fetchesRetention))
+	if err != nil || len(dropped) == 0 {
+		return err
+	}
+	r.dirtyMu.Lock()
+	for _, ref := range dropped {
+		delete(r.dirty, ref)
+	}
+	r.dirtyMu.Unlock()
+	if r.host.Reporter == nil {
+		return nil
+	}
+	gone := make([]src.Snapshot, len(dropped))
+	for i, ref := range dropped {
+		gone[i] = src.Snapshot{Unit: ref.Unit(), At: now, Gone: true}
+	}
+	return r.host.Reporter.Report(ctx, gone)
+}
+
+// load applies the retention, then reports every stored pull request once,
+// which the host waits for before it counts the plugin loaded.
 func (r *running) load(ctx context.Context) {
-	err := r.report(ctx, true)
+	err := r.retain(ctx)
+	if rerr := r.report(ctx, true); err == nil {
+		err = rerr
+	}
 	r.loadedMu.Lock()
 	defer r.loadedMu.Unlock()
 	r.loaded = true
@@ -316,6 +350,9 @@ func (p *Plugin) Ingest(ctx context.Context, req src.IngestRequest) (src.IngestR
 		rep, err = r.col.Fast(ctx)
 	case JobSlow:
 		rep, err = r.col.Slow(ctx)
+		if err == nil {
+			err = r.retain(ctx)
+		}
 	default:
 		return src.IngestResult{}, fmt.Errorf("%w: no job %s", src.ErrUnsupported, req.Job)
 	}
