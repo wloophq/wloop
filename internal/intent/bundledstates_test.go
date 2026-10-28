@@ -1,6 +1,7 @@
 package intent
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -34,6 +35,15 @@ func TestBundledStatesMatchTheBundledProfile(t *testing.T) {
 		pf, pt, pok := d.Move(string(v))
 		if fok != pok || ft != pt || !slices.Equal(ff, pf) {
 			t.Errorf("verb %s: the fake moves %v to %q (%v), the profile %v to %q (%v)", v, ff, ft, fok, pf, pt, pok)
+		}
+		if got, want := fake.Handler(string(v)), d.Handler(string(v)); got != want {
+			t.Errorf("verb %s: the fake's handler %q, the profile's %q", v, got, want)
+		}
+		for _, a := range task.Actors {
+			allow, _, _ := fake.Authority(context.Background(), string(v), a, task.Task{})
+			if want := d.Verbs[string(v)].By[string(a)] == "true"; allow != want {
+				t.Errorf("verb %s: the fake lets %s run it %v, the profile's by %q", v, a, allow, d.Verbs[string(v)].By[string(a)])
+			}
 		}
 	}
 }

@@ -54,6 +54,25 @@ type Trigger struct {
 	Kind     TriggerKind
 	On       []string // event kinds, Kind == TriggerEvent
 	Schedule *Cron    // Kind == TriggerSchedule
+	// Actors are the kinds of actor whose events plan the workflow, every
+	// one when empty; Depth the longest chain an event it reacts to may
+	// close, DefaultChainDepth when 0. Both read with Kind == TriggerEvent.
+	Actors []string
+	Depth  int
+}
+
+// Fires says whether an event of the trigger's kinds plans workflow w: its
+// actor is one the trigger listens to, its chain is shorter than the
+// trigger's depth, and w is not in that chain already.
+func (t Trigger) Fires(w string, ev Event) bool {
+	if len(t.Actors) > 0 && !slices.Contains(t.Actors, ActorKind(ev.Actor)) {
+		return false
+	}
+	depth := t.Depth
+	if depth == 0 {
+		depth = DefaultChainDepth
+	}
+	return ev.Chain.Depth < depth && !ev.Chain.Has(w)
 }
 
 // Predicate is a compiled `when`; Reads are the facts it names, for the why.
@@ -315,7 +334,11 @@ type Event struct {
 	ID              int64 // events.id
 	Unit            unit.Unit
 	Kind, Key, Data string
-	At              time.Time
+	// Actor is who recorded it, "<actor>:<source>" for a verb; Chain the
+	// chain of workflows it closes.
+	Actor string
+	Chain Chain
+	At    time.Time
 }
 
 type Why struct {

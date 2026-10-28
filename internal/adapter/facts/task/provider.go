@@ -62,6 +62,9 @@ type Deps struct {
 	Settings func() Settings
 	// Ended says whether a unit has ended, as its plugin says; nil: none has.
 	Ended func(ctx context.Context, u unit.Unit) (bool, error)
+	// Repo is the repository of a unit, owner/name: its placement's, else its plugin's; "" none, and nil none
+	// at all.
+	Repo func(ctx context.Context, u unit.Unit) (string, error)
 	// Turns counts the turns run on a unit; nil: none.
 	Turns func(ctx context.Context, u unit.Unit) (int, error)
 	// Clock's location is where working days are counted.
@@ -261,6 +264,9 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 		return nil, err
 	}
 	f["task.link_ended"] = ended
+	if f["task.repo"], err = p.repo(ctx, us); err != nil {
+		return nil, err
+	}
 	if p.d.Cards != nil {
 		uf, ok, err := p.d.Cards.UnitFacts(ctx, eu)
 		if err != nil {
@@ -288,6 +294,20 @@ func (p *Provider) facts(ctx context.Context, u unit.Unit, anyState bool) (workf
 	}
 	f["task.items_open"], f["task.items_resolved"], f["task.items_owed"] = open, resolved, owed
 	return f, nil
+}
+
+// repo is the repository of the first unit of us that has one.
+func (p *Provider) repo(ctx context.Context, us []unit.Unit) (string, error) {
+	if p.d.Repo == nil {
+		return "", nil
+	}
+	for _, u := range us {
+		r, err := p.d.Repo(ctx, u)
+		if err != nil || r != "" {
+			return r, err
+		}
+	}
+	return "", nil
 }
 
 // ended says whether every unit of us but the task's own has ended, with

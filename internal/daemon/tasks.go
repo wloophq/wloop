@@ -266,7 +266,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 		s.runBridge(w, r, g, e, v, b.unit, st, req)
 		return
 	}
-	res, err := g.Do(ctx, e.ID, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source})
+	res, err := g.Do(ctx, e.ID, coretasks.Request{Verb: v, Args: req.Args, Source: req.Source, Actor: task.ActorPerson})
 	s.writeTaskResult(ctx, w, g, res, err)
 }
 
@@ -450,7 +450,7 @@ func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.
 		}
 	}
 	ctx := context.WithoutCancel(r.Context())
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: verb, Source: req.Source, Actor: task.ActorPerson})
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e
@@ -801,7 +801,7 @@ func (ev *taskViewer) verbs(ctx context.Context, e task.Task) []api.VerbState {
 				st.Runners = ev.s.delegateModes(ctx, b.unit, runs.ID)
 			}
 		default:
-			if err := ev.g.Accepts(e, verb); err != nil {
+			if err := ev.g.Accepts(e, verb, task.ActorPerson); err != nil {
 				st.Reason = err.Error()
 			} else {
 				st.Enabled = true

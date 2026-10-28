@@ -25,12 +25,12 @@ var stepGrammar = []Key{
 
 	stepKey(StepNotifySelf, "text", KindFile, "text.md.tmpl", "The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`."),
 
-	required(stepEnum(StepTaskVerb, "verb", TaskStepVerbs, "", "The verb run on the task. Required.")),
-	stepKey(StepTaskVerb, "until", KindText, "", "With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepTaskVerb, "on_activity", KindText, "", "With schedule, `true` returns the task on new activity on its unit."),
-	stepKey(StepTaskVerb, "on", KindText, "", "With waiting, the people the task waits on, comma-separated."),
-	stepKey(StepTaskVerb, "resurface", KindText, "", "With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
-	stepKey(StepTaskVerb, "set", KindText, "", "With context, the contexts, comma-separated; with area, the area."),
+	required(stepKey(StepTaskVerb, "verb", KindText, "", "The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required.")),
+	stepKey(StepTaskVerb, "until", KindText, "", "With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "on_activity", KindText, "", "With a verb whose handler is schedule, `true` returns the task on new activity on its unit."),
+	stepKey(StepTaskVerb, "on", KindText, "", "With a verb whose handler is waiting, the people the task waits on, comma-separated."),
+	stepKey(StepTaskVerb, "resurface", KindText, "", "With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD."),
+	stepKey(StepTaskVerb, "set", KindText, "", "With a verb whose handler is context, the contexts, comma-separated; with area, the area."),
 
 	required(stepKey(StepGateOpen, "name", KindText, "", "The gate, of gates.toml, the step opens. Required.")),
 

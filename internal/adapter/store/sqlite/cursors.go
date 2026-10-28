@@ -22,8 +22,8 @@ var _ automation.Events = events{}
 func (db *DB) Events() automation.Events { return events{db} }
 
 const (
-	eventsSinceSQL      = `SELECT id, provider, unit_key, kind, key, data, at FROM events WHERE id > ? ORDER BY id`
-	eventsSinceKindsSQL = `SELECT id, provider, unit_key, kind, key, data, at FROM events
+	eventsSinceSQL      = `SELECT id, provider, unit_key, kind, key, actor, data, at FROM events WHERE id > ? ORDER BY id`
+	eventsSinceKindsSQL = `SELECT id, provider, unit_key, kind, key, actor, data, at FROM events
 		WHERE id > ? AND +kind IN (SELECT value FROM json_each(?)) ORDER BY id`
 )
 
@@ -45,10 +45,11 @@ func (e events) Since(ctx context.Context, cursor int64, kinds []string) ([]work
 	for rows.Next() {
 		var ev workflow.Event
 		var provider, at string
-		if err := rows.Scan(&ev.ID, &provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Data, &at); err != nil {
+		if err := rows.Scan(&ev.ID, &provider, &ev.Unit.Key, &ev.Kind, &ev.Key, &ev.Actor, &ev.Data, &at); err != nil {
 			return nil, err
 		}
 		ev.Unit.Provider = unit.ProviderID(provider)
+		ev.Data, ev.Chain = workflow.SplitChain(ev.Data)
 		if ev.At, err = parseStoredTime(at); err != nil {
 			return nil, fmt.Errorf("event %d: %w", ev.ID, err)
 		}

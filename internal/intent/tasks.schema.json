@@ -127,7 +127,7 @@
         "properties": {
           "by": {
             "additionalProperties": {
-              "description": "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens a proposal gate a person approves.",
+              "description": "A predicate over the task's facts that lets the actor run the verb where it holds, or \"gate\", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.",
               "type": "string"
             },
             "description": "Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.",
@@ -147,6 +147,9 @@
           "handler": {
             "description": "What the verb runs besides its move, a handler of the loop's; none when absent.",
             "enum": [
+              "focus",
+              "schedule",
+              "waiting",
               "approve",
               "delegate",
               "answer",

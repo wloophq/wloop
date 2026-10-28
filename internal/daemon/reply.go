@@ -59,7 +59,7 @@ func (s *Server) runReply(ctx context.Context, w http.ResponseWriter, g *coretas
 		writeTasksError(w, taskDraftError(err))
 		return
 	}
-	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source})
+	s.recordVerb(ctx, g, e, coretasks.Request{Verb: task.VerbReply, Source: req.Source, Actor: task.ActorPerson})
 	now, err := g.Task(ctx, e.ID)
 	if err != nil {
 		now = e

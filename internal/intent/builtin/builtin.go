@@ -191,16 +191,12 @@ var RoundProviders []unit.ProviderID
 var PayloadProviders = map[string]unit.ProviderID{}
 
 // EventProviders are the event kinds only one provider's units record, by
-// kind: a workflow reacting to one needs that provider.
+// kind: a workflow reacting to one needs that provider. The kinds of the
+// profile's verbs are the task provider's; the loader reads them from
+// tasks.toml.
 var EventProviders = coreEventProviders()
 
-func coreEventProviders() map[string]unit.ProviderID {
-	out := map[string]unit.ProviderID{}
-	for _, k := range task.VerbEventKinds {
-		out[k] = unit.Task
-	}
-	return out
-}
+func coreEventProviders() map[string]unit.ProviderID { return map[string]unit.ProviderID{} }
 
 // LoopEventKinds are the event kinds the loop records on a unit of any
 // provider, which a workflow's trigger.on names.

@@ -39,13 +39,21 @@ An **observe** workflow (`observe = true`) plans and runs nothing by itself: `{{
 
 ## React to a verb
 
-A verb you run on a task, such as Done, Someday or Delegate, records a `verb_<verb>` event on the task (`verb_done`, `verb_someday`). A workflow with `provider = "entry"` reacts to it with `trigger.on = ["verb_done"]`; its `trigger.event.data` is the state the task left, and the task's facts are read even once it is done or dismissed. Its default key is the task's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
+A verb run on a task, such as Done, Someday or Delegate, records a `verb_<verb>` event on the task (`verb_done`, `verb_someday`), whoever ran it: you, or a workflow. A workflow with `provider = "task"` reacts to it with `trigger.on = ["verb_done"]`, for any verb of the profile's `tasks.toml`; its `trigger.event.data` is the state the task left, and the task's facts are read even once it is done or dismissed. Its default key is the task's fingerprint; `key = ["trigger.event.id"]` plans one run per event.
+
+So workflows can trigger each other: one clarifies a task, another reacts to that move and sets its kind, a third starts a turn. Each event carries its chain, the workflows that led to it, and three guards bound it:
+
+- `trigger.actors` limits the trigger to the verbs of those actors: `actors = ["person"]` listens to your moves alone;
+- `trigger.depth` (3 when absent, at most 5) is the longest chain the workflow may close: an event that a chain of that many workflows caused plans it no more;
+- a workflow never runs on an event whose chain it is in already, so A then B then A cannot happen.
+
+Marks keep each trigger handled once, and the turn budgets bound what any turn a chain starts costs.
 
 The core's own moves and a project's verbs record the event with the change, in one write; a verb that changes nothing, such as the area the task already has, records nothing. A verb another part runs, a question's answer, a unit's action through Approve, Delegate or Dismiss, or Reply, records it once that succeeded. `seen` records nothing, since clients send it when you open a task, and neither do the verbs on an Outbox draft.
 
 An event workflow reads its task's facts even once the task is done or in the trash, so it reacts to the verb that took it there. The same holds while its runs wait and when its drafts are judged for withdrawal: guard on `task.state` in `when` and `[drafts.withdraw]` when a run should not go on after the task left its list.
 
-A workflow moves the task itself with the `task.verb` step: `verb = "someday"`, or `verb = "waiting"` with `on` and `resurface`, among the verbs that move a task or set its focus, context or area. Approve, Delegate, Answer and Reply never come from a workflow. The plan blocks the step while the task's state refuses the verb. A move a workflow makes records no verb event, so it never triggers another workflow. It is the task's own move: `dismiss` sends the task to the trash and never runs its unit's dismiss action, as your Dismiss does on a task whose unit offers one, and a verb's `offer` in `tasks.toml` does not bind it.
+A workflow moves the task itself with the `task.verb` step: `verb = "next"`, or `verb = "waiting"` with `on` and `resurface`, among the verbs whose `by.workflow` in `tasks.toml` lets a workflow run them (bundled: next, waiting, schedule, focus, done and dismiss). The arguments a verb takes are its handler's. The plan blocks the step while the task's state refuses the verb or the verb's `by.workflow` does not hold on the task. A move a workflow makes records its verb event, by `workflow:<name>`, and may trigger another workflow within the bounds above. It is the task's own move: `dismiss` sends the task to the trash and never runs its unit's dismiss action, as your Dismiss does on a task whose unit offers one, and a verb's `offer` in `tasks.toml` does not bind it.
 
 ```toml
 summary = "Mark done a waiting task whose unit has nothing open"

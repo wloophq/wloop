@@ -24,9 +24,9 @@ func (s *Server) registerMessages() {
 	if s.deps.Tasks == nil || s.deps.Messages == nil {
 		return
 	}
-	s.deps.Tasks.Register(task.KindMessage, task.VerbAnswer, s.taskVerb(task.VerbAnswer))
-	s.deps.Tasks.Register(task.KindMessage, task.VerbDismiss, s.taskVerb(task.VerbDismiss))
-	s.deps.Tasks.Register(task.KindMessage, task.VerbApprove, s.taskVerb(task.VerbApprove))
+	s.deps.Tasks.Register(task.KindMessage, string(task.VerbAnswer), s.taskVerb(task.VerbAnswer))
+	s.deps.Tasks.Register(task.KindMessage, string(task.VerbDismiss), s.taskVerb(task.VerbDismiss))
+	s.deps.Tasks.Register(task.KindMessage, string(task.VerbApprove), s.taskVerb(task.VerbApprove))
 }
 
 func (s *Server) taskVerb(verb task.Verb) coretasks.VerbHandler {

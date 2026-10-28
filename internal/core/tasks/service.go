@@ -3,6 +3,7 @@ package tasks
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -11,9 +12,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // Deps is what the service runs on.
@@ -29,11 +33,15 @@ type Deps struct {
 	StaleWaitingDays int
 	// Disabled are the providers whose plugin is disabled now; nil: none is.
 	Disabled func() []unit.ProviderID
+	// Authority says who may run each verb; nil: States', when it is an Authorizer, else no actor may.
+	Authority Authority
+	// Gates opens the gate a gated verb opens; nil: a gated verb fails.
+	Gates gates.Store
 }
 
 type handlerKey struct {
-	kind task.Kind
-	verb task.Verb
+	kind    task.Kind
+	handler string
 }
 
 type Service struct {
@@ -45,32 +53,41 @@ type Service struct {
 	reg         sync.RWMutex
 	handlers    map[handlerKey]VerbHandler
 	views       map[task.View]viewSource
+	authority   Authority
 }
 
 func New(d Deps) *Service {
-	return &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[task.View]viewSource{}}
+	s := &Service{d: d, handlers: map[handlerKey]VerbHandler{}, views: map[task.View]viewSource{}, authority: d.Authority}
+	if a, ok := d.States.(Authorizer); ok && s.authority == nil {
+		s.authority = a.Authority
+	}
+	return s
 }
 
 func (s *Service) now() time.Time { return s.d.Clock.Now() }
 
-// Register makes h run verb on entries of kind, before any state change.
-func (s *Service) Register(kind task.Kind, verb task.Verb, h VerbHandler) {
+// Register makes h run, on entries of kind and before any state change, the verbs whose profile handler is
+// handler, and a verb with no handler named so (a kind's own dismiss or done).
+func (s *Service) Register(kind task.Kind, handler string, h VerbHandler) {
 	s.reg.Lock()
 	defer s.reg.Unlock()
-	s.handlers[handlerKey{kind, verb}] = h
+	s.handlers[handlerKey{kind, handler}] = h
 }
 
+// handler is the registered handler of verb on entries of kind: the one its profile handler names, else for a
+// verb with none the one its own name does.
 func (s *Service) handler(kind task.Kind, verb task.Verb) VerbHandler {
+	name := cmp.Or(s.d.States.Handler(string(verb)), string(verb))
 	s.reg.RLock()
 	defer s.reg.RUnlock()
-	return s.handlers[handlerKey{kind, verb}]
+	return s.handlers[handlerKey{kind, name}]
 }
 
 // Do runs req.Verb on entry id: a registered handler first, else the state change. An entry of a unit whose
 // plugin is disabled refuses every verb with ErrPluginDisabled but dismiss, which moves a derived entry, or one
 // whose units are all of disabled plugins, to the Trash whole, and detaches a disabled plugin's units from any other.
 func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, error) {
-	if !known(req.Verb) {
+	if _, _, ok := s.d.States.Move(string(req.Verb)); !ok {
 		return Result{}, fmt.Errorf("%w: unknown verb %q", ErrArgs, req.Verb)
 	}
 	if src, ok := s.sourceOf(id); ok {
@@ -81,10 +98,14 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		if !found {
 			return Result{}, fmt.Errorf("%w: %s", ErrNoTask, id)
 		}
-		if h := s.handler(e.Kind, req.Verb); h != nil {
-			return h(ctx, e, req)
+		h := s.handler(e.Kind, req.Verb)
+		if h == nil {
+			return Result{}, fmt.Errorf("%w: %s on a %s entry", ErrVerb, req.Verb, e.Kind)
 		}
-		return Result{}, fmt.Errorf("%w: %s on a %s entry", ErrVerb, req.Verb, e.Kind)
+		if gated, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil || gated {
+			return s.gated(ctx, e, req, err)
+		}
+		return h(ctx, e, req)
 	}
 	e, err := s.d.Store.Task(ctx, id)
 	if err != nil {
@@ -95,7 +116,16 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 		if req.Verb != task.VerbDismiss || !errors.Is(err, ErrPluginDisabled) {
 			return Result{}, err
 		}
+		if _, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil {
+			return Result{}, err
+		}
 		return s.dismissOff(ctx, id, req, enabled)
+	}
+	if err := s.declared(e, req.Verb); err != nil {
+		return Result{}, err
+	}
+	if gated, err := s.allowed(ctx, e, req.Verb, req.actor()); err != nil || gated {
+		return s.gated(ctx, e, req, err)
 	}
 	if h := s.handler(e.Kind, req.Verb); h != nil {
 		return h(ctx, e, req)
@@ -107,8 +137,8 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	}
 	now := s.now()
 	var cs []task.Change
-	if req.Verb == task.VerbProject {
-		cs, err = s.project(ctx, e, req.Args, now)
+	if s.d.States.Handler(string(req.Verb)) == handlerProject {
+		cs, err = s.project(ctx, e, req, now)
 	} else {
 		var next task.Task
 		next, err = s.transition(e, req, now)
@@ -120,17 +150,18 @@ func (s *Service) Do(ctx context.Context, id task.ID, req Request) (Result, erro
 	if s.beforeApply != nil {
 		s.beforeApply()
 	}
-	if err := s.d.Store.Apply(ctx, cs, verbEvents(e, req, now)...); err != nil {
+	if err := s.d.Store.Apply(ctx, cs, s.verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: cs[len(cs)-1].Task}, nil
 }
 
 // project attaches e to the project args["id"] names, or to a new one titled args["title"], after its last action.
-func (s *Service) project(ctx context.Context, e task.Task, args map[string]string, now time.Time) ([]task.Change, error) {
-	if err := s.accepts(e, task.VerbProject); err != nil {
+func (s *Service) project(ctx context.Context, e task.Task, req Request, now time.Time) ([]task.Change, error) {
+	if err := s.accepts(e, req.Verb); err != nil {
 		return nil, err
 	}
+	args := req.Args
 	var cs []task.Change
 	var p task.Task
 	switch id, title := args["id"], strings.TrimSpace(args["title"]); {
@@ -218,30 +249,67 @@ func (s *Service) dismissOff(ctx context.Context, id task.ID, req Request, enabl
 			why += " " + string(p)
 		}
 	}
-	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: next, Why: why}}, verbEvents(e, req, now)...); err != nil {
+	if err := s.d.Store.Apply(ctx, []task.Change{{Op: task.OpUpdate, Task: next, Why: why}}, s.verbEvents(e, req, now)...); err != nil {
 		return Result{}, err
 	}
 	return Result{Task: next}, nil
 }
 
-// RecordVerb records that a person ran req's verb on e, once the handler or
-// the service that runs it succeeded.
+// RecordVerb records that req's actor ran req's verb on e, once the handler
+// or the service that runs it succeeded.
 func (s *Service) RecordVerb(ctx context.Context, e task.Task, req Request) error {
-	evs := verbEvents(e, req, s.now())
+	evs := s.verbEvents(e, req, s.now())
 	if len(evs) == 0 {
 		return nil
 	}
 	return s.d.Store.Apply(ctx, nil, evs...)
 }
 
-// verbEvents are the event of req's verb on e, which left e's state; none
-// for a verb that records nothing or an automated one.
-func verbEvents(e task.Task, req Request, now time.Time) []port.Event {
-	kind := task.VerbEventKind(req.Verb)
-	if req.Automated || !slices.Contains(task.VerbEventKinds, kind) {
+// verbEvents are the event of req's verb on e: its actor as "<actor>:<source>", and as data the state it left
+// with req's chain. None for a verb whose handler is seen, which clients send on their own.
+func (s *Service) verbEvents(e task.Task, req Request, now time.Time) []port.Event {
+	if s.d.States.Handler(string(req.Verb)) == handlerSeen {
 		return nil
 	}
-	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: kind, Actor: req.Source, Data: string(e.State), At: now}}
+	return []port.Event{{Unit: task.UnitOf(e.ID), Kind: task.VerbEventKind(req.Verb), Actor: string(req.actor()) + ":" + req.Source,
+		Data: workflow.ChainData(string(e.State), req.Chain), At: now}}
+}
+
+// gated opens the gate req's verb names on e, for a person to approve, and leaves e as it is; err, the
+// authority's refusal, is returned as it is.
+func (s *Service) gated(ctx context.Context, e task.Task, req Request, err error) (Result, error) {
+	if err != nil {
+		return Result{}, err
+	}
+	if s.d.Gates == nil {
+		return Result{}, fmt.Errorf("%w: %s opens a gate, and no gates are served", ErrVerb, req.Verb)
+	}
+	g, _ := s.d.States.Gate(string(req.Verb))
+	subject, err := json.Marshal(proposal{Verb: req.Verb, Args: req.Args})
+	if err != nil {
+		return Result{}, err
+	}
+	g.Task, g.Unit, g.Subject = e.ID, task.UnitOf(e.ID), string(subject)
+	if _, err := s.d.Gates.Open(ctx, g); err != nil {
+		return Result{}, err
+	}
+	return Result{Task: e}, nil
+}
+
+// proposal is the verb a gate a gated verb opened proposes, as its Subject keeps it.
+type proposal struct {
+	Verb task.Verb         `json:"verb"`
+	Args map[string]string `json:"args,omitempty"`
+}
+
+// ProposedVerb is the request a gate a gated verb opened proposes, run as the person who approves it; false
+// for a gate no verb opened.
+func ProposedVerb(g gate.Gate) (Request, bool) {
+	var p proposal
+	if json.Unmarshal([]byte(g.Subject), &p) != nil || p.Verb == "" {
+		return Request{}, false
+	}
+	return Request{Verb: p.Verb, Args: p.Args, Actor: task.ActorPerson, Source: "gate"}, true
 }
 
 // writable refuses an entry with a unit whose plugin is disabled; ok caches the answers per unit.

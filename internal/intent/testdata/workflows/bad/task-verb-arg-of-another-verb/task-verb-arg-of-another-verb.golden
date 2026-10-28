@@ -1,1 +1,1 @@
-testdata/workflows/bad/task-verb-arg-of-another-verb/workflows/case-workflow/workflow.toml:8:9: step[0].until: is not an argument of someday
+testdata/workflows/bad/task-verb-arg-of-another-verb/workflows/case-workflow/workflow.toml:8:9: step[0].until: is not an argument of next

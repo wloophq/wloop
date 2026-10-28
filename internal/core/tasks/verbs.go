@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -10,51 +11,105 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// handlerVerbs move nothing on their own: a registered handler or the daemon runs them.
-var handlerVerbs = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbAnswer, task.VerbEdit, task.VerbRetry,
-	task.VerbReply, task.VerbReviewed, task.VerbSequential}
+// The handlers the service runs itself as part of a verb's move; a verb
+// with another handler moves nothing on its own: a registered handler or
+// the daemon runs it.
+const (
+	handlerSeen     = "seen"
+	handlerFocus    = "focus"
+	handlerContext  = "context"
+	handlerArea     = "area"
+	handlerSchedule = "schedule"
+	handlerWaiting  = "waiting"
+	handlerProject  = "project"
+)
 
-func known(v task.Verb) bool { return slices.Contains(task.Verbs, v) }
+var ownHandlers = []string{handlerSeen, handlerFocus, handlerContext, handlerArea, handlerSchedule, handlerWaiting, handlerProject}
 
-// accepts says whether e's state takes verb, as the profile's from says, naming both when it does not.
-func (s *Service) accepts(e task.Task, v task.Verb) error {
-	if !known(v) {
+// Accepts says whether actor a may run verb v on t as its move: ErrArgs for a verb the profile does not
+// declare, ErrVerb naming the verb and the state for one t's state refuses or one whose handler the service
+// does not run, ErrForbidden for one the profile's by does not let a run. A verb whose by opens a gate for a is
+// accepted: running it opens the gate.
+func (s *Service) Accepts(t task.Task, v task.Verb, a task.Actor) error {
+	if err := s.accepts(t, v); err != nil {
+		return err
+	}
+	_, err := s.allowed(context.Background(), t, v, a)
+	return err
+}
+
+// declared refuses a verb the profile does not declare, and one t's state is not among the verb's from.
+func (s *Service) declared(e task.Task, v task.Verb) error {
+	from, _, ok := s.d.States.Move(string(v))
+	if !ok {
 		return fmt.Errorf("%w: unknown verb %q", ErrArgs, v)
 	}
-	from, _, ok := s.d.States.Move(string(v))
-	if !ok || slices.Contains(handlerVerbs, v) || len(from) > 0 && !slices.Contains(from, string(e.State)) {
+	if len(from) > 0 && !slices.Contains(from, string(e.State)) {
 		return fmt.Errorf("%w: %s on a %s entry", ErrVerb, v, e.State)
 	}
 	return nil
 }
 
-// transition is the state change of a verb with no handler, to the state the profile's to names; project is
-// the service's.
+// accepts says whether e's state takes verb as a move the service runs, as the profile's from and handler say,
+// naming both when it does not.
+func (s *Service) accepts(e task.Task, v task.Verb) error {
+	if err := s.declared(e, v); err != nil {
+		return err
+	}
+	if h := s.d.States.Handler(string(v)); h != "" && !slices.Contains(ownHandlers, h) {
+		return fmt.Errorf("%w: %s on a %s entry", ErrVerb, v, e.State)
+	}
+	return nil
+}
+
+// allowed says whether a may run v on e, and whether running it opens v's gate instead, as the profile's
+// authority says.
+func (s *Service) allowed(ctx context.Context, e task.Task, v task.Verb, a task.Actor) (gated bool, err error) {
+	if s.authority == nil {
+		return false, fmt.Errorf("%w: %s may not run %s: no authority", ErrForbidden, a, v)
+	}
+	allow, gate, err := s.authority(ctx, string(v), a, e)
+	switch {
+	case err != nil:
+		return false, err
+	case gate:
+		if _, ok := s.d.States.Gate(string(v)); !ok {
+			return false, fmt.Errorf("%w: %s opens a gate the profile does not name", ErrVerb, v)
+		}
+		return true, nil
+	case !allow:
+		return false, fmt.Errorf("%w: %s may not run %s on this entry", ErrForbidden, a, v)
+	}
+	return false, nil
+}
+
+// transition is the state change of a verb with no handler, or one the service runs, to the state the profile's
+// to names; project is the service's.
 func (s *Service) transition(e task.Task, req Request, now time.Time) (task.Task, error) {
 	if err := s.accepts(e, req.Verb); err != nil {
 		return task.Task{}, err
 	}
 	_, to, _ := s.d.States.Move(string(req.Verb))
-	switch req.Verb {
-	case task.VerbSeen:
+	switch s.d.States.Handler(string(req.Verb)) {
+	case handlerSeen:
 		e.Changed, e.SeenAt = false, now
-	case task.VerbFocus:
+	case handlerFocus:
 		v := task.FocusOn
 		if e.Starred() {
 			v = task.FocusOff
 		}
-		e.SetProp(task.PropFocus, task.Value{Text: v}, task.WriterPerson, now)
-	case task.VerbContext:
-		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.WriterPerson, now)
-	case task.VerbArea:
-		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.WriterPerson, now)
-	case task.VerbSchedule:
+		e.SetProp(task.PropFocus, task.Value{Text: v}, task.Writer(req.actor()), now)
+	case handlerContext:
+		e.SetProp(task.PropContexts, task.Value{List: split(req.Args["set"])}, task.Writer(req.actor()), now)
+	case handlerArea:
+		e.SetProp(task.PropArea, task.Value{Text: strings.TrimSpace(req.Args["set"])}, task.Writer(req.actor()), now)
+	case handlerSchedule:
 		snooze, err := scheduleArgs(e, req.Args, now)
 		if err != nil {
 			return task.Task{}, err
 		}
 		e.Snooze = snooze
-	case task.VerbWaiting:
+	case handlerWaiting:
 		w, err := waitingArgs(e, req.Args, now)
 		if err != nil {
 			return task.Task{}, err
@@ -62,7 +117,7 @@ func (s *Service) transition(e task.Task, req Request, now time.Time) (task.Task
 		e.Waiting = w
 	}
 	if to != "" {
-		if req.Verb != task.VerbSchedule {
+		if s.d.States.Handler(string(req.Verb)) != handlerSchedule {
 			e.Snooze = task.Snooze{Mute: e.Snooze.Mute}
 		}
 		e.Become(task.State(to), s.d.States)

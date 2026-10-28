@@ -121,44 +121,57 @@ doc     = "When to check on the task while it waits."
 # The verbs. A verb's label is its button; its summary, one line on what
 # pressing it does, is the button's tooltip; input is the question a verb
 # that asks for a value puts first. from are the states a verb takes a
-# task from (every state when left out), to the state it moves it to.
+# task from (every state when left out), to the state it moves it to,
+# handler what the loop runs besides the move. by says who may run it:
+# a condition over the task's facts per actor (person, workflow, agent,
+# plugin), or "gate", which opens the gate the verb's gate names for a
+# person to approve; an actor left out may not run it.
 
 [verbs.next]
 label   = "Next"
 summary = "Move it to Next: something you will do as soon as you can."
 from    = ["inbox", "waiting", "scheduled", "someday", "reference"]
 to      = "next"
+by      = { person = "true", workflow = "true" }
 
 [verbs.waiting]
+handler = "waiting"
 label   = "Waiting"
 summary = "Move it to Waiting on the people you name; it resurfaces on the date you set."
 input   = "Waiting on whom (optional)"
 from    = ["inbox", "next", "scheduled", "someday"]
 to      = "waiting"
+by      = { person = "true", workflow = "true" }
 
 [verbs.schedule]
+handler = "schedule"
 label   = "Schedule"
 summary = "Hide it until a date or until its unit moves, then bring it back where it was."
 input   = "Until when: YYYY-MM-DD, an RFC 3339 time, or activity"
 from    = ["inbox", "next", "waiting", "scheduled", "someday"]
 to      = "scheduled"
+by      = { person = "true", workflow = "true" }
 
 [verbs.someday]
 label   = "Someday"
 summary = "Move it to Someday: not now, kept for a later look."
 from    = ["inbox", "next", "waiting", "scheduled"]
 to      = "someday"
+by      = { person = "true" }
 
 [verbs.reference]
 label   = "Reference"
 summary = "Keep it as reference: nothing to do, worth finding again."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "done"]
 to      = "reference"
+by      = { person = "true" }
 
 [verbs.focus]
+handler = "focus"
 label   = "Focus"
 summary = "Star it in Focus, or take the star off."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
+by      = { person = "true", workflow = "true" }
 
 [verbs.project]
 handler = "project"
@@ -166,34 +179,40 @@ label   = "Project"
 summary = "Attach it to a project, or start a new project with it."
 input   = "Project title"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
+by      = { person = "true" }
 
 [verbs.approve]
 handler = "approve"
 label   = "Approve"
 summary = "Approve what it proposes: its draft, its recommended answer or its unit's action."
+by      = { person = "true" }
 
 [verbs.delegate]
 handler = "delegate"
 label   = "Delegate"
 summary = "Hand it to an agent, which runs its unit's action."
 input   = "Guidance for the agent (optional)"
+by      = { person = "true" }
 
 [verbs.done]
 label   = "Done"
 summary = "Mark it done: it leaves your lists for the Logbook."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
 to      = "done"
+by      = { person = "true", workflow = "true" }
 
 [verbs.dismiss]
 label   = "Dismiss"
 summary = "Throw it away: it goes to the trash, and a draft it carries is discarded."
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference", "done"]
 to      = "trash"
+by      = { person = "true", workflow = "true" }
 
 [verbs.seen]
 handler = "seen"
 label   = "Seen"
 summary = "Mark what changed on it as read."
+by      = { person = "true" }
 
 [verbs.context]
 handler = "context"
@@ -201,6 +220,7 @@ label   = "Context"
 summary = "Set the contexts it is listed under."
 input   = "Contexts, comma separated (empty clears)"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
+by      = { person = "true" }
 
 [verbs.area]
 handler = "area"
@@ -208,34 +228,41 @@ label   = "Area"
 summary = "Set the area it belongs to."
 input   = "Area (empty clears)"
 from    = ["inbox", "next", "waiting", "scheduled", "someday", "reference"]
+by      = { person = "true" }
 
 [verbs.answer]
 handler = "answer"
 label   = "Answer"
 summary = "Answer the question it asks."
+by      = { person = "true" }
 
 [verbs.edit]
 handler = "edit"
 label   = "Edit"
 summary = "Change its draft before it is sent."
+by      = { person = "true" }
 
 [verbs.retry]
 handler = "retry"
 label   = "Retry"
 summary = "Send its failed draft again."
+by      = { person = "true" }
 
 [verbs.reviewed]
 handler = "reviewed"
 label   = "Reviewed"
 summary = "Mark the project reviewed; the next review comes after its interval."
+by      = { person = "true" }
 
 [verbs.sequential]
 handler = "sequential"
 label   = "Sequential"
 summary = "Take the project's actions one at a time, or all at once again."
+by      = { person = "true" }
 
 [verbs.reply]
 handler = "reply"
 label   = "Reply"
 summary = "Write a reply on its unit; it waits in the Outbox for your approval."
 input   = "Reply, saved to the Outbox for your approval"
+by      = { person = "true" }

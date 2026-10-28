@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/turns"
@@ -81,4 +82,33 @@ func (e *Env) newTaskResults(g *coretasks.Service, mods []source.Module) taskRes
 		}
 	}
 	return taskResults{tasks: g, units: unit.NewRegistry(codecs...), intents: func() *dintent.Registry { return e.loadedIntents().Registry }}
+}
+
+// unitsRepo is the repository of a unit: the one the placement rules give it, else the repo fact of its
+// plugin's facts; "" when neither names one.
+func unitsRepo(mods []source.Module, cfg func() config.Config) func(ctx context.Context, u unit.Unit) (string, error) {
+	return func(ctx context.Context, u unit.Unit) (string, error) {
+		if p, ok := cfg().PlacementMap().Place(u); ok && p.Repo != "" {
+			return p.Repo, nil
+		}
+		slot, ok := builtin.Slots[u.Provider]
+		if !ok {
+			return "", nil
+		}
+		for _, m := range mods {
+			if m.ID != u.Provider || m.Facts == nil {
+				continue
+			}
+			f, err := m.Facts.Facts(ctx, u)
+			if errors.Is(err, automation.ErrUnitGone) {
+				return "", nil
+			}
+			if err != nil {
+				return "", err
+			}
+			repo, _ := f[slot+".repo"].(string)
+			return repo, nil
+		}
+		return "", nil
+	}
 }

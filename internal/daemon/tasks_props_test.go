@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -83,6 +84,12 @@ func (p *profileStates) FirstOf(c task.Category) string { return taskstest.Bundl
 
 func (p *profileStates) Move(verb string) ([]string, string, bool) {
 	return taskstest.BundledStates.Move(verb)
+}
+
+func (p *profileStates) Handler(verb string) string { return taskstest.BundledStates.Handler(verb) }
+
+func (p *profileStates) Gate(verb string) (gate.Gate, bool) {
+	return taskstest.BundledStates.Gate(verb)
 }
 
 func TestTheSyncWorkerRecategorizesAtStartAndOnAReload(t *testing.T) {

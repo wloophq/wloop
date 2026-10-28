@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func verbEvents(evs []port.Event) []port.Event {
-	return slices.DeleteFunc(slices.Clone(evs), func(ev port.Event) bool { return !slices.Contains(task.VerbEventKinds, ev.Kind) })
+	return slices.DeleteFunc(slices.Clone(evs), func(ev port.Event) bool { return !strings.HasPrefix(ev.Kind, task.VerbEventKind("")) })
 }
 
 func TestAVerbRecordsItsEvent(t *testing.T) {
@@ -23,7 +24,7 @@ func TestAVerbRecordsItsEvent(t *testing.T) {
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbDone, Source: "cockpit"}); err != nil {
 		t.Fatal(err)
 	}
-	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_done", Actor: "cockpit", Data: "next", At: r.clock.t}}
+	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_done", Actor: "person:cockpit", Data: "next", At: r.clock.t}}
 	if got := verbEvents(r.store.Events); !slices.Equal(got, want) {
 		t.Errorf("events %+v, want %+v", got, want)
 	}
@@ -59,7 +60,7 @@ func TestRecordVerbRecordsAVerbAnotherServiceRan(t *testing.T) {
 	if err := r.svc.RecordVerb(context.Background(), e, coretasks.Request{Verb: task.VerbDelegate, Source: "tui"}); err != nil {
 		t.Fatal(err)
 	}
-	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_delegate", Actor: "tui", Data: "inbox", At: t0}}
+	want := []port.Event{{Unit: task.UnitOf(e.ID), Kind: "verb_delegate", Actor: "person:tui", Data: "inbox", At: t0}}
 	if got := verbEvents(r.store.Events); !slices.Equal(got, want) {
 		t.Errorf("events %+v, want %+v", got, want)
 	}
@@ -69,24 +70,6 @@ func TestAVerbThatChangesNothingRecordsNothing(t *testing.T) {
 	r := newRig()
 	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Origin: task.OriginUser, Props: task.Props{"area": {Text: "OSS"}}, Written: map[string]task.Written{"area": {By: task.WriterPerson}}})
 	if _, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbArea, Args: map[string]string{"set": "OSS"}}); err != nil {
-		t.Fatal(err)
-	}
-	if got := verbEvents(r.store.Events); len(got) > 0 {
-		t.Errorf("events %+v", got)
-	}
-}
-
-func TestAnAutomatedVerbRecordsNoEvent(t *testing.T) {
-	r := newRig()
-	e := r.put(t, task.Task{ID: "e-x", Kind: task.KindCapture, State: "next", Category: task.CategoryReady, Origin: task.OriginUser})
-	res, err := r.svc.Do(context.Background(), e.ID, coretasks.Request{Verb: task.VerbSomeday, Source: "workflow", Automated: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Task.Category != task.CategoryDeferred {
-		t.Fatalf("state %s", res.Task.State)
-	}
-	if err := r.svc.RecordVerb(context.Background(), res.Task, coretasks.Request{Verb: task.VerbDone, Automated: true}); err != nil {
 		t.Fatal(err)
 	}
 	if got := verbEvents(r.store.Events); len(got) > 0 {

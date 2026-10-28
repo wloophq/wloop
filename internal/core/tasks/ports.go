@@ -3,13 +3,16 @@
 package tasks
 
 import (
+	"cmp"
 	"context"
 	"errors"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
 // Reader is the read half of Store.
@@ -90,14 +93,18 @@ type ViewSource interface {
 // one on a stored entry records the verb with Service.RecordVerb once it succeeded.
 type VerbHandler func(ctx context.Context, e task.Task, req Request) (Result, error)
 
+// Request is a verb to run. Actor is who runs it, a person when empty;
+// Source where it came from (the cockpit, a workflow's name). Chain is the
+// chain of workflows that led to it, which its event carries on.
 type Request struct {
 	Verb   task.Verb
 	Args   map[string]string
 	Source string
-	// Automated is a verb a workflow ran: it records no verb event, which
-	// says a person ran it and could start another workflow in turn.
-	Automated bool
+	Actor  task.Actor
+	Chain  workflow.Chain
 }
+
+func (r Request) actor() task.Actor { return cmp.Or(r.Actor, task.ActorPerson) }
 
 type Result struct {
 	Task  task.Task
@@ -119,6 +126,8 @@ var (
 	ErrArgs = errors.New("bad entry request")
 	// ErrPluginDisabled refuses a change to an entry whose unit's plugin is disabled.
 	ErrPluginDisabled = errors.New("the unit's plugin is disabled")
+	// ErrForbidden refuses a verb its actor may not run on the task, as the profile's by says.
+	ErrForbidden = errors.New("the actor may not run the verb")
 )
 
 // States are the profile's states (tasks.toml) and the transitions of its verbs.
@@ -127,6 +136,16 @@ type States interface {
 	// Move is the states verb moves a task from (every state when empty) and the state it moves it to ("" for
 	// none); false when the profile declares no such verb.
 	Move(verb string) (from []string, to string, ok bool)
+	// Handler is the handler verb runs besides its move, "" for none.
+	Handler(verb string) string
+	// Gate is the gate a by.<actor> of "gate" on verb opens, as the profile declares it: its Name, Kind and
+	// Intents; false when the verb names none.
+	Gate(verb string) (gate.Gate, bool)
+}
+
+// Authorizer is States that also says who may run a verb: the service runs on it when Deps.Authority is nil.
+type Authorizer interface {
+	Authority(ctx context.Context, verb string, a task.Actor, t task.Task) (allow, gate bool, err error)
 }
 
 // Recategorizer rewrites the stored tasks' categories from their states, as of reads them, noting the tasks

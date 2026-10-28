@@ -223,9 +223,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
 - `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
-- `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens a proposal gate a person approves.
+- `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens the gate the verb's gate names, and a person's approval runs the verb as theirs; true lets the actor run it anywhere.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
-- `verbs.<name>.handler` (one of `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+- `verbs.<name>.handler` (one of `focus`, `schedule`, `waiting`, `approve`, `delegate`, `answer`, `edit`, `retry`, `reply`, `project`, `context`, `area`, `seen`, `reviewed`, `sequential`): What the verb runs besides its move, a handler of the loop's; none when absent.
+  - `focus`: Stars the task in Focus, or takes the star off.
+  - `schedule`: Hides the task until a date or until its unit moves, then brings it back where it was.
+  - `waiting`: Records who the task waits on and when it resurfaces.
   - `approve`: Resolves the task's open gate as approved, or runs its unit's approve action.
   - `delegate`: Starts a turn on the task, headless or in a session.
   - `answer`: Answers the task's open question gate with the text it asks for.
@@ -336,10 +339,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### When it is planned
 
 - `trigger` (table): What plans the workflow: on or schedule; absent, every sweep.
-- `trigger.on` (list of `muted`, `unmuted`, `held`, `released`, `adopted`, `tracked`, `untracked`, `nudged`, `removed`, `status`, `check`, `closed`, `comment`, `draft`, `guidance`, `merged`, `opened`, `push`, `ready`, `review`, `review_ended`, `review_request_removed`, `review_requested`, `round_blocked`, `round_held`, `round_pending`, `round_sent`, `round_skipped`, `round_unblocked`, `verb_answer`, `verb_approve`, `verb_area`, `verb_context`, `verb_delegate`, `verb_dismiss`, `verb_done`, `verb_focus`, `verb_next`, `verb_project`, `verb_reference`, `verb_reply`, `verb_reviewed`, `verb_schedule`, `verb_sequential`, `verb_someday`, `verb_waiting`, `would_address`, `would_review`, `task.woke`): The source event kinds the workflow reacts to; verb_&lt;verb&gt;, a verb a person ran on a task, and task.woke, a task's wake matched, with provider task.
+- `trigger.on` (list of strings): The event kinds the workflow reacts to: the loop's, the plugins', task.woke (a task's wake matched) and verb_&lt;verb&gt;, a verb of tasks.toml run on a task by anyone, a workflow included; the last two with provider task.
 - `trigger.schedule` (string): A cron schedule, in local time.
-- `trigger.actors` (list of `person`, `workflow`, `agent`, `plugin`): With on, the actors whose events plan it; every actor when absent.
-- `trigger.depth` (integer, default `3`): With on, the longest chain of workflows triggering each other the event may close; at most 5.
+- `trigger.actors` (list of `person`, `workflow`, `agent`, `plugin`): With on, the actors whose verb events plan it (person, workflow, agent, plugin); every actor when absent.
+- `trigger.depth` (integer, default `3`): With on, the longest chain of workflows triggering each other the workflow may close: an event a chain of that many workflows caused plans it no more, and a workflow already in an event's chain never runs on it. 1 to 5.
 - `observe` (bool, default `false`): Plans items pending and never runs them by itself; a person applies an item by hand.
 - `limits` (table): How many runs the workflow may take.
 - `limits.per_run` (integer, default `0`): Runs per evaluation; 0 is no limit.
@@ -435,12 +438,12 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `notify.self`:
   - `text` (file, default `text.md.tmpl`): The template of the notification's text, beside the manifest: `.Workflow`, `.Unit` and `.Facts`.
 - `task.verb`:
-  - `verb` (one of `next`, `waiting`, `schedule`, `someday`, `reference`, `focus`, `context`, `area`, `done`, `dismiss`): The verb run on the task. Required.
-  - `until` (string): With schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.
-  - `on_activity` (string): With schedule, `true` returns the task on new activity on its unit.
-  - `on` (string): With waiting, the people the task waits on, comma-separated.
-  - `resurface` (string): With waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
-  - `set` (string): With context, the contexts, comma-separated; with area, the area.
+  - `verb` (string): The verb of tasks.toml run on the task, one whose by.workflow lets a workflow run it. Required.
+  - `until` (string): With a verb whose handler is schedule, the date the task returns: RFC 3339 or YYYY-MM-DD.
+  - `on_activity` (string): With a verb whose handler is schedule, `true` returns the task on new activity on its unit.
+  - `on` (string): With a verb whose handler is waiting, the people the task waits on, comma-separated.
+  - `resurface` (string): With a verb whose handler is waiting, the date the task resurfaces: RFC 3339 or YYYY-MM-DD.
+  - `set` (string): With a verb whose handler is context, the contexts, comma-separated; with area, the area.
 - `gate.open`:
   - `name` (string): The gate, of gates.toml, the step opens. Required.
 - `task.set`:

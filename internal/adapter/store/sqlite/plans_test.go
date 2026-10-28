@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/wloophq/wloop/internal/core/gates"
-	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -77,7 +76,6 @@ var hotPlans = []hotPlan{
 	{name: "retain an ended pull request's events", query: endedTables[5].query, args: 1, want: []string{"events_unit_kind (provider=? AND unit_key=?)"}},
 	{name: "retain an ended pull request's turns", query: endedTables[1].query, args: 1, want: []string{"turns_unit (provider=? AND unit_key=?)"}},
 	{name: "retain workflow events", query: retainWorkflowEventsSQL, args: len(workflow.EngineKinds) + 1, want: []string{"SEARCH events USING INDEX events_kind (kind=? AND at<?)"}},
-	{name: "retain verb events", query: retainVerbEventsSQL, args: len(task.VerbEventKinds) + 1, want: []string{"SEARCH events USING INDEX events_kind (kind=? AND at<?)"}},
 	{name: "events since a cursor", query: eventsSinceSQL, args: 1, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "events of kinds since a cursor", query: eventsSinceKindsSQL, args: 2, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "replace a workflow's plan items", query: `DELETE FROM plan_items WHERE workflow = ?`, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},

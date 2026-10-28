@@ -641,7 +641,7 @@ func TestRegisteredHandlerWins(t *testing.T) {
 	c, g := bridgeRig(t)
 	c.propose(t)
 	var got []string
-	g.Register(task.KindAction, task.VerbApprove, func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	g.Register(task.KindAction, string(task.VerbApprove), func(_ context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		got = append(got, string(e.ID)+" "+req.Source)
 		return coretasks.Result{Task: e, Lines: []string{"handled"}}, nil
 	})
@@ -743,7 +743,7 @@ func TestTaskAnswerRouteMatchesTheUnitAnswer(t *testing.T) {
 	if got := r.outcome(rec.Code, res.Lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("by entry %+v\nby unit %+v", got, want)
 	}
-	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "cockpit" {
+	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_answer" || evs[0].Actor != "person:cockpit" {
 		t.Fatalf("events %+v", evs)
 	}
 }
@@ -839,14 +839,15 @@ func TestATasksMessageShowsItsAnswersAndWhetherTheAgentReadThem(t *testing.T) {
 	}
 }
 
-func TestAVerbAWorkflowRunsOnAMessageRecordsNothing(t *testing.T) {
+func TestAVerbAWorkflowRunsOnAMessageRecordsItsActor(t *testing.T) {
 	t.Parallel()
 	r := newMessageRig(t)
 	m := r.question(t)
-	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), coretasks.Request{Verb: task.VerbDismiss, Source: "workflow stale", Automated: true}); err != nil {
+	req := coretasks.Request{Verb: task.VerbDismiss, Source: "stale", Actor: task.ActorWorkflow, Chain: workflow.Chain{}.Then("stale")}
+	if _, err := r.s.deps.Tasks.Do(context.Background(), task.ID(m.TaskID), req); err != nil {
 		t.Fatal(err)
 	}
-	if evs := r.tasks.Events; len(evs) != 0 {
+	if evs := r.tasks.Events; len(evs) != 1 || evs[0].Kind != "verb_dismiss" || evs[0].Actor != "workflow:stale" {
 		t.Fatalf("events %+v", evs)
 	}
 }

@@ -42,7 +42,7 @@ func TestBundledWorkflowsLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	loaded, broken, _, problems, warnings := loadWorkflows(nil, sub, nil, nil)
+	loaded, broken, _, problems, warnings := loadWorkflows(nil, sub, nil, nil, bundledTasks(t))
 	if len(problems) > 0 || len(broken) > 0 || len(warnings) > 0 {
 		t.Fatalf("%v\n%v", problems.Error(), warnings.Error())
 	}

@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wloophq/wloop/internal/domain/task"
-
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/automation/automationtest"
 	"github.com/wloophq/wloop/internal/core/change"
@@ -633,18 +631,5 @@ func TestRetentionPrunesClassificationsAndFetches(t *testing.T) {
 	}
 	if last, _ := f.Last(ctx, "ws-"+recent.Format(time.DateOnly)); !last.Equal(recent) {
 		t.Errorf("the recent fetch reads %v", last)
-	}
-}
-
-func TestRetentionPrunesVerbEvents(t *testing.T) {
-	t.Parallel()
-	db, _ := openTemp(t)
-	event_(t, db, "entry", "e-1", task.VerbEventKind(task.VerbDone), "", past)
-	event_(t, db, "entry", "e-2", task.VerbEventKind(task.VerbNext), "", recent)
-	event_(t, db, "entry", "e-3", "intake_guidance", "", past)
-
-	got := retain(t, db, DefaultRetention)
-	if want := (Retained{VerbEventsKey: 1}); !maps.Equal(got, want) {
-		t.Errorf("retained %v, want %v", got, want)
 	}
 }

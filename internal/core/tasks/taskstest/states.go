@@ -1,8 +1,10 @@
 package taskstest
 
 import (
+	"context"
 	"slices"
 
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
@@ -73,4 +75,32 @@ func (bundledStates) Move(verb string) ([]string, string, bool) {
 		return m.from, m.to, true
 	}
 	return nil, "", slices.Contains(task.Verbs, task.Verb(verb))
+}
+
+// handlers are the bundled verbs that name a handler, each the one named as the verb.
+var handlers = []task.Verb{task.VerbWaiting, task.VerbSchedule, task.VerbFocus, task.VerbProject, task.VerbApprove,
+	task.VerbDelegate, task.VerbSeen, task.VerbContext, task.VerbArea, task.VerbAnswer, task.VerbEdit, task.VerbRetry,
+	task.VerbReviewed, task.VerbSequential, task.VerbReply}
+
+// byWorkflow are the bundled verbs a workflow may run; a person may run every verb.
+var byWorkflow = []task.Verb{task.VerbDone, task.VerbDismiss, task.VerbNext, task.VerbWaiting, task.VerbSchedule, task.VerbFocus}
+
+func (bundledStates) Handler(verb string) string {
+	if slices.Contains(handlers, task.Verb(verb)) {
+		return verb
+	}
+	return ""
+}
+
+func (bundledStates) Gate(string) (gate.Gate, bool) { return gate.Gate{}, false }
+
+// Authority lets a person run every bundled verb and a workflow those whose by.workflow is true.
+func (bundledStates) Authority(_ context.Context, verb string, a task.Actor, _ task.Task) (bool, bool, error) {
+	switch a {
+	case task.ActorPerson:
+		return slices.Contains(task.Verbs, task.Verb(verb)), false, nil
+	case task.ActorWorkflow:
+		return slices.Contains(byWorkflow, task.Verb(verb)), false, nil
+	}
+	return false, false, nil
 }

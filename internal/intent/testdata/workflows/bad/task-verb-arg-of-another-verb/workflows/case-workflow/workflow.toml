@@ -4,5 +4,5 @@ when = 'task.state == "next"'
 
 [[step]]
 use = "task.verb"
-verb = "someday"
+verb = "next"
 until = "2026-12-01"

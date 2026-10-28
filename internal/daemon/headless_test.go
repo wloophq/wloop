@@ -167,7 +167,7 @@ func TestTheBridgeDelegatesActHeadlessWithTheTasksItems(t *testing.T) {
 	if len(h.got) != 1 || !slices.Equal(h.got[0].Items, []string{"i1"}) || h.got[0].Task != "e-t" {
 		t.Fatalf("started %+v", h.got)
 	}
-	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "cockpit" {
+	if len(store.Events) != 1 || store.Events[0].Kind != "verb_delegate" || store.Events[0].Actor != "person:cockpit" {
 		t.Fatalf("events %+v", store.Events)
 	}
 }

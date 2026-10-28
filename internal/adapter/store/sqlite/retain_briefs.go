@@ -18,16 +18,21 @@ const retainBriefBodiesSQL = `UPDATE brief_runs SET brief = '', input = json_rem
 // provider, reaches a brief another builder wrote.
 const cursorRuns = `(SELECT id FROM brief_runs WHERE trigger IN ('extraction', 'legacy'))`
 
-const (
+// untaskedBrief keeps the brief rows of table on a unit linked to a task.
+func untaskedBrief(table string) string {
+	return ` AND NOT EXISTS (SELECT 1 FROM task_units tu WHERE tu.provider = ` + table + `.provider AND tu.unit_key = ` + table + `.unit_key)`
+}
+
+var (
 	// retainCursorRunsSQL deletes the daily runs no one reads past the
 	// cutoff, and every run but a turn's of a unit whose cursor is gone; it
 	// runs after the orphan unit_briefs rows are deleted.
 	retainCursorRunsSQL = `DELETE FROM brief_runs WHERE trigger IN ('extraction', 'legacy') AND id NOT IN (SELECT brief_run FROM turns)
-		AND (started_at < ? AND id NOT IN ` + briefsInUse + ` OR (provider, unit_key) NOT IN ` + cursorUnits + `)`
+		AND (started_at < ? AND id NOT IN ` + briefsInUse + ` OR (provider, unit_key) NOT IN ` + cursorUnits + `)` + untaskedBrief("brief_runs")
 	orphanCursorBriefsSQL = `DELETE FROM unit_briefs WHERE run IN ` + cursorRuns + `
-		AND (provider, unit_key) NOT IN ` + cursorUnits + ``
+		AND (provider, unit_key) NOT IN ` + cursorUnits + untaskedBrief("unit_briefs")
 	orphanCursorTagsSQL = `DELETE FROM unit_tags WHERE run IN ` + cursorRuns + `
-		AND (provider, unit_key) NOT IN ` + cursorUnits + ``
+		AND (provider, unit_key) NOT IN ` + cursorUnits + untaskedBrief("unit_tags")
 )
 
 // briefs retains brief rows as of before: the bodies of runs no one reads,
@@ -43,7 +48,7 @@ func (r *retainer) briefs(before, cursors string) {
 // briefEndedTables are the brief rows of an ended pull request, in delete
 // order among endedTables.
 var briefEndedTables = []endedTable{
-	{"unit_briefs", port.TopicBriefs, `DELETE FROM unit_briefs WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"brief_runs", port.TopicBriefs, `DELETE FROM brief_runs WHERE provider = 'github' AND unit_key IN ` + endedUnits},
-	{"unit_tags", port.TopicBriefs, `DELETE FROM unit_tags WHERE provider = 'github' AND unit_key IN ` + endedUnits},
+	{"unit_briefs", port.TopicBriefs, `DELETE FROM unit_briefs WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"brief_runs", port.TopicBriefs, `DELETE FROM brief_runs WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
+	{"unit_tags", port.TopicBriefs, `DELETE FROM unit_tags WHERE provider = 'github' AND unit_key IN ` + untaskedUnits},
 }

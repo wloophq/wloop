@@ -357,7 +357,7 @@ func TestRegisteredViewSource(t *testing.T) {
 		t.Fatalf("counts: %+v %v", c, err)
 	}
 	var ran []string
-	r.svc.Register(task.KindDraft, task.VerbApprove, func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
+	r.svc.Register(task.KindDraft, string(task.VerbApprove), func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		ran = append(ran, fmt.Sprint(e.ID, " ", req.Verb))
 		return coretasks.Result{Task: e}, nil
 	})
