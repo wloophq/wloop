@@ -12,6 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/github"
@@ -60,9 +61,9 @@ type sentRound struct {
 }
 
 // effectRun is what a host effect does on a route, by phase: guide before
-// the round, unsent when it did not go out.
+// the round, sent once it went out, unsent when it did not.
 type effectRun struct {
-	guide, unsent func(r *sentRound)
+	guide, sent, unsent func(r *sentRound)
 }
 
 // onSentEffect is a turn effect the host applies and what it does on each
@@ -82,11 +83,16 @@ var keepsGuidance = effectRun{
 // phase runs them.
 var onSent = []onSentEffect{
 	{name: builtin.EffectGuidanceHanded, on: map[route]effectRun{routeSession: keepsGuidance, routeAsked: keepsGuidance}},
+	{name: builtin.EffectRoundSent, on: map[route]effectRun{routeSession: {sent: func(r *sentRound) {
+		r.env.recordEvent(r.ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
+	}}}},
 }
 
 type phase func(c effectRun, r *sentRound)
 
 func guidePhase(c effectRun, r *sentRound) { runCell(c.guide, r) }
+
+func sentPhase(c effectRun, r *sentRound) { runCell(c.sent, r) }
 
 func unsentPhase(c effectRun, r *sentRound) { runCell(c.unsent, r) }
 
@@ -105,10 +111,11 @@ func runPhase(rt route, d dintent.Def, r *sentRound, p phase) {
 	}
 }
 
-// applyPluginEffects applies, through ApplyEffect, the turn effects of d
-// that belong to the plugin of r's unit, once r went out on route rt. A
-// failure is only logged: the round is out.
-func (e *Env) applyPluginEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+// applySentEffects applies the turn effects of d once r went out on route
+// rt: the host's sent phase, then, through ApplyEffect, those of the plugin
+// of r's unit. A failure is only logged: the round is out.
+func (e *Env) applySentEffects(ctx context.Context, rt route, d dintent.Def, r *sentRound) {
+	runPhase(rt, d, r, sentPhase)
 	u := r.ref.Unit()
 	var names []string
 	for _, name := range d.Effects {

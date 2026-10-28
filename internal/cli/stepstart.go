@@ -186,7 +186,7 @@ func withTurnFacts(f workflow.Facts, turn []src.Fact, now time.Time) workflow.Fa
 
 // plan is the round named name of u's plugin plan, over u's round state:
 // the bound one while a sweep runs, else the stored one; false when the plan
-// has no such round.
+// has no such round. A round the plan holds as not due is only skipped.
 func (s *stepSet) plan(ctx context.Context, u unit.Unit, name string) (plannedRound, bool, error) {
 	pl := s.d.Planners[u.Provider]
 	if pl == nil {
@@ -274,7 +274,7 @@ func (s *stepSet) startGuards(ctx context.Context, c stepCall, byHand, live bool
 		if err != nil {
 			return "", p, err
 		}
-		if !ok {
+		if !ok || planned.NotDue != "" {
 			return "its " + p.args.kindName() + " is not due", p, nil
 		}
 		p.planned, p.round = planned, true
@@ -481,8 +481,8 @@ func (s *stepSet) holdByCap(ctx context.Context, c stepCall, why string) error {
 		return err
 	}
 	args := s.e.startOf(c.st, c.u.Provider)
-	planned, _, err := s.plan(ctx, c.u, args.candidate())
-	if err != nil || planned.Observed {
+	planned, ok, err := s.plan(ctx, c.u, args.candidate())
+	if err != nil || !ok || planned.NotDue != "" || planned.Observed {
 		return err
 	}
 	if !st.FirstCapHit(ref.String(), s.e.Now()) {
@@ -540,12 +540,12 @@ func (s *stepSet) startRun(ctx context.Context, c stepCall, o automation.RunOpts
 			}
 			return "", startError(err)
 		}
-		st.RecordSent(p.ref.String(), markOf(p.args.kind()), "", s.e.Now())
+		st.RecordSent(p.ref.String(), "", "", s.e.Now())
 		return started, nil
 	}
 	reason := s.reason(p)
 	sent, err := s.e.sendRound(ctx, st, roundCall{Kind: p.args.kind(), Workspace: p.planned.ws, Unit: c.u, Facts: p.planned.read,
-		Reason: reason, OnSent: p.planned.OnSent, Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
+		Reason: reason, Head: p.planned.Head, OnSent: p.planned.OnSent, OnSkipped: p.planned.OnSkipped, Guidance: guidance, BriefMissing: p.briefMissing, Observed: p.planned.Observed,
 		Confirmed: o.Confirmed, Why: &why, Address: p.address(s.e.Now())})
 	if !sent && guidance != "" {
 		s.e.keepGuidance(ctx, p.ref, guidance)

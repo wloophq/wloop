@@ -17,6 +17,7 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
@@ -298,7 +299,7 @@ func blockedTriage(t *testing.T) (*fake.Manager, *testEnv, *memRecorder, string)
 	home, file := untrustedHome(t)
 	te.cfg.AgentHome = home
 	te.gh.basics = pr9Basics
-	b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/wt/auth", Folder: "/wt/auth", Home: home, Homes: []string{home}, Round: "triage", Fingerprint: "2026-10-08T10:00:00Z"}
+	b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/wt/auth", Folder: "/wt/auth", Home: home, Homes: []string{home}, Round: "triage", Skip: map[string]string{round.AddressedReviews: "2026-10-08T10:00:00Z"}}
 	rec := &memRecorder{events: []dinv.Event{{PR: pr9, Kind: dinv.KindRoundBlocked, Key: b.Key(testNow), At: testNow, Data: "could not start: /wt/auth is not trusted in " + home}}}
 	te.Rec = rec
 	return m, te, rec, file

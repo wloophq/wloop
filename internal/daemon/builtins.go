@@ -48,7 +48,7 @@ var actionEffects = []actionEffect{
 	{name: builtin.EffectPlanCleared, before: func(s *Server, ctx context.Context, u unit.Unit) error {
 		return s.dropPending(ctx, u, askedByYou)
 	}},
-	{name: builtin.EffectPRRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit) error {
+	{name: builtin.EffectRoundSent, after: func(s *Server, ctx context.Context, u unit.Unit) error {
 		return s.recordEvent(ctx, u, builtin.EventRoundSent, askedByYou)
 	}},
 }

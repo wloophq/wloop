@@ -29,15 +29,11 @@ type Effect struct {
 	Plugin bool
 }
 
-// The effects the host applies by name. A plugin's own effects run through
-// its ApplyEffect, but for the two the host applies around a round of the
-// GitHub plugin's: handing it the guidance queued on its unit, which goes
-// into the turn before it is sent, and the round-sent event of a round the
-// daemon's action sent.
+// The effects the host applies by name.
 const (
 	EffectPlanCleared    = "plan.cleared"
-	EffectGuidanceHanded = "pr.guidance_handed"
-	EffectPRRoundSent    = "pr.round_sent"
+	EffectGuidanceHanded = "turn.guidance_handed"
+	EffectRoundSent      = "turn.round_sent"
 	EffectTaskNudged     = "task.nudged"
 	EffectUnitClosed     = "unit.closed"
 )
@@ -48,6 +44,8 @@ var Effects = slices.Clone(coreEffects)
 
 var coreEffects = []Effect{
 	{EffectPlanCleared, "", AppliesTurn, "Drops the unit's pending plan items.", false},
+	{EffectGuidanceHanded, "", AppliesTurn, "Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent.", false},
+	{EffectRoundSent, "", AppliesTurn, "Records the round-sent event on the unit when a person sends the turn.", false},
 	{EffectTaskNudged, "", AppliesDraft, "Stamps the last nudge of the draft's task, or of every live waiting task of its unit when it names none.", false},
 	{EffectUnitClosed, "", AppliesDraft, "Records the closure of the draft's unit, which ends its close task and unwatches it after its warm period; through the unit's plugin.", true},
 }

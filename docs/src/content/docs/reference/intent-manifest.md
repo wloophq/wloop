@@ -201,7 +201,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
-| `effects` | list of `plan.cleared`, `pr.guidance_handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
+| `effects` | list of `plan.cleared`, `turn.guidance_handed`, `turn.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged` |  | What sending the turn applies. |
 | `drafts` | table |  | The drafts its turns' agents propose. |
 | `drafts.allowed_effects` | list of `task.nudged`, `unit.closed`, `pr.nudged` |  | The effects its agents may declare on their drafts. |
 | `drafts.attach_posts` | bool | `false` | On a turn whose unit is a task, the unit of each post its agent makes, sent at once or once approved, is attached to the task; reactions and edits are not posts. |

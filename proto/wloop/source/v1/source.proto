@@ -698,6 +698,9 @@ message Round {
   // skips the round; "" removes a mark.
   map<string, string> on_sent = 7;
   map<string, string> on_skipped = 8;
+  // not_due says why the round is not due now; "" is due. A round not due
+  // is not launched, but skipping it still writes on_skipped.
+  string not_due = 9;
 }
 
 message PayloadRequest {

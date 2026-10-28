@@ -91,10 +91,9 @@ func plannedRounds(t *testing.T, sc sweepCase) *fakePlanner {
 	return out
 }
 
-// offeredRounds are the rounds the github planner plans on sc's pull
-// request over its stored round state, once the collector read sc's fake
-// GitHub.
-func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
+// livePlanner is the github planner of sc's pull request, once the
+// collector read sc's fake GitHub.
+func livePlanner(t *testing.T, sc sweepCase) roundPlanner {
 	t.Helper()
 	te := sc.te
 	ctx := context.Background()
@@ -113,9 +112,17 @@ func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gh := sc.env.planners([]source.Module{mod})[unit.GitHub]
+	return sc.env.planners([]source.Module{mod})[unit.GitHub]
+}
+
+// offeredRounds are the rounds the github planner plans on sc's pull
+// request over its stored round state, frozen.
+func offeredRounds(t *testing.T, sc sweepCase) *fakePlanner {
+	t.Helper()
+	ctx := context.Background()
+	gh := livePlanner(t, sc)
 	u := sc.ref.Unit()
-	stored, err := te.Rounds.Load(ctx)
+	stored, err := sc.te.Rounds.Load(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

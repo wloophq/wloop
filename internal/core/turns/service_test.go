@@ -768,7 +768,7 @@ func TestReconcileAtStartup(t *testing.T) {
 	store.Put(asked)
 	reg.Put(turn.Session{ID: "term_6", WorkspaceID: "ws6", Pane: "tab-6:leaf-1"})
 	sess.Put("ws6", turns.Terminal{Session: "term_6", LastOutput: long})
-	rec.reviews[r7] = []turns.SourceAnswer{{ID: "98", State: "COMMENTED", At: t0.Add(-2 * time.Hour)}, {ID: "99", State: "APPROVED", URL: "https://github.com/acme/api/pull/7#pullrequestreview-99", At: t0.Add(-30 * time.Minute)}}
+	rec.reviews[r7] = []turns.SourceAnswer{{ID: "98", State: "COMMENTED", Verdict: "COMMENT", At: t0.Add(-2 * time.Hour)}, {ID: "99", State: "APPROVED", Verdict: "APPROVE", URL: "https://github.com/acme/api/pull/7#pullrequestreview-99", At: t0.Add(-30 * time.Minute)}}
 
 	sess.SetAgents(
 		turns.AgentObservation{WorkspaceID: "ws2", Pane: "tab-2:leaf-1", State: turn.AgentDone, LastMessage: "Keep the column?\nOr drop it."},
@@ -1110,7 +1110,7 @@ func TestReconcileFollowsTheManifest(t *testing.T) {
 			Records: []turn.Record{{ID: int64(n * 10), TurnSeq: int64(n), Session: handle, Hash: "q", At: t0.Add(-time.Hour), Acked: true, Record: askedRecord()}}})
 		reg.Put(turn.Session{ID: handle, WorkspaceID: "ws" + handle, Pane: "tab:" + handle})
 		sess.Put("ws"+handle, turns.Terminal{Session: handle, LastOutput: long})
-		rec.reviews[ref(n)] = []turns.SourceAnswer{{ID: "99", State: "APPROVED", At: t0.Add(-30 * time.Minute)}}
+		rec.reviews[ref(n)] = []turns.SourceAnswer{{ID: "99", State: "APPROVED", Verdict: "APPROVE", At: t0.Add(-30 * time.Minute)}}
 	}
 	if _, err := s.Reconcile(ctx, true); err != nil {
 		t.Fatal(err)

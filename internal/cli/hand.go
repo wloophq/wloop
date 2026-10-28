@@ -154,7 +154,7 @@ func (e *Env) turnByHand(ctx context.Context, h handTurn, text io.Writer) error 
 			return false, err
 		}
 		sr.pr, sr.cfg, sr.inputs, sr.id = pr, cfg, h.inputs, sent.ID
-		e.applyPluginEffects(ctx, routeSession, d, sr)
+		e.applySentEffects(ctx, routeSession, d, sr)
 		e.recordGuidance(ctx, ref, sr.guidance)
 		return true, nil
 	})

@@ -445,7 +445,12 @@ func TestAConflictPastItsWindowStartsOneAddressRoundPerHead(t *testing.T) {
 	}
 	first := f["pr.fingerprint"]
 
-	w.rounds.SetHeads(r.String(), "", "head")
+	for name, v := range c.OnSkipped {
+		w.rounds.SetMark(r.String(), name, v)
+	}
+	if _, ok := w.planned(t, w.provider(), r.Unit(), factsgithub.RoundAddress); ok || w.rounds.Mark(r.String(), round.AddressedConflict) != "head" {
+		t.Fatalf("an address round skipped with its conflict head is planned again")
+	}
 	if f := facts(t, w.provider(), r.Unit()); f["pr.address.due"] != false || f["pr.address.reason"] != "nothing to address" || f["pr.address.conflict"] != false {
 		t.Fatalf("a handled conflict is due: %v", f)
 	}

@@ -45,15 +45,14 @@ func TestHostAnswersAreMyReviewsSince(t *testing.T) {
 	}
 	slices.SortFunc(got, func(a, b turns.SourceAnswer) int { return a.At.Compare(b.At) })
 	want := []turns.SourceAnswer{
-		{ID: "cr", State: "CHANGES_REQUESTED", URL: r7.URL(), At: testNow},
-		{ID: "cm", State: "COMMENTED", URL: r7.URL(), At: testNow.Add(time.Minute)},
-		{ID: "cr:DISMISSED", State: "DISMISSED", URL: r7.URL(), At: testNow.Add(2 * time.Minute)},
+		{ID: "cr", State: "CHANGES_REQUESTED", Verdict: "REQUEST_CHANGES", URL: r7.URL(), At: testNow},
+		{ID: "cm", State: "COMMENTED", Verdict: "COMMENT", URL: r7.URL(), At: testNow.Add(time.Minute)},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("reviews %+v", got)
 	}
 	for i := range want {
-		if got[i].ID != want[i].ID || got[i].State != want[i].State || got[i].URL != want[i].URL || !got[i].At.Equal(want[i].At) {
+		if got[i].ID != want[i].ID || got[i].State != want[i].State || got[i].Verdict != want[i].Verdict || got[i].URL != want[i].URL || !got[i].At.Equal(want[i].At) {
 			t.Fatalf("reviews %+v, want %+v", got, want)
 		}
 	}

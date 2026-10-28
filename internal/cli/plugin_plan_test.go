@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -10,12 +12,16 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
+	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/pkg/plugin/source/sourcetest"
@@ -196,7 +202,7 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 			t.Errorf("request %+v", req)
 		}
 	}
-	if want := []string{"pr.reviewed", "pr.round_sent"}; !slices.Equal(names, want) {
+	if want := []string{"pr.reviewed"}; !slices.Equal(names, want) {
 		t.Fatalf("applied %v, want the review's plugin effects %v", names, want)
 	}
 
@@ -211,5 +217,129 @@ func TestAPluginEffectRunsThroughApplyEffect(t *testing.T) {
 	last := p.applied()[len(p.applied())-1]
 	if last.Effect != "pr.nudged" || last.Draft == nil || last.Draft.ID != 4 || last.Turn != nil {
 		t.Fatalf("draft effect request %+v", last)
+	}
+}
+
+func TestUnblockingWritesTheBlockedRoundsSkipMarks(t *testing.T) {
+	t.Parallel()
+	sc := addressScenario(t)
+	sc.ws.Sessions = nil
+	sc.ws.Blocked = workspace.ReasonTrust
+	home, _ := untrustedHome(t)
+	sc.te.cfg.AgentHome = home
+	r := newStartRig(t, sc, string(dintent.Address), "")
+	key := sc.ref.String()
+	r.planner().edit(key, roundAddress, func(r *src.Round) {
+		r.OnSent, r.OnSkipped = map[string]string{"plugin.sent": "s"}, map[string]string{"plugin.x": "1"}
+	})
+	_, err := r.run(t, automation.RunOpts{})
+	var refused automation.Refused
+	if !asRefused(err, &refused) || !strings.HasPrefix(refused.Reason, "round blocked: ") {
+		t.Fatalf("run = %v", err)
+	}
+	if err := (envActions{e: sc.env}).Unblock(context.Background(), r.u, daemon.Call{Out: &strings.Builder{}}); err != nil {
+		t.Fatal(err)
+	}
+	marks := sc.te.loadRounds(t).PRs[key].Marks
+	if !maps.Equal(marks, map[string]string{"plugin.x": "1"}) {
+		t.Fatalf("marks %v, want the plan's skip marks alone", marks)
+	}
+}
+
+func TestTheStoredRoundStateServesItsMarksAndBlock(t *testing.T) {
+	t.Parallel()
+	sc := followupScenario(t)
+	rec := &memRecorder{}
+	sc.env.Rec = rec
+	ctx := context.Background()
+	key := sc.ref.String()
+	st, err := sc.te.Rounds.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.SetMark(key, "plugin.x", "1")
+	if err := sc.te.Rounds.Save(ctx, st); err != nil {
+		t.Fatal(err)
+	}
+	at := testNow.Add(-time.Hour)
+	rec.events = append(rec.events, trustBlockEvent(sc.ref, at))
+	got, err := sc.env.storedRoundState(ctx, sc.ref.Unit())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Marks["plugin.x"] != "1" || got.Blocked == nil || got.Blocked.Folder != "/wt/rev" || !got.Blocked.Since.Equal(at) {
+		t.Fatalf("stored round state %+v, blocked %+v", got, got.Blocked)
+	}
+}
+
+// firstPlanned is the first round the live planner gh plans on sc's pull
+// request over its stored round state; false when it plans none.
+func firstPlanned(t *testing.T, sc sweepCase, gh roundPlanner) (src.Round, bool) {
+	t.Helper()
+	ctx := context.Background()
+	stored, err := sc.te.Rounds.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := sc.env.roundStateOf(ctx, sc.ref.Unit(), stored, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := gh.Plan(ctx, psource.Wire(sc.ref.Unit()), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(plan.Rounds, func(r src.Round) bool { return r.Name == roundFirst })
+	if i < 0 {
+		return src.Round{}, false
+	}
+	return plan.Rounds[i], true
+}
+
+func TestADismissedFirstRoundIsNotPlannedAgain(t *testing.T) {
+	t.Parallel()
+	sc := firstRoundCase(t)
+	r := newStartRig(t, sc, string(dintent.Review), roundFirst)
+	gh := livePlanner(t, sc)
+	r.steps.d.Planners = map[unit.ProviderID]roundPlanner{unit.GitHub: gh}
+	if first, ok := firstPlanned(t, sc, gh); !ok || first.NotDue != "" {
+		t.Fatalf("the first round before the dismissal: %+v %v", first, ok)
+	}
+	r.load(t)
+	if err := r.steps.Dismiss(context.Background(), r.st, r.u, r.why); err != nil {
+		t.Fatal(err)
+	}
+	r.save(t)
+	if got := sc.te.loadRounds(t).Mark(sc.ref.String(), round.FirstSkipped); got == "" {
+		t.Fatal("the dismissal wrote no skip")
+	}
+	if first, ok := firstPlanned(t, sc, gh); ok {
+		t.Fatalf("a dismissed first round is planned again: %+v", first)
+	}
+}
+
+func TestAFirstRoundDismissedWhileNotDueStaysSkipped(t *testing.T) {
+	t.Parallel()
+	sc := firstRoundCase(t)
+	dev := wsdomain.Workspace{ID: "ws-dev", RepoID: "r1", Path: "/wt/dev", DisplayName: "feat/new", Status: "todo", HostID: "local", Branch: "feat/new", LinkedPR: 20}
+	sc.ws.WorkspaceList = append(sc.ws.WorkspaceList, dev)
+	r := newStartRig(t, sc, string(dintent.Review), roundFirst)
+	gh := livePlanner(t, sc)
+	r.steps.d.Planners = map[unit.ProviderID]roundPlanner{unit.GitHub: gh}
+	first, ok := firstPlanned(t, sc, gh)
+	if !ok || first.NotDue == "" {
+		t.Fatalf("the first round while its author workspace exists: %+v %v", first, ok)
+	}
+	if refusal := r.check(t, automation.CheckOpts{}); refusal != "its first round is not due" {
+		t.Fatalf("refusal %q", refusal)
+	}
+	r.load(t)
+	if err := r.steps.Dismiss(context.Background(), r.st, r.u, r.why); err != nil {
+		t.Fatal(err)
+	}
+	r.save(t)
+	sc.ws.WorkspaceList = slices.DeleteFunc(sc.ws.WorkspaceList, func(w wsdomain.Workspace) bool { return w.ID == dev.ID })
+	if first, ok := firstPlanned(t, sc, gh); ok {
+		t.Fatalf("a first round dismissed while not due is planned once due: %+v", first)
 	}
 }

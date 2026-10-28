@@ -321,7 +321,7 @@ func (p planner) Plan(_ context.Context, _ plugin.Unit, st source.RoundState) (s
 func rounds(facts []source.Fact) []source.Round {
 	return []source.Round{{
 		Name: "address", Workspace: source.WorkspaceRef{Manager: "trees", ID: "w1"}, Head: "abc123", Reason: "checks failed",
-		Observed: true, TurnFacts: facts, OnSent: map[string]string{"addressed.checks": "abc123"}, OnSkipped: map[string]string{"skipped": "1"},
+		Observed: true, TurnFacts: facts, OnSent: map[string]string{"addressed.checks": "abc123"}, OnSkipped: map[string]string{"skipped": "1"}, NotDue: "a check is pending",
 	}}
 }
 

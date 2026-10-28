@@ -236,10 +236,6 @@ func (g githubEffects) ApplyEffect(ctx context.Context, req src.EffectRequest) e
 	}
 	e := r.env
 	switch req.Effect {
-	case ghsource.EffectRoundSent:
-		if g.rt == routeSession {
-			e.recordEvent(ctx, r.ref, dinv.KindRoundSent, withInstructions(handInSession, r.id))
-		}
 	case ghsource.EffectNudged:
 		e.recordTurnEvent(ctx, r.ref, dinv.KindNudged, r.id, strings.Join(inputList(r.inputs[nudgedWho]), ", "))
 	case ghsource.EffectReviewed:

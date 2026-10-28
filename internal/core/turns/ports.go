@@ -136,9 +136,10 @@ type AgentSessionInfo struct {
 // SourceAnswer is the user's answer, in a unit's source, to a turn that
 // asked them, such as their review of a pull request.
 type SourceAnswer struct {
-	// State is APPROVED, CHANGES_REQUESTED or COMMENTED.
-	ID, State, URL string
-	At             time.Time
+	// State is the answer's state in its source; Verdict is the record's
+	// verdict it gives, "" for a state that answers nothing.
+	ID, State, Verdict, URL string
+	At                      time.Time
 }
 
 // Answers reads the user's answers on a unit since a time.

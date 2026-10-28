@@ -26,7 +26,9 @@ var Renamed = []Rename{
 	{"gtd", "tasks"},
 	{"entry", "task"},
 	{"entry-results-ended", "task-results-ended"},
-	{"guidance.handed", "pr.guidance_handed"},
+	{"guidance.handed", "turn.guidance_handed"},
+	{"pr.guidance_handed", "turn.guidance_handed"},
+	{"pr.round_sent", "turn.round_sent"},
 	{"config.github.", "config.plugins.github."},
 }
 

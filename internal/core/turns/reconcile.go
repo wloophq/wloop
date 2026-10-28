@@ -161,8 +161,6 @@ func (s *Service) fallback(ctx context.Context, w *world, b *turn.Book, t turn.T
 	return record.Unrecorded(pane.LastMessage), true, nil
 }
 
-var verdicts = map[string]string{"APPROVED": "APPROVE", "CHANGES_REQUESTED": "REQUEST_CHANGES", "COMMENTED": "COMMENT"}
-
 func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (record.Record, bool, error) {
 	last, ok := b.LastRecord(t.Seq)
 	if !ok {
@@ -174,7 +172,7 @@ func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (reco
 	}
 	var newest *SourceAnswer
 	for i, r := range reviews {
-		if _, known := verdicts[r.State]; known && r.At.After(last.At) && (newest == nil || r.At.After(newest.At)) {
+		if r.Verdict != "" && r.At.After(last.At) && (newest == nil || r.At.After(newest.At)) {
 			newest = &reviews[i]
 		}
 	}
@@ -188,7 +186,7 @@ func (s *Service) myReview(ctx context.Context, b *turn.Book, t turn.Turn) (reco
 	return record.Record{
 		State:   record.Done,
 		Summary: "my answer closed the question: " + newest.State,
-		Outcome: &record.Outcome{Verdict: verdicts[newest.State], URL: url},
+		Outcome: &record.Outcome{Verdict: newest.Verdict, URL: url},
 	}, true, nil
 }
 

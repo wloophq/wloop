@@ -184,10 +184,10 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ### Effects and drafts
 
-- `effects` (list of `plan.cleared`, `pr.guidance_handed`, `pr.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged`): What sending the turn applies.
+- `effects` (list of `plan.cleared`, `turn.guidance_handed`, `turn.round_sent`, `pr.reviewed`, `pr.addressed`, `pr.nudged`): What sending the turn applies.
   - `plan.cleared`: Drops the unit's pending plan items.
-  - `pr.guidance_handed`: Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent.
-  - `pr.round_sent`: Records the round-sent event on the pull request.
+  - `turn.guidance_handed`: Hands the guidance queued on the unit to the turn, and queues it back when the turn is not sent.
+  - `turn.round_sent`: Records the round-sent event on the unit when a person sends the turn.
   - `pr.reviewed`: Writes the plugin mark reviewed: the reviews the round covered, once its review is submitted.
   - `pr.addressed`: Writes the plugin marks addressed.*: the reviews, checks and conflict the address round covered.
   - `pr.nudged`: Records the nudged event on the pull request, which the nudge refusal reads: when its turn is sent, keyed by the turn so that a turn that ended before its agent started it does not count, or as the GitHub publisher posts its draft.

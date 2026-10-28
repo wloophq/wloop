@@ -43,7 +43,7 @@ type Vocabulary struct {
 	workflowSlots      []string
 	deliveries         []string
 	events             map[string]unit.ProviderID
-	answering          map[unit.ProviderID][]string
+	answering          map[unit.ProviderID]map[string]map[string]string
 	payloads           map[string]unit.ProviderID
 	rounds             []unit.ProviderID
 	taskKinds          []string
@@ -226,7 +226,7 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 	unitSlots := slices.Clone(coreUnitSlots)
 	deliveries := slices.Clone(coreDeliveries)
 	events := coreEventProviders()
-	answering := map[unit.ProviderID][]string{}
+	answering := map[unit.ProviderID]map[string]map[string]string{}
 	payloads := map[string]unit.ProviderID{}
 	var rounds []unit.ProviderID
 	var taskKinds []string
@@ -268,7 +268,10 @@ func build(all map[unit.ProviderID]*manifest.Source) *Vocabulary {
 		for _, k := range v.Events {
 			events[k.Name] = id
 			if k.AnswersAskedTurn {
-				answering[id] = append(answering[id], k.Name)
+				if answering[id] == nil {
+					answering[id] = map[string]map[string]string{}
+				}
+				answering[id][k.Name] = maps.Clone(k.Verdicts)
 			}
 		}
 		for _, f := range v.Facts {

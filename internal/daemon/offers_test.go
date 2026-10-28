@@ -185,7 +185,7 @@ var catalogFixtures = []catalogFixture{
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundBlocked, Key: "b", At: catalogNow, Data: "no workspace"})
 	}},
 	{"blocked_untrusted", r7, func(t *testing.T, c catalogRig) {
-		b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/src/api", Home: "/home/.claude-work", Homes: []string{"/home/.claude-work"}, Round: "triage", Fingerprint: "f1"}
+		b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/src/api", Home: "/home/.claude-work", Homes: []string{"/home/.claude-work"}, Round: "triage", Skip: map[string]string{"addressed.reviews": "f1"}}
 		c.events(t, dinv.Event{PR: r7, Kind: dinv.KindRoundBlocked, Key: b.Key(catalogNow), At: catalogNow, Data: "could not start: /src/api is not trusted in /home/.claude-work"})
 	}},
 	{"blocked_untrusted_terminal_home", r7, func(t *testing.T, c catalogRig) {

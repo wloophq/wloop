@@ -132,3 +132,14 @@ func bundledTasks(t *testing.T) TasksDef {
 	}
 	return d
 }
+
+func TestAPRRoundEffectNamesItsTurnEffect(t *testing.T) {
+	for old, now := range map[string]string{"pr.round_sent": "turn.round_sent", "pr.guidance_handed": "turn.guidance_handed", "guidance.handed": "turn.guidance_handed"} {
+		root := t.TempDir()
+		writeIntent(t, root, "ask-author", "effects = [\""+old+"\"]\n"+minimal, "{{.Headline}}")
+		_, problems := Load(userLayer(root), bundledFS(), testBase(), nil)
+		if !strings.Contains(problems.Error(), `did you mean "`+now+`"?`) {
+			t.Errorf("%s: %v", old, problems)
+		}
+	}
+}

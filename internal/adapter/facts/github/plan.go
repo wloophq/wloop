@@ -1,6 +1,7 @@
 package factsgithub
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"time"
@@ -43,9 +44,12 @@ func (p *Provider) Plan(ctx context.Context, w plugin.Unit, st src.RoundState) (
 		plan.Rounds = append(plan.Rounds, src.Round{Name: RoundFollowup, Workspace: wsRef(r.review.ws), Head: head, Reason: r.review.reason,
 			Observed: r.review.observed, OnSent: kept(map[string]string{round.Reviewed: fp}), OnSkipped: map[string]string{round.Reviewed: fp}})
 	}
-	if r.first.due {
-		plan.Rounds = append(plan.Rounds, src.Round{Name: RoundFirst, Head: head, Reason: r.first.reason,
-			OnSkipped: map[string]string{round.FirstSkipped: "1"}})
+	if r.first.due || v.requested(ref) && !pl.rounds.FirstRoundSkipped(ref.String()) {
+		first := src.Round{Name: RoundFirst, Head: head, Reason: r.first.reason, OnSkipped: map[string]string{round.FirstSkipped: "1"}}
+		if !r.first.due {
+			first.NotDue = cmp.Or(r.first.reason, "my review was requested")
+		}
+		plan.Rounds = append(plan.Rounds, first)
 	}
 	if r.address.due {
 		marks := kept(map[string]string{round.AddressedReviews: r.address.fingerprint, round.AddressedChecks: r.address.checksHead,

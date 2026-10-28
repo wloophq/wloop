@@ -89,6 +89,7 @@ doc = "A review request was removed."
 name = "review"
 doc = "A review was submitted."
 answers_asked_turn = true
+verdicts = { APPROVED = "APPROVE", CHANGES_REQUESTED = "REQUEST_CHANGES", COMMENTED = "COMMENT" }
 
 [[source.events]]
 name = "comment"
@@ -153,16 +154,6 @@ doc = "An address round the sweep observed without running, the pull request hav
 [[source.events]]
 name = "review_ended"
 doc = "A pull request with a review turn and no review workspace closed or merged."
-
-[[source.effects]]
-name = "pr.guidance_handed"
-applies = ["turn"]
-doc = "Hands the guidance queued on the pull request to the turn, and queues it back when the turn is not sent."
-
-[[source.effects]]
-name = "pr.round_sent"
-applies = ["turn"]
-doc = "Records the round-sent event on the pull request."
 
 [[source.effects]]
 name = "pr.reviewed"

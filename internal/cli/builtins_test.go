@@ -13,7 +13,7 @@ func TestEveryTurnEffectRunsOnARoute(t *testing.T) {
 	for _, e := range onSent {
 		runs := false
 		for _, c := range e.on {
-			runs = runs || c.guide != nil || c.unsent != nil
+			runs = runs || c.guide != nil || c.sent != nil || c.unsent != nil
 		}
 		if !runs {
 			t.Errorf("%s runs on no route", e.name)
