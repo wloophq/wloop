@@ -86,7 +86,7 @@ A turn of an intent whose manifest's `runners` include `headless` runs as one re
 
 ## Dossiers
 
-A dossier is the working memory of a unit or a project, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
+A dossier is the working memory of a task, shared by the turns on every pull request or thread it holds (a unit no task holds keeps its own), a local git repository under `<state>/dossiers/` that the daemon commits after every turn. A turn's instructions name its path; a session may read it and write under `log/`, `sources/` and `drafts/`. A resolved dossier is archived after `dossiers.archive_after` (30 days) and purged `dossiers.purge_after` (400 days) later. See [Files on disk](/reference/files/).
 
 ## Inspecting turns
 

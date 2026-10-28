@@ -133,7 +133,7 @@ func (e *Env) checkTurnEnds(ctx context.Context, t *dossiers.Turns, q <-chan por
 	}
 }
 
-// dossierGrant opens u's dossier for a session about to launch and grants it: read everywhere, write
+// dossierGrant opens the dossier u's turns read, its task's when a task holds u, for a session about to launch and grants it: read everywhere, write
 // under the dossiers' write directories. None without the dossiers or a unit, or when it cannot open.
 func (e *Env) dossierGrant(ctx context.Context, u unit.Unit) []turns.Dir {
 	if e.dossierTurns == nil || u.IsZero() {
@@ -199,13 +199,13 @@ func (s sessionDossiers) Dossier(ctx context.Context, u unit.Unit) (turn.Dossier
 	return out, true, nil
 }
 
-// grantLaunched records that the session handle, launched for u, was granted u's dossier: the launch
-// line opened it just before.
+// grantLaunched records that the session handle, launched for u, was granted the dossier u's turns read:
+// the launch line opened it just before.
 func (e *Env) grantLaunched(ctx context.Context, u unit.Unit, handle string) {
 	if e.dossierTurns == nil || e.recordGrant == nil || u.IsZero() {
 		return
 	}
-	d, ok, err := e.dossierTurns.Dossiers.Get(ctx, dossier.Owner{Unit: u})
+	d, ok, err := e.dossierTurns.Dossiers.Of(ctx, u)
 	if err != nil || !ok || d.Status != dossier.Active {
 		return
 	}

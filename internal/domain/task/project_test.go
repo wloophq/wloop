@@ -64,36 +64,6 @@ func TestProjectsOf(t *testing.T) {
 	}
 }
 
-func TestSlug(t *testing.T) {
-	for in, want := range map[string]string{
-		"Ship the v2 API":             "ship-the-v2-api",
-		"  Migração do  banco!! ":     "migracao-do-banco",
-		"Ação":                        "acao",
-		"Ac\u0327a\u0303o decomposed": "acao-decomposed",
-		"../etc/passwd":               "etc-passwd",
-		"":                            "project",
-		"!!!":                         "project",
-		"A very long project title that keeps going and going past the cap": "a-very-long-project-title-that-keeps-going-and-g",
-	} {
-		if got := Slug(in); got != want {
-			t.Errorf("Slug(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestNumberedSlugStaysWithinTheCap(t *testing.T) {
-	long := Slug("A very long project title that keeps going and going past the cap")
-	for n, want := range map[int]string{1: long, 2: "a-very-long-project-title-that-keeps-going-and-2", 12: "a-very-long-project-title-that-keeps-going-an-12"} {
-		got := NumberedSlug(long, n)
-		if got != want || len(got) > 48 {
-			t.Errorf("NumberedSlug(%d) = %q (%d), want %q", n, got, len(got), want)
-		}
-	}
-	if got := NumberedSlug("ship-it", 3); got != "ship-it-3" {
-		t.Errorf("short slug: %q", got)
-	}
-}
-
 func TestPlace(t *testing.T) {
 	acts := []Task{{ID: "a", Position: 1}, {ID: "b", Position: 2}, {ID: "c", Position: 3}}
 	pos := func(es []Task) []string {

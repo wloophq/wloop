@@ -2,11 +2,8 @@ package task
 
 import (
 	"cmp"
-	"fmt"
 	"slices"
-	"strings"
 	"time"
-	"unicode"
 )
 
 // The project verbs; position is an argument of VerbProject.
@@ -17,8 +14,6 @@ const (
 
 // DefaultReviewEvery is the review interval of a project that sets none.
 const DefaultReviewEvery = 7 * 24 * time.Hour
-
-const slugMax = 48
 
 func (e Task) ReviewInterval() time.Duration {
 	if e.ReviewEvery > 0 {
@@ -84,54 +79,6 @@ func NeedsReview(p Task, st ProjectStatus, now time.Time) bool {
 		return false
 	}
 	return p.ReviewDue(now) || (st.Next == "" && !inSomeday(p))
-}
-
-// accents folds the accents Portuguese and Spanish titles carry.
-var accents = strings.NewReplacer(
-	"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
-	"é", "e", "è", "e", "ê", "e", "ë", "e",
-	"í", "i", "ì", "i", "î", "i", "ï", "i",
-	"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ö", "o",
-	"ú", "u", "ù", "u", "û", "u", "ü", "u",
-	"ç", "c", "ñ", "n",
-)
-
-// Slug is the dossier name of a project titled title: accents folded, lowercase ASCII letters and digits, runs
-// of anything else as one "-", at most 48 characters; "project" when nothing is left.
-func Slug(title string) string {
-	var b strings.Builder
-	dash := false
-	folded := strings.Map(func(r rune) rune {
-		if unicode.Is(unicode.Mn, r) {
-			return -1
-		}
-		return r
-	}, accents.Replace(strings.ToLower(title)))
-	for _, r := range folded {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			if dash && b.Len() > 0 {
-				b.WriteByte('-')
-			}
-			b.WriteRune(r)
-			dash = false
-			continue
-		}
-		dash = true
-	}
-	s := b.String()
-	if len(s) > slugMax {
-		s = strings.TrimRight(s[:slugMax], "-")
-	}
-	return cmp.Or(s, "project")
-}
-
-// NumberedSlug is slug numbered n from 2, its base cut so the whole stays within 48 characters.
-func NumberedSlug(slug string, n int) string {
-	if n < 2 {
-		return slug
-	}
-	suffix := fmt.Sprintf("-%d", n)
-	return strings.TrimRight(slug[:min(len(slug), slugMax-len(suffix))], "-") + suffix
 }
 
 // Place puts e among its project's other actions at position pos (1 first; past the end, last) and numbers

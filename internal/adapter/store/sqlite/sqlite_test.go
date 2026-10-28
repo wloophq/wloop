@@ -41,7 +41,6 @@ var golden = []string{
 	"plan_items: id, workflow, provider, unit_key, key_value, decision, reason, steps, why, default_outcome, deadline, guidance, attempts, error, at, gain_memory, gain_disk, saved_at, observe",
 	"pr_details: owner, repo, number, version, read_at, body",
 	"pr_seen: owner, repo, number, at",
-	"projects: task_id, slug",
 	"pull_requests: owner, repo, number, title, author, state, is_draft, head_oid, head_branch, base_branch, is_fork, checks_state, review_decision, review_requests, url, created_at, updated_at, merged_at, closed_at, body_edited_at, changed_files, reasons, ws_id, ws_name, ws_status, ws_review, ws_agent, ws_comment, ws_main, ws_manager, failing_checks, mergeable, mergeable_at",
 	"review_runs: id, started_at, finished_at, done",
 	"round_day_notes: day, kind, note",

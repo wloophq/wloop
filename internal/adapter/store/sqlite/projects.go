@@ -14,45 +14,13 @@ import (
 type projectStore struct{ db *DB }
 
 const (
-	slugTakenSQL  = `SELECT EXISTS (SELECT 1 FROM projects WHERE slug = ?1 AND slug != '')`
 	currentRunSQL = `SELECT id, started_at, done FROM review_runs WHERE finished_at = '' ORDER BY started_at DESC, id DESC LIMIT 1`
 )
 
 var _ coretasks.ProjectStore = projectStore{}
 
-// Projects are the projects' slugs and the Review's runs; a project's own fields are read and written with its
-// task.
+// Projects are the Review's runs; a project's own fields are read and written with its task.
 func (db *DB) Projects() coretasks.ProjectStore { return projectStore{db} }
-
-// loadProjects sets the slugs of the tasks of out that the projects table holds, sub selecting their ids with
-// args.
-func loadProjects(ctx context.Context, q querier, sub string, args []any, out []task.Task, at map[task.ID]int) error {
-	return eachRow(ctx, q, `SELECT task_id, slug FROM projects WHERE task_id IN `+sub, args,
-		func(r *sql.Rows) error {
-			var id, slug string
-			if err := r.Scan(&id, &slug); err != nil {
-				return err
-			}
-			out[at[task.ID(id)]].Slug = slug
-			return nil
-		})
-}
-
-// writeProject keeps a project's row; other kinds have none.
-func writeProject(ctx context.Context, tx *Tx, e task.Task) error {
-	if e.Kind != task.KindProject {
-		return nil
-	}
-	_, err := tx.ExecContext(ctx, `INSERT INTO projects (task_id, slug) VALUES (?, ?)
-		ON CONFLICT (task_id) DO UPDATE SET slug = excluded.slug`, string(e.ID), e.Slug)
-	return err
-}
-
-func (s projectStore) SlugTaken(ctx context.Context, slug string) (bool, error) {
-	var taken bool
-	err := s.db.R().QueryRowContext(ctx, slugTakenSQL, slug).Scan(&taken)
-	return taken, err
-}
 
 func (s projectStore) CurrentRun(ctx context.Context) (task.ReviewRun, bool, error) {
 	var r task.ReviewRun

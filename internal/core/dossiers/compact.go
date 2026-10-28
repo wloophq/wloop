@@ -129,7 +129,7 @@ type snapshot struct {
 // Compact rewrites u's notes.md from its notes and the log files written since the last compaction,
 // once those pass the policy's CompactAt; the log files stay. It reports whether it rewrote notes.md.
 func (c *Calls) Compact(ctx context.Context, u unit.Unit) (bool, error) {
-	if d, ok, err := c.Turns.Dossiers.Get(ctx, dossier.Owner{Unit: u}); err != nil || !ok || d.Status != dossier.Active {
+	if d, ok, err := c.Turns.Dossiers.Of(ctx, u); err != nil || !ok || d.Status != dossier.Active {
 		return false, err
 	}
 	s, ok, err := c.read(ctx, u, func(fm frontmatter, logs []Entry) ([]Entry, bool) {

@@ -73,10 +73,9 @@ type Task struct {
 
 	Created, Updated time.Time
 
-	// A parent's review interval (zero: DefaultReviewEvery) and last review; a project's dossier slug.
+	// A parent's review interval (zero: DefaultReviewEvery) and last review.
 	ReviewEvery time.Duration
 	ReviewedAt  time.Time
-	Slug        string
 }
 
 // Written is who last wrote a property, and when.

@@ -461,12 +461,6 @@ CREATE INDEX drafts_task ON drafts (task, id);
 CREATE INDEX drafts_rule ON drafts (rule, rule_key, id);
 CREATE INDEX drafts_workflow ON drafts (workflow, provider, unit_key, id);
 
-CREATE TABLE projects (
-  task_id TEXT PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
-  slug TEXT NOT NULL DEFAULT ''
-) WITHOUT ROWID;
-CREATE UNIQUE INDEX projects_slug ON projects (slug) WHERE slug != '';
-
 CREATE TABLE review_runs (
   id TEXT PRIMARY KEY,
   started_at TEXT NOT NULL,
@@ -483,9 +477,9 @@ CREATE TABLE dossiers (
   archived_at TEXT NOT NULL DEFAULT '', purge_after TEXT NOT NULL DEFAULT ''
 ) WITHOUT ROWID;
 
--- A dossier directory a merge of tasks moved in the store and not yet on disk: paths under the dossiers
--- root, an archive at the same path under .archive with .tar.gz. Moves apply in seq order, a later one
--- moving what an earlier one put in place.
+-- A dossier directory a merge of tasks, or the migration onto tasks, moved in the store and not yet on disk:
+-- paths under the dossiers root, an archive at the same path under .archive with .tar.gz. Moves apply in seq
+-- order, a later one moving what an earlier one put in place.
 CREATE TABLE dossier_moves (
   seq INTEGER PRIMARY KEY,
   from_path TEXT NOT NULL,

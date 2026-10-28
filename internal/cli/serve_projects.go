@@ -8,6 +8,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/dossiers"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/task"
 )
 
 // serveProjects runs the project verbs and the weekly Review on g, the projects' dossiers kept by ds.
@@ -22,13 +23,14 @@ func serveProjects(g *coretasks.Service, db *sqlite.DB, ds *dossiers.Service) {
 	g.ServeProjects(d)
 }
 
+// projectDossiers keeps a project's dossier, the one its task owns.
 type projectDossiers struct{ s *dossiers.Service }
 
-func (p projectDossiers) Open(ctx context.Context, slug string) error {
-	_, err := p.s.Open(ctx, dossier.Owner{Project: slug})
+func (p projectDossiers) Open(ctx context.Context, id task.ID) error {
+	_, err := p.s.Open(ctx, dossier.Owner{Unit: task.UnitOf(id)})
 	return err
 }
 
-func (p projectDossiers) Resolved(ctx context.Context, slug string, at time.Time) error {
-	return p.s.Resolved(ctx, dossier.Owner{Project: slug}, at)
+func (p projectDossiers) Resolved(ctx context.Context, id task.ID, at time.Time) error {
+	return p.s.Resolved(ctx, dossier.Owner{Unit: task.UnitOf(id)}, at)
 }

@@ -154,7 +154,7 @@ type Headless struct {
 
 // Dossiers sets the dossiers' lifecycle and quotas; a value of zero or less keeps its default.
 type Dossiers struct {
-	ArchiveAfter Days  `json:"archive_after"` // after the unit or project resolved
+	ArchiveAfter Days  `json:"archive_after"` // after its task or unit resolved
 	PurgeAfter   Days  `json:"purge_after"`   // after the archive
 	SoftCapMB    int64 `json:"soft_cap_mb"`   // per dossier, reported by doctor
 	TotalCapMB   int64 `json:"total_cap_mb"`  // dossiers and archives, reported by doctor

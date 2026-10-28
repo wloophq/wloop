@@ -5,8 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/wloophq/wloop/internal/domain/dossier"
+	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // refForm is how a column spells a task's id.
@@ -196,6 +200,13 @@ func dropTask(ctx context.Context, tx *sql.Tx, id string) error {
 			held = append(held, fmt.Sprintf("%s.%s (%d rows)", r.table, r.column, n))
 		}
 	}
+	var merged int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM (`+mergedOwnersSQL+`)`, "/"+refOwner.spell(id)).Scan(&merged); err != nil {
+		return err
+	}
+	if merged > 0 {
+		held = append(held, fmt.Sprintf("dossiers merged into its own (%d rows)", merged))
+	}
 	if len(held) > 0 {
 		return fmt.Errorf("task %s is still named by %s; rekey them onto another task first", id, strings.Join(held, ", "))
 	}
@@ -292,31 +303,128 @@ func idByte(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c == '-'
 }
 
-// moveDossier gives task to the dossier of task from and records the move of its directory in
-// dossier_moves, which the CLI applies on disk: the whole directory when to has no dossier, else into
-// merged/<from> of to's directory, dropping from's row.
+// moveDossier gives task to the dossier of task from, with the dossiers merged into it.
 func moveDossier(ctx context.Context, tx *sql.Tx, from, to string) error {
-	var fromRel, toRel string
-	err := tx.QueryRowContext(ctx, `SELECT rel_path FROM dossiers WHERE owner = ?`, refOwner.spell(from)).Scan(&fromRel)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+	if err := moveMerged(ctx, tx, from, to); err != nil {
+		return err
 	}
+	return giveDossier(ctx, tx, refOwner.spell(from), from, to)
+}
+
+// giveDossier gives task to the dossier owned by from and records the move of its directory in dossier_moves,
+// which the CLI applies on disk. When to has no dossier, or a purged one, from's becomes to's. When to's is
+// archived and from's is not, from's becomes to's and to's archive moves into merged/<to> of it. Otherwise
+// from's goes into merged/<name> of to's directory: its files join to's dossier, dropping from's row, or, when
+// archived, it keeps its row as a merged dossier, whose archive the lifecycle purges.
+func giveDossier(ctx context.Context, tx *sql.Tx, from, name, to string) error {
+	fromRel, fromStatus, ok, err := dossierRow(ctx, tx, from)
+	if err != nil || !ok {
+		return err
+	}
+	toOwner := refOwner.spell(to)
+	toRel, toStatus, has, err := dossierRow(ctx, tx, toOwner)
 	if err != nil {
 		return err
 	}
-	err = tx.QueryRowContext(ctx, `SELECT rel_path FROM dossiers WHERE owner = ?`, refOwner.spell(to)).Scan(&toRel)
+	archived, purged := string(dossier.Archived), string(dossier.Purged)
 	switch {
-	case errors.Is(err, sql.ErrNoRows):
+	case !has || toStatus == purged:
 		toRel = refDossierPath.spell(to)
-		_, err = tx.ExecContext(ctx, `UPDATE dossiers SET owner = ?, rel_path = ? WHERE owner = ?`, refOwner.spell(to), toRel, refOwner.spell(from))
-	case err == nil:
-		toRel += "/merged/" + from
-		_, err = tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, refOwner.spell(from))
+		if _, err := tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, toOwner); err != nil {
+			return err
+		}
+		err = renameDossier(ctx, tx, from, toOwner, toRel)
+	case toStatus == archived && fromStatus != archived && fromStatus != purged:
+		err = keepArchiveMerged(ctx, tx, to, toOwner, toRel)
+		if err == nil {
+			err = renameDossier(ctx, tx, from, toOwner, toRel)
+		}
+	case fromStatus == archived:
+		var merged string
+		if merged, toRel, err = mergedInto(to, name); err == nil {
+			err = renameDossier(ctx, tx, from, merged, toRel)
+		}
+	default:
+		if _, toRel, err = mergedInto(to, name); err == nil {
+			_, err = tx.ExecContext(ctx, `DELETE FROM dossiers WHERE owner = ?`, from)
+		}
+		if err == nil && fromStatus == purged {
+			return nil
+		}
 	}
 	if err != nil {
-		return fmt.Errorf("moving the dossier of task %s: %w", from, err)
+		return fmt.Errorf("moving the dossier of %s: %w", from, err)
 	}
 	return recordDossierMove(ctx, tx, fromRel, toRel)
+}
+
+// keepArchiveMerged moves task to's archived dossier, at rel, into merged/<to> of its own directory.
+func keepArchiveMerged(ctx context.Context, tx *sql.Tx, to, owner, rel string) error {
+	kept, keptRel, err := mergedInto(to, to)
+	if err != nil {
+		return err
+	}
+	if err := renameDossier(ctx, tx, owner, kept, keptRel); err != nil {
+		return err
+	}
+	return recordDossierMove(ctx, tx, rel, keptRel)
+}
+
+func dossierRow(ctx context.Context, tx *sql.Tx, owner string) (rel, status string, ok bool, err error) {
+	err = tx.QueryRowContext(ctx, `SELECT rel_path, status FROM dossiers WHERE owner = ?`, owner).Scan(&rel, &status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", false, nil
+	}
+	return rel, status, err == nil, err
+}
+
+func renameDossier(ctx context.Context, tx *sql.Tx, from, to, rel string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE dossiers SET owner = ?, rel_path = ? WHERE owner = ?`, to, rel, from)
+	return err
+}
+
+// mergedInto is the owner and the directory of the dossier named name merged into task to's.
+func mergedInto(to, name string) (owner, rel string, err error) {
+	o := dossier.Owner{Unit: unit.Unit{Provider: v7Task, Key: to}, Merged: name}
+	rel, err = dossier.Rel(o)
+	return o.String(), filepath.ToSlash(rel), err
+}
+
+// mergedOwnersSQL selects the dossiers merged into the dossier of the task ?1 names as "/task/<id>".
+const mergedOwnersSQL = `SELECT owner, rel_path FROM dossiers WHERE owner LIKE 'merged/%' AND substr(owner, -length(?1)) = ?1`
+
+// moveMerged puts the dossiers merged into task from's into task to's, under the same names.
+func moveMerged(ctx context.Context, tx *sql.Tx, from, to string) error {
+	type row struct{ owner, rel string }
+	var rows []row
+	err := eachRow(ctx, tx, mergedOwnersSQL, []any{"/" + refOwner.spell(from)}, func(r *sql.Rows) error {
+		var x row
+		if err := r.Scan(&x.owner, &x.rel); err != nil {
+			return err
+		}
+		rows = append(rows, x)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, x := range rows {
+		o, err := dossier.ParseOwner(x.owner)
+		if err != nil {
+			return err
+		}
+		owner, rel, err := mergedInto(to, o.Merged)
+		if err != nil {
+			return err
+		}
+		if err := renameDossier(ctx, tx, x.owner, owner, rel); err != nil {
+			return fmt.Errorf("moving the dossier %s: %w", x.owner, err)
+		}
+		if err := recordDossierMove(ctx, tx, x.rel, rel); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // recordDossierMove records that the dossier directory at from goes to to, after every move recorded

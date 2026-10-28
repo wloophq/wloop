@@ -66,7 +66,7 @@ description: The words the code, the configuration, the facts and these pages us
 - **Endorsement**: whether you stood behind the verdict a turn published, by publishing it by hand or approving it. An automatic follow-up approves only after an endorsed verdict.
 - **Headless turn**: a turn run as one read-only call of the agent, with no session and no workspace, that proposes up to 3 drafts. See [Headless turns](/concepts/turns/#headless-turns).
 - **Intake**: the numbered wait of a first turn for its brief. `{{command}} intake <n>` follows it, and `{{command}} intake without <n>` starts it without the brief.
-- **Dossier**: the working memory of a unit or a project, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. See [Dossiers](/concepts/turns/#dossiers).
+- **Dossier**: the working memory of a task, or of a unit no task holds, a local git repository under `<state>/dossiers/` that the daemon commits after every turn. See [Dossiers](/concepts/turns/#dossiers).
 
 ## Profiles and intents
 

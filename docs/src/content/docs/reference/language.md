@@ -839,7 +839,7 @@ The fields each notice reads besides `Name` and `Command`:
 ### Dossiers
 
 - `dossiers` (table): The dossiers' lifecycle and quotas; a value of zero or less keeps its default.
-- `dossiers.archive_after` (duration, default `30d`): How long after its unit or project resolved a dossier is archived.
+- `dossiers.archive_after` (duration, default `30d`): How long after its task or unit resolved a dossier is archived.
 - `dossiers.purge_after` (duration, default `400d`): How long after the archive it is purged.
 - `dossiers.soft_cap_mb` (integer, default `50`): The size per dossier doctor reports.
 - `dossiers.total_cap_mb` (integer, default `2048`): The size of dossiers and archives doctor reports.
