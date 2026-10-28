@@ -48,7 +48,7 @@ const (
 	// Interrupted is the summary of a headless turn a restart cut short.
 	Interrupted = "interrupted by a restart"
 	itemsInput  = "items"
-	taskInput   = "entry"
+	taskInput   = "task"
 )
 
 // ErrHeadlessBusy is BeginHeadless's refusal while the unit has a headless turn started.

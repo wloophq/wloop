@@ -163,7 +163,7 @@ See [Review someone else's pull request](/guides/review/).
 Start new work from a brief.
 
 ```sh
-{{command}} start [entry:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
+{{command}} start [task:<id>] [--repo <repo>] [--manager <name>] [--parent <worktree>] [guidance...]
 ```
 
 Start new work from a brief: in a fresh worktree of a repository, or with no checkout. The target is entry:&lt;id&gt;, or none to capture the brief as a new task; words after it are guidance for the turn.

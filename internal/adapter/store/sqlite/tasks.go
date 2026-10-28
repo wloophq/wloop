@@ -24,19 +24,19 @@ var _ coretasks.Store = taskStore{}
 
 func (db *DB) Tasks() coretasks.Store { return taskStore{db} }
 
-const taskColumns = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
+const taskFields = `id, kind, state, title, notes, focus_on, focus_auto, focus_at, area, project, position, sequential,
 	snooze_until, snooze_on_activity, snooze_return, snooze_mute, waiting, deadline, changed, seen_at, origin, created, updated`
 
-// upsertTaskSQL updates an existing entry in place: a REPLACE would delete
+// upsertTaskSQL updates an existing task in place: a REPLACE would delete
 // the row first and cascade into its projects row.
 var upsertTaskSQL = func() string {
-	cols := strings.Split(taskColumns+`, rev`, ",")
+	cols := strings.Split(taskFields+`, rev`, ",")
 	set := make([]string, 0, len(cols)-1)
 	for _, c := range cols[1:] {
 		c = strings.TrimSpace(c)
 		set = append(set, c+` = excluded.`+c)
 	}
-	return `INSERT INTO entries (` + taskColumns + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
+	return `INSERT INTO tasks (` + taskFields + `, rev) VALUES (?` + strings.Repeat(`, ?`, len(cols)-1) +
 		`) ON CONFLICT (id) DO UPDATE SET ` + strings.Join(set, `, `)
 }()
 
@@ -44,11 +44,11 @@ const (
 	notEnded     = `state NOT IN ('done', 'trash')`
 	taskOrder    = ` ORDER BY created, id`
 	changedSince = `rev > ?`
-	ofUnit       = `id IN (SELECT entry_id FROM entry_units WHERE provider = ? AND unit_key = ?
-		UNION SELECT entry_id FROM entry_items WHERE provider = ? AND unit_key = ?)`
+	ofUnit       = `id IN (SELECT task_id FROM task_units WHERE provider = ? AND unit_key = ?
+		UNION SELECT task_id FROM task_items WHERE provider = ? AND unit_key = ?)`
 )
 
-// candidates is the SQL condition on entries that holds every entry the view predicate of v may select,
+// candidates is the SQL condition on tasks that holds every task the view predicate of v may select,
 // and what the sequential rule of Next needs.
 func candidates(v task.View) string {
 	switch v {
@@ -95,22 +95,22 @@ func scanTask(row scanner) (task.Task, error) {
 	}{{&e.Focus.At, focusAt}, {&e.Snooze.Until, snoozeUntil}, {&e.Deadline, deadline}, {&e.SeenAt, seenAt}, {&e.Created, created}, {&e.Updated, updated}} {
 		t, err := taskTime(f.raw)
 		if err != nil {
-			return task.Task{}, fmt.Errorf("a time of entry %s: %w", e.ID, err)
+			return task.Task{}, fmt.Errorf("a time of task %s: %w", e.ID, err)
 		}
 		*f.dst = t
 	}
 	if waiting != "" {
 		e.Waiting = &task.WaitingOn{}
 		if err := json.Unmarshal([]byte(waiting), e.Waiting); err != nil {
-			return task.Task{}, fmt.Errorf("the waiting of entry %s: %w", e.ID, err)
+			return task.Task{}, fmt.Errorf("the waiting of task %s: %w", e.ID, err)
 		}
 	}
 	return e, nil
 }
 
-// loadTasks reads the entries matching where, with their items, units and contexts, oldest first.
+// loadTasks reads the tasks matching where, with their items, units and contexts, oldest first.
 func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]task.Task, error) {
-	rows, err := q.QueryContext(ctx, `SELECT `+taskColumns+` FROM entries WHERE `+where+taskOrder, args...)
+	rows, err := q.QueryContext(ctx, `SELECT `+taskFields+` FROM tasks WHERE `+where+taskOrder, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,9 +128,9 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil || len(out) == 0 {
 		return out, err
 	}
-	sub := `(SELECT id FROM entries WHERE ` + where + `)`
-	err = eachRow(ctx, q, `SELECT entry_id, provider, unit_key, item FROM entry_items WHERE entry_id IN `+sub+
-		` ORDER BY entry_id, provider, unit_key, item`, args, func(r *sql.Rows) error {
+	sub := `(SELECT id FROM tasks WHERE ` + where + `)`
+	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key, item FROM task_items WHERE task_id IN `+sub+
+		` ORDER BY task_id, provider, unit_key, item`, args, func(r *sql.Rows) error {
 		var id string
 		var ref task.ItemRef
 		if err := r.Scan(&id, &ref.Unit.Provider, &ref.Unit.Key, &ref.Item); err != nil {
@@ -143,7 +143,7 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	if err != nil {
 		return nil, err
 	}
-	err = eachRow(ctx, q, `SELECT entry_id, provider, unit_key FROM entry_units WHERE entry_id IN `+sub+` ORDER BY entry_id, ord`,
+	err = eachRow(ctx, q, `SELECT task_id, provider, unit_key FROM task_units WHERE task_id IN `+sub+` ORDER BY task_id, ord`,
 		args, func(r *sql.Rows) error {
 			var id string
 			var u unit.Unit
@@ -157,7 +157,7 @@ func loadTasks(ctx context.Context, q querier, where string, args ...any) ([]tas
 	if err != nil {
 		return nil, err
 	}
-	err = eachRow(ctx, q, `SELECT entry_id, context FROM entry_contexts WHERE entry_id IN `+sub+` ORDER BY entry_id, ord`,
+	err = eachRow(ctx, q, `SELECT task_id, context FROM task_contexts WHERE task_id IN `+sub+` ORDER BY task_id, ord`,
 		args, func(r *sql.Rows) error {
 			var id, c string
 			if err := r.Scan(&id, &c); err != nil {
@@ -188,7 +188,7 @@ func eachRow(ctx context.Context, q querier, query string, args []any, fn func(*
 }
 
 func readPosition(ctx context.Context, q querier) (epoch string, rev uint64, err error) {
-	rows, err := q.QueryContext(ctx, `SELECT epoch, rev FROM entry_position WHERE only = 1`)
+	rows, err := q.QueryContext(ctx, `SELECT epoch, rev FROM task_position WHERE only = 1`)
 	if err != nil {
 		return "", 0, err
 	}
@@ -281,12 +281,12 @@ func (s taskStore) Counts(ctx context.Context, area string) (task.Counters, erro
 	return c, err
 }
 
-// nextIDs selects the entries Next lists: State next, and of a sequential project only its open action with the
+// nextIDs selects the tasks Next lists: State next, and of a sequential project only its open action with the
 // lowest Position (then id), as task.Select does over the candidates of ViewNext.
-const nextIDs = `WITH seq AS (SELECT id FROM entries WHERE kind = 'project' AND sequential = 1),
+const nextIDs = `WITH seq AS (SELECT id FROM tasks WHERE kind = 'project' AND sequential = 1),
 first AS (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY project ORDER BY position, id) AS n
-	FROM entries WHERE project IN seq AND state NOT IN ('done', 'trash', 'reference')) WHERE n = 1),
-nxt AS (SELECT id, area FROM entries WHERE state = 'next' AND (project NOT IN seq OR id IN first)) `
+	FROM tasks WHERE project IN seq AND state NOT IN ('done', 'trash', 'reference')) WHERE n = 1),
+nxt AS (SELECT id, area FROM tasks WHERE state = 'next' AND (project NOT IN seq OR id IN first)) `
 
 const inArea = `(? = '' OR area = ?)`
 
@@ -302,7 +302,7 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 		COALESCE(SUM(kind = 'project' AND `+notEnded+` AND `+inArea+`), 0),
 		COALESCE(SUM(state = 'someday' AND `+inArea+`), 0),
 		COALESCE(SUM(state IN ('reference', 'done') AND `+inArea+`), 0)
-		FROM entries`, area, area, area, area, area, area, area, area, area, area, area, area).
+		FROM tasks`, area, area, area, area, area, area, area, area, area, area, area, area).
 		Scan(&focus, &inbox, &next, &waiting, &projects, &someday, &logbook); err != nil {
 		return task.Counters{}, err
 	}
@@ -322,7 +322,7 @@ func countsTx(ctx context.Context, tx *sql.Tx, area string) (task.Counters, erro
 	if err != nil {
 		return task.Counters{}, err
 	}
-	err = eachRow(ctx, tx, nextIDs+`SELECT x.context, COUNT(*) FROM nxt JOIN entry_contexts x ON x.entry_id = nxt.id
+	err = eachRow(ctx, tx, nextIDs+`SELECT x.context, COUNT(*) FROM nxt JOIN task_contexts x ON x.task_id = nxt.id
 		WHERE `+inArea+` GROUP BY x.context`, []any{area, area}, func(r *sql.Rows) error {
 		var cx string
 		var n int
@@ -357,7 +357,7 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 		for _, c := range cs {
 			e := c.Task
 			if e.ID == "" {
-				return errors.New("an entry without an id")
+				return errors.New("a task without an id")
 			}
 			old, err := loadTasks(ctx, tx, `id = ?`, string(e.ID))
 			if err != nil {
@@ -386,7 +386,7 @@ func (s taskStore) Apply(ctx context.Context, cs []task.Change, evs ...port.Even
 			epoch = newEpoch()
 		}
 		rev++
-		if _, err := tx.ExecContext(ctx, `INSERT INTO entry_position (only, epoch, rev) VALUES (1, ?, ?)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO task_position (only, epoch, rev) VALUES (1, ?, ?)
 			ON CONFLICT (only) DO UPDATE SET epoch = excluded.epoch, rev = excluded.rev`, epoch, rev); err != nil {
 			return err
 		}
@@ -422,8 +422,8 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 		}
 		waiting = string(b)
 	}
-	for _, table := range []string{"entry_items", "entry_units", "entry_contexts"} {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE entry_id = ?`, string(e.ID)); err != nil {
+	for _, table := range []string{"task_items", "task_units", "task_contexts"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE task_id = ?`, string(e.ID)); err != nil {
 			return err
 		}
 	}
@@ -435,19 +435,19 @@ func writeTask(ctx context.Context, tx *Tx, e task.Task, rev uint64) error {
 		return err
 	}
 	for _, r := range e.Items {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO entry_items (entry_id, provider, unit_key, item) VALUES (?, ?, ?, ?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_items (task_id, provider, unit_key, item) VALUES (?, ?, ?, ?)`,
 			string(e.ID), string(r.Unit.Provider), r.Unit.Key, r.Item); err != nil {
 			return err
 		}
 	}
 	for i, u := range e.Units {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO entry_units (entry_id, provider, unit_key, ord) VALUES (?, ?, ?, ?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_units (task_id, provider, unit_key, ord) VALUES (?, ?, ?, ?)`,
 			string(e.ID), string(u.Provider), u.Key, i); err != nil {
 			return err
 		}
 	}
 	for i, c := range e.Contexts {
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO entry_contexts (entry_id, context, ord) VALUES (?, ?, ?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO task_contexts (task_id, context, ord) VALUES (?, ?, ?)`,
 			string(e.ID), c, i); err != nil {
 			return err
 		}

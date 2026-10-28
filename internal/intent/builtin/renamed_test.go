@@ -3,8 +3,6 @@ package builtin
 import (
 	"strings"
 	"testing"
-
-	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
 // isOld says whether name is a name the rename table renames.
@@ -45,9 +43,6 @@ func TestNoRenamedNameIsLive(t *testing.T) {
 		}
 	}
 	for p := range Slots {
-		if unit.Task == "entry" && p == unit.Task {
-			continue
-		}
 		if isOld(string(p)) {
 			t.Errorf("provider %s was renamed and is a provider again", p)
 		}

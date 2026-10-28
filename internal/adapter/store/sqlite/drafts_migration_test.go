@@ -49,7 +49,7 @@ func TestVersion2ShapesDraftsFromTheirKind(t *testing.T) {
 	}
 	rows.Close()
 	want := []string{
-		`C1/1 nudge message ["entry.nudged"]`, `C1/2 nudge message []`, `C1/3 close message ["unit.closed"]`, `C1/4 close message []`,
+		`C1/1 nudge message ["task.nudged"]`, `C1/2 nudge message []`, `C1/3 close message ["unit.closed"]`, `C1/4 close message []`,
 		`C1/5 react reaction []`, `C1/6 comment comment []`, `C1/7 reply message []`, `C1/8 ask_owner message []`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {

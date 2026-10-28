@@ -15,7 +15,7 @@ var errTasksUnavailable = errors.New("the tasks are read in the daemon alone")
 
 // taskShortID is a task's id cut to the first six hex digits after its prefix.
 func taskShortID(id task.ID) string {
-	s := strings.TrimPrefix(string(id), "e-")
+	s := strings.TrimPrefix(string(id), "t-")
 	return s[:min(6, len(s))]
 }
 

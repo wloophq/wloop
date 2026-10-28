@@ -46,7 +46,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | Key | Kind | Default | Meaning |
 |---|---|---|---|
 | `role` | one of `pr.review`, `pr.address`, `pr.nudge`, `probe`, `headless` |  | What binds it to a plugin's mechanism. One intent per role and provider. |
-| `provider` | one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
+| `provider` | one of `github`, `session`, `slack`, `task`, `workspace`, `any`, or a list of them |  | The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent. |
 | `builds` | one of `brief` |  | A builder, never a turn. |
 | `prompt` | file |  | A builder's prompt file, through the profile layers. |
 | `schema` | file |  | A builder's extra fields' schema file, beside the manifest. |

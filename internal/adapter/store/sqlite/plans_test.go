@@ -52,7 +52,7 @@ type hotPlan struct {
 
 var hotPlans = []hotPlan{
 	{name: "open work of a dossier's unit", query: unitOpenSQL, args: 2, want: []string{"items_state (state=? AND provider=? AND unit_key=?)",
-		"entry_items_unit (provider=? AND unit_key=?)", "entry_units_unit (provider=? AND unit_key=?)"}},
+		"task_items_unit (provider=? AND unit_key=?)", "task_units_unit (provider=? AND unit_key=?)"}},
 	{name: "book of a turn", query: bookOfTurn, args: 1, want: []string{"SEARCH turns USING INDEX turns_turn_id (turn_id=?)"}},
 	{name: "book of a round and a handle", query: bookOfBoth, args: 3, want: []string{"turns_turn_id"}},
 	{name: "book of a handle", query: bookOfHandle, args: 2, want: []string{"turns_session (session=?)", "turns_sent_to (sent_to=?)"}},
@@ -79,11 +79,11 @@ var hotPlans = []hotPlan{
 	{name: "events since a cursor", query: eventsSinceSQL, args: 1, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "events of kinds since a cursor", query: eventsSinceKindsSQL, args: 2, want: []string{"SEARCH events USING INTEGER PRIMARY KEY (rowid>?)"}},
 	{name: "replace a workflow's plan items", query: `DELETE FROM plan_items WHERE workflow = ?`, args: 1, want: []string{"SEARCH plan_items USING INDEX plan_items_workflow (workflow=?)"}},
-	{name: "entries in a state", query: `SELECT ` + taskColumns + ` FROM entries WHERE ` + candidates("inbox") + taskOrder,
-		want: []string{"entries_state (state=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-	{name: "entries changed since", query: `SELECT ` + taskColumns + ` FROM entries WHERE ` + changedSince + taskOrder, args: 1, want: []string{"entries_rev (rev>?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
-	{name: "entries of a unit", query: `SELECT ` + taskColumns + ` FROM entries WHERE ` + ofUnit + taskOrder, args: 4,
-		want: []string{"entry_units_unit (provider=? AND unit_key=?)", "entry_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "entries in a state", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + candidates("inbox") + taskOrder,
+		want: []string{"tasks_state (state=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "entries changed since", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + changedSince + taskOrder, args: 1, want: []string{"tasks_rev (rev>?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
+	{name: "entries of a unit", query: `SELECT ` + taskFields + ` FROM tasks WHERE ` + ofUnit + taskOrder, args: 4,
+		want: []string{"task_units_unit (provider=? AND unit_key=?)", "task_items_unit (provider=? AND unit_key=?)"}, tempSort: "USE TEMP B-TREE FOR ORDER BY"},
 	{name: "a project's slug", query: slugTakenSQL, args: 1, want: []string{"projects_slug (slug=?)"}},
 	{name: "open work of a project's dossier", query: projectOpenSQL, args: 1, want: []string{"projects_slug (slug=?)"}},
 	{name: "the current review run", query: currentRunSQL, want: []string{"review_runs_open (finished_at=?)"}},
@@ -161,7 +161,7 @@ func TestHotPlans(t *testing.T) {
 var indexesUsedByInventory = []string{
 	"events_keyed", "events_unkeyed", "events_unit", "events_unit_kind", "events_recent", "events_kind",
 	"turns_sent_at", "turn_instructions_kind", "pr_state", "unit_tags_kv", "turn_records_once", "intakes_open",
-	"messages_open", "messages_entry", "messages_proposal",
+	"messages_open", "messages_task", "messages_proposal",
 }
 
 func TestNoUnusedIndex(t *testing.T) {

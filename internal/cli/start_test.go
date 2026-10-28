@@ -42,7 +42,7 @@ func cloneAs(t *testing.T, origin string, clones *[]string) func(repo, path stri
 	}
 }
 
-var capturedTask = regexp.MustCompile(`captured (entry:e-[0-9a-f]+)`)
+var capturedTask = regexp.MustCompile(`captured (task:t-[0-9a-f]+)`)
 
 // startEnv serves a daemon whose manager knows no repository, cloning into
 // a projects_dir whose acme project trusts its clones in an agent home.
@@ -90,7 +90,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 	if len(m.Creates) != 1 {
 		t.Fatalf("creates %+v", m.Creates)
 	}
-	short := strings.TrimPrefix(tk[1], "entry:e-")[:6]
+	short := strings.TrimPrefix(tk[1], "task:t-")[:6]
 	c := m.Creates[0]
 	if c.Name != "add-retries-to-the-webhook-sender-done-when-a-"+short || !c.DefaultBase || c.Parent != "/worktrees/caller" {
 		t.Fatalf("create %+v", c)
@@ -115,7 +115,7 @@ func TestStartCapturesClonesTrustsAndCreatesFromTheDefaultBase(t *testing.T) {
 		}
 	}
 
-	id := task.ID(strings.TrimPrefix(tk[1], "entry:"))
+	id := task.ID(strings.TrimPrefix(tk[1], "task:"))
 	books, err := te.Turns.Store.Books(context.Background(), task.UnitOf(id))
 	if err != nil || len(books[task.UnitOf(id)].Turns) != 1 {
 		t.Fatalf("books %+v, %v", books, err)
@@ -166,7 +166,7 @@ func TestStartRefusesWhatItCannotWorkIn(t *testing.T) {
 			t.Fatalf("clones %q, creates %+v, prompts %+v", clones, m.Creates, m.Prompts)
 		}
 		unchanged(t, file)
-		if !strings.Contains(te.err.String(), "start entry:e-") || !strings.Contains(te.err.String(), "--repo acme/api --manager nowhere") {
+		if !strings.Contains(te.err.String(), "start task:t-") || !strings.Contains(te.err.String(), "--repo acme/api --manager nowhere") {
 			t.Fatalf("the retry lacks the flags: %s", te.err)
 		}
 	})
@@ -203,7 +203,7 @@ func TestStartRunsOnlyOnATaskTheUserCaptured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || !strings.Contains(te.err.String(), "Start runs only on a task you captured") {
+	if code := te.run("start", "task:"+string(derived.ID)); code == 0 || !strings.Contains(te.err.String(), "Start runs only on a task you captured") {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
 	if len(m.Prompts) != 0 {
@@ -300,7 +300,7 @@ func TestAHiddenStartActionStillRefusesADerivedTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code := te.run("start", "entry:"+string(derived.ID)); code == 0 || len(m.Prompts) != 0 {
+	if code := te.run("start", "task:"+string(derived.ID)); code == 0 || len(m.Prompts) != 0 {
 		t.Fatalf("exit %d, prompts %+v: %s", code, m.Prompts, te.err)
 	}
 }

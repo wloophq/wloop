@@ -91,7 +91,7 @@ async function taskAct(task, verb, args) {
 // taskIntentAct runs the intent action id on the task's own unit, such as
 // start, and asks for a reload.
 async function taskIntentAct(task, id) {
-  const path = "/api/units/" + ["entry", task.id, id].map(encodeURIComponent).join("/");
+  const path = "/api/units/" + ["task", task.id, id].map(encodeURIComponent).join("/");
   try {
     const out = await detailEnv.post(path, { source: "cockpit" });
     detailEnv.notice(`${id}: ${task.title || task.id}${out && out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);

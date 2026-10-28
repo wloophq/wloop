@@ -1,5 +1,5 @@
 summary = "Case"
-provider = "entry"
+provider = "task"
 when = 'task.items_resolved > 0'
 
 [[step]]

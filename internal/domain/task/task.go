@@ -24,14 +24,14 @@ const (
 // DerivedID is the id of the entry of kind derived from u's items for group, so a re-derivation finds it again.
 func DerivedID(kind Kind, u unit.Unit, group string) ID {
 	sum := sha256.Sum256([]byte(string(kind) + "|" + string(u.Provider) + "|" + u.Key + "|" + group))
-	return ID("e-" + hex.EncodeToString(sum[:])[:16])
+	return ID("t-" + hex.EncodeToString(sum[:])[:16])
 }
 
 // NewID is a random entry id.
 func NewID() ID {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
-	return ID("e-" + hex.EncodeToString(b[:]))
+	return ID("t-" + hex.EncodeToString(b[:]))
 }
 
 // Open says whether the entry is still to do: not done, trash or reference.

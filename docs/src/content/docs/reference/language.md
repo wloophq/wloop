@@ -30,11 +30,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `pr.nudge`: The nudge on a pull request: nudge.prepare fills its inputs from who the pull request waits on, or refuses it.
   - `probe`: The probe of an agent home: a synthetic pull request in the workspace the request names, under the probe's policy.
   - `headless`: The intent a headless turn on a unit runs when its request names none.
-- `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`, or a list of them): The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.
-  - `entry`: Facts under task.*.
+- `provider` (one of `github`, `session`, `slack`, `task`, `workspace`, `any`, or a list of them): The units its turns serve: a provider id, a list of them, or any; defaults.toml provider when absent.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
+  - `task`: Facts under task.*.
   - `workspace`: Facts under workspace.*.
   - `any`: Every provider's units.
 - `builds` (one of `brief`): A builder, never a turn.
@@ -221,11 +221,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 ### What it matches
 
 - `summary` (string): One line, what the workflow does; its plan items' description. Required.
-- `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`): The provider of the units it matches. Required.
-  - `entry`: Facts under task.*.
+- `provider` (one of `github`, `session`, `slack`, `task`, `workspace`): The provider of the units it matches. Required.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
+  - `task`: Facts under task.*.
   - `workspace`: Facts under workspace.*.
 - `when` (predicate): The match condition, over the unit's facts, the trigger's and config.*. Required.
 - `order` (integer, default `100`): Evaluation order, lowest first.
@@ -319,11 +319,11 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Defaults (`defaults.toml`)
 
-- `provider` (one of `entry`, `github`, `session`, `slack`, `workspace`, `any`): The provider of an intent whose manifest names none.
-  - `entry`: Facts under task.*.
+- `provider` (one of `github`, `session`, `slack`, `task`, `workspace`, `any`): The provider of an intent whose manifest names none.
   - `github`: Facts under pr.*.
   - `session`: Facts under session.*.
   - `slack`: Facts under slack.*.
+  - `task`: Facts under task.*.
   - `workspace`: Facts under workspace.*.
   - `any`: Every provider's units.
 - `session_name` (template): The session.name of an intent whose manifest has none.

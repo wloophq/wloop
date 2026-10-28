@@ -14,7 +14,7 @@ import (
 )
 
 const doneWorkflow = `summary = "React to an entry marked done"
-provider = "entry"
+provider = "task"
 when = 'trigger.event.kind == "verb_done"'
 key = ["trigger.event.id"]
 observe = true

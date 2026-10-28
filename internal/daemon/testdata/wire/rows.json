@@ -195,7 +195,7 @@
         "status": "reviewing"
       }
     },
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "5d1ccfc9deff",
     "summary": {
       "closed": false,
       "line": "muted",
@@ -317,7 +317,7 @@
         "status": ""
       }
     },
-    "specs_version": "b9c41aacfffc",
+    "specs_version": "5d1ccfc9deff",
     "summary": {
       "closed": true,
       "line": "merged",

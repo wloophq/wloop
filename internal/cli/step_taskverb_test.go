@@ -22,7 +22,7 @@ import (
 )
 
 const somedayWorkflow = `summary = "Move a next action to Someday"
-provider = "entry"
+provider = "task"
 when = 'task.state == "next"'
 
 [[step]]

@@ -342,7 +342,7 @@ func TestSlackDraftIsTiedToTheTaskTheTurnWasAskedFrom(t *testing.T) {
 	ctx := context.Background()
 	u := dslack.ThreadUnit("T000", sessChannel, sessParent)
 	_, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
-		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow, Inputs: map[string]any{"entry": "e42"}},
+		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow, Inputs: map[string]any{"task": "e42"}},
 	}})
 	if err != nil {
 		t.Fatal(err)

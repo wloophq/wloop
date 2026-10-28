@@ -51,7 +51,7 @@ func TestWorkflowsFactsRefuseAnUnknownSubject(t *testing.T) {
 	if code := te.run("workflows", "facts", "gmail"); code == 0 {
 		t.Fatal("exit 0")
 	}
-	if !strings.Contains(te.err.String(), "entry, github, session, slack, workspace") {
+	if !strings.Contains(te.err.String(), "github, session, slack, task, workspace") {
 		t.Fatal(te.err.String())
 	}
 }

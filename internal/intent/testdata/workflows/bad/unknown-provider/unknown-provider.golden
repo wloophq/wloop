@@ -1,1 +1,1 @@
-testdata/workflows/bad/unknown-provider/workflows/case-workflow/workflow.toml:2:12: provider: "gmail" is not one of "entry", "github", "session", "slack" or "workspace"
+testdata/workflows/bad/unknown-provider/workflows/case-workflow/workflow.toml:2:12: provider: "gmail" is not one of "github", "session", "slack", "task" or "workspace"

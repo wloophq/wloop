@@ -1,5 +1,5 @@
 {
-  "version": "b9c41aacfffc",
+  "version": "5d1ccfc9deff",
   "specs": [
     {
       "id": "run_now",
@@ -109,7 +109,7 @@
       },
       "source": "intents/start/intent.toml",
       "scope": "unit",
-      "plugin": "entry"
+      "plugin": "task"
     },
     {
       "id": "review",

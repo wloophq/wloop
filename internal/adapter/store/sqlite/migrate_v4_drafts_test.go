@@ -53,9 +53,9 @@ func TestV4MarksClosuresAndAppliedEffects(t *testing.T) {
 	}
 	rows.Close()
 	want := []string{
-		`C1/1 sent [] 2026-10-02T10:00:00Z`, `C1/2 sent [] 2026-10-02T10:00:00Z`, `C1/3 proposed ["entry.nudged"]`,
+		`C1/1 sent [] 2026-10-02T10:00:00Z`, `C1/2 sent [] 2026-10-02T10:00:00Z`, `C1/3 proposed ["task.nudged"]`,
 		`C1/4 failed ["unit.closed"]`, `C1/5 sent ["unit.closed"] 2026-10-02T10:00:00Z`, `C1/6 sent [] 2026-10-02T10:00:00Z`,
-		`C1/7 approved ["entry.nudged"]`, `C1/8 discarded []`, `o/r#1 proposed ["entry.nudged","pr.nudged"]`,
+		`C1/7 approved ["task.nudged"]`, `C1/8 discarded []`, `o/r#1 proposed ["task.nudged","pr.nudged"]`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))

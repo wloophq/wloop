@@ -23,7 +23,7 @@ var _ outbox.Store = draftStore{}
 func (db *DB) Drafts() outbox.Store { return draftStore{db} }
 
 const (
-	draftFields = `provider, unit_key, items, entry, kind, target, text, reaction, original, edited,
+	draftFields = `provider, unit_key, items, task, kind, target, text, reaction, original, edited,
 	origin_kind, turn_seq, intent, workflow, rule, rule_key, approval_mode, approval_window, deadline, state,
 	evidence_ref, evidence_permalink, evidence_at, error, reason, would_policy, would_reason, would_outcome,
 	created_at, updated_at, sending_at, purpose, delivery, effects, effects_applied_at, origin_provider, origin_unit_key, replaced`
@@ -164,7 +164,7 @@ func (s draftStore) List(ctx context.Context, f outbox.Filter) ([]draft.Draft, e
 	if f.Unit != nil {
 		where, args = append(where, `provider = ? AND unit_key = ?`), append(args, string(f.Unit.Provider), f.Unit.Key)
 	}
-	for _, c := range []struct{ col, v string }{{"entry", f.Task}, {"rule", f.Rule}, {"rule_key", f.Key}, {"workflow", f.Workflow}} {
+	for _, c := range []struct{ col, v string }{{"task", f.Task}, {"rule", f.Rule}, {"rule_key", f.Key}, {"workflow", f.Workflow}} {
 		if c.v != "" {
 			where, args = append(where, c.col+` = ?`), append(args, c.v)
 		}

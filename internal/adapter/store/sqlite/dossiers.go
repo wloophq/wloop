@@ -26,10 +26,10 @@ const (
 		files = excluded.files, last_write_at = excluded.last_write_at, resolved_at = excluded.resolved_at,
 		archived_at = excluded.archived_at, purge_after = excluded.purge_after`
 	unitOpenSQL = `SELECT EXISTS (SELECT 1 FROM items WHERE provider = ?1 AND unit_key = ?2 AND state = 'open')
-		OR EXISTS (SELECT 1 FROM entries e WHERE e.state NOT IN ('done', 'trash', 'reference') AND (
-			e.id IN (SELECT entry_id FROM entry_items WHERE provider = ?1 AND unit_key = ?2) OR
-			e.id IN (SELECT entry_id FROM entry_units WHERE provider = ?1 AND unit_key = ?2)))`
-	projectOpenSQL = `SELECT EXISTS (SELECT 1 FROM projects p JOIN entries e ON e.id = p.entry_id
+		OR EXISTS (SELECT 1 FROM tasks e WHERE e.state NOT IN ('done', 'trash', 'reference') AND (
+			e.id IN (SELECT task_id FROM task_items WHERE provider = ?1 AND unit_key = ?2) OR
+			e.id IN (SELECT task_id FROM task_units WHERE provider = ?1 AND unit_key = ?2)))`
+	projectOpenSQL = `SELECT EXISTS (SELECT 1 FROM projects p JOIN tasks e ON e.id = p.task_id
 		WHERE p.slug = ?1 AND p.slug != '' AND e.state NOT IN ('done', 'trash', 'reference'))`
 )
 

@@ -575,7 +575,7 @@ func TestDoctorPrintsBudgetScopes(t *testing.T) {
 	t.Parallel()
 	te := newTestEnv(t, &fake.Manager{})
 	te.run("doctor")
-	if want := "turns.per_unit_per_day=5 (github) turns.per_day=20 (entry, session, slack, workspace)"; !strings.Contains(te.out.String(), want) {
+	if want := "turns.per_unit_per_day=5 (github) turns.per_day=20 (session, slack, task, workspace)"; !strings.Contains(te.out.String(), want) {
 		t.Errorf("doctor lacks %q:\n%s", want, te.out)
 	}
 }

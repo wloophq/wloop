@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +16,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/dossier"
 )
 
 const backupsDir = "backups"
@@ -151,6 +153,60 @@ func (e *Env) migrateInDaemon(ctx context.Context, path string, logf func(string
 		return err
 	}
 	logf("store: at version %d", p.To)
+	return e.renameTaskDossiers(p.From, p.To)
+}
+
+// taskRenamedAt is the schema version that made the entries tasks, and taskIDPrefixes the prefix of a
+// task's id under each provider name a task had.
+const taskRenamedAt = 7
+
+var taskIDPrefixes = map[string]string{"entry": "e-", "task": "t-"}
+
+// renameTaskDossiers moves the tasks' dossier directories along with a store that moved from version
+// from to to across the rename of entries to tasks, either way.
+func (e *Env) renameTaskDossiers(from, to uint32) error {
+	switch {
+	case from < taskRenamedAt && to >= taskRenamedAt:
+		return renameDossierDirs(e.StateDir, "entry", "task")
+	case from >= taskRenamedAt && to < taskRenamedAt:
+		return renameDossierDirs(e.StateDir, "task", "entry")
+	}
+	return nil
+}
+
+// renameDossierDirs moves the dossiers and archived dossiers of provider from's units under stateDir to
+// provider to, each task id taking to's prefix. A directory already at its new name is left alone.
+func renameDossierDirs(stateDir, from, to string) error {
+	root := dossier.Root(stateDir)
+	for _, base := range []string{root, filepath.Join(root, dossier.ArchiveDir)} {
+		src, dst := filepath.Join(base, from), filepath.Join(base, to)
+		ents, err := os.ReadDir(src)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dst, 0o700); err != nil {
+			return err
+		}
+		for _, ent := range ents {
+			name := ent.Name()
+			if rest, ok := strings.CutPrefix(name, taskIDPrefixes[from]); ok {
+				name = taskIDPrefixes[to] + rest
+			}
+			target := filepath.Join(dst, name)
+			if _, err := os.Lstat(target); err == nil {
+				return fmt.Errorf("moving the dossier %s: %s exists", filepath.Join(src, ent.Name()), target)
+			}
+			if err := os.Rename(filepath.Join(src, ent.Name()), target); err != nil {
+				return err
+			}
+		}
+		if err := os.Remove(src); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -297,7 +353,7 @@ func (e *Env) migrateStore(ctx context.Context, path, backup string) error {
 		fmt.Fprintln(e.Out, "check: integrity ok")
 		fmt.Fprintf(e.Out, "store: version %d\n", p.To)
 	}
-	return nil
+	return e.renameTaskDossiers(p.From, p.To)
 }
 
 func (e *Env) confirmStore(verb string, yes bool) error {
@@ -353,6 +409,12 @@ func (e *Env) storeRestore(ctx context.Context, args []string) error {
 	}
 	path := e.storePath()
 	return e.withStoreLock(ctx, func() error {
+		// The dossier directories follow the store they sit beside; one this release cannot read is taken
+		// for one it wrote.
+		was := uint32(sqlite.SchemaVersion)
+		if s, err := sqlite.Inspect(path); err == nil && s.Version != 0 {
+			was = s.Version
+		}
 		got, err := sqlite.Restore(ctx, path, b.Path, e.backupsPath(), e.Now())
 		if err != nil {
 			return err
@@ -361,6 +423,9 @@ func (e *Env) storeRestore(ctx context.Context, args []string) error {
 			fmt.Fprintf(e.Out, "kept the replaced store as %s\n", got.Kept)
 		}
 		fmt.Fprintf(e.Out, "store: restored at version %d\n", got.From.Version)
+		if err := e.renameTaskDossiers(was, got.From.Version); err != nil {
+			return err
+		}
 		if got.From.Version < sqlite.SchemaVersion {
 			return e.migrateStore(ctx, path, "")
 		}

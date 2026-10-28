@@ -1,6 +1,6 @@
 label     = "Start"
 summary   = "Start new work from a brief: in a fresh worktree of a repository, or with no checkout"
-provider  = "entry"
+provider  = "task"
 workspace = { repo_input = "repo", repo_optional = true, name = '{{slug .task.title}}-{{.task.short_id}}' }
 runners   = ["session"]
 session   = { strategy = "new", title = "start", name = '{{or .workspace.name .task.title}}' }

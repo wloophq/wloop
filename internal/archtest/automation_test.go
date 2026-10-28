@@ -53,7 +53,7 @@ type providerSite struct {
 
 // coreProviderAllowlist are the places that may still name a provider.
 var coreProviderAllowlist = []providerSite{
-	{"internal/core/turns/headless.go", "taskInput", `"entry"`, 1, "the headless turn's entry input, which shares the entry provider's spelling"},
+	{"internal/core/turns/headless.go", "taskInput", `"task"`, 1, "the headless turn's task input, which shares the task provider's spelling"},
 	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},
 	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},
@@ -372,7 +372,7 @@ var c = "sessions"
 var d = workflow.Session
 var e = unit.Unit{}
 var f = unit.Task
-var g = "entry"
+var g = "task"
 `)
 	none := map[int]int{}
 	flagged(t, "literals", coreLiterals(fset, "internal/core/automation/x.go", f, nil, none, nil), 4, "the core names no provider")
