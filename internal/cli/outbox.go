@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	"github.com/wloophq/wloop/internal/domain/gate"
-	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -125,9 +124,26 @@ func decideDraft(ctx context.Context, c *client.Client, d api.Draft, st gate.Sta
 	return err
 }
 
-// draftVerb runs verb on d's Outbox task: a draft's delivery actions, which no gate decides.
-func draftVerb(ctx context.Context, c *client.Client, id int64, verb task.Verb, args map[string]string) error {
-	_, err := c.TaskDo(ctx, "draft:"+strconv.FormatInt(id, 10), string(verb), api.TaskRequest{Args: args, Source: string(dturn.Terminal)})
+// The handlers of a draft's delivery verbs, names of builtin.VerbHandlers, and the kind's own dismiss, which
+// binds by its name when no verb names it as its handler.
+const (
+	handlerRetry = "retry"
+	handlerEdit  = "edit"
+	ownDismiss   = "dismiss"
+)
+
+// draftVerb runs on draft id's Outbox task the verb of the profile that runs handler: a draft's delivery actions,
+// which no gate decides.
+func draftVerb(ctx context.Context, c *client.Client, id int64, handler string, args map[string]string) error {
+	cat, err := c.Views(ctx)
+	if err != nil {
+		return err
+	}
+	verb, ok := cat.VerbOf(handler)
+	if !ok {
+		return fmt.Errorf("the profile has no verb that runs %s", handler)
+	}
+	_, err = c.TaskDo(ctx, "draft:"+strconv.FormatInt(id, 10), verb, api.TaskRequest{Args: args, Source: string(dturn.Terminal)})
 	return err
 }
 
@@ -450,7 +466,7 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 		fmt.Fprintln(e.Out, "Not retried.")
 		return exitCode(1)
 	}
-	if err := draftVerb(ctx, c, id, task.VerbRetry, map[string]string{"confirm": strconv.FormatBool(*confirm), "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+	if err := draftVerb(ctx, c, id, handlerRetry, map[string]string{"confirm": strconv.FormatBool(*confirm), "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
 		return err
 	}
 	got, err := c.Draft(ctx, id)
@@ -469,7 +485,7 @@ func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) er
 	if err != nil {
 		return err
 	}
-	if err := draftVerb(ctx, c, id, task.VerbEdit, map[string]string{"text": args[1]}); err != nil {
+	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1]}); err != nil {
 		return err
 	}
 	fmt.Fprintf(e.Out, "draft %d edited\n", id)
@@ -495,7 +511,7 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	if d.Intents[string(gate.Rejected)] != "" {
 		err = decideDraft(ctx, c, d, gate.Rejected, nil)
 	} else {
-		err = draftVerb(ctx, c, id, task.VerbDismiss, map[string]string{"reason": *reason})
+		err = draftVerb(ctx, c, id, ownDismiss, map[string]string{"reason": *reason})
 	}
 	if err != nil {
 		return err

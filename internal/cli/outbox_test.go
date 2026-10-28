@@ -37,7 +37,7 @@ func outboxDaemon(t *testing.T, te *testEnv, interactive bool) *sqlite.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf}, db, te.cfg, mods, t.Logf)
+	d := te.serveTasks(daemon.Deps{Cfg: te.cfg, Version: "test", Now: te.Now, Log: t.Logf, Intents: te.loadedIntents}, db, te.cfg, mods, t.Logf)
 	d = te.serveOutbox(d, db, te.cfg, mods, t.Logf)
 	h := daemon.New(d).Handler()
 	te.Socket = serveSocket(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -427,5 +427,36 @@ func TestOutboxCLIUsesGates(t *testing.T) {
 	}
 	if code := te.run("outbox", "approve", "3", "--yes"); code == 0 || !strings.Contains(te.err.String(), "waits on no decision") {
 		t.Fatalf("approving a decided draft: exit %d: %s", code, te.err)
+	}
+}
+
+func TestOutboxCLIFindsDraftVerbsByHandler(t *testing.T) {
+	te := newTestEnv(t, &fake.Manager{})
+	userProfile(t, te, map[string]string{"tasks.toml": `[verbs.edit]
+handler = "retry"
+
+[verbs.retry]
+handler = "edit"
+`})
+	db := outboxDaemon(t, te, true)
+	failed := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "failed once", State: draft.Failed, Error: "refused"})
+	if code := te.run("outbox", "retry", "1", "--yes"); code != 0 {
+		t.Fatalf("retry: exit %d: %s %v", code, te.err, postedPaths())
+	}
+	if got := postedPaths(); !slices.Equal(got, []string{"/api/tasks/draft:1/edit"}) {
+		t.Fatalf("retry posted %v, want the verb whose handler is retry", got)
+	}
+	if got := te.draftState(t, db, failed.ID); got.State != draft.Queued {
+		t.Fatalf("retried %+v", got)
+	}
+	held := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "draft", State: draft.Held})
+	if code := te.run("outbox", "edit", "2", "better"); code != 0 {
+		t.Fatalf("edit: exit %d: %s", code, te.err)
+	}
+	if got := postedPaths(); len(got) != 2 || got[1] != "/api/tasks/draft:2/retry" {
+		t.Fatalf("edit posted %v, want the verb whose handler is edit", got)
+	}
+	if got := te.draftState(t, db, held.ID); got.Text != "better" {
+		t.Fatalf("edited %+v", got)
 	}
 }

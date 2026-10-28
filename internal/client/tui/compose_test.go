@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -191,3 +192,20 @@ func TestOpeningADetailFetchesItsDrafts(t *testing.T) {
 
 // draftGates are the gates of a task carrying d.
 func draftGates(d api.Draft) []api.GateView { return []api.GateView{api.DraftGate(d)} }
+
+func TestADraftTaskOffersTheVerbsThatRunItsHandlers(t *testing.T) {
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}}
+	d := api.Draft{ID: 4, State: "failed", Actions: []api.ActionState{{ID: "draft.edit"}, {ID: "draft.retry", Enabled: true}}}
+	got := map[string]bool{}
+	for _, v := range draftTask(cat, d, "").Verbs {
+		got[v.Verb] = v.Enabled
+	}
+	if want := map[string]bool{"approve": false, "dismiss": true, "edit": true, "retry": false}; !maps.Equal(got, want) {
+		t.Fatalf("verbs %v, want %v", got, want)
+	}
+	held := api.Draft{ID: 5, State: "held", Intents: map[string]string{"approved": "approve", "rejected": "discard"}}
+	if vs := draftTask(api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "dismiss", Handler: "context"}}}, held, "").Verbs; len(vs) != 0 {
+		t.Fatalf("a profile with no approve handler and no own dismiss offers %+v", vs)
+	}
+}

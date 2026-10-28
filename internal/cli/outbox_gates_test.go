@@ -46,7 +46,7 @@ func decideDraftAs(ctx context.Context, o *outbox.Service, id draft.ID, intent s
 		return fmt.Errorf("draft %d has no gate: %w", id, err)
 	}
 	if intent == "approve" {
-		if _, err := o.Prepare(ctx, id, d.Rev, nil); err != nil {
+		if _, err := o.Prepare(ctx, id, d.Rev); err != nil {
 			return err
 		}
 	}

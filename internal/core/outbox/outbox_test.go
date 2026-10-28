@@ -451,11 +451,11 @@ func TestApprovingWithTextPostsThatText(t *testing.T) {
 	if got := e.get(gone.ID); got.Reason != "user" || got.State != draft.Dropped {
 		t.Errorf("discard %+v", got)
 	}
-	if _, err := e.svc.Prepare(ctx, asIs.ID, e.get(asIs.ID).Rev, nil); !errors.Is(err, ErrConflict) {
+	if _, err := e.svc.Prepare(ctx, asIs.ID, e.get(asIs.ID).Rev); !errors.Is(err, ErrConflict) {
 		t.Errorf("preparing a queued draft: %v", err)
 	}
 	held := e.propose(reply("later"))
-	if _, err := e.svc.Prepare(ctx, held.ID, held.Rev+1, nil); !errors.Is(err, ErrConflict) {
+	if _, err := e.svc.Prepare(ctx, held.ID, held.Rev+1); !errors.Is(err, ErrConflict) {
 		t.Errorf("preparing at a stale rev: %v", err)
 	}
 }
@@ -572,7 +572,7 @@ func TestOutboxLogHasNoText(t *testing.T) {
 
 func TestNotFound(t *testing.T) {
 	e := newEnv()
-	if _, err := e.svc.Prepare(ctx, 42, 0, nil); !errors.Is(err, ErrNotFound) {
+	if _, err := e.svc.Prepare(ctx, 42, 0); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
 }

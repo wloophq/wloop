@@ -44,12 +44,13 @@ var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon run
 // mayHaveBeenPosted starts a publisher's error when the post may have reached its provider (#publisher).
 const mayHaveBeenPosted = "may have been posted"
 
-// draftVerbs are the task verbs a draft takes, by the draft action each runs.
-var draftVerbs = map[task.Verb]string{
-	task.VerbApprove: "approve",
-	task.VerbEdit:    "edit",
-	task.VerbDismiss: "discard",
-	task.VerbRetry:   "retry",
+// draftHandlers are the handlers a draft task's verbs run, by the draft action each runs: names of
+// builtin.VerbHandlers, and dismiss, the kind's own, which binds by its name when no verb names it.
+var draftHandlers = map[string]string{
+	"approve": "approve",
+	"edit":    "edit",
+	"dismiss": "discard",
+	"retry":   "retry",
 }
 
 // registerOutbox serves the Outbox view from the drafts and makes a draft task's verbs act on its draft.
@@ -57,8 +58,8 @@ func (s *Server) registerOutbox() {
 	if s.deps.Tasks == nil || s.deps.Outbox == nil {
 		return
 	}
-	for verb := range draftVerbs {
-		s.deps.Tasks.Register(task.KindDraft, string(verb), s.draftVerb(verb))
+	for handler := range draftHandlers {
+		s.deps.Tasks.Register(task.KindDraft, handler, s.draftVerb(handler))
 	}
 	s.deps.Tasks.RegisterView(task.ViewOutbox, draftPrefix, outboxView{s})
 }
@@ -253,16 +254,39 @@ func (s *Server) decideDraft(ctx context.Context, d draft.Draft, want gate.Statu
 	return o.Store.Get(ctx, d.ID)
 }
 
-// resolveDraftGate resolves draft gate g with intent as actor, readying its draft at rev first, with text when it is
-// set, when the intent approves. It runs under draftMu: an edit since g opened superseded it.
+// resolveDraftGate resolves draft gate g with intent as actor, under draftMu. Only a person resolves a draft's
+// gate here, refused before anything is written. An approval readies its draft at rev; with text other than the
+// draft's, it edits the draft first, which supersedes g, and approves the gate that edit opened.
 func (s *Server) resolveDraftGate(ctx context.Context, g gate.Gate, intent string, rev int64, text *string, actor task.Actor) error {
+	if actor != task.ActorPerson {
+		return fmt.Errorf("%w: draft gate %d is resolved by a person, not by %s", gates.ErrRefused, g.ID, cmp.Or(string(actor), "no one"))
+	}
 	if st, _ := s.intentStatus(g, intent); st == gate.Approved {
-		id, err := strconv.ParseInt(g.Subject, 10, 64)
+		o := s.deps.Outbox
+		n, err := strconv.ParseInt(g.Subject, 10, 64)
 		if err != nil {
 			return fmt.Errorf("draft gate %d names no draft: %q", g.ID, g.Subject)
 		}
-		if _, err := s.deps.Outbox.Prepare(ctx, draft.ID(id), rev, text); err != nil {
+		id := draft.ID(n)
+		d, err := o.Prepare(ctx, id, rev)
+		if err != nil {
 			return err
+		}
+		if text != nil && *text != d.Text {
+			if d, err = o.Edit(ctx, id, *text); err != nil {
+				return err
+			}
+			ng, ok, err := o.GateOf(ctx, d)
+			switch {
+			case err != nil:
+				return err
+			case !ok || ng.Status != gate.Open:
+				return fmt.Errorf("%w: draft %d has no open gate after its edit", outbox.ErrConflict, id)
+			}
+			if _, err := o.Prepare(ctx, id, d.Rev); err != nil {
+				return err
+			}
+			g = ng
 		}
 	}
 	return s.deps.Gates.Resolve(ctx, g.ID, gates.Resolution{Intent: intent, By: actor})
@@ -321,8 +345,8 @@ func writeDraftError(w http.ResponseWriter, err error) {
 	}
 }
 
-// draftVerb runs verb on a draft task's draft, with the statuses the draft routes answer.
-func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
+// draftVerb runs the verb of handler on a draft task's draft, with the statuses the draft routes answer.
+func (s *Server) draftVerb(handler string) coretasks.VerbHandler {
 	return func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		id, ok := draftIDOf(e.ID)
 		if !ok {
@@ -347,7 +371,7 @@ func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
 			}
 			a.Rev = &n
 		}
-		d, err := s.draftDo(ctx, id, draftVerbs[verb], a, cmp.Or(req.Actor, task.ActorPerson))
+		d, err := s.draftDo(ctx, id, draftHandlers[handler], a, cmp.Or(req.Actor, task.ActorPerson))
 		if err != nil {
 			return coretasks.Result{}, taskDraftError(err)
 		}

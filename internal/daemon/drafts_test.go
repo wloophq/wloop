@@ -924,3 +924,49 @@ func TestADraftGateServesItsDraftAndItsDelivery(t *testing.T) {
 		}
 	}
 }
+
+func TestAnAgentCannotChangeADraftThroughItsGate(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	d := r.propose(t, r7u, "the person's text", draft.Wait)
+	g, _, _ := r.o.GateOf(ctx, d)
+	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
+	for _, body := range []string{`{"source":"claude","args":{"text":"agent text"}}`, `{"source":"claude","args":{"text":"agent text","rev":"0"}}`, `{"source":"claude"}`} {
+		if rec := postFrom(t, r.s, "term_1", path, body); rec.Code != 403 {
+			t.Fatalf("an agent session's approval %s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	got, _ := r.o.Store.Get(ctx, d.ID)
+	after, _, _ := r.o.GateOf(ctx, got)
+	if got.Text != "the person's text" || got.Rev != d.Rev || got.State != draft.Held || after.ID != g.ID || after.Status != gate.Open {
+		t.Fatalf("the refused agent changed the draft %+v or its gate %+v", got, after)
+	}
+	if rec := post(t, r.s, path, `{"source":"cockpit"}`); rec.Code != 200 {
+		t.Fatalf("the person's approval: %d %s", rec.Code, rec.Body)
+	}
+	if _, _, err := r.o.Send(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := r.o.Store.Get(ctx, d.ID); got.State != draft.Sent || got.Text != "the person's text" || got.Edited {
+		t.Fatalf("the person approved %+v", got)
+	}
+}
+
+func TestApprovingWithOtherTextApprovesTheGateItsEditOpened(t *testing.T) {
+	t.Parallel()
+	r := newOutboxRig(t)
+	ctx := context.Background()
+	d := r.propose(t, r7u, "first", draft.Wait)
+	g, _, _ := r.o.GateOf(ctx, d)
+	path := api.GatesPath + "/" + strconv.FormatInt(g.ID, 10) + "/approve"
+	if rec := post(t, r.s, path, `{"source":"cockpit","args":{"text":"second","rev":"0"}}`); rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	got, _ := r.o.Store.Get(ctx, d.ID)
+	ng, _, _ := r.o.GateOf(ctx, got)
+	old, _ := r.s.deps.GateReader.Get(ctx, g.ID)
+	if got.State != draft.Queued || got.Text != "second" || ng.ID == g.ID || ng.Status != gate.Approved || ng.By != task.ActorPerson || old.Status != gate.Superseded {
+		t.Fatalf("draft %+v, its gate %+v, the gate the person saw %+v", got, ng, old)
+	}
+}

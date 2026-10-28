@@ -27,6 +27,18 @@ func TestOutboxSendsOnlyApprovedDrafts(t *testing.T) {
 	if _, err := e.svc.Withdraw(ctx, withdrawn.ID, draft.WithdrawMoot); err != nil {
 		t.Fatal(err)
 	}
+	openQueued := e.propose(reply("queued while its gate is open"))
+	rejectedQueued := e.propose(reply("queued after its gate refused it"))
+	if err := e.decide(rejectedQueued.ID, "discard"); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []draft.Draft{e.get(openQueued.ID), e.get(rejectedQueued.ID)} {
+		from := d.State
+		d.State = draft.Queued
+		if _, err := e.store.Update(ctx, d, from); err != nil {
+			t.Fatal(err)
+		}
+	}
 	withPolicy(e, observe)
 	dry := e.propose(reply("dry run"))
 	forged, err := e.store.Insert(ctx, draft.Draft{Unit: thread, Purpose: "reply", Delivery: draft.Message, Text: "queued with no gate",
@@ -36,6 +48,11 @@ func TestOutboxSendsOnlyApprovedDrafts(t *testing.T) {
 	}
 	for range 2 {
 		e.svc.Send(ctx)
+	}
+	for _, id := range []draft.ID{openQueued.ID, rejectedQueued.ID} {
+		if got := e.get(id); got.State != draft.Failed {
+			t.Errorf("a queued draft whose gate is %s is %s", e.gate(id).Status, got.State)
+		}
 	}
 	if !slices.Equal(e.fx.published, []draft.ID{approved.ID}) {
 		t.Fatalf("published %v, want only the approved draft %d", e.fx.published, approved.ID)

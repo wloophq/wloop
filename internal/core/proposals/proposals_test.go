@@ -110,7 +110,7 @@ func TestProposalsSkipDisabledPlugins(t *testing.T) {
 		if got, _ := e.drafts.Get(ctx, d.ID); got.State != draft.Held {
 			t.Fatalf("draft %d is %s", d.ID, got.State)
 		}
-		if _, err := e.svc.Prepare(ctx, d.ID, d.Rev, nil); !errors.Is(err, outbox.ErrDisabled) {
+		if _, err := e.svc.Prepare(ctx, d.ID, d.Rev); !errors.Is(err, outbox.ErrDisabled) {
 			t.Fatalf("approve on a disabled plugin: %v", err)
 		}
 	}

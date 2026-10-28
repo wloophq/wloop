@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/url"
 	"time"
@@ -93,8 +94,11 @@ type PropSpec struct {
 
 // VerbSpec is a verb a task offers: From are the states it moves a task from (every state when empty), To
 // the state it moves it to ("" for none).
+// VerbSpec is a verb of tasks.toml; Handler is what the verb runs besides its move, as the profile names it, "" for
+// none.
 type VerbSpec struct {
 	Verb    string   `json:"verb"`
+	Handler string   `json:"handler,omitempty"`
 	Label   string   `json:"label"`
 	Summary string   `json:"summary,omitempty"`
 	Input   string   `json:"input,omitempty"` // the question a verb that asks for a value puts first
@@ -384,4 +388,15 @@ func (e TaskView) PropTime(name string) time.Time {
 	var t time.Time
 	_ = json.Unmarshal(e.Props[name], &t)
 	return t
+}
+
+// VerbOf is the verb of c that runs handler: the first whose handler it is, or with no handler, whose name it is, as
+// the tasks service binds a kind's own verbs; false when none does.
+func (c ViewsCatalog) VerbOf(handler string) (string, bool) {
+	for _, v := range c.Verbs {
+		if cmp.Or(v.Handler, v.Verb) == handler {
+			return v.Verb, true
+		}
+	}
+	return "", false
 }

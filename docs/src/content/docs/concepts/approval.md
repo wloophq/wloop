@@ -77,7 +77,7 @@ A draft's gate opens under its approval policy:
 | `send` | approves the draft at once |
 | `dry_run` | discards the draft at once: it is stored as what would have been sent, and never sent |
 
-A gate a rule or a window approved whose draft its publisher now posts as another delivery than the rule decided, or whose workflow no longer loads, fails the draft for you to retry, so no rule posts what it never named. Editing a held draft supersedes its gate, so an approval you gave the text you saw never posts another; approving through `POST /api/gates/{id}/{intent}` names the gate you saw.
+A gate a rule or a window approved whose draft its publisher now posts as another delivery than the rule decided, or whose workflow no longer loads, fails the draft for you to retry, so no rule posts what it never named. Editing a held draft supersedes its gate, so an approval you gave the text you saw never posts another; approving through `POST /api/gates/{id}/{intent}` names the gate you saw, and approving with other text edits the draft first, so the gate the edit opens is the one approved. Only a person resolves a draft's gate there: an agent's session is refused before anything is written.
 
 A draft you write yourself (Save as draft on a task's page, Reply on a unit, see [Tasks and views](/concepts/tasks/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 

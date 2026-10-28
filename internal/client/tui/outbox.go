@@ -73,7 +73,7 @@ func draftState(e api.TaskView) string {
 // paragraphs, why it failed, and when its window sends it.
 func (m *Model) draftFacts(d *api.Draft, fact func(label, text string, style func(string) string), para func(label, text string)) {
 	t := m.t
-	fact("to", draftTarget(draftTask(*d, "")), plain)
+	fact("to", draftTarget(draftTask(api.ViewsCatalog{}, *d, "")), plain)
 	head := d.Purpose
 	if d.Edited {
 		head += " · edited"

@@ -16,7 +16,7 @@ func TestDraftTargetSaysWhenTheDestinationIsUnknown(t *testing.T) {
 		{api.Draft{Target: "C0REL", Permalink: "https://example.test/p/1"}, "C0REL"},
 	} {
 		d := tc.d
-		if got := draftTarget(draftTask(d, "")); got != tc.want {
+		if got := draftTarget(draftTask(api.ViewsCatalog{}, d, "")); got != tc.want {
 			t.Errorf("%+v: %q, want %q", d, got, tc.want)
 		}
 	}

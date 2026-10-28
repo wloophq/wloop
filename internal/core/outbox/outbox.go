@@ -521,25 +521,17 @@ func (s *Service) Edit(ctx context.Context, id draft.ID, text string) (draft.Dra
 }
 
 // Prepare readies held draft id for a person to approve its gate: the
-// draft at rev, with text when it is set, which its publisher must take.
-// The caller reads the gate it resolves before it prepares: an edit after
-// the person saw the draft supersedes that gate.
-func (s *Service) Prepare(ctx context.Context, id draft.ID, rev int64, text *string) (draft.Draft, error) {
+// draft at rev, which its publisher must take. It writes nothing. The caller
+// reads the gate it resolves before it prepares: an edit after the person saw
+// the draft supersedes that gate, and a person who changes the text approves
+// through Edit's new gate.
+func (s *Service) Prepare(ctx context.Context, id draft.ID, rev int64) (draft.Draft, error) {
 	d, err := s.load(ctx, id, draft.Queued, draft.Held)
 	if err != nil {
 		return draft.Draft{}, err
 	}
 	if d.Rev != rev {
 		return draft.Draft{}, fmt.Errorf("%w: draft %d changed since you saw it (rev %d, now %d)", ErrConflict, id, rev, d.Rev)
-	}
-	if text != nil && *text != d.Text {
-		if err := setText(&d, *text); err != nil {
-			return draft.Draft{}, err
-		}
-		if err := s.publishable(ctx, &d); err != nil {
-			return draft.Draft{}, err
-		}
-		return s.save(ctx, d, draft.Held)
 	}
 	return d, s.publishable(ctx, &d)
 }

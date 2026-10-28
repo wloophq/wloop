@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -144,7 +145,7 @@ func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) er
 	facts := s.draftFacts(d)
 	open := g.Status == gate.Open
 	for i, vs := range v.Verbs {
-		action, ok := draftVerbs[task.Verb(vs.Verb)]
+		action, ok := draftHandlers[cmp.Or(s.loaded().Tasks.Handler(vs.Verb), vs.Verb)]
 		switch {
 		case !ok:
 			v.Verbs[i] = api.VerbState{Verb: vs.Verb, Reason: "a draft takes approve, edit, dismiss and retry"}

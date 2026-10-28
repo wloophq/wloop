@@ -93,7 +93,7 @@ func (g *Gates) decideDraft(ctx context.Context, id draft.ID, intent string) err
 		return fmt.Errorf("draft %d has no gate", id)
 	}
 	if intent == "approve" {
-		if _, err := o.Prepare(ctx, id, d.Rev, nil); err != nil {
+		if _, err := o.Prepare(ctx, id, d.Rev); err != nil {
 			return err
 		}
 	}
