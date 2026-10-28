@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ import (
 func taskCatalog() api.ViewsCatalog {
 	return api.ViewsCatalog{
 		Views: []api.TaskViewSpec{{ID: "triage", Label: "Triage", Group: "task.category"}, {ID: "parked", Label: "Parked", Group: "task.state"},
-			{ID: "review", Label: "Weekly walk"}},
+			{ID: "walk", Label: "Weekly walk"}},
 		Verbs: []api.VerbSpec{{Verb: "finish", Label: "Finish", Summary: "Close it"}, {Verb: "reply", Label: "Reply", Summary: "Hold a reply for approval"}},
 		States: []api.StateSpec{{Name: "triage", Label: "To sort", Category: "inbox"}, {Name: "doing", Label: "Doing", Category: "active"},
 			{Name: "parked", Label: "Parked", Category: "deferred"}, {Name: "later", Label: "Later", Category: "deferred"}, {Name: "shipped", Label: "Shipped", Category: "done"}},
@@ -323,6 +324,9 @@ done({
 	}
 }
 
+// bundledViewIDs are the bundled profile's view ids, which no client logic may name.
+var bundledViewIDs = []string{"inbox", "next", "waiting", "snoozed", "someday", "focus", "projects", "logbook", "outbox"}
+
 func TestGroupingReadsCategoryNotStateNames(t *testing.T) {
 	tasks := []api.TaskView{
 		task("t-1", "shipped", func(e *api.TaskView) { e.Category = "done" }),
@@ -340,11 +344,11 @@ func TestGroupingReadsCategoryNotStateNames(t *testing.T) {
 		IDs   []string `json:"ids"`
 	}
 	var got map[string][]group
-	nodeRun(t, viewsPrelude(t), nil, `
-tasksState.catalog = input.catalog;
-const g = (group) => viewGroups({ id: "any", group }, input.tasks).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
-process.stdout.write(JSON.stringify({ category: g("task.category"), state: g("task.state"), size: g("task.prop.size"), none: g("") }));`,
-		map[string]any{"tasks": tasks, "catalog": taskCatalog()}, &got)
+	answers := map[string]any{"tasks": tasks}
+	nodeRun(t, cockpitScript(t)+taskPageHarness, nil, `
+const g = (group) => viewGroups({ id: "any", group }, input.answers.tasks).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
+done({ category: g("task.category"), state: g("task.state"), size: g("task.prop.size"), none: g("") });`,
+		map[string]any{"catalog": taskCatalog(), "answers": answers}, &got)
 	want := map[string][]group{
 		"category": {{"inbox", []string{"t-5"}}, {"active", []string{"t-3", "t-6"}}, {"deferred", []string{"t-2", "t-4"}}, {"done", []string{"t-1"}}},
 		"state":    {{"To sort", []string{"t-5"}}, {"Doing", []string{"t-3", "t-6"}}, {"Parked", []string{"t-4"}}, {"Later", []string{"t-2"}}, {"Shipped", []string{"t-1"}}},
@@ -356,13 +360,11 @@ process.stdout.write(JSON.stringify({ category: g("task.category"), state: g("ta
 			t.Errorf("by %s: %+v, want %+v", k, got[k], w)
 		}
 	}
-	src := staticJS(t, "views.js")
-	for _, f := range []string{"viewGroups", "groupValue", "applyTasksPage", "taskList"} {
-		body := jsFunction(t, src, f)
-		for _, name := range []string{"inbox", "next", "waiting", "someday", "reference", "done", "logbook", "outbox", "focus", "projects"} {
-			if strings.Contains(body, `"`+name+`"`) {
-				t.Errorf("views.js %s names %q", f, name)
-			}
+	ids := strings.Join(bundledViewIDs, "|")
+	logic := regexp.MustCompile(`[!=]==?\s*"(` + ids + `)"|"(` + ids + `)"\s*[!=]==?|\(\s*"(` + ids + `)"\s*[,)]|[\[,]\s*"(` + ids + `)"\s*[,\]]|case\s+"(` + ids + `)"`)
+	for _, f := range []string{"views.js", "review.js", "keys.js", "task.js"} {
+		for _, m := range logic.FindAllString(staticJS(t, f), -1) {
+			t.Errorf("%s uses a view id as logic: %s", f, m)
 		}
 	}
 }
@@ -379,21 +381,23 @@ func TestReviewStepsAreViews(t *testing.T) {
 		map[string]any{"id": "sort", "label": "Sort what came in", "view": "triage", "count": 1, "done": false},
 		map[string]any{"id": "parked", "label": "Look at what waits", "view": "parked", "count": 0, "done": true},
 	}}
-	nodeRun(t, viewsPrelude(t)+staticJS(t, "review.js"), nil, `
-const gets = [], posts = [];
-tasksState.catalog = input.catalog;
-reviewEnv.getJSON = async (url) => { gets.push(url); return url === "/api/review" ? input.review : { tasks: [input.task] }; };
-reviewEnv.post = async (path) => { posts.push(path); return input.review; };
+	nodeRun(t, cockpitScript(t)+taskPageHarness, nil, `
+const gets = [], sent = [];
+reviewEnv.getJSON = async (url) => { gets.push(url); return url === "/api/review" ? input.answers.review : { tasks: [input.answers.task] }; };
+reviewEnv.post = async (path) => { sent.push(path); return input.answers.review; };
 reviewEnv.notice = () => {}; reviewEnv.render = () => {}; reviewEnv.focusStep = () => {};
 (async () => {
-  await loadReview();
-  const panel = reviewPanel("");
+  const route = { view: REVIEW, area: "", ctx: [], q: "", task: "" };
+  await loadTasks(route);
+  renderTasks(route);
+  const panel = document.getElementById("tasks");
+  if (panel.hidden) throw new Error("the review mode is hidden");
   await reviewKey("done");
-  process.stdout.write(JSON.stringify({ Head: text(byClass(panel, "tasks-head")), Steps: byClass(panel, "review-label").map(text), Gets: gets, Posts: posts,
-    Tasks: tasksState.tasks.map((e) => e.id) }));
-})();`, map[string]any{"catalog": taskCatalog(), "review": review, "task": task("t-1", "triage", nil)}, &got)
-	if got.Head != "Weekly walk" {
-		t.Errorf("the review is titled %q, want the profile's label", got.Head)
+  done({ Head: cls(panel, "tasks-head")[0].textContent, Steps: cls(panel, "review-label").map((x) => x.textContent), Gets: gets, Posts: sent,
+    Tasks: tasksState.tasks.map((e) => e.id) });
+})();`, map[string]any{"catalog": taskCatalog(), "answers": map[string]any{"review": review, "task": task("t-1", "triage", nil)}}, &got)
+	if got.Head != "Review" {
+		t.Errorf("the review is titled %q, want the mode's own title", got.Head)
 	}
 	if !slices.Equal(got.Steps, []string{"Sort what came in", "Look at what waits"}) {
 		t.Errorf("steps %v", got.Steps)

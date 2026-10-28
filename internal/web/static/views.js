@@ -1,7 +1,9 @@
 "use strict";
 
-// REVIEW is the key context the review's keys work in, and the view that walks the review.
+// REVIEW is the route and the key context of the review, a mode of the cockpit that walks the catalog's review
+// views; REVIEW_TITLE is its title.
 const REVIEW = "review";
+const REVIEW_TITLE = "Review";
 const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], gates: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
 function coreViews(cat = tasksState.catalog) {
@@ -9,7 +11,7 @@ function coreViews(cat = tasksState.catalog) {
 }
 
 function isCoreView(id, cat = tasksState.catalog) {
-  return coreViews(cat).some((v) => v.id === id);
+  return id === REVIEW || coreViews(cat).some((v) => v.id === id);
 }
 
 function viewSpec(id, cat = tasksState.catalog) {
@@ -58,10 +60,10 @@ function railSections(nav, name) {
   return out.filter((sec) => sec.views.length);
 }
 
-// tasksURL lists view; every view but Inbox is narrowed to area.
+// tasksURL lists view, narrowed to area.
 function tasksURL(view, area, ctx, since) {
   const p = new URLSearchParams({ view });
-  if (area && view !== "inbox") p.set("area", area);
+  if (area) p.set("area", area);
   if (ctx && ctx.length) p.set("context", ctx.join(","));
   if (since) p.set("since", since);
   return "/api/tasks?" + p.toString();
@@ -116,7 +118,7 @@ async function loadFiltered(route) {
 }
 
 function viewQueryKey(view, area, ctx) {
-  return [view, view === "inbox" ? "" : area || "", (ctx || []).join(",")].join("|");
+  return [view, area || "", (ctx || []).join(",")].join("|");
 }
 
 // applyTasksPage folds a page into the list; a page of another query,
@@ -163,7 +165,7 @@ async function loadTasks(given) {
 }
 
 async function loadTaskList(route) {
-  if (route.view === REVIEW && isCoreView(route.view)) return loadReview();
+  if (route.view === REVIEW) return loadReview();
   if (!isCoreView(route.view)) {
     try {
       tasksState.counters = await getJSON(countersURL(route.area));
@@ -178,22 +180,12 @@ async function loadTaskList(route) {
   try {
     applyTasksPage(key, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
     tasksState.error = "";
-    if (route.view === "inbox" && route.area) await areaCounters(route.area);
   } catch (err) {
     tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
   }
 }
 
-// areaCounters are the rail's counts of area while Inbox, which ignores it,
-// is shown; the Inbox count stays the page's.
-async function areaCounters(area) {
-  try {
-    const c = await getJSON(countersURL(area));
-    tasksState.counters = { ...c, views: { ...c.views, inbox: tasksState.counters.views.inbox } };
-  } catch {
-    // The rail keeps the page's counts.
-  }
-}
+
 
 // groupValue reads fact, a task fact such as task.category or task.prop.size, from a task as the wire serves it:
 // its first value when it holds several.
@@ -319,7 +311,6 @@ function viewHash(change) {
 function areaPicker(route) {
   const areas = (tasksState.catalog && tasksState.catalog.areas) || [];
   if (!areas.length) return null;
-  if (route.view === "inbox") return h("span", { class: "lens-label" }, "Inbox shows every area");
   const counts = (viewCounters(route) || {}).areas || {};
   return h("label", { class: "lens-pick" },
     h("span", { class: "lens-label" }, "Area"),
@@ -329,7 +320,7 @@ function areaPicker(route) {
 }
 
 function contextChips(route) {
-  if (route.view !== "next") return null;
+  if ((viewSpec(route.view) || {}).over === "gates") return null;
   const ctxs = (tasksState.catalog && tasksState.catalog.contexts) || [];
   const counts = (viewCounters(route) || {}).contexts || {};
   return ctxs.map((c) => {
@@ -429,6 +420,6 @@ function renderTasks(route) {
     box.replaceChildren();
     return;
   }
-  box.setAttribute("aria-label", viewLabel(route.view));
+  box.setAttribute("aria-label", route.view === REVIEW ? REVIEW_TITLE : viewLabel(route.view));
   box.replaceChildren(...(route.view === REVIEW ? reviewPanel(route.task) : taskList(route, route.task)));
 }

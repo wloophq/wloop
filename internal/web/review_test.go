@@ -89,9 +89,8 @@ func TestReviewStepsWeb(t *testing.T) {
 	project := task("e-p", "next", nil)
 	project.Kind, project.Title = "project", "Ship the v2 API"
 	project.ReviewDue, project.OpenActions, project.ReviewEvery = true, 0, "168h0m0s"
-	nodeRun(t, viewsPrelude(t)+staticJS(t, "review.js"), nil, `
+	nodeRun(t, viewsPrelude(t), nil, `
 const gets = [], posts = [], focused = [];
-tasksState.catalog = { views: [{ id: "review", label: "Weekly review" }] };
 reviewEnv.getJSON = async (url) => {
   gets.push(url);
   if (url === "/api/review") return input.review;
@@ -134,7 +133,7 @@ reviewEnv.focusStep = (id) => focused.push(id);
 	if !reflect.DeepEqual(got.Tasks, []string{"e-p", "e-1", "e-2"}) {
 		t.Errorf("tasks %v", got.Tasks)
 	}
-	for _, s := range []string{"Weekly review", "Inbox to zero", "Prune Focus", "Ship the v2 API", "review due", "no next action", "every 7d"} {
+	for _, s := range []string{"Review", "Inbox to zero", "Prune Focus", "Ship the v2 API", "review due", "no next action", "every 7d"} {
 		if !strings.Contains(got.Text, s) {
 			t.Errorf("the review lacks %q: %s", s, got.Text)
 		}

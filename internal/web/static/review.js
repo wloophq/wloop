@@ -5,6 +5,9 @@
 // detail act on them.
 const reviewState = { review: null, step: "", error: "" };
 
+// STEP_MOVES are how far the review's step keys move.
+const STEP_MOVES = { next: 1, prev: -1 };
+
 const reviewEnv = {
   getJSON: (url) => getJSON(url),
   post: (path, body) => taskPost(path, body),
@@ -81,8 +84,8 @@ async function reviewKey(action) {
   const steps = reviewSteps();
   const at = steps.findIndex((s) => s.id === reviewState.step);
   if (!steps.length || at < 0) return false;
-  if (action === "next" || action === "prev") {
-    const next = steps[Math.max(0, Math.min(steps.length - 1, at + (action === "next" ? 1 : -1)))];
+  if (STEP_MOVES[action]) {
+    const next = steps[Math.max(0, Math.min(steps.length - 1, at + STEP_MOVES[action]))];
     if (next.id === reviewState.step) return true;
     reviewState.step = next.id;
   } else if (action === "done") {
@@ -124,7 +127,7 @@ function reviewStepItem(s) {
 // reviewPanel is the review: its steps with their counts, then the step
 // shown with its tasks.
 function reviewPanel(open) {
-  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, viewLabel(REVIEW)))];
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, REVIEW_TITLE))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
   const steps = reviewSteps();
   if (!reviewState.review) {
