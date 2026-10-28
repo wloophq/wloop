@@ -1,4 +1,4 @@
-#12  nudge  proposed
+#12  nudge  held
 acme/api#7 · Batch export for large accounts
 https://github.com/acme/api/pull/7
 
@@ -13,5 +13,5 @@ Origin      rule stalled-nudge, 26h ago
 Approval    wait
 
 {{command}} outbox approve 12
-{{command}} outbox edit 12 <markdown>
 {{command}} outbox discard 12
+{{command}} outbox edit 12 <markdown>

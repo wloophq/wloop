@@ -63,6 +63,16 @@ func TestAUserTableNamingNoActionFails(t *testing.T) {
 	}
 }
 
+func TestADraftActionOfAUserActionsTomlNamesItsGateIntent(t *testing.T) {
+	got := actionsProblems(t, string(defaultProfile()), "[\"draft.approve\"]\nlabel = \"Ship it\"\n[\"draft.discard\"]\nlabel = \"Drop\"\n")
+	for _, want := range []string{`draft.approve: names no built-in action: it is gates.draft.intents.approve of gates.toml now`,
+		`draft.discard: names no built-in action: it is gates.draft.intents.discard of gates.toml now`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestABuiltinActionWithoutLabelOrSummaryFails(t *testing.T) {
 	got := actionsProblems(t, "", "")
 	if !strings.Contains(got, "run_now: is missing") {

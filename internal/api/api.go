@@ -130,8 +130,6 @@ var Operations = []Operation{
 	{"GET", CountersPath},
 	{"GET", Drafts},
 	{"POST", Drafts},
-	{"GET", DraftDetail},
-	{"POST", DraftActionPath},
 	{"GET", DigestPath},
 	{"GET", ReviewPath},
 	{"POST", ReviewStepDone},

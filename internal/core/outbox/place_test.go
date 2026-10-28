@@ -85,7 +85,7 @@ func TestAPlacementIsInsideTheUnit(t *testing.T) {
 	p := reply("done")
 	p.Unit, p.Items = segment, []string{"i1"}
 	d := e.propose(p)
-	if d.Approval.Mode != draft.Send || d.State != draft.Approved || d.Would.Policy != draft.WouldRelease {
+	if e.approval(d.ID).Mode != draft.Send || d.State != draft.Queued {
 		t.Fatalf("%+v", d)
 	}
 }
@@ -96,7 +96,7 @@ func TestApprovingADraftProposedUnplacedPlacesIt(t *testing.T) {
 	p.Unit, p.Items = segment, []string{"i1"}
 	d := e.propose(p)
 	withPlacer(e, "msg:D000AAA/1700000000.000100")
-	got, err := e.svc.Approve(ctx, d.ID, nil)
+	got, err := e.approve(d.ID, nil)
 	if err != nil || got.Target != "msg:D000AAA/1700000000.000100" || e.get(d.ID).Target != got.Target {
 		t.Fatalf("approve: %+v %v", got, err)
 	}
@@ -105,9 +105,7 @@ func TestApprovingADraftProposedUnplacedPlacesIt(t *testing.T) {
 func approvedUnplaced(e *env) draft.Draft {
 	p := reply("done")
 	p.Unit, p.Items = segment, []string{"i1"}
-	d := e.propose(p)
-	d.State = draft.Approved
-	d, err := e.store.Update(ctx, d, draft.Proposed)
+	d, err := e.approve(e.propose(p).ID, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -237,7 +237,7 @@ func (f *fakeOutbox) task(d draft.Draft) task.Task {
 func (f *fakeOutbox) Tasks(context.Context, task.Query) ([]task.Task, error) {
 	var out []task.Task
 	for _, d := range f.drafts {
-		if d.State == draft.Proposed || d.State == draft.Failed {
+		if d.State == draft.Held || d.State == draft.Failed {
 			out = append(out, f.task(d))
 		}
 	}
@@ -266,7 +266,7 @@ func withOutbox(r *tasksRig, drafts ...draft.Draft) *fakeOutbox {
 }
 
 func proposed(id int64, task string) draft.Draft {
-	return draft.Draft{ID: draft.ID(id), Unit: r7u, Task: task, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Proposed,
+	return draft.Draft{ID: draft.ID(id), Unit: r7u, Task: task, Kind: draft.Comment, Purpose: "comment", Delivery: draft.CommentDelivery, Text: "Thanks, merging.\nmore", State: draft.Held,
 		CreatedAt: tasksNow.Add(-time.Hour), UpdatedAt: tasksNow.Add(-time.Duration(id) * time.Minute)}
 }
 

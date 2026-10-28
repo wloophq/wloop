@@ -119,8 +119,8 @@ func newDraftRig(t *testing.T, wf workflow.Workflow, text string) *draftRig {
 		tasks: &memTasks{m: map[task.ID]task.Task{}}, items: &memItems{m: map[unit.Unit][]items.Item{}}, units: automationtest.NewUnits()}
 	r.cfg.Profile = dir
 	clock := clockFunc(func() time.Time { return r.now })
-	r.svc = &outbox.Service{Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
-		Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil }}
+	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Store: countingDrafts{Store: db.Drafts(), n: &r.writes}, Clock: clock,
+		Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil }})
 	r.deps = &draftDeps{Outbox: func() draftOutbox { return r.svc }, Tasks: r.tasks, Items: r.items,
 		Workflow: func(name string) (workflow.Workflow, bool) { return r.wf, name == r.wf.Name },
 		Config:   func() config.Config { return r.cfg }, Now: func() time.Time { return r.now }}
@@ -234,13 +234,13 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	if got := r.check(draftTask); !strings.Contains(got, "held by draft") {
 		t.Fatalf("an open draft does not hold: %q", got)
 	}
-	if _, err := r.svc.Approve(context.Background(), anas.ID, nil); err != nil {
+	if err := approveDraft(context.Background(), r.svc, anas.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := r.svc.Send(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.svc.Discard(context.Background(), byKey["e1:"+bob.Key].ID, draft.WithdrawMoot); err != nil {
+	if _, err := r.svc.Withdraw(context.Background(), byKey["e1:"+bob.Key].ID, draft.WithdrawMoot); err != nil {
 		t.Fatal(err)
 	}
 	r.now = r.now.Add(time.Hour)
@@ -273,7 +273,7 @@ func TestDraftProposeHoldsPerWorkflowUnitAndPerson(t *testing.T) {
 	forever.items.set(draftThread, done)
 	forever.run(draftThread)
 	d := forever.drafts()[0]
-	if _, err := forever.svc.Approve(context.Background(), d.ID, nil); err != nil {
+	if err := approveDraft(context.Background(), forever.svc, d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := forever.svc.Send(context.Background()); err != nil {
@@ -373,9 +373,9 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 		return nil
 	}}}
 	newSvc := func() *outbox.Service {
-		return &outbox.Service{Store: db.Drafts(), Clock: clock,
+		return withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
 			Effects: func(unit.ProviderID) (port.Effects, error) { return okEffects{}, nil },
-			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Modules: []source.Module{m}})}}
+			Applier: outbox.EffectApplier{Store: db.DraftEffects(), Clock: clock, Effects: effectLookup(effectDeps{Modules: []source.Module{m}})}})
 	}
 	svc := newSvc()
 	closeOf := func(closed bool) []task.Change {
@@ -399,7 +399,7 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Approve(ctx, plain.ID, nil); err != nil {
+	if err := approveDraft(ctx, svc, plain.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := svc.Send(ctx); err != nil {
@@ -408,7 +408,7 @@ func TestUnitClosedClosesTheTaskAndUnwatchesAfterWarmFor(t *testing.T) {
 	if len(closed) != 0 {
 		t.Fatal("a close draft that declares no effect marked the closure")
 	}
-	if _, err := svc.Approve(ctx, react.ID, nil); err != nil {
+	if err := approveDraft(ctx, svc, react.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := svc.Send(ctx); err != nil {

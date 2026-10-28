@@ -114,7 +114,7 @@ func (s *Server) handleViews(w http.ResponseWriter, r *http.Request) {
 	cat := api.ViewsCatalog{Areas: nonNil(slices.Clone(s.deps.Cfg.Tasks.Areas)), Contexts: nonNil(slices.Clone(s.deps.Cfg.Tasks.Contexts)), Views: s.servedViews(g)}
 	for _, v := range builtin.TaskVerbs {
 		t, b := s.loaded().Tasks.Verbs[v], bundledWords().tasks.Verbs[v]
-		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
+		cat.Verbs = append(cat.Verbs, api.VerbSpec{Verb: v, Handler: s.loaded().Tasks.Handler(v), Label: cmp.Or(t.Label, b.Label, v), Summary: cmp.Or(t.Summary, b.Summary),
 			Input: cmp.Or(t.Input, b.Input), Key: verbKey(task.Verb(v))})
 	}
 	writeJSON(w, cat)

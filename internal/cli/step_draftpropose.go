@@ -35,7 +35,7 @@ var draftProposeStep = stepEntry{check: (*stepSet).draftProposeCheck, run: (*ste
 type draftOutbox interface {
 	Propose(ctx context.Context, p outbox.Proposal) (draft.Draft, error)
 	List(ctx context.Context, f outbox.Filter) ([]draft.Draft, error)
-	Discard(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
+	Withdraw(ctx context.Context, id draft.ID, reason string) (draft.Draft, error)
 }
 
 type draftTasks interface {
@@ -462,7 +462,7 @@ func holdOf(ctx context.Context, ob draftOutbox, p outbox.Proposal, a draftArgs,
 		switch {
 		case slices.Contains(draft.Open, d.State), d.State == draft.Failed, d.State == draft.Sent && a.forever:
 			return held, false, nil
-		case d.State == draft.Discarded && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
+		case d.State == draft.Dropped && (d.Reason == draft.WithdrawAssigned || d.Reason == draft.WithdrawMoot):
 		case d.State == draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfterSent, d.State != draft.Sent && now.Sub(d.UpdatedAt) < a.repeatAfter:
 			if refusal == "" {
 				refusal, timed = held, true

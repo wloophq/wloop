@@ -19,7 +19,7 @@ var BuiltinActionIDs = []string{
 	"take_over", "pause", "resume", "mute", "unmute", "track", "untrack",
 	"open", "remove", "remove_force",
 	"brief_refresh", "intake_without", "intake_cancel",
-	"draft.approve", "draft.edit", "draft.discard", "draft.retry",
+	"draft.edit", "draft.retry",
 	"plan_apply", "plan_dismiss", "plan_guide",
 	"run.open", "run.enter", "run.transcript",
 }

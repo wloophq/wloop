@@ -47,7 +47,7 @@ func TestKeysAreUniqueAndAvoidNavigation(t *testing.T) {
 
 func TestBuiltinVerbs(t *testing.T) {
 	want := map[string]string{"run_now": "approve", "skip": "dismiss", "dismiss": "dismiss", "answer": "answer",
-		"draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry"}
+		"draft.edit": "edit", "draft.retry": "retry"}
 	for _, b := range builtinActions {
 		if b.spec.Verb != want[b.spec.ID] {
 			t.Errorf("%s: verb %q, want %q", b.spec.ID, b.spec.Verb, want[b.spec.ID])

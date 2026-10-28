@@ -53,9 +53,9 @@ func TestV4MarksClosuresAndAppliedEffects(t *testing.T) {
 	}
 	rows.Close()
 	want := []string{
-		`C1/1 sent [] 2026-10-02T10:00:00Z`, `C1/2 sent [] 2026-10-02T10:00:00Z`, `C1/3 proposed ["task.nudged"]`,
+		`C1/1 sent [] 2026-10-02T10:00:00Z`, `C1/2 sent [] 2026-10-02T10:00:00Z`, `C1/3 held ["task.nudged"]`,
 		`C1/4 failed ["unit.closed"]`, `C1/5 sent ["unit.closed"] 2026-10-02T10:00:00Z`, `C1/6 sent [] 2026-10-02T10:00:00Z`,
-		`C1/7 approved ["task.nudged"]`, `C1/8 discarded []`, `o/r#1 proposed ["task.nudged","pr.nudged"]`,
+		`C1/7 queued ["task.nudged"]`, `C1/8 dropped []`, `o/r#1 held ["task.nudged","pr.nudged"]`,
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
@@ -96,21 +96,22 @@ func TestV4RenamesTheDraftApprovalModesAndWhatTheyRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	rows, err := db.r.Query(`SELECT unit_key, approval_mode, reason, would_policy, would_outcome FROM drafts ORDER BY unit_key`)
+	rows, err := db.r.Query(`SELECT d.unit_key, d.state, d.reason, g.status, g.by_actor, g.rule, g.default_intent
+		FROM drafts d JOIN gates g ON g.kind = 'draft' AND g.subject = CAST(d.id AS TEXT) ORDER BY d.unit_key`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got []string
 	for rows.Next() {
-		var u, m, r, p, o string
-		if err := rows.Scan(&u, &m, &r, &p, &o); err != nil {
+		var u, st, r, gs, by, rule, def string
+		if err := rows.Scan(&u, &st, &r, &gs, &by, &rule, &def); err != nil {
 			t.Fatal(err)
 		}
-		got = append(got, strings.Join([]string{u, m, r, p, o}, "|"))
+		got = append(got, strings.Join([]string{u, st, r, gs, by, rule, def}, "|"))
 	}
 	rows.Close()
-	want := []string{"C1/1|wait||wait|", "C1/2|delay||release|", "C1/3|send||release|released", "C1/4|dry_run|dry_run|release|dry_run",
-		"C1/5|wait|user|wait|discarded", "C1/6||||"}
+	want := []string{"C1/1|held||open|||", "C1/2|held||open|||approve", "C1/3|sent||approved|workflow|send|",
+		"C1/4|dropped|dry_run|rejected|workflow|dry_run|", "C1/5|dropped|user|rejected|person||", "C1/6|sent||approved|agent||"}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("drafts\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}

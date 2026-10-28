@@ -7,10 +7,33 @@ import (
 	"strings"
 
 	"github.com/wloophq/wloop/internal/api"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 )
 
-// draftVerbs are the task verbs of a draft's actions.
-var draftVerbs = map[string]string{"draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry"}
+// draftHandlers are the handlers of the task verbs a draft's delivery actions run, names of
+// builtin.VerbHandlers.
+var draftHandlers = map[string]string{"draft.edit": "edit", "draft.retry": "retry"}
+
+// The handlers of a draft's verbs, names of builtin.VerbHandlers, and the kind's own dismiss, which binds by its
+// name when no verb names it.
+const (
+	handlerApprove = "approve"
+	handlerEdit    = "edit"
+	handlerRetry   = "retry"
+	ownDismiss     = "dismiss"
+)
+
+// draftVerbHandlers are the handlers a draft's verbs run.
+var draftVerbHandlers = []string{handlerApprove, ownDismiss, handlerRetry, handlerEdit}
+
+// draftOn is the draft of e's draft gate, nil when it has none.
+func draftOn(e api.TaskView) *api.Draft {
+	if d, ok := e.DraftOf(); ok {
+		return &d
+	}
+	return nil
+}
 
 // SetDrafts shows the drafts made for task id while its detail is open.
 func (m *Model) SetDrafts(id string, ds []api.Draft) {
@@ -29,8 +52,8 @@ func (m *Model) listedDrafts() []api.Draft {
 		return nil
 	}
 	shown := int64(0)
-	if m.opened != nil && m.opened.Draft != nil {
-		shown = m.opened.Draft.ID
+	if m.opened != nil && draftOn(*m.opened) != nil {
+		shown = draftOn(*m.opened).ID
 	}
 	return slices.DeleteFunc(slices.Clone(m.drafts), func(d api.Draft) bool { return d.ID == shown })
 }
@@ -66,21 +89,44 @@ func (m *Model) pickedDraft() (api.Draft, bool) {
 	return m.listedDrafts()[i], true
 }
 
-// draftTask is the Outbox task of d, its verbs read from the draft's actions.
-func draftTask(d api.Draft, title string) api.TaskView {
-	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title, Draft: &d}
+// draftTask is the Outbox task of d, its verbs read from the draft's gate and actions, each the verb of cat that
+// runs its handler.
+func draftTask(cat api.ViewsCatalog, d api.Draft, title string) api.TaskView {
+	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title}
+	e.Gates = []api.GateView{api.DraftGate(d)}
+	held, why := d.Intents[string(gate.Approved)] != "", ""
 	for _, a := range d.Actions {
-		if v, ok := draftVerbs[a.ID]; ok {
-			e.Verbs = append(e.Verbs, api.VerbState{Verb: v, Enabled: a.Enabled, Reason: a.Reason})
+		if a.ID == "draft.edit" && !a.Enabled {
+			why = a.Reason
+		}
+	}
+	drops := held || d.State == string(draft.Queued) || d.State == string(draft.Failed)
+	offer := func(handler string, enabled bool, reason string) {
+		if v, ok := cat.VerbOf(handler); ok {
+			e.Verbs = append(e.Verbs, api.VerbState{Verb: v, Enabled: enabled, Reason: reason})
+		}
+	}
+	offer(handlerApprove, held, reasonUnless(held, why))
+	offer(ownDismiss, drops, reasonUnless(drops, why))
+	for _, a := range d.Actions {
+		if h, ok := draftHandlers[a.ID]; ok {
+			offer(h, a.Enabled, a.Reason)
 		}
 	}
 	return e
 }
 
+func reasonUnless(enabled bool, why string) string {
+	if enabled {
+		return ""
+	}
+	return why
+}
+
 // pickedVerb runs verb on the picked draft as on an Outbox task: approve and retry after a y with the
 // revision on screen, discard after a y, edit through the text prompt.
 func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64) (Command, bool) {
-	de := draftTask(d, e.Title)
+	de := draftTask(m.viewsCat, d, e.Title)
 	if i := slices.IndexFunc(de.Verbs, func(v api.VerbState) bool { return v.Verb == verb }); i < 0 || !de.Verbs[i].Enabled {
 		reason := "not offered on a draft"
 		if i >= 0 {
@@ -91,12 +137,12 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 	}
 	c := Command{Unit: taskUnit(de.ID), Label: taskLabel(e), Action: verb, task: de.ID, verb: verb}
 	target := draftTarget(de)
-	switch verb {
-	case "edit":
+	switch m.viewsCat.HandlerOf(verb) {
+	case handlerEdit:
 		return m.editPrompt(c, d, read)
-	case "dismiss":
+	case ownDismiss:
 		m.confirm(c, "discard the draft to "+target+"?", read)
-	case "retry":
+	case handlerRetry:
 		c.args = map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}
 		m.confirm(c, "post again to "+target+"?", read)
 	default:
@@ -121,7 +167,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 		m.edit = &EditRequest{Label: "edit", Text: d.Text, submit: submit}
 		return Command{}, false
 	}
-	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(api.TaskView{Draft: &d}) + " (Ctrl+E: editor)", text: []rune(d.Text),
+	m.prompt = &prompt{action: "edit", label: "edit the draft to " + draftTarget(draftTask(api.ViewsCatalog{}, d, "")) + " (Ctrl+E: editor)", text: []rune(d.Text),
 		read: read, submit: submit, editor: true}
 	return Command{}, false
 }

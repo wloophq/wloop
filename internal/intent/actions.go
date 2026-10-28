@@ -106,6 +106,10 @@ func mergeActions(out map[string]BuiltinAction, file string, src []byte) Problem
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
 	for _, id := range slices.Sorted(maps.Keys(m)) {
+		if to := builtin.RenamedTo(id); to != "" {
+			s.add(id, "names no built-in action: it is %s of %s now", to, GatesFile)
+			continue
+		}
 		if !slices.Contains(builtin.BuiltinActionIDs, id) {
 			s.add(id, "names no built-in action%s", expr.DidYouMean(id, builtin.BuiltinActionIDs))
 			continue

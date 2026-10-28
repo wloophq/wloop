@@ -27,7 +27,7 @@ type Drafts interface {
 const stampToken = "20060102T150405.000000000"
 
 // notifiedDrafts are the drafts that notify: proposed, or failed and waiting on a retry.
-var notifiedDrafts = []draft.State{draft.Proposed, draft.Failed}
+var notifiedDrafts = []draft.State{draft.Held, draft.Failed}
 
 // attention is e's notification, nil when it posts none: an Inbox task notifies once, a draft of the Outbox
 // once unless it serves an Inbox task, whose id the draft then keys. A draft is never approved from a
@@ -287,7 +287,7 @@ func (ev *taskViewer) proposedFor(ctx context.Context, id task.ID) (draft.Draft,
 	var best draft.Draft
 	found := false
 	for _, d := range ev.openDrafts(ctx) {
-		if d.Task == string(id) && d.State == draft.Proposed && ev.s.pluginEnabled(d.Unit.Provider) && (!found || d.ID > best.ID) {
+		if d.Task == string(id) && d.State == draft.Held && ev.s.pluginEnabled(d.Unit.Provider) && (!found || d.ID > best.ID) {
 			best, found = d, true
 		}
 	}
@@ -306,7 +306,7 @@ func (ev *taskViewer) draftAttention(ctx context.Context, e task.Task) *api.Atte
 		return nil
 	}
 	d := ev.drafts[i]
-	if !ev.s.pluginEnabled(d.Unit.Provider) || d.State == draft.Proposed && ev.servesInbox(ctx, d) {
+	if !ev.s.pluginEnabled(d.Unit.Provider) || d.State == draft.Held && ev.servesInbox(ctx, d) {
 		return nil
 	}
 	a := api.Attention{Category: string(api.CategoryOutbox), Subtitle: d.Unit.Label(), Body: draftBody(d)}

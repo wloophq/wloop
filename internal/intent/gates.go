@@ -64,7 +64,7 @@ func (a GateApproval) Decide(f workflow.Facts) (gate.Mode, time.Duration, string
 // of that kind, open. A rule that cannot be read waits.
 func (d GatesDef) DefaultFor(k gate.Kind) (gate.Mode, time.Duration, string) {
 	g, _ := d.FirstOf(k)
-	m, w, at, err := d.Approval.Decide(GateFacts(gate.Gate{Kind: k, Name: g.Name, Status: gate.Open}))
+	m, w, at, err := d.Approval.Decide(GateFacts(gate.Gate{Kind: k, Name: g.Name, Status: gate.Open}, ""))
 	if err != nil || !m.AppliesTo(k) {
 		return gate.ModeWait, 0, at
 	}
@@ -72,13 +72,14 @@ func (d GatesDef) DefaultFor(k gate.Kind) (gate.Mode, time.Duration, string) {
 }
 
 // GateFacts are g's facts in slot gate, which a gates.toml rule and a
-// view over gates read; a draft gate's delivery state is the Outbox's.
-func GateFacts(g gate.Gate) workflow.Facts {
+// view over gates read; delivery is a draft gate's delivery state, as the
+// Outbox reads it from its draft, "" for any other gate.
+func GateFacts(g gate.Gate, delivery string) workflow.Facts {
 	return workflow.Facts{
 		builtin.GateSlot + ".kind":     string(g.Kind),
 		builtin.GateSlot + ".name":     g.Name,
 		builtin.GateSlot + ".status":   string(g.Status),
-		builtin.GateSlot + ".delivery": "",
+		builtin.GateSlot + ".delivery": delivery,
 	}
 }
 

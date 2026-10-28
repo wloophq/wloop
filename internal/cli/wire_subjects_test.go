@@ -171,7 +171,7 @@ func TestPlanEvaluatesUserWorkflowsOnTaskAndSlackSubjects(t *testing.T) {
 	}
 	if _, err := r.db.Drafts().Insert(context.Background(), draft.Draft{Unit: subjectThread, Task: "e-01", Kind: draft.Nudge, Purpose: "nudge",
 		Delivery: draft.Message, Text: "x", Original: "x", Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-waiting", Rule: "my-waiting"},
-		Approval: draft.Approval{Mode: draft.Wait}, State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
+		State: draft.Sent, CreatedAt: testNow.Add(time.Hour), UpdatedAt: testNow.Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.planned(t); !slices.Equal(got, want[:1]) {
@@ -204,7 +204,7 @@ func TestTheSweepWakesOnTaskItemAndDraftChanges(t *testing.T) {
 	}
 	woke("a draft", func() {
 		if _, err := r.db.Drafts().Insert(ctx, draft.Draft{Unit: subjectThread, Kind: draft.Close, Purpose: "close", Delivery: draft.Message, Text: "x", Original: "x",
-			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-close"}, Approval: draft.Approval{Mode: draft.Wait}, State: draft.Proposed,
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "my-close"}, State: draft.Held,
 			CreatedAt: testNow, UpdatedAt: testNow}); err != nil {
 			t.Fatal(err)
 		}

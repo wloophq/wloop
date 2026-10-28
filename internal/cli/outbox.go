@@ -20,6 +20,8 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
 	"github.com/wloophq/wloop/internal/brand"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/termfmt"
 )
@@ -59,7 +61,7 @@ func outboxList(ctx context.Context, e *Env, c *client.Client, args []string) er
 	if err != nil || len(pos) > 0 {
 		return usageError{usage: outboxUsage}
 	}
-	ds, err := c.Drafts(ctx, "proposed", "failed", "sending")
+	ds, err := c.Drafts(ctx)
 	if err != nil {
 		return err
 	}
@@ -100,11 +102,49 @@ func draftWhere(d api.Draft) string {
 	return d.Where
 }
 
+// approvalOf is how d's gate waits: for you, or until its window sends it; "" once it decided.
 func approvalOf(d api.Draft) string {
-	if d.Approval.Window != "" {
-		return d.Approval.Mode + " " + d.Approval.Window
+	switch {
+	case d.Intents[string(gate.Approved)] == "":
+		return ""
+	case d.Deadline != nil:
+		return "delay until " + d.Deadline.Local().Format("2006-01-02 15:04 MST")
 	}
-	return d.Approval.Mode
+	return "wait"
+}
+
+// decideDraft resolves d's open gate with its intent of status st, as the args say: an approval's text and the rev
+// the user saw.
+func decideDraft(ctx context.Context, c *client.Client, d api.Draft, st gate.Status, args map[string]string) error {
+	intent := d.Intents[string(st)]
+	if intent == "" {
+		return fmt.Errorf("draft %d is %s: its gate waits on no decision", d.ID, d.State)
+	}
+	_, err := c.ResolveGate(ctx, d.Gate, intent, api.TaskRequest{Args: args, Source: string(dturn.Terminal)})
+	return err
+}
+
+// The handlers of a draft's delivery verbs, names of builtin.VerbHandlers, and the kind's own dismiss, which
+// binds by its name when no verb names it as its handler.
+const (
+	handlerRetry = "retry"
+	handlerEdit  = "edit"
+	ownDismiss   = "dismiss"
+)
+
+// draftVerb runs on draft id's Outbox task the verb of the profile that runs handler: a draft's delivery actions,
+// which no gate decides.
+func draftVerb(ctx context.Context, c *client.Client, id int64, handler string, args map[string]string) error {
+	cat, err := c.Views(ctx)
+	if err != nil {
+		return err
+	}
+	verb, ok := cat.VerbOf(handler)
+	if !ok {
+		return fmt.Errorf("the profile has no verb that runs %s", handler)
+	}
+	_, err = c.TaskDo(ctx, "draft:"+strconv.FormatInt(id, 10), verb, api.TaskRequest{Args: args, Source: string(dturn.Terminal)})
+	return err
 }
 
 // draftArg is the one draft id args hold.
@@ -169,9 +209,8 @@ func printDraft(w io.Writer, d api.Draft, text string) {
 		origin += " " + d.Origin.Rule
 	}
 	fmt.Fprintf(w, "origin:   %s\n", origin)
-	fmt.Fprintf(w, "approval: %s\n", approvalOf(d))
-	if d.Deadline != nil {
-		fmt.Fprintf(w, "deadline: %s\n", d.Deadline.Local().Format("2006-01-02 15:04 MST"))
+	if a := approvalOf(d); a != "" {
+		fmt.Fprintf(w, "approval: %s (gate %d)\n", a, d.Gate)
 	}
 	if d.Error != "" {
 		fmt.Fprintf(w, "error:    %s\n", d.Error)
@@ -272,7 +311,10 @@ func outboxApprove(ctx context.Context, e *Env, c *client.Client, args []string)
 		fmt.Fprintln(e.Out, "Not approved.")
 		return exitCode(1)
 	}
-	got, err := c.DraftDo(ctx, id, "approve", api.DraftAction{Text: &shown, Rev: &d.Rev})
+	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"text": shown, "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+		return err
+	}
+	got, err := c.Draft(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -350,13 +392,16 @@ func (e *Env) sendUserDraft(ctx context.Context, c *client.Client, cr api.DraftC
 			fmt.Fprintf(e.Out, "Not sent; draft %d stays in the Outbox.\n", d.ID)
 			return exitCode(1)
 		}
-		if _, err := c.DraftDo(ctx, d.ID, "discard", api.DraftAction{Reason: "user"}); err != nil {
+		if err := decideDraft(ctx, c, d, gate.Rejected, nil); err != nil {
 			return fmt.Errorf("not sent, and draft %d stays in the Outbox: %w", d.ID, err)
 		}
 		fmt.Fprintln(e.Out, "Not sent.")
 		return exitCode(1)
 	}
-	got, err := c.DraftDo(ctx, d.ID, "approve", api.DraftAction{Rev: &d.Rev})
+	if err := decideDraft(ctx, c, d, gate.Approved, map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+		return err
+	}
+	got, err := c.Draft(ctx, d.ID)
 	if err != nil {
 		return err
 	}
@@ -370,7 +415,7 @@ var postWait, postPoll = 30 * time.Second, 250 * time.Millisecond
 // reportPosted waits for approved draft d to go out and says where it landed; where is where it was to go.
 func (e *Env) reportPosted(ctx context.Context, c *client.Client, d api.Draft, where string) error {
 	deadline := time.Now().Add(postWait)
-	for d.State == "approved" || d.State == "sending" {
+	for d.State == string(draft.Queued) || d.State == string(draft.Sending) {
 		if time.Now().After(deadline) {
 			fmt.Fprintf(e.Out, "draft %d %s; it posts on the daemon's next send\n", d.ID, d.State)
 			return nil
@@ -421,7 +466,10 @@ func outboxRetry(ctx context.Context, e *Env, c *client.Client, args []string) e
 		fmt.Fprintln(e.Out, "Not retried.")
 		return exitCode(1)
 	}
-	got, err := c.DraftDo(ctx, id, "retry", api.DraftAction{Confirm: *confirm, Rev: &d.Rev})
+	if err := draftVerb(ctx, c, id, handlerRetry, map[string]string{"confirm": strconv.FormatBool(*confirm), "rev": strconv.FormatInt(d.Rev, 10)}); err != nil {
+		return err
+	}
+	got, err := c.Draft(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -437,18 +485,17 @@ func outboxEdit(ctx context.Context, e *Env, c *client.Client, args []string) er
 	if err != nil {
 		return err
 	}
-	got, err := c.DraftDo(ctx, id, "edit", api.DraftAction{Text: &args[1]})
-	if err != nil {
+	if err := draftVerb(ctx, c, id, handlerEdit, map[string]string{"text": args[1]}); err != nil {
 		return err
 	}
-	fmt.Fprintf(e.Out, "draft %d edited\n", got.ID)
+	fmt.Fprintf(e.Out, "draft %d edited\n", id)
 	return nil
 }
 
 func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string) error {
 	fs := flag.NewFlagSet("outbox discard", flag.ContinueOnError)
 	fs.SetOutput(e.Err)
-	reason := fs.String("reason", "", "why the draft is dropped")
+	reason := fs.String("reason", "", "why a draft its gate approved is dropped")
 	pos, err := parseInterspersed(fs, args)
 	if err != nil {
 		return err
@@ -457,10 +504,18 @@ func outboxDiscard(ctx context.Context, e *Env, c *client.Client, args []string)
 	if err != nil {
 		return err
 	}
-	got, err := c.DraftDo(ctx, id, "discard", api.DraftAction{Reason: *reason})
+	d, err := c.Draft(ctx, id)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(e.Out, "draft %d discarded\n", got.ID)
+	if d.Intents[string(gate.Rejected)] != "" {
+		err = decideDraft(ctx, c, d, gate.Rejected, nil)
+	} else {
+		err = draftVerb(ctx, c, id, ownDismiss, map[string]string{"reason": *reason})
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(e.Out, "draft %d discarded\n", id)
 	return nil
 }

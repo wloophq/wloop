@@ -63,7 +63,7 @@ func (w draftWithdrawals) Proposed(ctx context.Context, name string) ([]automati
 	if errors.Is(err, errNoDraftDeps) {
 		return nil, nil
 	}
-	ds, err := ob.List(ctx, outbox.Filter{States: []draft.State{draft.Proposed}, Workflow: name})
+	ds, err := ob.List(ctx, outbox.Filter{States: []draft.State{draft.Held}, Workflow: name})
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (w draftWithdrawals) Withdraw(ctx context.Context, id int64, reason string)
 	if err != nil {
 		return err
 	}
-	_, err = ob.Discard(ctx, draft.ID(id), reason)
+	_, err = ob.Withdraw(ctx, draft.ID(id), reason)
 	if errors.Is(err, outbox.ErrConflict) {
 		return nil
 	}

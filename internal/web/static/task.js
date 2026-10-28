@@ -154,12 +154,13 @@ function gateCard(e, g) {
 }
 
 function taskGates(e) {
-  const gates = (e.gates || []).filter((g) => g.status === "open");
-  if (!gates.length && !e.draft) return null;
+  const d = isDraftTask(e) ? draftOf(e) : null;
+  const gates = (e.gates || []).filter((g) => g.status === "open" && !(d && g.kind === "draft"));
+  if (!gates.length && !d) return null;
   return h("section", { class: "d-gates", "aria-label": "Open gates" },
     h("h2", { class: "d-sub" }, "Waiting on you"),
     ...gates.map((g) => gateCard(e, g)),
-    e.draft ? draftCard(e, "detail") : null);
+    d ? draftCard(e, "detail") : null);
 }
 
 const RUN_PATHS = { open: "/api/runs/{seq}/open", enter: "/api/runs/{seq}/enter", transcript: "/api/runs/{seq}/transcript" };

@@ -5,7 +5,7 @@
 [1mReply in the release thread[22m
   [2mstate    [22m  outbox
   [2mto       [22m  #releases thread
-  [2mdraft    [22m  [2mreply · approval wait · from turn[22m
+  [2mdraft    [22m  [2mreply · from turn[22m
   [2mtext     [22m  Ship it tonight. Rollback plan in the doc.
   [2mkeys     [22m  [1ma[22m [2mapprove[22m  [1mBackspace[22m [2mdismiss[22m
   [2mnot now  [22m  [2mx next · w waiting · s schedule · y someday · l reference · f focus · p project · d delegate · e done[22m

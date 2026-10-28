@@ -57,7 +57,7 @@ func TestAReactionClosureClosesWithACheckMark(t *testing.T) {
 	if d.Delivery != draft.Reaction || d.Reaction != "white_check_mark" || d.Target != "https://example.test/d1" || d.Text != "" {
 		t.Fatalf("closure %+v", d)
 	}
-	if _, err := r.svc.Approve(ctx, d.ID, nil); err != nil {
+	if err := approveDraft(ctx, r.svc, d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, failed, err := r.svc.Send(ctx); err != nil || failed > 0 {
@@ -189,7 +189,7 @@ func TestAnAskOwnerDraftTakesTheConfiguredWindow(t *testing.T) {
 		t.Fatalf("ask-owner drafts %+v, %v", ds, err)
 	}
 	for _, d := range ds {
-		if d.State != draft.Proposed || d.Approval.Mode != draft.Delay || !d.Deadline.Equal(d.CreatedAt.Add(time.Hour)) {
+		if d.State != draft.Held || decided(t, r.svc, d) != (draft.Approval{Mode: draft.Delay, Window: time.Hour}) {
 			t.Errorf("an ask-owner draft ignores the configured window: %+v", d)
 		}
 	}
@@ -224,7 +224,7 @@ func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
 		}
 		return ds
 	}
-	if ds := mine(); len(ds) == 0 || ds[0].State != draft.Proposed {
+	if ds := mine(); len(ds) == 0 || ds[0].State != draft.Held {
 		t.Fatalf("my-ask proposed %+v; broken %v", ds, r.te.loadedIntents().BrokenWorkflows)
 	}
 	if err := os.WriteFile(manifest, append(b, []byte("\nwhen_typo = true\n")...), 0o600); err != nil {
@@ -237,7 +237,7 @@ func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
 		t.Fatal("the typo did not break my-ask")
 	}
 	for _, d := range mine() {
-		if d.State != draft.Proposed {
+		if d.State != draft.Held {
 			t.Fatalf("a workflow that failed to load lost its draft: %+v", d)
 		}
 	}
@@ -248,7 +248,7 @@ func TestAUserWorkflowThatFailsToLoadKeepsItsDrafts(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, d := range mine() {
-		if d.State != draft.Discarded || d.Reason != draft.WithdrawMoot {
+		if d.State != draft.Dropped || d.Reason != draft.WithdrawMoot {
 			t.Fatalf("a removed workflow kept its draft: %+v", d)
 		}
 	}

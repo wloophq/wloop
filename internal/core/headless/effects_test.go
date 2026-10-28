@@ -68,7 +68,7 @@ func TestAHeadlessDraftTakesItsProposersPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := r.outbox.List(context.Background(), outbox.Filter{})
-	if len(drafts) != 1 || drafts[0].Approval.Mode != draft.Send || drafts[0].State == draft.Proposed {
+	if len(drafts) != 1 || drafts[0].State != draft.Queued {
 		t.Fatalf("drafts %+v", drafts)
 	}
 }

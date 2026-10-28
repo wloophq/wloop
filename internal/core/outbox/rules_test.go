@@ -54,7 +54,7 @@ func TestACommentDraftUnderACatchAllNoneWaits(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, draft.Fixed(noneA))
 	d := e.propose(comment("looks good"))
-	if d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
+	if d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 		t.Fatalf("%+v", d)
 	}
 	e.svc.Send(ctx)
@@ -69,7 +69,7 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 		e.svc.Facts = botFacts
 		withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{commentRule(bot, noneA)}})
 		d := e.propose(comment("looks good"))
-		if d.State != draft.Approved || d.Approval != noneA || d.Would.Policy != draft.WouldRelease {
+		if d.State != draft.Queued || e.approval(d.ID) != noneA {
 			t.Fatalf("%+v", d)
 		}
 		if sent, _, err := e.svc.Send(ctx); sent != 1 || err != nil {
@@ -81,7 +81,7 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 		e.svc.Facts = botFacts
 		withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{commentRule(bot, window5)}})
 		d := e.propose(comment("looks good"))
-		if d.State != draft.Proposed || d.Approval != window5 || !d.Deadline.Equal(t0.Add(5*time.Minute)) {
+		if d.State != draft.Held || e.approval(d.ID) != window5 || !e.gate(d.ID).Deadline.Equal(t0.Add(5*time.Minute)) {
 			t.Fatalf("%+v", d)
 		}
 	})
@@ -89,7 +89,7 @@ func TestARuleThatNamesCommentDeliveryReleasesAComment(t *testing.T) {
 		e := newEnv()
 		e.svc.Facts = botFacts
 		withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{{When: bot, Approval: noneA, Subjects: []string{"pr"}}}})
-		if d := e.propose(comment("looks good")); d.State != draft.Proposed || d.Approval.Mode != draft.Wait {
+		if d := e.propose(comment("looks good")); d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("%+v", d)
 		}
 	})
@@ -101,8 +101,8 @@ func TestADeliveryThatPostsWaitsUnlessARuleNamesIt(t *testing.T) {
 		rule draft.Rule
 		want draft.State
 	}{
-		"a rule that names no delivery":  {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}, draft.Proposed},
-		"a rule that names its delivery": {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Names: draft.Message, Subjects: slackSubject}, draft.Approved},
+		"a rule that names no delivery":  {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Subjects: slackSubject}, draft.Held},
+		"a rule that names its delivery": {draft.Rule{When: factIs{"slack.conversation", "dm"}, Approval: noneA, Names: draft.Message, Subjects: slackSubject}, draft.Queued},
 	} {
 		t.Run(name, func(t *testing.T) {
 			e := newEnv()
@@ -117,7 +117,7 @@ func TestADeliveryThatPostsWaitsUnlessARuleNamesIt(t *testing.T) {
 	e := newEnv()
 	e.svc.Posts = nil
 	withPolicy(e, draft.Fixed(noneA))
-	if d := e.propose(reply("x")); d.State != draft.Proposed {
+	if d := e.propose(reply("x")); d.State != draft.Held {
 		t.Fatalf("with no manifest to read, every delivery posts: %+v", d)
 	}
 }
@@ -140,8 +140,8 @@ func TestRulesPickTheModeByTheUnitsFacts(t *testing.T) {
 			e := newEnv()
 			e.svc.Facts = subjectOf("slack", c.facts)
 			withPolicy(e, pol)
-			if d := e.propose(reply("x")); d.Approval != c.want {
-				t.Fatalf("%+v, want %+v", d.Approval, c.want)
+			if d := e.propose(reply("x")); e.approval(d.ID) != c.want {
+				t.Fatalf("%+v, want %+v", e.approval(d.ID), c.want)
 			}
 		})
 	}
@@ -153,16 +153,16 @@ func TestRulesPickTheModeByTheUnitsFacts(t *testing.T) {
 		}
 		p := reply("x")
 		p.Policy, p.Subject = pol, &draft.Subject{Slot: "slack", Facts: map[string]any{"slack.conversation": "dm"}}
-		if d := e.propose(p); d.Approval != noneA {
-			t.Fatalf("%+v", d.Approval)
+		if d := e.propose(p); e.approval(d.ID) != noneA {
+			t.Fatalf("%+v", e.approval(d.ID))
 		}
 	})
 	t.Run("facts that cannot be read hold the draft", func(t *testing.T) {
 		e := newEnv()
 		e.svc.Facts = func(context.Context, unit.Unit, string) (draft.Subject, error) { return draft.Subject{}, errBoom }
 		withPolicy(e, &draft.Policy{Default: noneA, Rules: pol.Rules})
-		if d := e.propose(reply("x")); d.Approval.Mode != draft.Wait {
-			t.Fatalf("%+v", d.Approval)
+		if d := e.propose(reply("x")); e.approval(d.ID).Mode != draft.Wait {
+			t.Fatalf("%+v", e.approval(d.ID))
 		}
 		if !slices.ContainsFunc(e.logs, func(l string) bool { return strings.Contains(l, "resolved to wait") && strings.Contains(l, "boom") }) {
 			t.Fatalf("logs %q", e.logs)
@@ -177,14 +177,14 @@ func TestAnAgentsPurposeNeverMatchesAPurposeRule(t *testing.T) {
 		withPolicy(e, pol)
 		p := reply("thanks!")
 		p.Kind, p.Purpose, p.Delivery, p.Origin.Kind = "", "thanks", draft.Message, kind
-		if d := e.propose(p); d.State != draft.Proposed || d.Approval.Mode != draft.Wait {
+		if d := e.propose(p); d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 			t.Fatalf("a %s draft labeled thanks: %+v", kind, d)
 		}
 	}
 	e := newEnv()
 	p := Proposal{Unit: thread, Purpose: "thanks", Text: "thanks!", Policy: pol,
 		Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: "slack-thanks", Rule: "slack-thanks", Key: "k"}}
-	if d := e.propose(p); d.State != draft.Approved {
+	if d := e.propose(p); d.State != draft.Queued {
 		t.Fatalf("a workflow's draft: %+v", d)
 	}
 }
@@ -194,7 +194,7 @@ func TestARuleNeverReleasesADraftAimedOutsideItsUnit(t *testing.T) {
 	withPolicy(e, &draft.Policy{Default: draft.Approval{Mode: draft.Wait}, Rules: []draft.Rule{{When: factIs{"draft.delivery", "message"}, Approval: noneA}}})
 	p := reply("x")
 	p.Target = "#general"
-	if d := e.propose(p); d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Reason != "targets outside its unit" {
+	if d := e.propose(p); d.State != draft.Held || e.approval(d.ID).Mode != draft.Wait {
 		t.Fatalf("%+v", d)
 	}
 }
@@ -202,7 +202,7 @@ func TestARuleNeverReleasesADraftAimedOutsideItsUnit(t *testing.T) {
 func TestARuleThatObservesRecordsAComment(t *testing.T) {
 	e := newEnv()
 	withPolicy(e, &draft.Policy{Default: noneA, Rules: []draft.Rule{{When: factIs{"draft.delivery", "comment"}, Approval: draft.Approval{Mode: draft.DryRun}}}})
-	if d := e.propose(comment("x")); d.State != draft.Discarded || d.Reason != string(draft.DryRun) {
+	if d := e.propose(comment("x")); d.State != draft.Dropped || d.Reason != string(draft.DryRun) {
 		t.Fatalf("%+v", d)
 	}
 }

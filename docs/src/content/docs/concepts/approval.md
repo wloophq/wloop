@@ -7,7 +7,7 @@ Every decision that waits for you is a **gate**: a draft to send, a round to run
 
 1. the **approval window** announces every automatic round before it goes out;
 2. the **ambiguity gate** stops a round that is unsure and asks you before publishing;
-3. the **Outbox** holds every draft that an agent or a rule proposes to post, until its approval policy lets it out.
+3. the **Outbox** holds every draft that an agent or a rule proposes to post, until its gate lets it out.
 
 ## Gates
 
@@ -56,25 +56,28 @@ An address round stops the same way before a deep change of direction, an irreve
 
 ## The Outbox
 
-Every outbound post that an agent or a rule proposes (a reply, a nudge, a closing message, a Slack reaction) is a **draft** first, in the Outbox:
+Every outbound post that an agent or a rule proposes (a reply, a nudge, a closing message, a Slack reaction) is a **draft** first, held by a **draft gate**: the gate holds the decision (approve or discard, in `gates.toml`'s words), the draft keeps only its delivery.
 
 ```text
-proposed --> approved --> sending --> sent
-   |          |    |         |
-   v          v    |         v
-discarded  discarded +-----> failed --> approved (retry, by hand)
+held --(its gate approves it)--> queued --> sending --> sent
+  |                                |   |        |
+  v                                v   |        v
+dropped (its gate refused it,  dropped +------> failed --> queued (retry, by hand)
+         or its proposer withdrew it)
 ```
 
-An approved draft its publisher cannot take (the provider is off, or the draft cannot be placed) fails without ever being `sending`, so a restart never looks for a post that was never made.
+The sender posts only a queued draft whose gate approved it. A draft its gate approved but its publisher cannot take (the provider is off, or the draft cannot be placed) fails without ever being `sending`, so a restart never looks for a post that was never made. The Outbox lists the drafts whose gate is open and those whose gate approved them and whose delivery failed or a restart has yet to settle, each failed one with Retry; `gate.delivery` is that delivery state of a draft gate, for a view over gates.
 
-A draft goes out only once its approval policy lets it:
+A draft's gate opens under its approval policy:
 
-| Policy | The draft |
+| Policy | The gate |
 |---|---|
-| `wait` (default) | waits in the Outbox until you approve it |
-| `delay` | is sent when its `window` ends unless you discard or edit it first; an edit makes it `wait` |
-| `send` | is sent at once |
-| `dry_run` | is stored as what would have been sent, and never sent |
+| `wait` (default) | waits in the Outbox until you approve or discard the draft |
+| `delay` | approves the draft once its `window` ends, at the gates' next check, at most 30 seconds later, unless you decide first; an edit supersedes the gate with one that waits |
+| `send` | approves the draft at once |
+| `dry_run` | discards the draft at once: it is stored as what would have been sent, and never sent |
+
+A gate a rule or a window approved whose draft its publisher now posts as another delivery than the rule decided, or whose workflow no longer loads, fails the draft for you to retry, so no rule posts what it never named. Editing a held draft supersedes its gate, so an approval you gave the text you saw never posts another; approving through `POST /api/gates/{id}/{intent}` names the gate you saw, and approving with other text edits the draft first, so the gate the edit opens is the one approved. Only a person resolves a draft's gate there: an agent's session is refused before anything is written.
 
 A draft you write yourself (Save as draft on a task's page, Reply on a unit, see [Tasks and views](/concepts/tasks/), `outbox new`, or `slack send` to a thread) is `wait` too: Save to Outbox leaves it there, and Send now approves it right after proposing it, through the same publisher.
 
@@ -119,21 +122,22 @@ A draft has a purpose (nudge, close, ask_owner, or any label its proposer names)
 
 Nothing follows from a draft's purpose: a closing message with no `unit.closed` closes nothing. An agent's draft may declare only the effects its intent lists in `[drafts] allowed_effects`; the draft is refused otherwise, with a message naming the intent. A draft declaring an effect its unit's provider does not implement, such as `pr.nudged` on a Slack thread, is refused when it is proposed. A sent draft whose effect cannot apply, such as `unit.closed` while its plugin is off, keeps it pending until it can.
 
-A workflow proposes drafts with its `draft.propose` step, its text rendered from the workflow's `text.md.tmpl` through the profile's layers, the items' text as data. It skips a draft of the same workflow, unit and person while one is open or failed, for `repeat_after_sent` after one was sent (`forever` never proposes again) and for `repeat_after` after one was otherwise settled. Its `[drafts.withdraw] when` discards an open draft it no longer calls for, with the reason `moot` or, with `reason = "assigned"`, assigned; a draft whose workflow is gone or disabled is withdrawn `moot`; no draft of a disabled plugin is, nor one of a workflow whose manifest fails to load, which waits for you to fix it: its window does not end while the manifest fails, and resumes once it loads. A draft its `[drafts.withdraw] when` would withdraw at once is not proposed.
+A workflow proposes drafts with its `draft.propose` step, its text rendered from the workflow's `text.md.tmpl` through the profile's layers, the items' text as data. It skips a draft of the same workflow, unit and person while one is open or failed, for `repeat_after_sent` after one was sent (`forever` never proposes again) and for `repeat_after` after one was otherwise settled. Its `[drafts.withdraw] when` drops an open draft it no longer calls for, superseding its gate, with the reason `moot` or, with `reason = "assigned"`, assigned; a draft whose workflow is gone or disabled is withdrawn `moot`; no draft of a disabled plugin is, nor one of a workflow whose manifest fails to load: when its window ends while the manifest fails, the draft fails for you to retry. A draft its `[drafts.withdraw] when` would withdraw at once is not proposed.
 
 ```sh
 {{command}} outbox                      # drafts that wait on you, by purpose
 {{command}} outbox show <id>            # one draft as it reads, its items and the commands it takes
 {{command}} outbox new <unit|message> <markdown> # a reply of yours; --react <emoji> for a reaction (on the Slack message a ref or permalink names), --send to post it now
-{{command}} outbox approve <id>         # shows it and posts it once you say yes
+{{command}} outbox approve <id>         # shows it and approves its gate once you say yes
 {{command}} outbox edit <id> <markdown>
-{{command}} outbox discard <id> --reason "not needed"
+{{command}} outbox discard <id>         # discards its gate; --reason "not needed" drops a draft its gate approved
+{{command}} outbox retry <id>           # posts a failed draft again
 ```
 
 On a terminal the list groups the drafts by purpose (nudges, closings, replies, ...), each with its id, its unit as its row reads (`acme/api#7 · <title>`, `#channel · <thread>`, `DM with <name>`), who it mentions, its age and its first line; a column shows only where the drafts differ, such as the state when one failed. Piped, it prints one tab-separated line per draft for scripts: id, kind, state, unit, label, mentions, creation time (RFC 3339) and first line. A unit is a pull request URL or `owner/repo#n`, a Slack message ref (`<conversation>/<ts>`) or permalink (its thread) or `<provider>:<key>`.
 
 `outbox approve`, `outbox retry` and `outbox new --send` refuse when they detect an agent session's environment or no terminal. That is a guard against mistakes, not a security boundary: any process running as you can reach the daemon's socket. A draft still `sending` after a crash is checked against its destination, marked `sent` when it went out and `failed` when that cannot be told, so a crash never posts twice.
 
-The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tools an agent uses to post, react or edit on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved, tracked or not, with the turn that made it, and an edit's record keeps the text it replaced, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
+The review, address and nudge rounds on pull requests publish through `gh` from their own session, under the approval window and the ambiguity gate above. The tools an agent uses to post, react or edit on Slack as you right away do so without your approval; the Outbox records each such post as a sent draft on the unit it landed in, its gate recorded as already approved by the agent with the tool as its rule, tracked or not, with the turn that made it, and an edit's record keeps the text it replaced, so its history shows everything an agent posted or changed in your name. `slack_draft` only proposes drafts, so a session's policy allows it too.
 
 A draft or a post names the turn that proposed it, and that turn's unit when it is not the draft's: a pull request's turn that drafts in a team's Slack thread shows in the Outbox as `turn <n> (<intent>) on <owner>/<repo>#<n>`. Such a draft answers none of the turn's items, declares no effect and, aimed outside the turn's unit, waits for you.

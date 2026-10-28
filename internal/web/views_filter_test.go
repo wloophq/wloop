@@ -139,7 +139,7 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 		}),
 		task("c", "inbox", func(e *api.TaskView) {
 			e.Kind = "draft"
-			e.Draft = &api.Draft{Unit: "slack/T1/C1", Target: "C0REL", Where: "#releases", Text: "Ship it", Reaction: "eyes"}
+			e.Gates = draftGates(api.Draft{Unit: "slack/T1/C1", Target: "C0REL", Where: "#releases", Text: "Ship it", Reaction: "eyes"})
 		}),
 		task("d", "next", func(e *api.TaskView) { e.Title = "Škoda deal with Erdős" }),
 		task("e", "next", func(e *api.TaskView) { e.Title = "회의 준비, がんばる" }),

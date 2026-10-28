@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -108,7 +109,7 @@ func TestEditADraftFromItsDetail(t *testing.T) {
 
 	one := task("draft:12", "Thanks", "inbox")
 	one.Kind, one.Verbs = "draft", []api.VerbState{{Verb: "edit", Enabled: true}}
-	one.Draft = &api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "proposed"}
+	one.Gates = draftGates(api.Draft{ID: 12, Rev: 1, Kind: "reply", Purpose: "reply", Text: "Thanks!", State: "held"})
 	m.SetTasks("outbox", []api.TaskView{one}, viewCounters())
 	m.Done(c, nil, nil)
 	press(m, Key{Name: KeyEnter}, Key{Rune: 'i'})
@@ -127,12 +128,12 @@ func TestTaskDetailListsAndPicksItsDrafts(t *testing.T) {
 	press(m, Key{Name: KeyEnter})
 	m.SetDetail(e.ID, e, nil)
 	m.SetDrafts(e.ID, []api.Draft{
-		{ID: 4, Task: e.ID, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "proposed", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
-			Actions: []api.ActionState{{ID: "draft.approve", Enabled: true}, {ID: "draft.edit", Enabled: true}, {ID: "draft.discard", Enabled: true}}},
-		{ID: 3, Task: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.approve", Reason: "the draft is sent"}}},
+		{ID: 4, Task: e.ID, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "held", Rev: 2, Where: "#ops thread", Origin: api.DraftOrigin{Kind: "turn"},
+			Gate: 6, Intents: map[string]string{"approved": "approve", "rejected": "discard"}, Actions: []api.ActionState{{ID: "draft.edit", Enabled: true}}},
+		{ID: 3, Task: e.ID, Kind: "react", Purpose: "react", Reaction: "eyes", State: "sent", Actions: []api.ActionState{{ID: "draft.edit", Reason: "the draft is sent"}}},
 	})
 	screen := screenOf(m, 100, 40)
-	for _, s := range []string{"drafts", "1. reply · proposed · from turn", "Friday works", "2. react · sent", ":eyes:"} {
+	for _, s := range []string{"drafts", "1. reply · held · from turn", "Friday works", "2. react · sent", ":eyes:"} {
 		if !strings.Contains(screen, s) {
 			t.Fatalf("the detail lacks %q:\n%s", s, screen)
 		}
@@ -186,5 +187,43 @@ func TestOpeningADetailFetchesItsDrafts(t *testing.T) {
 	got, err = carry(context.Background(), Config{Daemon: d}, Command{task: "draft:11", fetch: true})
 	if err != nil || got.task.ID != "draft:11" || got.drafts != nil {
 		t.Fatalf("a draft's own detail: %+v %v", got, err)
+	}
+}
+
+// draftGates are the gates of a task carrying d.
+func draftGates(d api.Draft) []api.GateView { return []api.GateView{api.DraftGate(d)} }
+
+func TestADraftTaskOffersTheVerbsThatRunItsHandlers(t *testing.T) {
+	cat := api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}}
+	d := api.Draft{ID: 4, State: "failed", Actions: []api.ActionState{{ID: "draft.edit"}, {ID: "draft.retry", Enabled: true}}}
+	got := map[string]bool{}
+	for _, v := range draftTask(cat, d, "").Verbs {
+		got[v.Verb] = v.Enabled
+	}
+	if want := map[string]bool{"approve": false, "dismiss": true, "edit": true, "retry": false}; !maps.Equal(got, want) {
+		t.Fatalf("verbs %v, want %v", got, want)
+	}
+	held := api.Draft{ID: 5, State: "held", Intents: map[string]string{"approved": "approve", "rejected": "discard"}}
+	if vs := draftTask(api.ViewsCatalog{Verbs: []api.VerbSpec{{Verb: "dismiss", Handler: "context"}}}, held, "").Verbs; len(vs) != 0 {
+		t.Fatalf("a profile with no approve handler and no own dismiss offers %+v", vs)
+	}
+}
+
+func TestADraftKeyRunsTheHandlerOfItsVerb(t *testing.T) {
+	m := viewsModel(t)
+	m.viewsCat.Verbs = []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}
+	e := m.tasks["focus"][0]
+	d := api.Draft{ID: 4, Task: e.ID, Rev: 3, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "failed",
+		Actions: []api.ActionState{{ID: "draft.edit", Enabled: true}, {ID: "draft.retry", Enabled: true}}}
+	m.pickedVerb(e, d, "edit", 0)
+	if p := m.prompt; p == nil || !p.confirm || !strings.Contains(p.label, "post again") || p.cmd.verb != "edit" || p.cmd.args["rev"] != "3" {
+		t.Fatalf("the verb whose handler is retry asked %+v", p)
+	}
+	m.prompt = nil
+	m.pickedVerb(e, d, "retry", 0)
+	if p := m.prompt; p == nil || p.confirm || p.action != "edit" || p.cmd.verb != "" && p.cmd.verb != "retry" {
+		t.Fatalf("the verb whose handler is edit asked %+v", p)
 	}
 }

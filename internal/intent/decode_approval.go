@@ -414,7 +414,7 @@ func (g gateCondition) Source() string {
 // withGate is facts with the facts of an open gate of kind k where facts
 // has none of its own.
 func withGate(facts map[string]any, k gate.Kind) map[string]any {
-	out := map[string]any(GateFacts(gate.Gate{Kind: k, Status: gate.Open}))
+	out := map[string]any(GateFacts(gate.Gate{Kind: k, Status: gate.Open}, ""))
 	maps.Copy(out, facts)
 	return out
 }

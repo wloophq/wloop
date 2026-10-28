@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/url"
 	"time"
@@ -91,10 +92,11 @@ type PropSpec struct {
 	Writers []string `json:"writers,omitempty"`
 }
 
-// VerbSpec is a verb a task offers: From are the states it moves a task from (every state when empty), To
-// the state it moves it to ("" for none).
+// VerbSpec is a verb a task offers: Handler is what it runs besides its move, as the profile names it ("" for
+// none), From the states it moves a task from (every state when empty), To the state it moves it to ("" for none).
 type VerbSpec struct {
 	Verb    string   `json:"verb"`
+	Handler string   `json:"handler,omitempty"`
 	Label   string   `json:"label"`
 	Summary string   `json:"summary,omitempty"`
 	Input   string   `json:"input,omitempty"` // the question a verb that asks for a value puts first
@@ -124,7 +126,6 @@ type TaskView struct {
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`
 	Message   *Message      `json:"message,omitempty"`
-	Draft     *Draft        `json:"draft,omitempty"`
 	Created   time.Time     `json:"created"`
 	Updated   time.Time     `json:"updated"`
 
@@ -163,7 +164,8 @@ type AskView struct {
 
 // GateView is a gate as clients offer it: Task and Unit what it is on ("" when none), Text its words from
 // gates.toml, Intents what a person may resolve it with, in order, Default the intent its Deadline resolves it
-// with, Delivery a draft gate's delivery state (sending, failed), Subject its subject as its kind serves it.
+// with, Delivery a draft gate's delivery state (held, queued, sending, sent, failed, dropped), Subject its subject as
+// its kind serves it: a draft gate's is its Draft.
 type GateView struct {
 	ID       int64           `json:"id"`
 	Task     string          `json:"task,omitempty"`
@@ -384,4 +386,25 @@ func (e TaskView) PropTime(name string) time.Time {
 	var t time.Time
 	_ = json.Unmarshal(e.Props[name], &t)
 	return t
+}
+
+// VerbOf is the verb of c that runs handler: the first whose handler it is, or with no handler, whose name it is, as
+// the tasks service binds a kind's own verbs; false when none does.
+func (c ViewsCatalog) VerbOf(handler string) (string, bool) {
+	for _, v := range c.Verbs {
+		if cmp.Or(v.Handler, v.Verb) == handler {
+			return v.Verb, true
+		}
+	}
+	return "", false
+}
+
+// HandlerOf is the handler verb runs in c: its profile handler, else its own name, as the tasks service binds it.
+func (c ViewsCatalog) HandlerOf(verb string) string {
+	for _, v := range c.Verbs {
+		if v.Verb == verb {
+			return cmp.Or(v.Handler, v.Verb)
+		}
+	}
+	return verb
 }

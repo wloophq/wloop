@@ -13,6 +13,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/outbox"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -84,7 +85,7 @@ func sendArg(raw string) (bool, error) {
 
 // userDraftLine says where a user's draft went.
 func userDraftLine(d draft.Draft) string {
-	if d.State == draft.Approved {
+	if d.State == draft.Queued {
 		return fmt.Sprintf("draft %d approved; it goes out in a moment", d.ID)
 	}
 	return fmt.Sprintf("draft %d saved to the Outbox for your approval", d.ID)
@@ -120,11 +121,16 @@ func (s *Server) handleDraftCreate(w http.ResponseWriter, r *http.Request) {
 		writeDraftError(w, err)
 		return
 	}
-	writeJSON(w, s.draftDetail(ctx, d, nil))
+	g, _, err := s.deps.Outbox.GateOf(ctx, d)
+	if err != nil {
+		writeDraftError(w, err)
+		return
+	}
+	writeJSON(w, s.draftDetail(ctx, d, g, nil))
 }
 
-// writeUserDraft proposes the draft the user wrote, under the always policy whatever the unit's, and approves
-// it right away when c.Send: the same approval and publish path a draft takes from the Outbox.
+// writeUserDraft proposes the draft the user wrote, under the wait policy whatever the unit's, and approves its
+// gate right away when c.Send: the same approval and publish path a draft takes from the Outbox.
 func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.Draft, error) {
 	source := turn.Source(c.Source)
 	if source == "" {
@@ -157,7 +163,7 @@ func (s *Server) writeUserDraft(ctx context.Context, c api.DraftCreate) (draft.D
 		return d, err
 	}
 	s.logf("draft %d sent at once by the user from the %s", d.ID, source)
-	got, err := o.Approve(ctx, d.ID, nil)
+	got, err := s.decideDraft(ctx, d, gate.Approved, nil, task.ActorPerson)
 	if err != nil {
 		return d, fmt.Errorf("draft %d is in the Outbox, not approved: %w", d.ID, err)
 	}

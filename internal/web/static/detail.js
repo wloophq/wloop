@@ -5,13 +5,23 @@
 const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "reply", "edit", "retry"]);
 // CLOSED_CATEGORIES are the categories of a state a task leaves the lists for.
 const CLOSED_CATEGORIES = new Set(["done", "dropped"]);
-// DRAFT_VERBS are the task verbs of a draft's actions.
-const DRAFT_VERBS = { "draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry" };
+// DRAFT_VERBS are the task verbs of a draft's delivery actions; DRAFT_TASK_VERBS every verb its card offers.
+const DRAFT_VERBS = { "draft.edit": "edit", "draft.retry": "retry" };
+const DRAFT_TASK_VERBS = ["approve", "dismiss", "edit", "retry"];
 
 // draftWord is the label of a draft's action id, from the served specs, else its verb's.
 function draftWord(id) {
   const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
   return (sp && sp.label) || verbLabel(DRAFT_VERBS[id]);
+}
+
+// gateWord is the label gates.toml gives the intent of e's draft gate that resolves it to status, else verb's.
+function gateWord(e, status, verb) {
+  const d = draftOf(e) || {};
+  const name = (d.intents || {})[status];
+  const g = (e.gates || []).find((x) => x.kind === "draft");
+  const intent = g && name ? (g.intents || []).find((x) => x.id === name) : null;
+  return (intent && intent.label) || verbLabel(verb);
 }
 
 const detailState = {
@@ -113,13 +123,13 @@ function taskIntentButtons(e) {
 // draftTarget is the Outbox task of the draft e carries: e itself, or
 // draft:<id> when e is a message task that only shows the draft.
 function draftTarget(e) {
-  const id = "draft:" + e.draft.id;
+  const id = "draft:" + draftOf(e).id;
   return e.id === id ? e : { id, title: e.title, verbs: [] };
 }
 
 // approveEdited approves the draft of e with the text being edited.
 async function approveEdited(e) {
-  const out = await taskAct(draftTarget(e), "approve", { text: detailState.editing.get(e.id), rev: String(e.draft.rev) });
+  const out = await taskAct(draftTarget(e), "approve", { text: detailState.editing.get(e.id), rev: String(draftOf(e).rev) });
   if (out) detailState.editing.delete(e.id);
   return out;
 }
@@ -127,8 +137,9 @@ async function approveEdited(e) {
 // actOn runs verb on task; an approve while its draft is being edited
 // sends the edited text.
 function actOn(task, verb, args) {
-  if (task && verb === "approve" && task.draft && detailState.editing.has(task.id)) return approveEdited(task);
-  if (task && task.draft && task.id.startsWith("draft:") && (verb === "approve" || verb === "retry")) args = { ...args, rev: String(task.draft.rev) };
+  const d = task ? draftOf(task) : null;
+  if (task && verb === "approve" && d && detailState.editing.has(task.id)) return approveEdited(task);
+  if (task && d && task.id.startsWith("draft:") && (verb === "approve" || verb === "retry")) args = { ...args, rev: String(d.rev) };
   return taskAct(task, verb, args);
 }
 
@@ -236,33 +247,32 @@ function verbLabel(verb) {
 }
 
 function verbButtons(e) {
-  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || (!!e.draft && Object.values(DRAFT_VERBS).includes(verb));
+  const skip = (verb) => SKIP_VERB_BUTTONS.has(verb) || (isDraftTask(e) && DRAFT_TASK_VERBS.includes(verb));
   return (e.verbs || []).filter((v) => !skip(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
     const args = askedArgs(v.verb);
     if (args) taskAct(e, v.verb, args);
   }));
 }
 
-function wouldLine(d) {
-  const w = d.would || {};
-  if (!w.policy) return "";
-  return `Auto-send would ${w.policy}${w.reason ? `: ${w.reason}` : ""}`;
+// windowLine says when the window of d's gate sends it, "" when it has none.
+function windowLine(d) {
+  return d.deadline ? `Sends at ${stamp(d.deadline)} unless you decide first` : "";
 }
 
 // draftCard shows the draft a task carries, with approve, edit and
 // discard through the task's verbs.
 function draftCard(e, scope) {
-  const d = e.draft;
+  const d = draftOf(e);
   const editing = detailState.editing.has(e.id);
-  const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "proposed" ? ` (${d.state})` : "");
+  const head = `Draft ${(d.purpose || "").replaceAll("_", " ")}`.trim() + (d.state && d.state !== "held" ? ` (${d.state})` : "");
   const buttons = editing ? [
-    verbButton(e, "approve", draftWord("draft.approve"), () => approveEdited(e), { scope, primary: true }),
+    verbButton(e, "approve", gateWord(e, "approved", "approve"), () => approveEdited(e), { scope, primary: true }),
     h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),
   ] : [
     d.state === "failed" ? verbButton(e, "retry", draftWord("draft.retry"), () => taskAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, "approve", draftWord("draft.approve"), () => taskAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
+      : verbButton(e, "approve", gateWord(e, "approved", "approve"), () => taskAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
     verbButton(e, (e.verbs || []).some((v) => v.verb === "edit") ? "edit" : "approve", draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, "dismiss", draftWord("draft.discard"), () => taskAct(e, "dismiss", {}), { scope }),
+    verbButton(e, "dismiss", gateWord(e, "rejected", "dismiss"), () => taskAct(e, "dismiss", {}), { scope }),
   ];
   return h("section", { class: "d-draft", "aria-label": "Draft" },
     h("div", { class: "d-sub" }, head),
@@ -270,7 +280,7 @@ function draftCard(e, scope) {
     editing ? h("textarea", { class: "draft-text", rows: 6, "aria-label": "Draft text", "data-focus": `${scope}:draft-text:${e.id}`, oninput: (ev) => detailState.editing.set(e.id, ev.target.value) }, detailState.editing.get(e.id))
       : h("pre", { class: "draft-text" }, d.text || (d.reaction ? `:${d.reaction}:` : "")),
     d.error ? h("p", { class: "err" }, d.error) : null,
-    wouldLine(d) ? h("p", { class: "would" }, wouldLine(d)) : null,
+    windowLine(d) ? h("p", { class: "would" }, windowLine(d)) : null,
     h("div", { class: "d-actions" }, ...buttons));
 }
 
@@ -324,7 +334,7 @@ function unitComposer(u) {
   return composer("unit:" + u.provider + ":" + u.key, { scope: "unit:reply", reacts: providerReacts(u.provider), post: async (args) => {
     try {
       const d = await detailEnv.postJSON("/api/drafts", { unit: u, kind: args.kind, text: args.text, reaction: args.reaction, send: args.send === "now", source: "cockpit" });
-      detailEnv.notice(d.state === "approved" ? `Draft ${d.id} approved; it goes out in a moment` : `Draft ${d.id} saved to the Outbox for your approval`);
+      detailEnv.notice(d.state === "queued" ? `Draft ${d.id} approved; it goes out in a moment` : `Draft ${d.id} saved to the Outbox for your approval`);
       detailEnv.changed();
       return d;
     } catch (err) {
@@ -341,7 +351,7 @@ function personName(p) {
 // draftWhere is where a draft posts, as its publisher named it; the raw target, marked unknown, when it could not.
 function draftWhere(d) {
   if (d.where) return h("div", { class: "meta" }, "To ", h("span", { class: "ref" }, d.where));
-  const pending = ["proposed", "failed", "approved", "sending"].includes(d.state);
+  const pending = ["held", "failed", "queued", "sending"].includes(d.state);
   return h("div", { class: "meta" }, "To ", h("span", { class: "ref" }, d.target || d.unit || ""), pending ? " (destination unknown)" : "");
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/outbox"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
@@ -55,7 +56,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 	}
 	d := ds[0]
 	if d.Unit != r7u || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) || d.Kind != draft.Reply || d.Text != "On it, thanks" ||
-		d.Origin.Kind != draft.OriginUser || d.Approval.Mode != draft.Wait || d.State != draft.Proposed {
+		d.Origin.Kind != draft.OriginUser || d.State != draft.Held {
 		t.Fatalf("draft %+v", d)
 	}
 	var listed api.DraftsResponse
@@ -77,8 +78,8 @@ func TestReplySendNowApprovesThroughTheOutbox(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	d := r.drafts(t)[0]
-	if d.State != draft.Approved || d.Would.Outcome != draft.OutcomeAsIs || d.Approval.Mode != draft.Wait || d.Origin.Kind != draft.OriginUser {
-		t.Fatalf("draft %+v", d)
+	if g, _, _ := r.o.GateOf(context.Background(), d); d.State != draft.Queued || g.Status != gate.Approved || g.By != task.ActorPerson || d.Origin.Kind != draft.OriginUser {
+		t.Fatalf("draft %+v, gate %+v", d, g)
 	}
 	sent, failed, err := r.o.Send(context.Background())
 	if err != nil || sent != 1 || failed != 0 || !slices.Equal(r.fx.seen(), []string{fmt.Sprintf("publish %d", d.ID)}) {
@@ -124,11 +125,11 @@ func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 	r.put(t, unitTask("e-1", task.KindAction, r7u))
 	rec := post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"text":"LGTM","source":"cockpit"}`)
 	var d api.Draft
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "proposed" || d.Origin.Kind != "user" || d.Task != "" || d.Kind != "reply" {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "held" || d.Origin.Kind != "user" || d.Task != "" || d.Kind != "reply" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 	rec = post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"task":"e-1","items":["it-e-1"],"text":"Done","send":true,"source":"cockpit"}`)
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "approved" || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) {
+	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "queued" || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) {
 		t.Fatalf("send: %d %s", rec.Code, rec.Body)
 	}
 	for _, c := range []struct {

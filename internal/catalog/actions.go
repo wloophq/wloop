@@ -233,9 +233,7 @@ var builtinActions = []builtinAction{
 		}
 		return on("intake_cancel")
 	}},
-	draftAction("draft.approve", "approve", nil),
 	draftAction("draft.edit", "edit", &api.InputSpec{Kind: "text", Required: true}),
-	draftAction("draft.discard", "dismiss", nil),
 	draftAction("draft.retry", "retry", nil),
 	runAction(RunOpen),
 	runAction(RunEnter),
@@ -275,7 +273,8 @@ func RunActions(f RunFacts) []string {
 	return out
 }
 
-// draftAction is an Outbox action: no row offers it, the draft's task does (DraftStates).
+// draftAction is an action on a draft's delivery: no row offers it, the draft's task does (DraftStates). Approving
+// and discarding a draft are its gate's intents.
 func draftAction(id, verb string, input *api.InputSpec) builtinAction {
 	spec := api.ActionSpec{ID: id, Group: "draft", Scope: ScopeDraft, Verb: verb, Input: input,
 		Surfaces: []string{SurfaceRow, SurfaceDetail, SurfaceTUI, SurfaceCLI}}
@@ -323,10 +322,8 @@ func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[stri
 
 // draftFrom are the draft states each draft action moves a draft from.
 var draftFrom = map[string][]string{
-	"draft.approve": {"proposed"},
-	"draft.edit":    {"proposed", "failed"},
-	"draft.discard": {"proposed", "approved", "failed"},
-	"draft.retry":   {"failed"},
+	"draft.edit":  {"held", "failed"},
+	"draft.retry": {"failed"},
 }
 
 // DraftFacts are what a draft's actions depend on.
@@ -340,7 +337,7 @@ type DraftFacts struct {
 }
 
 // postingDraftActions are the draft actions that lead to a post.
-var postingDraftActions = []string{"draft.approve", "draft.retry"}
+var postingDraftActions = []string{"draft.retry"}
 
 // DraftStates are the draft actions in catalog order as they stand on a draft, worded by l: all disabled
 // when its plugin is off.
@@ -352,7 +349,7 @@ func DraftStates(l *intentload.Loaded, f DraftFacts) []api.ActionState {
 		}
 		refusal := ""
 		switch {
-		case f.Disabled && b.spec.ID != "draft.discard":
+		case f.Disabled:
 			refusal = "plugin_off"
 		case !slices.Contains(draftFrom[b.spec.ID], f.State):
 			refusal = "state"

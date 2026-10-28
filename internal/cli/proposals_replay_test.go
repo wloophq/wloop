@@ -115,14 +115,13 @@ func newReplayOn(t *testing.T, db *sqlite.DB, start time.Time) *replay {
 	te.Env.Now = func() time.Time { return r.now }
 	clock := clockFunc(func() time.Time { return r.now })
 	r.slack = newSlackFacts(db, clock)
-	ledger := te.itemsLedger(db, te.cfg, t.Logf)
-	r.svc = &outbox.Service{Store: db.Drafts(), Items: ledger, Clock: clock,
+	r.svc = withDraftGates(db, clock.Now, &outbox.Service{Store: db.Drafts(), Clock: clock,
 		Effects: func(p unit.ProviderID) (port.Effects, error) {
 			if p != slackPlugin {
 				return nil, fmt.Errorf("%s: %w", p, outbox.ErrDisabled)
 			}
 			return okEffects{}, nil
-		}}
+		}})
 	return r
 }
 
@@ -283,13 +282,13 @@ func (r *replay) record() {
 		case !seen && r.counts != nil:
 			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" proposed"]++
 			r.settle = append(r.settle, d.ID)
-		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "" && r.counts != nil:
+		case was == draft.Held && d.State == draft.Dropped && d.Reason != "" && r.counts != nil:
 			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" withdrawn "+d.Reason]++
 		case !seen:
 			proposed = append(proposed, fmt.Sprintf("propose %s %s on %s task=%q key=%s items=%s approval=%s text=%q",
-				d.Purpose, d.Delivery, d.Unit, d.Task, d.Origin.Key, strings.Join(d.Items, ","), d.Approval.Mode, d.Text))
+				d.Purpose, d.Delivery, d.Unit, d.Task, d.Origin.Key, strings.Join(d.Items, ","), decided(r.t, r.svc, d).Mode, d.Text))
 			r.settle = append(r.settle, d.ID)
-		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "":
+		case was == draft.Held && d.State == draft.Dropped && d.Reason != "":
 			withdrawn = append(withdrawn, fmt.Sprintf("withdraw %s key=%s reason=%s", d.Purpose, d.Origin.Key, d.Reason))
 		}
 	}
@@ -315,7 +314,7 @@ func (r *replay) settleQueued() {
 			r.t.Fatal(err)
 		}
 		i := slices.IndexFunc(ds, func(d draft.Draft) bool { return d.ID == id })
-		if i < 0 || ds[i].State != draft.Proposed {
+		if i < 0 || ds[i].State != draft.Held {
 			continue
 		}
 		d := ds[i]
@@ -328,16 +327,16 @@ func (r *replay) settleQueued() {
 		}
 		switch n % 3 {
 		case 0:
-			if _, err := r.svc.Approve(ctx, id, nil); err != nil {
+			if err := approveDraft(ctx, r.svc, id); err != nil {
 				r.t.Fatal(err)
 			}
 			sent = true
 			r.stamp("send %s key=%s", d.Purpose, d.Origin.Key)
 		case 1:
-			if _, err := r.svc.Discard(ctx, id, ""); err != nil {
+			if err := discardDraft(ctx, r.svc, id); err != nil {
 				r.t.Fatal(err)
 			}
-			r.known[id] = draft.Discarded
+			r.known[id] = draft.Dropped
 			r.stamp("discard %s key=%s", d.Purpose, d.Origin.Key)
 		}
 	}

@@ -304,7 +304,7 @@ func TestSlackDraftProposes(t *testing.T) {
 	}
 	d := ds[0]
 	want := draft.Origin{Kind: draft.OriginTurn, TurnSeq: newest.Seq, Intent: "reply", Workflow: newest.Workflow}
-	if d.Unit != u || d.State != draft.Proposed || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || d.Approval.Mode != draft.Wait {
+	if d.Unit != u || d.State != draft.Held || d.Origin != want || d.Kind != draft.Reply || d.Text != "on it, **today**" || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
 	if n := len(w.st.srv.Calls("chat.postMessage")) + len(w.st.srv.Calls("reactions.add")); n != 0 {
@@ -375,7 +375,7 @@ func TestApprovedSlackDraftPublishesThroughTheDaemonOutbox(t *testing.T) {
 		t.Fatalf("slack_draft = %q", got)
 	}
 	d := w.drafts(t)[0]
-	if _, err := w.deps.Outbox.Approve(ctx, d.ID, nil); err != nil {
+	if err := approveDraft(ctx, w.deps.Outbox, d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, failed, err := w.deps.Outbox.Send(ctx); sent != 1 || failed != 0 || err != nil {
@@ -394,6 +394,7 @@ func TestSlackDraftIsTiedToTheTaskTheTurnWasAskedFrom(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	ctx := context.Background()
+	seedTask(t, w.db, "e42")
 	u := slackThreadUnit("T000", sessChannel, sessParent)
 	_, err := w.te.repo.Save(ctx, dturn.Book{Unit: u, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow, Inputs: map[string]any{"task": "e42"}},
@@ -420,11 +421,11 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	postWait = 10 * time.Millisecond
 	t.Cleanup(func() { postWait = wait })
 	link := "https://acme.slack.com/archives/" + sessChannel + "/p" + strings.ReplaceAll(sessReply, ".", "") + "?thread_ts=" + sessParent + "&cid=" + sessChannel
-	if code := w.te.run("slack", "send", link, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 approved") {
+	if code := w.te.run("slack", "send", link, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 queued") {
 		t.Fatalf("exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	ds := w.drafts(t)
-	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessParent) || ds[0].Origin.Kind != draft.OriginUser || ds[0].State != draft.Approved {
+	if len(ds) != 1 || ds[0].Unit != slackThreadUnit("T000", sessChannel, sessParent) || ds[0].Origin.Kind != draft.OriginUser || ds[0].State != draft.Queued {
 		t.Fatalf("drafts %+v", ds)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
@@ -435,7 +436,7 @@ func TestSlackSendToAThreadGoesThroughTheOutbox(t *testing.T) {
 	}
 
 	w.te.out.Reset()
-	if code := w.te.run("slack", "send", sessChannel+"/"+sessReply, "by ref", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 approved") {
+	if code := w.te.run("slack", "send", sessChannel+"/"+sessReply, "by ref", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 2 queued") {
 		t.Fatalf("a ref: exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	if ds := w.drafts(t); len(ds) != 2 || ds[1].Unit != slackThreadUnit("T000", sessChannel, sessParent) {
@@ -467,7 +468,7 @@ func TestSlackSendAndOutboxNewToADirectMessageRefReplyInItsSegment(t *testing.T)
 		t.Fatalf("segments %v", segs)
 	}
 	ref := sessDM + "/" + sessReply
-	if code := w.te.run("slack", "send", ref, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 approved") {
+	if code := w.te.run("slack", "send", ref, "on it", "--yes"); code != 0 || !strings.Contains(w.te.out.String(), "draft 1 queued") {
 		t.Fatalf("slack send: exit %d: %s %s", code, w.te.out, w.te.err)
 	}
 	w.te.out.Reset()
@@ -561,7 +562,7 @@ window = "10m"
 	if got, isErr := w.draftTool(t, draftHandle, `{"text":"on it"}`); isErr {
 		t.Fatalf("slack_draft = %q; broken %v", got, w.te.loadedIntents().Broken)
 	}
-	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Proposed || ds[0].Approval.Mode != draft.Delay {
+	if ds := w.drafts(t); len(ds) != 1 || ds[0].State != draft.Held || decided(t, w.deps.Outbox, ds[0]).Mode != draft.Delay {
 		t.Fatalf("drafts %+v", ds)
 	}
 }
@@ -572,9 +573,9 @@ func TestSlackDraftTellsTheAgentWhatItsApprovalPolicyDid(t *testing.T) {
 		state draft.State
 		says  string
 	}{
-		"wait":    {draft.Proposed, "once the user approves it"},
-		"send":    {draft.Approved, "is approved by its policy"},
-		"dry_run": {draft.Discarded, "is a dry run"},
+		"wait":    {draft.Held, "once the user approves it"},
+		"send":    {draft.Queued, "is approved by its policy"},
+		"dry_run": {draft.Dropped, "is a dry run"},
 	} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
@@ -633,10 +634,10 @@ func TestSlackDraftFromAPullRequestTurnDraftsInThePermalinksThread(t *testing.T)
 	d := ds[0]
 	wantOrigin := draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "address", Unit: pr.Ref{Owner: "acme", Repo: "widgets", Number: 7}.Unit()}
 	if d.Unit != slackThreadUnit("T000", sessThreaded, sessParent) || d.Origin != wantOrigin || d.Target != link ||
-		d.State != draft.Proposed || d.Approval.Mode != draft.Wait || d.Would.Policy != draft.WouldWait {
+		d.State != draft.Held || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
-	if _, err := w.deps.Outbox.Approve(ctx, d.ID, nil); err != nil {
+	if err := approveDraft(ctx, w.deps.Outbox, d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
@@ -811,7 +812,7 @@ func TestPostingOutsideATurn(t *testing.T) {
 			if isErr {
 				t.Fatalf("slack_draft = %q", got)
 			}
-			if d := w.drafts(t)[0]; d.State != draft.Proposed || d.Unit != thread || d.Origin != session || d.Approval.Mode != draft.Wait {
+			if d := w.drafts(t)[0]; d.State != draft.Held || d.Unit != thread || d.Origin != session || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 				t.Fatalf("draft %+v", d)
 			}
 			if got, isErr := w.callTool(t, "", handle, "slack_draft", `{"text":"any news?"}`); !isErr || !strings.Contains(got, "no turn") {
@@ -839,6 +840,7 @@ func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 	w := newSessionWiring(t)
 	ctx := context.Background()
 	task := unit.Unit{Provider: unit.Task, Key: "e1"}
+	seedTask(t, w.db, "e1")
 	if _, err := w.te.repo.Save(ctx, dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -857,10 +859,10 @@ func TestSlackDraftFromATaskTurnPostsToItsTargetThroughSlack(t *testing.T) {
 	}
 	d := ds[0]
 	if d.Unit != task || d.Target != sessChannel || d.Origin != (draft.Origin{Kind: draft.OriginTurn, TurnSeq: 1, Intent: "act"}) ||
-		d.State != draft.Proposed || d.Would.Policy != draft.WouldWait {
+		d.State != draft.Held || decided(t, w.deps.Outbox, d).Mode != draft.Wait {
 		t.Fatalf("draft %+v", d)
 	}
-	if _, err := w.deps.Outbox.Approve(ctx, d.ID, nil); err != nil {
+	if err := approveDraft(ctx, w.deps.Outbox, d.ID); err != nil {
 		t.Fatal(err)
 	}
 	if sent, _, err := w.deps.Outbox.Send(ctx); sent != 1 || err != nil {
@@ -891,6 +893,7 @@ func TestASendFromATaskTurnIsRecordedWithTheTurnAsOrigin(t *testing.T) {
 	t.Parallel()
 	w := newSessionWiring(t)
 	task := unit.Unit{Provider: unit.Task, Key: "e1"}
+	seedTask(t, w.db, "e1")
 	if _, err := w.te.repo.Save(context.Background(), dturn.Book{Unit: task, Turns: []dturn.Turn{
 		{Intent: "act", Trigger: dturn.ByHand, Session: draftHandle, State: dturn.Started, SentAt: testNow},
 	}}); err != nil {
@@ -920,8 +923,8 @@ items = "unowned_aged"
 		approval string
 		state    draft.State
 	}{
-		"a mode that names no delivery":  {"[gates.approval]\nmode = \"send\"\n", draft.Proposed},
-		"a rule that names its delivery": {"[[gates.approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\n", draft.Approved},
+		"a mode that names no delivery":  {"[gates.approval]\nmode = \"send\"\n", draft.Held},
+		"a rule that names its delivery": {"[[gates.approval.rule]]\nwhen = 'draft.delivery == \"message\"'\nmode = \"send\"\n", draft.Queued},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

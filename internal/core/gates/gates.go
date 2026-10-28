@@ -163,6 +163,61 @@ func (s *Service) Resolve(ctx context.Context, id int64, r Resolution) error {
 	return err
 }
 
+// Supersede closes open gate id as superseded by by, its subject gone or
+// replaced, with no consequence: the subject's owner settles the subject.
+// It refuses an agent: no agent closes an open gate.
+func (s *Service) Supersede(ctx context.Context, id int64, by task.Actor) error {
+	if by == task.ActorAgent || by == "" {
+		return fmt.Errorf("%w: gate %d is superseded by its subject's owner, not by %s", ErrRefused, id, cmp.Or(string(by), "no one"))
+	}
+	g, err := s.d.Reader.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if g.Status != gate.Open {
+		return fmt.Errorf("%w: %d is %s", ErrResolved, id, g.Status)
+	}
+	_, err = s.d.Store.Resolve(ctx, id, Resolution{Status: gate.Superseded, By: by})
+	return err
+}
+
+// RecordSent records g, a post a tool made at once, as a gate already
+// approved by g.By with g.Rule, worded by gates.toml and on the task of its
+// unit when one holds it. It resolves no gate and applies no consequence.
+func (s *Service) RecordSent(ctx context.Context, g gate.Gate) (gate.Gate, error) {
+	sent, ok := s.d.Store.(Sent)
+	if !ok {
+		return gate.Gate{}, errors.New("the gates store records no sent post")
+	}
+	def, err := s.def(g)
+	if err != nil {
+		return gate.Gate{}, err
+	}
+	g.Name, g.Kind = def.Name, def.Kind
+	if len(g.Intents) == 0 {
+		for _, in := range def.Intents {
+			g.Intents = append(g.Intents, in.Name)
+		}
+	}
+	if approve, ok := statusIntent(g, def, gate.Approved); ok {
+		g.Intent = approve.Name
+	}
+	if g.Task == "" {
+		if id, ok := task.IDOf(g.Unit); ok {
+			g.Task = id
+		} else if s.d.Tasks != nil && !g.Unit.IsZero() {
+			ts, err := s.d.Tasks.TasksOf(ctx, g.Unit)
+			if err != nil {
+				return gate.Gate{}, err
+			}
+			if len(ts) > 0 {
+				g.Task = ts[0].ID
+			}
+		}
+	}
+	return sent.RecordSent(ctx, g)
+}
+
 // Tick resolves every open gate whose Deadline is not after now to its
 // Default, with the rule window.
 func (s *Service) Tick(ctx context.Context, now time.Time) error {

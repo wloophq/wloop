@@ -105,10 +105,10 @@ func TestOpeningClearsChanged(t *testing.T) {
 }
 
 func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
-	e := task("e-5", "inbox", func(e *api.TaskView) {
-		e.Kind, e.Title = "message", "Nudge the reviewer?"
+	e := task("draft:11", "inbox", func(e *api.TaskView) {
+		e.Kind, e.Title = "draft", "Nudge the reviewer?"
 		e.Units = []unit.Unit{prUnit}
-		e.Draft = &api.Draft{ID: 11, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "proposed", Rev: 2}
+		e.Gates = draftGates(api.Draft{ID: 11, Unit: "github/acme/api#8", Kind: "nudge", Target: "acme/api#8", Text: "Could you take a look?", State: "held", Rev: 2})
 		e.Verbs = []api.VerbState{{Verb: "approve", Enabled: true}, {Verb: "dismiss", Enabled: true}, {Verb: "answer", Enabled: true}}
 	})
 	var got struct {
@@ -120,25 +120,25 @@ func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness, nil, `
 (async () => {
-  await loadDetailPane({ task: "e-5" });
+  await loadDetailPane({ task: "draft:11" });
   const pane = taskPage(detailState.task);
   posts.length = 0;
-  await byFocus(pane, "detail:approve:e-5").attrs.onclick();
+  await byFocus(pane, "detail:approve:draft:11").attrs.onclick();
   const posted = posts.map((p) => p.path);
   const show = (p) => p.path + " " + JSON.stringify(p.body);
   posts.length = 0;
-  byFocus(pane, "detail:open:approve:e-5").attrs.onclick();
+  byFocus(pane, "detail:open:approve:draft:11").attrs.onclick();
   const editing = taskPage(detailState.task);
-  byFocus(editing, "detail:draft-text:e-5").attrs.oninput({ target: { value: "Could you review the retry change today?" } });
-  await byFocus(taskPage(detailState.task), "detail:approve:e-5").attrs.onclick();
+  byFocus(editing, "detail:draft-text:draft:11").attrs.oninput({ target: { value: "Could you review the retry change today?" } });
+  await byFocus(taskPage(detailState.task), "detail:approve:draft:11").attrs.onclick();
   const edited = posts.map(show);
   posts.length = 0;
-  byFocus(taskPage(detailState.task), "detail:open:approve:e-5").attrs.onclick();
-  byFocus(taskPage(detailState.task), "detail:draft-text:e-5").attrs.oninput({ target: { value: "Ping on the retry change" } });
+  byFocus(taskPage(detailState.task), "detail:open:approve:draft:11").attrs.onclick();
+  byFocus(taskPage(detailState.task), "detail:draft-text:draft:11").attrs.oninput({ target: { value: "Ping on the retry change" } });
   await detailPane.act("approve", {});
   const keyed = posts.map(show);
   process.stdout.write(JSON.stringify({ Text: text(pane), Kinds: [byClass(pane, "d-gates").length, byClass(pane, "d-draft").length], Posted: posted, Edited: edited, Keyed: keyed }));
-})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-5": e}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/draft:11": e}}, &got)
 	if !slices.Equal(got.Kinds, []int{1, 1}) {
 		t.Errorf("gates sections and draft cards %v, want the draft among the gates", got.Kinds)
 	}
@@ -147,8 +147,8 @@ func TestADraftOnATaskApprovesItsEditedText(t *testing.T) {
 			t.Errorf("the detail lacks %q", s)
 		}
 	}
-	if !slices.Equal(got.Posted, []string{"/api/tasks/e-5/approve"}) {
-		t.Errorf("approving the draft posted %v, want the task's approve", got.Posted)
+	if !slices.Equal(got.Posted, []string{"/api/tasks/draft:11/approve"}) {
+		t.Errorf("approving the draft posted %v, want its task's approve", got.Posted)
 	}
 	if want := []string{`/api/tasks/draft:11/approve {"source":"cockpit","args":{"text":"Could you review the retry change today?","rev":"2"}}`}; !slices.Equal(got.Edited, want) {
 		t.Errorf("approving the edited draft posted %v, want %v", got.Edited, want)
@@ -265,3 +265,6 @@ func TestATaskOffersTheIntentsThatServeIt(t *testing.T) {
 		t.Fatalf("posts %+v", got.Posts)
 	}
 }
+
+// draftGates are the gates of a task carrying d.
+func draftGates(d api.Draft) []api.GateView { return []api.GateView{api.DraftGate(d)} }

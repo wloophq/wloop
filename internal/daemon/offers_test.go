@@ -407,8 +407,8 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 	for _, spec := range catalogOf(bundledActions()) {
 		ids[spec.ID] = true
 		if spec.Scope == catalog.ScopeDraft {
-			if !slices.Contains(api.DraftActions, strings.TrimPrefix(spec.ID, "draft.")) {
-				t.Errorf("%s has no draft route", spec.ID)
+			if _, ok := draftHandlers[spec.Verb]; !ok {
+				t.Errorf("%s runs no draft verb", spec.ID)
 			}
 			continue
 		}

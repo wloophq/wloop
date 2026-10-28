@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -22,6 +23,8 @@ import (
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/daemon"
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/source"
@@ -85,13 +88,35 @@ func insertDraft(t *testing.T, db *sqlite.DB, d draft.Draft) draft.Draft {
 	if d.Original == "" {
 		d.Original = d.Text
 	}
-	if d.Approval.Mode == "" {
-		d.Approval.Mode = draft.Wait
-	}
 	if d.CreatedAt.IsZero() {
 		d.CreatedAt, d.UpdatedAt = testNow, testNow
 	}
-	got, err := db.Drafts().Insert(context.Background(), d)
+	return insertDraftGate(t, db, d, time.Time{})
+}
+
+// insertDraftGate stores d with the gate its state implies: open while it is held, with deadline when it is set,
+// approved by a person once it is queued, none once it is dropped.
+func insertDraftGate(t *testing.T, db *sqlite.DB, d draft.Draft, deadline time.Time) draft.Draft {
+	t.Helper()
+	ctx := context.Background()
+	got, err := db.Drafts().Insert(ctx, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := db.Gates(func() time.Time { return got.CreatedAt })
+	g := gate.Gate{Kind: gate.KindDraft, Name: "draft", Intents: []string{"approve", "discard"}, Unit: got.Unit,
+		Subject: strconv.FormatInt(int64(got.ID), 10)}
+	switch got.State {
+	case draft.Held:
+		if !deadline.IsZero() {
+			g.Deadline, g.Default = deadline, "approve"
+		}
+		_, err = st.Open(ctx, g)
+	case draft.Dropped:
+	default:
+		g.Intent, g.By = "approve", task.ActorPerson
+		_, err = st.RecordSent(ctx, g)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +135,7 @@ func TestServeRecoversBeforeSending(t *testing.T) {
 	defer db.Close()
 	pub := &recordingPublisher{found: true}
 	stuck := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "left sending", State: draft.Sending, SendingAt: testNow})
-	ready := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "approved", State: draft.Approved})
+	ready := insertDraft(t, db, draft.Draft{Unit: threadUnit, Text: "approved", State: draft.Queued})
 	cfg := te.cfg
 	cfg.HTTP.Port = 0
 	mods, err := buildSources([]source.Plugin{publishing(pub)}, cfg, source.Deps{DB: db, Clock: clockFunc(te.Now)})
@@ -187,7 +212,7 @@ func TestOutboxEffectsFollowThePlugins(t *testing.T) {
 			t.Errorf("%s: %v", p, err)
 		}
 	}
-	if d.Outbox.Items == nil || d.Outbox.Evidence == nil || d.Outbox.Policies == nil {
+	if d.Outbox.Gates == nil || d.Outbox.Evidence == nil || d.Outbox.Policies == nil || d.Gates == nil {
 		t.Fatal("the outbox is not wired to the ledger and the policies")
 	}
 }
@@ -226,7 +251,7 @@ func TestTurnDraftIsPinnedToItsUnit(t *testing.T) {
 	if calls := pub.seen(); len(calls) != 0 {
 		t.Fatalf("published %v", calls)
 	}
-	o := &outbox.Service{Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }}
+	o := withDraftGates(te.db, te.Now, &outbox.Service{Store: te.db.Drafts(), Clock: clockFunc(te.Now), Effects: func(unit.ProviderID) (port.Effects, error) { return fx, nil }})
 	if _, err := o.Propose(ctx, outbox.Proposal{Unit: other, Kind: draft.Reply, Text: "x", Origin: draft.Origin{Kind: draft.OriginTurn, TurnSeq: 7}}); !errors.Is(err, outbox.ErrInvalid) {
 		t.Fatalf("propose on another unit: %v", err)
 	}

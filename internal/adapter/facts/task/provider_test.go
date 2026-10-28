@@ -300,9 +300,9 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 	put := func(wf string, s draft.State, at time.Time) {
 		t.Helper()
 		d := draft.Draft{Unit: chatA, Task: "e-01", Kind: draft.Nudge, Purpose: "nudge", Delivery: draft.Message, Text: "x", Original: "x",
-			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "e-01:chat:U1"}, Approval: draft.Approval{Mode: draft.Wait},
-			State: s, CreatedAt: at, UpdatedAt: at}
-		if s == draft.Discarded {
+			Origin: draft.Origin{Kind: draft.OriginAuto, Workflow: wf, Rule: wf, Key: "e-01:chat:U1"},
+			State:  s, CreatedAt: at, UpdatedAt: at}
+		if s == draft.Dropped {
 			d.Reason = draft.WithdrawMoot
 		}
 		if _, err := e.db.Drafts().Insert(ctx, d); err != nil {
@@ -310,8 +310,8 @@ func TestTaskSettledAtIsTheWorkflowsOwn(t *testing.T) {
 		}
 	}
 	put("nudge-a", draft.Sent, monday.Add(-3*time.Hour))
-	put("nudge-a", draft.Discarded, monday.Add(-2*time.Hour))
-	put("nudge-a", draft.Proposed, monday.Add(-time.Hour))
+	put("nudge-a", draft.Dropped, monday.Add(-2*time.Hour))
+	put("nudge-a", draft.Held, monday.Add(-time.Hour))
 	put("nudge-b", draft.Sent, monday.Add(-30*time.Minute))
 	f := e.facts("e-01")
 	scoped, err := e.p.Scope(ctx, "nudge-a", task.UnitOf("e-01"), f)

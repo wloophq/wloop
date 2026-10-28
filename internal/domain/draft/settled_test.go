@@ -16,13 +16,13 @@ func TestSettledAtIsTheNewestSettledDraftOfTheWorkflowOnTheSubject(t *testing.T)
 	mine := func(s State, h int) Draft {
 		return Draft{Unit: thread, Task: "e-0000000000000001", State: s, UpdatedAt: at(h), Origin: Origin{Kind: OriginAuto, Rule: "wf-a", Workflow: "wf-a"}}
 	}
-	withdrawn := mine(Discarded, 5)
+	withdrawn := mine(Dropped, 5)
 	withdrawn.Reason = WithdrawMoot
 	otherWorkflow := mine(Sent, 9)
 	otherWorkflow.Origin.Workflow = "wf-b"
 	otherUnit := mine(Sent, 9)
 	otherUnit.Unit, otherUnit.Task = other, ""
-	ds := []Draft{mine(Sent, 2), withdrawn, mine(Proposed, 8), mine(Approved, 8), mine(Sending, 8), mine(Failed, 8), otherWorkflow, otherUnit}
+	ds := []Draft{mine(Sent, 2), withdrawn, mine(Held, 8), mine(Queued, 8), mine(Sending, 8), mine(Failed, 8), otherWorkflow, otherUnit}
 	for _, c := range []struct {
 		name    string
 		subject unit.Unit
@@ -31,7 +31,7 @@ func TestSettledAtIsTheNewestSettledDraftOfTheWorkflowOnTheSubject(t *testing.T)
 	}{
 		{"withdrawn included, open and failed ones not", thread, ds, at(5)},
 		{"an entry subject reads the drafts serving it", task, ds, at(5)},
-		{"none settled", thread, []Draft{mine(Proposed, 3)}, time.Time{}},
+		{"none settled", thread, []Draft{mine(Held, 3)}, time.Time{}},
 		{"another unit's drafts", other, ds[:6], time.Time{}},
 		{"no drafts", thread, nil, time.Time{}},
 	} {

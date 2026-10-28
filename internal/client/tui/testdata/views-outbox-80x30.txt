@@ -5,7 +5,7 @@
 Reply in the release thread
   state      outbox
   to         #releases thread
-  draft      reply · approval wait · from turn
+  draft      reply · from turn
   text       Ship it tonight. Rollback plan in the doc.
   keys       a approve  Backspace dismiss
   not now    x next · w waiting · s schedule · y someday · l reference · f focu…

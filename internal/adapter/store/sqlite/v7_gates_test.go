@@ -268,3 +268,21 @@ func mustTime(t *testing.T, s string) time.Time {
 }
 
 func itoa(id int64) string { return strconv.FormatInt(id, 10) }
+
+func TestAMigratedDraftKeepsOnlyItsDelivery(t *testing.T) {
+	t.Parallel()
+	path := v6GatesFixture(t)
+	rawExec(t, path, `INSERT INTO drafts (id, provider, unit_key, kind, origin_kind, approval_mode, state, evidence_ref, created_at, updated_at, sending_at) VALUES
+		(38, 'slack', 'T1/C1/1.1', 'reply', 'turn', 'wait', 'approved', '', '2026-10-27T09:00:00Z', '2026-10-27T10:00:00Z', ''),
+		(39, 'slack', 'T1/C1/1.1', 'reply', 'turn', 'wait', 'sending', '', '2026-10-27T09:00:00Z', '2026-10-27T10:00:00Z', '2026-10-27T10:00:00Z')`)
+	migrateV6(t, path)
+	raw := rawDB(t, path)
+	want := []string{"30 held", "31 held", "32 sent", "33 dropped", "34 dropped", "35 held", "36 failed", "37 dropped", "38 queued", "39 sending"}
+	if got := strings1(t, raw, `SELECT id || ' ' || state FROM drafts ORDER BY id`); !slices.Equal(got, want) {
+		t.Fatalf("delivery states %q, want %q", got, want)
+	}
+	if got := strings1(t, raw, `SELECT name FROM pragma_table_info('drafts') WHERE name IN
+		('approval_mode', 'approval_window', 'deadline', 'would_policy', 'would_reason', 'would_outcome')`); len(got) != 0 {
+		t.Fatalf("columns left: %q", got)
+	}
+}

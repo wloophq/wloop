@@ -49,7 +49,7 @@ func TestARunLeavingAPersonOnATimedHoldIsNotDone(t *testing.T) {
 	}
 	for _, d := range r.drafts() {
 		if d.Origin.Key == "e1:"+bob.Key {
-			if _, err := r.svc.Discard(context.Background(), d.ID, ""); err != nil {
+			if err := discardDraft(context.Background(), r.svc, d.ID); err != nil {
 				t.Fatal(err)
 			}
 		}
