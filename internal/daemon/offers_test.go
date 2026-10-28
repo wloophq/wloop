@@ -122,6 +122,7 @@ func newCatalogRig(t *testing.T) catalogRig {
 	s := New(d)
 	s.token = ""
 	stopOnCleanup(t, s)
+	plan.gated(s)
 	return catalogRig{s: s, db: db, st: st, repo: repo, plan: plan}
 }
 
@@ -420,12 +421,15 @@ func TestEverySpecHasADispatchAndBack(t *testing.T) {
 			continue
 		}
 		plugin := slices.Contains([]string{present.ActionMute, present.ActionUnmute}, spec.ID)
-		if !isBuiltin(spec.ID) && !isIntent((&Server{}).loaded(), spec.ID) && !plugin {
+		if l := (&Server{}).loaded(); !isBuiltin(l, spec.ID) && !isIntent(l, spec.ID) && !plugin {
 			t.Errorf("%s has no dispatch", spec.ID)
 		}
 	}
 	dispatched := slices.Concat(slices.Collect(maps.Keys(delegatedActions)), slices.Collect(maps.Keys(holdActions)), slices.Collect(maps.Keys(followActions)),
-		slices.Collect(maps.Keys(roundActions)), slices.Collect(maps.Keys(turnActions)), slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
+		slices.Collect(maps.Keys(turnActions)), slices.Collect(maps.Keys(intakeRouteActions)), []string{"brief_refresh"})
+	for _, g := range catalog.RowGateIntents((&Server{}).loaded()) {
+		dispatched = append(dispatched, g.Intent.Name)
+	}
 	for _, id := range dispatched {
 		if !ids[id] {
 			t.Errorf("%s is dispatched with no spec", id)

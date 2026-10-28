@@ -471,6 +471,9 @@ func (s *Server) startAction(ctx context.Context, i intake.Intake, out io.Writer
 	if err := json.Unmarshal(i.Request, &p); err != nil {
 		return fmt.Errorf("the request of intake %d: %w", i.Seq, err)
 	}
+	if _, ok := catalog.RowGateIntent(s.loaded(), p.Action); ok && i.Source == sourceSession {
+		return Refusal{Reason: p.Action + " resolves a gate as a person; an agent's session does not"}
+	}
 	line := startHeldRound
 	if d, ok := s.loaded().Registry.Get(dintent.Name(p.Action)); ok {
 		line = d.StartLine
@@ -640,10 +643,10 @@ func (s *Server) expireSessionIntakesLocked(ctx context.Context) error {
 	return nil
 }
 
-// intentOf is the intent an intake action asks for: run_now's is the one
-// the row's action state names.
+// intentOf is the intent an intake action asks for: the held round's is
+// the one the row's action state names.
 func (s *Server) intentOf(action string, row api.Row) (turn.Intent, error) {
-	if action != "run_now" {
+	if !catalog.RunsHeld(s.loaded(), action) {
 		return turn.Intent(action), nil
 	}
 	if st, ok := offerOf(row, action); ok && st.Intent != "" {

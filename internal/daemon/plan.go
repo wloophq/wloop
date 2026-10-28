@@ -13,19 +13,15 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/catalog"
 	"github.com/wloophq/wloop/internal/core/automation"
-	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/readmodel"
 	"github.com/wloophq/wloop/internal/turn"
 )
-
-// dueEvery is how often the due job looks for pending items whose window
-// ended.
-const dueEvery = 5 * time.Second
 
 var errNoPlan = errors.New("the daemon runs no workflows")
 
@@ -39,36 +35,6 @@ var planActions = map[string]workflow.Action{
 
 // planOffers are the item's action each POST action needs offered.
 var planOffers = map[string]string{"apply": catalog.PlanApply, "dismiss": catalog.PlanDismiss, "skip": catalog.PlanDismiss, "guide": "guide"}
-
-// dueJob runs the pending items whose window ended, under the loop lock. It
-// runs them on the daemon's life context bounded by the job's, so their
-// meter scope is the plan's own, as the gate's runs were.
-func (s *Server) dueJob(p Plan) *job {
-	return newJob("due", dueEvery, sweepTimeout, func(ctx context.Context) (string, string, error) {
-		if due, err := s.anyDue(ctx, p); err != nil || !due {
-			return "", "", err
-		}
-		rctx, cancel := context.WithCancel(s.life)
-		defer cancel()
-		defer context.AfterFunc(ctx, cancel)()
-		s.deps.LoopMu.Lock()
-		defer s.deps.LoopMu.Unlock()
-		return "", "", p.DueRun(withLoopHeld(rctx))
-	})
-}
-
-// anyDue says whether a pending item that runs by default reached its
-// deadline, so the due job takes the loop lock and the round state only then.
-func (s *Server) anyDue(ctx context.Context, p Plan) (bool, error) {
-	items, err := p.Items(ctx, automation.Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
-	if err != nil {
-		return false, err
-	}
-	now := s.deps.Now()
-	return slices.ContainsFunc(items, func(it workflow.Item) bool {
-		return it.Default == workflow.OutcomeRun && !it.Deadline.After(now)
-	}), nil
-}
 
 // handlePlan answers the plan: with a trigger, what evaluating it would
 // decide now, which writes nothing; without one, the stored plan.
@@ -170,6 +136,14 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "guide needs guidance")
 		return
 	}
+	actor, ok := requestActor(w, r)
+	if !ok {
+		return
+	}
+	if actor != task.ActorPerson && req.Action != "pause" {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("%s decides a plan item as a person; an agent's session does not", req.Action))
+		return
+	}
 	ctx := context.WithoutCancel(r.Context())
 	if s.refuseUnitOf(w, func() (unit.Unit, bool) { return s.planUnit(ctx, p, req.IDs) }) {
 		return
@@ -177,7 +151,7 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 	res := api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}}
 	var acted []workflow.Item
 	for _, id := range req.IDs {
-		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance)
+		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance, actor)
 		if err != nil {
 			res.Errors = append(res.Errors, id+": "+err.Error())
 		}
@@ -191,7 +165,7 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 
 // actOnPlanItem acts on item id when it offers the action; kept is false
 // when no item is left to show.
-func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string) (_ workflow.Item, kept bool, _ error) {
+func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string, by task.Actor) (_ workflow.Item, kept bool, _ error) {
 	items, err := p.Items(ctx, automation.Filter{ID: id})
 	if err != nil {
 		return workflow.Item{}, false, err
@@ -220,6 +194,18 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 		return it, true, conflict{msg: fmt.Sprintf("%s offers no %s while %s", id, action, it.Decision)}
 	case !wire.Actions[i].Enabled:
 		return it, true, conflict{wire.Actions[i].Reason, wire.Actions[i].Refusal}
+	}
+	if g, gated, err := s.itemGate(ctx, it); err != nil {
+		return it, true, err
+	} else if gated {
+		if err := s.resolveItemGate(ctx, g, action, guidance, by); err != nil {
+			return it, true, err
+		}
+		left, err := p.Items(ctx, automation.Filter{ID: id})
+		if err != nil || len(left) == 0 {
+			return it, false, err
+		}
+		return left[0], true, nil
 	}
 	s.deps.LoopMu.Lock()
 	defer s.deps.LoopMu.Unlock()
@@ -278,54 +264,6 @@ func (s *Server) wirePlanItem(ctx context.Context, it workflow.Item, shown readm
 	}
 	p.Actions = catalog.PlanStates(s.loaded(), p, row)
 	return p
-}
-
-// pendingRound is u's pending turn.start item.
-func (s *Server) pendingRound(ctx context.Context, u unit.Unit) (workflow.Item, bool, error) {
-	items, err := s.deps.Plan.Items(ctx, automation.Filter{Unit: &u, Decisions: []workflow.Decision{workflow.DecisionPending}})
-	if err != nil {
-		return workflow.Item{}, false, err
-	}
-	for _, it := range items {
-		if slices.ContainsFunc(it.Steps, func(st workflow.Step) bool { return st.Use == builtin.StepTurnStart }) {
-			return it, true, nil
-		}
-	}
-	return workflow.Item{}, false, nil
-}
-
-// actOnRound carries a row's skip, guide or approval of u's pending round
-// onto its plan item; guide with no round pending keeps the guidance for
-// the next one.
-func (s *Server) actOnRound(ctx context.Context, u unit.Unit, a workflow.Action, guidance string) (string, error) {
-	guidance = strings.TrimSpace(guidance)
-	it, ok, err := s.pendingRound(ctx, u)
-	switch {
-	case err != nil:
-		return "", err
-	case !ok && a == workflow.ActionGuide && guidance != "":
-		if s.deps.Overrides == nil {
-			return "", errStoreUnavailable
-		}
-		_, err := s.deps.Overrides.SetOverride(ctx, u, map[string]string{port.OverrideNextGuidance: guidance}, nil)
-		return "no round pending; the guidance goes with the next automatic round", err
-	case !ok && a == workflow.ActionApply:
-		return "", conflict{msg: "the row changed: the pending round already went out"}
-	case !ok:
-		return "", badRequest{"no round pending for " + u.Label() + "; add guidance to send it with the next round"}
-	}
-	if !LoopHeld(ctx) {
-		s.deps.LoopMu.Lock()
-		defer s.deps.LoopMu.Unlock()
-		ctx = withLoopHeld(ctx)
-	}
-	if _, err := s.deps.Plan.Act(ctx, it.ID, a, guidance); err != nil {
-		return "", err
-	}
-	if a == workflow.ActionSkip {
-		return "skipped the pending " + it.Workflow, nil
-	}
-	return "sent the " + it.Workflow + " round", nil
 }
 
 // dropPending discards u's pending plan items without marking them handled.

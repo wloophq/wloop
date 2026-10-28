@@ -48,7 +48,6 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 		{"pending run_now", "run_now", func(f *Facts) { f.HeldByCap, f.Row.Pending = true, &api.PendingRound{} }, api.ActionState{}},
 		{"guide without a pending round", "guide", func(*Facts) {}, api.ActionState{Note: "Kept for the next automatic round"}},
 		{"guide on a pending round", "guide", func(f *Facts) { f.Row.Pending = &api.PendingRound{} }, api.ActionState{}},
-		{"guide with the gate off", "guide", func(f *Facts) { f.GateOn = false }, api.ActionState{Reason: "the daemon plans no automatic round; see doctor"}},
 		{"trust_run", "trust_run", func(f *Facts) {
 			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude", "~/.codex"}
 		}, api.ActionState{Note: "Trust /src/api in ~/.claude, ~/.codex, then run the round"}},
@@ -85,11 +84,66 @@ func TestBuiltinTextsComeFromTheProfile(t *testing.T) {
 	}
 }
 
+// TestTheRowGatesIntentsAreOfferedWhereTheirActionsWere pins where the
+// intents of the plan and trust gates show on a row, worded by gates.toml.
+func TestTheRowGatesIntentsAreOfferedWhereTheirActionsWere(t *testing.T) {
+	l := bundled(t)
+	base := func() Facts {
+		return Facts{Intents: l, PR: r7, Owner: "acme", Repo: "api", Row: api.Row{Unit: r7}, Open: true, Tracked: true, GateOn: true, NudgeWho: []string{}}
+	}
+	offered := func(f Facts) map[string]api.ActionState {
+		out := map[string]api.ActionState{}
+		for _, st := range States(f) {
+			out[st.ID] = st
+		}
+		return out
+	}
+	for _, c := range []struct {
+		name string
+		set  func(f *Facts)
+		want []string
+		none []string
+	}{
+		{"nothing pending", func(*Facts) {}, []string{"guide"}, []string{"run_now", "skip", "trust_run", "unblock"}},
+		{"held", func(f *Facts) { f.HeldByCap = true }, []string{"run_now", "guide"}, []string{"skip"}},
+		{"pending", func(f *Facts) { f.Row.Pending = &api.PendingRound{} }, []string{"run_now", "guide", "skip"}, []string{"trust_run"}},
+		{"the gate off", func(f *Facts) { f.GateOn = false }, nil, []string{"guide"}},
+		{"blocked", func(f *Facts) { f.StartBlocked = true }, []string{"unblock"}, []string{"trust_run"}},
+		{"blocked on a folder", func(f *Facts) {
+			f.StartBlocked, f.TrustFolder, f.TrustHomes = true, "/src/api", []string{"~/.claude"}
+		}, []string{"trust_run", "unblock"}, nil},
+	} {
+		f := base()
+		c.set(&f)
+		got := offered(f)
+		for _, id := range c.want {
+			if st, ok := got[id]; !ok || !st.Enabled {
+				t.Errorf("%s: %s = %+v %v, want it offered", c.name, id, st, ok)
+			}
+		}
+		for _, id := range c.none {
+			if st, ok := got[id]; ok {
+				t.Errorf("%s: %s offered: %+v", c.name, id, st)
+			}
+		}
+	}
+	held := base()
+	held.HeldByCap = true
+	if st := offered(held)["run_now"]; st.Intent != "review" || !st.Primary {
+		t.Errorf("the held round's run_now = %+v, want the review it runs", st)
+	}
+	for id, want := range map[string]string{"run_now": "Run now", "skip": "Skip", "guide": "Guide", "trust_run": "Trust folder and run", "unblock": "Dismiss block"} {
+		if s, ok := specByID(Specs(l), id); !ok || s.Label != want || s.Summary == "" {
+			t.Errorf("%s spec %+v %v, want label %q and a summary from gates.toml", id, s, ok, want)
+		}
+	}
+}
+
 func TestBuiltinSpecsAreWordedByTheProfile(t *testing.T) {
 	l := bundled(t)
 	specs := Specs(l)
 	for id, want := range map[string]api.InputSpec{
-		"guide": {Label: "Guidance", Placeholder: "what the next round should look at"},
+		"guide": {Label: "Guide"},
 		"mute":  {Label: "Mute for", Placeholder: "2d, 36h"},
 	} {
 		s, _ := specByID(specs, id)

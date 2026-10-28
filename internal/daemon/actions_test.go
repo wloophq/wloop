@@ -28,6 +28,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/core/turns/turnstest"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -235,6 +236,10 @@ func TestAStartBlockOnAnUntrustedFolderOffersTrustAndDismiss(t *testing.T) {
 			b := inventory.StartBlock{Question: turns.QuestionTrust, Root: "/src/api", Folder: "/src/api", Homes: []string{"/home/.claude"}, Round: "triage"}
 			at := s.deps.Now().Add(-time.Minute)
 			s.store().AppendEvents(context.Background(), []dinv.Event{{PR: r7, Kind: dinv.KindRoundBlocked, Key: b.Key(at), At: at, Data: "could not start: /src/api is not trusted in the agent home of its terminal"}})
+			svc, _ := withRowGates(s)
+			if _, err := svc.Open(context.Background(), gate.Gate{Kind: gate.KindTrust, Unit: r7.Unit(), Subject: b.Key(at)}, holdGate{}); err != nil {
+				t.Fatal(err)
+			}
 			row, err := s.currentRow(context.Background(), r7.Unit())
 			if err != nil {
 				t.Fatal(err)

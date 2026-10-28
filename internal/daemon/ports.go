@@ -9,6 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/ingest"
 	"github.com/wloophq/wloop/internal/core/intake"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -40,9 +41,9 @@ type Plan interface {
 	Act(ctx context.Context, id string, a workflow.Action, guidance string) (workflow.Item, error)
 	// Drop discards u's pending items without marking them handled.
 	Drop(ctx context.Context, u unit.Unit, why string) error
-	// DueRun runs the pending items whose window ended; the caller holds the
-	// loop lock.
-	DueRun(ctx context.Context) error
+	// Release is the consequence of the resolved plan gate g on the item it
+	// names; the caller holds the loop lock.
+	Release(ctx context.Context, g gate.Gate) error
 }
 
 // SweepFunc is a Sweeper with no deadline that reads no snapshot and runs

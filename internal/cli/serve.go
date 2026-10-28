@@ -33,6 +33,7 @@ import (
 	coreusage "github.com/wloophq/wloop/internal/core/usage"
 	"github.com/wloophq/wloop/internal/core/views"
 	"github.com/wloophq/wloop/internal/daemon"
+	"github.com/wloophq/wloop/internal/domain/gate"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
 	"github.com/wloophq/wloop/internal/domain/pr"
@@ -159,7 +160,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 			deps := endpoint.wire(serveDeps(gctx, e, db, cfg, logf, loopMu, appState), cfg)
 			deps.ConfigWarning = e.cfg.Warning
 			srv := daemon.New(deps)
-			e.Briefing = srv
+			e.Briefing, e.consequences = srv, srv
 			err := srv.Run(ctx)
 			stop()
 			return err
@@ -429,6 +430,9 @@ func withEngine(d daemon.Deps, e *Env, ed engineDeps) daemon.Deps {
 		ed.WorkspaceFacts = e.workspaceFacts()
 	}
 	eng := meteredEngine{e.newEngine(ed)}
+	if ed.DB != nil {
+		eng.Gates = draftGates{e: e, db: ed.DB, logf: ed.Log}
+	}
 	d.Sweep = eng
 	pd := ed
 	pd.WorkspaceFacts, pd.Withdrawals = siblingFacts(ed.WorkspaceFacts), nil
@@ -465,7 +469,7 @@ func (p servedPlan) Drop(ctx context.Context, u unit.Unit, why string) error {
 	return p.eng.Drop(ctx, u, why)
 }
 
-func (p servedPlan) DueRun(ctx context.Context) error { return p.eng.DueRun(ctx) }
+func (p servedPlan) Release(ctx context.Context, g gate.Gate) error { return p.eng.Release(ctx, g) }
 
 // authorFacts is the facts provider of the first module that serves the
 // views' author facts; nil without one.
@@ -843,7 +847,7 @@ func (e *Env) serveTurns(ctx context.Context, db *sqlite.DB, store *inventory.St
 	repo := sqlite.New(db)
 	clock := clockFunc(func() time.Time { return e.Now() })
 	v := &views.Service{Books: trackedBooks{books: repo, cards: e.viewFacts()}, Intents: registryPort{e}, State: repo, Sinks: viewSinks, Clock: clock, Log: logf, Paused: e.boardPaused, Debounce: cmp.Or(e.ViewDebounce, views.FlushDebounce),
-		Facts: e.viewFacts()}
+		Facts: e.viewFacts(), Gates: openGates{e}}
 	if e.changes != nil {
 		v.Changes = e.changes
 	}

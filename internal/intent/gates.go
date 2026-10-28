@@ -3,8 +3,10 @@ package intent
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/workflow"
@@ -107,8 +109,18 @@ type GateDef struct {
 // gate to, and whether it takes text.
 type GateIntent struct {
 	Name, Label string
-	Status      gate.Status
-	Answer      bool
+	// Summary is what resolving with it does, as help and palettes show it.
+	Summary string
+	Status  gate.Status
+	Answer  bool
+	// Texts are its note and confirm, templates over the action facts a
+	// row offering it reads.
+	Texts map[string]*template.Template
+}
+
+// Render is the intent's text name over facts, "" when it has none.
+func (in GateIntent) Render(name string, facts map[string]any) (string, error) {
+	return BuiltinAction{Texts: in.Texts}.Render(name, facts)
 }
 
 // Gate is the gate name declares.
@@ -150,9 +162,12 @@ type mGate struct {
 }
 
 type mGateIntent struct {
-	Label  *string `toml:"label"`
-	Status *string `toml:"status"`
-	Answer *bool   `toml:"answer"`
+	Label   *string `toml:"label"`
+	Summary *string `toml:"summary"`
+	Note    *string `toml:"note"`
+	Confirm *string `toml:"confirm"`
+	Status  *string `toml:"status"`
+	Answer  *bool   `toml:"answer"`
 }
 
 // BundledGates is the gates.toml of bundled alone.
@@ -297,6 +312,30 @@ func mergeIntent(s *sheet, g *GateDef, path, name string, m mGateIntent) {
 		s.add(path+".status", "is required: the status the intent resolves the gate to")
 	}
 	text(s, path+".label", m.Label, &in.Label)
+	text(s, path+".summary", m.Summary, &in.Summary)
+	in.Texts = maps.Clone(in.Texts)
+	for _, t := range []struct {
+		name string
+		v    *string
+	}{{"note", m.Note}, {"confirm", m.Confirm}} {
+		name, v := t.name, t.v
+		switch {
+		case v == nil:
+		case *v == "":
+			delete(in.Texts, name)
+		default:
+			tmpl, err := ActionText(path+"."+name, *v, SampleActionFacts())
+			if err != nil {
+				_, msg := templateMsg(path+"."+name, err)
+				s.add(path+"."+name, "%s", msg)
+				continue
+			}
+			if in.Texts == nil {
+				in.Texts = map[string]*template.Template{}
+			}
+			in.Texts[name] = tmpl
+		}
+	}
 	if m.Answer != nil {
 		in.Answer = *m.Answer
 	}

@@ -26,7 +26,7 @@ func (e *Env) newGates(db *sqlite.DB, logf func(string, ...any)) *gates.Service 
 		e.gateReader = st
 		e.gates = gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{e.loadedIntents}, Tasks: gateTasks{db.Tasks(), e},
 			Policy: profilePolicy{e.loadedIntents}, Clock: clockFunc(e.Now), Log: logf, Events: sqlite.New(db),
-			Publisher: outboxPublisher{e}})
+			Publisher: outboxPublisher{e}, Releaser: daemonConsequences{e}, Unblocker: daemonConsequences{e}})
 	}
 	return e.gates
 }
@@ -44,7 +44,34 @@ func (p outboxPublisher) Publish(ctx context.Context, g gate.Gate) error {
 	return p.e.outbox.Publish(ctx, g)
 }
 
-// draftGates are the gates the drafts of db wait on, through the daemon's gates service.
+// gateConsequences apply a resolved plan gate to its plan item and a
+// resolved trust gate to its round's start block.
+type gateConsequences interface {
+	gates.Releaser
+	gates.Unblocker
+}
+
+// daemonConsequences are the daemon's consequences of the plan and trust
+// gates, read at each resolution: the daemon is built after the gates.
+type daemonConsequences struct{ e *Env }
+
+var errNoDaemonYet = errors.New("the daemon is not built: the gate's consequence waits")
+
+func (c daemonConsequences) Release(ctx context.Context, g gate.Gate) error {
+	if c.e.consequences == nil {
+		return errNoDaemonYet
+	}
+	return c.e.consequences.Release(ctx, g)
+}
+
+func (c daemonConsequences) Unblock(ctx context.Context, g gate.Gate) error {
+	if c.e.consequences == nil {
+		return errNoDaemonYet
+	}
+	return c.e.consequences.Unblock(ctx, g)
+}
+
+// draftGates are the gates the drafts and the plan items of db wait on, through the daemon's gates service.
 type draftGates struct {
 	e    *Env
 	db   *sqlite.DB
@@ -180,4 +207,15 @@ func (g gateTasks) Open(ctx context.Context, r coretasks.OpenRequest) (task.Task
 		return task.Task{}, errNoTasksService
 	}
 	return g.e.tasks.Open(ctx, r)
+}
+
+// openGates are the daemon's gates as the views read them, none before
+// serve built them.
+type openGates struct{ e *Env }
+
+func (g openGates) Where(ctx context.Context, q gates.Query) ([]gate.Gate, error) {
+	if g.e.gateReader == nil {
+		return nil, nil
+	}
+	return g.e.gateReader.Where(ctx, q)
 }

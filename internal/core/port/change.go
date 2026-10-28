@@ -50,7 +50,7 @@ const (
 	// RowInputs are the topics a row is derived from.
 	RowInputs = TopicPRs | TopicFollow | TopicSourceEvents | TopicLoopEvents | TopicOverrides |
 		TopicTurns | TopicSessions | TopicIntakes | TopicBriefs | TopicUsage | TopicPause |
-		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems
+		TopicPending | TopicAgents | TopicConfig | TopicViewer | TopicRefusals | TopicItems | TopicGates
 	// HealthInputs are the topics the health endpoint shows.
 	HealthInputs = TopicMeta | TopicPause | TopicBriefs | TopicApp | TopicJobs | TopicConfig
 	// SweepInputs leaves out LoopEvents and Rounds, the sweep's own writes

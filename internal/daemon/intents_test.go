@@ -272,6 +272,7 @@ func TestAPendingRunNowIgnoresAnOpenIntake(t *testing.T) {
 	s, _ := newIntakeServer(t, intaketest.NewBriefs(waitBriefing), nil)
 	plan := newPendingPlan(s.deps.Now())
 	s.deps.Plan, s.deps.Pending = plan, plan
+	plan.gated(s)
 	in := ask(t, s, "review", `{"source":"cockpit"}`)
 	waitFor(t, func() bool { return intakeOf(t, s, in.Seq).State == intake.Briefing })
 	plan.propose(r7.Unit())

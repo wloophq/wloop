@@ -5,14 +5,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	intentload "github.com/wloophq/wloop/internal/intent"
-	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 // The surfaces an action spec names.
@@ -80,7 +78,8 @@ func off(id string) (api.ActionState, bool) { return api.ActionState{ID: id}, tr
 
 func absent() (api.ActionState, bool) { return api.ActionState{}, false }
 
-// BasisPending and BasisHeld prefix a run_now basis.
+// BasisPending and BasisHeld prefix the basis of the plan gate's first
+// approving intent.
 const (
 	BasisPending = "pending:"
 	BasisHeld    = "held:"
@@ -106,43 +105,6 @@ func everywhere(extra ...string) []string {
 // builtinActions is the catalog's Go table; the intents' actions go after
 // the start group.
 var builtinActions = []builtinAction{
-	{api.ActionSpec{ID: "run_now", Group: builtin.GroupStart, Key: "R", Verb: "approve", Surfaces: everywhere(), Intake: true}, func(f Facts) (api.ActionState, bool) {
-		if p := f.Row.Pending; p != nil {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisPending + p.Since.UTC().Format(time.RFC3339Nano)}, true
-		}
-		if f.HeldByCap {
-			return api.ActionState{ID: "run_now", Enabled: true, Primary: true, Basis: BasisHeld + f.Row.Summary.Reason, Intent: requestIntent(f, "run_now")}, true
-		}
-		return absent()
-	}},
-	{api.ActionSpec{ID: "skip", Group: builtin.GroupStart, Key: "S", Verb: "dismiss", Surfaces: everywhere()}, func(f Facts) (api.ActionState, bool) {
-		if f.Row.Pending == nil {
-			return absent()
-		}
-		return on("skip")
-	}},
-	{api.ActionSpec{ID: "guide", Group: builtin.GroupStart, Key: "G", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
-		Input: &api.InputSpec{Kind: "text", Required: true}}, func(f Facts) (api.ActionState, bool) {
-		if !f.Tracked || !f.Open {
-			return absent()
-		}
-		if !f.GateOn {
-			return off("guide")
-		}
-		return on("guide")
-	}},
-	{api.ActionSpec{ID: "trust_run", Group: builtin.GroupStart, Key: "T", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
-		if !f.StartBlocked || f.TrustFolder == "" || len(f.TrustHomes) == 0 || !f.Open {
-			return absent()
-		}
-		return api.ActionState{ID: "trust_run", Enabled: true, Primary: true}, true
-	}},
-	{api.ActionSpec{ID: "unblock", Group: builtin.GroupStart, Key: "D", Surfaces: blockSurfaces}, func(f Facts) (api.ActionState, bool) {
-		if !f.StartBlocked {
-			return absent()
-		}
-		return on("unblock")
-	}},
 	{api.ActionSpec{ID: "answer", Group: "turn", Key: "W", Verb: "answer", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification},
 		Input: &api.InputSpec{Kind: "answer", Required: true}}, questionOffer("answer")},
 	{api.ActionSpec{ID: "continue", Group: "turn", Key: "C", Surfaces: []string{SurfaceDetail, SurfaceTUI, SurfaceNotification}}, questionOffer("continue")},
@@ -317,6 +279,23 @@ func texted(l *intentload.Loaded, key string, st api.ActionState, facts map[stri
 		return st
 	}
 	st.Note, st.Confirm, st.Warning = render("note"), render("confirm"), render("warning")
+	return st
+}
+
+// gateTexted is st with the note and confirm of gate intent in over facts,
+// when it is enabled.
+func gateTexted(in intentload.GateIntent, st api.ActionState, facts map[string]any) api.ActionState {
+	if !st.Enabled {
+		return st
+	}
+	render := func(name string) string {
+		out, err := in.Render(name, facts)
+		if err != nil {
+			return fmt.Sprintf("the profile has errors: %s: gates.*.intents.%s.%s: %v", intentload.GatesFile, in.Name, name, err)
+		}
+		return out
+	}
+	st.Note, st.Confirm = render("note"), render("confirm")
 	return st
 }
 

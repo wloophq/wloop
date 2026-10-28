@@ -32,6 +32,9 @@ type Engine struct {
 	Config   func() workflow.Facts
 	State    StateLoader
 	Marks    Marks // nil reads every unit as having no marks
+	// Gates are the plan gates a pending item waits on; nil opens none, and
+	// a window's end runs its item.
+	Gates Gates
 	// Withdrawals are the drafts the workflows proposed; nil withdraws none.
 	Withdrawals Withdrawals
 	// PluginEnabled says whether a provider's plugin is on; nil: every one
@@ -43,6 +46,7 @@ type Engine struct {
 	Log           func(format string, args ...any)
 
 	mu     sync.Mutex
+	gateMu sync.Mutex
 	due    time.Time
 	seen   port.Generation
 	events heldEvents

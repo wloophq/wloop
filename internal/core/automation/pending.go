@@ -13,8 +13,9 @@ import (
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
 
-// DueRun runs the pending items whose window ended with default run; the
-// caller holds the loop lock.
+// DueRun runs the deferred items whose Deadline passed, and, with no Gates,
+// the pending items whose window ended with default run; the caller holds
+// the loop lock.
 func (e *Engine) DueRun(ctx context.Context) (err error) {
 	pause, err := e.pause(ctx)
 	if err != nil {
@@ -33,11 +34,20 @@ func (e *Engine) DueRun(ctx context.Context) (err error) {
 	return err
 }
 
+// dueDecisions are the decisions of the items a passed Deadline runs: a
+// gated item's window is its gate's.
+func (e *Engine) dueDecisions() []workflow.Decision {
+	if e.Gates != nil {
+		return []workflow.Decision{workflow.DecisionDeferred}
+	}
+	return []workflow.Decision{workflow.DecisionPending, workflow.DecisionDeferred}
+}
+
 // dueRun runs the due items of workflows still loaded and not observing whose
 // unit the pause does not hold.
 func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	var t tally
-	items, err := e.Ledger.Items(ctx, Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+	items, err := e.Ledger.Items(ctx, Filter{Decisions: e.dueDecisions()})
 	if err != nil {
 		return t, err
 	}
@@ -48,25 +58,7 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 		if !ok || w.Observe || it.Default != workflow.OutcomeRun || it.Deadline.After(now) {
 			continue
 		}
-		facts, err := e.factsFor(ctx, w, it.Unit)
-		if err != nil {
-			e.logf("%s: not run, its facts cannot be read: %v", it.ID, err)
-			continue
-		}
-		if holds(pause, w.Slot, facts) {
-			continue
-		}
-		if moved, err := e.sourceMoved(ctx, it); err != nil || moved || keyMoved(w, it, facts) {
-			if err == nil {
-				err = e.dropMoved(ctx, it)
-			}
-			if err != nil {
-				return t, err
-			}
-			t.dropped++
-			continue
-		}
-		r, err := e.runItem(ctx, it, RunOpts{})
+		r, err := e.dueOne(ctx, w, it, pause)
 		if err != nil {
 			return t, err
 		}
@@ -75,10 +67,24 @@ func (e *Engine) dueRun(ctx context.Context, pause Pause) (tally, error) {
 	return t, nil
 }
 
-// Pending are the pending items of every workflow; the composition root
-// picks the turn.start ones for the read model.
-func (e *Engine) Pending(ctx context.Context) ([]workflow.Item, error) {
-	return e.Ledger.Items(ctx, Filter{Decisions: []workflow.Decision{workflow.DecisionPending}})
+// dueOne runs it, of w, unless the pause holds its unit or its facts cannot
+// be read; an item whose source or key facts moved is dropped instead.
+func (e *Engine) dueOne(ctx context.Context, w workflow.Workflow, it workflow.Item, pause Pause) (result, error) {
+	facts, err := e.factsFor(ctx, w, it.Unit)
+	if err != nil {
+		e.logf("%s: not run, its facts cannot be read: %v", it.ID, err)
+		return result{outcome: outcomeNone}, nil
+	}
+	if holds(pause, w.Slot, facts) {
+		return result{outcome: outcomeNone}, nil
+	}
+	if moved, err := e.sourceMoved(ctx, it); err != nil || moved || keyMoved(w, it, facts) {
+		if err == nil {
+			err = e.dropMoved(ctx, it)
+		}
+		return result{outcome: outcomeDropped}, err
+	}
+	return e.runItem(ctx, it, RunOpts{})
 }
 
 // whyMoved drops or refuses an item whose source moved since it was planned.

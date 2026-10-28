@@ -69,8 +69,16 @@
                   "description": "The intent takes text, such as a question's answer.",
                   "type": "boolean"
                 },
+                "confirm": {
+                  "description": "The dialog that confirms the intent on a row, over the action facts; empty asks nothing.",
+                  "type": "string"
+                },
                 "label": {
                   "description": "The name people read on its button.",
+                  "type": "string"
+                },
+                "note": {
+                  "description": "What the intent would do on a row that offers it, over the action facts.",
                   "type": "string"
                 },
                 "status": {
@@ -82,6 +90,10 @@
                     "dismissed",
                     "superseded"
                   ],
+                  "type": "string"
+                },
+                "summary": {
+                  "description": "What resolving the gate with the intent does, as help and palettes show it.",
                   "type": "string"
                 }
               },

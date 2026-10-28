@@ -23,11 +23,12 @@ import (
 	"github.com/wloophq/wloop/internal/meter"
 )
 
-// gateTickEvery bounds how late a gate whose window passed resolves.
+// gateTickEvery is the longest the gates' tick waits between two looks.
 const gateTickEvery = 30 * time.Second
 
-// tickGates resolves the gates whose window passed, after each gates note
-// and every gateTickEvery, until ctx ends.
+// tickGates resolves the gates whose window passed, after each gates note,
+// at the earliest open deadline and at least every gateTickEvery, until ctx
+// ends.
 func (s *Server) tickGates(ctx context.Context) {
 	var poke <-chan struct{}
 	if s.deps.Changes != nil {
@@ -40,12 +41,18 @@ func (s *Server) tickGates(ctx context.Context) {
 		if err := s.deps.Gates.Tick(pctx, time.Now()); err != nil && ctx.Err() == nil {
 			s.logf("gates: tick: %v", err)
 		}
+		wait := gateTickEvery
+		if next, err := s.deps.Gates.NextDeadline(pctx); err != nil {
+			s.logf("gates: next deadline: %v", err)
+		} else if left := time.Until(next); left > 0 {
+			wait = min(wait, left)
+		}
 		scope.End()
 		select {
 		case <-ctx.Done():
 			return
 		case <-poke:
-		case <-s.draftClock.After(gateTickEvery):
+		case <-s.draftClock.After(wait):
 		}
 	}
 }

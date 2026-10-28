@@ -1247,7 +1247,7 @@ func TestPostCarriesBasisAndSource(t *testing.T) {
 		{call{Fixture: "held", ID: "run_now", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%237/run_now", Body: map[string]any{"source": "cockpit", "basis": "held:automatic round held: daily cap"}, Fetched: 1}},
 		{call{Fixture: "pending", ID: "mute", Prompt: "36h"}, result{URL: "/api/units/github/acme%2Fapi%237/mute", Body: map[string]any{"source": "cockpit", "until": "36h"}, Fetched: 1}},
 		{call{Fixture: "pending", ID: "mute", Prompt: "state"}, result{URL: "/api/units/github/acme%2Fapi%237/mute", Body: map[string]any{"source": "cockpit", "until_state": true}, Fetched: 1}},
-		{call{Fixture: "pending", ID: "guide"}, result{Error: "guide acme/api#7: Guidance is required"}},
+		{call{Fixture: "pending", ID: "guide"}, result{Error: "guide acme/api#7: Guide is required"}},
 		{call{Fixture: "mine_no_reviewer", ID: "nudge", Guidance: long, Confirm: true}, result{Error: "nudge acme/api#10: guidance is 501 characters, the limit is 500"}},
 		{call{Fixture: "mine_no_reviewer", ID: "nudge", Guidance: "ask about CI", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%2310/nudge", Body: map[string]any{"source": "cockpit", "guidance": "ask about CI"}, Fetched: 1}},
 		{call{Fixture: "forceable_refusal", ID: "remove_force", Confirm: true}, result{URL: "/api/units/github/acme%2Fapi%237/remove_force", Body: map[string]any{"source": "cockpit"}, Fetched: 1}},

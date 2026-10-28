@@ -5,7 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/wloophq/wloop/internal/core/gates"
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/gate"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 )
@@ -199,4 +202,12 @@ type Guidance interface {
 type Pause struct {
 	On    bool
 	Repos []string // owner/repo
+}
+
+// Gates are the plan gates the pending items wait on, each naming its
+// item's id as its Subject: the gates service, which alone resolves them.
+type Gates interface {
+	Open(ctx context.Context, g gate.Gate, p gates.Policy) (gate.Gate, error)
+	Supersede(ctx context.Context, id int64, by task.Actor) error
+	Where(ctx context.Context, q gates.Query) ([]gate.Gate, error)
 }

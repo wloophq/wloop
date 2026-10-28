@@ -135,7 +135,7 @@ const (
 		(SELECT j.value FROM turn_instructions r, json_each(r.parts) j WHERE r.parts != '')`
 	retainViewRowsSQL     = `DELETE FROM view_applied WHERE provider = 'github' AND unit_key IN ` + endedUnits
 	endedPRsSQL           = `SELECT owner, repo, number FROM pull_requests WHERE state != 'OPEN' AND ` + endedAt + ` != '' AND ` + endedAt + ` < ?`
-	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision != 'pending' AND saved_at < ?` + untaskedPlanItems
+	retainPlanItemsSQL    = `DELETE FROM plan_items WHERE decision NOT IN ('pending', 'deferred') AND saved_at < ?` + untaskedPlanItems
 	retainWorkflowRunsSQL = `DELETE FROM workflow_runs WHERE status = 'done' AND at < ?`
 	retainSessionRunsSQL  = `DELETE FROM workflow_runs WHERE provider = 'session' AND at < ? AND unit_key NOT IN (SELECT session_id FROM sessions)`
 	retainSessionMarksSQL = `DELETE FROM unit_marks WHERE provider = 'session' AND unit_key NOT IN (SELECT session_id FROM sessions)`

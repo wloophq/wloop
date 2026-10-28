@@ -88,11 +88,11 @@ var v6Gates = map[gate.Kind]struct {
 	yes, no, dismiss string
 }{
 	gate.KindDraft:    {"draft", []string{"approve", "discard"}, "approve", "discard", ""},
-	gate.KindPlan:     {"plan", []string{"run", "skip"}, "run", "skip", ""},
+	gate.KindPlan:     {"plan", []string{"run_now", "skip", "guide"}, "run_now", "skip", ""},
 	gate.KindQuestion: {"question", []string{"answer", "dismiss"}, "answer", "", "dismiss"},
 	gate.KindPost:     {"post", []string{"reply", "dismiss"}, "reply", "", "dismiss"},
 	gate.KindProposal: {"proposal", []string{"approve", "reject"}, "approve", "reject", ""},
-	gate.KindTrust:    {"trust", []string{"trust", "dismiss"}, "trust", "", "dismiss"},
+	gate.KindTrust:    {"trust", []string{"trust_run", "unblock"}, "trust_run", "", "unblock"},
 }
 
 // The words version 6 stored, as it wrote them.
