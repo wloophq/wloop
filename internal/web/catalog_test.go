@@ -61,19 +61,19 @@ process.stdout.write(JSON.stringify([at(input.t0), at(input.t0 + 86400000)]));`,
 	}
 }
 
-// domShim is a minimal DOM: elements that keep their children and text,
-// and stubs for what app.js touches while it loads.
+// domShim is a minimal DOM: elements that keep their children, text and
+// listeners (on[type]), and stubs for what app.js touches while it loads.
 const domShim = `
 class Node {}
 class Text extends Node { constructor(t) { super(); this.data = t; } get textContent() { return this.data; } }
 class El extends Node {
   constructor(tag) { super(); this.tag = tag; this.children = []; this.attrs = {}; this.dataset = {}; this.style = { setProperty() {} }; this.hidden = false;
-    this.classList = { add() {}, remove() {}, toggle() {}, contains: () => false }; }
+    this.classList = { add() {}, remove() {}, toggle() {}, contains: () => false }; this.on = {}; }
   append(...c) { this.children.push(...c.map((x) => (x instanceof Node ? x : new Text(String(x))))); }
   replaceChildren(...c) { this.children = []; this.append(...c); }
   setAttribute(k, v) { this.attrs[k] = v; }
   getAttribute(k) { return this.attrs[k]; }
-  addEventListener() {}
+  addEventListener(type, fn) { this.on[type] = fn; }
   querySelector() { return null; }
   querySelectorAll() { return []; }
   closest() { return null; }

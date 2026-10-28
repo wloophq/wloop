@@ -46,12 +46,12 @@ const noViews = "const loadTasks = async () => {};\n"
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\n"
 
-// viewsScripts are routes.js, views.js and detail.js.
+// viewsScripts are routes.js, views.js, review.js, task.js and detail.js, in the page's order.
 func viewsScripts(t *testing.T) string {
-	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "detail.js")
+	return staticJS(t, "routes.js") + staticJS(t, "views.js") + staticJS(t, "review.js") + staticJS(t, "task.js") + staticJS(t, "detail.js")
 }
 
-// viewsPrelude is plugins.js, routes.js, views.js and detail.js over a tree h.
+// viewsPrelude is viewsScripts and plugins.js over a tree h.
 func viewsPrelude(t *testing.T) string {
 	return treeJS + pluginsJS(t) + viewsScripts(t)
 }
@@ -125,41 +125,6 @@ process.stdout.write(JSON.stringify({
 	}
 }
 
-func TestGroupingPerView(t *testing.T) {
-	tasks := []api.TaskView{
-		task("e-1", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
-		task("e-2", "next", func(e *api.TaskView) { e.Contexts = []string{"@decide", "@reply"} }),
-		task("e-3", "next", nil),
-		task("e-4", "next", func(e *api.TaskView) { e.Contexts = []string{"@reply"} }),
-	}
-	waiting := []api.TaskView{
-		task("w-1", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
-		task("w-2", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "alice"}}} }),
-		task("w-3", "waiting", func(e *api.TaskView) { e.Waiting = &api.WaitingView{On: []api.WaitingPerson{{Name: "bob"}}} }),
-	}
-	logbook := []api.TaskView{task("d-1", "done", nil), task("r-1", "reference", nil), task("d-2", "done", nil)}
-	type group struct {
-		Label string   `json:"label"`
-		IDs   []string `json:"ids"`
-	}
-	var got map[string][]group
-	nodeRun(t, viewsPrelude(t), nil, `
-const g = (v, es) => viewGroups(v, es).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
-process.stdout.write(JSON.stringify({ next: g("next", input.next), waiting: g("waiting", input.waiting), logbook: g("logbook", input.logbook), inbox: g("inbox", input.next) }));`,
-		map[string]any{"next": tasks, "waiting": waiting, "logbook": logbook}, &got)
-	want := map[string][]group{
-		"next":    {{"@decide", []string{"e-2"}}, {"@reply", []string{"e-1", "e-4"}}, {"No context", []string{"e-3"}}},
-		"waiting": {{"alice", []string{"w-2"}}, {"bob", []string{"w-1", "w-3"}}},
-		"logbook": {{"Reference", []string{"r-1"}}, {"Done", []string{"d-1", "d-2"}}},
-		"inbox":   {{"", []string{"e-1", "e-2", "e-3", "e-4"}}},
-	}
-	for v, w := range want {
-		if !slices.EqualFunc(got[v], w, func(a, b group) bool { return a.Label == b.Label && slices.Equal(a.IDs, b.IDs) }) {
-			t.Errorf("%s groups %+v, want %+v", v, got[v], w)
-		}
-	}
-}
-
 func TestNavCountsComeFromThePage(t *testing.T) {
 	full := api.TasksPage{Epoch: "ep", Rev: 4, Full: true, Removed: []string{},
 		Tasks:    []api.TaskView{task("e-1", "inbox", nil), task("e-2", "inbox", nil)},
@@ -194,44 +159,63 @@ const inboxCount = () => viewNav(tasksState.catalog, [], [], tasksState.counters
 	}
 }
 
-func TestAreaSparesInbox(t *testing.T) {
+func TestAreaFiltersEveryView(t *testing.T) {
 	var got struct {
-		URLs  map[string]string `json:"urls"`
-		Keys  []string          `json:"keys"`
-		Route map[string]any    `json:"route"`
-		Hash  string            `json:"hash"`
-		Asked []string          `json:"asked"`
+		URLs   map[string]string `json:"urls"`
+		Keys   []string          `json:"keys"`
+		Route  map[string]any    `json:"route"`
+		Hash   string            `json:"hash"`
+		Asked  []string          `json:"asked"`
+		Picker string            `json:"picker"`
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 const urls = {};
 for (const v of input.views) urls[v] = tasksURL(v, "OSS", [], "");
 const asked = [];
 async function getJSON(u) { asked.push(u); return u === "/api/views" ? input.cat : { epoch: "e", rev: 1, full: true, tasks: [], removed: [], counters: { views: {} } }; }
+function writeHash() {}
 (async () => {
   await loadTasks({ view: "inbox", area: "OSS", ctx: [] });
   await loadTasks({ view: "focus", area: "OSS", ctx: [] });
   await loadTasks({ view: "needs-me", area: "OSS", ctx: [] });
   process.stdout.write(JSON.stringify({
     urls, asked,
-    keys: [viewQueryKey("inbox", "OSS", []), viewQueryKey("inbox", "", []), viewQueryKey("next", "OSS", [])],
+    keys: [viewQueryKey("inbox", "OSS", []), viewQueryKey("inbox", "", [])],
     route: readRoute(routeHash("next", "", new URLSearchParams({ area: "OSS" }))),
     hash: routeHash("next", "", new URLSearchParams({ area: "OSS" })),
+    picker: text(areaPicker({ view: "inbox", area: "OSS", ctx: [], q: "" })),
   }));
 })();`, map[string]any{"cat": viewsCatalog(), "views": coreViewIDs}, &got)
 	for _, v := range coreViewIDs {
-		has := strings.Contains(got.URLs[v], "area=OSS")
-		if has == (v == "inbox") {
-			t.Errorf("%s: %s", v, got.URLs[v])
+		if !strings.Contains(got.URLs[v], "area=OSS") {
+			t.Errorf("%s ignores the area: %s", v, got.URLs[v])
 		}
 	}
-	if got.Keys[0] != got.Keys[1] || got.Keys[2] == "next||" {
-		t.Errorf("query keys %v: Inbox must not depend on the area", got.Keys)
+	if got.Keys[0] == got.Keys[1] {
+		t.Errorf("query keys %v: every view depends on the area", got.Keys)
 	}
 	if got.Route["area"] != "OSS" || got.Hash != "view=next&area=OSS" {
 		t.Errorf("the area is not kept in the hash: %q -> %v", got.Hash, got.Route)
 	}
-	if want := []string{"/api/views", "/api/tasks?view=inbox", "/api/counters?area=OSS", "/api/tasks?view=focus&area=OSS", "/api/counters?area=OSS"}; !slices.Equal(got.Asked, want) {
+	if want := []string{"/api/views", "/api/tasks?view=inbox&area=OSS", "/api/tasks?view=focus&area=OSS", "/api/counters?area=OSS"}; !slices.Equal(got.Asked, want) {
 		t.Errorf("asked %v, want %v", got.Asked, want)
+	}
+	if !strings.HasPrefix(got.Picker, "Area") {
+		t.Errorf("the area picker on every view reads %q", got.Picker)
+	}
+}
+
+func TestContextChipsShowOnEveryViewOfTasks(t *testing.T) {
+	var got map[string][]string
+	nodeRun(t, viewsPrelude(t), nil, `
+function writeHash() {}
+tasksState.catalog = input.cat;
+const chips = (view) => byClass(h("div", {}, contextChips({ view, area: "", ctx: [], q: "" })), "chip").map(text);
+process.stdout.write(JSON.stringify({ triage: chips("triage"), gates: chips("approvals") }));`,
+		map[string]any{"cat": api.ViewsCatalog{Views: []api.TaskViewSpec{{ID: "triage", Label: "Triage"}, {ID: "approvals", Label: "Approvals", Over: "gates"}},
+			Contexts: []string{"@decide", "@reply"}}}, &got)
+	if !slices.Equal(got["triage"], []string{"@decide", "@reply"}) || len(got["gates"]) != 0 {
+		t.Errorf("chips %v, want the contexts on a view of tasks and none on a view of gates", got)
 	}
 }
 

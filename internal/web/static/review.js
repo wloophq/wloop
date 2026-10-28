@@ -1,9 +1,12 @@
 "use strict";
 
-// reviewState is the weekly Review on screen: the daemon's Review, the step
-// shown and its tasks, which also stand in tasksState so the task keys and
-// the detail act on them.
+// reviewState is the review on screen: the daemon's Review, the step shown
+// and its tasks, which also stand in tasksState so the task keys and the
+// detail act on them.
 const reviewState = { review: null, step: "", error: "" };
+
+// STEP_MOVES are how far the review's step keys move.
+const STEP_MOVES = { next: 1, prev: -1 };
 
 const reviewEnv = {
   getJSON: (url) => getJSON(url),
@@ -16,8 +19,16 @@ const reviewEnv = {
   },
 };
 
+// reviewSteps are the views the catalog's review walks, in its order, each
+// with the label, count and done mark of the Review's step that shows it.
 function reviewSteps() {
-  return (reviewState.review && reviewState.review.steps) || [];
+  const served = (reviewState.review && reviewState.review.steps) || [];
+  const views = (tasksState.catalog && tasksState.catalog.review) || [];
+  if (!views.length) return served;
+  return views.map((v) => {
+    const s = served.find((x) => x.view === v || x.id === v) || {};
+    return { id: s.id || v, view: v, label: s.label || viewLabel(v), count: s.count !== undefined ? s.count : ((tasksState.counters || {}).views || {})[v] || 0, done: !!s.done };
+  });
 }
 
 // reviewFirstOpen is the first step not done after index from (wrapping),
@@ -35,7 +46,7 @@ function reviewCurrent() {
 }
 
 function reviewTasksURL(step) {
-  return "/api/tasks?" + new URLSearchParams(step.query || { view: step.view }).toString();
+  return tasksURL(step.view, "", [], "");
 }
 
 // loadReview reads the Review and the tasks of the step shown, the first
@@ -73,8 +84,8 @@ async function reviewKey(action) {
   const steps = reviewSteps();
   const at = steps.findIndex((s) => s.id === reviewState.step);
   if (!steps.length || at < 0) return false;
-  if (action === "next" || action === "prev") {
-    const next = steps[Math.max(0, Math.min(steps.length - 1, at + (action === "next" ? 1 : -1)))];
+  if (STEP_MOVES[action]) {
+    const next = steps[Math.max(0, Math.min(steps.length - 1, at + STEP_MOVES[action]))];
     if (next.id === reviewState.step) return true;
     reviewState.step = next.id;
   } else if (action === "done") {
@@ -113,10 +124,10 @@ function reviewStepItem(s) {
     h("span", { class: "count" }, String(s.count))));
 }
 
-// reviewPanel is the Review: its steps with their counts, then the step
+// reviewPanel is the review: its steps with their counts, then the step
 // shown with its tasks.
 function reviewPanel(open) {
-  const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, "Weekly review"))];
+  const parts = [h("div", { class: "tools tasks-tools" }, h("h2", { class: "tasks-head" }, REVIEW_TITLE))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
   const steps = reviewSteps();
   if (!reviewState.review) {
@@ -140,7 +151,6 @@ function reviewPanel(open) {
     parts.push(h("p", { class: "empty" }, "Nothing here."));
     return parts;
   }
-  const item = step.view === "outbox" ? outboxItem : taskItem;
-  parts.push(h("ol", { class: "entries" }, ...tasksState.tasks.map((e) => item(e, open))));
+  parts.push(h("ol", { class: "task-list" }, ...tasksState.tasks.map((e) => listItem(e, open))));
   return parts;
 }

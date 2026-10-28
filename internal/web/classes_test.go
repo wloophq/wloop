@@ -8,7 +8,6 @@ import (
 )
 
 func TestCockpitClassesSayTask(t *testing.T) {
-	t.Skip("carried from R2 review: K1a renames the gtd and entry CSS classes")
 	old := `(gtd|entry|entries)\b`
 	patterns := map[string]*regexp.Regexp{
 		"static/app.css":    regexp.MustCompile(`\.([\w-]*-)?` + old),

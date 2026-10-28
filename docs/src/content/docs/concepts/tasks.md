@@ -104,7 +104,7 @@ A project is an outcome that takes more than one action. `p` on a task makes a p
 
 ## The review
 
-The review (`g r`) walks six steps, each a filtered view you mark done with `Enter` (`]` and `[` move between steps):
+The review (`g r`) walks six steps, each a view you mark done with `Enter` (`]` and `[` move between steps):
 
 1. Inbox to zero;
 2. the Outbox;
