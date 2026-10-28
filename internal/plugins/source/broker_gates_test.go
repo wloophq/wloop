@@ -1,0 +1,151 @@
+package source_test
+
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/wloophq/wloop/internal/core/outbox"
+	"github.com/wloophq/wloop/internal/domain/draft"
+	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	dturn "github.com/wloophq/wloop/internal/domain/turn"
+	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/plugins/codec"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
+	"github.com/wloophq/wloop/pkg/plugin"
+	"github.com/wloophq/wloop/pkg/plugin/manifest"
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+)
+
+type gateSessions struct {
+	sessions map[string]dturn.Session
+	book     dturn.Book
+}
+
+func (s gateSessions) Session(_ context.Context, id string) (dturn.Session, bool, error) {
+	v, ok := s.sessions[id]
+	return v, ok, nil
+}
+
+func (s gateSessions) BookOf(context.Context, string) (dturn.Book, bool, error) {
+	return s.book, true, nil
+}
+
+type gateDrafts struct {
+	proposed, sent []outbox.Proposal
+}
+
+func (d *gateDrafts) Propose(_ context.Context, p outbox.Proposal) (draft.Draft, error) {
+	d.proposed = append(d.proposed, p)
+	return draft.Draft{ID: draft.ID(len(d.proposed))}, nil
+}
+
+func (d *gateDrafts) RecordSent(_ context.Context, p outbox.Proposal, _ draft.Evidence) (draft.Draft, error) {
+	d.sent = append(d.sent, p)
+	return draft.Draft{ID: draft.ID(len(d.sent))}, nil
+}
+
+func (d *gateDrafts) PublisherOf(dr draft.Draft) unit.ProviderID { return dr.Unit.Provider }
+
+// gatesOver is the gates of plugin acme, whose tool post_now posts at once,
+// with session live and session gone closed, both on the turn of a reply
+// intent on acme's unit t1 that allows the effect unit.closed.
+func gatesOver(t *testing.T) (src.Gates, *gateDrafts) {
+	t.Helper()
+	c, err := codec.Of("acme", manifest.Codec{Keys: []string{"{thread}"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := unit.Unit{Provider: "acme", Key: "t1"}
+	book := dturn.Book{Unit: own, Turns: []dturn.Turn{{Seq: 7, Intent: "reply", Session: "live",
+		Inputs: map[string]any{"items": []string{"i1"}, "task": "task-1"}}}}
+	at := time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)
+	ds := &gateDrafts{}
+	b := &psource.Broker{ID: "acme", Units: psource.Units{Codecs: unit.NewRegistry(c)},
+		Manifest: &manifest.Source{Tools: []manifest.Tool{{Name: "post_now", Posts: "now"}, {Name: "read_only"}}},
+		Hosted: &psource.Hosted{Drafts: ds,
+			Sessions: gateSessions{sessions: map[string]dturn.Session{"live": {ID: "live"}, "gone": {ID: "gone", ClosedAt: at}}, book: book},
+			Intents: func() *dintent.Registry {
+				return dintent.NewRegistry([]dintent.Def{{Name: "reply", AllowedEffects: []string{"unit.closed"}}})
+			}}}
+	return b.Host().Gates, ds
+}
+
+func TestASessionsGateTakesItsOriginTaskAndItemsFromTheHostsBook(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	forged := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Kind: "reply", Text: "hi", Task: "forged-task",
+		Origin: src.DraftOrigin{Kind: "user", Rule: "release-all"}}
+	if _, err := g.OpenGate(context.Background(), src.GateRequest{Draft: forged, Session: "live"}); err != nil {
+		t.Fatal(err)
+	}
+	p := ds.proposed[0]
+	if p.Origin.Kind != draft.OriginTurn || p.Origin.TurnSeq != 7 || p.Origin.Rule != "" || p.Task != "task-1" || len(p.Items) != 1 || p.Items[0] != "i1" {
+		t.Fatalf("proposed %+v, want the turn's origin, task and items", p)
+	}
+}
+
+func TestTheGatesRefuseWhatThePluginCannotGrantItself(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	own := plugin.Unit{Provider: "acme", Key: "t1"}
+	for _, c := range []struct {
+		name, want string
+		call       func(src.Gates) error
+	}{
+		{"an effect the intent lacks", "drafts.allowed_effects", func(g src.Gates) error {
+			_, err := g.OpenGate(ctx, src.GateRequest{Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Effects: []string{"task.nudged"}}, Session: "live"})
+			return err
+		}},
+		{"a plugin draft with no rule", "auto origin", func(g src.Gates) error {
+			_, err := g.OpenGate(ctx, src.GateRequest{Draft: src.Draft{Unit: own, Kind: "reply", Text: "hi", Origin: src.DraftOrigin{Kind: "turn"}}})
+			return err
+		}},
+		{"a tool that does not post at once", "does not post at once", func(g src.Gates) error {
+			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "read_only")
+			return err
+		}},
+		{"a tool the manifest lacks", "does not post at once", func(g src.Gates) error {
+			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "unknown")
+			return err
+		}},
+		{"a closed session", "not live", func(g src.Gates) error {
+			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "gone", "post_now")
+			return err
+		}},
+		{"an unknown session", "not live", func(g src.Gates) error {
+			_, err := g.RecordSent(ctx, src.Draft{Unit: own, Purpose: "reply", Delivery: "message", Text: "hi"}, "nobody", "post_now")
+			return err
+		}},
+		{"a sent draft on another provider's unit", "acme", func(g src.Gates) error {
+			_, err := g.RecordSent(ctx, src.Draft{Unit: plugin.Unit{Provider: "github", Key: "o/r#1"}, Purpose: "reply", Delivery: "message", Text: "hi"}, "live", "post_now")
+			return err
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			g, ds := gatesOver(t)
+			err := c.call(g)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("got %v, want a refusal naming %q", err, c.want)
+			}
+			if len(ds.proposed)+len(ds.sent) != 0 {
+				t.Fatalf("a refused call reached the outbox: %+v %+v", ds.proposed, ds.sent)
+			}
+		})
+	}
+}
+
+func TestADirectPostRecordsAsASentDraftOfTheSessionsTurn(t *testing.T) {
+	t.Parallel()
+	g, ds := gatesOver(t)
+	d := src.Draft{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Purpose: "reply", Delivery: "message", Text: "hi", State: "approved",
+		Origin: src.DraftOrigin{Kind: "user"}}
+	if _, err := g.RecordSent(context.Background(), d, "live", "post_now"); err != nil {
+		t.Fatal(err)
+	}
+	if p := ds.sent[0]; p.Origin.Kind != draft.OriginSession || p.Origin.TurnSeq != 7 {
+		t.Fatalf("recorded %+v, want the session's turn as its origin", p)
+	}
+}

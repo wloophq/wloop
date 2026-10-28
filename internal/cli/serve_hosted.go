@@ -19,6 +19,7 @@ import (
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/meter"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/profile"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -79,9 +80,16 @@ func (h *hostedLate) of(e *Env, id string, db *sqlite.DB, items psource.ItemLedg
 }
 
 // pluginAsk asks the configured agent for plugin id, in the plugin's own
-// agent directory.
+// agent directory, metered under the scope the request names.
 func (e *Env) pluginAsk(id string) func(ctx context.Context, req src.AskRequest) (src.AskResult, error) {
 	return func(ctx context.Context, req src.AskRequest) (src.AskResult, error) {
+		if e.meter != nil {
+			ctx = meter.WithRegistry(ctx, e.meter)
+		}
+		if req.MeterScope != "" {
+			// Never ended: the job that names the scope counts its own runs.
+			ctx, _ = meter.Start(ctx, req.MeterScope)
+		}
 		a, err := e.asker(e.currentConfig(), filepath.Join(e.StateDir, "plugins", id, "agent"))
 		if err != nil {
 			return src.AskResult{}, err

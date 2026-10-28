@@ -93,7 +93,7 @@ Write one, approve one with `a`, or from a terminal:
 {{command}} outbox approve <id>
 ```
 
-`slack send` posts as you after a confirmation. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook. To a channel, a person, or with `--thread=false` or `--broadcast`, it posts directly:
+`slack send` posts as you after a confirmation, through the running daemon. To a message ref or permalink it replies in the thread through the Outbox, as a draft of yours approved once you say yes (or at once with `--yes`), so the reply counts for the thread's items and shows in the Logbook. To a channel, a person, or with `--thread=false` or `--broadcast`, it posts directly:
 
 ```sh
 {{command}} slack send https://acme.slack.com/archives/C000/p1700000000000100 'On it.'

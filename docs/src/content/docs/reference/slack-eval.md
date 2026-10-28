@@ -14,7 +14,7 @@ Each fixture is one conversation as {{name}} stores it. A run puts each through 
 3. a **blind reader** writes the same briefing from the items alone;
 4. a **judge** compares the two briefings and gives a severity (`none`, `minor`, `major`, `critical`) and the causes of each gap (`missing_item`, `spurious_item`, `wrong_assignee`, `wrong_waiting_on`, `wrong_state`, `wrong_resolution`, `missing_link`, `vague_summary`, `missing_context`, `wrong_verdict`, `other`).
 
-The extractor runs on the fast tier; the oracle, the blind reader and the judge on the frontier tier. Every stage's answer is cached under the output directory by the key of its inputs, so a rerun pays only for what changed.
+Each command runs in the Slack plugin through the running daemon, which reads the plugin's store and asks its agent. The extractor runs on the fast tier; the oracle, the blind reader and the judge on the frontier tier. Every stage's answer is cached under the output directory by the key of its inputs, so a rerun pays only for what changed.
 
 ## Commands
 
@@ -35,7 +35,7 @@ The extractor runs on the fast tier; the oracle, the blind reader and the judge 
 
 A fixture is in the `dev` or the `holdout` split; `export` marks every fixture holdout. Change prompts from dev judgments only, so the holdout stays a measure.
 
-Per split, the score counts the fixtures, the share judged "same actions", the critical or major judgments, the recall of your actions, decisions and chases, contradictions, extras, the causes and the cost, and the extractor's own spend: its cost and its input, output, cache-read and cache-write tokens, in total and per conversation. Each stage file's `.key.json` keeps the call's cost and tokens. With `--bar <share>`, the run fails when there is no holdout, the holdout is incomplete, any holdout judgment is critical or major, or the holdout's "same actions" share is below the bar. `--bar` defaults to 0, which checks nothing.
+Per split, the score counts the fixtures, the share judged "same actions", the critical or major judgments, the recall of your actions, decisions and chases, contradictions, extras, the causes and the cost, and the extractor's own spend: its cost and the tokens the agent reports for a call, one total, in total and per conversation. Each stage file's `.key.json` keeps the call's cost and tokens. With `--bar <share>`, the run fails when there is no holdout, the holdout is incomplete, any holdout judgment is critical or major, or the holdout's "same actions" share is below the bar. `--bar` defaults to 0, which checks nothing.
 
 The shipped prompt is held to 0.8 on the holdout:
 
