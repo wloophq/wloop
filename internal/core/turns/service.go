@@ -48,6 +48,9 @@ type Service struct {
 	Prompts Prompts
 	// Items is nil when records' ledger ops are not applied.
 	Items Ledger
+	// Gates opens the gate an intent's record.missing names when a turn of it
+	// ends without the record it requires; nil opens none.
+	Gates Gates
 	// Results attaches a done record's outcome url to the turn's entry when
 	// its intent's record.attach_url says so; nil attaches nothing.
 	Results Results
@@ -75,6 +78,9 @@ type Service struct {
 	begun map[int64]unit.Unit
 	// unboundMCP holds the MCP initializes of handles no session took yet.
 	unboundMCP map[string]time.Time
+	// unrecorded are the turns that ended without a record since the last
+	// openMissing.
+	unrecorded []endedTurn
 }
 
 // Refusal is a request the turn's state or the caller's identity refuses.

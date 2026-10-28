@@ -81,7 +81,7 @@ func (s *Server) routes() []route {
 		{"POST " + api.TasksPath, s.handleCapture},
 		{"GET " + api.TaskDetail, s.handleTask},
 		{"POST " + api.TaskVerb, s.handleTaskVerb},
-		{"GET " + api.TimelinePath, owedBy("T1")},
+		{"GET " + api.TimelinePath, s.handleTimeline},
 		{"GET " + api.RunsPath, owedBy("U1")},
 		{"POST " + api.ChatPath, owedBy("U2")},
 		{"POST " + api.AttachPath, owedBy("U1")},

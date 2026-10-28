@@ -1,24 +1,189 @@
 {
  "type": "object",
  "additionalProperties": false,
- "required": ["unchanged", "goal", "context", "kind", "risk", "risk_why", "open_questions", "tags"],
+ "required": [
+  "unchanged",
+  "goal",
+  "context",
+  "kind",
+  "risk",
+  "risk_why",
+  "open_questions",
+  "tags"
+ ],
  "properties": {
-  "unchanged": {"type": "boolean"},
-  "goal": {"type": "string", "maxLength": 600},
-  "context": {"type": "string", "maxLength": 700},
-  "kind": {"type": "string", "enum": ["question", "request", "incident", "decision", "announcement"]},
-  "risk": {"type": "string", "enum": ["low", "medium", "high"]},
-  "risk_why": {"type": "string", "maxLength": 300},
-  "open_questions": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 200}},
+  "unchanged": {
+   "type": "boolean"
+  },
+  "goal": {
+   "type": "string",
+   "maxLength": 600
+  },
+  "context": {
+   "type": "string",
+   "maxLength": 700
+  },
+  "kind": {
+   "type": "string",
+   "enum": [
+    "question",
+    "request",
+    "incident",
+    "decision",
+    "announcement"
+   ]
+  },
+  "risk": {
+   "type": "string",
+   "enum": [
+    "low",
+    "medium",
+    "high"
+   ]
+  },
+  "risk_why": {
+   "type": "string",
+   "maxLength": 300
+  },
+  "open_questions": {
+   "type": "array",
+   "maxItems": 3,
+   "items": {
+    "type": "string",
+    "maxLength": 200
+   }
+  },
   "tags": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["domain", "audience", "concern"],
+   "required": [
+    "domain",
+    "audience",
+    "concern"
+   ],
    "properties": {
-    "domain": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 40}},
-    "audience": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["end-user", "internal", "developer", "operator"]}},
-    "concern": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["security", "privacy", "compliance", "performance", "data-loss", "concurrency", "backward-compat", "accessibility", "i18n", "cost", "reliability"]}}
+    "domain": {
+     "type": "array",
+     "maxItems": 3,
+     "items": {
+      "type": "string",
+      "maxLength": 40
+     }
+    },
+    "audience": {
+     "type": "array",
+     "maxItems": 3,
+     "items": {
+      "type": "string",
+      "enum": [
+       "end-user",
+       "internal",
+       "developer",
+       "operator"
+      ]
+     }
+    },
+    "concern": {
+     "type": "array",
+     "maxItems": 3,
+     "items": {
+      "type": "string",
+      "enum": [
+       "security",
+       "privacy",
+       "compliance",
+       "performance",
+       "data-loss",
+       "concurrency",
+       "backward-compat",
+       "accessibility",
+       "i18n",
+       "cost",
+       "reliability"
+      ]
+     }
+    }
    }
+  },
+  "asks": {
+   "type": "array",
+   "maxItems": 15,
+   "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "ref",
+     "ask",
+     "asker",
+     "ts",
+     "deadline",
+     "missing",
+     "said",
+     "quotes"
+    ],
+    "properties": {
+     "ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$",
+      "description": "The item's ref."
+     },
+     "ask": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "One line, phrased as the asker's question."
+     },
+     "asker": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Who asked."
+     },
+     "ts": {
+      "type": "string",
+      "pattern": "^([0-9]{9,11}\\.[0-9]{6})?$",
+      "description": "The message that asks."
+     },
+     "deadline": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "The implied deadline, or empty."
+     },
+     "missing": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "What the viewer lacks to answer, or empty."
+     },
+     "said": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "What the viewer already said, or empty."
+     },
+     "quotes": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "ts",
+        "text"
+       ],
+       "properties": {
+        "ts": {
+         "type": "string",
+         "pattern": "^[0-9]{9,11}\\.[0-9]{6}$"
+        },
+        "text": {
+         "type": "string",
+         "maxLength": 200
+        }
+       }
+      },
+      "description": "The source messages the ask relies on: each its ts and the words quoted."
+     }
+    }
+   },
+   "description": "One per open request or question of items that waits on the viewer, so the viewer can answer without opening the conversation; none for FYIs, thanks and cc's. At most five lines each."
   }
  }
 }

@@ -45,6 +45,12 @@ What a turn on a task produces is attached to it, when the turn's intent asks fo
 
 Each plugin says when one of its units has ended: a pull request merged or closed (`pr.ended`); a Slack unit with a closure posted or marked, or quiet for `plugins.slack.ended_after` (7 days) (`slack.ended`). The bundled workflow `task-results-ended` closes a task you captured, marking it done, once a turn ran on it, such as a start, and it has a unit and every one of them has ended (`task.captured_by_user && task.turns > 0 && task.link_ended`). A task you captured on a pull request to keep track of it, with no turn on the task itself, stays open. It never closes a task derived from items, which its items close.
 
+## The timeline and the records
+
+A task's timeline is its own events and those of the units it holds, every one kept forever, newest first: `GET /api/tasks/<id>/timeline` pages it by each event's `seq`, and its `kinds` parameter keeps the kinds asked for.
+
+A record is a typed note on a unit or a task, of a kind `records.toml` declares: the JSON schema under `records/` its data follows, who may write it, and the task properties its fields set. A unit keeps one record of each kind, the newest; the timeline shows it as a `record` event. The bundled kinds are `brief`, `report` and `decision`. A brief record sets the task's `risk` from its `risk` and the task's `effort` from its `size`, when its writer may write the property: `size` stays the attention you give the task. A task's brief is its own brief record, else the brief of the first unit it holds that has one, so a pull request task's brief is its pull request's.
+
 ## Start new work
 
 `{{command}} start --repo acme/api <brief>` captures the brief as a task (its first line is the title, the whole brief its notes), prints `entry:<id>`, then starts an agent session on it. `{{command}} start entry:<id>` starts one on a task you captured before, and the cockpit offers Start on such a task. Start runs only on a task you captured; a derived task is refused.

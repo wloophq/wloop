@@ -30,7 +30,8 @@ func Intents() *dintent.Registry {
 			Session: dintent.Session{Title: "act", CloseWhenDone: true}, Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}}},
 		{Name: "start", UserFacing: true, Answerable: true, Provider: "entry", Session: dintent.Session{Title: "start"},
 			Record: dintent.RecordRules{States: []string{"done", "asked", "failed"}, Outcome: []string{"url"},
-				OutcomeDoc: "`outcome` (done): `url`, the pull request you opened or the message you posted.", AttachURL: true}},
+				OutcomeDoc: "`outcome` (done): `url`, the pull request you opened or the message you posted.", AttachURL: true,
+				Requires: "report", Missing: "missing-record"}},
 		{Name: "brief", Builds: "brief", Prompt: "prompts/brief.md", Provider: "github", Providers: []unit.ProviderID{"github", "slack"}},
 	})
 }

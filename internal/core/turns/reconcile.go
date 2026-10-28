@@ -208,11 +208,15 @@ func (s *Service) closeTurn(ctx context.Context, ref unit.Unit, seen turn.Turn, 
 	b.Record(turn.Record{TurnSeq: t.Seq, Session: t.Session, Head: t.Head, Hash: hash, At: s.now(), Acked: true, Record: rec})
 	ev := s.event(ref, KindTurnEnded, t.ID+":"+short(hash), rec.EventData())
 	_, err = s.Store.Save(ctx, b, ev)
+	if err == nil {
+		s.ended(ref, *t, rec)
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return false, err
 	}
 	s.publish(ev)
+	s.openMissing(ctx)
 	return true, nil
 }
 

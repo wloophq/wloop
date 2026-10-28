@@ -148,6 +148,12 @@ type mRecord struct {
 	Missing         *string    `toml:"missing"`
 }
 
+// outcomes says whether the table holds a key of the turn's outcome, which
+// needs record.states.
+func (r *mRecord) outcomes() bool {
+	return r.When != nil || r.Artifacts != nil || r.Outcome != nil || r.Require != nil || r.AttachURL
+}
+
 // mGates is the [gates] table of a manifest: the approval of the gates its runs and drafts open.
 type mGates struct {
 	Approval *mApproval `toml:"approval"`

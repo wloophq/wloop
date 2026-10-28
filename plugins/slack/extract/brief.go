@@ -21,6 +21,66 @@ type wireBrief struct {
 	OpenQuestions []string            `json:"open_questions"`
 	Tags          map[string][]string `json:"tags"`
 	Extra         map[string]any      `json:"extra"`
+	Asks          []wireAsk           `json:"asks"`
+}
+
+// wireAsk is an ask the brief quotes, about the item of Ref, from the
+// message at TS.
+type wireAsk struct {
+	Ref      string `json:"ref"`
+	Ask      string `json:"ask"`
+	Asker    string `json:"asker"`
+	TS       string `json:"ts"`
+	Deadline string `json:"deadline"`
+	Missing  string `json:"missing"`
+	Said     string `json:"said"`
+	Quotes   []struct {
+		TS   string `json:"ts"`
+		Text string `json:"text"`
+	} `json:"quotes"`
+}
+
+// storedAsk is an ask as the brief record keeps it: Item is the item's id,
+// Permalink the asking message's, each quote's Ref the message it quotes.
+type storedAsk struct {
+	Item      string        `json:"item"`
+	Ask       string        `json:"ask"`
+	Asker     string        `json:"asker,omitempty"`
+	Permalink string        `json:"permalink,omitempty"`
+	Deadline  string        `json:"deadline,omitempty"`
+	Missing   string        `json:"missing,omitempty"`
+	Said      string        `json:"said,omitempty"`
+	Quotes    []storedQuote `json:"quotes,omitempty"`
+}
+
+type storedQuote struct {
+	Ref  string `json:"ref"`
+	Text string `json:"text"`
+}
+
+// askContext resolves an answer's asks: ids are the item ids of the
+// answer's refs, permalinks the window's messages' by ts.
+type askContext struct {
+	ids        map[string]string
+	permalinks map[string]string
+}
+
+// asks are w's asks as stored, each about an item of the answer or of the
+// ledger; an ask about neither is dropped.
+func (c askContext) asks(w []wireAsk) []storedAsk {
+	var out []storedAsk
+	for _, a := range w {
+		id, ok := c.ids[a.Ref]
+		if !ok {
+			continue
+		}
+		s := storedAsk{Item: id, Ask: a.Ask, Asker: a.Asker, Permalink: c.permalinks[a.TS], Deadline: a.Deadline, Missing: a.Missing, Said: a.Said}
+		for _, q := range a.Quotes {
+			s.Quotes = append(s.Quotes, storedQuote{Ref: q.TS, Text: q.Text})
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // Extra is the brief intent's extra fields as an extraction asks them: the
@@ -43,14 +103,16 @@ type storedBrief struct {
 	Tags          []string          `json:"tags"`
 	Extra         map[string]any    `json:"extra,omitempty"`
 	ExtraVersions map[string]string `json:"extra_versions,omitempty"`
+	Asks          []storedAsk       `json:"asks,omitempty"`
 }
 
 // briefJSON is the stored JSON of w, the answer for a unit whose brief in
 // use is prev: empty when the answer says nothing, or keeps prev and prev is
 // complete under x. A migrated goal-only brief, or one written before a
 // field of x, takes the answer's brief even when it is unchanged. An answer
-// without extras keeps prev's extras still at their version.
-func briefJSON(w wireBrief, x *Extra, prev string) (string, error) {
+// without extras keeps prev's extras still at their version. Its asks are
+// resolved under c.
+func briefJSON(w wireBrief, x *Extra, prev string, c askContext) (string, error) {
 	if w.Goal == "" || w.Unchanged && complete(prev, x) {
 		return "", nil
 	}
@@ -62,7 +124,7 @@ func briefJSON(w wireBrief, x *Extra, prev string) (string, error) {
 		tags = []string{}
 	}
 	sb := storedBrief{Goal: w.Goal, Context: w.Context, Kind: w.Kind, Risk: w.Risk, RiskWhy: w.RiskWhy,
-		OpenQuestions: w.OpenQuestions, Tags: tags}
+		OpenQuestions: w.OpenQuestions, Tags: tags, Asks: c.asks(w.Asks)}
 	switch {
 	case x == nil:
 	case len(w.Extra) > 0:

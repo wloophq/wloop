@@ -209,9 +209,6 @@ func decode(raw []byte, in Input) (Result, error) {
 		w.Brief.Extra = nil
 		r.ExtrasDropped++
 	}
-	if r.Brief, err = briefJSON(w.Brief, in.Extra, in.Brief); err != nil {
-		return Result{}, err
-	}
 	known := map[string]bool{}
 	for _, it := range in.Ledger {
 		known[it.ID] = true
@@ -261,6 +258,15 @@ func decode(raw []byte, in Input) (Result, error) {
 		}
 		r.Items = append(r.Items, it)
 	}
+	asks := askContext{ids: itemIDs(in, r), permalinks: map[string]string{}}
+	for _, m := range in.Messages {
+		if m.Permalink != "" {
+			asks.permalinks[m.TS] = m.Permalink
+		}
+	}
+	if r.Brief, err = briefJSON(w.Brief, in.Extra, in.Brief, asks); err != nil {
+		return Result{}, err
+	}
 	for i, s := range w.Segments {
 		prev := ""
 		if s.Ref != "new" {
@@ -276,7 +282,7 @@ func decode(raw []byte, in Input) (Result, error) {
 			s.Brief.Extra = nil
 			r.ExtrasDropped++
 		}
-		brief, err := briefJSON(s.Brief, in.Extra, prev)
+		brief, err := briefJSON(s.Brief, in.Extra, prev, asks)
 		if err != nil {
 			return Result{}, err
 		}

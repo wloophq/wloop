@@ -42,12 +42,11 @@ func TestASlackBriefGoesWithItsCursor(t *testing.T) {
 	run(5, "C2/2", old)
 	run(6, "C2/2", fresh)
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('slack', 'C2/2', 6, 6)`)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('slack', 'C2/2', 'domain', 'billing', 6)`)
 	exec(t, db, `INSERT INTO brief_runs (id, provider, unit_key, intent, trigger, version, attempt_of, started_at, outcome)
 		VALUES (7, 'github', 'acme/api#1', 'brief', 'wanted', 'v', '', ?, 'ok')`, old)
 
 	got := retainBriefs(t, db, at(retainNow.Add(-7*day)))
-	if got["unit_briefs"] != 1 || got["unit_tags"] != 1 {
+	if got["unit_briefs"] != 1 {
 		t.Errorf("retained %v", got)
 	}
 	if left := column(t, db, `SELECT id FROM brief_runs ORDER BY id`); !slices.Equal(left, []string{"2", "4", "7"}) {
@@ -71,7 +70,6 @@ func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
 			VALUES (?, 'github', 'acme/api#1', 'brief', ?, 'v', '', ?, 'ok', '{"goal":"g"}')`, id, trigger, old)
 	}
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key, run, last_run) VALUES ('github', 'acme/api#1', 1, 2)`)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', 'acme/api#1', 'domain', 'billing', 1)`)
 
 	if got := retainBriefs(t, db, at(retainNow.Add(-7*day))); len(got) != 0 {
 		t.Errorf("retained %v", got)
@@ -81,8 +79,5 @@ func TestACursorOfAPullRequestLeavesItsBriefs(t *testing.T) {
 	}
 	if left := column(t, db, `SELECT count(*) FROM unit_briefs`); !slices.Equal(left, []string{"1"}) {
 		t.Errorf("briefs left %q", left)
-	}
-	if left := column(t, db, `SELECT count(*) FROM unit_tags`); !slices.Equal(left, []string{"1"}) {
-		t.Errorf("tags left %q", left)
 	}
 }

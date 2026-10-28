@@ -73,7 +73,7 @@ doc     = "How much work the agent's brief estimates for the task."
 [props.risk]
 type    = "enum"
 values  = ["low", "medium", "high"]
-writers = ["person", "agent"]
+writers = ["person", "agent", "plugin"]
 doc     = "How much could go wrong doing the task."
 
 [props.owner]

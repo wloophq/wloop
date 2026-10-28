@@ -19,6 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/messages"
 	"github.com/wloophq/wloop/internal/core/port"
 	coretasks "github.com/wloophq/wloop/internal/core/tasks"
+	"github.com/wloophq/wloop/internal/core/timeline"
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/items"
@@ -689,10 +690,27 @@ func (ev *taskViewer) view(ctx context.Context, e task.Task) (api.TaskView, erro
 	if err := ev.project(ctx, e, &v); err != nil {
 		return api.TaskView{}, err
 	}
+	if err := ev.brief(ctx, e, &v); err != nil {
+		return api.TaskView{}, err
+	}
 	if err := ev.s.withDraft(whereBy(ctx, ev.whereBy), e, &v); err != nil {
 		return api.TaskView{}, err
 	}
 	return v, nil
+}
+
+// brief sets the task's brief record: its own, or the first of its units', as a pull request task's is
+// its pull request's.
+func (ev *taskViewer) brief(ctx context.Context, e task.Task, v *api.TaskView) error {
+	if ev.s.deps.TaskRecords == nil {
+		return nil
+	}
+	rec, ok, err := timeline.RecordOf(ctx, ev.s.deps.TaskRecords, builtin.BuildsBrief, e.ID, e.Units)
+	if err != nil || !ok {
+		return err
+	}
+	v.Brief = &api.RecordView{Kind: rec.Key, At: rec.At, Data: jsonData(rec.Data)}
+	return nil
 }
 
 // childrenOf sets the open children of a project, or of any task in a detail, from one read per page.

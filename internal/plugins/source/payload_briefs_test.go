@@ -202,7 +202,7 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 	changed, release := q.Changed(u)
 	defer release()
 	body := json.RawMessage(`{"goal":"Ship the export","kind":"request","risk":"low","tags":["domain:billing"]}`)
-	if err := stub.Host().PutBrief(ctx, src.Brief{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Task: "t-0123456789abcdef", Version: "x1", Body: body}); err != nil {
+	if err := stub.Host().PutBrief(ctx, src.Brief{Unit: plugin.Unit{Provider: "acme", Key: "t1"}, Version: "x1", Body: body}); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -223,10 +223,6 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 			t.Errorf("%s: kept", name)
 		}
 	}
-}
-
-func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
-	t.Skip("T1: review of X5b; PutBrief checks the task id's form, not that the task holds the unit, once the brief is the task's record")
 }
 
 // TestAFirstTurnAsksThePluginForItsBrief has the brief queue answer a

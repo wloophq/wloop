@@ -1,0 +1,24 @@
+# The record kinds a run, a person or a plugin writes on a task. Each
+# follows its JSON schema under records/; projects names the task
+# properties a record's fields set. A user profile's records.toml replaces
+# the keys it sets.
+
+# A preview of the task's work: a pull request's brief, or the asks of a
+# conversation's task.
+[records.brief]
+schema  = "records/brief.schema.json"
+writers = ["agent", "plugin", "person"]
+
+[records.brief.projects]
+risk = "risk"
+size = "effort"
+
+# What a run did, as its agent reports it.
+[records.report]
+schema  = "records/report.schema.json"
+writers = ["agent"]
+
+# A decision taken on the task, and why.
+[records.decision]
+schema  = "records/decision.schema.json"
+writers = ["person", "agent"]

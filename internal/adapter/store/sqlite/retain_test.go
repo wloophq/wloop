@@ -251,7 +251,6 @@ var prTables = map[string]string{
 	"pr_seen":       `SELECT count(*) FROM pr_seen WHERE owner = ? AND repo = ? AND number = ?`,
 	"unit_briefs":   `SELECT count(*) FROM unit_briefs WHERE provider = 'github' AND unit_key = ?`,
 	"brief_runs":    `SELECT count(*) FROM brief_runs WHERE provider = 'github' AND unit_key = ?`,
-	"unit_tags":     `SELECT count(*) FROM unit_tags WHERE provider = 'github' AND unit_key = ?`,
 	"events":        `SELECT count(*) FROM events WHERE provider = 'github' AND unit_key = ?`,
 	"overrides":     `SELECT count(*) FROM overrides WHERE provider = 'github' AND unit_key = ?`,
 	"round_state":   `SELECT count(*) FROM round_state WHERE provider = 'github' AND unit_key = ?`,
@@ -288,7 +287,6 @@ func seedPRRows(t *testing.T, db *DB, ref pr.Ref, seq int) {
 	exec(t, db, `INSERT INTO pr_seen (owner, repo, number, at) VALUES (?, ?, ?, ?)`, append(triple, when)...)
 	exec(t, db, `INSERT INTO unit_briefs (provider, unit_key) VALUES ('github', ?)`, u)
 	exec(t, db, `INSERT INTO brief_runs (provider, unit_key, trigger, version, attempt_of, started_at) VALUES ('github', ?, 'wanted', 'v1', 'h', ?)`, u, when)
-	exec(t, db, `INSERT INTO unit_tags (provider, unit_key, key, value, run) VALUES ('github', ?, 'change', 'fix', 1)`, u)
 	exec(t, db, `INSERT INTO events (provider, unit_key, kind, key, at) VALUES ('github', ?, 'review', 'r1', ?)`, u, when)
 	exec(t, db, `INSERT INTO overrides (provider, unit_key, hold) VALUES ('github', ?, 1)`, u)
 	exec(t, db, `INSERT INTO round_state (provider, unit_key, agent_home) VALUES ('github', ?, 'f')`, u)

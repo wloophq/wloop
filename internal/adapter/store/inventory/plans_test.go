@@ -63,7 +63,7 @@ var hotPlans = []hotPlan{
 	{name: "outages", query: outagesSQL, args: 1, want: []string{"events_kind (kind=? AND at>?)"}},
 	{name: "latest bundle", query: latestBundleSQL, args: 2, want: []string{"turn_instructions_kind (kind=? AND repo=?)"}},
 	{name: "open pull requests", query: listPRsSQL(true), want: []string{"pr_state (state=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR LAST 3 TERMS OF ORDER BY"}},
-	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"unit_tags_kv (key=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR ORDER BY"}},
+	{name: "tag vocabulary", query: tagVocabularySQL(2), args: 4, want: []string{"events_kind (kind=?)"}, tempSorts: []string{"USE TEMP B-TREE FOR GROUP BY", "USE TEMP B-TREE FOR ORDER BY"}},
 }
 
 var (

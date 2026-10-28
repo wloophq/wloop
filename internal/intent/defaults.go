@@ -240,8 +240,11 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	case r == nil && d.Builds == "":
 		s.add("record.states", "is required")
 	case r != nil:
-		if r.States == nil {
+		if r.States == nil && r.outcomes() {
 			s.add("record.states", "is required")
+		}
+		if r.Requires != nil && r.Missing == nil {
+			s.add("record.missing", "is required with record.requires: the gate a run that ends without its record opens")
 		}
 		d.Records = s.pred("record.when", r.When, "true")
 		d.Record = dintent.RecordRules{
@@ -251,6 +254,8 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 			OutcomeDoc:      r.OutcomeDoc,
 			HistoryArtifact: r.HistoryArtifact,
 			AttachURL:       r.AttachURL,
+			Requires:        str(r.Requires, ""),
+			Missing:         str(r.Missing, ""),
 		}
 		for i, q := range r.Require {
 			d.Record.Require = append(d.Record.Require, dintent.Require{

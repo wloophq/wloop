@@ -31,7 +31,7 @@ func endOK(r dinv.BriefRun, id int64) dinv.BriefRun {
 	r.Outcome, r.Model, r.CostUSD = "ok", "haiku", ptr(0.011)
 	r.Tokens = &usage.Tokens{Input: 1200, Output: 300, CacheRead: 9000, CacheWrite: 40}
 	r.DiffBytes, r.DiffCut = ptr(51200), true
-	r.Brief = `{"goal":"x"}`
+	r.Brief = `{"goal":"x","tags":["change:fix","area:store"]}`
 	r.Files, r.Tags, r.DroppedTags = []string{"a.go", "b.go"}, []string{"change:fix", "area:store"}, []string{"vibe:good"}
 	return r
 }
@@ -148,7 +148,7 @@ func TestAFailedRunKeepsTheBriefAndTags(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec, _, err := s.BriefRecord(ctx, ref)
-	if err != nil || rec.Brief != `{"goal":"x"}` || rec.Model != "haiku" || rec.Error != "timeout" || !rec.AttemptedAt.Equal(later.StartedAt) ||
+	if err != nil || rec.Brief != `{"goal":"x","tags":["change:fix","area:store"]}` || rec.Model != "haiku" || rec.Error != "timeout" || !rec.AttemptedAt.Equal(later.StartedAt) ||
 		rec.Failures != 2 || rec.AttemptOf != later.AttemptOf || rec.Run != good || rec.LastRun != bad {
 		t.Fatalf("record %+v %v", rec, err)
 	}
@@ -495,9 +495,8 @@ func TestEndBriefRunReusedIsOneTransaction(t *testing.T) {
 	if run.Brief != first.Brief || run.ReusedFrom != good || run.InputSHA != "sha1" || !slices.Equal(run.Tags, first.Tags) || run.CostUSD != nil {
 		t.Fatalf("run %+v", run)
 	}
-	var tagRuns int
-	if err := s.db.R().QueryRowContext(ctx, `SELECT COUNT(*) FROM unit_tags WHERE run = ?`, id).Scan(&tagRuns); err != nil || tagRuns != len(first.Tags) {
-		t.Fatalf("%d tags point at the reused run: %v", tagRuns, err)
+	if tags, err := s.Tags(ctx, ref); err != nil || !slices.Equal(tags, slices.Sorted(slices.Values(first.Tags))) {
+		t.Fatalf("the reused run's brief record has the tags %v: %v", tags, err)
 	}
 	if evs := eventsOf(t, s, dinv.KindBriefEnded); len(evs) != 2 || evs[1].Data != "reused" {
 		t.Fatalf("events %+v", evs)

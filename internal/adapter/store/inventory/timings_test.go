@@ -51,7 +51,7 @@ func TestTimingsReadsTheWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.EndBriefRun(ctx, dinv.BriefRun{ID: id, PR: ref, Trigger: "wanted", StartedAt: in, EndedAt: in.Add(13 * time.Second), Outcome: "ok", Tags: []string{"change:fix"}, Files: []string{"api/export.go"}}, dinv.BriefRecord{PR: ref}); err != nil {
+	if err := s.EndBriefRun(ctx, dinv.BriefRun{ID: id, PR: ref, Trigger: "wanted", StartedAt: in, EndedAt: in.Add(13 * time.Second), Outcome: "ok", Brief: `{"goal":"g"}`, Tags: []string{"change:fix"}, Files: []string{"api/export.go"}}, dinv.BriefRecord{PR: ref}); err != nil {
 		t.Fatal(err)
 	}
 

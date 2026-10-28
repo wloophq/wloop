@@ -89,3 +89,17 @@ status = "approved"
 [gates.review-diff.intents.dismiss]
 label = "Dismiss"
 status = "dismissed"
+
+# A run that ended without the record its intent requires.
+[gates.missing-record]
+kind = "question"
+label = "The run ended without its record"
+
+[gates.missing-record.intents.continue]
+label = "Continue"
+status = "answered"
+answer = true
+
+[gates.missing-record.intents.dismiss]
+label = "Dismiss"
+status = "dismissed"

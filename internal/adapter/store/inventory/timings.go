@@ -110,7 +110,7 @@ const activeIn = `provider = 'github' AND unit_key IN (` + activeRefsSQL + `)`
 
 // prTags are the tags of the pull requests active in the window.
 func (s *Store) prTags(ctx context.Context, at string) (map[github.Ref][]string, error) {
-	rows, err := s.db.R().QueryContext(ctx, `SELECT unit_key, key, value FROM unit_tags WHERE `+activeIn+` ORDER BY unit_key, key, value`, at)
+	rows, err := s.db.R().QueryContext(ctx, `SELECT unit_key, key, value FROM `+briefTagsSQL+` WHERE `+activeIn+` ORDER BY unit_key, key, value`, at)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *Store) timedIntakes(ctx context.Context, at string) ([]dinv.TimedIntake
 	return out, rows.Err()
 }
 
-const tagTalliesSQL = `SELECT key, value, count(*) FROM unit_tags WHERE ` + activeIn + `
+const tagTalliesSQL = `SELECT key, value, count(*) FROM ` + briefTagsSQL + ` WHERE ` + activeIn + `
 	GROUP BY key, value ORDER BY key, count(*) DESC, value`
 
 // tagTallies counts the tags of the pull requests active in the window.

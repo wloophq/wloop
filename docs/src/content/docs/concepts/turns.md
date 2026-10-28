@@ -39,6 +39,8 @@ Every turn ends with a record: its state, a one-line summary, the outcome (verdi
 
 The agent sends it with the `turn_end` tool of {{name}}'s MCP server, which the daemon serves at `http://127.0.0.1:<mcp.port>/mcp`. The daemon stores a record only for the turn it sent to, or that was started by, the calling session. A malformed record comes back with every problem listed, and the agent fixes it and calls again. A session without the tool writes the record to a file and runs `{{command}} turn end <url> --turn <id> --file <path>`.
 
+A run can owe more than its record: `record.requires` in an intent's manifest names a record kind of `records.toml` its run owes, and `record.missing` the gate of `gates.toml` a run that ends without one opens. A run that ends without a record, as when its session stops or goes away, opens that gate on its task, which you resolve to continue the run or dismiss. The bundled `start` requires a `report` and opens `missing-record`. An intent that sets no `record.requires` owes nothing more, and its `[record]` table needs `states` only when it sets one of `when`, `artifacts`, `outcome`, `require` or `attach_url`.
+
 ## The hooks
 
 `{{command}} install` adds three hooks to each Claude Code home:

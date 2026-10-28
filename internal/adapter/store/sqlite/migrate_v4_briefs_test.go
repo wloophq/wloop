@@ -87,9 +87,8 @@ func TestV4KeepsEveryPRBriefTagAndRun(t *testing.T) {
 		"github|acme/api#12|0||7|7||||",
 		"github|acme/web#3|3|b1-x h2 0001-01-01T00:00:00Z 0|0|9|w|r|g|too many",
 	})
-	sameRows(t, "unit_tags", tableRows(t, db, `SELECT * FROM unit_tags ORDER BY unit_key, key`), []string{
-		"github|acme/api#12|concern|perf|7",
-		"github|acme/api#12|domain|billing|7",
+	sameRows(t, "the brief records", tableRows(t, db, `SELECT provider, unit_key, key, data FROM events WHERE kind = 'record' ORDER BY unit_key`), []string{
+		`github|acme/api#12|brief|{"goal":"g","tags":["concern:perf","domain:billing"]}`,
 	})
 	sameRows(t, "brief_runs", tableRows(t, db, `SELECT id, provider, unit_key, intent, trigger, version, attempt_of, revision, input,
 		input_bytes, input_cut, outcome, error, brief, tags, input_sha FROM brief_runs ORDER BY id`), []string{

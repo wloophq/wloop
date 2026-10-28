@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/core/port"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
+	"github.com/wloophq/wloop/internal/intent/builtin"
 )
 
 const (
@@ -23,11 +25,14 @@ const (
 )
 
 // PutUnitBrief keeps body, a brief's JSON a source plugin wrote of u at
-// version, as the brief u uses: u's plugin run of at's day, updated in
-// place, or a new ok run.
+// version, as the brief u uses: u's brief record, and u's plugin run of at's
+// day, updated in place, or a new ok run.
 func (db *DB) PutUnitBrief(ctx context.Context, u unit.Unit, version, body string, at time.Time) error {
 	_, err := db.Write(ctx, func(tx *Tx) error {
 		tx.Touch(port.TopicBriefs, u)
+		if err := tx.PutRecord(ctx, u, builtin.BuildsBrief, string(task.WriterPlugin), body, at); err != nil {
+			return err
+		}
 		ts := formatTime(at)
 		var id int64
 		err := tx.QueryRowContext(ctx, pluginBriefRunSQL, string(u.Provider), u.Key, ts).Scan(&id)

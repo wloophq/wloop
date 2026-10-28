@@ -15,7 +15,7 @@ const (
 	RoleHeadless = "headless"
 )
 
-// BuildsBrief is what the brief intent builds.
+// BuildsBrief is what the brief intent builds, and the kind of the record, of records.toml, that a brief is.
 const BuildsBrief = "brief"
 
 // Builds are what a builder intent may build.
