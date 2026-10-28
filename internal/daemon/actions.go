@@ -297,10 +297,6 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := context.WithoutCancel(r.Context())
 	if g, ok := questionIntent(l, name); ok {
-		actor, ok := requestActor(w, r)
-		if !ok {
-			return
-		}
 		var out bytes.Buffer
 		if err := s.actOnGate(ctx, g, u, req, actor, &out); err != nil {
 			writeActionError(w, err)

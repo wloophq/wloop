@@ -432,8 +432,8 @@ func (s *Service) gate(ctx context.Context, ms []message.Message) error {
 }
 
 // gated is m with its gate open: the one it has while its task is open, else a new one on m's task, or on
-// its unit's open task, or on a capture task named after m's text when m is on no unit. A ledger proposal's message supersedes the gate its
-// proposal waited on before the message existed.
+// its unit's open task, or on a capture task named after m's text when m is on no unit. A ledger proposal's
+// message supersedes the gate its proposal waited on before the message existed.
 func (s *Service) gated(ctx context.Context, m message.Message) (message.Message, error) {
 	s.gating.Lock()
 	defer s.gating.Unlock()
