@@ -115,6 +115,12 @@ var actionTypes = []string{
 
 func testFile(file string) bool { return strings.HasSuffix(file, "_test.go") }
 
+// historicalMigration reports a store migration file, which keeps the words
+// the version it migrates from stored.
+func historicalMigration(file string) bool {
+	return strings.HasPrefix(file, "internal/adapter/store/sqlite/migrate_v")
+}
+
 // actionLiterals (R4) flags a non-empty composite literal of an action spec,
 // state or input spec in a non-test file outside internal/catalog. A zero
 // value is allowed. Mutating a state received from the catalog is not checked.
@@ -221,7 +227,7 @@ func builtinNames() map[string]bool {
 // builtinLiterals (R6) flags a string literal equal to a name of builtinNames
 // in a non-test file outside builtinTables.
 func builtinLiterals(fset *token.FileSet, file string, f *ast.File) []string {
-	if testFile(file) || slices.Contains(builtinTables, file) {
+	if testFile(file) || slices.Contains(builtinTables, file) || historicalMigration(file) {
 		return nil
 	}
 	names := builtinNames()
@@ -280,7 +286,8 @@ func TestOnlyTheCatalogEvaluatesIntentPredicates(t *testing.T) {
 }
 
 // TestBuiltinNamesLiveInTheirTables checks that builtin names appear only in
-// their table files.
+// their table files. A released migration keeps the words that version stored,
+// so migrate_v*.go files are history and exempt.
 func TestBuiltinNamesLiveInTheirTables(t *testing.T) {
 	t.Parallel()
 	for _, p := range packages(t) {

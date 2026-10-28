@@ -176,6 +176,7 @@ const g = "pr.round_sent is fine inside a sentence"
 var _ = builtin.Names
 `)
 	flagged(t, "daemon", builtinLiterals(fset, "internal/daemon/x.go", f), 4, "a builtin's name lives in its table")
+	flagged(t, "a migration", builtinLiterals(fset, "internal/adapter/store/sqlite/migrate_v7_gates.go", f), 0, "")
 	for _, file := range []string{"internal/intent/builtin/builtin.go", "internal/cli/builtins.go", "internal/daemon/builtins.go", "internal/daemon/x_test.go"} {
 		flagged(t, file, builtinLiterals(fset, file, f), 0, "")
 	}
