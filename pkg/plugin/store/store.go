@@ -52,7 +52,7 @@ func Open(ctx context.Context, dir string, opts Options) (*sql.DB, error) {
 		return nil, err
 	}
 	path := filepath.Join(dir, File)
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}

@@ -54,7 +54,6 @@ func TestASlackMessageRefTargetNamesItsThread(t *testing.T) {
 
 func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
 	te := newSlackTestEnv(t)
-	startSlackDaemon(t, te)
 	te.saveToken(t, fakeToken())
 	ctx := context.Background()
 	pdb := pluginStore(t, te.StateDir)
@@ -68,6 +67,10 @@ func TestASlackDirectMessageRefTargetNamesItsSegment(t *testing.T) {
 		t.Fatalf("segments %v %v", ps, err)
 	}
 	segs := []unit.Unit{{Provider: unit.ProviderID(ps[0].Provider), Key: ps[0].Key}}
+	if err := pdb.Close(); err != nil {
+		t.Fatal(err)
+	}
+	startSlackDaemon(t, te)
 	u, err := te.unitTarget(ctx, "D000/1700000050.000200")
 	if err != nil || u != segs[0] {
 		t.Fatalf("unitTarget = %+v, %v; want the segment %+v", u, err, segs[0])
