@@ -471,6 +471,9 @@ func (s *Server) startAction(ctx context.Context, i intake.Intake, out io.Writer
 	if err := json.Unmarshal(i.Request, &p); err != nil {
 		return fmt.Errorf("the request of intake %d: %w", i.Seq, err)
 	}
+	if _, ok := catalog.RowGateIntent(s.loaded(), p.Action); ok && i.Source == sourceSession {
+		return Refusal{Reason: p.Action + " resolves a gate as a person; an agent's session does not"}
+	}
 	line := startHeldRound
 	if d, ok := s.loaded().Registry.Get(dintent.Name(p.Action)); ok {
 		line = d.StartLine

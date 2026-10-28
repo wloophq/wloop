@@ -113,7 +113,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 	if err != nil {
 		return err
 	}
-	b, err := e.startBlockOf(ctx, u)
+	b, err := e.namedBlockOf(ctx, u, c.Block)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (a envActions) TrustAndRun(ctx context.Context, u unit.Unit, c daemon.Call)
 func (a envActions) Unblock(ctx context.Context, u unit.Unit, c daemon.Call) error {
 	ref := prOf(u)
 	e := a.call(c)
-	b, err := e.startBlockOf(ctx, u)
+	b, err := e.namedBlockOf(ctx, u, c.Block)
 	if err != nil {
 		return err
 	}
@@ -153,6 +153,43 @@ func (a envActions) Unblock(ctx context.Context, u unit.Unit, c daemon.Call) err
 	}
 	fmt.Fprintf(e.Out, "%s: the blocked round waits for a new trigger\n", ref)
 	return nil
+}
+
+// StartBlockKey names the start block holding u's round, the subject of
+// its trust gate.
+func (a envActions) StartBlockKey(ctx context.Context, u unit.Unit) (string, bool, error) {
+	if a.e.Rec == nil {
+		return "", false, errNoStore
+	}
+	blocks, err := a.e.Rec.FirstRoundBlocks(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	ev, ok := blocks[u]
+	if _, isBlock := inventory.StartBlockOf(ev); !ok || !isBlock {
+		return "", false, nil
+	}
+	return ev.Key, true, nil
+}
+
+// namedBlockOf is u's start block when it is the block named key, or any
+// when key is "": a trust gate decides only the block it was opened on.
+func (e *Env) namedBlockOf(ctx context.Context, u unit.Unit, key string) (inventory.StartBlock, error) {
+	if key == "" {
+		return e.startBlockOf(ctx, u)
+	}
+	if e.Rec == nil {
+		return inventory.StartBlock{}, errNoStore
+	}
+	blocks, err := e.Rec.FirstRoundBlocks(ctx)
+	if err != nil {
+		return inventory.StartBlock{}, err
+	}
+	ev, ok := blocks[u]
+	if !ok || ev.Key != key {
+		return inventory.StartBlock{}, daemon.Refusal{Reason: "the start block this decision was asked on was replaced; decide the round's current block"}
+	}
+	return e.startBlockOf(ctx, u)
 }
 
 func (e *Env) startBlockOf(ctx context.Context, u unit.Unit) (inventory.StartBlock, error) {

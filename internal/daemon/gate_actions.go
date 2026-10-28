@@ -57,7 +57,7 @@ func (s *Server) Unblock(ctx context.Context, g gate.Gate) error {
 	if s.deps.Actions == nil {
 		return errActionsUnavailable
 	}
-	return s.delegate(ctx, unblocks[g.Status == gate.Approved], g.Unit, Call{Out: io.Discard})
+	return s.delegate(ctx, unblocks[g.Status == gate.Approved], g.Unit, Call{Out: io.Discard, Block: g.Subject})
 }
 
 // openRowGate is u's open gate of kind k: for a plan gate, the one its
@@ -108,7 +108,14 @@ func (s *Server) actOnGate(ctx context.Context, g catalog.GateIntent, u unit.Uni
 	guidance := strings.TrimSpace(req.Guidance)
 	switch {
 	case !ok && g.Kind == gate.KindTrust && s.deps.Gates != nil:
-		if open, err = s.deps.Gates.Open(ctx, gate.Gate{Kind: gate.KindTrust, Unit: u}, holdForYou{}); err != nil {
+		key, blocked, err := s.blockKey(ctx, u)
+		if err != nil {
+			return err
+		}
+		if !blocked {
+			return conflict{msg: "no start block holds a round of " + u.Label()}
+		}
+		if open, err = s.deps.Gates.Open(ctx, gate.Gate{Kind: gate.KindTrust, Unit: u, Subject: key}, holdForYou{}); err != nil {
 			return err
 		}
 	case !ok || s.deps.Gates == nil:
@@ -140,6 +147,16 @@ func resolvedLine(g catalog.GateIntent, it workflow.Item, u unit.Unit) string {
 		return "skipped the pending " + what
 	}
 	return "sent the " + what + " round"
+}
+
+// blockKey names the start block holding u's round, when Actions read it;
+// with no reader, the unit's block is taken as it stands.
+func (s *Server) blockKey(ctx context.Context, u unit.Unit) (string, bool, error) {
+	r, ok := s.deps.Actions.(BlockReader)
+	if !ok {
+		return "", true, nil
+	}
+	return r.StartBlockKey(ctx, u)
 }
 
 // holdForYou holds a gate for a person: a start block's trust is the
@@ -205,8 +222,8 @@ func (s *Server) itemGate(ctx context.Context, it workflow.Item) (gate.Gate, boo
 }
 
 // resolveItemGate resolves g, the gate of a plan item, with the first intent
-// of the role the plan's action names, as a person.
-func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guidance string) error {
+// of the role the plan's action names, as by.
+func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guidance string, by task.Actor) error {
 	role := planRoles[action]
 	def, _ := s.loaded().Gates.Gate(g.Name)
 	i := slices.IndexFunc(def.Intents, func(in intentload.GateIntent) bool {
@@ -215,7 +232,7 @@ func (s *Server) resolveItemGate(ctx context.Context, g gate.Gate, action, guida
 	if i < 0 {
 		return conflict{msg: fmt.Sprintf("gate %s offers no intent that %s", g.Name, role)}
 	}
-	r := gates.Resolution{Intent: def.Intents[i].Name, By: task.ActorPerson}
+	r := gates.Resolution{Intent: def.Intents[i].Name, By: by}
 	if def.Intents[i].Answer {
 		r.Answer = guidance
 	}

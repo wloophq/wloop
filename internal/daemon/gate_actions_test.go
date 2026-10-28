@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/core/gates"
+	"github.com/wloophq/wloop/internal/core/gates/gatestest"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/gate"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
@@ -103,4 +106,105 @@ func TestTrustRunResolvesTheTrustGate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAnAgentSessionCannotApplyAGatedPlanItem(t *testing.T) {
+	t.Parallel()
+	r := newPlanRig(t)
+	r.sweep(t)
+	it := r.pending7(t)
+	g := r.planGate(t, it)
+	sess := r.items(t, r.sess, workflow.DecisionPending)[0]
+	for _, c := range []struct{ id, action string }{{it.ID, "apply"}, {it.ID, "guide"}, {it.ID, "dismiss"}, {sess.ID, "apply"}} {
+		body := fmt.Sprintf(`{"ids":[%q],"action":%q,"guidance":"look"}`, c.id, c.action)
+		if rec := postFrom(t, r.s, "term_1", api.Plan, body); rec.Code != http.StatusForbidden {
+			t.Fatalf("an agent session's %s on %s: %d %s", c.action, c.id, rec.Code, rec.Body)
+		}
+	}
+	if got, _ := r.gr.Get(context.Background(), g.ID); got.Status != gate.Open {
+		t.Fatalf("the agent's apply left the gate %+v", got)
+	}
+	if len(r.steps.Ran()) != 0 || len(r.items(t, u7, workflow.DecisionPending)) != 1 {
+		t.Fatalf("the agent's apply ran %+v", r.steps.Ran())
+	}
+	if run, ok := r.marked(t, it); ok {
+		t.Fatalf("the agent's dismiss marked %+v", run)
+	}
+}
+
+func TestAnAgentSessionCannotRunAHeldRound(t *testing.T) {
+	t.Parallel()
+	s := newServer(t)
+	fa := &fakeActions{}
+	s.deps.Actions = fa
+	holdByCap(t, s)
+	for _, name := range []string{"run_now", "guide", "skip", "trust_run", "unblock"} {
+		if rec := postFrom(t, s, "term_1", "/api/units/github/acme%2Fapi%237/"+name, `{"source":"cockpit","guidance":"x"}`); rec.Code != http.StatusForbidden {
+			t.Fatalf("an agent session's %s on a held round: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+	if len(fa.calls) != 0 {
+		t.Fatalf("calls %v", fa.calls)
+	}
+	if o, _ := s.store().Override(context.Background(), r7); o.NextGuidance != "" {
+		t.Fatalf("the agent kept guidance %q", o.NextGuidance)
+	}
+}
+
+func TestAWindowEndsAtItsDeadlineOnTheGatesTick(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		st := gatestest.NewStore(time.Now)
+		cons := &releases{}
+		svc := gates.New(gates.Deps{Store: st, Reader: st, Profile: profileGates{(&Server{}).loaded().Gates}, Clock: clockFunc(time.Now), Releaser: cons})
+		g, err := svc.Open(ctx, gate.Gate{Kind: gate.KindPlan, Unit: u7, Subject: "review-follow-up/github/acme%2Fapi%237/k"}, delayFor{45 * time.Second})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := &Server{deps: Deps{Gates: svc, Log: t.Logf}, draftClock: wallClock{}}
+		done := make(chan struct{})
+		go func() { defer close(done); s.tickGates(ctx) }()
+		defer func() { cancel(); <-done }()
+		time.Sleep(45*time.Second - time.Nanosecond)
+		synctest.Wait()
+		if got, _ := st.Get(ctx, g.ID); got.Status != gate.Open || len(cons.ids()) != 0 {
+			t.Fatalf("before its deadline the gate is %s, released %v", got.Status, cons.ids())
+		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait()
+		got, _ := st.Get(ctx, g.ID)
+		if got.Status != gate.Approved || got.Rule != gates.RuleWindow || !got.ClosedAt.Equal(g.Deadline) {
+			t.Fatalf("at its deadline the gate = %+v, want approved by its window at %s", got, g.Deadline)
+		}
+		if got := cons.ids(); !slices.Equal(got, []int64{g.ID}) {
+			t.Fatalf("released %v, want gate %d once", got, g.ID)
+		}
+	})
+}
+
+// delayFor opens a gate with a window of its duration.
+type delayFor struct{ window time.Duration }
+
+func (d delayFor) Decide(context.Context, gate.Gate) (gates.Decision, error) {
+	return gates.Decision{Mode: gate.ModeDelay, Window: d.window}, nil
+}
+
+// releases records the plan gates released, read by the test while the
+// tick runs.
+type releases struct {
+	mu  sync.Mutex
+	got []int64
+}
+
+func (r *releases) Release(_ context.Context, g gate.Gate) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.got = append(r.got, g.ID)
+	return nil
+}
+
+func (r *releases) ids() []int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.got)
 }

@@ -242,6 +242,7 @@ var (
 	_ daemon.Actions     = envActions{}
 	_ daemon.AheadReader = envActions{}
 	_ daemon.Unblocker   = envActions{}
+	_ daemon.BlockReader = envActions{}
 )
 
 func (a envActions) ReadAhead(ctx context.Context, u unit.Unit, full bool) context.Context {

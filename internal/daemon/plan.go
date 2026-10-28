@@ -15,6 +15,7 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/core/turns"
 	"github.com/wloophq/wloop/internal/domain/round"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -135,6 +136,14 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "guide needs guidance")
 		return
 	}
+	actor, ok := requestActor(w, r)
+	if !ok {
+		return
+	}
+	if actor != task.ActorPerson && req.Action != "pause" {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("%s decides a plan item as a person; an agent's session does not", req.Action))
+		return
+	}
 	ctx := context.WithoutCancel(r.Context())
 	if s.refuseUnitOf(w, func() (unit.Unit, bool) { return s.planUnit(ctx, p, req.IDs) }) {
 		return
@@ -142,7 +151,7 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 	res := api.PlanResponse{Items: []api.PlanItem{}, Errors: []string{}}
 	var acted []workflow.Item
 	for _, id := range req.IDs {
-		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance)
+		it, kept, err := s.actOnPlanItem(ctx, p, id, req.Action, req.Guidance, actor)
 		if err != nil {
 			res.Errors = append(res.Errors, id+": "+err.Error())
 		}
@@ -156,7 +165,7 @@ func (s *Server) handlePlanAct(w http.ResponseWriter, r *http.Request) {
 
 // actOnPlanItem acts on item id when it offers the action; kept is false
 // when no item is left to show.
-func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string) (_ workflow.Item, kept bool, _ error) {
+func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance string, by task.Actor) (_ workflow.Item, kept bool, _ error) {
 	items, err := p.Items(ctx, automation.Filter{ID: id})
 	if err != nil {
 		return workflow.Item{}, false, err
@@ -189,7 +198,7 @@ func (s *Server) actOnPlanItem(ctx context.Context, p Plan, id, action, guidance
 	if g, gated, err := s.itemGate(ctx, it); err != nil {
 		return it, true, err
 	} else if gated {
-		if err := s.resolveItemGate(ctx, g, action, guidance); err != nil {
+		if err := s.resolveItemGate(ctx, g, action, guidance, by); err != nil {
 			return it, true, err
 		}
 		left, err := p.Items(ctx, automation.Filter{ID: id})

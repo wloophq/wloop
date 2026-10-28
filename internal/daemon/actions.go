@@ -51,6 +51,12 @@ type Unblocker interface {
 	Unblock(ctx context.Context, u unit.Unit, c Call) error
 }
 
+// BlockReader is Actions that names the start block holding a unit's round:
+// the subject of the trust gate it waits on.
+type BlockReader interface {
+	StartBlockKey(ctx context.Context, u unit.Unit) (key string, ok bool, err error)
+}
+
 // unblocking calls do on Actions that lift a start block.
 func unblocking(do func(un Unblocker, ctx context.Context, u unit.Unit, c Call) error) func(a Actions, ctx context.Context, u unit.Unit, c Call) error {
 	return func(a Actions, ctx context.Context, u unit.Unit, c Call) error {
@@ -95,6 +101,10 @@ type Call struct {
 	// Manager and Parent are the request's: the workspace manager of the
 	// worktree the turn creates and the caller's worktree.
 	Manager, Parent string
+	// Block is the start block a trust gate names, which TrustAndRun and
+	// Unblock refuse to act past once another block replaced it; "" acts on
+	// the unit's block.
+	Block string
 }
 
 // AheadPreparer is Actions that readies, before an intent's round takes the
@@ -288,6 +298,16 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("action")
 	l := s.loaded()
+	actor := task.ActorPerson
+	if _, ok := catalog.RowGateIntent(l, name); ok {
+		if actor, ok = requestActor(w, r); !ok {
+			return
+		}
+		if actor != task.ActorPerson {
+			writeError(w, http.StatusForbidden, name+" resolves a gate as a person; an agent's session does not")
+			return
+		}
+	}
 	plugin := !isBuiltin(l, name) && !isIntent(l, name)
 	if plugin && !s.pluginActs(r.Context(), u, name) {
 		writeError(w, http.StatusNotFound, "no action "+strconv.Quote(name))
@@ -337,10 +357,6 @@ func (s *Server) runAction(w http.ResponseWriter, r *http.Request) {
 		}
 		u = row.Unit
 		if g, ok := catalog.RowGateIntent(l, name); ok && (!catalog.RunsHeld(l, name) || strings.HasPrefix(st.Basis, catalog.BasisPending)) {
-			actor, ok := requestActor(w, r)
-			if !ok {
-				return
-			}
 			var out bytes.Buffer
 			if err := s.actOnGate(ctx, g, u, req, actor, &out); err != nil {
 				writeActionError(w, err)

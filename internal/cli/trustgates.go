@@ -22,9 +22,9 @@ func (waitsForYou) Decide(context.Context, gate.Gate) (gates.Decision, error) {
 	return gates.Decision{Mode: gate.ModeWait}, nil
 }
 
-// syncTrustGates opens a trust gate on each unit a start block holds the
-// round of and that has none open, its subject the block, and supersedes
-// each open trust gate of a unit no block holds any more.
+// syncTrustGates opens a trust gate on each start block holding a unit's
+// round that has none open, its subject the block, and supersedes each open
+// trust gate whose block lifted or was replaced.
 func (e *Env) syncTrustGates(ctx context.Context) error {
 	if e.gates == nil || e.gateReader == nil || e.Rec == nil {
 		return nil
@@ -39,7 +39,7 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 	}
 	gated := map[unit.Unit]bool{}
 	for _, g := range open {
-		gated[g.Unit] = true
+		gated[g.Unit] = gated[g.Unit] || g.Subject == blocks[g.Unit].Key
 	}
 	blocked := map[unit.Unit]bool{}
 	var units []unit.Unit
@@ -62,7 +62,7 @@ func (e *Env) syncTrustGates(ctx context.Context) error {
 		}
 	}
 	for _, g := range open {
-		if blocked[g.Unit] {
+		if blocked[g.Unit] && g.Subject == blocks[g.Unit].Key {
 			continue
 		}
 		if err := e.gates.Supersede(ctx, g.ID, task.ActorWorkflow); err != nil && !errors.Is(err, gates.ErrResolved) {

@@ -234,6 +234,22 @@ func (s *Service) Tick(ctx context.Context, now time.Time) error {
 	return errors.Join(errs...)
 }
 
+// NextDeadline is the earliest Deadline of an open gate, zero when none
+// has one.
+func (s *Service) NextDeadline(ctx context.Context) (time.Time, error) {
+	open, err := s.d.Reader.Where(ctx, Query{})
+	if err != nil {
+		return time.Time{}, err
+	}
+	var next time.Time
+	for _, g := range open {
+		if !g.Deadline.IsZero() && (next.IsZero() || g.Deadline.Before(next)) {
+			next = g.Deadline
+		}
+	}
+	return next, nil
+}
+
 func (s *Service) resolve(ctx context.Context, id int64, r Resolution, now time.Time) (gate.Gate, error) {
 	g, err := s.d.Reader.Get(ctx, id)
 	if err != nil {
