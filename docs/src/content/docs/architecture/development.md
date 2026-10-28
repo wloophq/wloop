@@ -13,7 +13,10 @@ make vet-tags     # compile the contract and live tests without running them
 make fuzz         # fuzz the predicate compilers for 60 s each
 make test-brand   # the tests, built with a test product name (SHARD=<name> for one CI shard)
 make scan-brand   # check that nothing the program writes names the default product name
+make proto        # lint proto/ and regenerate the plugin protocol's Go code
 ```
+
+`make proto` runs `buf`, `protoc-gen-go` and `protoc-gen-go-grpc` through `go tool`, at the versions the `tool` directives of `go.mod` pin, so it needs no `protoc`. The generated code is committed, and CI fails when it drifts from `proto/`.
 
 ## Running your checkout
 

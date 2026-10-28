@@ -141,6 +141,7 @@ jobs:
         with:
           node-version: 24
       - run: go mod tidy
+      - run: make proto
       - run: make docs-ref
       - name: Check that the generated files are up to date
         run: git diff --exit-code

@@ -25,7 +25,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestGoNamesNoBundledProperty` | Go names no property of the bundled tasks.toml: the constants PropFocus, PropArea, PropContexts, PropDue, FocusOn and FocusOff of internal/domain/task/props.go go once the lists, the counters and the automatic star are the profile's. |
 | `TestGoNamesNoState` | Go reads a task's category and never names a state: no Go literal is converted to, assigned to or compared with a task.State or a task.Category outside internal/intent and the version 7 migration, but the Category constants and Categories of internal/domain/task/schema.go, which declare the closed set; and no SQL text under internal/adapter/store compares the state column with a state the bundled profile declares, nor inlines a category, which it binds as a parameter. |
 | `TestLoopCodeImportsNoPR` | Loop code is keyed by `unit.Unit` and imports the pull request domain only in allowlisted files. |
-| `TestManifestKeysAreInTheGrammar` | Every toml key the module decodes is a word of builtin.Grammar and that only internal/intent, internal/profile, internal/frontmatter and internal/config decode a profile file's or the configuration's TOML, so no key is read outside the table the loaders check, the schemas and the reference pages derive from. The configuration's keys are checked against the table by internal/config's TestEveryConfigKeyIsInTheGrammar. |
+| `TestManifestKeysAreInTheGrammar` | Every toml key the module decodes is a word of builtin.Grammar and that only internal/intent, internal/profile, internal/frontmatter and internal/config decode a profile file's or the configuration's TOML, so no key is read outside the table the loaders check, the schemas and the reference pages derive from. The configuration's keys are checked against the table by internal/config's TestEveryConfigKeyIsInTheGrammar. The plugin SDK under `pkg/plugin`, which reads a plugin's `plugin.toml`, is outside the rule. |
 | `TestMeterIsALeaf` | `internal/meter` imports only the standard library. |
 | `TestNoDraftKindComparisons` | Go names no draft kind, compares no draft's purpose with a value nor keys a table by it, and compares its delivery only in the publishers and the Outbox: a draft is what its proposer declares. |
 | `TestNoIntentEnumerations` | Go compares, switches on or lists no intent name outside allowlisted files. |
@@ -40,6 +40,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestOnlyTheCatalogEvaluatesIntentPredicates` | Only the loader and the catalog read an intent's predicates. |
 | `TestOnlyTheDraftStepProposes` | Only the draft.propose step, and the plugin proposers its allowlist names, build a draft.Origin of kind auto: every other draft comes from a person, a turn or an agent. |
 | `TestOnlyTheStoreTouchesSQL` | Only the sqlite package opens the database, and SQL text appears only under `internal/adapter/store`. |
+| `TestPluginWritesNothingToStdout` | No file of `pkg/plugin` or `plugins/` writes to stdout: go-plugin reads a plugin's handshake from it, so a plugin logs to stderr only. |
 | `TestProseIsEmbeddedOnlyFromProfiles` | Prose files are embedded only from `profiles/`, except the allowlisted ones. |
 | `TestProviderIdentityThroughAPluginPackageOnlyShrinks` | Code outside a provider's homes tells a pull request from another unit through the GitHub plugin's package only where pluginIdentityAllowlist lists it. |
 | `TestProviderIdsInStringsOutsideThePluginsOnlyShrink` | A plugin's id spelled inside a Go string outside its plugin (an SQL literal 'github', a config key "slack.enabled", a struct tag) appears only in the store's migrations, which hold data already written, and in the files of a counted allowlist that only shrinks. |
@@ -49,6 +50,7 @@ Each rule is a test in `internal/archtest`, with a self-test that plants a viola
 | `TestSpawningPackagesImportMeter` | A package that spawns a process imports the meter. |
 | `TestTheCoreNamesNoProvider` | The core spells no provider id, and that outside the core a provider id appears only in its plugin's packages, the vocabulary tables, the unit package and the composition root. |
 | `TestTheEngineImportsNoProvider` | The automation engine imports no provider's domain. |
+| `TestTheSDKImportsNoInternal` | No package under `pkg/`, tests included, imports a package under `internal/`: plugins built outside this module compile against it. |
 
 ## Allowlists
 

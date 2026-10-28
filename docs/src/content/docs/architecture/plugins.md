@@ -51,6 +51,18 @@ Test imports count too, except a plugin's own test fake: a core test builds its 
 
 `session`, `workspace` and `entry` are providers the core keeps for its own units. They have no plugin: their facts come from the turn registry and the workspace managers, through `internal/adapter/facts/session` and `internal/adapter/facts/workspace`.
 
+## The plugin protocol
+
+`pkg/plugin` is the SDK of plugins that run as their own processes, through `hashicorp/go-plugin` over gRPC; the daemon does not run any yet. It holds what every plugin shares, with its protocol under `proto/`:
+
+- the handshake and the protocol versions (`VersionedPlugins`, protocol 1), negotiated when the host starts a plugin;
+- the lifecycle every kind answers: `Health`, `Start`, `Stop`, and `Notify(units, topics)`, which tells a kind that host state it reads changed, each topic one of the names `plugin.Topic` declares (`rounds`, `gates`, `marks`, ...);
+- `Serve`, which serves one implementation per kind from one binary, the kind being go-plugin's plugin name;
+- the logger, which writes JSON lines to stderr for the host to relay; a plugin writes nothing to stdout, which carries the handshake (`TestPluginWritesNothingToStdout`);
+- the exit when the parent dies: the host passes its pid (`plugin.ParentEnv`), and a plugin polls its parent process id and exits once it differs, even when the host died before the plugin served, with no reattach.
+
+A plugin's directory holds a `plugin.toml` (`pkg/plugin/manifest`) with its `id`, the `kinds` its binary serves, the `protocol` it speaks, and one table per kind, which the kind's SDK package decodes. `pkg/plugin/plugintest` serves kinds in-process, for tests on either side. Nothing under `pkg/` imports `internal/` (`TestTheSDKImportsNoInternal`), and the host passes its product name through the environment (`plugin.BrandEnv`).
+
 ## Adding a source
 
 1. A package under `internal/adapter/source/<id>` with its codec, its `port.Source`, its store and its rows; its domain values under `internal/domain/<id>`; a client for the service if it needs one.
