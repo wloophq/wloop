@@ -292,6 +292,9 @@ func TestTheForwardIsTheHostsOwn(t *testing.T) {
 			t.Errorf("a forward a %s asked for: %v", actor, err)
 		}
 	}
+	if _, err := p.Action(context.Background(), src.ActionRequest{Unit: ref7.Unit(), Action: ActionForward, Args: args}); !errors.Is(err, src.ErrUnsupported) {
+		t.Errorf("a forward named as a unit's action: %v", err)
+	}
 }
 
 func TestTheCheckoutIsTheStoredHeadAndBase(t *testing.T) {

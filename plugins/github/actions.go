@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	sdk "github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 	"github.com/wloophq/wloop/plugins/github/api"
 )
@@ -21,7 +22,7 @@ const (
 	ActionBudget = "github.budget"
 	// ActionForward sends an api.Exchange, its args, with the plugin's
 	// credentials and answers the api.Answer. Only the host's own code
-	// calls it: a person's or an agent's request is refused.
+	// calls it, with no actor and no unit; any other request is refused.
 	ActionForward = "github.forward"
 )
 
@@ -54,7 +55,7 @@ func (p *Plugin) Action(ctx context.Context, req src.ActionRequest) (json.RawMes
 	case ActionBudget:
 		return json.Marshal(r.client.Budget())
 	case ActionForward:
-		if req.Actor != "" {
+		if req.Actor != "" || req.Unit != (sdk.Unit{}) {
 			return nil, fmt.Errorf("%w: %s is the host's own", src.ErrUnsupported, req.Action)
 		}
 		var x api.Exchange

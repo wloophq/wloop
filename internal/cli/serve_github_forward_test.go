@@ -44,7 +44,7 @@ func (s *forwardingStub) Action(_ context.Context, req src.ActionRequest) (json.
 		"body": []byte(`{"data":{"viewer":{"login":"ana"}}}`)})
 }
 
-func TestServeHandsGitHubsAPIClientToNoInProcessModule(t *testing.T) {
+func TestServesGitHubClientHoldsNoCredentialAndSendsThroughThePlugin(t *testing.T) {
 	te := newTestEnv(t, &fake.Manager{})
 	te.github = newGitHubClients()
 	te.plugins = []host.Plugin{{Manifest: bundledGitHubManifest(t), Dir: t.TempDir(), Binary: brand.PluginBinary(string(unit.GitHub)), Bundled: true}}

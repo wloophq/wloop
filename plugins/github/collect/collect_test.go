@@ -589,12 +589,14 @@ func TestSyncWorkspacesLinksWithoutAgentActivity(t *testing.T) {
 	if pa, _, _ := c.Store.PR(ctx, a.Ref); pa.Workspace.ID != "w1" || pa.Workspace.AgentStates != nil {
 		t.Fatalf("workspace not linked: %+v", pa.Workspace)
 	}
-	ws.edit(func(l *src.Listing) { l.Partial, l.Workspaces = true, nil })
+	ws.edit(func(l *src.Listing) {
+		l.Partial, l.Workspaces = true, localWorkspaces([]src.Workspace{{ID: "w2", Units: linkedTo(7)}})
+	})
 	if rep, err = c.Fast(ctx); err != nil || len(rep.Warnings) != 1 {
 		t.Fatalf("a partial listing: %+v %v", rep, err)
 	}
 	if pa, _, _ := c.Store.PR(ctx, a.Ref); pa.Workspace.ID != "w1" {
-		t.Fatalf("a partial listing unlinked the workspace: %+v", pa.Workspace)
+		t.Fatalf("a partial listing relinked the workspace: %+v", pa.Workspace)
 	}
 }
 
@@ -1143,6 +1145,10 @@ func TestTrackReadsAtOnce(t *testing.T) {
 	var low *api.BudgetError
 	if _, err := c.ReadOne(ctx, s.Ref); !errors.As(err, &low) || low.Limit.ResetAt.IsZero() {
 		t.Fatalf("a refused read keeps the budget error: %v", err)
+	}
+	f := &Follows{Store: c.Store, Read: c.ReadOne, Save: c.Save, Now: c.Now, Name: "loop"}
+	if _, err := f.ReadTrack(ctx, s.Ref); !errors.Is(err, src.ErrUnavailable) || errors.Is(err, src.ErrUnfit) {
+		t.Fatalf("a track refused for the budget: %v, want unavailable", err)
 	}
 }
 
