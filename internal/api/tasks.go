@@ -398,3 +398,13 @@ func (c ViewsCatalog) VerbOf(handler string) (string, bool) {
 	}
 	return "", false
 }
+
+// HandlerOf is the handler verb runs in c: its profile handler, else its own name, as the tasks service binds it.
+func (c ViewsCatalog) HandlerOf(verb string) string {
+	for _, v := range c.Verbs {
+		if v.Verb == verb {
+			return cmp.Or(v.Handler, v.Verb)
+		}
+	}
+	return verb
+}

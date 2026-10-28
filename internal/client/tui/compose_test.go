@@ -209,3 +209,21 @@ func TestADraftTaskOffersTheVerbsThatRunItsHandlers(t *testing.T) {
 		t.Fatalf("a profile with no approve handler and no own dismiss offers %+v", vs)
 	}
 }
+
+func TestADraftKeyRunsTheHandlerOfItsVerb(t *testing.T) {
+	m := viewsModel(t)
+	m.viewsCat.Verbs = []api.VerbSpec{{Verb: "approve", Handler: "approve"}, {Verb: "dismiss"},
+		{Verb: "edit", Handler: "retry"}, {Verb: "retry", Handler: "edit"}}
+	e := m.tasks["focus"][0]
+	d := api.Draft{ID: 4, Task: e.ID, Rev: 3, Kind: "reply", Purpose: "reply", Text: "Friday works", State: "failed",
+		Actions: []api.ActionState{{ID: "draft.edit", Enabled: true}, {ID: "draft.retry", Enabled: true}}}
+	m.pickedVerb(e, d, "edit", 0)
+	if p := m.prompt; p == nil || !p.confirm || !strings.Contains(p.label, "post again") || p.cmd.verb != "edit" || p.cmd.args["rev"] != "3" {
+		t.Fatalf("the verb whose handler is retry asked %+v", p)
+	}
+	m.prompt = nil
+	m.pickedVerb(e, d, "retry", 0)
+	if p := m.prompt; p == nil || p.confirm || p.action != "edit" || p.cmd.verb != "" && p.cmd.verb != "retry" {
+		t.Fatalf("the verb whose handler is edit asked %+v", p)
+	}
+}

@@ -15,11 +15,17 @@ import (
 // builtin.VerbHandlers.
 var draftHandlers = map[string]string{"draft.edit": "edit", "draft.retry": "retry"}
 
-// The handler of a draft's approval, and the kind's own dismiss, which binds by its name when no verb names it.
+// The handlers of a draft's verbs, names of builtin.VerbHandlers, and the kind's own dismiss, which binds by its
+// name when no verb names it.
 const (
 	handlerApprove = "approve"
+	handlerEdit    = "edit"
+	handlerRetry   = "retry"
 	ownDismiss     = "dismiss"
 )
+
+// draftVerbHandlers are the handlers a draft's verbs run.
+var draftVerbHandlers = []string{handlerApprove, ownDismiss, handlerRetry, handlerEdit}
 
 // draftOn is the draft of e's draft gate, nil when it has none.
 func draftOn(e api.TaskView) *api.Draft {
@@ -131,12 +137,12 @@ func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64
 	}
 	c := Command{Unit: taskUnit(de.ID), Label: taskLabel(e), Action: verb, task: de.ID, verb: verb}
 	target := draftTarget(de)
-	switch verb {
-	case "edit":
+	switch m.viewsCat.HandlerOf(verb) {
+	case handlerEdit:
 		return m.editPrompt(c, d, read)
-	case "dismiss":
+	case ownDismiss:
 		m.confirm(c, "discard the draft to "+target+"?", read)
-	case "retry":
+	case handlerRetry:
 		c.args = map[string]string{"rev": strconv.FormatInt(d.Rev, 10)}
 		m.confirm(c, "post again to "+target+"?", read)
 	default:

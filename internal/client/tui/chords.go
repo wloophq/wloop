@@ -310,7 +310,8 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	if !ok {
 		return Command{}, false
 	}
-	if d, ok := m.pickedDraft(); ok && m.detailOpen(e) && slices.Contains([]string{"approve", "dismiss", "retry", "edit"}, verb) {
+	handler := m.viewsCat.HandlerOf(verb)
+	if d, ok := m.pickedDraft(); ok && m.detailOpen(e) && slices.Contains(draftVerbHandlers, handler) {
 		return m.pickedVerb(e, d, verb, read)
 	}
 	if i := slices.IndexFunc(e.Verbs, func(v api.VerbState) bool { return v.Verb == verb }); i >= 0 && !e.Verbs[i].Enabled {
@@ -323,9 +324,9 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 	}
 	c := Command{Unit: taskUnit(e.ID), Label: taskLabel(e), Action: verb, task: e.ID, verb: verb}
 	switch {
-	case draftOn(e) != nil && (verb == "approve" || verb == "dismiss" || verb == "retry"):
+	case draftOn(e) != nil && (handler == handlerApprove || handler == ownDismiss || handler == handlerRetry):
 		return m.draftVerb(c, e, read)
-	case verb == "edit":
+	case handler == handlerEdit:
 		shown := m.shownDetail(e)
 		if draftOn(shown) == nil || !m.detailOpen(e) {
 			m.status = "open a draft, or pick one with its digit, to edit it"
@@ -363,7 +364,8 @@ func (m *Model) taskVerb(verb string, read uint64) (Command, bool) {
 // asks for a y too.
 func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool) {
 	target := draftTarget(e)
-	if c.verb == "dismiss" {
+	handler := m.viewsCat.HandlerOf(c.verb)
+	if handler == ownDismiss {
 		m.confirm(c, "discard the draft to "+target+"?", read)
 		return Command{}, false
 	}
@@ -377,7 +379,7 @@ func (m *Model) draftVerb(c Command, e api.TaskView, read uint64) (Command, bool
 		return Command{}, false
 	}
 	c.args = map[string]string{"rev": strconv.FormatInt(draftOn(shown).Rev, 10)}
-	if c.verb == "retry" {
+	if handler == handlerRetry {
 		m.confirm(c, "post again to "+target+"?", read)
 		return Command{}, false
 	}
