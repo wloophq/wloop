@@ -4,14 +4,14 @@ import "github.com/wloophq/wloop/internal/domain/gate"
 
 // gatesGrammar is the keys of gates.toml.
 var gatesGrammar = []Key{
-	{Path: "gates", In: SurfaceGates, Kind: KindMap, Doc: "The gates a profile names, by name."},
+	{Path: "gates", In: SurfaceGates, Kind: KindMap, Doc: "The gates a profile names, by name, in the order the file declares them, a user layer's new ones after the bundled."},
 	{Path: "gates.*", In: SurfaceGates, Kind: KindTable, Doc: "A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind."},
-	{Path: "gates.*.kind", In: SurfaceGates, Kind: KindEnum, Values: gateKindValues, Required: true, Doc: "What the gate decides, which names the consequence of resolving it. Required."},
+	{Path: "gates.*.kind", In: SurfaceGates, Kind: KindEnum, Values: gateKindValues, Required: true, Doc: "What the gate decides, which names the consequence of resolving it; required for a new gate."},
 	{Path: "gates.*.label", In: SurfaceGates, Kind: KindText, Doc: "What the gate asks of you, as clients list it."},
 	{Path: "gates.*.intents", In: SurfaceGates, Kind: KindMap, Doc: "What you may resolve the gate with, by intent, in the order clients offer them."},
 	{Path: "gates.*.intents.*", In: SurfaceGates, Kind: KindTable, Doc: "An intent, by its name."},
 	{Path: "gates.*.intents.*.label", In: SurfaceGates, Kind: KindText, Doc: "The name people read on its button."},
-	{Path: "gates.*.intents.*.status", In: SurfaceGates, Kind: KindEnum, Values: gateStatusValues, Required: true, Doc: "The status the intent resolves the gate to. Required."},
+	{Path: "gates.*.intents.*.status", In: SurfaceGates, Kind: KindEnum, Values: gateStatusValues, Required: true, Doc: "The status the intent resolves the gate to; required for a new intent."},
 	{Path: "gates.*.intents.*.answer", In: SurfaceGates, Kind: KindBool, Default: "false", Doc: "The intent takes text, such as a question's answer."},
 }
 

@@ -46,8 +46,9 @@ func ruleTrustedFacts(plants []trustPlant) []string {
 // intent's and a workflow's [drafts.approval], a workflow's [approval],
 // and the config's workflows.<name>.drafts.approval and
 // workflows.<name>.approval. The untrusted facts are the table's, the
-// brief's extra fields and a classification's output, so an agent or a
-// thread's text never releases a send or a run.
+// brief's extra fields, a classification's output and a task property an
+// agent or a plugin writes, so an agent or a thread's text never releases
+// a send or a run.
 func TestApprovalRulesReadTrustedFacts(t *testing.T) {
 	t.Parallel()
 	var plants []trustPlant
@@ -62,12 +63,15 @@ func TestApprovalRulesReadTrustedFacts(t *testing.T) {
 }
 
 // untrustedFacts are the untrusted facts of a workflow of slot, each with
-// a predicate that reads it, and a brief's extra field and a
-// classification's output.
+// a predicate that reads it, a brief's extra field, a classification's
+// output and, on a task, the bundled risk property, which an agent writes.
 func untrustedFacts(slot string) map[string]string {
 	out := map[string]string{
 		builtin.ExtraPrefix + "planted":    builtin.ExtraPrefix + "planted == true",
 		builtin.ClassifyPrefix + "planted": builtin.ClassifyPrefix + "planted == true",
+	}
+	if slot == builtin.TaskSlot {
+		out[builtin.PropPrefix+"risk"] = builtin.PropPrefix + `risk == "high"`
 	}
 	for name, typ := range builtin.WorkflowEnv(slot) {
 		if builtin.IsUntrusted(name) {

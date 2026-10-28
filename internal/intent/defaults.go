@@ -2,6 +2,7 @@ package intent
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -33,6 +34,9 @@ type sheet struct {
 	extras func(dunit.ProviderID) expr.Env
 	// defaults are the profile's defaults.toml.
 	defaults manifestDefaults
+	// taskFacts are the task.prop.* facts of tasks.toml, which a predicate
+	// over a task's facts reads.
+	taskFacts expr.Env
 }
 
 // pos is where path's value starts, else its nearest placed parent, else 1:1.
@@ -159,7 +163,11 @@ func (s *sheet) define(name dintent.Name, m manifest) dintent.Def {
 	if m.Drafts != nil {
 		d.AllowedEffects = orEmpty(m.Drafts.AllowedEffects, nil)
 		d.AttachPosts = m.Drafts.AttachPosts
-		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, builtin.ApprovalEnv(false, servedSlots(d)...))
+		env := builtin.ApprovalEnv(false, servedSlots(d)...)
+		if slices.Contains(servedSlots(d), builtin.TaskSlot) {
+			maps.Copy(env, s.taskFacts)
+		}
+		d.DraftApproval = s.draftApprovalAt("drafts.approval", m.Drafts.Approval, env)
 	}
 	s.workspace(&d, m.Workspace)
 	d.Board = builtin.BoardOf(d.Workspace)

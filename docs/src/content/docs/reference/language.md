@@ -220,8 +220,8 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `verbs.<name>.summary` (string): One line, what pressing it does: its tooltip. Required.
 - `verbs.<name>.offer` (predicate, default `true`): When a task offers the verb, over the task's own facts (task.id, task.kind, task.state, task.muted, task.unit, task.unit_provider); where it holds not, the verb is neither listed nor run.
 - `verbs.<name>.input` (string): The question a verb that asks for a value puts first (waiting, schedule, project, context, area, delegate, reply); required for those.
-- `verbs.<name>.from` (list of strings): The states the verb moves a task from; every state when absent.
-- `verbs.<name>.to` (string): The state the verb moves a task to; absent, the verb moves none.
+- `verbs.<name>.from` (list of strings): The states the verb moves a task from, each a state of states; every state when absent.
+- `verbs.<name>.to` (string): The state the verb moves a task to, a state of states; absent, the verb moves none.
 - `verbs.<name>.by` (table by name): Who may run the verb, by actor (person, workflow, agent, plugin); an actor left out may not.
 - `verbs.<name>.by.<name>` (string): A predicate over the task's facts that lets the actor run the verb where it holds, or "gate", which opens a proposal gate a person approves.
 - `verbs.<name>.gate` (string): The gate, of gates.toml, a by.&lt;actor&gt; of "gate" opens; required when one does.
@@ -239,19 +239,19 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
   - `reviewed`: Marks a parent task reviewed.
   - `sequential`: Switches a parent task's children between sequential and parallel.
 - `verbs.<name>.send` (one of `now`, `draft`, default `draft`): With reply: now sends the reply at once, draft proposes it in the Outbox.
-- `props` (table by name): The task properties, by name; each is the fact task.prop.&lt;name&gt;.
+- `props` (table by name): The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.&lt;name&gt;, typed from its type.
 - `props.<name>` (table): A property, by its name.
-- `props.<name>.type` (one of `string`, `string[]`, `int`, `enum`, `date`, `duration`, `actor`, `actor[]`): The property's type. Required.
-- `props.<name>.values` (list of strings): An enum's values, in order.
+- `props.<name>.type` (one of `string`, `string[]`, `int`, `enum`, `date`, `duration`, `actor`, `actor[]`): The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.
+- `props.<name>.values` (list of strings): An enum's values, in order; an enum without values takes any value.
 - `props.<name>.writers` (list of `person`, `workflow`, `agent`, `plugin`): Who may write the property; one an agent or a plugin may write is untrusted, so no approval rule reads it.
   - `person`: A person, through a client.
   - `workflow`: A profile workflow's step.
   - `agent`: An agent's turn; untrusted.
   - `plugin`: A source plugin; untrusted.
 - `props.<name>.doc` (string): What the property holds, for the facts' reference and the agents.
-- `states` (table by name): The states a task takes, by name, in the order clients list them.
+- `states` (table by name): The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.
 - `states.<name>` (table): A state, by its name.
-- `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it. Required.
+- `states.<name>.category` (one of `inbox`, `ready`, `active`, `waiting`, `deferred`, `done`, `dropped`): The state's category, which is all Go reads of it; required for a new state.
 - `states.<name>.label` (string): The name people read.
 - `owed_by` (table): Who owes a task's next step.
 - `owed_by.expr` (string): An expression over the task's facts whose value, me or a person's key, is task.owed_by.
@@ -280,9 +280,9 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 
 ## Gates (`gates.toml`)
 
-- `gates` (table by name): The gates a profile names, by name.
+- `gates` (table by name): The gates a profile names, by name, in the order the file declares them, a user layer's new ones after the bundled.
 - `gates.<name>` (table): A gate, by its name: the one a gate.open step, an intent's record.missing or a verb's gate opens; a gate the loop opens by kind takes the first of its kind.
-- `gates.<name>.kind` (one of `draft`, `plan`, `question`, `post`, `proposal`, `trust`, `step`): What the gate decides, which names the consequence of resolving it. Required.
+- `gates.<name>.kind` (one of `draft`, `plan`, `question`, `post`, `proposal`, `trust`, `step`): What the gate decides, which names the consequence of resolving it; required for a new gate.
   - `draft`: A draft to send: resolving it publishes the draft.
   - `plan`: A run the plan holds: resolving it releases the plan item.
   - `question`: An agent's question: resolving it delivers the answer to its session.
@@ -294,7 +294,7 @@ Every key a profile file or `config.toml` may set, with its kind, its values and
 - `gates.<name>.intents` (table by name): What you may resolve the gate with, by intent, in the order clients offer them.
 - `gates.<name>.intents.<name>` (table): An intent, by its name.
 - `gates.<name>.intents.<name>.label` (string): The name people read on its button.
-- `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to. Required.
+- `gates.<name>.intents.<name>.status` (one of `approved`, `rejected`, `answered`, `dismissed`, `superseded`): The status the intent resolves the gate to; required for a new intent.
 - `gates.<name>.intents.<name>.answer` (bool, default `false`): The intent takes text, such as a question's answer.
 
 ## Record kinds (`records.toml`)

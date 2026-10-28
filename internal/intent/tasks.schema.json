@@ -49,7 +49,7 @@
             "type": "string"
           },
           "type": {
-            "description": "The property's type. Required.",
+            "description": "The property's type; required for a new property. An int or a duration of 0 means unset: a value of 0 is refused.",
             "enum": [
               "string",
               "string[]",
@@ -63,7 +63,7 @@
             "type": "string"
           },
           "values": {
-            "description": "An enum's values, in order.",
+            "description": "An enum's values, in order; an enum without values takes any value.",
             "items": {
               "type": "string"
             },
@@ -88,7 +88,7 @@
         ],
         "type": "object"
       },
-      "description": "The task properties, by name; each is the fact task.prop.<name>.",
+      "description": "The task properties, by name, in the order the file declares them, a user layer's new ones after the bundled; each is the fact task.prop.<name>, typed from its type.",
       "type": "object"
     },
     "stale_waiting_days": {
@@ -101,7 +101,7 @@
         "description": "A state, by its name.",
         "properties": {
           "category": {
-            "description": "The state's category, which is all Go reads of it. Required.",
+            "description": "The state's category, which is all Go reads of it; required for a new state.",
             "enum": [
               "inbox",
               "ready",
@@ -123,7 +123,7 @@
         ],
         "type": "object"
       },
-      "description": "The states a task takes, by name, in the order clients list them.",
+      "description": "The states a task takes, by name, in the order the file declares them, a user layer's new ones after the bundled; clients list them in this order, and a task proposed in a category takes the first state of it.",
       "type": "object"
     },
     "verbs": {
@@ -140,7 +140,7 @@
             "type": "object"
           },
           "from": {
-            "description": "The states the verb moves a task from; every state when absent.",
+            "description": "The states the verb moves a task from, each a state of states; every state when absent.",
             "items": {
               "type": "string"
             },
@@ -195,7 +195,7 @@
             "type": "string"
           },
           "to": {
-            "description": "The state the verb moves a task to; absent, the verb moves none.",
+            "description": "The state the verb moves a task to, a state of states; absent, the verb moves none.",
             "type": "string"
           }
         },

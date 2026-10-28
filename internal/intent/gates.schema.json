@@ -23,7 +23,7 @@
                   "type": "string"
                 },
                 "status": {
-                  "description": "The status the intent resolves the gate to. Required.",
+                  "description": "The status the intent resolves the gate to; required for a new intent.",
                   "enum": [
                     "approved",
                     "rejected",
@@ -43,7 +43,7 @@
             "type": "object"
           },
           "kind": {
-            "description": "What the gate decides, which names the consequence of resolving it. Required.",
+            "description": "What the gate decides, which names the consequence of resolving it; required for a new gate.",
             "enum": [
               "draft",
               "plan",
@@ -65,7 +65,7 @@
         ],
         "type": "object"
       },
-      "description": "The gates a profile names, by name.",
+      "description": "The gates a profile names, by name, in the order the file declares them, a user layer's new ones after the bundled.",
       "type": "object"
     }
   },

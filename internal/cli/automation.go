@@ -128,7 +128,7 @@ func (e *Env) assemble(d engineDeps) *automation.Engine {
 	workflows := func() []workflow.Workflow {
 		cfg, _ := e.loadConfig()
 		l := e.loadedIntents()
-		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l.Registry))
+		return applyConfigWith(l.Workflows, cfg, briefExtrasOf(l))
 	}
 	units.classified = &classifiedUnits{c: steps.classify, workflows: workflows}
 	if d.DB != nil {
@@ -227,7 +227,7 @@ func applyConfigWith(ws []workflow.Workflow, cfg config.Config, extras func(unit
 // which stop the workflow, and its drafts.approval over each block it may
 // overlay, which holds every draft of it.
 func configWorkflowProblems(cfg config.Config, l *intentload.Loaded) []error {
-	extras := briefExtrasOf(l.Registry)
+	extras := briefExtrasOf(l)
 	var out []error
 	for _, w := range l.Workflows {
 		wc, ok := cfg.Workflows[w.Name]
@@ -324,12 +324,17 @@ func overlay(a config.ApprovalConfig) intentload.ApprovalOverlay {
 	return o
 }
 
-// briefExtrasOf are the brief.extra.* facts of each provider's brief intent
-// in reg.
-func briefExtrasOf(reg *dintent.Registry) func(unit.ProviderID) expr.Env {
+// briefExtrasOf are the facts l's profile declares for each provider's
+// units: the brief.extra.* facts of its brief intent and, of a task, the
+// task.prop.* facts of tasks.toml.
+func briefExtrasOf(l *intentload.Loaded) func(unit.ProviderID) expr.Env {
 	return func(p unit.ProviderID) expr.Env {
-		d, _ := reg.Builder(builtin.BuildsBrief, p)
-		return builtin.ExtraFacts(d.Extra)
+		d, _ := l.Registry.Builder(builtin.BuildsBrief, p)
+		env := builtin.ExtraFacts(d.Extra)
+		if builtin.Slots[p] == builtin.TaskSlot {
+			maps.Copy(env, l.Tasks.Facts())
+		}
+		return env
 	}
 }
 

@@ -320,7 +320,7 @@ func (s *sheet) defineWorkflow(name string, m wManifest, turnProblem func(intent
 	s.defineMarks(&w, m.Marks, slot)
 	s.defineApproval(&w, m.Approval, slot)
 	if d := m.Drafts; d != nil {
-		w.DraftApproval = s.draftApprovalAt("drafts.approval", d.Approval, builtin.ApprovalEnv(true, slot))
+		w.DraftApproval = s.draftApprovalAt("drafts.approval", d.Approval, s.withExtras(builtin.ApprovalEnv(true, slot), w.Provider, slot))
 		s.defineWithdraw(&w, d.Withdraw, slot)
 	}
 	s.turnBudget(w, m.Limits)

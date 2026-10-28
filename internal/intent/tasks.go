@@ -1,16 +1,26 @@
 package intent
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"maps"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/wloophq/wloop/internal/domain/duration"
+	"github.com/wloophq/wloop/internal/domain/items"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
+	"github.com/wloophq/wloop/internal/profile"
 )
 
-// TasksFile is the profile file that words the verbs a task offers.
+// TasksFile is the profile file that declares the task properties and
+// states and words the verbs a task offers.
 const TasksFile = "tasks.toml"
 
 // VerbText is a verb's words: Input is the question a verb that asks for
@@ -18,6 +28,222 @@ const TasksFile = "tasks.toml"
 type VerbText struct {
 	Label, Summary, Input string
 	Offer                 workflow.Predicate
+}
+
+// TasksDef is the profile's tasks.toml over every layer. Props and States
+// keep their declared order: the bundled entries in the order the bundled
+// file declares them, then each user layer's new entries in its own order;
+// a layer that sets an entry declared below it changes it in place.
+//
+// A zero task.Value unsets a property, so an int or a duration property
+// holds no 0: 0 means unset, and Parse refuses it.
+type TasksDef struct {
+	Props            []PropDef
+	States           []StateDef
+	Verbs            map[string]VerbText
+	OwedBy           string
+	Areas, Contexts  []string
+	StaleWaitingDays int
+}
+
+// PropDef is a task property: the fact task.prop.<Name>. Values are an
+// enum's; an enum without values takes any value.
+type PropDef struct {
+	Name    string
+	Type    task.PropType
+	Values  []string
+	Writers []task.Writer
+	Doc     string
+}
+
+// Untrusted says whether an agent or a plugin may write p, so no approval
+// rule that releases reads it.
+func (p PropDef) Untrusted() bool {
+	return slices.ContainsFunc(p.Writers, func(w task.Writer) bool { return !w.Trusted() })
+}
+
+// StateDef is a state a task takes and its category, which is all Go reads
+// of it.
+type StateDef struct {
+	Name     string
+	Category task.Category
+	Label    string
+}
+
+// Prop is the property name declares.
+func (d TasksDef) Prop(name string) (PropDef, bool) {
+	i := slices.IndexFunc(d.Props, func(p PropDef) bool { return p.Name == name })
+	if i < 0 {
+		return PropDef{}, false
+	}
+	return d.Props[i], true
+}
+
+// CategoryOf is the category of state; false when the profile declares no
+// such state.
+func (d TasksDef) CategoryOf(state string) (task.Category, bool) {
+	i := slices.IndexFunc(d.States, func(s StateDef) bool { return s.Name == state })
+	if i < 0 {
+		return "", false
+	}
+	return d.States[i].Category, true
+}
+
+// FirstOf is the first state of category c in the profile's order, which a
+// task proposed in c takes; "" when no state is of c.
+func (d TasksDef) FirstOf(c task.Category) string {
+	for _, s := range d.States {
+		if s.Category == c {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+// Untrusted says whether no approval rule that releases may read the
+// property name: an agent or a plugin writes it, or the profile declares
+// no such property.
+func (d TasksDef) Untrusted(name string) bool {
+	p, ok := d.Prop(name)
+	return !ok || p.Untrusted()
+}
+
+// Facts are the task.prop.<name> facts of the declared properties, typed
+// from their types, an enum's closed to its values and an untrusted one
+// marked so; and task.state closed to the declared states.
+func (d TasksDef) Facts() expr.Env {
+	env := expr.Env{}
+	for _, p := range d.Props {
+		name := builtin.PropPrefix + p.Name
+		env[name] = builtin.PropFactType(p.Type)
+		if p.Type == task.PropEnum && len(p.Values) > 0 {
+			env.SetEnum(name, p.Values)
+		}
+		if p.Untrusted() {
+			env.SetUntrusted(name)
+		}
+	}
+	states := make([]string, len(d.States))
+	for i, s := range d.States {
+		states[i] = s.Name
+	}
+	env.SetEnum(taskStateFact, states)
+	return env
+}
+
+const taskStateFact = "task.state"
+
+// errZeroUnsets refuses a 0 for an int or a duration property.
+var errZeroUnsets = errors.New("0 unsets the property: an int or a duration property holds no 0")
+
+// Parse reads text as the value of the property name, by its type: a
+// string as is; an enum one of its values; a date YYYY-MM-DD (midnight
+// UTC) or RFC 3339; a duration as the profile writes them (90m, 2d); an
+// int in decimal; an actor a person's key, provider:id; a list type its
+// items comma-separated. Empty text is the zero Value, which unsets the
+// property, and so is 0: Parse refuses 0 for an int or a duration.
+func (d TasksDef) Parse(name, text string) (task.Value, error) {
+	p, ok := d.Prop(name)
+	if !ok {
+		return task.Value{}, fmt.Errorf("%s names no property of %s%s", name, TasksFile, expr.DidYouMean(name, d.propNames()))
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return task.Value{}, nil
+	}
+	switch p.Type {
+	case task.PropEnum:
+		if len(p.Values) > 0 && !slices.Contains(p.Values, text) {
+			return task.Value{}, fmt.Errorf("%s is %q, not one of %s", name, text, strings.Join(p.Values, ", "))
+		}
+		return task.Value{Text: text}, nil
+	case task.PropInt:
+		n, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			return task.Value{}, fmt.Errorf("%s is an int, not %q", name, text)
+		}
+		if n == 0 {
+			return task.Value{}, fmt.Errorf("%s: %w", name, errZeroUnsets)
+		}
+		return task.Value{Int: n}, nil
+	case task.PropDate:
+		if t, err := time.Parse(time.DateOnly, text); err == nil {
+			return task.Value{Time: t}, nil
+		}
+		t, err := time.Parse(time.RFC3339, text)
+		if err != nil {
+			return task.Value{}, fmt.Errorf("%s is a date, YYYY-MM-DD or RFC 3339, not %q", name, text)
+		}
+		return task.Value{Time: t}, nil
+	case task.PropDuration:
+		if zeroDuration(text) {
+			return task.Value{}, fmt.Errorf("%s: %w", name, errZeroUnsets)
+		}
+		v, err := duration.Parse(text)
+		if err != nil {
+			return task.Value{}, fmt.Errorf("%s is a duration such as 90m or 2d, not %q", name, text)
+		}
+		return task.Value{Dur: v}, nil
+	case task.PropActor:
+		a, err := actorOf(name, text)
+		if err != nil {
+			return task.Value{}, err
+		}
+		return task.Value{Actors: []items.Person{a}}, nil
+	case task.PropActors:
+		var out []items.Person
+		for _, k := range splitList(text) {
+			a, err := actorOf(name, k)
+			if err != nil {
+				return task.Value{}, err
+			}
+			out = append(out, a)
+		}
+		return task.Value{Actors: out}, nil
+	case task.PropStrings:
+		return task.Value{List: splitList(text)}, nil
+	}
+	return task.Value{Text: text}, nil
+}
+
+// zeroDuration says whether text is a duration of 0, which duration.Parse
+// refuses for not being positive.
+func zeroDuration(text string) bool {
+	if n, ok := strings.CutSuffix(text, "d"); ok {
+		v, err := strconv.ParseFloat(n, 64)
+		return err == nil && v == 0
+	}
+	if v, err := strconv.ParseFloat(text, 64); err == nil {
+		return v == 0
+	}
+	v, err := time.ParseDuration(text)
+	return err == nil && v == 0
+}
+
+func (d TasksDef) propNames() []string {
+	out := make([]string, len(d.Props))
+	for i, p := range d.Props {
+		out[i] = p.Name
+	}
+	return out
+}
+
+func actorOf(name, key string) (items.Person, error) {
+	provider, id, ok := strings.Cut(key, ":")
+	if !ok || provider == "" || id == "" || strings.ContainsAny(key, " \t") {
+		return items.Person{}, fmt.Errorf("%s is a person's key, provider:id such as slack:U0123, not %q", name, key)
+	}
+	return items.Person{Key: key}, nil
+}
+
+func splitList(text string) []string {
+	var out []string
+	for _, s := range strings.Split(text, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 type mTasks struct {
@@ -64,55 +290,287 @@ type mChat struct {
 	Intent *string `toml:"intent"`
 }
 
-// mergeTasks lays the verbs of file over out.
-func mergeTasks(out ListTexts, file string, src []byte) Problems {
+// ref is a name a file's key holds, checked once every layer is read.
+type ref struct {
+	s          *sheet
+	path, name string
+}
+
+// tasksLoad is tasks.toml on its way to a TasksDef over the layers. The
+// checks that need every layer's properties, states or gates wait in
+// states, gates and preds, by path.
+type tasksLoad struct {
+	def    TasksDef
+	states map[string]ref
+	gates  map[string]ref
+	preds  map[string]ref
+}
+
+// BundledTasks is the bundled profile's tasks.toml alone.
+func BundledTasks(bundled fs.FS) (TasksDef, Problems) {
+	return loadTasks(nil, bundled, nil)
+}
+
+// loadTasks reads tasks.toml from bundled and the user's layers: a higher
+// layer's key replaces a lower one's. A verb's to and from name declared
+// states, its by keys actors, its gate one gates declares (nil gates checks
+// none), and its by predicates compile over the task's facts.
+func loadTasks(layers []profile.Layer, bundled fs.FS, gates *GatesDef) (TasksDef, Problems) {
+	l := &tasksLoad{def: TasksDef{Verbs: map[string]VerbText{}}, states: map[string]ref{}, gates: map[string]ref{}, preds: map[string]ref{}}
+	problems, read := readLayered(layers, bundled, TasksFile, l.merge)
+	if !read {
+		return l.def, problems
+	}
+	problems = append(problems, missingVerbs(l.def.Verbs)...)
+	return l.def, append(problems, l.check(gates)...)
+}
+
+// merge lays file over the definition so far.
+func (l *tasksLoad) merge(file string, src []byte) Problems {
 	m, problems, _, complete := decode[mTasks](file, src)
 	if !complete {
 		return problems
 	}
 	s := &sheet{file: file, at: positions(src), problems: problems}
-	for _, id := range slices.Sorted(maps.Keys(m.Verbs)) {
-		if !slices.Contains(builtin.TaskVerbs, id) {
-			s.add("verbs."+id, "names no verb%s", expr.DidYouMean(id, builtin.TaskVerbs))
-			continue
+	l.mergeProps(s, m.Props)
+	l.mergeStates(s, m.States)
+	l.mergeVerbs(s, m.Verbs)
+	if m.OwedBy != nil {
+		text(s, "owed_by.expr", m.OwedBy.Expr, &l.def.OwedBy)
+	}
+	if m.Areas != nil {
+		l.def.Areas = slices.Clone(m.Areas)
+	}
+	if m.Contexts != nil {
+		l.def.Contexts = slices.Clone(m.Contexts)
+	}
+	if n := m.StaleWaitingDays; n != nil {
+		if *n < 0 {
+			s.add("stale_waiting_days", "must be 0 or more")
+		} else {
+			l.def.StaleWaitingDays = *n
 		}
-		w, t := out.Verbs[id], m.Verbs[id]
-		text(s, "verbs."+id+".label", t.Label, &w.Label)
-		text(s, "verbs."+id+".summary", t.Summary, &w.Summary)
-		text(s, "verbs."+id+".input", t.Input, &w.Input)
-		if t.Offer != nil && id == string(task.VerbSeen) {
-			s.add("verbs.seen.offer", "seen takes no offer: clients send it when a task opens")
-		} else if t.Offer != nil {
-			if p := s.predicate("verbs."+id+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
-				w.Offer = p
-			}
-		}
-		if t.Gate == nil && slices.Contains(slices.Collect(maps.Values(t.By)), "gate") {
-			s.add("verbs."+id+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
-		}
-		if w.Label == "" && t.Label == nil {
-			s.add("verbs."+id+".label", "is required")
-		}
-		if w.Summary == "" && t.Summary == nil {
-			s.add("verbs."+id+".summary", "is required")
-		}
-		out.Verbs[id] = w
 	}
 	s.addGrammar(grammar(builtin.SurfaceTasks, src))
 	return s.problems
 }
 
-// missingVerbs are the verbs file words none of, or words without the
-// question they ask first.
-func missingVerbs(out ListTexts) Problems {
+func (l *tasksLoad) mergeProps(s *sheet, props map[string]mProp) {
+	for _, name := range declared(s, "props", props) {
+		path, m := "props."+name, props[name]
+		i := slices.IndexFunc(l.def.Props, func(p PropDef) bool { return p.Name == name })
+		p := PropDef{Name: name}
+		if i >= 0 {
+			p = l.def.Props[i]
+		}
+		n := len(s.problems)
+		switch {
+		case m.Type != nil:
+			s.oneOf(path+".type", *m.Type, builtin.ValuesOf(builtin.SurfaceTasks, "props.*.type"))
+			p.Type = task.PropType(*m.Type)
+		case i < 0:
+			s.add(path+".type", "is required: one of %s", joinTypes())
+		}
+		if m.Values != nil {
+			p.Values = slices.Clone(m.Values)
+		}
+		if len(p.Values) > 0 && p.Type != task.PropEnum {
+			s.add(path+".values", "is read only with type enum, not %s", p.Type)
+		}
+		if m.Writers != nil {
+			s.eachOneOf(path+".writers", m.Writers, builtin.ValuesOf(builtin.SurfaceTasks, "props.*.writers"))
+			p.Writers = make([]task.Writer, len(m.Writers))
+			for j, w := range m.Writers {
+				p.Writers[j] = task.Writer(w)
+			}
+		}
+		text(s, path+".doc", m.Doc, &p.Doc)
+		switch {
+		case len(s.problems) > n:
+		case i < 0:
+			l.def.Props = append(l.def.Props, p)
+		default:
+			l.def.Props[i] = p
+		}
+	}
+}
+
+func joinTypes() string {
+	out := make([]string, len(task.PropTypes))
+	for i, t := range task.PropTypes {
+		out[i] = string(t)
+	}
+	return strings.Join(out, ", ")
+}
+
+func (l *tasksLoad) mergeStates(s *sheet, states map[string]mState) {
+	for _, name := range declared(s, "states", states) {
+		path, m := "states."+name, states[name]
+		i := slices.IndexFunc(l.def.States, func(st StateDef) bool { return st.Name == name })
+		st := StateDef{Name: name}
+		if i >= 0 {
+			st = l.def.States[i]
+		}
+		n := len(s.problems)
+		switch {
+		case m.Category != nil:
+			s.oneOf(path+".category", *m.Category, builtin.ValuesOf(builtin.SurfaceTasks, "states.*.category"))
+			st.Category = task.Category(*m.Category)
+		case i < 0:
+			s.add(path+".category", "is required: the category Go reads of the state")
+		}
+		text(s, path+".label", m.Label, &st.Label)
+		switch {
+		case len(s.problems) > n:
+		case i < 0:
+			l.def.States = append(l.def.States, st)
+		default:
+			l.def.States[i] = st
+		}
+	}
+}
+
+func (l *tasksLoad) mergeVerbs(s *sheet, verbs map[string]mVerbText) {
+	for _, id := range slices.Sorted(maps.Keys(verbs)) {
+		if !slices.Contains(builtin.TaskVerbs, id) {
+			s.add("verbs."+id, "names no verb%s", expr.DidYouMean(id, builtin.TaskVerbs))
+			continue
+		}
+		path := "verbs." + id
+		w, t := l.def.Verbs[id], verbs[id]
+		text(s, path+".label", t.Label, &w.Label)
+		text(s, path+".summary", t.Summary, &w.Summary)
+		text(s, path+".input", t.Input, &w.Input)
+		if t.Offer != nil && id == string(task.VerbSeen) {
+			s.add("verbs.seen.offer", "seen takes no offer: clients send it when a task opens")
+		} else if t.Offer != nil {
+			if p := s.predicate(path+".offer", *t.Offer, builtin.OfferEnv()); p != nil {
+				w.Offer = p
+			}
+		}
+		l.verbStates(s, path, t)
+		l.verbActors(s, path, t.By)
+		if t.Gate != nil {
+			l.gates[path] = ref{s, path + ".gate", *t.Gate}
+		}
+		if t.Gate == nil && slices.Contains(slices.Collect(maps.Values(t.By)), "gate") {
+			s.add(path+".gate", "is required: a by.<actor> of \"gate\" opens the gate it names")
+		}
+		if w.Label == "" && t.Label == nil {
+			s.add(path+".label", "is required")
+		}
+		if w.Summary == "" && t.Summary == nil {
+			s.add(path+".summary", "is required")
+		}
+		l.def.Verbs[id] = w
+	}
+}
+
+// verbStates waits to check the states the verb at path moves from and to.
+func (l *tasksLoad) verbStates(s *sheet, path string, t mVerbText) {
+	if t.To != nil {
+		l.states[path+".to"] = ref{s, path + ".to", *t.To}
+	}
+	if t.From == nil {
+		return
+	}
+	maps.DeleteFunc(l.states, func(k string, _ ref) bool { return strings.HasPrefix(k, path+".from[") })
+	for i, f := range t.From {
+		at := fmt.Sprintf("%s.from[%d]", path, i)
+		l.states[at] = ref{s, at, f}
+	}
+}
+
+// verbActors checks the actors of the verb at path's by, and waits to
+// compile their predicates.
+func (l *tasksLoad) verbActors(s *sheet, path string, by map[string]string) {
+	names := make([]string, len(task.Actors))
+	for i, a := range task.Actors {
+		names[i] = string(a)
+	}
+	for _, actor := range slices.Sorted(maps.Keys(by)) {
+		at := path + ".by." + actor
+		switch {
+		case !slices.Contains(names, actor):
+			s.add(at, "names no actor%s; the actors are %s", expr.DidYouMean(actor, names), strings.Join(names, ", "))
+		case by[actor] == "gate":
+			delete(l.preds, at)
+		default:
+			l.preds[at] = ref{s, at, by[actor]}
+		}
+	}
+}
+
+// check is what needs every layer read: the states a verb names, the gate
+// it opens and its by predicates, over the task's facts.
+func (l *tasksLoad) check(gates *GatesDef) Problems {
+	var out Problems
+	states := make([]string, len(l.def.States))
+	for i, s := range l.def.States {
+		states[i] = s.Name
+	}
+	for _, at := range slices.Sorted(maps.Keys(l.states)) {
+		r := l.states[at]
+		if !slices.Contains(states, r.name) {
+			out = append(out, r.s.problem(r.path, "names no state %s%s; the states are %s", r.name, expr.DidYouMean(r.name, states), strings.Join(states, ", ")))
+		}
+	}
+	if gates != nil {
+		names := gates.names()
+		for _, at := range slices.Sorted(maps.Keys(l.gates)) {
+			r := l.gates[at]
+			if !slices.Contains(names, r.name) {
+				out = append(out, r.s.problem(r.path, "names no gate of %s%s", GatesFile, expr.DidYouMean(r.name, names)))
+			}
+		}
+	}
+	env := builtin.WorkflowEnv(builtin.TaskSlot)
+	maps.Copy(env, l.def.Facts())
+	for _, at := range slices.Sorted(maps.Keys(l.preds)) {
+		r := l.preds[at]
+		if _, err := expr.CompileWorkflow(r.name, env); err != nil {
+			msg, snippet := exprMsg(err)
+			p := r.s.problem(r.path, "%s", msg)
+			p.Snippet = snippet
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// declared is the keys of the map table section of s's file in their
+// source order; a key the file does not place comes last, by name.
+func declared[V any](s *sheet, section string, m map[string]V) []string {
+	keys := slices.Sorted(maps.Keys(m))
+	slices.SortStableFunc(keys, func(a, b string) int {
+		pa, oka := s.at[section+"."+a]
+		pb, okb := s.at[section+"."+b]
+		switch {
+		case oka && okb && pa.Line != pb.Line:
+			return pa.Line - pb.Line
+		case oka && okb:
+			return pa.Col - pb.Col
+		case oka:
+			return -1
+		case okb:
+			return 1
+		}
+		return 0
+	})
+	return keys
+}
+
+// missingVerbs are the verbs no layer words, or words without the question
+// they ask first.
+func missingVerbs(verbs map[string]VerbText) Problems {
 	var problems Problems
 	for _, v := range builtin.TaskVerbs {
-		if _, ok := out.Verbs[v]; !ok {
+		if _, ok := verbs[v]; !ok {
 			problems = append(problems, Problem{File: TasksFile, Field: "verbs." + v, Msg: "is missing: every verb has a table"})
 		}
 	}
 	for _, v := range builtin.TaskVerbInputs {
-		if w, ok := out.Verbs[v]; ok && w.Input == "" {
+		if w, ok := verbs[v]; ok && w.Input == "" {
 			problems = append(problems, Problem{File: TasksFile, Field: "verbs." + v + ".input", Msg: "is required: the verb asks for a value first"})
 		}
 	}

@@ -586,3 +586,18 @@ func TestApplyConfigOnlyWhenReadsTheBriefExtras(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyConfigOnlyWhenReadsTheTaskProperties(t *testing.T) {
+	t.Parallel()
+	te := newTestEnv(t, &fake.Manager{})
+	w := turnStartWorkflow("focus")
+	w.Provider, w.Slot = unit.Task, "task"
+	cfg := Defaults()
+	cfg.Workflows = map[string]config.WorkflowConfig{"focus": {OnlyWhen: `task.prop.priority == "high"`}}
+	w = applyConfigWith([]workflow.Workflow{w}, cfg, briefExtrasOf(te.loadedIntents()))[0]
+	for priority, want := range map[string]bool{"high": true, "low": false} {
+		if got, err := w.When.Match(workflow.Vars{Facts: workflow.Facts{"task.prop.priority": priority}}); err != nil || got != want {
+			t.Errorf("priority %q: %v, %v; want %v", priority, got, err, want)
+		}
+	}
+}

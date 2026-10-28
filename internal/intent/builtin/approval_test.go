@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wloophq/wloop/internal/domain/draft"
+	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/intent/expr"
 )
 
@@ -185,5 +186,26 @@ func TestARuleReadingAProfilesUntrustedFactIsRefused(t *testing.T) {
 func TestTriggerEventDataIsUntrusted(t *testing.T) {
 	if !IsUntrusted("trigger.event.data") {
 		t.Fatal("the event's data carries a person's or an agent's text, yet reads as trusted")
+	}
+}
+
+func TestAPropRuleNeedsTheProfileAndATrustedWriter(t *testing.T) {
+	const when = `task.prop.promised > timestamp(0)`
+	send := draft.Approval{Mode: draft.Send}
+	var untrusted *UntrustedError
+	if _, err := ApprovalRule(when, send, ApprovalEnv(true, "task")); !errors.As(err, &untrusted) || untrusted.Fact != PropPrefix+"promised" {
+		t.Errorf("without the profile: %v", err)
+	}
+	env := ApprovalEnv(true, "task")
+	env[PropPrefix+"promised"] = PropFactType(task.PropDate)
+	if _, err := ApprovalRule(when, send, env); err != nil {
+		t.Errorf("a property a person writes: %v", err)
+	}
+	env.SetUntrusted(PropPrefix + "promised")
+	if _, err := ApprovalRule(when, send, env); !errors.As(err, &untrusted) {
+		t.Errorf("a property an agent writes: %v", err)
+	}
+	if got := DynamicFacts(`task.prop.risk == "task.prop.x" && task.state == "next"`); len(got) != 1 || got[0] != PropPrefix+"risk" {
+		t.Errorf("DynamicFacts = %v", got)
 	}
 }

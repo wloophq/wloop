@@ -160,7 +160,7 @@ func (s *sheet) runApproval(m *mApproval, env expr.Env) workflow.Approval {
 			continue
 		}
 		if rule.Mode.Releases() {
-			if f := untrustedRead(rule.When); f != "" {
+			if f := untrustedRead(rule.When, env); f != "" {
 				s.add(path+".when", "reads %s, which a rule that runs (mode %s) may not: a third party's text or an agent sets its value; a wait rule may read it", f, rule.Mode)
 				continue
 			}
@@ -170,9 +170,11 @@ func (s *sheet) runApproval(m *mApproval, env expr.Env) workflow.Approval {
 	return a
 }
 
-func untrustedRead(p workflow.Predicate) string {
+// untrustedRead is the first fact p reads that no releasing rule may: the
+// table marks it untrusted, or env does.
+func untrustedRead(p workflow.Predicate, env expr.Env) string {
 	for _, name := range p.Reads() {
-		if builtin.IsUntrusted(name) {
+		if builtin.IsUntrusted(name) || env.Untrusted(name) {
 			return name
 		}
 	}
@@ -222,7 +224,7 @@ func OverlayRunApproval(a workflow.Approval, o ApprovalOverlay, env expr.Env) (w
 				return workflow.Approval{}, fmt.Errorf("rule[%d].when: %w", i, err)
 			}
 			rule := workflow.ApprovalRule{When: p, Mode: workflow.ApprovalMode(r.Mode), Window: r.Window}
-			if f := untrustedRead(p); f != "" && rule.Mode.Releases() {
+			if f := untrustedRead(p, env); f != "" && rule.Mode.Releases() {
 				return workflow.Approval{}, fmt.Errorf("rule[%d].when reads %s, which a rule that runs (mode %s) may not", i, f, rule.Mode)
 			}
 			a.Rules = append(a.Rules, rule)
