@@ -46,6 +46,7 @@ service SourceService {
   rpc BriefRevision(BriefRevisionRequest) returns (BriefRevisionResponse);
   rpc BriefDescribe(BriefDescribeRequest) returns (BriefDescribeResponse);
   rpc BriefStale(BriefStaleRequest) returns (BriefStaleResponse);
+  rpc BriefWant(BriefWantRequest) returns (BriefWantResponse);
 
   // Planner.
   rpc Plan(PlanRequest) returns (PlanResponse);
@@ -622,6 +623,17 @@ message BriefStaleResponse {
   bool stale = 1;
 }
 
+message BriefWantRequest {
+  Call call = 1;
+  wloop.plugin.v1.Unit unit = 2;
+}
+
+message BriefWantResponse {
+  // coming says a brief of the unit is coming, which the plugin writes
+  // through PutBrief; false when nothing of it is left to read.
+  bool coming = 1;
+}
+
 message PendingRound {
   string intent = 1;
   string reason = 2;
@@ -1137,6 +1149,21 @@ message Config {
   bytes plugin_json = 1;
   // host_json holds the host keys the manifest's config_reads names.
   bytes host_json = 2;
+  // brief_intent is the brief intent of the plugin's units as the loaded
+  // profile resolves it; unset when the plugin's units have none.
+  BriefIntent brief_intent = 3;
+}
+
+// BriefIntent is what the brief intent asks of a brief besides the core
+// fields.
+message BriefIntent {
+  // extra_schema_json is the flat JSON schema of the extra fields; empty
+  // when the intent declares none.
+  bytes extra_schema_json = 1;
+  // field_versions are the version of each extra field, by name.
+  map<string, string> field_versions = 2;
+  string prompt = 3;
+  string fields_prompt = 4;
 }
 
 message ConfigResponse {

@@ -15,7 +15,20 @@ type Briefs struct {
 	Kind *Kind
 }
 
-var _ brief.BriefSource = Briefs{}
+var (
+	_ brief.BriefSource = Briefs{}
+	_ brief.OnDemand    = Briefs{}
+)
+
+// Want asks the plugin for u's brief now: true when it writes one through
+// the broker.
+func (b Briefs) Want(ctx context.Context, u unit.Unit) (bool, error) {
+	c, err := b.Kind.Client(b.ID)
+	if err != nil {
+		return false, err
+	}
+	return c.BriefWant(ctx, Wire(u))
+}
 
 func (b Briefs) Input(ctx context.Context, u unit.Unit) (brief.UnitInput, error) {
 	c, err := b.Kind.Client(b.ID)

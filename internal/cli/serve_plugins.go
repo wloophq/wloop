@@ -261,6 +261,7 @@ func installPlugins(configDir, exe string) ([]host.Plugin, error) {
 func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config, logf func(string, ...any)) (stop func()) {
 	snaps := psource.NewSnapshots(db.Snapshots())
 	e.briefsHeard = &atomic.Pointer[brief.Queue]{}
+	briefIntents := e.briefIntents(logf)
 	codecs := e.unitCodecs()
 	note := func(t port.Topic, units ...unit.Unit) {
 		if e.changes != nil {
@@ -277,7 +278,7 @@ func (e *Env) servePlugins(ctx context.Context, db *sqlite.DB, cfg config.Config
 		StateDir:  func(id string) string { return filepath.Join(e.StateDir, "plugins", id) },
 		Broker: func(id string, s *manifest.Source) *psource.Broker {
 			return &psource.Broker{ID: id, Manifest: s, Snapshots: snaps, Units: psource.Units{Codecs: codecs}, Config: e.currentConfig,
-				Note: note, Briefs: db, Briefed: e.heardBrief, Now: e.Now}
+				Note: note, Briefs: db, Briefed: e.heardBrief, Now: e.Now, BriefIntent: briefIntents}
 		},
 		Loaded: func(id string) {
 			logf("plugin %s: loaded", id)

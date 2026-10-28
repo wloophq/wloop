@@ -123,6 +123,10 @@ func (b *briefer) BriefStale(_ context.Context, req src.BriefStaleRequest) (bool
 	return req.Written.AttemptOf != brief.AttemptKey(req.Version, brief.At{Attempt: req.Current.Attempt}), nil
 }
 
+func (b *briefer) BriefWant(_ context.Context, u plugin.Unit) (bool, error) {
+	return u.Key == "t1", nil
+}
+
 // TestABriefInputComesFromThePlugin reads a unit's brief input, revision,
 // description and staleness through the host's brief source over a real
 // connection. The attempt the plugin names makes the attempt key a
@@ -152,6 +156,12 @@ func TestABriefInputComesFromThePlugin(t *testing.T) {
 	w := brief.Written{At: cur, Version: "b1-0123", Error: "boom", Failures: 1, AttemptedAt: at0, AttemptOf: stored}
 	if s.Stale(w, cur, "b1-0123", at0.Add(time.Minute)) {
 		t.Error("the same attempt is due again")
+	}
+	if coming, err := s.Want(ctx, u); err != nil || !coming {
+		t.Errorf("want t1: %v %v", coming, err)
+	}
+	if coming, err := s.Want(ctx, unit.Unit{Provider: "acme", Key: "t9"}); err != nil || coming {
+		t.Errorf("want t9: %v %v", coming, err)
 	}
 	sent := b.stales[0]
 	if sent.Written.AttemptOf != stored || sent.Written.At.Attempt != cur.Attempt || sent.Current.Attempt != cur.Attempt ||
@@ -217,4 +227,64 @@ func TestBriefWatchCallsBackThroughTheBroker(t *testing.T) {
 
 func TestAPutBriefOnATaskThatDoesNotHoldTheUnitIsRefused(t *testing.T) {
 	t.Skip("T1: review of X5b; PutBrief checks the task id's form, not that the task holds the unit, once the brief is the task's record")
+}
+
+// TestAFirstTurnAsksThePluginForItsBrief has the brief queue answer a
+// first turn on a plugin's unit: it waits while the plugin says a brief is
+// coming, and goes without one at once when nothing is left to read.
+func TestAFirstTurnAsksThePluginForItsBrief(t *testing.T) {
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "store.db"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	k := kindOver(t, &change.Log{})
+	start(t, k, "acme", "", &briefer{Stub: sourcetest.NewStub()})
+	q := brief.New(brief.Deps{Store: inventory.New(db), Enabled: true, Now: func() time.Time { return at0 }, Log: t.Logf})
+	q.Register("acme", psource.Briefs{ID: "acme", Kind: k})
+	ctx := context.Background()
+	rd, err := q.Ready(ctx, unit.Unit{Provider: "acme", Key: "t1"}, true, nil)
+	if err != nil || rd.State != brief.Wait || rd.Wait != brief.WaitBriefing || !rd.Next.Equal(at0.Add(brief.DemandTimeout)) {
+		t.Fatalf("a coming brief: %+v %v", rd, err)
+	}
+	rd, err = q.Ready(ctx, unit.Unit{Provider: "acme", Key: "t9"}, true, nil)
+	if err != nil || rd.State != brief.Without {
+		t.Fatalf("nothing to read: %+v %v", rd, err)
+	}
+}
+
+// TestConfigHandsThePluginItsBriefIntent reads the configuration as the
+// plugin does: it carries the brief intent the host resolves for the
+// plugin's units, extra fields, their versions and prompts.
+func TestConfigHandsThePluginItsBriefIntent(t *testing.T) {
+	extra, err := brief.Compose(brief.Schema, []byte(`{"type":"object","properties":{"urgency":{"type":"string"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var asked []unit.ProviderID
+	k := &psource.Kind{Snapshots: psource.NewSnapshots(nil), StateDir: func(string) string { return t.TempDir() },
+		Broker: func(id string, s *manifest.Source) *psource.Broker {
+			return &psource.Broker{ID: id, Manifest: s, Config: func() config.Config { return config.Config{} },
+				BriefIntent: func(p unit.ProviderID) brief.Intent {
+					asked = append(asked, p)
+					return brief.Intent{Schema: extra, Prompt: "brief {{.unit}}", FieldsPrompt: "fill {{.fields}}"}
+				}}
+		}}
+	stub := sourcetest.NewStub()
+	start(t, k, "acme", "", stub)
+	cfg, err := stub.Host().Config(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	bi := cfg.BriefIntent
+	if bi == nil || !reflect.DeepEqual(asked, []unit.ProviderID{"acme"}) || bi.Prompt != "brief {{.unit}}" || bi.FieldsPrompt != "fill {{.fields}}" ||
+		!reflect.DeepEqual(bi.FieldVersions, extra.FieldVersions()) || len(bi.FieldVersions) != 1 {
+		t.Fatalf("the plugin reads %+v, asked for %v", bi, asked)
+	}
+	var schema struct {
+		Properties map[string]any `json:"properties"`
+	}
+	if err := json.Unmarshal(bi.ExtraSchema, &schema); err != nil || schema.Properties["urgency"] == nil {
+		t.Fatalf("extra schema %s: %v", bi.ExtraSchema, err)
+	}
 }

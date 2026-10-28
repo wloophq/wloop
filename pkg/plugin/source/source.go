@@ -101,12 +101,16 @@ type Lander interface {
 	WriteState(ctx context.Context, w StateWrite) (Evidence, error)
 }
 
-// Briefer is how the host's brief queue reads a unit.
+// Briefer is how the host's brief queue reads a unit. BriefWant is a first
+// turn asking for a unit's brief now: true when one is coming, which the
+// plugin writes through Recorder.PutBrief, false when nothing of the unit is
+// left to read.
 type Briefer interface {
 	BriefInput(ctx context.Context, u plugin.Unit) (BriefInput, error)
 	BriefRevision(ctx context.Context, u plugin.Unit) (BriefRevision, error)
 	BriefDescribe(ctx context.Context, in BriefInput) (string, error)
 	BriefStale(ctx context.Context, req BriefStaleRequest) (bool, error)
+	BriefWant(ctx context.Context, u plugin.Unit) (bool, error)
 }
 
 // Planner plans the automatic rounds on the plugin's units from the host's

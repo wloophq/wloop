@@ -135,6 +135,19 @@ type EventQuery struct {
 type Config struct {
 	Plugin json.RawMessage
 	Host   json.RawMessage
+	// BriefIntent is the brief intent of the plugin's units as the loaded
+	// profile resolves it; nil when they have none.
+	BriefIntent *BriefIntent
+}
+
+// BriefIntent is what the brief intent asks of a brief besides the core
+// fields: the flat JSON schema of its extra fields, nil when it declares
+// none, the version of each by name, and its prompts.
+type BriefIntent struct {
+	ExtraSchema   json.RawMessage
+	FieldVersions map[string]string
+	Prompt        string
+	FieldsPrompt  string
 }
 
 // Task is a task the host keeps, as a plugin reads it.

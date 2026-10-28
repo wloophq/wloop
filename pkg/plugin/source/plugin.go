@@ -236,6 +236,13 @@ func (s *server) BriefStale(ctx context.Context, r *pb.BriefStaleRequest) (*pb.B
 	})
 }
 
+func (s *server) BriefWant(ctx context.Context, r *pb.BriefWantRequest) (*pb.BriefWantResponse, error) {
+	return serve[Briefer](ctx, s.src, "briefer", r.GetCall(), func(ctx context.Context, c Briefer) (*pb.BriefWantResponse, error) {
+		coming, err := c.BriefWant(ctx, unitGo(r.GetUnit()))
+		return &pb.BriefWantResponse{Coming: coming}, err
+	})
+}
+
 func (s *server) Plan(ctx context.Context, r *pb.PlanRequest) (*pb.PlanResponse, error) {
 	return serve[Planner](ctx, s.src, "planner", r.GetCall(), func(ctx context.Context, c Planner) (*pb.PlanResponse, error) {
 		p, err := c.Plan(ctx, unitGo(r.GetUnit()), roundStateGo(r.GetState()))

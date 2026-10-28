@@ -181,6 +181,13 @@ func (c *Client) BriefDescribe(ctx context.Context, in BriefInput) (string, erro
 	return r.GetLine(), err
 }
 
+func (c *Client) BriefWant(ctx context.Context, u plugin.Unit) (bool, error) {
+	r, err := via(ctx, func(call *pb.Call) (*pb.BriefWantResponse, error) {
+		return c.c.BriefWant(ctx, &pb.BriefWantRequest{Call: call, Unit: unitPB(u)})
+	})
+	return r.GetComing(), err
+}
+
 func (c *Client) BriefStale(ctx context.Context, req BriefStaleRequest) (bool, error) {
 	w := req.Written
 	r, err := via(ctx, func(call *pb.Call) (*pb.BriefStaleResponse, error) {

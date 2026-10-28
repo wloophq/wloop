@@ -40,6 +40,7 @@ const (
 	SourceService_BriefRevision_FullMethodName = "/wloop.source.v1.SourceService/BriefRevision"
 	SourceService_BriefDescribe_FullMethodName = "/wloop.source.v1.SourceService/BriefDescribe"
 	SourceService_BriefStale_FullMethodName    = "/wloop.source.v1.SourceService/BriefStale"
+	SourceService_BriefWant_FullMethodName     = "/wloop.source.v1.SourceService/BriefWant"
 	SourceService_Plan_FullMethodName          = "/wloop.source.v1.SourceService/Plan"
 	SourceService_Payload_FullMethodName       = "/wloop.source.v1.SourceService/Payload"
 	SourceService_ApplyEffect_FullMethodName   = "/wloop.source.v1.SourceService/ApplyEffect"
@@ -86,6 +87,7 @@ type SourceServiceClient interface {
 	BriefRevision(ctx context.Context, in *BriefRevisionRequest, opts ...grpc.CallOption) (*BriefRevisionResponse, error)
 	BriefDescribe(ctx context.Context, in *BriefDescribeRequest, opts ...grpc.CallOption) (*BriefDescribeResponse, error)
 	BriefStale(ctx context.Context, in *BriefStaleRequest, opts ...grpc.CallOption) (*BriefStaleResponse, error)
+	BriefWant(ctx context.Context, in *BriefWantRequest, opts ...grpc.CallOption) (*BriefWantResponse, error)
 	// Planner.
 	Plan(ctx context.Context, in *PlanRequest, opts ...grpc.CallOption) (*PlanResponse, error)
 	Payload(ctx context.Context, in *PayloadRequest, opts ...grpc.CallOption) (*PayloadResponse, error)
@@ -318,6 +320,16 @@ func (c *sourceServiceClient) BriefStale(ctx context.Context, in *BriefStaleRequ
 	return out, nil
 }
 
+func (c *sourceServiceClient) BriefWant(ctx context.Context, in *BriefWantRequest, opts ...grpc.CallOption) (*BriefWantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BriefWantResponse)
+	err := c.cc.Invoke(ctx, SourceService_BriefWant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sourceServiceClient) Plan(ctx context.Context, in *PlanRequest, opts ...grpc.CallOption) (*PlanResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PlanResponse)
@@ -434,6 +446,7 @@ type SourceServiceServer interface {
 	BriefRevision(context.Context, *BriefRevisionRequest) (*BriefRevisionResponse, error)
 	BriefDescribe(context.Context, *BriefDescribeRequest) (*BriefDescribeResponse, error)
 	BriefStale(context.Context, *BriefStaleRequest) (*BriefStaleResponse, error)
+	BriefWant(context.Context, *BriefWantRequest) (*BriefWantResponse, error)
 	// Planner.
 	Plan(context.Context, *PlanRequest) (*PlanResponse, error)
 	Payload(context.Context, *PayloadRequest) (*PayloadResponse, error)
@@ -518,6 +531,9 @@ func (UnimplementedSourceServiceServer) BriefDescribe(context.Context, *BriefDes
 }
 func (UnimplementedSourceServiceServer) BriefStale(context.Context, *BriefStaleRequest) (*BriefStaleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BriefStale not implemented")
+}
+func (UnimplementedSourceServiceServer) BriefWant(context.Context, *BriefWantRequest) (*BriefWantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BriefWant not implemented")
 }
 func (UnimplementedSourceServiceServer) Plan(context.Context, *PlanRequest) (*PlanResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Plan not implemented")
@@ -939,6 +955,24 @@ func _SourceService_BriefStale_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SourceService_BriefWant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BriefWantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SourceServiceServer).BriefWant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SourceService_BriefWant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SourceServiceServer).BriefWant(ctx, req.(*BriefWantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SourceService_Plan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PlanRequest)
 	if err := dec(in); err != nil {
@@ -1148,6 +1182,10 @@ var SourceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BriefStale",
 			Handler:    _SourceService_BriefStale_Handler,
+		},
+		{
+			MethodName: "BriefWant",
+			Handler:    _SourceService_BriefWant_Handler,
 		},
 		{
 			MethodName: "Plan",
