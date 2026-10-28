@@ -22,7 +22,7 @@ WHAT WAITS ON YOU
   tui                    The same views in the terminal, one-key actions
   open                   The cockpit, a workspace or a pull request
   outbox                 Drafts waiting for your approval, and yours
-  task                   Make this agent session a run of a task
+  task                   Create a task, or make this agent session a run of one
   explore                Open pull requests of others to help on
 
 AUTOMATION

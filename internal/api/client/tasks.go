@@ -49,8 +49,8 @@ func (c *Client) Task(ctx context.Context, id string) (api.TaskView, error) {
 	return e, err
 }
 
-// Capture files a task in the Inbox.
-func (c *Client) Capture(ctx context.Context, req api.TaskCreate) (api.TaskView, error) {
+// CreateTask creates a task: a title alone captures it in the Inbox.
+func (c *Client) CreateTask(ctx context.Context, req api.TaskCreate) (api.TaskView, error) {
 	var e api.TaskView
 	err := c.do(ctx, ReadTimeout, http.MethodPost, api.TasksPath, req, &e)
 	return e, err

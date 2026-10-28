@@ -316,6 +316,7 @@ func (e *Env) roundsPaused(ctx context.Context, u unit.Unit) (bool, error) {
 // withStore is d with every store role on st and its database.
 func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
 	d.Events, d.Overrides, d.Meta, d.Records = inventory.ByUnit{Store: st}, st.DB(), st, present.Records{Store: st}
+	d.TaskRecords, d.RecordWriter, d.Placements = st.DB(), st.DB(), inventory.Placements{Store: st}
 	return d
 }
 

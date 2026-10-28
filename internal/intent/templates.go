@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"text/template/parse"
 	"time"
+	"unicode"
 
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -224,9 +225,10 @@ const (
 var targetEnv = expr.Env{"guidance": expr.String}
 
 // NameFuncs are the functions a manifest's names may call: slug, a text
-// as lowercase words joined by dashes, and firstLine, its first non-blank
-// line, trimmed.
-var NameFuncs = template.FuncMap{"slug": slug, "firstLine": firstLine}
+// as lowercase words joined by dashes; firstLine, its first non-blank
+// line, trimmed; and title n, that line without its markdown heading
+// marks, cut at its last whole word within n runes.
+var NameFuncs = template.FuncMap{"slug": slug, "firstLine": firstLine, "title": title}
 
 var notSlug = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -252,6 +254,19 @@ func firstLine(s string) string {
 		}
 	}
 	return ""
+}
+
+func title(n int, s string) string {
+	line := strings.TrimSpace(strings.TrimLeft(firstLine(s), "#"))
+	runes := []rune(line)
+	if n <= 0 || len(runes) <= n {
+		return line
+	}
+	cut := string(runes[:n])
+	if i := strings.LastIndexFunc(cut, unicode.IsSpace); i > 0 && !unicode.IsSpace(runes[n]) {
+		cut = cut[:i]
+	}
+	return strings.TrimRightFunc(cut, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsPunct(r) }) + "…"
 }
 
 // RefuseWhyName is the name refuse[i].why is parsed under.

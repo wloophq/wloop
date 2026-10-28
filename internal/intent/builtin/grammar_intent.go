@@ -69,7 +69,7 @@ var intentGrammar = []Key{
 	{Path: "session", In: SurfaceIntent, Kind: KindTable, Doc: "The agent session its turns run in."},
 	{Path: "target", In: SurfaceIntent, Kind: KindTable, Doc: "What a run with no unit does."},
 	{Path: "target.missing", In: SurfaceIntent, Kind: KindEnum, Values: named(dintent.TargetCapture), Doc: "capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent."},
-	{Path: "target.title", In: SurfaceIntent, Kind: KindTemplate, Doc: "The captured task's title, over .guidance, with firstLine."},
+	{Path: "target.title", In: SurfaceIntent, Kind: KindTemplate, Doc: "The captured task's title, over .guidance, with firstLine or title."},
 	{Path: "session.strategy", In: SurfaceIntent, Kind: KindEnum, Values: named("reuse_live", "new"), Doc: "Whether a turn reuses the unit's live session or starts a new one."},
 	{Path: "session.title", In: SurfaceIntent, Kind: KindText, Doc: "The session's title: 1 to 12 lowercase letters."},
 	{Path: "session.name", In: SurfaceIntent, Kind: KindTemplate, Doc: "What the workspace manager and the agent show the session as, over the name facts; defaults.toml session_name when absent, else the title. A name that session.title leads and the start time ends, as dd/mm hh:mm, lets the loop recognize its session when it lost track of it."},

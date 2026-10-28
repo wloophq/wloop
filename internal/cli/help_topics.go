@@ -169,13 +169,22 @@ func helpGroups(manager string) []helpGroup {
 			},
 			{
 				Names:   []string{"task"},
-				Summary: "Make this agent session a run of a task",
-				Usage:   []string{"task attach task:<id>"},
-				About: "attach makes the agent session it runs in, one a workspace manager started, a run of the task: " +
+				Summary: "Create a task, or make this agent session a run of one",
+				Usage:   []string{"task new --title <title> [--brief-file <path>] [--prop <name>=<value>]... [--repo <owner/name>]", "task attach task:<id>"},
+				About: "new creates a task in the Inbox and prints it as task:<id>: a title alone captures it. " +
+					"Each property is one tasks.toml declares, parsed by its type, and a value its type refuses creates nothing. " +
+					"attach makes the agent session it runs in, one a workspace manager started, a run of the task: " +
 					"the task's page lists it with its workspace, session and transcript, and what it posts or drafts lands on the task. " +
 					"Its turn owes no record, so the session stops as it would without " + name + ".",
-				Examples: []string{"task attach task:t-3f9a2c4b5d6e7f80"},
-				Docs:     "concepts/tasks",
+				Flags: []helpFlag{
+					{"--title <title>", "new: the task's title, one short line"},
+					{"--brief-file <path>", "new: a file whose markdown is the task's brief"},
+					{"--prop <name>=<value>", "new: a property of the task; repeatable"},
+					{"--repo <owner/name>", "new: the repository the task's work runs in"},
+				},
+				Examples: []string{"task new --title \"Add retries to the webhook sender\" --brief-file brief.md --prop priority=high --repo acme/api",
+					"task attach task:t-3f9a2c4b5d6e7f80"},
+				Docs: "concepts/tasks",
 			},
 			{
 				Names:   []string{"explore"},

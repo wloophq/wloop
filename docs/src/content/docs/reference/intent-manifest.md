@@ -68,7 +68,7 @@ The bundled intents are written the same way; `{{command}} profile show <owner/r
 | `session.close_when_done` | bool | `false` | The session closes when its turn is done. |
 | `target` | table |  | What a run with no unit does. |
 | `target.missing` | one of `capture` |  | capture: a run with no unit captures its guidance as a new task, the turn's unit; refused when absent. |
-| `target.title` | template |  | The captured task's title, over .guidance, with firstLine. |
+| `target.title` | template |  | The captured task's title, over .guidance, with firstLine or title. |
 
 ### How a turn runs
 

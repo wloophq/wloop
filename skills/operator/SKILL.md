@@ -1,6 +1,6 @@
 ---
 name: {{name}}
-description: Use when the user wants a GitHub pull request reviewed, followed or monitored by the review loop, wants to take over someone else's PR to finish it, or asks which reviews or PRs need them, what the loop is doing, or why a review did not continue. Drives the {{name}} CLI, which runs each review in its own workspace with its own agent. Do NOT review the PR yourself in the current session.
+description: Use when the user wants a GitHub pull request reviewed, followed or monitored by the review loop, wants to take over someone else's PR to finish it, or asks which reviews or PRs need them, what the loop is doing, or why a review did not continue, or wants new work started from a description or a diagnosis. Drives the {{name}} CLI, which runs each review in its own workspace with its own agent. Do NOT review the PR yourself in the current session.
 ---
 
 # Operating the review loop
@@ -26,7 +26,8 @@ rounds. This session only drives the CLI: never review the PR here.
 | know why nothing happens to a PR, a session or a workspace | `{{command}} plan --unit <url>` (its items, then every workflow that gives it none, with the facts its `when` read and the reasons beside them, such as `pr.first.reason`) |
 | run a sweep now | tell them to choose Sweep now in the menu bar; `{{command}} plan` prints what it would do |
 | stop or restart the automatic workflows, everywhere or on some PRs or repositories | `{{command}} pause [<url>\|<owner/repo>]...`, `{{command}} resume [<url>\|<owner/repo>]...` (none means everywhere; only when the user asks) |
-| start new work from a description: code to change, or a message to post | resolve the repository with `gh` (ask which when more than one matches), then `{{command}} start --repo <owner/name> <brief>`; leave out `--repo` when no code is involved. The brief says what to do and how to know it is done |
+| start new work from a description or a diagnosis: code to change, or a message to post | map it into a task: a title (one short line naming the work), a brief in a markdown file (what you found, what to do, how to know it is done) and the properties the user gave, such as a priority or a due date; resolve the repository with `gh` (ask which when more than one matches); run `{{command}} task new --title <title> --brief-file <path> [--prop <name>=<value>]... [--repo <owner/name>]`, which prints `task:<id>`, then `{{command}} start task:<id>`, which works in the repository `--repo` named. Leave out `--repo` when no code is involved |
+| make this session a run of a task, so the task lists it and what it posts lands on the task | `{{command}} task attach task:<id>` (in a session a workspace manager started) |
 | ask whoever a PR waits on for the next step (a reviewer, the author) | `{{command}} nudge <url> [guidance]` (an agent posts one comment under the user's name; only when the user asks, and it refuses when the PR waits on the user or the loop) |
 | run a kind of turn their profile defines | `{{command}} <intent> <url> [flags] [guidance]`; `{{command}} --help` lists the intents and their flags |
 | watch what needs them in the terminal, with one-key actions | tell them to run `{{command}} tui` in their own terminal (it needs one; do not run it here) |
@@ -48,12 +49,15 @@ every turn with a record, through the `turn_end` tool of the {{name}} MCP server
 to publish), asked (a question for the user) or failed. A session that stops
 without one is marked unrecorded.
 
-When the agent asks, the user answers from the cockpit (`{{command}} open`),
-the notification or `{{command}} tui` (`w` answers, `c` continues without an
-answer, `d` dismisses). {{name}} types the answer into the agent's session as
-its next prompt (a long one tells the agent to run
-`{{command}} turn answer <url>`), or starts a new session that resumes the turn when the old one is
-gone. Do not answer for the user and do not type into that agent's terminal.
+Every decision waiting on the user is a gate on its task: an agent's question,
+a draft to approve, a pending round. The user resolves it from the cockpit
+(`{{command}} open`), the notification or `{{command}} tui` (`w` answers, `c`
+continues without an answer, `d` dismisses). {{name}} types an answer into the
+agent's session as its next prompt (a long one tells the agent to run
+`{{command}} turn answer <url>`), or starts a new session that resumes the turn
+when the old one is gone; an agent reads the answers to what it posted with
+`inbox_read`. Do not answer for the user and do not type into that agent's
+terminal.
 
 ## Reading `{{command}} status`
 

@@ -692,7 +692,7 @@
           "type": "string"
         },
         "title": {
-          "description": "The captured task's title, over .guidance, with firstLine.",
+          "description": "The captured task's title, over .guidance, with firstLine or title.",
           "type": "string"
         }
       },

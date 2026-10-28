@@ -22,7 +22,7 @@ A work loop for the reviews and pull requests that reach you.
   [cyan]tui[/]                    The same views in the terminal, one-key actions
   [cyan]open[/]                   The cockpit, a workspace or a pull request
   [cyan]outbox[/]                 Drafts waiting for your approval, and yours
-  [cyan]task[/]                   Make this agent session a run of a task
+  [cyan]task[/]                   Create a task, or make this agent session a run of one
   [cyan]explore[/]                Open pull requests of others to help on
 
 [bold]AUTOMATION[/]

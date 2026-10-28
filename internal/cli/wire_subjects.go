@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/core/automation"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -20,7 +21,7 @@ func (e *Env) wireSubjects(w *serveWiring) {
 		w.Engine.Subjects = map[unit.ProviderID]automation.Units{}
 	}
 	if w.DB != nil {
-		w.Engine.Subjects[task.Codec{}.Provider()] = e.taskFacts(w.DB, unitsEnded(w.Modules), unitsRepo(w.Modules, e.currentConfig))
+		w.Engine.Subjects[task.Codec{}.Provider()] = e.taskFacts(w.DB, unitsEnded(w.Modules), unitsRepo(w.Modules, e.currentConfig, inventory.Placements{Store: inventory.New(w.DB)}))
 	}
 	for _, p := range e.sourcePlugins() {
 		if !slices.ContainsFunc(w.Modules, func(m source.Module) bool { return m.ID == p.ID && m.Facts != nil }) {

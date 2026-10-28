@@ -34,7 +34,7 @@ type Daemon interface {
 	Task(ctx context.Context, id string) (api.TaskView, error)
 	TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error)
 	TaskDrafts(ctx context.Context, task string) ([]api.Draft, error)
-	Capture(ctx context.Context, req api.TaskCreate) (api.TaskView, error)
+	CreateTask(ctx context.Context, req api.TaskCreate) (api.TaskView, error)
 	Keys(ctx context.Context, surface string) (api.KeysResponse, error)
 	Review(ctx context.Context) (api.Review, error)
 	ReviewStepDone(ctx context.Context, step string) (api.Review, error)
@@ -746,7 +746,7 @@ func carry(ctx context.Context, cfg Config, c Command) (carried, error) {
 		ds, err := d.TaskDrafts(ctx, c.task)
 		return carried{task: e, drafts: ds}, err
 	case c.capture != "":
-		e, err := d.Capture(ctx, api.TaskCreate{Title: c.capture})
+		e, err := d.CreateTask(ctx, api.TaskCreate{Title: c.capture})
 		if err != nil {
 			return carried{}, err
 		}
