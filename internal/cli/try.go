@@ -14,9 +14,9 @@ import (
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/turns"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
@@ -118,7 +118,7 @@ func runTry(ctx context.Context, e *Env, args []string) error {
 	if len(rest) != 1 {
 		return usageError{usage: tryUsage}
 	}
-	ref, err := github.ParseURL(rest[0])
+	ref, err := pr.ParseURL(rest[0])
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func readWhy(path string) (*workflow.Why, error) {
 
 // dryRunTurn stores, in the daemon, the review turn of a profile try.
 func (e *Env) dryRunTurn(ctx context.Context, r api.DryRunTurnRequest) (api.DryRunTurn, error) {
-	ref, err := github.ParseURL(r.PR)
+	ref, err := pr.ParseURL(r.PR)
 	if err != nil {
 		return api.DryRunTurn{}, err
 	}

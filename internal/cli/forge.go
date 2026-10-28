@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,10 +12,12 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
-// forgeCalls are what the round commands ask the forge's plugin: the viewer,
-// and the commands it serves without the daemon, such as a clone.
+// forgeCalls are what the commands ask the forge's plugin: the viewer, its
+// actions, such as reading a pull request, and the commands it serves
+// without the daemon, such as a clone.
 type forgeCalls interface {
 	Identity(ctx context.Context) (src.Identity, error)
+	Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error)
 	RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error)
 }
 

@@ -17,9 +17,9 @@ import (
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/workspace"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -255,7 +255,7 @@ func TestTrustCommandTrustsTheRepositoryOnlyWhenTheUserRunsIt(t *testing.T) {
 	}
 }
 
-func blocksOf(rec *memRecorder, ref github.Ref) []dinv.Event {
+func blocksOf(rec *memRecorder, ref pr.Ref) []dinv.Event {
 	var out []dinv.Event
 	for _, e := range rec.events {
 		if e.PR == ref && (e.Kind == dinv.KindRoundBlocked || e.Kind == dinv.KindRoundUnblocked || e.Kind == dinv.KindRoundSkipped) {
@@ -286,7 +286,7 @@ func blindHomes(t *testing.T, te *testEnv) (def, profile, project string) {
 	return def, profile, project
 }
 
-var pr9 = github.Ref{Owner: "acme", Repo: "api", Number: 9}
+var pr9 = pr.Ref{Owner: "acme", Repo: "api", Number: 9}
 
 const pr9Basics = `{"data":{"pr":{"pullRequest":{"number":9,"title":"Add z","state":"OPEN","headRefName":"feat/z","baseRefName":"main","headRefOid":"hfeat/z","repository":{"nameWithOwner":"acme/api"},"author":{"__typename":"User","login":"me"}}}}}`
 

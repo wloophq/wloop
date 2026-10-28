@@ -2,15 +2,22 @@ package ghsource
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
 // CommandClone is the command plugin.toml declares that clones a
 // repository: clone <owner>/<name> <path>.
 const CommandClone = "clone"
+
+// ActionBasics is the action that reads a pull request's basics: its
+// answer is the pr.PullRequest as JSON.
+const ActionBasics = "pr.basics"
 
 type ghRunner interface {
 	Run(ctx context.Context, args ...string) ([]byte, error)
@@ -21,7 +28,12 @@ type ghRunner interface {
 // reads it.
 type Local struct {
 	GH  ghRunner
-	API viewerReader
+	API localAPI
+}
+
+type localAPI interface {
+	viewerReader
+	Basics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error)
 }
 
 func (l Local) Identity(ctx context.Context) (src.Identity, error) {
@@ -44,4 +56,20 @@ func (l Local) RunCLI(ctx context.Context, req src.CLIRequest, _, stderr io.Writ
 	}
 	fmt.Fprintf(stderr, "unknown command %q\n", req.Args)
 	return 2, nil
+}
+
+// Action runs the plugin's actions the host calls while it runs in process.
+func (l Local) Action(ctx context.Context, req src.ActionRequest) (json.RawMessage, error) {
+	if req.Action != ActionBasics {
+		return nil, fmt.Errorf("%w: no action %s", src.ErrUnsupported, req.Action)
+	}
+	ref, ok := pr.RefOf(unit.Unit{Provider: unit.ProviderID(req.Unit.Provider), Key: req.Unit.Key})
+	if !ok {
+		return nil, fmt.Errorf("%w: %s is not a pull request", src.ErrNotFound, req.Unit.Key)
+	}
+	basics, err := l.API.Basics(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(basics)
 }

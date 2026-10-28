@@ -11,8 +11,11 @@ import (
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
 	dgh "github.com/wloophq/wloop/internal/domain/github"
+	dchange "github.com/wloophq/wloop/internal/domain/github/change"
 	"github.com/wloophq/wloop/internal/domain/round"
+	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
 	"github.com/wloophq/wloop/internal/github"
+	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/turn"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
@@ -201,6 +204,60 @@ func (e *Env) forgeViewer(ctx context.Context) (string, error) {
 		return "", errors.New("the forge's plugin knows no viewer")
 	}
 	return login, nil
+}
+
+// forgeBasics are ref's basics as the forge's plugin reads them.
+func (e *Env) forgeBasics(ctx context.Context, ref pr.Ref) (*pr.PullRequest, error) {
+	raw, err := e.forgeCalls().Action(ctx, src.ActionRequest{Unit: psource.Wire(ref.Unit()), Action: ghsource.ActionBasics})
+	if err != nil {
+		return nil, err
+	}
+	var basics pr.PullRequest
+	if err := json.Unmarshal(raw, &basics); err != nil {
+		return nil, fmt.Errorf("%s: the plugin's basics: %w", ref, err)
+	}
+	return &basics, nil
+}
+
+// clearFingerprint forgets the reviews the address rounds on ref covered, so
+// a pull request taken over starts its triage from none of them.
+func (e *Env) clearFingerprint(ctx context.Context, ref pr.Ref) error {
+	if e.Rounds == nil {
+		return nil
+	}
+	st, err := e.Rounds.Load(ctx)
+	if err != nil {
+		return err
+	}
+	marks := ghsource.TakenOverMarks()
+	if !marksChange(st, ref.String(), marks) {
+		return nil
+	}
+	setMarks(st, ref.String(), marks)
+	return e.Rounds.Save(ctx, st)
+}
+
+func marksChange(st *round.Store, key string, marks map[string]string) bool {
+	for name, v := range marks {
+		if st.Mark(key, name) != v {
+			return true
+		}
+	}
+	return false
+}
+
+// recordAddressed marks the reviews so far and the checks and the conflict
+// of head as covered by a round asked for by hand.
+func (e *Env) recordAddressed(st *round.Store, ref pr.Ref, head string) {
+	setMarks(st, ref.String(), ghsource.AddressedMarks(e.Now()))
+	st.SetHeads(ref.String(), head, head)
+}
+
+// recordReviewed marks the reviews of full a held review round in ws
+// covered.
+func (e *Env) recordReviewed(st *round.Store, cfg config.Config, ref pr.Ref, ws wsdomain.Workspace, full *pr.PullRequest, viewer string) {
+	setMarks(st, ref.String(), ghsource.ReviewedMarks(dchange.ReviewerInput{PR: full.Facts, Viewer: viewer, WorkspaceStatus: ws.Status,
+		CompletedStatus: e.column(cfg, config.ColumnCompleted), TrustedOwners: []string{ref.Owner}, TrustedAuthors: cfg.GitHub.TrustedAuthors}))
 }
 
 // githubLocator is the pull request of the checkout's branch, as gh reads it.
