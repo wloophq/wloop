@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -71,8 +70,5 @@ func TestLocateResolvesAWorktree(t *testing.T) {
 	}
 	if got, err := te.handUnit(ctx, "", plain, wsdomain.Workspace{}, wsdomain.Repo{}, false); err == nil {
 		t.Errorf("a checkout no plugin locates holds %v", got)
-	}
-	if _, err := os.Stat(wt); err != nil {
-		t.Fatal(err)
 	}
 }

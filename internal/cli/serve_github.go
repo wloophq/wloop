@@ -154,7 +154,6 @@ func storedGitHubBudget(ctx context.Context, st *inventory.Store) ([]dgh.Limit, 
 	return ghsource.StoredBudget(ctx, st)
 }
 
-// githubBudget is the GitHub client's budget.
 func (e *Env) githubBudget() daemon.Budget { return ghsource.Budget{Limiter: e.GitHub} }
 
 // githubIdentity is the viewer as the GitHub plugin knows them.
@@ -177,5 +176,4 @@ func (g githubLocator) Locate(ctx context.Context, dir string) (unit.Unit, bool,
 	return ref.Unit(), true, nil
 }
 
-// githubLocators are the built-in GitHub module's locator.
 func (e *Env) githubLocators() []unit.Locator { return []unit.Locator{githubLocator{e}} }

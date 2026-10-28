@@ -156,6 +156,8 @@ func TestR16FlagsAPlantedImport(t *testing.T) {
 	flagged(t, "a plugin imports the core", r16("internal/adapter/source/slack", []string{module + "internal/core/items", module + "internal/domain/unit"}, nil), 0, "")
 	flagged(t, "outside core and plugins", r16("internal/daemon", []string{slack, gh}, nil), 0, "")
 	flagged(t, "a core sibling of a plugin root", r16("internal/domain/prx", []string{slack}, nil), 1, "(R16)")
+	flagged(t, "the catalog imports the pull request domain", r16("internal/catalog", []string{module + "internal/domain/pr"}, nil), 1, "(R16)")
+	flagged(t, "the keys import the GitHub change domain", r16("internal/keys", []string{module + "internal/domain/github/change"}, nil), 1, "(R16)")
 }
 
 func TestR16ExemptsPluginTestFakes(t *testing.T) {
