@@ -96,7 +96,7 @@ func (f *fakeDaemon) Views(context.Context) (api.ViewsCatalog, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.viewsCat == nil {
-		return api.ViewsCatalog{}, errors.New("the entries are not served: the daemon runs without a store")
+		return api.ViewsCatalog{}, errors.New("the tasks are not served: the daemon runs without a store")
 	}
 	return *f.viewsCat, nil
 }
@@ -116,7 +116,7 @@ func (f *fakeDaemon) TasksSince(_ context.Context, q client.TaskQuery, since api
 	return page, nil
 }
 
-// Counters counts each view's entries holding every term.
+// Counters counts each view's tasks holding every term.
 func (f *fakeDaemon) Counters(_ context.Context, area string, terms ...string) (api.Counters, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -189,7 +189,7 @@ func (f *fakeDaemon) Keys(_ context.Context, surface string) (api.KeysResponse, 
 }
 
 // changeTasks makes the daemon hold delta for view at the next position
-// and announces it with the counters, as the entries feed does.
+// and announces it with the counters, as the tasks feed does.
 func (f *fakeDaemon) changeTasks(view string, delta []api.TaskView, c api.Counters) {
 	f.mu.Lock()
 	f.taskRev++

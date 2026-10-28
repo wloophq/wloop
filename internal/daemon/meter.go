@@ -28,7 +28,7 @@ func wireTally(t meter.Tally) []api.MeterStat {
 	return out
 }
 
-// wireLoad is the cost of every sample of totals, one entry per resource
+// wireLoad is the cost of every sample of totals, one task per resource
 // that has any.
 func (s *Server) load() api.Load {
 	reg := s.deps.Meter

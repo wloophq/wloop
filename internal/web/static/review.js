@@ -1,13 +1,13 @@
 "use strict";
 
 // reviewState is the weekly Review on screen: the daemon's Review, the step
-// shown and its entries, which also stand in gtdState so the entry keys and
+// shown and its tasks, which also stand in tasksState so the task keys and
 // the detail act on them.
 const reviewState = { review: null, step: "", error: "" };
 
 const reviewEnv = {
   getJSON: (url) => getJSON(url),
-  post: (path, body) => entryPost(path, body),
+  post: (path, body) => taskPost(path, body),
   notice: (text, err) => setNotice(text, err),
   render: () => render(),
   focusStep: (id) => {
@@ -34,11 +34,11 @@ function reviewCurrent() {
   return reviewSteps().find((s) => s.id === reviewState.step) || null;
 }
 
-function reviewEntriesURL(step) {
-  return "/api/entries?" + new URLSearchParams(step.query || { view: step.view }).toString();
+function reviewTasksURL(step) {
+  return "/api/tasks?" + new URLSearchParams(step.query || { view: step.view }).toString();
 }
 
-// loadReview reads the Review and the entries of the step shown, the first
+// loadReview reads the Review and the tasks of the step shown, the first
 // open step when none is.
 async function loadReview() {
   try {
@@ -56,14 +56,14 @@ async function loadReviewStep() {
   const step = reviewCurrent();
   if (!step) return;
   try {
-    const page = await reviewEnv.getJSON(reviewEntriesURL(step));
-    gtdState.entries = page.entries || [];
-    gtdState.key = "review|" + step.id;
-    gtdState.page = null;
-    if (page.counters) gtdState.counters = page.counters;
-    gtdState.error = "";
+    const page = await reviewEnv.getJSON(reviewTasksURL(step));
+    tasksState.tasks = page.tasks || [];
+    tasksState.key = "review|" + step.id;
+    tasksState.page = null;
+    if (page.counters) tasksState.counters = page.counters;
+    tasksState.error = "";
   } catch (err) {
-    gtdState.error = `Could not load the ${step.label} step: ${err.message}`;
+    tasksState.error = `Could not load the ${step.label} step: ${err.message}`;
   }
 }
 
@@ -114,7 +114,7 @@ function reviewStepItem(s) {
 }
 
 // reviewPanel is the Review: its steps with their counts, then the step
-// shown with its entries.
+// shown with its tasks.
 function reviewPanel(open) {
   const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, "Weekly review"))];
   if (reviewState.error) parts.push(h("p", { class: "plan-error" }, reviewState.error));
@@ -131,16 +131,16 @@ function reviewPanel(open) {
     h("h3", { class: "plan-head", tabindex: 0, "data-focus": "review:step:" + step.id, title: "Enter marks the step done; ] and [ move between steps" },
       `${step.label} (${step.count})`, step.done ? " ✓" : ""),
     step.done ? null : h("button", { type: "button", class: "act", "data-focus": "review:done:" + step.id, onclick: () => reviewKey("done") }, "Mark done")));
-  if (gtdState.error) parts.push(h("p", { class: "plan-error" }, gtdState.error));
-  if (gtdState.key !== "review|" + step.id) {
+  if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
+  if (tasksState.key !== "review|" + step.id) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
   }
-  if (!gtdState.entries.length) {
+  if (!tasksState.tasks.length) {
     parts.push(h("p", { class: "empty" }, "Nothing here."));
     return parts;
   }
-  const item = step.view === "outbox" ? outboxItem : entryItem;
-  parts.push(h("ol", { class: "entries" }, ...gtdState.entries.map((e) => item(e, open))));
+  const item = step.view === "outbox" ? outboxItem : taskItem;
+  parts.push(h("ol", { class: "entries" }, ...tasksState.tasks.map((e) => item(e, open))));
   return parts;
 }

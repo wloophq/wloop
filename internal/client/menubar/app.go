@@ -57,7 +57,7 @@ type Config struct {
 	Notifier Notifier
 	OpenURL  func(url string) error
 	// CockpitURL is the cockpit's address at a hash route such as
-	// "entry=<id>" or "view=inbox".
+	// "task=<id>" or "view=inbox".
 	CockpitURL func(route string) (string, error)
 	Quit       func()
 	// Copy puts text on the clipboard; nil offers no copy.
@@ -78,7 +78,7 @@ type Controller struct {
 	ctx  context.Context
 	mu   sync.Mutex
 	sent map[string]bool
-	// daily are today's held entries and digest already posted.
+	// daily are today's held tasks and digest already posted.
 	daily    map[string]bool
 	posted   map[string]posted
 	saveMu   sync.Mutex
@@ -216,7 +216,7 @@ func (c *Controller) follow(ctx context.Context, events <-chan api.Change) bool 
 	}
 }
 
-// apply pulls the rows and the entries past the held revision, unless the
+// apply pulls the rows and the tasks past the held revision, unless the
 // change only names the health and is not ahead of it, and the health only
 // when the change names it.
 func (c *Controller) apply(ctx context.Context, ch api.Change) {
@@ -243,7 +243,7 @@ func (c *Controller) report(ctx context.Context, st api.AppStatus) {
 	}
 }
 
-// Refresh reads the rows and entries that moved and the health, then
+// Refresh reads the rows and tasks that moved and the health, then
 // redraws the title, the menu and the notifications.
 func (c *Controller) Refresh(ctx context.Context) { c.refresh(ctx, true, true) }
 

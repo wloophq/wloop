@@ -41,7 +41,7 @@ type messageRig struct{ *turnRig }
 
 var r8u = pr.Ref{Owner: "acme", Repo: "api", Number: 8}
 
-// newMessageRig serves the messages over a turn rig, with the entries' verbs registered.
+// newMessageRig serves the messages over a turn rig, with the tasks' verbs registered.
 func newMessageRig(t *testing.T) *messageRig {
 	t.Helper()
 	r := &messageRig{turnRig: newTurnRig(t)}

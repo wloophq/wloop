@@ -20,7 +20,7 @@ const draftPrefix = "draft:"
 // outboxStates are the drafts the Outbox shows: those waiting on the user, and those a restart has yet to settle.
 var outboxStates = []draft.State{draft.Proposed, draft.Failed, draft.Sending}
 
-// outboxView serves the Outbox: one virtual entry per draft of an enabled plugin, newest first, never stored.
+// outboxView serves the Outbox: one virtual task per draft of an enabled plugin, newest first, never stored.
 type outboxView struct{ s *Server }
 
 func (v outboxView) Tasks(ctx context.Context, q task.Query) ([]task.Task, error) {
@@ -72,7 +72,7 @@ func draftIDOf(id task.ID) (draft.ID, bool) {
 	return draft.ID(n), err == nil && n > 0
 }
 
-// draftTaskStates are the entry states that tell where a draft stands.
+// draftTaskStates are the task states that tell where a draft stands.
 var draftTaskStates = map[draft.State]task.State{
 	draft.Proposed: task.Inbox, draft.Failed: task.Inbox,
 	draft.Approved: task.Next, draft.Sending: task.Next,
@@ -97,7 +97,7 @@ func draftTitle(d draft.Draft, where string) string {
 	return fmt.Sprintf("%s on %s: %s", d.Purpose, where, first)
 }
 
-// withDraft sets a draft entry's draft on v, and its verbs from the draft's actions: the others are refused.
+// withDraft sets a draft task's draft on v, and its verbs from the draft's actions: the others are refused.
 func (s *Server) withDraft(ctx context.Context, e task.Task, v *api.TaskView) error {
 	if e.Kind != task.KindDraft || s.deps.Outbox == nil {
 		return nil

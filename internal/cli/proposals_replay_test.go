@@ -283,7 +283,7 @@ func (r *replay) record() {
 		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "" && r.counts != nil:
 			r.counts[r.now.Format("01-02")+" "+workflowOf(d)+" "+d.Purpose+" withdrawn "+d.Reason]++
 		case !seen:
-			proposed = append(proposed, fmt.Sprintf("propose %s %s on %s entry=%q key=%s items=%s approval=%s text=%q",
+			proposed = append(proposed, fmt.Sprintf("propose %s %s on %s task=%q key=%s items=%s approval=%s text=%q",
 				d.Purpose, d.Delivery, d.Unit, d.Task, d.Origin.Key, strings.Join(d.Items, ","), d.Approval.Mode, d.Text))
 			r.settle = append(r.settle, d.ID)
 		case was == draft.Proposed && d.State == draft.Discarded && d.Reason != "":

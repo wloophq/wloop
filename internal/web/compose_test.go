@@ -35,14 +35,14 @@ func TestDelegateBoxSendsGuidanceAndMode(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
-  await loadDetailPane({ entry: "e-s" });
-  let pane = entryPane(detailState.entry);
+  await loadDetailPane({ task: "e-s" });
+  let pane = taskPane(detailState.task);
   typeInto(pane, "detail:guidance", "say we ship Friday");
   await click(pane, "detail:headless:delegate:e-s");
-  pane = entryPane(detailState.entry);
+  pane = taskPane(detailState.task);
   await click(pane, "detail:session:delegate:e-s");
   process.stdout.write(JSON.stringify({ Text: text(pane), Buttons: buttonLabels(pane), Posts: posts.filter((p) => !p.path.endsWith("/seen")) }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-s": e, "/api/drafts?entry=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-s": e, "/api/drafts?task=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
 	for _, b := range []string{"Draft for me", "Hand to an agent", "Save to Outbox", "Send now"} {
 		if !slices.Contains(got.Buttons, b) {
 			t.Errorf("no %q button: %v", b, got.Buttons)
@@ -59,7 +59,7 @@ func TestDelegateBoxSendsGuidanceAndMode(t *testing.T) {
 		a, _ := p["body"].(map[string]any)["args"].(map[string]any)
 		return a
 	}
-	if first["path"] != "/api/entries/e-s/delegate" || args(first)["mode"] != "headless" || args(first)["guidance"] != "say we ship Friday" {
+	if first["path"] != "/api/tasks/e-s/delegate" || args(first)["mode"] != "headless" || args(first)["guidance"] != "say we ship Friday" {
 		t.Errorf("Draft for me posted %+v", first)
 	}
 	if args(second)["mode"] != "session" || args(second)["guidance"] != nil {
@@ -75,10 +75,10 @@ func TestDelegateBoxShowsWhyItIsOff(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
-  await loadDetailPane({ entry: "e-s" });
-  const pane = entryPane(detailState.entry);
+  await loadDetailPane({ task: "e-s" });
+  const pane = taskPane(detailState.task);
   process.stdout.write(JSON.stringify({ Text: text(pane), Disabled: !!byFocus(pane, "detail:headless:delegate:e-s").attrs.disabled }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-s": e}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-s": e}}, &got)
 	if !got.Disabled || !strings.Contains(got.Text, "offers no action to delegate") || !strings.Contains(got.Text, "Could not load the drafts") {
 		t.Errorf("%+v", got)
 	}
@@ -94,12 +94,12 @@ func TestHandToAnAgentIsOffWithThePlacementReason(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
-  await loadDetailPane({ entry: "e-s" });
-  const pane = entryPane(detailState.entry);
+  await loadDetailPane({ task: "e-s" });
+  const pane = taskPane(detailState.task);
   const s = byFocus(pane, "detail:session:delegate:e-s").attrs;
   process.stdout.write(JSON.stringify({ Text: text(pane), Headless: !!byFocus(pane, "detail:headless:delegate:e-s").attrs.disabled,
     Session: !!s.disabled, Title: s.title || "" }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-s": e, "/api/drafts?entry=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-s": e, "/api/drafts?task=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
 	if got.Headless || !got.Session || got.Title != "no workspace manager is enabled" || !strings.Contains(got.Text, "Hand to an agent: no workspace manager is enabled") {
 		t.Errorf("%+v", got)
 	}
@@ -115,20 +115,20 @@ func TestTaskComposerSavesSendsAndReacts(t *testing.T) {
 (async () => {
   let notices = [];
   detailEnv.notice = (t, err) => notices.push((err ? "! " : "") + t);
-  await loadDetailPane({ entry: "e-s" });
-  let pane = entryPane(detailState.entry);
+  await loadDetailPane({ task: "e-s" });
+  let pane = taskPane(detailState.task);
   await click(pane, "detail:reply:save");
   typeInto(pane, "detail:reply:text", "Friday, after the freeze");
   await click(pane, "detail:reply:save");
-  pane = entryPane(detailState.entry);
+  pane = taskPane(detailState.task);
   typeInto(pane, "detail:reply:text", "Shipped");
   await click(pane, "detail:reply:send");
-  pane = entryPane(detailState.entry);
+  pane = taskPane(detailState.task);
   typeInto(pane, "detail:reply:reaction", ":eyes:");
   await click(pane, "detail:reply:save");
   const replies = posts.filter((p) => p.path.endsWith("/reply")).map((p) => p.body.args);
   process.stdout.write(JSON.stringify({ Args: replies, Empty: notices[0] }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-s": e, "/api/drafts?entry=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-s": e, "/api/drafts?task=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": api.DraftsResponse{Drafts: []api.Draft{}}}}, &got)
 	want := []map[string]any{
 		{"kind": "reply", "text": "Friday, after the freeze"},
 		{"kind": "reply", "text": "Shipped", "send": "now"},
@@ -167,16 +167,16 @@ func TestTaskDetailListsItsDrafts(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t)+detailHarness+composeHarness, nil, `
 (async () => {
-  await loadDetailPane({ entry: "e-s" });
-  const pane = entryPane(detailState.entry);
+  await loadDetailPane({ task: "e-s" });
+  const pane = taskPane(detailState.task);
   await click(pane, "drafts:approve:draft:4");
   process.stdout.write(JSON.stringify({ Text: text(pane), Drafts: byClass(pane, "d-draft").length, Post: posts.find((p) => p.path.includes("draft")) }));
-})();`, map[string]any{"answers": map[string]any{"/api/entries/e-s": e, "/api/drafts?entry=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": drafts}}, &got)
+})();`, map[string]any{"answers": map[string]any{"/api/tasks/e-s": e, "/api/drafts?task=e-s&state=proposed%2Capproved%2Csending%2Csent%2Cfailed": drafts}}, &got)
 	if got.Drafts != 2 || !strings.Contains(got.Text, "Friday works") || !strings.Contains(got.Text, ":eyes:") || !strings.Contains(got.Text, "#ops in the thread") {
 		t.Fatalf("%+v", got)
 	}
 	body, _ := got.Post["body"].(map[string]any)
-	if got.Post["path"] != "/api/entries/draft:4/approve" || body["args"].(map[string]any)["rev"] != "2" {
+	if got.Post["path"] != "/api/tasks/draft:4/approve" || body["args"].(map[string]any)["rev"] != "2" {
 		t.Fatalf("approve posted %+v", got.Post)
 	}
 }
@@ -230,9 +230,9 @@ func TestTheViewFilterMatchesTasksByTheirWords(t *testing.T) {
 	nodeRun(t, viewsPrelude(t), nil, `
 const out = {};
 for (const q of ["", "#ops", "dana", "souza review", "ACME/API", "\"retry\"", "nothing"]) {
-  out[q] = input.entries.filter((e) => entryMatches(e, gtdTerms(q))).map((e) => e.id);
+  out[q] = input.tasks.filter((e) => taskMatches(e, filterTerms(q))).map((e) => e.id);
 }
-process.stdout.write(JSON.stringify(out));`, map[string]any{"entries": es}, &got)
+process.stdout.write(JSON.stringify(out));`, map[string]any{"tasks": es}, &got)
 	want := map[string][]string{"": {"e-1", "e-2", "e-3"}, "#ops": {"e-1"}, "dana": {"e-2"}, "souza review": {"e-2"}, "ACME/API": {"e-3"}, `"retry"`: {"e-2"}, "nothing": {}}
 	for q, ids := range want {
 		if !slices.Equal(got[q], ids) && !(len(ids) == 0 && len(got[q]) == 0) {
@@ -249,12 +249,12 @@ func TestAViewListShowsOnlyMatchingTasks(t *testing.T) {
 	var got struct{ Text []string }
 	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
-gtdState.catalog = input.cat;
-gtdState.key = gtdQueryKey("inbox", "", []);
-gtdState.entries = input.entries;
+tasksState.catalog = input.cat;
+tasksState.key = viewQueryKey("inbox", "", []);
+tasksState.tasks = input.tasks;
 const out = [];
-for (const q of ["rollout", "zzz"]) out.push(text(gtdList({ view: "inbox", area: "", ctx: [], q }, "")));
-process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"entries": es, "cat": viewsCatalog()}, &got)
+for (const q of ["rollout", "zzz"]) out.push(text(taskList({ view: "inbox", area: "", ctx: [], q }, "")));
+process.stdout.write(JSON.stringify({ Text: out }));`, map[string]any{"tasks": es, "cat": viewsCatalog()}, &got)
 	if !strings.Contains(got.Text[0], "Rollout date") || strings.Contains(got.Text[0], "Review the retry") {
 		t.Errorf("filtered list: %s", got.Text[0])
 	}

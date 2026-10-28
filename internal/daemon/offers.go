@@ -139,7 +139,7 @@ func (s *Server) storedRead(ctx context.Context, u unit.Unit, asked catalog.Aske
 	return st, true, nil
 }
 
-// readRow is the read model's entry of the unit under any case, which costs the
+// readRow is the read model's task of the unit under any case, which costs the
 // inventory's lookup only when the exact key is unknown.
 func (s *Server) readRow(ctx context.Context, u unit.Unit) (readmodel.Read, bool, error) {
 	m := s.readModel()

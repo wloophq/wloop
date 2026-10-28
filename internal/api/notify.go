@@ -13,7 +13,7 @@ const (
 	CategoryOutbox Category = "OUTBOX"
 	// CategoryHeld's token is the local day, so it is posted once a day.
 	CategoryHeld Category = "HELD"
-	// CategoryDigest's entry is "-" and its token the day.
+	// CategoryDigest's task is "-" and its token the day.
 	CategoryDigest Category = "DIGEST"
 	CategoryNote   Category = "NOTE"
 )
@@ -45,7 +45,7 @@ func (c Category) known() bool {
 	return ok
 }
 
-// NotificationID is "<category>|<entry-id>|<token>".
+// NotificationID is "<category>|<task-id>|<token>".
 func NotificationID(cat Category, task string, token string) string {
 	return string(cat) + "|" + task + "|" + token
 }
@@ -64,5 +64,5 @@ type Digest struct {
 	Title  string   `json:"title"`
 	Body   string   `json:"body"`
 	Counts Counters `json:"counts"`
-	Tasks  []string `json:"entries"`
+	Tasks  []string `json:"tasks"`
 }

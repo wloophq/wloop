@@ -2,10 +2,10 @@
 
 const CHORD_MS = 1000;
 const KEY_CONTEXTS = ["question", "plan", "review", "list", "global"];
-const ENTRY_VERBS = new Set(["next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss", "reviewed", "sequential"]);
+const TASK_VERBS = new Set(["next", "waiting", "schedule", "someday", "reference", "focus", "project", "approve", "delegate", "done", "dismiss", "reviewed", "sequential"]);
 const CORE_ACTIONS = /^(move:|detail:|nav:|area:|answer:|step:|palette$|help$|filter$|open-source$|capture$|quit$)/;
 // A served action's key is one uppercase letter, or its plan context's own key.
-const servedAction = (b) => !!b.served || /^[A-Z]$/.test(b.key) || (b.context === "plan" && !CORE_ACTIONS.test(b.action) && !ENTRY_VERBS.has(b.action));
+const servedAction = (b) => !!b.served || /^[A-Z]$/.test(b.key) || (b.context === "plan" && !CORE_ACTIONS.test(b.action) && !TASK_VERBS.has(b.action));
 const NAMED_KEYS = { Enter: "Enter", Escape: "Esc", Esc: "Esc", Backspace: "Backspace", Tab: "Tab" };
 
 // VERB_ASKS are the verbs that ask for a value first, the question from
@@ -20,7 +20,7 @@ const VERB_ASKS = {
   delegate: { args: (v) => (v ? { guidance: v } : {}) },
   reply: { args: (v) => (v ? { text: v } : null) },
 };
-const keyVerb = (name) => ENTRY_VERBS.has(name) || !!VERB_ASKS[name];
+const keyVerb = (name) => TASK_VERBS.has(name) || !!VERB_ASKS[name];
 
 // eventKey is the canonical name of a key event, as the served bindings
 // spell it; "" when no binding can match. Shift+digit reads the physical
@@ -54,14 +54,14 @@ function pressable(el) {
   return ["BUTTON", "A", "SUMMARY"].includes(tag) || role === "button" || role === "link";
 }
 
-const isEntry = (sel) => !!sel && typeof sel.id === "string" && Array.isArray(sel.units);
-const unitsOf = (sel) => (!sel ? [] : isEntry(sel) ? sel.units : sel.unit ? [sel.unit] : []);
+const isTask = (sel) => !!sel && typeof sel.id === "string" && Array.isArray(sel.units);
+const unitsOf = (sel) => (!sel ? [] : isTask(sel) ? sel.units : sel.unit ? [sel.unit] : []);
 const sameUnit = (a, b) => !!a && !!b && a.provider === b.provider && a.key === b.key;
 
 // sourceLink is the link of the selection's first unit.
 function sourceLink(sel) {
   if (!sel) return "";
-  if (!isEntry(sel)) return safeURL(sel.link) || "";
+  if (!isTask(sel)) return safeURL(sel.link) || "";
   const u = sel.units[0];
   const c = (sel.cards || []).find((x) => x.card && sameUnit(x.card.unit, u));
   return (c && safeURL(c.card.link)) || "";
@@ -114,24 +114,24 @@ function createKeys(env) {
 
   const say = (text, err) => env.notice && env.notice(text, err);
 
-  async function entryVerb(entry, verb, args) {
-    if (env.act) return env.act(verb, args, entry);
+  async function taskVerb(task, verb, args) {
+    if (env.act) return env.act(verb, args, task);
     const body = { source: "cockpit" };
     if (args && Object.keys(args).length) body.args = Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)]));
     try {
-      const out = await postJSON(`/api/entries/${encodeURIComponent(entry.id)}/${encodeURIComponent(verb)}`, body);
-      say(`${verb}: ${entry.title || entry.id}`);
+      const out = await postJSON(`/api/tasks/${encodeURIComponent(task.id)}/${encodeURIComponent(verb)}`, body);
+      say(`${verb}: ${task.title || task.id}`);
       if (env.changed) env.changed();
       return out;
     } catch (err) {
-      say(`${verb} ${entry.title || entry.id} failed: ${err.message}`, true);
+      say(`${verb} ${task.title || task.id} failed: ${err.message}`, true);
     }
   }
 
   async function verb(name) {
-    const entry = isEntry(env.selected()) ? env.selected() : null;
-    if (!entry) return false;
-    const st = (entry.verbs || []).find((v) => v.verb === name);
+    const task = isTask(env.selected()) ? env.selected() : null;
+    if (!task) return false;
+    const st = (task.verbs || []).find((v) => v.verb === name);
     if (!st || !st.enabled) {
       say(`${name}: ${(st && st.reason) || "not offered here"}`, true);
       return true;
@@ -144,13 +144,13 @@ function createKeys(env) {
       args = ask.args(String(v).trim());
       if (!args) return true;
     }
-    await entryVerb(entry, name, args);
+    await taskVerb(task, name, args);
     return true;
   }
 
   // unitRows are the rows whose served actions the selection's unit offers.
   function unitRows(sel) {
-    if (sel && !isEntry(sel) && sel.unit) return [sel];
+    if (sel && !isTask(sel) && sel.unit) return [sel];
     return unitsOf(sel).map((u) => env.rowOf && env.rowOf(u)).filter(Boolean);
   }
 
@@ -178,7 +178,7 @@ function createKeys(env) {
     if (!q) return false;
     const pick = questionOptions(q.question)[n - 1];
     if (!pick) return true;
-    if (q.entry) await entryVerb(q.entry, "answer", pick);
+    if (q.task) await taskVerb(q.task, "answer", pick);
     else if (q.row) await env.unitAction(q.row, "answer", pick);
     return true;
   }
@@ -235,7 +235,7 @@ function createKeys(env) {
     const title = await env.ask({ label: "Capture" });
     if (!title || !String(title).trim()) return true;
     try {
-      await postJSON("/api/entries", { title: String(title).trim() });
+      await postJSON("/api/tasks", { title: String(title).trim() });
       say(`captured: ${String(title).trim()}`);
       if (env.changed) env.changed();
     } catch (err) {
@@ -251,7 +251,7 @@ function createKeys(env) {
     const items = [];
     const item = (b, label) => ({ label: label || b.help || b.action, key: b.key || "", run: () => run(b, {}) });
     const listBinding = (action, served) => bindings.find((b) => b.action === action && b.context === "list" && servedAction(b) === served);
-    if (isEntry(sel)) {
+    if (isTask(sel)) {
       for (const v of (sel.verbs || []).filter((x) => x.enabled && keyVerb(x.verb))) {
         const b = listBinding(v.verb, false) || { key: "", action: v.verb, context: "list" };
         items.push(item(b, b.help || v.verb));
@@ -399,11 +399,11 @@ function appEnv() {
     location.hash = p.toString();
   };
   let areas = null;
-  const entryNodes = () => [...document.querySelectorAll('#gtd [data-focus^="entry:"]')];
+  const taskNodes = () => [...document.querySelectorAll('#tasks [data-focus^="task:"]')];
   return {
     fetch: (...a) => fetch(...a),
     selected: () => detailPane.selected() || selectedRow(),
-    act: (verb, args, entry) => detailPane.act(verb, args, entry),
+    act: (verb, args, task) => detailPane.act(verb, args, task),
     rowOf,
     spec: (id) => state.specs.byId[id],
     unitAction: (row, id, extra) => act(row, id, extra),
@@ -414,17 +414,17 @@ function appEnv() {
     viewContext: () => keyContextOf(readHash().view),
     step: (action) => reviewKey(action),
     questionAt: (el) => {
-      if (readHash().entry) return detailPane.questionAt(el);
+      if (readHash().task) return detailPane.questionAt(el);
       const d = state.detail;
       if (!el || !el.closest || !el.closest(".d-question") || !d || !d.row.question || d.row.question.state !== "asked") return null;
       return { row: d.row, question: d.row.question };
     },
     move: (delta) => {
-      if (isGTDView(readHash().view)) {
-        const nodes = entryNodes();
+      if (isCoreView(readHash().view)) {
+        const nodes = taskNodes();
         if (!nodes.length) return false;
         const sel = detailPane.selected();
-        const at = sel ? nodes.findIndex((n) => n.dataset.focus === "entry:" + sel.id) : -1;
+        const at = sel ? nodes.findIndex((n) => n.dataset.focus === "task:" + sel.id) : -1;
         nodes[Math.max(0, Math.min(nodes.length - 1, at < 0 ? 0 : at + delta))].focus();
         return true;
       }
@@ -447,7 +447,7 @@ function appEnv() {
     open: () => {
       const e = detailPane.selected();
       if (e) {
-        writeHash({ entry: e.id, pr: "" });
+        writeHash({ task: e.id, pr: "" });
         return true;
       }
       const r = selectedRow();
@@ -456,8 +456,8 @@ function appEnv() {
       return true;
     },
     close: () => {
-      if (readHash().entry) {
-        writeHash({ entry: "" });
+      if (readHash().task) {
+        writeHash({ task: "" });
         return true;
       }
       if (!readHash().pr) return false;
@@ -468,7 +468,7 @@ function appEnv() {
     views: () => catalog.views,
     providers: () => [...providerNames.keys()],
     areas: async () => {
-      if (!areas) areas = (await getJSON("/api/gtd")).areas || [];
+      if (!areas) areas = (await getJSON("/api/views")).areas || [];
       return areas;
     },
     setArea: (a) => setHashParam("area", a),

@@ -59,7 +59,7 @@ func TestReplySavesAUserDraftToTheOutbox(t *testing.T) {
 		t.Fatalf("draft %+v", d)
 	}
 	var listed api.DraftsResponse
-	if code := get(t, r.s, api.Drafts+"?entry=e-1", &listed); code != 200 || len(listed.Drafts) != 1 || listed.Drafts[0].Origin.Kind != "user" {
+	if code := get(t, r.s, api.Drafts+"?task=e-1", &listed); code != 200 || len(listed.Drafts) != 1 || listed.Drafts[0].Origin.Kind != "user" {
 		t.Fatalf("drafts of the entry: %d %+v", code, listed)
 	}
 	evs, err := r.db.Events().Since(context.Background(), 0, []string{task.VerbEventKind(task.VerbReply)})
@@ -127,7 +127,7 @@ func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "proposed" || d.Origin.Kind != "user" || d.Task != "" || d.Kind != "reply" {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
-	rec = post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"entry":"e-1","items":["it-e-1"],"text":"Done","send":true,"source":"cockpit"}`)
+	rec = post(t, r.s, api.Drafts, `{"unit":{"provider":"github","key":"acme/api#7"},"task":"e-1","items":["it-e-1"],"text":"Done","send":true,"source":"cockpit"}`)
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &d) != nil || d.State != "approved" || d.Task != "e-1" || !slices.Equal(d.Items, []string{"it-e-1"}) {
 		t.Fatalf("send: %d %s", rec.Code, rec.Body)
 	}
@@ -136,8 +136,8 @@ func TestDraftCreateRouteWritesOnAUnit(t *testing.T) {
 		code       int
 	}{
 		{"no unit", `{"text":"x","source":"cockpit"}`, 400},
-		{"another unit's entry", `{"unit":{"provider":"github","key":"acme/api#9"},"entry":"e-1","text":"x","source":"cockpit"}`, 400},
-		{"no such entry", `{"unit":{"provider":"github","key":"acme/api#7"},"entry":"e-9","text":"x","source":"cockpit"}`, 404},
+		{"another unit's entry", `{"unit":{"provider":"github","key":"acme/api#9"},"task":"e-1","text":"x","source":"cockpit"}`, 400},
+		{"no such entry", `{"unit":{"provider":"github","key":"acme/api#7"},"task":"e-9","text":"x","source":"cockpit"}`, 404},
 		{"an unknown kind", `{"unit":{"provider":"github","key":"acme/api#7"},"kind":"nudge","text":"x","source":"cockpit"}`, 400},
 	} {
 		if rec := post(t, r.s, api.Drafts, c.body); rec.Code != c.code {

@@ -299,8 +299,8 @@ type Deps struct {
 	Cards card.Store
 	// CardsJob is told each published row change; nil runs none.
 	CardsJob CardsJob
-	// Tasks is the entries service; nil answers 503 to the entries routes and runs no Sync. Messages are the
-	// Inbox messages, whose entries' verbs it registers on Tasks.
+	// Tasks is the tasks service; nil answers 503 to the tasks routes and runs no Sync. Messages are the
+	// Inbox messages, whose tasks' verbs it registers on Tasks.
 	Tasks    *coretasks.Service
 	Messages *messages.Service
 	// Drafts are the outbox's drafts the notifications read; nil: no draft notifies.
@@ -308,7 +308,7 @@ type Deps struct {
 	// TasksMe resolves the user's identity over the enabled plugins and sets it on Tasks, saying whether it grew;
 	// the Sync worker calls it before each batch until it succeeds. nil: Tasks' identity stands.
 	TasksMe func(ctx context.Context) (grew bool, err error)
-	// TaskUnits are the units a full Sync covers: those with an open item or a live entry; nil: none.
+	// TaskUnits are the units a full Sync covers: those with an open item or a live task; nil: none.
 	TaskUnits func(ctx context.Context) ([]unit.Unit, error)
 	// Outbox keeps the drafts; nil answers 503 to the draft routes. SendDrafts runs its sender, which
 	// publishes the approved drafts.

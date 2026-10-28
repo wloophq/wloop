@@ -9,10 +9,10 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 )
 
-// draftVerbs are the entry verbs of a draft's actions.
+// draftVerbs are the task verbs of a draft's actions.
 var draftVerbs = map[string]string{"draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry"}
 
-// SetDrafts shows the drafts made for entry id while its detail is open.
+// SetDrafts shows the drafts made for task id while its detail is open.
 func (m *Model) SetDrafts(id string, ds []api.Draft) {
 	if id != m.detailID {
 		return
@@ -23,7 +23,7 @@ func (m *Model) SetDrafts(id string, ds []api.Draft) {
 	}
 }
 
-// listedDrafts are the drafts the open detail lists: those made for its entry but the one it shows itself.
+// listedDrafts are the drafts the open detail lists: those made for its task but the one it shows itself.
 func (m *Model) listedDrafts() []api.Draft {
 	if m.detailID == "" || m.draftsFor != m.detailID {
 		return nil
@@ -66,7 +66,7 @@ func (m *Model) pickedDraft() (api.Draft, bool) {
 	return m.listedDrafts()[i], true
 }
 
-// draftTask is the Outbox entry of d, its verbs read from the draft's actions.
+// draftTask is the Outbox task of d, its verbs read from the draft's actions.
 func draftTask(d api.Draft, title string) api.TaskView {
 	e := api.TaskView{ID: "draft:" + strconv.FormatInt(d.ID, 10), Kind: "draft", Title: title, Draft: &d}
 	for _, a := range d.Actions {
@@ -77,7 +77,7 @@ func draftTask(d api.Draft, title string) api.TaskView {
 	return e
 }
 
-// pickedVerb runs verb on the picked draft as on an Outbox entry: approve and retry after a y with the
+// pickedVerb runs verb on the picked draft as on an Outbox task: approve and retry after a y with the
 // revision on screen, discard after a y, edit through the text prompt.
 func (m *Model) pickedVerb(e api.TaskView, d api.Draft, verb string, read uint64) (Command, bool) {
 	de := draftTask(d, e.Title)
@@ -127,7 +127,7 @@ func (m *Model) editPrompt(c Command, d api.Draft, read uint64) (Command, bool) 
 }
 
 // delegatePrompt asks for the delegate's guidance, empty allowed, then runs it as the action chooses
-// (headless when it can); Tab hands it to an agent in a session instead, unless the entry has nowhere
+// (headless when it can); Tab hands it to an agent in a session instead, unless the task has nowhere
 // to run one, which the label says.
 func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read uint64) (Command, bool) {
 	name, q := taskLabel(e), m.verbQuestion("delegate")
@@ -169,7 +169,7 @@ func (m *Model) delegatePrompt(e api.TaskView, c Command, confirm string, read u
 	return Command{}, false
 }
 
-// sessionOff is why the entry's delegate cannot hand it to an agent in a session, "" when it can or the
+// sessionOff is why the task's delegate cannot hand it to an agent in a session, "" when it can or the
 // daemon says nothing of its modes.
 func sessionOff(e api.TaskView) string {
 	for _, v := range e.Verbs {
@@ -188,7 +188,7 @@ func sessionOff(e api.TaskView) string {
 	return ""
 }
 
-// replyPrompt asks for a reply in the entry's conversation, saved to the Outbox; Tab sends it at once,
+// replyPrompt asks for a reply in the task's conversation, saved to the Outbox; Tab sends it at once,
 // after a y, and Ctrl+E writes it in the editor.
 func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bool) {
 	name := taskLabel(e)
@@ -219,7 +219,7 @@ func (m *Model) replyPrompt(e api.TaskView, c Command, read uint64) (Command, bo
 	return Command{}, false
 }
 
-// replyTarget names where an entry's reply goes: its first unit.
+// replyTarget names where a task's reply goes: its first unit.
 func replyTarget(e api.TaskView) string {
 	if len(e.Units) > 0 {
 		return e.UnitLabel(0)

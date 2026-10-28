@@ -21,7 +21,7 @@ import (
 // other unit takes a turn action, track and untrack when its source follows
 // it, and an intent unitIntent admits. The row of such a unit offers the
 // intents serving its provider, but this route does not check their
-// visible and enabled predicates; the entries' bridge does.
+// visible and enabled predicates; the tasks' bridge does.
 func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(unit.ProviderID) bool) error {
 	if isPullRequest(u) {
 		return nil
@@ -42,7 +42,7 @@ func unitAction(l *intentload.Loaded, name string, u unit.Unit, follows func(uni
 	return unitIntent(d, u)
 }
 
-// taskIntentActions are the actions of the intents that name the entry provider
+// taskIntentActions are the actions of the intents that name the task provider
 // among theirs, over e's facts.
 func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 	if l == nil {
@@ -61,8 +61,8 @@ func taskIntentActions(l *intentload.Loaded, e task.Task) []api.ActionState {
 	return out
 }
 
-// taskRefusal is why the entry u names refuses the intent name, "" when
-// it takes it or names no entry.
+// taskRefusal is why the task u names refuses the intent name, "" when
+// it takes it or names no task.
 func (s *Server) taskRefusal(ctx context.Context, l *intentload.Loaded, name string, u unit.Unit) (string, error) {
 	id, ok := task.IDOf(u)
 	if !ok || isBuiltin(name) {

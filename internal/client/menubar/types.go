@@ -60,14 +60,14 @@ const (
 type Action string
 
 const (
-	// ActionOpen opens the notification's entry in the cockpit.
+	// ActionOpen opens the notification's task in the cockpit.
 	ActionOpen Action = "open"
 	// ActionServed posts the action whose id is Response.Identifier.
 	ActionServed Action = "served"
 	// ActionAnswer answers the question with Response.Text, OptionID, Yes or
 	// No.
 	ActionAnswer Action = "answer"
-	// ActionReply writes Response.Text as a reply on the entry's unit: to the
+	// ActionReply writes Response.Text as a reply on the task's unit: to the
 	// Outbox, or sent at once with Response.Send.
 	ActionReply Action = "reply"
 )

@@ -26,7 +26,7 @@ function safeURL(u) { return u; }
 function stamp(t) { return String(t); }
 `
 
-// viewsCatalog is GET /api/gtd with the core views the daemon serves.
+// viewsCatalog is GET /api/views with the core views the daemon serves.
 func viewsCatalog() api.ViewsCatalog {
 	return api.ViewsCatalog{
 		Views: []api.TaskViewSpec{{ID: "focus", Label: "Focus"}, {ID: "inbox", Label: "Inbox"}, {ID: "outbox", Label: "Outbox"}, {ID: "next", Label: "Next"},
@@ -41,7 +41,7 @@ func viewsCatalog() api.ViewsCatalog {
 var coreViewIDs = []string{"focus", "inbox", "outbox", "next", "waiting", "projects", "someday", "logbook"}
 
 // noViews stands in for views.js where a test runs app.js's loading alone.
-const noViews = "const loadGTD = async () => {};\n"
+const noViews = "const loadTasks = async () => {};\n"
 
 // noUpdate stands in for update.js where a test runs app.js's loading alone.
 const noUpdate = "const checkBuild = () => {};\n"
@@ -57,7 +57,7 @@ func viewsPrelude(t *testing.T) string {
 }
 
 func task(id, state string, mod func(*api.TaskView)) api.TaskView {
-	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Entry " + id, Contexts: []string{}, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
+	e := api.TaskView{ID: id, Kind: "action", State: state, Title: "Task " + id, Contexts: []string{}, Units: []unit.Unit{}, Items: []api.ItemView{}, Verbs: []api.VerbState{},
 		Created: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), Updated: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	if mod != nil {
 		mod(&e)
@@ -73,7 +73,7 @@ func TestNavListsCoreThenPluginViews(t *testing.T) {
 	}
 	counters := api.Counters{Views: map[string]int{"focus": 1, "inbox": 4, "outbox": 2, "next": 7, "waiting": 3, "projects": 0, "someday": 5, "logbook": 9}}
 	nodeRun(t, catalogPrelude(t)+viewsPrelude(t), nil, `
-const nav = gtdNav(input.cat, catalog.views, ["fake-board"], input.counters);
+const nav = viewNav(input.cat, catalog.views, ["fake-board"], input.counters);
 process.stdout.write(JSON.stringify({ ids: nav.map((v) => v.id), core: nav.map((v) => v.core), counts: nav.filter((v) => v.core).map((v) => v.count) }));`,
 		map[string]any{"cat": viewsCatalog(), "counters": counters}, &got)
 	plugin := []string{"needs-me", "stalled", "mine", "loop", "plan", "approved", "dash", "done", "all", "explore", "recent"}
@@ -106,13 +106,13 @@ func TestDisabledPluginViewsVanish(t *testing.T) {
 	}
 	nodeRun(t, catalogPrelude(t)+viewsPrelude(t), nil, `
 const served = catalog.views;
-const nav = gtdNav(input.cat, [], [], null);
+const nav = viewNav(input.cat, [], [], null);
 process.stdout.write(JSON.stringify({
   ids: nav.map((v) => v.id),
-  view: gtdResolveView("needs-me", input.cat, [], () => false),
-  before: gtdResolveView("needs-me", null, [], () => false),
-  enabled: gtdResolveView("needs-me", input.cat, served, () => false),
-  core_stay: gtdResolveView("waiting", input.cat, [], () => false),
+  view: resolveView("needs-me", input.cat, [], () => false),
+  before: resolveView("needs-me", null, [], () => false),
+  enabled: resolveView("needs-me", input.cat, served, () => false),
+  core_stay: resolveView("waiting", input.cat, [], () => false),
 }));`, map[string]any{"cat": viewsCatalog()}, &got)
 	if !slices.Equal(got.IDs, coreViewIDs) {
 		t.Errorf("nav with the GitHub plugin off %v, want the core views alone", got.IDs)
@@ -144,7 +144,7 @@ func TestGroupingPerView(t *testing.T) {
 	}
 	var got map[string][]group
 	nodeRun(t, viewsPrelude(t), nil, `
-const g = (v, es) => gtdGroups(v, es).map((x) => ({ label: x.label, ids: x.entries.map((e) => e.id) }));
+const g = (v, es) => viewGroups(v, es).map((x) => ({ label: x.label, ids: x.tasks.map((e) => e.id) }));
 process.stdout.write(JSON.stringify({ next: g("next", input.next), waiting: g("waiting", input.waiting), logbook: g("logbook", input.logbook), inbox: g("inbox", input.next) }));`,
 		map[string]any{"next": tasks, "waiting": waiting, "logbook": logbook}, &got)
 	want := map[string][]group{
@@ -173,23 +173,23 @@ func TestNavCountsComeFromThePage(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 const asked = []; const pages = [input.full, input.delta];
-async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input.cat : pages.shift(); }
-const inboxCount = () => gtdNav(gtdState.catalog, [], [], gtdState.counters).find((v) => v.id === "inbox").count;
+async function getJSON(u) { asked.push(u); return u === "/api/views" ? input.cat : pages.shift(); }
+const inboxCount = () => viewNav(tasksState.catalog, [], [], tasksState.counters).find((v) => v.id === "inbox").count;
 (async () => {
   const route = { view: "inbox", area: "", ctx: [] };
   const counts = [], lens = [];
-  await loadGTD(route);
-  counts.push(inboxCount()); lens.push(gtdState.entries.length);
+  await loadTasks(route);
+  counts.push(inboxCount()); lens.push(tasksState.tasks.length);
   // A change carries other counters; the list reloads and its page wins.
   const change = { counters: { views: { inbox: 3 } } };
-  if (change.counters) await loadGTD(route);
-  counts.push(inboxCount()); lens.push(gtdState.entries.length);
+  if (change.counters) await loadTasks(route);
+  counts.push(inboxCount()); lens.push(tasksState.tasks.length);
   process.stdout.write(JSON.stringify({ asked, counts, lens }));
 })();`, map[string]any{"cat": viewsCatalog(), "full": full, "delta": delta}, &got)
 	if len(got.Counts) != 2 || got.Counts[0] != float64(2) || got.Counts[1] != float64(1) || !slices.Equal(got.Lens, []int{2, 1}) {
 		t.Errorf("counts %v with lists of %v, want the page's 2 then 1", got.Counts, got.Lens)
 	}
-	if want := []string{"/api/gtd", "/api/entries?view=inbox", "/api/entries?view=inbox&since=ep%3A4"}; !slices.Equal(got.Asked, want) {
+	if want := []string{"/api/views", "/api/tasks?view=inbox", "/api/tasks?view=inbox&since=ep%3A4"}; !slices.Equal(got.Asked, want) {
 		t.Errorf("asked %v, want %v", got.Asked, want)
 	}
 }
@@ -204,16 +204,16 @@ func TestAreaSparesInbox(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 const urls = {};
-for (const v of input.views) urls[v] = entriesURL(v, "OSS", [], "");
+for (const v of input.views) urls[v] = tasksURL(v, "OSS", [], "");
 const asked = [];
-async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input.cat : { epoch: "e", rev: 1, full: true, entries: [], removed: [], counters: { views: {} } }; }
+async function getJSON(u) { asked.push(u); return u === "/api/views" ? input.cat : { epoch: "e", rev: 1, full: true, tasks: [], removed: [], counters: { views: {} } }; }
 (async () => {
-  await loadGTD({ view: "inbox", area: "OSS", ctx: [] });
-  await loadGTD({ view: "focus", area: "OSS", ctx: [] });
-  await loadGTD({ view: "needs-me", area: "OSS", ctx: [] });
+  await loadTasks({ view: "inbox", area: "OSS", ctx: [] });
+  await loadTasks({ view: "focus", area: "OSS", ctx: [] });
+  await loadTasks({ view: "needs-me", area: "OSS", ctx: [] });
   process.stdout.write(JSON.stringify({
     urls, asked,
-    keys: [gtdQueryKey("inbox", "OSS", []), gtdQueryKey("inbox", "", []), gtdQueryKey("next", "OSS", [])],
+    keys: [viewQueryKey("inbox", "OSS", []), viewQueryKey("inbox", "", []), viewQueryKey("next", "OSS", [])],
     route: readRoute(routeHash("next", "", new URLSearchParams({ area: "OSS" }))),
     hash: routeHash("next", "", new URLSearchParams({ area: "OSS" })),
   }));
@@ -230,7 +230,7 @@ async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input.cat :
 	if got.Route["area"] != "OSS" || got.Hash != "view=next&area=OSS" {
 		t.Errorf("the area is not kept in the hash: %q -> %v", got.Hash, got.Route)
 	}
-	if want := []string{"/api/gtd", "/api/entries?view=inbox", "/api/counters?area=OSS", "/api/entries?view=focus&area=OSS", "/api/counters?area=OSS"}; !slices.Equal(got.Asked, want) {
+	if want := []string{"/api/views", "/api/tasks?view=inbox", "/api/counters?area=OSS", "/api/tasks?view=focus&area=OSS", "/api/counters?area=OSS"}; !slices.Equal(got.Asked, want) {
 		t.Errorf("asked %v, want %v", got.Asked, want)
 	}
 }
@@ -295,14 +295,14 @@ func TestOutboxListsDraftsAndApproves(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 const posts = [];
-detailEnv.post = async (path, body) => { posts.push({ path, body }); return { entry: {} }; };
+detailEnv.post = async (path, body) => { posts.push({ path, body }); return { task: {} }; };
 detailEnv.notice = () => {}; detailEnv.changed = () => {}; detailEnv.render = () => {};
 function writeHash() {}
-gtdState.catalog = input.cat;
-const route = { view: "outbox", area: "", ctx: [], entry: "" };
-gtdState.key = gtdQueryKey("outbox", "", []);
-gtdState.entries = input.entries;
-const list = () => gtdList(route, "");
+tasksState.catalog = input.cat;
+const route = { view: "outbox", area: "", ctx: [], task: "" };
+tasksState.key = viewQueryKey("outbox", "", []);
+tasksState.tasks = input.tasks;
+const list = () => taskList(route, "");
 const first = list();
 const cards = byClass(first, "d-draft");
 const buttons = cards.map(buttonLabels);
@@ -316,7 +316,7 @@ const buttons = cards.map(buttonLabels);
   await byFocus(first, "outbox:dismiss:draft:8").attrs.onclick();
   await byFocus(first, "outbox:retry:draft:8").attrs.onclick();
   process.stdout.write(JSON.stringify({ text: text(first), buttons, posts, editing: buttonLabels(byClass(editing, "d-draft")[0]) }));
-})();`, map[string]any{"cat": viewsCatalog(), "entries": outboxTasks()}, &got)
+})();`, map[string]any{"cat": viewsCatalog(), "tasks": outboxTasks()}, &got)
 	for _, s := range []string{`To #deploys in the thread "Deploy at five"`, "Deployed, all green.", "Auto-send would release: a reply from a turn",
 		"To acme/api#8 (destination unknown)", "Ping?", "rate limited", "Auto-send would hold: low confidence"} {
 		if !strings.Contains(got.Text, s) {
@@ -335,10 +335,10 @@ const buttons = cards.map(buttonLabels);
 		posts = append(posts, post{p["path"].(string), mustJS(t, p["body"])})
 	}
 	want := []post{
-		{"/api/entries/draft:7/approve", `{"args":{"rev":"3"},"source":"cockpit"}`},
-		{"/api/entries/draft:7/approve", `{"args":{"rev":"3","text":"Deployed; two checks were retried."},"source":"cockpit"}`},
-		{"/api/entries/draft:8/dismiss", `{"source":"cockpit"}`},
-		{"/api/entries/draft:8/retry", `{"args":{"rev":"5"},"source":"cockpit"}`},
+		{"/api/tasks/draft:7/approve", `{"args":{"rev":"3"},"source":"cockpit"}`},
+		{"/api/tasks/draft:7/approve", `{"args":{"rev":"3","text":"Deployed; two checks were retried."},"source":"cockpit"}`},
+		{"/api/tasks/draft:8/dismiss", `{"source":"cockpit"}`},
+		{"/api/tasks/draft:8/retry", `{"args":{"rev":"5"},"source":"cockpit"}`},
 	}
 	if !slices.Equal(posts, want) {
 		t.Errorf("posts %v, want %v", posts, want)

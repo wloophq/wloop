@@ -23,31 +23,37 @@ func routesPrelude(t *testing.T) string {
 	return b.String()
 }
 
-func TestTaskRouteOverView(t *testing.T) {
+func TestTaskHashOpensTheTask(t *testing.T) {
 	var got struct {
-		View, Entry, PR string
-		Detail          bool
-		List            string
-		Back            string
+		View, Task, PR string
+		Detail         bool
+		List           string
+		Back           string
+		Old            string
 	}
 	nodeRun(t, routesPrelude(t)+treeJS+staticJS(t, "detail.js"), nil, `
-gtdState.catalog = input;
-gtdState.key = gtdQueryKey("next", "", []);
-gtdState.entries = [{ id: "e-1", state: "next", title: "Write the release notes", contexts: [], units: [] }];
+tasksState.catalog = input;
+tasksState.key = viewQueryKey("next", "", []);
+tasksState.tasks = [{ id: "e-1", state: "next", title: "Write the release notes", contexts: [], units: [] }];
 location.hash = "#view=next&entry=e-1";
+const old = readHash().task;
+location.hash = "#view=next&task=e-1";
 const r = readHash();
 const box = { dataset: {}, hidden: true, replaceChildren() {}, contains: () => false };
 globalThis.document = { activeElement: null, body: { classList: { add() {} } } };
-const shown = renderEntryDetail(box, r);
-process.stdout.write(JSON.stringify({ View: r.view, Entry: r.entry, PR: r.pr, Detail: shown && !box.hidden, List: text(gtdList(r, r.entry)), Back: hashString({ ...r, entry: "" }) }));`, viewsCatalog(), &got)
-	if got.View != "next" || got.Entry != "e-1" || got.PR != "" {
-		t.Errorf("#view=next&entry=e-1 reads view %q entry %q unit %q", got.View, got.Entry, got.PR)
+const shown = renderTaskDetail(box, r);
+process.stdout.write(JSON.stringify({ View: r.view, Task: r.task, PR: r.pr, Detail: shown && !box.hidden, List: text(taskList(r, r.task)), Back: hashString({ ...r, task: "" }), Old: old }));`, viewsCatalog(), &got)
+	if got.View != "next" || got.Task != "e-1" || got.PR != "" {
+		t.Errorf("#view=next&task=e-1 reads view %q task %q unit %q", got.View, got.Task, got.PR)
 	}
 	if !got.Detail || !strings.Contains(got.List, "Write the release notes") {
 		t.Errorf("detail open %v, list %q", got.Detail, got.List)
 	}
 	if got.Back != "view=next" {
-		t.Errorf("closing the entry leaves %q, want view=next", got.Back)
+		t.Errorf("closing the task leaves %q, want view=next", got.Back)
+	}
+	if got.Old != "" {
+		t.Errorf("the old entry= hash still opens task %q", got.Old)
 	}
 }
 
@@ -55,13 +61,13 @@ func TestFirstLoadResolvesACoreViewOnceItsCatalogIsIn(t *testing.T) {
 	var got struct{ Asked []string }
 	nodeRun(t, routesPrelude(t), nil, `
 const asked = [];
-async function getJSON(u) { asked.push(u); return u === "/api/gtd" ? input : { epoch: "e", rev: 1, full: true, entries: [], removed: [], counters: { views: {} } }; }
+async function getJSON(u) { asked.push(u); return u === "/api/views" ? input : { epoch: "e", rev: 1, full: true, tasks: [], removed: [], counters: { views: {} } }; }
 location.hash = "#view=focus";
 (async () => {
-  await loadGTD();
+  await loadTasks();
   process.stdout.write(JSON.stringify({ Asked: asked }));
 })();`, viewsCatalog(), &got)
-	if want := "/api/gtd,/api/entries?view=focus"; strings.Join(got.Asked, ",") != want {
+	if want := "/api/views,/api/tasks?view=focus"; strings.Join(got.Asked, ",") != want {
 		t.Errorf("first load asked %v, want %s", got.Asked, want)
 	}
 }

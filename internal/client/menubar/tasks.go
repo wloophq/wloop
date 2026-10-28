@@ -11,14 +11,14 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// coreSections are the GTD views the menu lists first, in order.
+// coreSections are the task views the menu lists first, in order.
 var coreSections = []struct {
 	view  task.View
 	label string
 }{{task.ViewFocus, "Focus"}, {task.ViewInbox, "Inbox"}, {task.ViewOutbox, "Outbox"}}
 
-// pullTasks reads each core view whole: an entry's attention also moves
-// with its row's notice and its proposed draft, which no entry write marks,
+// pullTasks reads each core view whole: a task's attention also moves
+// with its row's notice and its proposed draft, which no task write marks,
 // so a delta would miss it. The badge comes with the Inbox's page, so the
 // title and the Inbox agree.
 func (c *Controller) pullTasks(ctx context.Context) error {
@@ -66,7 +66,7 @@ func taskLabel(e api.TaskView) string {
 	return e.UnitLabel(0) + " · " + e.Title
 }
 
-func taskRoute(id string) string { return "entry=" + id }
+func taskRoute(id string) string { return "task=" + id }
 
 func viewRoute(v string) string { return "view=" + url.QueryEscape(v) }
 

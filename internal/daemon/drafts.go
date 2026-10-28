@@ -46,7 +46,7 @@ var errOutboxUnavailable = unavailable{"the Outbox is not served: the daemon run
 // mayHaveBeenPosted starts a publisher's error when the post may have reached its provider (#publisher).
 const mayHaveBeenPosted = "may have been posted"
 
-// draftVerbs are the entry verbs a draft takes, by the draft action each runs.
+// draftVerbs are the task verbs a draft takes, by the draft action each runs.
 var draftVerbs = map[task.Verb]string{
 	task.VerbApprove: "approve",
 	task.VerbEdit:    "edit",
@@ -54,7 +54,7 @@ var draftVerbs = map[task.Verb]string{
 	task.VerbRetry:   "retry",
 }
 
-// registerOutbox serves the Outbox view from the drafts and makes a draft entry's verbs act on its draft.
+// registerOutbox serves the Outbox view from the drafts and makes a draft task's verbs act on its draft.
 func (s *Server) registerOutbox() {
 	if s.deps.Tasks == nil || s.deps.Outbox == nil {
 		return
@@ -72,7 +72,7 @@ func (s *Server) handleDrafts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	f := outbox.Filter{States: []draft.State{draft.Proposed, draft.Failed}, Task: q.Get("entry")}
+	f := outbox.Filter{States: []draft.State{draft.Proposed, draft.Failed}, Task: q.Get("task")}
 	if raw := q.Get("state"); raw != "" {
 		f.States = nil
 		for _, st := range strings.Split(raw, ",") {
@@ -222,7 +222,7 @@ func writeDraftError(w http.ResponseWriter, err error) {
 	}
 }
 
-// draftVerb runs verb on a draft entry's draft, with the statuses the draft routes answer.
+// draftVerb runs verb on a draft task's draft, with the statuses the draft routes answer.
 func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
 	return func(ctx context.Context, e task.Task, req coretasks.Request) (coretasks.Result, error) {
 		id, ok := draftIDOf(e.ID)
@@ -260,7 +260,7 @@ func (s *Server) draftVerb(verb task.Verb) coretasks.VerbHandler {
 	}
 }
 
-// taskDraftError is a draft action's error as the entries' routes answer it.
+// taskDraftError is a draft action's error as the tasks' routes answer it.
 func taskDraftError(err error) error {
 	var off pluginOff
 	var bad badRequest

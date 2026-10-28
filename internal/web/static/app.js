@@ -187,12 +187,12 @@ function safeURL(u) {
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const route = readRoute(location.hash);
-  const view = gtdResolveView(route.view, gtdState.catalog, catalog.views, (id) => pluginViews.has(id));
+  const view = resolveView(route.view, tasksState.catalog, catalog.views, (id) => pluginViews.has(id));
   const g = p.get("g") || "";
   return {
     view,
     pr: UNIT_KEY.test(route.unit) ? route.unit : "",
-    entry: route.entry,
+    task: route.task,
     area: route.area,
     ctx: route.ctx,
     layout: p.get("layout") === "board" ? "board" : "",
@@ -207,7 +207,7 @@ function readHash() {
 
 function hashString(next) {
   const p = new URLSearchParams();
-  if (next.entry) p.set("entry", next.entry);
+  if (next.task) p.set("task", next.task);
   if (next.area) p.set("area", next.area);
   if (next.ctx && next.ctx.length) p.set("ctx", [].concat(next.ctx).join(","));
   if (next.layout) p.set("layout", next.layout);
@@ -1028,13 +1028,13 @@ function lensHash(change) {
 
 function renderRail() {
   const lens = readLens();
-  const nav = gtdNav(gtdState.catalog, catalog.views, [...pluginViews.keys()], gtdCounters(readHash()));
+  const nav = viewNav(tasksState.catalog, catalog.views, [...pluginViews.keys()], viewCounters(readHash()));
   const views = railSections(nav, providerName).flatMap((sec) => [
     sec.title ? h("li", { class: "rail-head", role: "presentation" }, sec.title) : null,
     ...sec.views.map((v) => {
       const rows = !v.core && catalog.views.some((c) => c.id === v.id) && !(v.id === "recent" || v.id === "explore" || v.id === "plan");
       const count = v.core ? v.count : v.id === "plan" ? planCount() : rows ? state.rows.filter((r) => passes(r, v.id, lens)).length : "";
-      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, entry: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"));
+      return railItem(v.label, count, v.id === lens.view, lensHash({ view: v.id, task: "", pr: "" }), (v.id === "stalled" ? "late-count " : "") + (v.core ? "core" : "plugin"));
     })]).filter(Boolean);
   document.getElementById("views").replaceChildren(...views);
 
@@ -1164,7 +1164,7 @@ function multiCopy(field) {
 
 function openRow(scope, key) {
   state.openSlot = scope;
-  writeHash({ pr: key, entry: "" });
+  writeHash({ pr: key, task: "" });
 }
 
 // openSlot is the copy of the open pull request last opened, when it is
@@ -1304,14 +1304,14 @@ function renderRows() {
   const lens = readLens();
   const { pr } = readHash();
   const { view } = lens;
-  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isGTDView(view);
+  const listless = view === "recent" || view === "explore" || view === "plan" || pluginViews.has(view) || isCoreView(view);
   renderActivity(lens);
   const table = document.getElementById("table");
   const boardBox = document.getElementById("board");
   const empty = document.getElementById("empty");
   const listBox = document.getElementById("list-box");
   listBox.classList.toggle("in-dash", view === "dash");
-  listBox.hidden = view === "plan" || pluginViews.has(view) || isGTDView(view);
+  listBox.hidden = view === "plan" || pluginViews.has(view) || isCoreView(view);
   if (view !== "dash") listBox.open = true;
   if (listless) {
     renderLens(lens, null);
@@ -1909,7 +1909,7 @@ function setupDetailResize() {
 
 function renderDetail() {
   const box = document.getElementById("detail");
-  if (renderEntryDetail(box, readHash())) return;
+  if (renderTaskDetail(box, readHash())) return;
   const { pr } = readHash();
   const d = state.detail;
   if (!pr || !d || keyOf(d.row) !== pr) {
@@ -2423,7 +2423,7 @@ function render() {
   renderExplore(readHash().view);
   renderPlan(readHash().view);
   renderPluginView(readHash().view);
-  renderGTD(readHash());
+  renderTasks(readHash());
   renderDash(readLens());
   renderRows();
   renderDetail();
@@ -2455,9 +2455,9 @@ async function loadActivity() {
 }
 
 async function loadDetail() {
-  const { pr, entry } = readHash();
-  await detailPane.load({ entry, unit: pr });
-  if (!pr || entry) {
+  const { pr, task } = readHash();
+  await detailPane.load({ task, unit: pr });
+  if (!pr || task) {
     state.detail = null;
     state.detailError = "";
     return;
@@ -2518,7 +2518,7 @@ async function load() {
     state.error = "";
     state.authLost = false;
   }
-  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadGTD()]);
+  await Promise.all([loadActivity(), loadDetail(), loadExploreRecent(), loadPlan(), loadTasks()]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
 }
@@ -2629,9 +2629,9 @@ async function applyChange(c) {
   const { view, pr } = route;
   await Promise.all([
     c.units.length && view === "recent" ? loadActivity() : null,
-    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.entries && (route.entry || pr)) ? loadDetail() : null,
+    (pr && c.units.some((u) => u.toLowerCase() === pr.toLowerCase())) || (c.tasks && (route.task || pr)) ? loadDetail() : null,
     loadPlan(),
-    c.entries ? loadGTD(route) : null,
+    c.tasks ? loadTasks(route) : null,
   ]);
   await refreshSpecs([...state.rows, ...(state.detail ? [state.detail.row] : [])]);
   render();
@@ -2641,12 +2641,12 @@ let pending;
 let queued = null;
 let chain = Promise.resolve();
 function scheduleLoad(c = { all: true }) {
-  queued = queued || { units: [], all: false, rows: false, health: false, entries: false };
+  queued = queued || { units: [], all: false, rows: false, health: false, tasks: false };
   queued.units = [...new Set([...queued.units, ...(c.units || [])])];
   queued.all = queued.all || !!c.all;
   queued.rows = queued.rows || !!c.rows;
   queued.health = queued.health || !!c.health;
-  queued.entries = queued.entries || !!c.entries;
+  queued.tasks = queued.tasks || !!c.tasks;
   clearTimeout(pending);
   pending = setTimeout(() => {
     const c = queued;
@@ -2662,7 +2662,7 @@ function onChange(e) {
   } catch {
     return scheduleLoad();
   }
-  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, entries: !!c.counters });
+  scheduleLoad({ units: (c.units || []).map(unitKey), all: !!c.all, health: !!c.health, tasks: !!c.counters });
 }
 
 let retries = 0;
@@ -2699,7 +2699,7 @@ window.addEventListener("hashchange", async () => {
   searchBox.value = readHash().q;
   document.getElementById("explore-q").value = readHash().x;
   render();
-  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadGTD(readHash())]);
+  await Promise.all([viewChanged || !state.activityLoaded ? loadActivity() : null, viewChanged ? loadExploreRecent() : null, loadDetail(), viewChanged ? loadPlan() : null, loadTasks(readHash())]);
   render();
 });
 

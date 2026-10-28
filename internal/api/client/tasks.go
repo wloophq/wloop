@@ -9,7 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/api"
 )
 
-// TaskQuery selects a view's entries; Contexts must all match, and the Inbox ignores Area.
+// TaskQuery selects a view's tasks; Contexts must all match, and the Inbox ignores Area.
 type TaskQuery struct {
 	View     string
 	Area     string
@@ -23,7 +23,7 @@ func (c *Client) Views(ctx context.Context) (api.ViewsCatalog, error) {
 	return cat, err
 }
 
-// TasksSince is q's page since: every entry when since is zero or the daemon answers Full, else the entries
+// TasksSince is q's page since: every task when since is zero or the daemon answers Full, else the tasks
 // changed after it and the ids that left the view.
 func (c *Client) TasksSince(ctx context.Context, q TaskQuery, since api.Since) (api.TasksPage, error) {
 	v := url.Values{}
@@ -42,28 +42,28 @@ func (c *Client) TasksSince(ctx context.Context, q TaskQuery, since api.Since) (
 	return page, err
 }
 
-// Task is entry id with its cards and items.
+// Task is task id with its cards and items.
 func (c *Client) Task(ctx context.Context, id string) (api.TaskView, error) {
 	var e api.TaskView
 	err := c.do(ctx, ReadTimeout, http.MethodGet, api.TaskPath(id), nil, &e)
 	return e, err
 }
 
-// Capture files an entry in the Inbox.
+// Capture files a task in the Inbox.
 func (c *Client) Capture(ctx context.Context, req api.CaptureRequest) (api.TaskView, error) {
 	var e api.TaskView
 	err := c.do(ctx, ReadTimeout, http.MethodPost, api.TasksPath, req, &e)
 	return e, err
 }
 
-// TaskDo runs verb on entry id.
+// TaskDo runs verb on task id.
 func (c *Client) TaskDo(ctx context.Context, id, verb string, req api.TaskRequest) (api.TaskResult, error) {
 	var res api.TaskResult
 	err := c.do(ctx, actionTimeout, http.MethodPost, api.TaskPath(id, verb), req, &res)
 	return res, err
 }
 
-// Counters are the counters of area, "" for every area, of the entries holding every term.
+// Counters are the counters of area, "" for every area, of the tasks holding every term.
 func (c *Client) Counters(ctx context.Context, area string, terms ...string) (api.Counters, error) {
 	q := url.Values{}
 	if area != "" {

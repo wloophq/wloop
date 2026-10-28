@@ -9,20 +9,20 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// The entries' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
+// The tasks' routes: ViewsPath serves the ViewsCatalog, TasksPath lists a view (query parameters view, area,
 // context as "a,b" and since, a Since's String) and takes a capture, TaskVerb runs a verb, CountersPath
-// serves the counters of the query parameter area (narrowed to the entries holding each CountersTerm), DigestPath the daily digest of the query parameter day
+// serves the counters of the query parameter area (narrowed to the tasks holding each CountersTerm), DigestPath the daily digest of the query parameter day
 // (YYYY-MM-DD).
 const (
-	ViewsPath    = "/api/gtd"
-	TasksPath    = "/api/entries"
+	ViewsPath    = "/api/views"
+	TasksPath    = "/api/tasks"
 	TaskDetail   = TasksPath + "/{id}"
 	TaskVerb     = TaskDetail + "/{verb}"
 	CountersPath = "/api/counters"
 	DigestPath   = "/api/digest"
 )
 
-// TaskPath is the path of entry id, followed by the segments of rest.
+// TaskPath is the path of task id, followed by the segments of rest.
 func TaskPath(id string, rest ...string) string {
 	p := TasksPath + "/" + url.PathEscape(id)
 	for _, r := range rest {
@@ -74,7 +74,7 @@ type TaskView struct {
 	Items            []ItemView   `json:"items"`
 	Cards            []CardView   `json:"cards,omitempty"` // detail only
 	Verbs            []VerbState  `json:"verbs"`
-	// Actions are the intents that serve the entry's own unit, such as start.
+	// Actions are the intents that serve the task's own unit, such as start.
 	Actions   []ActionState `json:"actions,omitempty"`
 	Attention *Attention    `json:"attention,omitempty"`
 	Message   *Message      `json:"message,omitempty"`
@@ -112,7 +112,7 @@ type ItemView struct {
 	Kind    string    `json:"kind"`
 }
 
-// CardView is a unit's stored card on an entry's detail.
+// CardView is a unit's stored card on a task's detail.
 type CardView = card.Snapshot
 
 type VerbState struct {
@@ -134,7 +134,7 @@ type TasksPage struct {
 	Epoch    string     `json:"epoch"`
 	Rev      uint64     `json:"rev"`
 	Full     bool       `json:"full"`
-	Tasks    []TaskView `json:"entries"`
+	Tasks    []TaskView `json:"tasks"`
 	Removed  []string   `json:"removed"`
 	Counters Counters   `json:"counters"`
 }
@@ -155,7 +155,7 @@ type TaskRequest struct {
 }
 
 type TaskResult struct {
-	Task  TaskView `json:"entry"`
+	Task  TaskView `json:"task"`
 	Lines []string `json:"lines,omitempty"`
 }
 
@@ -169,7 +169,7 @@ type Counters struct {
 
 type Message struct {
 	ID        int64           `json:"id"`
-	TaskID    string          `json:"entry_id"`
+	TaskID    string          `json:"task_id"`
 	Unit      unit.Unit       `json:"unit"`
 	Kind      string          `json:"kind"`
 	Text      string          `json:"text"`

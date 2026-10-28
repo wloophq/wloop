@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-// CountersTerm is the query parameter of CountersPath, repeated, that counts only the entries holding every
+// CountersTerm is the query parameter of CountersPath, repeated, that counts only the tasks holding every
 // term, as TaskMatches reads them.
 const CountersTerm = "term"
 
@@ -32,7 +32,7 @@ func Fold(s string) string {
 	}, accents.Replace(strings.ToLower(s)))
 }
 
-// Texts are what a filter's free words search in an entry: its title, notes, state, kind, area, project and
+// Texts are what a filter's free words search in a task: its title, notes, state, kind, area, project and
 // contexts, its units, the people it waits on, its items, its cards' people, its draft and its message. The
 // cockpit's entryHaystack lists the same texts.
 func (e TaskView) Texts() []string {

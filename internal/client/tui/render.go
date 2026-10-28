@@ -97,7 +97,7 @@ const pluginViewsGroup = " plugins"
 
 // tabs names the views with their counts, the current one bold, and the
 // daemon's flags at the right edge when they fit: the group on screen
-// whole, then each other group that fits whole, GTD views first.
+// whole, then each other group that fits whole, task views first.
 func (m *Model) tabs(width int) string {
 	t := m.t
 	views := make([]tab, len(m.taskViews))

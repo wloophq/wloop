@@ -294,3 +294,32 @@ func TestClientReadsTheRefusalCode(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestViewsRouteServesTheCatalog(t *testing.T) {
+	socket := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/views":
+			fmt.Fprint(w, `{"views":[{"id":"inbox","label":"Inbox"}],"areas":["OSS"],"contexts":[],"verbs":[]}`)
+		case "/api/tasks":
+			fmt.Fprint(w, `{"epoch":"e","rev":2,"full":true,"tasks":[{"id":"e-1","title":"Call the bank","units":[],"items":[],"verbs":[],"contexts":[]}],"removed":[]}`)
+		case "/api/tasks/e-1/done":
+			fmt.Fprint(w, `{"task":{"id":"e-1","state":"done"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	c := New(socket)
+	ctx := context.Background()
+	cat, err := c.Views(ctx)
+	if err != nil || len(cat.Views) != 1 || cat.Views[0].Label != "Inbox" || cat.Areas[0] != "OSS" {
+		t.Fatalf("views %+v %v", cat, err)
+	}
+	page, err := c.TasksSince(ctx, TaskQuery{View: "inbox"}, api.Since{})
+	if err != nil || len(page.Tasks) != 1 || page.Tasks[0].Title != "Call the bank" {
+		t.Fatalf("page %+v %v", page, err)
+	}
+	res, err := c.TaskDo(ctx, "e-1", "done", api.TaskRequest{Source: "cli"})
+	if err != nil || res.Task.State != "done" {
+		t.Fatalf("result %+v %v", res, err)
+	}
+}

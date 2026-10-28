@@ -57,7 +57,7 @@ func waitingOn(e api.TaskView, names ...string) api.TaskView {
 	return e
 }
 
-// viewTasks are the entries of each GTD view.
+// viewTasks are the tasks of each task view.
 func viewTasks() map[string][]api.TaskView {
 	focus := task("e1", "Reply on the batch export review", "next", "computer")
 	focus.Focus, focus.Units = true, []unit.Unit{ref(7).Unit()}
@@ -86,7 +86,7 @@ func viewCounters() api.Counters {
 		Areas: map[string]int{}, Contexts: map[string]int{}, Badge: 3}
 }
 
-// viewsModel is a model with the GTD views loaded, on Focus.
+// viewsModel is a model with the task views loaded, on Focus.
 func viewsModel(t testing.TB, rs ...api.Row) *Model {
 	t.Helper()
 	m := newModel(t)

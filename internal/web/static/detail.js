@@ -1,10 +1,10 @@
 "use strict";
 
-// UNIT_ENTRY_VIEWS are the lists a unit's detail reads its open entries from.
-const UNIT_ENTRY_VIEWS = ["inbox", "next", "waiting", "someday"];
+// UNIT_TASK_VIEWS are the lists a unit's detail reads its open tasks from.
+const UNIT_TASK_VIEWS = ["inbox", "next", "waiting", "someday"];
 const MESSAGE_HEAD = { question: "Question", agent_post: "Message from the agent", proposal: "Proposal" };
 const SKIP_VERB_BUTTONS = new Set(["seen", "answer", "edit", "retry", "approve", "dismiss", "delegate", "reply"]);
-// DRAFT_VERBS are the entry verbs of a draft's actions.
+// DRAFT_VERBS are the task verbs of a draft's actions.
 const DRAFT_VERBS = { "draft.approve": "approve", "draft.edit": "edit", "draft.discard": "dismiss", "draft.retry": "retry" };
 
 // draftWord is the label of a draft's action id, from the served specs, else its verb's.
@@ -12,30 +12,30 @@ function draftWord(id) {
   const sp = typeof state === "object" && state.specs && state.specs.byId ? state.specs.byId[id] : null;
   return (sp && sp.label) || verbLabel(DRAFT_VERBS[id]);
 }
-const ENTRY_DRAFT_STATES = "proposed,approved,sending,sent,failed";
+const TASK_DRAFT_STATES = "proposed,approved,sending,sent,failed";
 
 const detailState = {
-  id: "", entry: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", editing: new Map(), answer: "", unitKey: "", unitEntries: [],
+  id: "", task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", editing: new Map(), answer: "", unitKey: "", unitTasks: [],
   guidance: "", drafts: [], draftsError: "", compose: { key: "", text: "", reaction: "" },
 };
 
 // detailEnv is what the pane reaches of the page; tests replace it.
 const detailEnv = {
   getJSON: (url) => getJSON(url),
-  post: (path, body) => entryPost(path, body),
+  post: (path, body) => taskPost(path, body),
   notice: (text, err) => setNotice(text, err),
-  changed: () => scheduleLoad({ entries: true }),
+  changed: () => scheduleLoad({ tasks: true }),
   render: () => render(),
-  close: () => writeHash({ entry: "" }),
+  close: () => writeHash({ task: "" }),
   ask: (label, value) => prompt(label, value || ""),
-  postJSON: (path, body) => entryPost(path, body),
+  postJSON: (path, body) => taskPost(path, body),
   focused: () => {
-    const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="entry:"]');
-    return el ? el.dataset.focus.slice("entry:".length) : "";
+    const el = typeof document !== "undefined" && document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-focus^="task:"]');
+    return el ? el.dataset.focus.slice("task:".length) : "";
   },
 };
 
-async function entryPost(path, body) {
+async function taskPost(path, body) {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json", "X-Loop-API": API_VERSION },
@@ -46,8 +46,8 @@ async function entryPost(path, body) {
   return out;
 }
 
-function entryPath(id, ...rest) {
-  return "/api/entries/" + [id, ...rest].map((s) => encodeURIComponent(s).replace(/%3A/gi, ":")).join("/");
+function taskPath(id, ...rest) {
+  return "/api/tasks/" + [id, ...rest].map((s) => encodeURIComponent(s).replace(/%3A/gi, ":")).join("/");
 }
 
 // verbBody is a verb's request: its args as strings.
@@ -58,10 +58,10 @@ function verbBody(args) {
   return body;
 }
 
-function entryById(id) {
+function taskById(id) {
   if (!id) return null;
-  if (detailState.entry && detailState.entry.id === id) return detailState.entry;
-  const lists = [typeof gtdState === "object" ? gtdState.entries : [], detailState.unitEntries];
+  if (detailState.task && detailState.task.id === id) return detailState.task;
+  const lists = [typeof tasksState === "object" ? tasksState.tasks : [], detailState.unitTasks];
   for (const list of lists) {
     const e = (list || []).find((x) => x.id === id);
     if (e) return e;
@@ -69,53 +69,53 @@ function entryById(id) {
   return null;
 }
 
-// entryAct runs verb on entry and asks for a reload; the result, or null
+// taskAct runs verb on task and asks for a reload; the result, or null
 // when it failed.
-async function entryAct(entry, verb, args) {
-  if (!entry) return null;
+async function taskAct(task, verb, args) {
+  if (!task) return null;
   try {
-    const out = await detailEnv.post(entryPath(entry.id, verb), verbBody(args));
-    detailEnv.notice(`${verb}: ${entry.title || entry.id}${out && out.lines && out.lines.length ? ". " + out.lines.join(" ") : ""}`);
+    const out = await detailEnv.post(taskPath(task.id, verb), verbBody(args));
+    detailEnv.notice(`${verb}: ${task.title || task.id}${out && out.lines && out.lines.length ? ". " + out.lines.join(" ") : ""}`);
     if (verb === "approve" || verb === "answer") {
-      detailState.editing.delete(entry.id);
+      detailState.editing.delete(task.id);
       detailState.answer = "";
     }
     detailEnv.changed();
     return out || {};
   } catch (err) {
-    detailEnv.notice(`${verb} ${entry.title || entry.id} failed: ${err.message}`, true);
+    detailEnv.notice(`${verb} ${task.title || task.id} failed: ${err.message}`, true);
     return null;
   }
 }
 
-// entryIntentAct runs the intent action id on the entry's own unit, such as
+// taskIntentAct runs the intent action id on the task's own unit, such as
 // start, and asks for a reload.
-async function entryIntentAct(entry, id) {
-  const path = "/api/units/" + ["entry", entry.id, id].map(encodeURIComponent).join("/");
+async function taskIntentAct(task, id) {
+  const path = "/api/units/" + ["entry", task.id, id].map(encodeURIComponent).join("/");
   try {
     const out = await detailEnv.post(path, { source: "cockpit" });
-    detailEnv.notice(`${id}: ${entry.title || entry.id}${out && out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
+    detailEnv.notice(`${id}: ${task.title || task.id}${out && out.output && out.output.length ? ". " + out.output.join(" ") : ""}`);
     detailEnv.changed();
   } catch (err) {
-    detailEnv.notice(`${id} ${entry.title || entry.id} failed: ${err.message}`, true);
+    detailEnv.notice(`${id} ${task.title || task.id} failed: ${err.message}`, true);
   }
 }
 
-// entryIntentButtons are the buttons of the intents that serve the entry's
-// own unit, as the entry lists them.
-function entryIntentButtons(e) {
+// taskIntentButtons are the buttons of the intents that serve the task's
+// own unit, as the task lists them.
+function taskIntentButtons(e) {
   return (e.actions || []).map((a) => h("button", {
     type: "button",
     class: "act" + (a.enabled ? "" : " off"),
     disabled: !a.enabled,
     title: a.enabled ? a.note || undefined : a.reason,
     "data-focus": `detail:${a.id}:${e.id}`,
-    onclick: () => entryIntentAct(e, a.id),
+    onclick: () => taskIntentAct(e, a.id),
   }, a.label || a.id));
 }
 
-// draftTarget is the Outbox entry of the draft e carries: e itself, or
-// draft:<id> when e is a message entry that only shows the draft.
+// draftTarget is the Outbox task of the draft e carries: e itself, or
+// draft:<id> when e is a message task that only shows the draft.
 function draftTarget(e) {
   const id = "draft:" + e.draft.id;
   return e.id === id ? e : { id, title: e.title, verbs: [] };
@@ -123,65 +123,65 @@ function draftTarget(e) {
 
 // approveEdited approves the draft of e with the text being edited.
 async function approveEdited(e) {
-  const out = await entryAct(draftTarget(e), "approve", { text: detailState.editing.get(e.id), rev: String(e.draft.rev) });
+  const out = await taskAct(draftTarget(e), "approve", { text: detailState.editing.get(e.id), rev: String(e.draft.rev) });
   if (out) detailState.editing.delete(e.id);
   return out;
 }
 
-// actOn runs verb on entry; an approve while its draft is being edited
+// actOn runs verb on task; an approve while its draft is being edited
 // sends the edited text.
-function actOn(entry, verb, args) {
-  if (entry && verb === "approve" && entry.draft && detailState.editing.has(entry.id)) return approveEdited(entry);
-  if (entry && entry.draft && entry.id.startsWith("draft:") && (verb === "approve" || verb === "retry")) args = { ...args, rev: String(entry.draft.rev) };
-  return entryAct(entry, verb, args);
+function actOn(task, verb, args) {
+  if (task && verb === "approve" && task.draft && detailState.editing.has(task.id)) return approveEdited(task);
+  if (task && task.draft && task.id.startsWith("draft:") && (verb === "approve" || verb === "retry")) args = { ...args, rev: String(task.draft.rev) };
+  return taskAct(task, verb, args);
 }
 
-// detailPane is what keys.js reaches: the selected entry and its verbs.
+// detailPane is what keys.js reaches: the selected task and its verbs.
 const detailPane = {
-  selected: () => entryById(detailEnv.focused()) || detailState.entry,
-  act: (verb, args, entry) => actOn(entry || detailPane.selected(), verb, args),
+  selected: () => taskById(detailEnv.focused()) || detailState.task,
+  act: (verb, args, task) => actOn(task || detailPane.selected(), verb, args),
   load: (route) => loadDetailPane(route),
   questionAt: (el) => {
-    const e = detailState.entry;
+    const e = detailState.task;
     const m = e && e.message;
     if (!el || !el.closest || !el.closest(".d-question") || !m || m.state !== "open") return null;
-    return { entry: e, question: { kind: m.confirm ? "confirm" : m.kind, options: m.options || [], recommend: m.recommend || "" } };
+    return { task: e, question: { kind: m.confirm ? "confirm" : m.kind, options: m.options || [], recommend: m.recommend || "" } };
   },
 };
 
 async function loadDetailPane(route) {
-  if (!route.entry) {
-    Object.assign(detailState, { id: "", entry: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
-    return loadUnitEntries(route.unit);
+  if (!route.task) {
+    Object.assign(detailState, { id: "", task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
+    return loadUnitTasks(route.unit);
   }
-  const id = route.entry;
-  if (detailState.id !== id) Object.assign(detailState, { id, entry: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
+  const id = route.task;
+  if (detailState.id !== id) Object.assign(detailState, { id, task: null, error: "", seenFor: "", log: null, logOpen: false, logError: "", answer: "", guidance: "", drafts: [], draftsError: "" });
   try {
-    const e = await detailEnv.getJSON(entryPath(id));
+    const e = await detailEnv.getJSON(taskPath(id));
     if (detailState.id !== id) return;
-    detailState.entry = e;
+    detailState.task = e;
     detailState.error = "";
-    await loadEntryDrafts(e);
+    await loadTaskDrafts(e);
     if (e.state === "inbox" && detailState.seenFor !== id) {
       detailState.seenFor = id;
-      detailEnv.post(entryPath(id, "seen"), { source: "cockpit" }).catch(() => {});
+      detailEnv.post(taskPath(id, "seen"), { source: "cockpit" }).catch(() => {});
     }
     if (detailState.logOpen) await loadAgentLog();
   } catch (err) {
     if (detailState.id !== id) return;
-    detailState.entry = null;
+    detailState.task = null;
     detailState.error = err.message;
   }
 }
 
-// loadEntryDrafts reads the drafts made for e, but for a draft's own entry, which shows its draft.
-async function loadEntryDrafts(e) {
+// loadTaskDrafts reads the drafts made for e, but for a draft's own task, which shows its draft.
+async function loadTaskDrafts(e) {
   if (e.kind === "draft") {
     detailState.drafts = [];
     return;
   }
   try {
-    const out = await detailEnv.getJSON("/api/drafts?" + new URLSearchParams({ entry: e.id, state: ENTRY_DRAFT_STATES }).toString());
+    const out = await detailEnv.getJSON("/api/drafts?" + new URLSearchParams({ task: e.id, state: TASK_DRAFT_STATES }).toString());
     if (detailState.id !== e.id) return;
     detailState.drafts = out.drafts || [];
     detailState.draftsError = "";
@@ -190,30 +190,30 @@ async function loadEntryDrafts(e) {
   }
 }
 
-// loadUnitEntries reads the open entries that hold the unit key.
-async function loadUnitEntries(key) {
+// loadUnitTasks reads the open tasks that hold the unit key.
+async function loadUnitTasks(key) {
   detailState.unitKey = key || "";
   if (!key) {
-    detailState.unitEntries = [];
+    detailState.unitTasks = [];
     return;
   }
-  const pages = await Promise.allSettled(UNIT_ENTRY_VIEWS.map((v) => detailEnv.getJSON(entriesURL(v, "", [], ""))));
+  const pages = await Promise.allSettled(UNIT_TASK_VIEWS.map((v) => detailEnv.getJSON(tasksURL(v, "", [], ""))));
   if (detailState.unitKey !== key) return;
   const seen = new Set();
   const out = [];
   for (const p of pages) {
     if (p.status !== "fulfilled") continue;
-    for (const e of p.value.entries || []) {
+    for (const e of p.value.tasks || []) {
       if (seen.has(e.id) || !(e.units || []).some((u) => `${u.provider}:${u.key}` === key)) continue;
       seen.add(e.id);
       out.push(e);
     }
   }
-  detailState.unitEntries = out;
+  detailState.unitTasks = out;
 }
 
 async function loadAgentLog() {
-  const e = detailState.entry;
+  const e = detailState.task;
   const u = e && (e.units || [])[0];
   if (!u) return;
   try {
@@ -243,7 +243,7 @@ function verbButton(e, verb, label, run, extra = {}) {
     type: "button",
     class: "act" + (st.enabled ? "" : " off") + (extra.primary ? " primary" : ""),
     disabled: !st.enabled,
-    title: [verbEntry(verb).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n") || undefined,
+    title: [verbTask(verb).summary, st.enabled ? "" : st.reason].filter(Boolean).join("\n") || undefined,
     "data-focus": `${extra.scope || "detail"}:${verb}:${e.id}`,
     onclick: run,
   }, label);
@@ -258,25 +258,25 @@ function askedArgs(verb) {
   return ask.args(String(v).trim());
 }
 
-// verbEntry is the catalog's word for verb: its label and summary.
-function verbEntry(verb) {
-  return ((typeof gtdState === "object" && gtdState.catalog && gtdState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
+// verbTask is the catalog's word for verb: its label and summary.
+function verbTask(verb) {
+  return ((typeof tasksState === "object" && tasksState.catalog && tasksState.catalog.verbs) || []).find((x) => x.verb === verb) || {};
 }
 
 // verbQuestion is what a verb that asks puts first: the catalog's input.
 function verbQuestion(verb) {
-  const v = verbEntry(verb);
+  const v = verbTask(verb);
   return v.input || v.label || verb;
 }
 
 function verbLabel(verb) {
-  return verbEntry(verb).label || verb;
+  return verbTask(verb).label || verb;
 }
 
 function verbButtons(e) {
   return (e.verbs || []).filter((v) => !SKIP_VERB_BUTTONS.has(v.verb)).map((v) => verbButton(e, v.verb, verbLabel(v.verb), () => {
     const args = askedArgs(v.verb);
-    if (args) entryAct(e, v.verb, args);
+    if (args) taskAct(e, v.verb, args);
   }));
 }
 
@@ -286,8 +286,8 @@ function wouldLine(d) {
   return `Auto-send would ${w.policy}${w.reason ? `: ${w.reason}` : ""}`;
 }
 
-// draftCard shows the draft an entry carries, with approve, edit and
-// discard through the entry's verbs.
+// draftCard shows the draft a task carries, with approve, edit and
+// discard through the task's verbs.
 function draftCard(e, scope) {
   const d = e.draft;
   const editing = detailState.editing.has(e.id);
@@ -296,10 +296,10 @@ function draftCard(e, scope) {
     verbButton(e, "approve", draftWord("draft.approve"), () => approveEdited(e), { scope, primary: true }),
     h("button", { type: "button", class: "act", "data-focus": `${scope}:cancel:${e.id}`, onclick: () => { detailState.editing.delete(e.id); detailEnv.render(); } }, "Cancel"),
   ] : [
-    d.state === "failed" ? verbButton(e, "retry", draftWord("draft.retry"), () => entryAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
-      : verbButton(e, "approve", draftWord("draft.approve"), () => entryAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
+    d.state === "failed" ? verbButton(e, "retry", draftWord("draft.retry"), () => taskAct(e, "retry", { rev: String(d.rev) }), { scope, primary: true })
+      : verbButton(e, "approve", draftWord("draft.approve"), () => taskAct(e, "approve", { rev: String(d.rev) }), { scope, primary: true }),
     verbButton(e, (e.verbs || []).some((v) => v.verb === "edit") ? "edit" : "approve", draftWord("draft.edit"), () => { detailState.editing.set(e.id, d.text || ""); detailEnv.render(); }, { scope: scope + ":open" }),
-    verbButton(e, "dismiss", draftWord("draft.discard"), () => entryAct(e, "dismiss", {}), { scope }),
+    verbButton(e, "dismiss", draftWord("draft.discard"), () => taskAct(e, "dismiss", {}), { scope }),
   ];
   return h("section", { class: "d-draft", "aria-label": "Draft" },
     h("div", { class: "d-sub" }, head),
@@ -311,21 +311,21 @@ function draftCard(e, scope) {
     h("div", { class: "d-actions" }, ...buttons));
 }
 
-// draftEntry is the Outbox entry of draft d, its verbs read from the draft's actions, for draftCard.
-function draftEntry(d, title) {
+// draftTask is the Outbox task of draft d, its verbs read from the draft's actions, for draftCard.
+function draftTask(d, title) {
   const verbs = (d.actions || []).filter((a) => DRAFT_VERBS[a.id]).map((a) => ({ verb: DRAFT_VERBS[a.id], enabled: !!a.enabled, reason: a.reason || "" }));
   return { id: "draft:" + d.id, title, verbs, draft: d };
 }
 
-// entryDrafts are the drafts made for e, each with its card.
-function entryDrafts(e) {
+// taskDrafts are the drafts made for e, each with its card.
+function taskDrafts(e) {
   const shown = e.draft ? e.draft.id : null;
   const ds = detailState.drafts.filter((d) => d.id !== shown);
   if (!ds.length && !detailState.draftsError) return null;
   return h("section", { class: "d-drafts", "aria-label": "Drafts" },
     h("h2", { class: "d-sub" }, "Drafts"),
     detailState.draftsError ? h("p", { class: "plan-error" }, detailState.draftsError) : null,
-    ...ds.map((d) => draftCard(draftEntry(d, e.title || e.id), "drafts")));
+    ...ds.map((d) => draftCard(draftTask(d, e.title || e.id), "drafts")));
 }
 
 const MODE_NAMES = { headless: "draft headless", session: "run a session" };
@@ -338,7 +338,7 @@ function delegateMode(st, mode) {
   return m || { enabled: false, reason: `This action does not ${MODE_NAMES[mode] || mode}` };
 }
 
-// delegateBox hands the entry to an agent with optional guidance: headless, which drafts what it needs
+// delegateBox hands the task to an agent with optional guidance: headless, which drafts what it needs
 // into the Outbox, or a session, off with its reason when the unit has nowhere to run one.
 function delegateBox(e) {
   const st = verbState(e, "delegate");
@@ -346,7 +346,7 @@ function delegateBox(e) {
   const run = async (mode) => {
     const args = { mode };
     if (detailState.guidance.trim()) args.guidance = detailState.guidance.trim();
-    if (await entryAct(e, "delegate", args)) {
+    if (await taskAct(e, "delegate", args)) {
       detailState.guidance = "";
       detailEnv.render();
     }
@@ -418,13 +418,13 @@ function composer(key, opts) {
     h("div", { class: "d-actions" }, button("Save to Outbox", false, true), button("Send now", true, false)));
 }
 
-// entryComposer replies on the entry's first unit through the reply verb.
-function entryComposer(e) {
+// taskComposer replies on the task's first unit through the reply verb.
+function taskComposer(e) {
   if (!(e.verbs || []).some((v) => v.verb === "reply")) return null;
   const st = verbState(e, "reply");
   const u = (e.units || [])[0];
-  return composer("entry:" + e.id, { scope: "detail:reply", placeholder: verbQuestion("reply"), reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
-    post: (args) => entryAct(e, "reply", args) });
+  return composer("task:" + e.id, { scope: "detail:reply", placeholder: verbQuestion("reply"), reason: st.enabled ? "" : st.reason || "Not offered here", reacts: !!u && providerReacts(u.provider),
+    post: (args) => taskAct(e, "reply", args) });
 }
 
 // unitComposer replies on a unit through POST /api/drafts.
@@ -443,13 +443,13 @@ function unitComposer(u) {
   } });
 }
 
-// questionCard shows the entry's message with its options; .d-question
+// questionCard shows the task's message with its options; .d-question
 // lets the digit keys answer it.
 function questionCard(e) {
   const m = e.message;
   const open = m.state === "open";
   const opts = m.options || [];
-  const answer = (args) => entryAct(e, "answer", detailState.answer ? { ...args, guidance: detailState.answer } : args);
+  const answer = (args) => taskAct(e, "answer", detailState.answer ? { ...args, guidance: detailState.answer } : args);
   const choices = !open ? [] : m.confirm ? [
     h("button", { type: "button", class: "act primary", "data-focus": "question:yes", onclick: () => answer({ yes: true }) }, "Yes"),
     h("button", { type: "button", class: "act", "data-focus": "question:no", onclick: () => answer({ no: true }) }, "No"),
@@ -535,9 +535,9 @@ function agentLog() {
     h("div", {}, h("span", { class: "kind" }, String(ev.kind || "").replaceAll("_", " ")), ev.actor ? h("span", { class: "who" }, " " + ev.actor) : null))));
 }
 
-// entryPane is the detail of an entry: its head, verbs, items, question,
+// taskPane is the detail of a task: its head, verbs, items, question,
 // draft and cards; the agent log waits for a click.
-function entryPane(e) {
+function taskPane(e) {
   const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
   return [
     h("div", { class: "d-head" },
@@ -552,15 +552,15 @@ function entryPane(e) {
     e.notes ? h("p", { class: "d-notes" }, e.notes) : null,
     waiting.length ? h("div", {}, "Waiting on ", h("strong", {}, waiting.join(", ")), e.waiting.since ? ` since ${stamp(e.waiting.since)}` : "") : null,
     e.deadline ? h("div", {}, "Due ", stamp(e.deadline)) : null,
-    h("div", { class: "d-actions" }, ...verbButtons(e), ...entryIntentButtons(e),
-      e.message || e.draft ? null : verbButton(e, "approve", verbLabel("approve"), () => entryAct(e, "approve", {})),
-      e.draft ? null : verbButton(e, "dismiss", verbLabel("dismiss"), () => entryAct(e, "dismiss", {}))),
+    h("div", { class: "d-actions" }, ...verbButtons(e), ...taskIntentButtons(e),
+      e.message || e.draft ? null : verbButton(e, "approve", verbLabel("approve"), () => taskAct(e, "approve", {})),
+      e.draft ? null : verbButton(e, "dismiss", verbLabel("dismiss"), () => taskAct(e, "dismiss", {}))),
     itemsBlock(e.items),
     e.message ? questionCard(e) : null,
     e.draft ? draftCard(e, "detail") : null,
     delegateBox(e),
-    entryComposer(e),
-    entryDrafts(e),
+    taskComposer(e),
+    taskDrafts(e),
     ...(e.cards || []).map(unitCard),
     (e.units || []).length ? h("div", { class: "d-log" },
       h("button", { type: "button", class: "act", "aria-expanded": String(detailState.logOpen), "data-focus": "detail:agent-log", onclick: () => openAgentLog() }, "Agent log"),
@@ -568,33 +568,33 @@ function entryPane(e) {
   ];
 }
 
-// unitExtras are a unit detail's card and open entries.
+// unitExtras are a unit detail's card and open tasks.
 function unitExtras(d) {
   const key = detailState.unitKey;
-  const entries = key ? detailState.unitEntries : [];
+  const tasks = key ? detailState.unitTasks : [];
   return h("div", { class: "d-unit" },
     d && d.card ? unitCard(d.card) : null,
     d && (d.items || []).length ? itemsBlock(d.items) : null,
     d && d.row ? unitComposer(d.row.unit) : null,
-    entries.length ? [h("h2", { class: "d-sub" }, "Entries"),
-      h("ul", { class: "d-entries" }, ...entries.map((e) => h("li", {},
-        h("a", { href: "#" + gtdHash({ entry: e.id, pr: "" }), "data-focus": "unit-entry:" + e.id }, e.title || e.id), " ", h("span", { class: "pill" }, e.state))))] : null);
+    tasks.length ? [h("h2", { class: "d-sub" }, "Tasks"),
+      h("ul", { class: "d-entries" }, ...tasks.map((e) => h("li", {},
+        h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), "data-focus": "unit-task:" + e.id }, e.title || e.id), " ", h("span", { class: "pill" }, e.state))))] : null);
 }
 
-// renderEntryDetail draws the entry route into box; false when the route
-// names no entry.
-function renderEntryDetail(box, route) {
-  if (!route.entry) return false;
-  const e = detailState.entry && detailState.entry.id === route.entry ? detailState.entry : null;
-  const parts = e ? entryPane(e) : [
+// renderTaskDetail draws the task route into box; false when the route
+// names no task.
+function renderTaskDetail(box, route) {
+  if (!route.task) return false;
+  const e = detailState.task && detailState.task.id === route.task ? detailState.task : null;
+  const parts = e ? taskPane(e) : [
     h("div", { class: "d-head" },
       h("button", { type: "button", class: "close", "aria-label": "Close detail", "data-focus": "detail:close", onclick: () => detailEnv.close() }, "×"),
-      h("p", { class: detailState.error ? "plan-error" : "empty" }, detailState.error ? `Could not load the entry: ${detailState.error}` : "Loading the entry.")),
+      h("p", { class: detailState.error ? "plan-error" : "empty" }, detailState.error ? `Could not load the task: ${detailState.error}` : "Loading the task.")),
   ];
   const was = document.activeElement && box.contains(document.activeElement) ? document.activeElement : null;
   const caret = was && typeof was.selectionStart === "number" ? [was.selectionStart, was.selectionEnd] : null;
   box.replaceChildren(...parts.flat().filter(Boolean));
-  box.dataset.key = "entry:" + route.entry;
+  box.dataset.key = "task:" + route.task;
   box.hidden = false;
   document.body.classList.add("has-detail");
   const el = was && was.dataset.focus && box.querySelector(`[data-focus="${CSS.escape(was.dataset.focus)}"]`);

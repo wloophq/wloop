@@ -24,7 +24,7 @@ type Review struct {
 	Done      bool         `json:"done"`
 }
 
-// ReviewStep is a step of the Review: the entries of Query (GET /api/entries with these parameters), their
+// ReviewStep is a step of the Review: the tasks of Query (GET /api/tasks with these parameters), their
 // count, and whether the step is done. Step ids: inbox, outbox, waiting, projects, someday, focus.
 type ReviewStep struct {
 	ID    string            `json:"id"`

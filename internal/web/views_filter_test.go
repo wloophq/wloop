@@ -40,10 +40,10 @@ function writeHash() {}
 const urls = [];
 let answer = null;
 async function getJSON(url) { urls.push(url); return answer; }
-gtdState.catalog = input.cat;
-gtdState.counters = input.whole;
-const counts = (route) => gtdNav(gtdState.catalog, [], [], gtdCounters(route)).map((v) => v.count);
-const route = { view: "next", area: "", ctx: [], entry: "", q: "invoice" };
+tasksState.catalog = input.cat;
+tasksState.counters = input.whole;
+const counts = (route) => viewNav(tasksState.catalog, [], [], viewCounters(route)).map((v) => v.count);
+const route = { view: "next", area: "", ctx: [], task: "", q: "invoice" };
 (async () => {
   const before = counts(route);
   answer = input.narrowed;
@@ -57,10 +57,10 @@ const route = { view: "next", area: "", ctx: [], entry: "", q: "invoice" };
   const stale = counts(route);
   const cleared = counts({ ...route, q: "" });
   await loadFiltered({ ...route, area: "OSS", q: "invoice \"the client\"" });
-  gtdState.key = gtdQueryKey("next", "", []);
-  gtdState.entries = input.next;
-  const list = gtdList(route, "");
-  const filtered = gtdState.filtered;
+  tasksState.key = viewQueryKey("next", "", []);
+  tasksState.tasks = input.next;
+  const list = taskList(route, "");
+  const filtered = tasksState.filtered;
   process.stdout.write(JSON.stringify({ urls, before, rail, stale, cleared, filtered,
     head: text(byClass(list, "lens-count")),
     groups: all(list, (x) => x.tag === "h3").map(text),
@@ -103,18 +103,18 @@ func TestTheViewHeadingCountsTheWholeViewWithoutAFilter(t *testing.T) {
 	var head string
 	nodeRun(t, viewsPrelude(t), nil, `
 function writeHash() {}
-gtdState.catalog = input.cat;
-gtdState.key = gtdQueryKey("inbox", "", []);
-gtdState.entries = input.entries;
-process.stdout.write(JSON.stringify(text(byClass(gtdList({ view: "inbox", area: "", ctx: [], entry: "", q: "" }, ""), "lens-count"))));`,
-		map[string]any{"cat": viewsCatalog(), "entries": []api.TaskView{task("a", "inbox", nil), task("b", "inbox", nil)}}, &head)
+tasksState.catalog = input.cat;
+tasksState.key = viewQueryKey("inbox", "", []);
+tasksState.tasks = input.tasks;
+process.stdout.write(JSON.stringify(text(byClass(taskList({ view: "inbox", area: "", ctx: [], task: "", q: "" }, ""), "lens-count"))));`,
+		map[string]any{"cat": viewsCatalog(), "tasks": []api.TaskView{task("a", "inbox", nil), task("b", "inbox", nil)}}, &head)
 	if head != "2 of 2" {
 		t.Errorf("heading %q", head)
 	}
 }
 
 // TestTheCockpitAndTheDaemonMatchTheSameTasks keeps the cockpit's list
-// and the daemon's counts on the same entries: the daemon matches the terms
+// and the daemon's counts on the same tasks: the daemon matches the terms
 // the cockpit sends, trimmed as handleCounters trims them, with
 // api.TaskMatches.
 func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
@@ -140,7 +140,7 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 		task("f", "next", func(e *api.TaskView) { e.Title, e.Notes = "Send the invoice", "e\u0301clair and CAFÉ" }),
 	}
 	queries := []string{"acao", "runbook oss", "launch", "@reply", "acme/api#12", "slack:t1/c9", "deploys", "bruna", "question", "octocat",
-		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"entry a" ação`,
+		"dora", "window", "c0rel", "releases", "ship", "eyes", "slack/t1", "next", "capture", "draft ship", "nobody", `"task a" ação`,
 		"Škoda", "skoda", "erdos", "Erdős", "회의", "が", "がんばる", `"invoice `, `" the invoice"`, `"send the"`, "eclair", "éclair", "cafe",
 		"repo:acme invoice"}
 	var got []struct {
@@ -149,9 +149,9 @@ func TestTheCockpitAndTheDaemonMatchTheSameTasks(t *testing.T) {
 	}
 	nodeRun(t, viewsPrelude(t), nil, `
 process.stdout.write(JSON.stringify(input.queries.map((q) => {
-  const ts = gtdTerms(q);
-  return { terms: ts, matches: input.entries.map((e) => entryMatches(e, ts)) };
-})));`, map[string]any{"entries": es, "queries": queries}, &got)
+  const ts = filterTerms(q);
+  return { terms: ts, matches: input.tasks.map((e) => taskMatches(e, ts)) };
+})));`, map[string]any{"tasks": es, "queries": queries}, &got)
 	for i, q := range queries {
 		var sent []string
 		for _, term := range got[i].Terms {
@@ -175,8 +175,8 @@ func TestAFailedFilteredReadLeavesTheRailWithoutCounts(t *testing.T) {
 	nodeRun(t, viewsPrelude(t), nil, `
 let fail = false;
 async function getJSON() { if (fail) throw new Error("HTTP 500"); return input.counters; }
-gtdState.catalog = input.cat;
-const counts = (route) => gtdNav(gtdState.catalog, [], [], gtdCounters(route)).map((v) => v.count);
+tasksState.catalog = input.cat;
+const counts = (route) => viewNav(tasksState.catalog, [], [], viewCounters(route)).map((v) => v.count);
 (async () => {
   await loadFiltered({ area: "", q: "invoice" });
   const rail = counts({ area: "", q: "invoice" });

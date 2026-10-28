@@ -21,8 +21,8 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// posted is what the buttons of a notification answer: its entry, the
-// entry's units, the basis each button was served for and the options of
+// posted is what the buttons of a notification answer: its task, the
+// task's units, the basis each button was served for and the options of
 // its question.
 type posted struct {
 	task     string
@@ -34,11 +34,11 @@ type posted struct {
 
 // draftButtons are the only buttons a draft's notification offers: a draft
 // is approved where its whole text shows.
-var draftButtons = []string{"open", "gtd:" + string(task.VerbDismiss)}
+var draftButtons = []string{"open", api.TaskActionPrefix + string(task.VerbDismiss)}
 
-// notify posts the attention of the entries that are new, and withdraws the
-// notifications of entries that left the Inbox and of drafts that left the
-// Outbox. A held entry's id holds its day, so it is posted once a day.
+// notify posts the attention of the tasks that are new, and withdraws the
+// notifications of tasks that left the Inbox and of drafts that left the
+// Outbox. A held task's id holds its day, so it is posted once a day.
 func (c *Controller) notify() {
 	today := c.cfg.Now().Local().Format(time.DateOnly)
 	postedDaily := false
@@ -95,7 +95,7 @@ func (c *Controller) notify() {
 	}
 }
 
-// notifying are the entries of the menu's views that carry an attention.
+// notifying are the tasks of the menu's views that carry an attention.
 func (c *Controller) notifying() []api.TaskView {
 	var out []api.TaskView
 	for _, sec := range coreSections {
@@ -108,7 +108,7 @@ func (c *Controller) notifying() []api.TaskView {
 	return out
 }
 
-// notification is the entry's attention as the daemon gave it, with what
+// notification is the task's attention as the daemon gave it, with what
 // its buttons answer.
 func notification(e api.TaskView) (Notification, posted) {
 	a := *e.Attention
@@ -144,7 +144,7 @@ func displayCategory(cat Category, actions []NotificationAction) Category {
 	return cat + "." + Category(strconv.FormatUint(h.Sum64(), 36))
 }
 
-// Respond turns a notification answer into the entry's verb, its answer, or
+// Respond turns a notification answer into the task's verb, its answer, or
 // the catalog action on its first unit; opening the cockpit, and a draft's
 // open, are the app's own.
 func (c *Controller) Respond(ctx context.Context, r Response) {
@@ -171,8 +171,8 @@ func (c *Controller) Respond(ctx context.Context, r Response) {
 	}
 }
 
-// routeOf is the cockpit route a notification opens: a note's entry part is
-// its route, the digest opens Next, anything else its entry.
+// routeOf is the cockpit route a notification opens: a note's task part is
+// its route, the digest opens Next, anything else its task.
 func routeOf(cat Category, tk string) string {
 	switch cat {
 	case api.CategoryNote:
@@ -213,7 +213,7 @@ func (c *Controller) answer(ctx context.Context, r Response, tk string) error {
 	return nil
 }
 
-// reply writes the notification's text as a reply on its entry's unit, and says where it went.
+// reply writes the notification's text as a reply on its task's unit, and says where it went.
 func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 	if strings.TrimSpace(r.Text) == "" {
 		c.notifyNote(r.ID, task, "Reply not saved", "Nothing was typed.")
@@ -239,7 +239,7 @@ func (c *Controller) reply(ctx context.Context, r Response, task string) error {
 
 func (c *Controller) served(ctx context.Context, r Response, cat Category, task string) error {
 	var err error
-	if verb, ok := strings.CutPrefix(r.Identifier, "gtd:"); ok {
+	if verb, ok := strings.CutPrefix(r.Identifier, api.TaskActionPrefix); ok {
 		if cat == api.CategoryOutbox && !slices.Contains(draftButtons, r.Identifier) {
 			return errors.New("a draft's notification offers no " + r.Identifier)
 		}
@@ -260,7 +260,7 @@ func (c *Controller) served(ctx context.Context, r Response, cat Category, task 
 	return err
 }
 
-// unitOf is the first unit of the notification's entry, read again from the
+// unitOf is the first unit of the notification's task, read again from the
 // daemon when the app restarted since it was posted.
 func (c *Controller) unitOf(ctx context.Context, id, task string) (unit.Unit, error) {
 	c.mu.Lock()
@@ -275,7 +275,7 @@ func (c *Controller) unitOf(ctx context.Context, id, task string) (unit.Unit, er
 		units = e.Units
 	}
 	if len(units) == 0 {
-		return unit.Unit{}, errors.New("entry " + task + " has no unit to act on")
+		return unit.Unit{}, errors.New("task " + task + " has no unit to act on")
 	}
 	return units[0], nil
 }
@@ -301,7 +301,7 @@ func (c *Controller) optionAnswer(id, option string) string {
 }
 
 // notifyNote tells the user what became of an answer to notification id,
-// since the log is out of sight; the note opens the entry.
+// since the log is out of sight; the note opens the task.
 func (c *Controller) notifyNote(id, task, title, body string) {
 	c.mu.Lock()
 	subtitle := c.posted[id].subtitle
@@ -330,7 +330,7 @@ func (c *Controller) postNote(n Notification) {
 	}
 }
 
-// forgetSent drops the held entries marked as posted, which the start has
+// forgetSent drops the held tasks marked as posted, which the start has
 // just cleared from the notification center, so today's is posted again;
 // today's digest stays posted.
 func (c *Controller) forgetSent() {
@@ -408,13 +408,13 @@ func (c *Controller) saveSent(today string) {
 	}
 }
 
-// dailyOn says whether id is a held entry's or the digest's of day.
+// dailyOn says whether id is a held task's or the digest's of day.
 func dailyOn(id, day string) bool {
 	cat, _, ok := api.ParseNotificationID(id)
 	return ok && (cat == api.CategoryHeld || cat == api.CategoryDigest) && strings.HasSuffix(id, "|"+day)
 }
 
-// mayPost reports whether a notification would be shown, so a held entry or
+// mayPost reports whether a notification would be shown, so a held task or
 // the digest, announced once a day, is not spent while notifications are
 // off.
 func (c *Controller) mayPost() bool {

@@ -19,7 +19,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 )
 
-// registerMessages makes the message entries' answer, dismiss and approve verbs answer their messages.
+// registerMessages makes the message tasks' answer, dismiss and approve verbs answer their messages.
 func (s *Server) registerMessages() {
 	if s.deps.Tasks == nil || s.deps.Messages == nil {
 		return
@@ -36,7 +36,7 @@ func (s *Server) taskVerb(verb task.Verb) coretasks.VerbHandler {
 			return coretasks.Result{}, err
 		}
 		if !ok {
-			return coretasks.Result{}, fmt.Errorf("%w: entry %s holds no message", coretasks.ErrVerb, e.ID)
+			return coretasks.Result{}, fmt.Errorf("%w: task %s holds no message", coretasks.ErrVerb, e.ID)
 		}
 		var out bytes.Buffer
 		switch verb {
@@ -72,7 +72,7 @@ func (s *Server) taskVerb(verb task.Verb) coretasks.VerbHandler {
 	}
 }
 
-// actionArgs reads an entry verb's args as the fields of api.ActionRequest.
+// actionArgs reads a task verb's args as the fields of api.ActionRequest.
 func actionArgs(req coretasks.Request) (api.ActionRequest, error) {
 	ar := api.ActionRequest{Guidance: req.Args["guidance"], OptionID: req.Args["option_id"], Source: req.Source}
 	for key, dst := range map[string]*bool{"yes": &ar.Yes, "no": &ar.No} {
@@ -148,7 +148,7 @@ type pluginOff struct{ provider unit.ProviderID }
 
 func (p pluginOff) Error() string { return string(p.provider) + " is disabled" }
 
-// taskMessage is the message a KindMessage entry carries, nil when it holds none.
+// taskMessage is the message a KindMessage task carries, nil when it holds none.
 func (s *Server) taskMessage(ctx context.Context, task string) (*api.Message, error) {
 	if s.deps.Messages == nil {
 		return nil, nil

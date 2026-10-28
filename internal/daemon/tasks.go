@@ -48,10 +48,10 @@ const syncInputs = port.TopicItems | port.TopicSourceEvents | port.TopicCards
 // taskInputs are the notes after which a change carries the counters.
 const taskInputs = port.TopicTasks | port.TopicDrafts
 
-// bridged are the verbs an entry with units runs as its unit's action when no handler takes them.
+// bridged are the verbs a task with units runs as its unit's action when no handler takes them.
 var bridged = []task.Verb{task.VerbApprove, task.VerbDelegate, task.VerbDismiss}
 
-// delegableKinds are the kinds of entry with units whose delegate runs as their unit's action; an action entry
+// delegableKinds are the kinds of task with units whose delegate runs as their unit's action; an action task
 // bridges every verb of bridged.
 var delegableKinds = []task.Kind{task.KindAction, task.KindWaiting, task.KindClose, task.KindCapture}
 
@@ -63,7 +63,7 @@ func bridges(e task.Task, verb task.Verb) bool {
 	return e.Kind == task.KindAction || verb == task.VerbDelegate && slices.Contains(delegableKinds, e.Kind)
 }
 
-var errTasksUnavailable = errors.New("the entries are not served: the daemon runs without a store")
+var errTasksUnavailable = errors.New("the tasks are not served: the daemon runs without a store")
 
 func verbKey(v task.Verb) string {
 	for _, b := range keys.Core {
@@ -234,7 +234,7 @@ func (s *Server) runTaskVerb(w http.ResponseWriter, r *http.Request, verb string
 	}
 	v := task.Verb(verb)
 	if !offers(s.loaded().Lists, e, v) {
-		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this entry: the profile's gtd.toml says where it is", v))
+		writeError(w, http.StatusConflict, fmt.Sprintf("%s is not offered on this task: the profile's tasks.toml says where it is", v))
 		return
 	}
 	for _, u := range e.Units {
@@ -291,7 +291,7 @@ func (s *Server) writeTaskResult(ctx context.Context, w http.ResponseWriter, g *
 	writeJSON(w, api.TaskResult{Task: view, Lines: res.Lines})
 }
 
-// bridgeAction are the row's actions a verb may run on a unit: those of the highest rank the row offers whose gtd
+// bridgeAction are the row's actions a verb may run on a unit: those of the highest rank the row offers whose task
 // verb matches, enabled or not (see rank). Empty when the row offers none.
 type bridgeAction struct {
 	unit unit.Unit
@@ -339,7 +339,7 @@ func (s *Server) bridge(ctx context.Context, g *coretasks.Service, e task.Task, 
 	b := bridgeAction{unit: u, verb: verb}
 	rd, found, err := s.readRow(ctx, u)
 	if err != nil {
-		s.logf("entries: the row of %s: %v", u.Label(), err)
+		s.logf("tasks: the row of %s: %v", u.Label(), err)
 	}
 	if found {
 		b = s.offeredFor(rd.Row, verb)
@@ -380,7 +380,7 @@ func rankOffered(served []api.ActionSpec, row api.Row, verb task.Verb) bridgeAct
 }
 
 // runBridge runs st on u as POST /api/units/<provider>/<key>/<action> would, with the row's basis, the
-// entry's items on u, and the guidance and mode of the entry's args.
+// task's items on u, and the guidance and mode of the task's args.
 func (s *Server) runBridge(w http.ResponseWriter, r *http.Request, g *coretasks.Service, e task.Task, verb task.Verb, u unit.Unit, st api.ActionState, req api.TaskRequest) {
 	mode := req.Args["mode"]
 	if err := s.bridgeMode(st.ID, mode); err != nil {
@@ -562,14 +562,14 @@ func (s *Server) writeTask(w http.ResponseWriter, ctx context.Context, g *coreta
 	writeJSON(w, v)
 }
 
-// counters are the Area "" counters a change or a rows page carries; nil without the entries.
+// counters are the Area "" counters a change or a rows page carries; nil without the tasks.
 func (s *Server) counters(ctx context.Context) *api.Counters {
 	if s.deps.Tasks == nil {
 		return nil
 	}
 	c, err := s.deps.Tasks.Counts(ctx, "")
 	if err != nil {
-		s.logf("entries: counters: %v", err)
+		s.logf("tasks: counters: %v", err)
 		return nil
 	}
 	out := wireCounters(c)
@@ -592,7 +592,7 @@ func wireCounters(c task.Counters) api.Counters {
 	return out
 }
 
-// taskViewer maps entries to their wire views; detail expands the cards and the items.
+// taskViewer maps tasks to their wire views; detail expands the cards and the items.
 type taskViewer struct {
 	s        *Server
 	g        *coretasks.Service
@@ -790,14 +790,14 @@ func (s *Server) syncTasks(ctx context.Context) {
 				idErr = ""
 			case err.Error() != idErr:
 				idErr = err.Error()
-				s.logf("entries: identity: %v", err)
+				s.logf("tasks: identity: %v", err)
 			}
 			settled, all = err == nil, all || grew
 		}
 		if all && s.deps.TaskUnits != nil {
 			us, err := s.deps.TaskUnits(ctx)
 			if err != nil {
-				s.logf("entries: units: %v", err)
+				s.logf("tasks: units: %v", err)
 			}
 			units = append(units, us...)
 		}
@@ -805,7 +805,7 @@ func (s *Server) syncTasks(ctx context.Context) {
 		all, retry = false, nil
 		sctx, scope := meter.Start(ctx, meter.Loop("tasks"))
 		if err := g.Sync(sctx, units); err != nil && ctx.Err() == nil {
-			s.logf("entries: sync: %v", err)
+			s.logf("tasks: sync: %v", err)
 			retry = units
 		}
 		scope.End()
@@ -831,8 +831,8 @@ func (s *Server) syncTasks(ctx context.Context) {
 	}
 }
 
-// feedTasks publishes a change with the counters after each burst of entry and draft notes, naming the units
-// of the entries that moved, until ctx ends.
+// feedTasks publishes a change with the counters after each burst of task and draft notes, naming the units
+// of the tasks that moved, until ctx ends.
 func (s *Server) feedTasks(ctx context.Context) {
 	if s.deps.Changes == nil {
 		return

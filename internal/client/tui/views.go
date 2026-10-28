@@ -12,7 +12,7 @@ import (
 	"github.com/wloophq/wloop/internal/termfmt"
 )
 
-// The GTD views a list groups.
+// The task views a list groups.
 const (
 	viewFocus   = "focus"
 	viewInbox   = "inbox"
@@ -21,17 +21,17 @@ const (
 	viewWaiting = "waiting"
 )
 
-// taskProvider names an entry in the busy map, which is keyed by unit.
-const taskProvider unit.ProviderID = "entry"
+// taskProvider names a task in the busy map, which is keyed by unit.
+const taskProvider = unit.Task
 
 func taskUnit(id string) unit.Unit { return unit.Unit{Provider: taskProvider, Key: id} }
 
-// SetViews takes the core views of GET /api/gtd. The first time, before the
+// SetViews takes the core views of GET /api/views. The first time, before the
 // user moved to a view, it shows Focus.
 func (m *Model) SetViews(c api.ViewsCatalog) {
 	current := m.viewKey()
 	if !m.navigated {
-		current = "gtd:" + viewFocus
+		current = "view:" + viewFocus
 	}
 	m.viewsCat, m.taskViews = c, nil
 	for _, v := range c.Views {
@@ -40,7 +40,7 @@ func (m *Model) SetViews(c api.ViewsCatalog) {
 	m.goTo(current)
 }
 
-// SetTasks replaces the entries of view, as its last page left them, and
+// SetTasks replaces the tasks of view, as its last page left them, and
 // the counters that page carried.
 func (m *Model) SetTasks(view string, tasks []api.TaskView, c api.Counters) {
 	if m.tasks == nil {
@@ -64,7 +64,7 @@ func (m *Model) SetCounters(c api.Counters) {
 	}
 }
 
-// SetFilteredCounters takes the counts of area narrowed to the entries
+// SetFilteredCounters takes the counts of area narrowed to the tasks
 // the filter keeps.
 func (m *Model) SetFilteredCounters(area string, c api.Counters) {
 	if area == m.area {
@@ -75,8 +75,8 @@ func (m *Model) SetFilteredCounters(area string, c api.Counters) {
 // FilterTerms are the filter's words.
 func (m *Model) FilterTerms() []string { return strings.Fields(string(m.filter)) }
 
-// tabCounters are the counts the GTD tabs show: with a filter, those of the
-// entries it keeps, the last read while a newer one is on its way; nil
+// tabCounters are the counts the task tabs show: with a filter, those of the
+// tasks it keeps, the last read while a newer one is on its way; nil
 // before the first.
 func (m *Model) tabCounters() *api.Counters {
 	if len(m.FilterTerms()) == 0 {
@@ -85,10 +85,10 @@ func (m *Model) tabCounters() *api.Counters {
 	return m.filtered
 }
 
-// viewsBase is the index of the first GTD view, after the plan.
+// viewsBase is the index of the first task view, after the plan.
 func (m *Model) viewsBase() int { return m.planView() + 1 }
 
-// viewOnScreen is the GTD view on screen.
+// viewOnScreen is the task view on screen.
 func (m *Model) viewOnScreen() (View, bool) {
 	if i := m.view - m.viewsBase(); i >= 0 && i < len(m.taskViews) {
 		return m.taskViews[i], true
@@ -96,8 +96,8 @@ func (m *Model) viewOnScreen() (View, bool) {
 	return View{}, false
 }
 
-// TaskQuery is the GTD view on screen and the area the list follows; ok
-// is false outside the GTD views.
+// TaskQuery is the task view on screen and the area the list follows; ok
+// is false outside the task views.
 func (m *Model) TaskQuery() (view, area string, ok bool) {
 	v, ok := m.viewOnScreen()
 	if ok && v.ID == viewReview {
@@ -107,7 +107,7 @@ func (m *Model) TaskQuery() (view, area string, ok bool) {
 	return v.ID, m.area, ok
 }
 
-// groupOf is the views Tab cycles through from view i: the GTD views, or
+// groupOf is the views Tab cycles through from view i: the task views, or
 // the unit views (the catalog's rows views, the plan and the plugin views).
 func (m *Model) groupOf(i int) []int {
 	var out []int
@@ -127,7 +127,7 @@ func (m *Model) cycle() {
 	m.setView(g[(i+1)%len(g)])
 }
 
-// visibleTasks are the entries of the GTD view on screen the filter
+// visibleTasks are the tasks of the task view on screen the filter
 // keeps, in the order the list shows them: grouped by context in Next and
 // by person in Waiting.
 func (m *Model) visibleTasks() []api.TaskView {
@@ -151,7 +151,7 @@ func (m *Model) visibleTasks() []api.TaskView {
 	return out
 }
 
-// grouping is the key a view groups its entries by, nil when it does not.
+// grouping is the key a view groups its tasks by, nil when it does not.
 func (m *Model) grouping(view string) func(api.TaskView) string {
 	switch view {
 	case viewNext:
@@ -172,7 +172,7 @@ func (m *Model) grouping(view string) func(api.TaskView) string {
 	return nil
 }
 
-// groupOrder is the groups of entries in the order they show: the served
+// groupOrder is the groups of tasks in the order they show: the served
 // contexts' order, then the others by name, the empty group last.
 func (m *Model) groupOrder(tasks []api.TaskView, key func(api.TaskView) string) []string {
 	seen := map[string]bool{}
@@ -216,7 +216,7 @@ func groupHead(view, key string) string {
 }
 
 // taskMatches reports whether every word of query is in one of the
-// entry's texts.
+// task's texts.
 func taskMatches(e api.TaskView, query string) bool {
 	return api.TaskMatches(e, strings.Fields(query))
 }
@@ -259,7 +259,7 @@ func (m *Model) taskMove(delta int) {
 	m.closeDetail()
 }
 
-// taskLabel names an entry on the status line.
+// taskLabel names a task on the status line.
 func taskLabel(e api.TaskView) string {
 	return termfmt.Cut(oneLine(cmp.Or(e.Title, e.ID)), 48)
 }
@@ -273,7 +273,7 @@ func (m *Model) rowOf(u unit.Unit) (api.Row, bool) {
 	return m.rows[i], true
 }
 
-// sourceLink is the link of the entry's first unit: its row's, else its
+// sourceLink is the link of the task's first unit: its row's, else its
 // card's in the open detail.
 func (m *Model) sourceLink(e api.TaskView) string {
 	if len(e.Units) == 0 {
@@ -298,7 +298,7 @@ func (m *Model) sourceLink(e api.TaskView) string {
 	return ""
 }
 
-// renderTasks draws the GTD view on screen: its entries, the open
+// renderTasks draws the task view on screen: its tasks, the open
 // detail below them.
 func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Time) []string {
 	tasks := m.visibleTasks()
@@ -338,7 +338,7 @@ func (m *Model) renderTasks(lines []string, v View, width, body int, now time.Ti
 	return lines
 }
 
-// taskList lays the entries out in columns, with a head line before each
+// taskList lays the tasks out in columns, with a head line before each
 // group, and shows the height of them around the cursor.
 func (m *Model) taskList(view string, tasks []api.TaskView, cur, width, height int, now time.Time) []string {
 	t := m.t
@@ -375,7 +375,7 @@ func (m *Model) taskList(view string, tasks []api.TaskView, cur, width, height i
 	return window(out, slices.Index(at, cur), height)
 }
 
-// taskLine marks the cursor, a busy entry and a changed one.
+// taskLine marks the cursor, a busy task and a changed one.
 func (m *Model) taskLine(e api.TaskView, laid string, selected bool, width int) string {
 	t := m.t
 	mark := []rune("   ")
@@ -403,7 +403,7 @@ func window(lines []string, cur, height int) []string {
 	return lines[start:min(len(lines), start+height)]
 }
 
-// taskAge is how long the entry waits: since its waiting started, else
+// taskAge is how long the task waits: since its waiting started, else
 // since it last changed.
 func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) string) {
 	since := e.Updated
@@ -419,7 +419,7 @@ func (m *Model) taskAge(e api.TaskView, now time.Time) (string, func(string) str
 	return span(now.Sub(since)), m.t.Dim
 }
 
-// taskWhere is the entry's contexts and its first unit, or its project.
+// taskWhere is the task's contexts and its first unit, or its project.
 func (m *Model) taskWhere(e api.TaskView) string {
 	var parts []string
 	for _, c := range e.Contexts {
@@ -435,7 +435,7 @@ func (m *Model) taskWhere(e api.TaskView) string {
 	return termfmt.Clean(strings.Join(parts, " "))
 }
 
-// viewTabs are the GTD views with their counts.
+// viewTabs are the task views with their counts.
 func (m *Model) viewTabs() []string {
 	out := make([]string, len(m.taskViews))
 	views := map[string]int{}
@@ -452,7 +452,7 @@ func (m *Model) viewTabs() []string {
 	return out
 }
 
-// taskSet is one view's entries as the pages left them, in the daemon's
+// taskSet is one view's tasks as the pages left them, in the daemon's
 // order, and the position to pull the next page from.
 type taskSet struct {
 	since api.Since

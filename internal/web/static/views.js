@@ -1,30 +1,30 @@
 "use strict";
 
-const GTD_DEFAULT_VIEW = "focus";
-const gtdState = { catalog: null, catalogError: "", key: "", page: null, entries: [], counters: null, filtered: null, filterSeq: 0, error: "" };
+const DEFAULT_VIEW = "focus";
+const tasksState = { catalog: null, catalogError: "", key: "", page: null, tasks: [], counters: null, filtered: null, filterSeq: 0, error: "" };
 
-function gtdViews(cat = gtdState.catalog) {
+function coreViews(cat = tasksState.catalog) {
   return (cat && cat.views) || [];
 }
 
-function isGTDView(id, cat = gtdState.catalog) {
-  return gtdViews(cat).some((v) => v.id === id);
+function isCoreView(id, cat = tasksState.catalog) {
+  return coreViews(cat).some((v) => v.id === id);
 }
 
-// gtdResolveView is the view a route shows: a core view, a served plugin
+// resolveView is the view a route shows: a core view, a served plugin
 // view or a plugin's own web view; Focus otherwise. Before anything is
 // loaded every view stands.
-function gtdResolveView(view, cat, served, plugin) {
-  if (view && ((!cat && !served.length) || isGTDView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
+function resolveView(view, cat, served, plugin) {
+  if (view && ((!cat && !served.length) || isCoreView(view, cat) || served.some((v) => v.id === view) || plugin(view))) return view;
   if (!cat && served.length) return served[0].id;
-  return GTD_DEFAULT_VIEW;
+  return DEFAULT_VIEW;
 }
 
-// gtdNav is the rail: the core views with their counters, then each plugin
+// viewNav is the rail: the core views with their counters, then each plugin
 // view (count left to the caller).
-function gtdNav(cat, served, plugin, counters) {
+function viewNav(cat, served, plugin, counters) {
   const views = (counters && counters.views) || {};
-  const out = gtdViews(cat).map((v) => ({ id: v.id, label: v.label, count: views[v.id] === undefined ? "" : views[v.id], core: true }));
+  const out = coreViews(cat).map((v) => ({ id: v.id, label: v.label, count: views[v.id] === undefined ? "" : views[v.id], core: true }));
   const taken = new Set(out.map((v) => v.id));
   for (const v of served) {
     if (taken.has(v.id)) continue;
@@ -37,7 +37,7 @@ function gtdNav(cat, served, plugin, counters) {
   return out;
 }
 
-// railSections splits gtdNav's list: the core views untitled, then one
+// railSections splits viewNav's list: the core views untitled, then one
 // section per provider, titled by name(provider), in the order they first
 // appear.
 function railSections(nav, name) {
@@ -53,19 +53,19 @@ function railSections(nav, name) {
   return out.filter((sec) => sec.views.length);
 }
 
-// entriesURL lists view; every view but Inbox is narrowed to area.
-function entriesURL(view, area, ctx, since) {
+// tasksURL lists view; every view but Inbox is narrowed to area.
+function tasksURL(view, area, ctx, since) {
   const p = new URLSearchParams({ view });
   if (area && view !== "inbox") p.set("area", area);
   if (ctx && ctx.length) p.set("context", ctx.join(","));
   if (since) p.set("since", since);
-  return "/api/entries?" + p.toString();
+  return "/api/tasks?" + p.toString();
 }
 
 // FILTER_COUNT_DELAY_MS lets a burst of keystrokes ask for the counts once.
 const FILTER_COUNT_DELAY_MS = 250;
 
-// countersURL counts area, every area when "", narrowed to the entries
+// countersURL counts area, every area when "", narrowed to the tasks
 // holding each of ts.
 function countersURL(area, ts) {
   const p = new URLSearchParams();
@@ -75,115 +75,115 @@ function countersURL(area, ts) {
   return "/api/counters" + (q ? "?" + q : "");
 }
 
-// gtdCounters are the counts the rail, the area picker and the context
-// chips show: with free words in the filter, those of the entries it keeps,
+// viewCounters are the counts the rail, the area picker and the context
+// chips show: with free words in the filter, those of the tasks it keeps,
 // the last read while a newer one is on its way; null before the first.
-function gtdCounters(route) {
-  if (!gtdTerms(route.q).length) return gtdState.counters;
-  const f = gtdState.filtered;
+function viewCounters(route) {
+  if (!filterTerms(route.q).length) return tasksState.counters;
+  const f = tasksState.filtered;
   return f && f.area === (route.area || "") ? f.counters : null;
 }
 
 // filteredKey names the counts of the free words of route in its area.
 function filteredKey(route) {
-  return [route.area || "", ...gtdTerms(route.q)].join("\u0000");
+  return [route.area || "", ...filterTerms(route.q)].join("\u0000");
 }
 
 // loadFiltered reads the counters the filter's free words narrow, once
 // the words stop changing for FILTER_COUNT_DELAY_MS; only the latest read
 // is kept, and a failed one leaves the rail without counts.
 async function loadFiltered(route) {
-  const ts = gtdTerms(route.q);
-  const seq = ++gtdState.filterSeq;
+  const ts = filterTerms(route.q);
+  const seq = ++tasksState.filterSeq;
   if (!ts.length) {
-    gtdState.filtered = null;
+    tasksState.filtered = null;
     return;
   }
   const key = filteredKey(route);
-  if (!gtdState.filtered || gtdState.filtered.key !== key) await new Promise((done) => setTimeout(done, FILTER_COUNT_DELAY_MS));
-  if (seq !== gtdState.filterSeq) return;
+  if (!tasksState.filtered || tasksState.filtered.key !== key) await new Promise((done) => setTimeout(done, FILTER_COUNT_DELAY_MS));
+  if (seq !== tasksState.filterSeq) return;
   try {
     const c = await getJSON(countersURL(route.area, ts));
-    if (seq === gtdState.filterSeq) gtdState.filtered = { key, area: route.area || "", counters: c };
+    if (seq === tasksState.filterSeq) tasksState.filtered = { key, area: route.area || "", counters: c };
   } catch {
-    if (seq === gtdState.filterSeq) gtdState.filtered = null;
+    if (seq === tasksState.filterSeq) tasksState.filtered = null;
   }
 }
 
-function gtdQueryKey(view, area, ctx) {
+function viewQueryKey(view, area, ctx) {
   return [view, view === "inbox" ? "" : area || "", (ctx || []).join(",")].join("|");
 }
 
-// gtdSort orders a merged list as the store does: Logbook puts Reference
+// viewSort orders a merged list as the store does: Logbook puts Reference
 // first, then the newest; every other view the oldest first.
-function gtdSort(view, entries) {
+function viewSort(view, tasks) {
   const t = (s) => Date.parse(s || "") || 0;
-  if (view === "outbox") return entries;
+  if (view === "outbox") return tasks;
   if (view === "logbook") {
-    return [...entries].sort((a, b) => Number(b.state === "reference") - Number(a.state === "reference") || t(b.updated) - t(a.updated));
+    return [...tasks].sort((a, b) => Number(b.state === "reference") - Number(a.state === "reference") || t(b.updated) - t(a.updated));
   }
-  return [...entries].sort((a, b) => t(a.created) - t(b.created));
+  return [...tasks].sort((a, b) => t(a.created) - t(b.created));
 }
 
-// applyEntriesPage folds a page of view into the list; a page of another
+// applyTasksPage folds a page of view into the list; a page of another
 // query, epoch or a full page replaces it, an older one is dropped.
-function applyEntriesPage(key, view, page) {
-  const cur = gtdState.page;
-  const same = gtdState.key === key && cur && cur.epoch === page.epoch;
+function applyTasksPage(key, view, page) {
+  const cur = tasksState.page;
+  const same = tasksState.key === key && cur && cur.epoch === page.epoch;
   if (same && !page.full && page.rev < cur.rev) return;
   if (!same || page.full) {
-    gtdState.entries = page.entries || [];
+    tasksState.tasks = page.tasks || [];
   } else {
     const gone = new Set(page.removed || []);
-    const fresh = new Map((page.entries || []).map((e) => [e.id, e]));
-    const kept = gtdState.entries.filter((e) => !gone.has(e.id)).map((e) => {
+    const fresh = new Map((page.tasks || []).map((e) => [e.id, e]));
+    const kept = tasksState.tasks.filter((e) => !gone.has(e.id)).map((e) => {
       const next = fresh.get(e.id);
       fresh.delete(e.id);
       return next || e;
     });
-    gtdState.entries = gtdSort(view, [...kept, ...fresh.values()]);
+    tasksState.tasks = viewSort(view, [...kept, ...fresh.values()]);
   }
-  gtdState.key = key;
-  gtdState.page = { epoch: page.epoch || "", rev: page.rev || 0 };
-  if (page.counters) gtdState.counters = page.counters;
+  tasksState.key = key;
+  tasksState.page = { epoch: page.epoch || "", rev: page.rev || 0 };
+  if (page.counters) tasksState.counters = page.counters;
 }
 
-// loadGTD loads the catalog once, then the list of route (the hash's when
+// loadTasks loads the catalog once, then the list of route (the hash's when
 // not given, read once the catalog can resolve it) with its counters, or the
 // counters alone on a plugin view, and the counters the filter narrows.
-async function loadGTD(given) {
-  if (!gtdState.catalog) {
+async function loadTasks(given) {
+  if (!tasksState.catalog) {
     try {
-      gtdState.catalog = await getJSON("/api/gtd");
-      gtdState.catalogError = "";
+      tasksState.catalog = await getJSON("/api/views");
+      tasksState.catalogError = "";
     } catch (err) {
-      gtdState.catalogError = err.message;
+      tasksState.catalogError = err.message;
       return;
     }
   }
   const route = given || readHash();
-  await Promise.all([loadGTDList(route), loadFiltered(route)]);
+  await Promise.all([loadTaskList(route), loadFiltered(route)]);
 }
 
-async function loadGTDList(route) {
-  if (route.view === "review" && isGTDView(route.view)) return loadReview();
-  if (!isGTDView(route.view)) {
+async function loadTaskList(route) {
+  if (route.view === "review" && isCoreView(route.view)) return loadReview();
+  if (!isCoreView(route.view)) {
     try {
-      gtdState.counters = await getJSON(countersURL(route.area));
+      tasksState.counters = await getJSON(countersURL(route.area));
     } catch {
       // The rail keeps its last counts.
     }
     return;
   }
-  const key = gtdQueryKey(route.view, route.area, route.ctx);
-  const cur = gtdState.page;
-  const since = gtdState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
+  const key = viewQueryKey(route.view, route.area, route.ctx);
+  const cur = tasksState.page;
+  const since = tasksState.key === key && cur && cur.epoch ? `${cur.epoch}:${cur.rev}` : "";
   try {
-    applyEntriesPage(key, route.view, await getJSON(entriesURL(route.view, route.area, route.ctx, since)));
-    gtdState.error = "";
+    applyTasksPage(key, route.view, await getJSON(tasksURL(route.view, route.area, route.ctx, since)));
+    tasksState.error = "";
     if (route.view === "inbox" && route.area) await areaCounters(route.area);
   } catch (err) {
-    gtdState.error = `Could not load the ${route.view} list: ${err.message}`;
+    tasksState.error = `Could not load the ${route.view} list: ${err.message}`;
   }
 }
 
@@ -192,30 +192,30 @@ async function loadGTDList(route) {
 async function areaCounters(area) {
   try {
     const c = await getJSON(countersURL(area));
-    gtdState.counters = { ...c, views: { ...c.views, inbox: gtdState.counters.views.inbox } };
+    tasksState.counters = { ...c, views: { ...c.views, inbox: tasksState.counters.views.inbox } };
   } catch {
     // The rail keeps the page's counts.
   }
 }
 
-// gtdGroups splits a view's list: Next by context, Waiting by person,
+// viewGroups splits a view's list: Next by context, Waiting by person,
 // Logbook into Reference then Done; other views are one group.
-function gtdGroups(view, entries) {
+function viewGroups(view, tasks) {
   const by = (keyOf, label) => {
     const groups = new Map();
-    for (const e of entries) {
+    for (const e of tasks) {
       const k = keyOf(e);
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(e);
     }
-    return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b)).map((k) => ({ key: k, label: label(k), entries: groups.get(k) }));
+    return [...groups.keys()].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b)).map((k) => ({ key: k, label: label(k), tasks: groups.get(k) }));
   };
   if (view === "next") return by((e) => (e.contexts || [])[0] || "", (k) => k || "No context");
   if (view === "waiting") return by((e) => (((e.waiting || {}).on || [])[0] || {}).name || "", (k) => k || "Someone");
   if (view === "logbook") {
-    return [["reference", "Reference"], ["done", "Done"]].map(([s, label]) => ({ key: s, label, entries: entries.filter((e) => e.state === s) })).filter((g) => g.entries.length);
+    return [["reference", "Reference"], ["done", "Done"]].map(([s, label]) => ({ key: s, label, tasks: tasks.filter((e) => e.state === s) })).filter((g) => g.tasks.length);
   }
-  return [{ key: "", label: "", entries }];
+  return [{ key: "", label: "", tasks }];
 }
 
 function unitLabel(u) {
@@ -227,13 +227,13 @@ function shortDate(t) {
   return isNaN(d) ? "" : d.toISOString().slice(0, 10);
 }
 
-function entryItem(e, open) {
-  const go = () => writeHash({ entry: e.id, pr: "" });
+function taskItem(e, open) {
+  const go = () => writeHash({ task: e.id, pr: "" });
   const waiting = ((e.waiting || {}).on || []).map((p) => p.name).filter(Boolean);
   return h("li", {
     class: "entry" + (e.id === open ? " sel" : "") + (e.changed ? " changed" : ""),
     tabindex: 0,
-    "data-focus": "entry:" + e.id,
+    "data-focus": "task:" + e.id,
     "aria-selected": e.id === open ? "true" : "false",
     onclick: go,
     onkeydown: (ev) => {
@@ -285,41 +285,41 @@ function localDate(t) {
 }
 
 function outboxItem(e, open) {
-  return h("li", { class: "entry outbox" + (e.id === open ? " sel" : ""), "data-focus": "entry:" + e.id, tabindex: 0 },
-    h("div", { class: "e-line" }, h("a", { href: "#" + gtdHash({ entry: e.id, pr: "" }), class: "title" }, e.title || e.id)),
+  return h("li", { class: "entry outbox" + (e.id === open ? " sel" : ""), "data-focus": "task:" + e.id, tabindex: 0 },
+    h("div", { class: "e-line" }, h("a", { href: "#" + viewHash({ task: e.id, pr: "" }), class: "title" }, e.title || e.id)),
     e.draft ? draftCard(e, "outbox") : null);
 }
 
-function gtdHash(change) {
+function viewHash(change) {
   return typeof hashString === "function" && typeof readHash === "function" ? hashString({ ...readHash(), ...change }) : "";
 }
 
 function areaPicker(route) {
-  const areas = (gtdState.catalog && gtdState.catalog.areas) || [];
+  const areas = (tasksState.catalog && tasksState.catalog.areas) || [];
   if (!areas.length) return null;
   if (route.view === "inbox") return h("span", { class: "lens-label" }, "Inbox shows every area");
-  const counts = (gtdCounters(route) || {}).areas || {};
+  const counts = (viewCounters(route) || {}).areas || {};
   return h("label", { class: "lens-pick" },
     h("span", { class: "lens-label" }, "Area"),
-    h("select", { "data-focus": "gtd:area", onchange: (ev) => writeHash({ area: ev.target.value }) },
+    h("select", { "data-focus": "view:area", onchange: (ev) => writeHash({ area: ev.target.value }) },
       h("option", { value: "", selected: !route.area }, "All areas"),
       ...areas.map((a) => h("option", { value: a, selected: route.area === a }, counts[a] === undefined ? a : `${a} (${counts[a]})`))));
 }
 
 function contextChips(route) {
   if (route.view !== "next") return null;
-  const ctxs = (gtdState.catalog && gtdState.catalog.contexts) || [];
-  const counts = (gtdCounters(route) || {}).contexts || {};
+  const ctxs = (tasksState.catalog && tasksState.catalog.contexts) || [];
+  const counts = (viewCounters(route) || {}).contexts || {};
   return ctxs.map((c) => {
     const on = route.ctx.includes(c);
     const next = on ? route.ctx.filter((x) => x !== c) : [...route.ctx, c];
-    return h("button", { type: "button", class: "chip" + (on ? " on" : ""), "aria-pressed": String(on), "data-focus": "gtd:ctx:" + c, onclick: () => writeHash({ ctx: next.join(",") }) },
+    return h("button", { type: "button", class: "chip" + (on ? " on" : ""), "aria-pressed": String(on), "data-focus": "view:ctx:" + c, onclick: () => writeHash({ ctx: next.join(",") }) },
       c, counts[c] === undefined ? "" : ` ${counts[c]}`);
   });
 }
 
-const GTD_EMPTY = {
-  focus: "Nothing starred. Star an entry to keep it here.",
+const VIEW_EMPTY = {
+  focus: "Nothing starred. Star a task to keep it here.",
   inbox: "Inbox zero.",
   outbox: "No drafts wait for approval.",
   next: "No next actions.",
@@ -329,10 +329,10 @@ const GTD_EMPTY = {
   logbook: "Nothing done or filed yet.",
 };
 
-// entryHaystack is what the filter's free words search in an entry, the texts the daemon's counters search
-// (api.EntryView.Texts): its title, notes, state, kind, area, project and contexts, its units, the people
+// taskHaystack is what the filter's free words search in a task, the texts the daemon's counters search
+// (api.TaskView.Texts): its title, notes, state, kind, area, project and contexts, its units, the people
 // it waits on, its items, its cards' people, its draft and its message.
-function entryHaystack(e) {
+function taskHaystack(e) {
   const d = e.draft || {};
   const m = e.message || {};
   return [e.title, e.notes, e.state, e.kind, e.area, e.project_title, ...(e.contexts || []),
@@ -340,73 +340,79 @@ function entryHaystack(e) {
     ...((e.waiting || {}).on || []).map((p) => p.name),
     ...(e.items || []).map((it) => it.summary),
     ...(e.cards || []).flatMap((c) => [((c.card || {}).last_human || {}).who ? personName(c.card.last_human.who) : "", ...((c.card || {}).waits_on || []).map(personName)]),
-    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => gtdFold(x));
+    d.target, d.where, d.text, d.reaction, d.unit, m.text].map((x) => foldText(x));
 }
 
-// GTD_ACCENTS are the accents api.Fold folds; gtdFold folds as api.Fold does, so the daemon's counts
+// FOLD_ACCENTS are the accents api.Fold folds; foldText folds as api.Fold does, so the daemon's counts
 // match what the list shows.
-const GTD_ACCENTS = {
+const FOLD_ACCENTS = {
   á: "a", à: "a", â: "a", ã: "a", ä: "a", é: "e", è: "e", ê: "e", ë: "e", í: "i", ì: "i", î: "i", ï: "i",
   ó: "o", ò: "o", ô: "o", õ: "o", ö: "o", ú: "u", ù: "u", û: "u", ü: "u", ç: "c", ñ: "n",
 };
 
-function gtdFold(s) {
-  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => GTD_ACCENTS[c]).replace(/\p{Mn}/gu, "");
+function foldText(s) {
+  return String(s || "").toLowerCase().replace(/[áàâãäéèêëíìîïóòôõöúùûüçñ]/g, (c) => FOLD_ACCENTS[c]).replace(/\p{Mn}/gu, "");
 }
 
-// gtdTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
+// filterTerms are the free words of the filter query, the qualifiers left to the pull request lists, as the
 // daemon reads them.
-function gtdTerms(q) {
+function filterTerms(q) {
   const qualifier = typeof qualifierOf === "function" ? qualifierOf : () => null;
   return (String(q || "").match(/[^\s"]*"[^"]*"?|[^\s"]+/g) || []).filter((t) => !qualifier(t))
-    .map((t) => gtdFold(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
+    .map((t) => foldText(t.replace(/^"|"$/g, "")).trim()).filter(Boolean);
 }
 
-// entryMatches says whether every free word of ts is in e.
-function entryMatches(e, ts) {
+// taskMatches says whether every free word of ts is in e.
+function taskMatches(e, ts) {
   if (!ts.length) return true;
-  const hay = entryHaystack(e);
+  const hay = taskHaystack(e);
   return ts.every((t) => hay.some((f) => f.includes(t)));
 }
 
-// gtdList is the list of a core view; its heading counts what the filter
+// taskList is the list of a core view; its heading counts what the filter
 // shows of the view, as a pull request list's bar does.
-function gtdList(route, open) {
-  const label = (gtdViews().find((v) => v.id === route.view) || {}).label || route.view;
-  const loaded = gtdState.key === gtdQueryKey(route.view, route.area, route.ctx);
-  const ts = gtdTerms(route.q);
-  const shown = loaded ? gtdState.entries.filter((e) => entryMatches(e, ts)) : [];
+function taskList(route, open) {
+  const label = viewLabel(route.view);
+  const loaded = tasksState.key === viewQueryKey(route.view, route.area, route.ctx);
+  const ts = filterTerms(route.q);
+  const shown = loaded ? tasksState.tasks.filter((e) => taskMatches(e, ts)) : [];
   const parts = [h("div", { class: "tools gtd-tools" }, h("h2", { class: "gtd-head" }, label), areaPicker(route), contextChips(route),
-    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${gtdState.entries.length}`) : null)];
-  if (gtdState.error) parts.push(h("p", { class: "plan-error" }, gtdState.error));
+    loaded ? h("span", { class: "lens-count" }, `${shown.length} of ${tasksState.tasks.length}`) : null)];
+  if (tasksState.error) parts.push(h("p", { class: "plan-error" }, tasksState.error));
   if (!loaded) {
     parts.push(h("p", { class: "empty" }, "Loading."));
     return parts;
   }
-  if (!gtdState.entries.length) {
-    parts.push(h("p", { class: "empty" }, GTD_EMPTY[route.view] || "Nothing here."));
+  if (!tasksState.tasks.length) {
+    parts.push(h("p", { class: "empty" }, VIEW_EMPTY[route.view] || "Nothing here."));
     return parts;
   }
   if (!shown.length) {
     parts.push(h("p", { class: "empty" }, `Nothing here matches "${route.q}".`));
     return parts;
   }
-  const item = route.view === "outbox" ? outboxItem : entryItem;
-  for (const g of gtdGroups(route.view, shown)) {
-    if (g.label) parts.push(h("h3", { class: "plan-head" }, `${g.label} (${g.entries.length})`));
-    parts.push(h("ol", { class: "entries" }, ...g.entries.map((e) => item(e, open))));
+  const item = route.view === "outbox" ? outboxItem : taskItem;
+  for (const g of viewGroups(route.view, shown)) {
+    if (g.label) parts.push(h("h3", { class: "plan-head" }, `${g.label} (${g.tasks.length})`));
+    parts.push(h("ol", { class: "entries" }, ...g.tasks.map((e) => item(e, open))));
   }
   return parts;
 }
 
-function renderGTD(route) {
-  const box = document.getElementById("gtd");
-  const on = isGTDView(route.view);
+// viewLabel is the profile's word for a core view.
+function viewLabel(view) {
+  return (coreViews().find((v) => v.id === view) || {}).label || view;
+}
+
+function renderTasks(route) {
+  const box = document.getElementById("tasks");
+  const on = isCoreView(route.view);
   box.hidden = !on;
   if (route.view !== "review") reviewState.step = "";
   if (!on) {
     box.replaceChildren();
     return;
   }
-  box.replaceChildren(...(route.view === "review" ? reviewPanel(route.entry) : gtdList(route, route.entry)));
+  box.setAttribute("aria-label", viewLabel(route.view));
+  box.replaceChildren(...(route.view === "review" ? reviewPanel(route.task) : taskList(route, route.task)));
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/wloophq/wloop/internal/domain/task"
 )
 
-// handleDigest serves the daily digest of the query parameter day: the counters, and the entries that moved
+// handleDigest serves the daily digest of the query parameter day: the counters, and the tasks that moved
 // into Next or Waiting since the previous digest, at notifications.digest_at local time (midnight when off).
 func (s *Server) handleDigest(w http.ResponseWriter, r *http.Request) {
 	g, ok := s.tasks(w)
