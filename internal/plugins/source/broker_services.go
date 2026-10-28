@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
+	"github.com/wloophq/wloop/internal/domain/unit"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 )
 
@@ -40,7 +42,19 @@ func (s services) Config(context.Context) (src.Config, error) {
 	if out.Host, err = json.Marshal(host); err != nil {
 		return src.Config{}, err
 	}
+	if s.b.BriefIntent != nil {
+		out.BriefIntent = briefIntentOf(s.b.BriefIntent(unit.ProviderID(s.b.ID)))
+	}
 	return out, nil
+}
+
+// briefIntentOf is in as a plugin reads it.
+func briefIntentOf(in brief.Intent) *src.BriefIntent {
+	out := &src.BriefIntent{FieldVersions: in.Schema.FieldVersions(), Prompt: in.Prompt, FieldsPrompt: in.FieldsPrompt}
+	if x := in.Schema.Extra; x != nil {
+		out.ExtraSchema = json.RawMessage(x.Source())
+	}
+	return out
 }
 
 func (services) Profile(context.Context, string) ([]byte, error) { return nil, src.ErrUnsupported }

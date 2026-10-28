@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/internal/domain/unit"
@@ -39,6 +40,22 @@ type Broker struct {
 	// Paused says a unit's rounds are held by a pause wider than its own
 	// hold, such as its repository's; nil holds none.
 	Paused func(ctx context.Context, u unit.Unit) (bool, error)
+	// Briefs keep the briefs the plugin writes of its units, and Briefed
+	// hears of each unit whose brief it wrote; nil Briefs serves no
+	// PutBrief.
+	Briefs  BriefStore
+	Briefed func(u unit.Unit)
+	// Now is the host's clock; PutBrief needs it.
+	Now func() time.Time
+	// BriefIntent is the brief intent of a provider's units as the loaded
+	// profile resolves it, which Config hands the plugin; nil hands none.
+	BriefIntent func(p unit.ProviderID) brief.Intent
+}
+
+// BriefStore keeps body, the brief JSON a plugin wrote of u at version, as
+// the brief u uses since at.
+type BriefStore interface {
+	PutUnitBrief(ctx context.Context, u unit.Unit, version, body string, at time.Time) error
 }
 
 // OverrideStore keeps the host's overrides of units by name

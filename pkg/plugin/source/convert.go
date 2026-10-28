@@ -612,10 +612,21 @@ func payloadGo(p *pb.PayloadResponse) PayloadResult {
 		Facts: factsGo(p.GetFacts()), Data: raw(p.GetDataJson()), Contents: p.GetContents()}
 }
 
-func configPB(c Config) *pb.Config { return &pb.Config{PluginJson: c.Plugin, HostJson: c.Host} }
+func configPB(c Config) *pb.Config {
+	out := &pb.Config{PluginJson: c.Plugin, HostJson: c.Host}
+	if b := c.BriefIntent; b != nil {
+		out.BriefIntent = &pb.BriefIntent{ExtraSchemaJson: b.ExtraSchema, FieldVersions: b.FieldVersions, Prompt: b.Prompt, FieldsPrompt: b.FieldsPrompt}
+	}
+	return out
+}
 
 func configGo(c *pb.Config) Config {
-	return Config{Plugin: raw(c.GetPluginJson()), Host: raw(c.GetHostJson())}
+	out := Config{Plugin: raw(c.GetPluginJson()), Host: raw(c.GetHostJson())}
+	if b := c.GetBriefIntent(); b != nil {
+		out.BriefIntent = &BriefIntent{ExtraSchema: raw(b.GetExtraSchemaJson()), FieldVersions: b.GetFieldVersions(), Prompt: b.GetPrompt(),
+			FieldsPrompt: b.GetFieldsPrompt()}
+	}
+	return out
 }
 
 func listingPB(l Listing) *pb.WorkspacesResponse {

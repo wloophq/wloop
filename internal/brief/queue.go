@@ -293,12 +293,6 @@ func (q *Queue) isDue(pr dinv.PR, rec dinv.BriefRecord, ok bool, version string,
 	return q.source(pr.Ref.Unit().Provider).Stale(w, AtOf(pr), version, now)
 }
 
-// attemptKey is what an attempt at version on pr is made from, as its
-// BriefSource names it.
-func (q *Queue) attemptKey(pr dinv.PR, version string) string {
-	return q.source(pr.Ref.Unit().Provider).AttemptKey(version, AtOf(pr))
-}
-
 // source is the BriefSource of p's units; a pull request without one in
 // Deps.Sources has the GitHub rules with the queue's retry.
 func (q *Queue) source(p unit.ProviderID) BriefSource {
@@ -328,9 +322,7 @@ func tried(rec dinv.BriefRecord, ok bool) bool {
 
 // attemptOf names what a brief is made from: a change in any of it is a
 // new pull request to try.
-func attemptOf(pr dinv.PR, version string) string {
-	return fmt.Sprintf("%s %s %s %d", version, pr.HeadOid, pr.BodyEditedAt.UTC().Format(time.RFC3339), pr.ChangedFiles)
-}
+func attemptOf(pr dinv.PR, version string) string { return AttemptKey(version, AtOf(pr)) }
 
 // moved is a description edited BodyQuiet ago or more, or a head that added
 // more than RefreshFiles files since the brief. A record without a file
@@ -487,7 +479,7 @@ func (q *Queue) timeout(wanted bool) time.Duration {
 func (q *Queue) brief(ctx context.Context, pr dinv.PR, trigger string, timeout time.Duration) error {
 	defer q.release(pr.Ref)
 	taxonomy, version := q.version(pr.Ref)
-	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: q.attemptKey(pr, version),
+	run := dinv.BriefRun{PR: pr.Ref, Trigger: trigger, Version: version, AttemptOf: attemptOf(pr, version),
 		HeadOid: pr.HeadOid, BodyEditedAt: pr.BodyEditedAt, ChangedFiles: pr.ChangedFiles}
 	vocabulary, err := q.d.Store.TagVocabulary(ctx, pr.Ref.Owner, tag.OpenKeys(), VocabularySize)
 	if err != nil {
@@ -902,7 +894,7 @@ func summaryOf(rec dinv.BriefRecord) (Summary, bool) {
 // read.
 func (q *Queue) AttemptOf(pr dinv.PR, rec dinv.BriefRecord) int {
 	_, version := q.version(pr.Ref)
-	return q.attempt(pr.Ref, rec, q.attemptKey(pr, version))
+	return q.attempt(pr.Ref, rec, attemptOf(pr, version))
 }
 
 // Views are what the detail panel shows for each of prs, by pull request.

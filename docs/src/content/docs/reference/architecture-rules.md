@@ -187,6 +187,7 @@ The entries a rule lets pass, each with its reason. An entry that matches nothin
 | `internal/core/intake/intake.go` `SourceSession` `"session"` `1` | ✅ | the intake source a managed session asks from, which shares the session provider's spelling |
 | `internal/core/turns/headless.go` `taskInput` `"task"` `1` | ✅ | the headless turn's task input, which shares the task provider's spelling |
 | `internal/meter/meter.go` `GitHub` `"github"` `1` | ✅ | the meter's resource of a GitHub API request, not a unit provider |
+| `internal/turn/payload.go` `PR.Unit` `unit.GitHub` `1` | 🧾 | the turn's pull request payload, which X8c2 moves into the GitHub plugin |
 | `internal/workspace/orca/orca.go` `Manager.LinkUnit` `unit.GitHub` `1` | ✅ | Orca's linkedPR holds a GitHub pull request only |
 
 This page is generated from the sources of `internal/archtest` by `make docs-ref`.

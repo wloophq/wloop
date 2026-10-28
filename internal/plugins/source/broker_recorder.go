@@ -3,7 +3,9 @@ package source
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/wloophq/wloop/internal/brief"
 	"github.com/wloophq/wloop/internal/core/port"
 	"github.com/wloophq/wloop/pkg/plugin"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
@@ -46,4 +48,33 @@ func (r recorder) SetMarks(ctx context.Context, w plugin.Unit, marks map[string]
 	return r.b.Marks.SetMarks(ctx, u, marks)
 }
 
-func (recorder) PutBrief(context.Context, src.Brief) error { return src.ErrUnsupported }
+// PutBrief keeps a brief the plugin wrote of one of its own units as the
+// brief the unit uses, and tells the host's turns waiting on it.
+func (r recorder) PutBrief(ctx context.Context, b src.Brief) error {
+	if r.b.Briefs == nil || r.b.Now == nil {
+		return src.ErrUnsupported
+	}
+	u, err := r.b.Units.Own(r.b.ID, b.Unit)
+	if err != nil {
+		return err
+	}
+	if b.Task != "" {
+		if _, err := TaskID(b.Task); err != nil {
+			return err
+		}
+	}
+	parsed, err := brief.Parse(string(b.Body))
+	if err != nil {
+		return fmt.Errorf("the brief of %s is not a brief object: %w", u, err)
+	}
+	if parsed == nil {
+		return fmt.Errorf("the brief of %s is empty", u)
+	}
+	if err := r.b.Briefs.PutUnitBrief(ctx, u, b.Version, string(b.Body), r.b.Now()); err != nil {
+		return err
+	}
+	if r.b.Briefed != nil {
+		r.b.Briefed(u)
+	}
+	return nil
+}

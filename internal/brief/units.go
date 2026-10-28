@@ -18,33 +18,22 @@ import (
 const DemandTimeout = 2 * time.Minute
 
 // OnDemand is a BriefSource whose briefs another job writes, such as the
-// Slack extraction, which a first turn asks for its unit's brief.
+// Slack extraction, which a first turn asks for its unit's brief. The job
+// tells the queue of each brief it writes through Noted.
 type OnDemand interface {
 	// Want asks for u's brief now; false when no brief of u is coming,
 	// such as when nothing of it is left to read.
 	Want(ctx context.Context, u unit.Unit) (bool, error)
-	// Watch has the source call noted each time it writes a unit's brief.
-	Watch(noted func(u unit.Unit))
 }
 
-// Register adds p's BriefSource, watching an OnDemand one.
+// Register adds p's BriefSource.
 func (q *Queue) Register(p unit.ProviderID, s BriefSource) {
 	q.srcMu.Lock()
+	defer q.srcMu.Unlock()
 	if q.d.Sources == nil {
 		q.d.Sources = map[unit.ProviderID]BriefSource{}
 	}
 	q.d.Sources[p] = s
-	q.srcMu.Unlock()
-	if od, ok := s.(OnDemand); ok {
-		od.Watch(q.Noted)
-	}
-}
-
-// IntentUser is a BriefSource whose job asks the brief intent's extra
-// fields itself, such as the Slack extraction. The composition root gives
-// it its provider's brief intent, whether or not a queue runs.
-type IntentUser interface {
-	UseIntent(intent func() Intent)
 }
 
 // Noted wakes the Changed of u once another job wrote its brief.

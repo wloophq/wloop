@@ -143,7 +143,7 @@ func serve(ctx context.Context, e *Env, args []string) error {
 	if e.noJobs {
 		logf("serving with --no-jobs: no collector, sweep, gate, brief, usage, retain or plugin")
 	}
-	stopPlugins := e.servePlugins(ctx, db.Snapshots(), startCfg, logf)
+	stopPlugins := e.servePlugins(ctx, db, startCfg, logf)
 	defer stopPlugins()
 
 	// One loop mutex for every server this process runs: an action the

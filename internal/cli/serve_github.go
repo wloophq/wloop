@@ -11,6 +11,7 @@ import (
 
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/turn"
 
 	ghsource "github.com/wloophq/wloop/internal/adapter/source/github"
 	"github.com/wloophq/wloop/internal/adapter/source/github/present"
@@ -211,3 +212,6 @@ func withStore(d daemon.Deps, st *inventory.Store) daemon.Deps {
 
 // githubBriefs is the brief queue keyed by unit, as the daemon runs it.
 func githubBriefs(q *interruptFirst) present.BriefQueue { return present.BriefQueue{Q: q} }
+
+// githubPayloads is GitHub's turn payload, over the read rounds make.
+func (e *Env) githubPayloads() turn.PayloadReader { return ghsource.TurnPayloads{PRs: basicsReader{e}} }

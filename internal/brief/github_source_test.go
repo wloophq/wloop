@@ -40,7 +40,7 @@ func TestGitHubSourceStaleIsTheQueuesRule(t *testing.T) {
 	}
 	for pn, p := range prs {
 		cur := AtOf(p)
-		if got, want := g.AttemptKey(version, cur), attemptOf(p, version); got != want {
+		if got, want := AttemptKey(version, cur), fmt.Sprintf("%s %s %s %d", version, p.HeadOid, p.BodyEditedAt.UTC().Format(time.RFC3339), p.ChangedFiles); got != want {
 			t.Errorf("%s: attempt key %q, the queue's %q", pn, got, want)
 		}
 		for rn, rec := range recs {
@@ -69,7 +69,7 @@ func TestGitHubSourceReadsTheRevisionAndInput(t *testing.T) {
 		Source: &fakeSource{fail: map[string]error{}}, MaxDiffBytes: 1000}
 	u := unit.Unit{Provider: unit.GitHub, Key: ref.String()}
 	at, err := g.Revision(ctx, u)
-	if err != nil || at.Revision != "h9 2026-10-14T12:00:00.000000000Z" || string(at.Parts) != `{"changed_files":2}` {
+	if err != nil || at.Revision != "h9 2026-10-14T12:00:00.000000000Z" || string(at.Parts) != `{"changed_files":2}` || at.Attempt != "h9 2026-10-14T12:00:00Z 2" {
 		t.Fatalf("%+v %s %v", at, at.Parts, err)
 	}
 	in, err := g.Input(ctx, u)

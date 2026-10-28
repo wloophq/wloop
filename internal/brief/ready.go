@@ -102,7 +102,7 @@ func (q *Queue) readyPR(ctx context.Context, ref github.Ref, first bool) (Readin
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := q.attemptKey(p, version)
+	cur := attemptOf(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -178,7 +178,7 @@ func (q *Queue) peekPR(ctx context.Context, ref github.Ref, first bool) (Readine
 		}
 		return Readiness{State: Ready, Brief: b, Run: rec.Run}, nil
 	}
-	cur := q.attemptKey(p, version)
+	cur := attemptOf(p, version)
 	rd := Readiness{State: Wait, Wait: WaitBriefing, Attempt: q.attempt(ref, rec, cur)}
 	if rd.Attempt > 1 {
 		rd.LastError = rec.Error
@@ -230,7 +230,7 @@ func (q *Queue) Attempt(ctx context.Context, ref github.Ref) (int, error) {
 		return 0, err
 	}
 	_, version := q.version(ref)
-	return q.attempt(ref, rec, q.attemptKey(p, version)), nil
+	return q.attempt(ref, rec, attemptOf(p, version)), nil
 }
 
 func (q *Queue) want(ctx context.Context, ref github.Ref, rec dinv.BriefRecord, now time.Time) error {

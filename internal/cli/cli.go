@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wloophq/wloop/internal/brief"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/pkg/plugin"
 
@@ -183,6 +184,9 @@ type Env struct {
 	pluginKind *psource.Kind
 	// pluginLauncher starts serve's plugins; nil starts their binaries.
 	pluginLauncher plugin.Launcher
+	// briefsHeard holds the brief queue that hears of each brief a plugin
+	// writes through its broker; nil outside serve.
+	briefsHeard *atomic.Pointer[brief.Queue]
 
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.

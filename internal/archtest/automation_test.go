@@ -57,6 +57,7 @@ var coreProviderAllowlist = []providerSite{
 	{"internal/core/intake/intake.go", "SourceSession", `"session"`, 1, "the intake source a managed session asks from, which shares the session provider's spelling"},
 	{"internal/client/tui/views.go", "taskProvider", "unit.Task", 1, "debt: the TUI keys its busy map by the task provider; K2 keys it by the served unit"},
 	{"internal/catalog/catalog.go", "withSource", "unit.GitHub", 1, "debt: the catalog's built-in actions name the GitHub plugin"},
+	{"internal/turn/payload.go", "PR.Unit", "unit.GitHub", 1, "debt: the turn's pull request payload, which X8c2 moves into the GitHub plugin"},
 	{"internal/adapter/facts/session/facts.go", "Provider.build", "unit.GitHub", 1, "debt: a session's facts read its linked pull request's state"},
 	{"internal/adapter/orca/orca.go", "Adapter.Apply", "unit.GitHub", 1, "Orca links a worktree to a GitHub pull request only"},
 	{"internal/workspace/orca/orca.go", "Manager.LinkUnit", "unit.GitHub", 1, "Orca's linkedPR holds a GitHub pull request only"},

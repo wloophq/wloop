@@ -57,7 +57,7 @@ func TestLocateResolvesAWorktree(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
-	stop := te.servePlugins(ctx, db.Snapshots(), te.cfg, t.Logf)
+	stop := te.servePlugins(ctx, db, te.cfg, t.Logf)
 	t.Cleanup(func() {
 		cancel()
 		stop()

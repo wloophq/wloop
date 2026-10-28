@@ -19,11 +19,11 @@ func (e *Env) servePayloads(mods []source.Module) {
 	}
 }
 
-// payloadReaders are github's turn payload reader and the sources' own.
+// payloadReaders are the sources' turn payload readers, GitHub's and the tasks' included.
 func (e *Env) payloadReaders() map[unit.ProviderID]turn.PayloadReader {
 	out := map[unit.ProviderID]turn.PayloadReader{}
 	maps.Copy(out, e.payloads)
-	out[unit.GitHub] = turn.GitHub{PRs: basicsReader{e}}
+	out[unit.GitHub] = e.githubPayloads()
 	out[task.Codec{}.Provider()] = taskPayloads{e}
 	return out
 }
