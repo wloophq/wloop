@@ -174,6 +174,20 @@ func (e *Env) githubIdentity(st *inventory.Store, logf func(string, ...any)) fun
 	return ghsource.Identity(st, e.GitHub, logf)
 }
 
+// forgeCalls is the forge's plugin as the round commands call it: the one
+// set on e, else the running plugin's client, else GitHub's in process.
+func (e *Env) forgeCalls() forgeCalls {
+	if e.forge != nil {
+		return e.forge
+	}
+	if e.pluginKind != nil {
+		if c, err := e.pluginKind.Client(string(unit.GitHub)); err == nil {
+			return c
+		}
+	}
+	return ghsource.Local{GH: e.GH, API: e.GitHub}
+}
+
 // githubLocator is the pull request of the checkout's branch, as gh reads it.
 type githubLocator struct{ e *Env }
 

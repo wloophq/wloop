@@ -10,6 +10,13 @@ const (
 	ReviewDismissed        = "DISMISSED"
 )
 
+// PullRequest is a pull request as a read returned it: the facts the decide
+// rules read and the head repository's owner.
+type PullRequest struct {
+	Facts
+	HeadRepositoryOwner string
+}
+
 // Facts are a pull request as the decide rules read it.
 type Facts struct {
 	Ref

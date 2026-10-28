@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
@@ -26,7 +28,6 @@ import (
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace"
@@ -293,7 +294,7 @@ func (e *Env) repoCheckout(ctx context.Context, cfg config.Config, name string) 
 		return wsdomain.Repo{}, err
 	}
 	owner, repo, _ := strings.Cut(name, "/")
-	ref := github.Ref{Owner: owner, Repo: repo}
+	ref := pr.Ref{Owner: owner, Repo: repo}
 	var trust func(string) error
 	if cfg.TrustsClones(owner, repo) {
 		trust = func(path string) error {

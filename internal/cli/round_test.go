@@ -145,13 +145,13 @@ func TestTrusts(t *testing.T) {
 	cfg := config.Config{Plugins: config.Plugins{GitHub: config.GitHub{TrustedAuthors: []string{"bot[bot]"}}}}
 	for _, c := range []struct {
 		name string
-		pr   github.PullRequest
+		pr   pr.PullRequest
 		want bool
 	}{
-		{"member", github.PullRequest{Facts: pr.Facts{Ref: r7, Author: "ann", AuthorAssociation: "MEMBER"}}, true},
-		{"outsider", github.PullRequest{Facts: pr.Facts{Ref: r7, Author: "eve", AuthorAssociation: "NONE"}}, false},
-		{"trusted author", github.PullRequest{Facts: pr.Facts{Ref: r7, Author: "bot[bot]", AuthorAssociation: "NONE"}}, true},
-		{"fork", github.PullRequest{Facts: pr.Facts{Ref: r7, Author: "ann", AuthorAssociation: "MEMBER", IsCrossRepository: true}}, false},
+		{"member", pr.PullRequest{Facts: pr.Facts{Ref: r7, Author: "ann", AuthorAssociation: "MEMBER"}}, true},
+		{"outsider", pr.PullRequest{Facts: pr.Facts{Ref: r7, Author: "eve", AuthorAssociation: "NONE"}}, false},
+		{"trusted author", pr.PullRequest{Facts: pr.Facts{Ref: r7, Author: "bot[bot]", AuthorAssociation: "NONE"}}, true},
+		{"fork", pr.PullRequest{Facts: pr.Facts{Ref: r7, Author: "ann", AuthorAssociation: "MEMBER", IsCrossRepository: true}}, false},
 	} {
 		if got := trusts(cfg, &c.pr); got != c.want {
 			t.Errorf("%s: %v", c.name, got)

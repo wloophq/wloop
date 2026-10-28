@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/core/automation"
@@ -23,7 +25,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	"github.com/wloophq/wloop/internal/plugins/source/value"
@@ -146,7 +147,7 @@ func (a startArgs) runnerName() string {
 
 // startPlan is what the guards of a turn.start read, for its run.
 type startPlan struct {
-	ref     github.Ref
+	ref     pr.Ref
 	args    startArgs
 	facts   workflow.Facts
 	planned plannedRound
@@ -380,7 +381,7 @@ func (s *stepSet) intakeAsks(ctx context.Context, u unit.Unit, intent string) (s
 
 // startBlocked refuses a round its start block holds: folder trust is the
 // user's alone, so no step clears it.
-func (s *stepSet) startBlocked(ctx context.Context, ref github.Ref) (string, error) {
+func (s *stepSet) startBlocked(ctx context.Context, ref pr.Ref) (string, error) {
 	if s.e.Rec == nil {
 		return "", nil
 	}
@@ -572,7 +573,7 @@ func startError(err error) error {
 		return automation.Refused{Reason: err.Error()}
 	case errors.As(err, &untrusted), errors.As(err, &asked):
 		return automation.Refused{Reason: "round blocked: " + err.Error()}
-	case errors.Is(err, workspace.ErrUnreachable), errors.Is(err, github.ErrRateLimited), errors.Is(err, github.ErrUnavailable), errors.Is(err, dgh.ErrBudget):
+	case errors.Is(err, workspace.ErrUnreachable), errors.Is(err, src.ErrUnavailable), errors.Is(err, dgh.ErrBudget):
 		return automation.Transient{Err: err}
 	}
 	return err

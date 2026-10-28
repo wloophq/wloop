@@ -272,7 +272,7 @@ func stripTypenames(v any) {
 // sweepReads are what the sweep's reviewer and author reads by reference
 // returned for the cannedPR payloads, before the sweep planned from the
 // store.
-func sweepReads(t *testing.T) (viewer string, reviewer, author map[github.Ref]*github.PullRequest) {
+func sweepReads(t *testing.T) (viewer string, reviewer, author map[github.Ref]*pr.PullRequest) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "sweep_reads.json"))
 	if err != nil {
@@ -280,12 +280,12 @@ func sweepReads(t *testing.T) (viewer string, reviewer, author map[github.Ref]*g
 	}
 	var golden struct {
 		Viewer string
-		PRs    map[string]struct{ Reviewer, Author *github.PullRequest }
+		PRs    map[string]struct{ Reviewer, Author *pr.PullRequest }
 	}
 	if err := json.Unmarshal(raw, &golden); err != nil {
 		t.Fatal(err)
 	}
-	reviewer, author = map[github.Ref]*github.PullRequest{}, map[github.Ref]*github.PullRequest{}
+	reviewer, author = map[github.Ref]*pr.PullRequest{}, map[github.Ref]*pr.PullRequest{}
 	for key, p := range golden.PRs {
 		ref, err := pr.ParseKey(key)
 		if err != nil {

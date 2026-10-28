@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	dgh "github.com/wloophq/wloop/internal/domain/github"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	src "github.com/wloophq/wloop/pkg/plugin/source"
+
+	dgh "github.com/wloophq/wloop/internal/domain/github"
 )
 
 // Retry bounds the retries of one call and the breaker every call shares.
@@ -55,7 +58,9 @@ func (e *RateLimitedError) Error() string {
 	return fmt.Sprintf("GitHub %s on %s until %s", kind, e.Resource, e.RetryAt.Format(time.RFC3339))
 }
 
-func (e *RateLimitedError) Is(target error) bool { return target == ErrRateLimited }
+func (e *RateLimitedError) Is(target error) bool {
+	return target == ErrRateLimited || target == src.ErrUnavailable
+}
 
 var errBreaker = errors.New("breaker open")
 

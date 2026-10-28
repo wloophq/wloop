@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/port"
@@ -21,7 +23,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/turn"
 )
@@ -39,7 +40,7 @@ const (
 type step struct {
 	kind   stepKind
 	ws     wsdomain.Workspace
-	pr     github.Ref
+	pr     pr.Ref
 	reason string
 	// observed is a round the facts only log: its workspace is gone and its
 	// project does not let the round recreate it.
@@ -50,7 +51,7 @@ type step struct {
 	// onSent and onSkipped are the marks the round's plan writes once it
 	// is sent, or skipped.
 	onSent, onSkipped map[string]string
-	read              *github.PullRequest // the pull request as the facts read it, for the turn
+	read              *pr.PullRequest // the pull request as the facts read it, for the turn
 	// briefMissing is why the round goes without its brief, "" with one.
 	briefMissing string
 	// confirmed is a round the user sent from the plan.
@@ -167,7 +168,7 @@ const whyPaused = "automatic rounds paused"
 
 // blockRound records a block of the round of kind with key, "" or a
 // StartBlock's. Without an inventory it logs the reason once a day.
-func (s *sweep) blockRound(ctx context.Context, ref github.Ref, kind, why, key string) {
+func (s *sweep) blockRound(ctx context.Context, ref pr.Ref, kind, why, key string) {
 	line := fmt.Sprintf("skip %s: my review was requested, but %s", ref, why)
 	if kind != "first round" {
 		line = fmt.Sprintf("skip the %s of %s: %s", kind, ref, why)
@@ -304,7 +305,7 @@ func (e *Env) sendRound(ctx context.Context, st *round.Store, c roundCall) (sent
 	s := &sweep{e: e, cfg: cfg, st: st, now: e.Now()}
 	return s.send(ctx, step{kind: c.Kind, ws: c.Workspace, pr: ref, reason: c.Reason, observed: c.Observed,
 		head: c.Head, onSent: c.OnSent, onSkipped: c.OnSkipped,
-		read: &github.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
+		read: &pr.PullRequest{Facts: c.Facts.Facts}, briefMissing: c.BriefMissing, confirmed: c.Confirmed,
 		fresh: true, why: c.Why, address: c.Address}, c.Guidance)
 }
 
@@ -417,7 +418,7 @@ func (s *sweep) openRound(ctx context.Context, st step, guidance string, planned
 
 // openRead is the open pull request a round that creates its workspace is
 // about: the facts' read when fresh, else read from GitHub.
-func (s *sweep) openRead(ctx context.Context, st step) (*github.PullRequest, error) {
+func (s *sweep) openRead(ctx context.Context, st step) (*pr.PullRequest, error) {
 	if st.fresh && st.read != nil {
 		return st.read, nil
 	}

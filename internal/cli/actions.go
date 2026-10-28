@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/adapter/store/inventory"
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/api/client"
@@ -448,7 +450,7 @@ func runHeldRound(ctx context.Context, e *Env, base config.Config, ref github.Re
 
 // fetchPR reads ref in full from GitHub into the inventory and returns it as
 // the sweep reads it, with viewer, else the stored viewer, else GitHub's.
-func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, viewer string) (*github.PullRequest, string, error) {
+func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, viewer string) (*pr.PullRequest, string, error) {
 	if e.Store == nil {
 		return nil, "", errNoStore
 	}
@@ -471,7 +473,7 @@ func (e *Env) fetchPR(ctx context.Context, cfg config.Config, ref github.Ref, vi
 
 // heldRoleFacts are the role facts of a pull request with no review
 // workspace, read up to the first that makes it the author's.
-func (e *Env) heldRoleFacts(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest) (catalog.RoleFacts, error) {
+func (e *Env) heldRoleFacts(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest) (catalog.RoleFacts, error) {
 	var f catalog.RoleFacts
 	var err error
 	mine := e.prOf(ctx, pr)

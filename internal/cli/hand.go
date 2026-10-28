@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	psource "github.com/wloophq/wloop/internal/plugins/source"
 	src "github.com/wloophq/wloop/pkg/plugin/source"
 
@@ -284,7 +286,7 @@ func realPath(p string) string {
 // the rule rounds use: an author workspace, the viewer's own pull request, or
 // one taken over. An author workspace elsewhere is an error: the round runs
 // there.
-func (e *Env) ownedByHand(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest, cwd string) (bool, error) {
+func (e *Env) ownedByHand(ctx context.Context, cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest, cwd string) (bool, error) {
 	mine := e.prOf(ctx, pr)
 	ws, found, err := findAuthorWorkspace(cfg, repos, all, ref, pr, mine)
 	if err != nil {

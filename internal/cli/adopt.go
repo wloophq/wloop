@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/wloophq/wloop/internal/domain/pr"
+
 	"github.com/wloophq/wloop/internal/api"
 	"github.com/wloophq/wloop/internal/brand"
 	"github.com/wloophq/wloop/internal/config"
@@ -88,7 +90,7 @@ func (e *Env) clearFingerprint(ctx context.Context, ref github.Ref) error {
 // workspace into one, else creates one at the PR head with an idle agent. It
 // links the workspace to the PR and moves it to in-progress. action says
 // which of the three happened.
-func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref github.Ref, pr *github.PullRequest, mine func() (bool, error), repos []wsdomain.Repo, all []wsdomain.Workspace) (ws wsdomain.Workspace, action string, err error) {
+func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref github.Ref, pr *pr.PullRequest, mine func() (bool, error), repos []wsdomain.Repo, all []wsdomain.Workspace) (ws wsdomain.Workspace, action string, err error) {
 	remoteKey := ref.RemoteKey()
 	ws, found, err := findAuthorWorkspace(cfg, repos, all, ref, pr, mine)
 	if err != nil {
@@ -145,7 +147,7 @@ func (e *Env) authorWorkspace(ctx context.Context, cfg config.Config, ref github
 // linked to the PR or sits on its head branch. A main checkout counts, whatever
 // its name, only for a PR of mine from the same repository whose head branch
 // it has checked out, other than the default branch; a worktree wins over it.
-func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, bool, error) {
+func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest, mine func() (bool, error)) (wsdomain.Workspace, bool, error) {
 	ofRepo := reposOf(repos, ref)
 	var main wsdomain.Workspace
 	for _, w := range all {
@@ -175,7 +177,7 @@ func findAuthorWorkspace(cfg config.Config, repos []wsdomain.Repo, all []wsdomai
 
 // prOf answers whether the PR is the viewer's, asking GitHub once and only
 // when called.
-func (e *Env) prOf(ctx context.Context, pr *github.PullRequest) func() (bool, error) {
+func (e *Env) prOf(ctx context.Context, pr *pr.PullRequest) func() (bool, error) {
 	var asked, mine bool
 	var err error
 	return func() (bool, error) {
@@ -199,7 +201,7 @@ func (e *Env) prOf(ctx context.Context, pr *github.PullRequest) func() (bool, er
 // branch of a PR from the same repository checked out, with its repository:
 // git keeps a branch in one checkout, so the workspace manager would put a new
 // workspace for the PR on a renamed branch.
-func branchHolder(repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *github.PullRequest) (wsdomain.Workspace, wsdomain.Repo, bool) {
+func branchHolder(repos []wsdomain.Repo, all []wsdomain.Workspace, ref github.Ref, pr *pr.PullRequest) (wsdomain.Workspace, wsdomain.Repo, bool) {
 	if pr.IsCrossRepository || pr.HeadRefName == "" {
 		return wsdomain.Workspace{}, wsdomain.Repo{}, false
 	}
@@ -219,7 +221,7 @@ func checkedOutIn(branch, path string) string { return branch + " is checked out
 // at the PR head. Once the PR head is fetched, a branch behind it is moved up
 // to it, which loses nothing; before, a head the repository lacks is left for
 // that later check.
-func (e *Env) localBranchProblem(ctx context.Context, dir string, pr *github.PullRequest, fetched bool) (string, error) {
+func (e *Env) localBranchProblem(ctx context.Context, dir string, pr *pr.PullRequest, fetched bool) (string, error) {
 	branch, head := pr.HeadRefName, pr.HeadRefOid
 	if pr.IsCrossRepository || branch == "" || head == "" {
 		return "", nil

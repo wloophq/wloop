@@ -190,6 +190,9 @@ type Env struct {
 	// pluginEffects applies a provider's plugin effects in place of its
 	// running plugin; nil asks the plugin.
 	pluginEffects func(p unit.ProviderID) (effectApplier, bool)
+	// forge is the forge's plugin the round commands call; nil calls the
+	// running plugin, else the one in process.
+	forge forgeCalls
 
 	// noJobs is serve --no-jobs: the daemon plans no round and writes no
 	// Orca card; it still writes unit cards and derived items to its store.
