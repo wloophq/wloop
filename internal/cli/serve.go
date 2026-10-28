@@ -38,7 +38,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/gitx"
 	intentload "github.com/wloophq/wloop/internal/intent"
 	"github.com/wloophq/wloop/internal/intent/builtin"
@@ -276,14 +275,14 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 			briefs, intakeBriefs = &interruptFirst{done: e.interruptedFlag(), Queue: queue}, brief.Intakes{Q: queue}
 		}
 	}
-	sd := source.Deps{DB: db, Inventory: store, GitHub: e.GitHub, Host: host, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
+	sd := e.withGitHubClient(source.Deps{DB: db, Inventory: store, Host: host, WS: e.WS, Sink: e.boardSink(cfg), Turns: e.Turns,
 		Changes: e.changes, Clock: clockFunc(e.Now), Log: logf, Git: e.Git, Agents: e.Agents,
 		Intents: func() *dintent.Registry {
 			if l := e.loadedIntents(); l != nil {
 				return l.Registry
 			}
 			return nil
-		}}
+		}})
 	if briefs != nil {
 		sd.Briefs = briefs.Queue
 	}
@@ -332,7 +331,7 @@ func serveAllDeps(ctx context.Context, e *Env, db *sqlite.DB, cfg config.Config,
 
 		NotifierStart: notifierStart(),
 
-		FailedSteps: failedSteps(e.GitHub),
+		FailedSteps: e.failedSteps(),
 
 		TurnByHand: e.byHand(loopMu),
 		Startup:    e.startupOnce(cfg, logf),
@@ -1101,21 +1100,19 @@ func (e *Env) briefQueue(cfg config.Config, store *inventory.Store, logf func(st
 	if e.changes != nil {
 		changes = e.changes
 	}
-	d := brief.Deps{
+	d := e.withGitHubBriefs(brief.Deps{
 		Enabled:      cfg.Brief.Enabled,
 		Store:        store,
-		Source:       brief.Source{GitHub: e.GitHub},
-		Taxonomy:     func(github.Ref) string { return brief.DefaultTaxonomy },
+		Taxonomy:     func(pr.Ref) string { return brief.DefaultTaxonomy },
 		Home:         briefHome(cfg),
 		Tier:         cfg.Brief.Tier,
 		MaxDiffBytes: cfg.Brief.MaxInputBytes,
 		Retry:        time.Duration(cfg.Sweep.Slow),
-		Allow:        e.GitHub.Allow,
 		Changes:      changes,
 		Now:          e.Now,
 		Log:          logf,
 		Intent:       e.briefIntents(logf),
-	}
+	})
 	asker, err := e.asker(cfg, filepath.Join(e.StateDir, "brief"))
 	if err != nil {
 		logf("brief: %v; only on-demand briefs", err)

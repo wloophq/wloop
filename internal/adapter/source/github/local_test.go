@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -75,5 +76,78 @@ func TestTheLocalPluginReadsAPullRequestsBasics(t *testing.T) {
 	}
 	if _, err := l.Action(ctx, src.ActionRequest{Action: "mute"}); !errors.Is(err, src.ErrUnsupported) {
 		t.Fatalf("an action the local plugin does not run: %v", err)
+	}
+}
+
+// answeringGH answers each command by its first two words.
+type answeringGH struct {
+	answers map[string]string
+	fail    map[string]error
+	calls   []string
+}
+
+func (g *answeringGH) Run(_ context.Context, args ...string) ([]byte, error) {
+	g.calls = append(g.calls, strings.Join(args, " "))
+	key := strings.Join(args[:min(2, len(args))], " ")
+	return []byte(g.answers[key]), g.fail[key]
+}
+
+func (g *answeringGH) RunIn(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	g.calls = append(g.calls, "in "+dir)
+	return g.Run(ctx, args...)
+}
+
+func run(t *testing.T, l ghsource.Local, args ...string) (int, string, string) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	exit, err := l.RunCLI(context.Background(), src.CLIRequest{Args: args}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("%q: %v", args, err)
+	}
+	return exit, stdout.String(), stderr.String()
+}
+
+func TestTheLocalPluginChecksGhAndReadsTheScopeSuggestions(t *testing.T) {
+	gh := &answeringGH{answers: map[string]string{"search prs": "acme/api\nacme/web\n", "api user/teams": "acme/backend\n"}, fail: map[string]error{}}
+	l := ghsource.Local{GH: gh}
+	if exit, _, stderr := run(t, l, ghsource.CommandAuth); exit != 0 || stderr != "" {
+		t.Fatalf("auth: exit %d, stderr %q", exit, stderr)
+	}
+	gh.fail["auth status"] = errors.New("gh auth status: not logged in")
+	if exit, _, stderr := run(t, l, ghsource.CommandAuth); exit != 1 || !strings.Contains(stderr, "not logged in") {
+		t.Fatalf("not logged in: exit %d, stderr %q", exit, stderr)
+	}
+	gh.fail["auth status"] = fmt.Errorf("gh auth status: %w", exec.ErrNotFound)
+	if exit, _, _ := run(t, l, ghsource.CommandAuth); exit != ghsource.ExitNoGH {
+		t.Fatalf("no gh: exit %d", exit)
+	}
+	exit, out, _ := run(t, l, ghsource.CommandReviewedRepos, "2026-09-28")
+	if exit != 0 || out != "acme/api\nacme/web\n" || !strings.Contains(gh.calls[len(gh.calls)-1], "--reviewed-by=@me --updated=>=2026-09-28") {
+		t.Fatalf("reviewed repos: exit %d, %q, calls %q", exit, out, gh.calls)
+	}
+	if exit, out, _ := run(t, l, ghsource.CommandTeams); exit != 0 || out != "acme/backend\n" {
+		t.Fatalf("teams: exit %d, %q", exit, out)
+	}
+	gh.fail["api user/teams"] = errors.New("HTTP 403")
+	if exit, _, stderr := run(t, l, ghsource.CommandTeams); exit != 1 || !strings.Contains(stderr, "HTTP 403") {
+		t.Fatalf("a failed read: exit %d, %q", exit, stderr)
+	}
+	if exit, _, _ := run(t, l, ghsource.CommandReviewedRepos); exit != 2 {
+		t.Fatalf("reviewed repos without a date: exit %d", exit)
+	}
+}
+
+func TestTheLocatorReadsTheCheckoutsPullRequest(t *testing.T) {
+	gh := &answeringGH{answers: map[string]string{"pr view": "https://github.com/acme/api/pull/7\n"}, fail: map[string]error{}}
+	u, ok, err := ghsource.Locator{GH: gh}.Locate(context.Background(), "/src/api")
+	if err != nil || !ok || u != (pr.Ref{Owner: "acme", Repo: "api", Number: 7}).Unit() || !slices.Contains(gh.calls, "in /src/api") {
+		t.Fatalf("%v %v %v, calls %q", u, ok, err, gh.calls)
+	}
+	gh.fail["pr view"] = errors.New("no pull requests found for branch")
+	if _, _, err := (ghsource.Locator{GH: gh}).Locate(context.Background(), "/src/api"); err == nil {
+		t.Fatal("no error for a branch with no pull request")
+	}
+	if _, _, err := (ghsource.Locator{GH: &recordingGH{}}).Locate(context.Background(), "/src/api"); err == nil {
+		t.Fatal("a runner that cannot run in a directory located")
 	}
 }

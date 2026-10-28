@@ -29,7 +29,7 @@ Each outside tool has one adapter that talks to it, and an architecture test kee
 
 - only `internal/adapter/store/sqlite` opens the database, and SQL text lives only under `internal/adapter/store`;
 - only `internal/cli/storecmd.go` opens the store as its writer, for the daemon and the store commands; any other process reads it with `sqlite.OpenReadOnly` or checks its version with `sqlite.Check`;
-- only `internal/github` reaches GitHub's API, and only it and the composition root import `internal/ghcli`, which runs `gh` for the token;
+- only `internal/github` reaches GitHub's API, and only it imports `internal/ghcli`, which runs `gh` for the token;
 - only `internal/workspace/orca` runs `orca` or dials Orca's socket, and only the Claude Desktop manager names Desktop's control surface;
 - the names of agents and managers (`claude`, `orca`, `CLAUDE_`, `mcp__` and the like) appear only in their adapters and in the composition root's registries, and only the adapters parse an agent's state;
 - a package that spawns a process imports `internal/meter`, so every spawn is counted.

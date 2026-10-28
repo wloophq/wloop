@@ -21,14 +21,14 @@ import (
 	"github.com/wloophq/wloop/internal/core/tasks/taskstest"
 	"github.com/wloophq/wloop/internal/daemon"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 )
 
 var _ menubar.Daemon = (*client.Client)(nil)
 
 var daemonNow = time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
 
-var r7 = github.Ref{Owner: "acme", Repo: "api", Number: 7}
+var r7 = pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 
 type testDaemon struct {
 	socket string

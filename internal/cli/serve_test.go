@@ -48,7 +48,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/view"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	"github.com/wloophq/wloop/internal/github"
-	"github.com/wloophq/wloop/internal/github/githubtest"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/meter"
 	"github.com/wloophq/wloop/internal/meter/metertest"
@@ -497,10 +496,10 @@ func TestBriefHomeFollowsTheProjectsProfile(t *testing.T) {
 	cfg := Defaults()
 	cfg.Projects = []config.Project{{Match: "me/*", AgentHome: "/home/me/.claude-personal"}}
 	home := briefHome(cfg)
-	if got := home(github.Ref{Owner: "me", Repo: "lib", Number: 1}); got != "/home/me/.claude-personal" {
+	if got := home(pr.Ref{Owner: "me", Repo: "lib", Number: 1}); got != "/home/me/.claude-personal" {
 		t.Fatalf("project: %q", got)
 	}
-	if got := home(github.Ref{Owner: "acme", Repo: "api", Number: 1}); got != "" {
+	if got := home(pr.Ref{Owner: "acme", Repo: "api", Number: 1}); got != "" {
 		t.Fatalf("no profile: %q", got)
 	}
 }
@@ -797,73 +796,15 @@ func TestServeRestoresTheBudgetAFastRunKept(t *testing.T) {
 		t.Fatalf("fast: %+v %v", rep, err)
 	}
 
-	te.Env.GitHub = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
+	te.Env.github.API = github.NewClient(github.Options{Host: "github.com", Now: func() time.Time { return at },
 		Token: func(context.Context) (string, error) { return "t", nil }})
 	cfg.GitHub.RateLimitFraction = 0.7
 	te.Env.restoreBudget(ctx, db, cfg, t.Logf)
-	if got := te.Env.GitHub.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
+	if got := te.Env.github.API.Budget()[dgh.ResourceGraphQL]; got.Remaining != 3000 || got.Limit != 5000 || !got.ResetAt.Equal(spent.ResetAt) {
 		t.Fatalf("restored %+v", got)
 	}
-	if te.Env.GitHub.Allow(dgh.PriorityBackground) || !te.Env.GitHub.Allow(dgh.PriorityUser) {
+	if te.Env.github.API.Allow(dgh.PriorityBackground) || !te.Env.github.API.Allow(dgh.PriorityUser) {
 		t.Fatal("60 % left under a 0.7 floor: background must wait, the user may read")
-	}
-}
-
-type ghFunc func(args ...string) ([]byte, error)
-
-func (f ghFunc) Run(_ context.Context, args ...string) ([]byte, error) { return f(args...) }
-
-func TestFailedStepsReadsTheJobOnce(t *testing.T) {
-	t.Parallel()
-	var asked [][]string
-	steps := failedSteps(githubtest.Runner(ghFunc(func(args ...string) ([]byte, error) {
-		asked = append(asked, args)
-		return []byte(`{"steps":[{"name":"Lint PR title","conclusion":"failure"},{"name":"Build","conclusion":"success"},{"name":"Run\ttests\u001b[2J","conclusion":"failure"}]}`), nil
-	})))
-	got, err := steps(context.Background(), "acme", "api", 114268776435)
-	if err != nil || !slices.Equal(got, []string{"Lint PR title", "Run tests [2J"}) {
-		t.Fatalf("%q %v", got, err)
-	}
-	if len(asked) != 1 || !slices.Equal(asked[0], []string{"api", "repos/acme/api/actions/jobs/114268776435"}) {
-		t.Fatalf("gh %q", asked)
-	}
-	steps = failedSteps(githubtest.Runner(ghFunc(func(...string) ([]byte, error) { return nil, errors.New("HTTP 404") })))
-	if _, err := steps(context.Background(), "acme", "api", 1); err == nil {
-		t.Fatal("no error from a failed call")
-	}
-}
-
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
-func TestFailedStepsOneRequestPerJob(t *testing.T) {
-	t.Parallel()
-	var paths []string
-	gh := githubtest.Client(roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		paths = append(paths, r.URL.Path)
-		return &http.Response{
-			StatusCode: 200,
-			Header:     http.Header{"Content-Type": {"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"steps":[{"name":"Build","conclusion":"failure"}]}`)),
-			Request:    r,
-		}, nil
-	}))
-	gh.SetFloors(github.DefaultFloors(0.5))
-	gh.Restore([]dgh.Limit{{Resource: dgh.ResourceCore, Limit: 5000, Remaining: 1000, ResetAt: time.Now().Add(time.Hour)}})
-	background := dgh.WithPriority(context.Background(), dgh.PriorityBackground)
-	if _, err := gh.REST(background, github.Request{Path: "repos/acme/api"}); !errors.Is(err, dgh.ErrBudget) {
-		t.Fatalf("a background read at 20 %% was admitted: %v", err)
-	}
-	steps := failedSteps(gh)
-	for _, job := range []int64{11, 12} {
-		got, err := steps(background, "acme", "api", job)
-		if err != nil || !slices.Equal(got, []string{"Build"}) {
-			t.Fatalf("job %d: %q %v", job, got, err)
-		}
-	}
-	if len(paths) != 2 || !strings.HasSuffix(paths[0], "/repos/acme/api/actions/jobs/11") || !strings.HasSuffix(paths[1], "/repos/acme/api/actions/jobs/12") {
-		t.Fatalf("requests %q", paths)
 	}
 }
 
@@ -877,7 +818,7 @@ func TestBriefSkipsTheHomeOfAProjectOfAnotherAgent(t *testing.T) {
 		{Match: "acme/*", Agent: "claude", AgentHome: "/home/me/.claude-acme"},
 	}
 	home := briefHome(cfg)
-	for ref, want := range map[github.Ref]string{
+	for ref, want := range map[pr.Ref]string{
 		{Owner: "me", Repo: "lib", Number: 1}:   "/home/me/.claude-personal",
 		{Owner: "oss", Repo: "lib", Number: 1}:  "/home/me/.claude-work",
 		{Owner: "acme", Repo: "api", Number: 1}: "/home/me/.claude-acme",
@@ -1323,7 +1264,7 @@ func TestTheServedPlanEvaluatesOverTheRealStepsWithoutWriting(t *testing.T) {
 func TestDaemonReadsSpawnNoGh(t *testing.T) {
 	t.Parallel()
 	_, te := scenario(t)
-	te.GH = noGH{t}
+	te.github.GH = noGH{t}
 	db, err := sqlitetest.Open(filepath.Join(t.TempDir(), "store.db"), nil)
 	if err != nil {
 		t.Fatal(err)

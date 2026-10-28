@@ -7,7 +7,7 @@ import (
 
 	"github.com/wloophq/wloop/internal/core/turns"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
-	"github.com/wloophq/wloop/internal/github"
+	"github.com/wloophq/wloop/internal/domain/pr"
 )
 
 // answeredQuestions is an agent whose home or checkout answered every
@@ -26,13 +26,13 @@ type blockRig struct {
 	sc  sweepCase
 	rec *memRecorder
 	now time.Time
-	ref github.Ref
+	ref pr.Ref
 }
 
 func newBlockRig(t *testing.T, key string) *blockRig {
 	t.Helper()
 	sc := followupScenario(t)
-	r := &blockRig{sc: sc, rec: &memRecorder{}, now: testNow, ref: github.Ref{Owner: "acme", Repo: "api", Number: 3}}
+	r := &blockRig{sc: sc, rec: &memRecorder{}, now: testNow, ref: pr.Ref{Owner: "acme", Repo: "api", Number: 3}}
 	sc.env.Rec, sc.env.Now = r.rec, func() time.Time { return r.now }
 	r.block(key, testNow.Add(-time.Hour))
 	return r

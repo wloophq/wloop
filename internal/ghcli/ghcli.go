@@ -60,7 +60,7 @@ func (e *Exec) RunIn(ctx context.Context, dir string, args ...string) ([]byte, e
 	if err := cmd.Run(); err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
-			msg = err.Error()
+			return stdout.Bytes(), fmt.Errorf("gh %s: %w", summarize(args), err)
 		}
 		return stdout.Bytes(), fmt.Errorf("gh %s: %s", summarize(args), msg)
 	}

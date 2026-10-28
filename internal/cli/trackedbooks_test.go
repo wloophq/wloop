@@ -7,8 +7,8 @@ import (
 
 	dgh "github.com/wloophq/wloop/internal/domain/github"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -29,8 +29,8 @@ func TestTheViewsListThePullRequestsACardCanMoveFor(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	te := newTestEnv(t, &fake.Manager{})
-	withTurn, carded, closed := github.Ref{Owner: "acme", Repo: "api", Number: 7}, github.Ref{Owner: "acme", Repo: "api", Number: 8}, github.Ref{Owner: "acme", Repo: "api", Number: 9}
-	for _, r := range []github.Ref{withTurn, carded, closed} {
+	withTurn, carded, closed := pr.Ref{Owner: "acme", Repo: "api", Number: 7}, pr.Ref{Owner: "acme", Repo: "api", Number: 8}, pr.Ref{Owner: "acme", Repo: "api", Number: 9}
+	for _, r := range []pr.Ref{withTurn, carded, closed} {
 		if err := te.Store.UpsertPR(ctx, dinv.PR{Ref: r, Author: "me", State: dgh.StateOpen, LastSeenAt: testNow}); err != nil {
 			t.Fatal(err)
 		}

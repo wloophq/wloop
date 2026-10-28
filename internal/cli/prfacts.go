@@ -15,7 +15,7 @@ func (e *Env) prFacts(cfg config.Config) func(ctx context.Context, u unit.Unit) 
 	return func(ctx context.Context, u unit.Unit) (api.Facts, error) {
 		ref := prOf(u)
 		f := api.Facts{Owner: ref.Owner, Repo: ref.Repo}
-		if read, err := e.GitHub.Basics(ctx, ref); err == nil {
+		if read, err := e.forgeBasics(ctx, ref); err == nil {
 			p := turnPR(read)
 			f.Author, f.Association, f.Base, f.Labels = p.Author, p.Association, p.Base, p.Labels
 		} else if e.Store != nil {

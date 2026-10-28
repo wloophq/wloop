@@ -21,7 +21,6 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/core/setup"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/ghcli"
 	"github.com/wloophq/wloop/internal/gitx"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/termfmt"
@@ -158,7 +157,7 @@ func runDoctor(ctx context.Context, e *Env, args []string) error {
 	// The shell commands stay on one goroutine: Sh and Stdout need not be safe
 	// for concurrent use. The git fetch starts before the manager answers and
 	// is dropped when it does not.
-	authErr := async(func() error { return ghcli.Authenticated(ctx, e.GH) })
+	authErr := async(func() error { _, err := e.forgeAuthenticated(ctx); return err })
 	reach := async(func() map[string]error { return e.WS.Unreachable(ctx) })
 	sshCtx, cancelSSH := context.WithCancel(ctx)
 	defer cancelSSH()

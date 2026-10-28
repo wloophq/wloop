@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -21,19 +20,37 @@ type forgeCalls interface {
 	RunCLI(ctx context.Context, req src.CLIRequest, stdout, stderr io.Writer) (int, error)
 }
 
+// forgeExit is a command of the forge's plugin that exited other than 0,
+// with what it wrote to its stderr.
+type forgeExit struct {
+	args []string
+	code int
+	msg  string
+}
+
+func (x *forgeExit) Error() string {
+	if x.msg != "" {
+		return x.msg
+	}
+	return fmt.Sprintf("%s exited %d", strings.Join(x.args, " "), x.code)
+}
+
 // forgeCommand runs a command of the forge's plugin; an exit other than 0
-// is an error carrying what the command wrote to its stderr.
+// is a *forgeExit.
 func (e *Env) forgeCommand(ctx context.Context, args ...string) error {
-	var stderr bytes.Buffer
-	exit, err := e.forgeCalls().RunCLI(ctx, src.CLIRequest{Args: args}, io.Discard, &stderr)
+	_, err := e.forgeOutput(ctx, args...)
+	return err
+}
+
+// forgeOutput is what a command of the forge's plugin writes to its stdout.
+func (e *Env) forgeOutput(ctx context.Context, args ...string) ([]byte, error) {
+	var stdout, stderr bytes.Buffer
+	exit, err := e.forgeCalls().RunCLI(ctx, src.CLIRequest{Args: args}, &stdout, &stderr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if exit != 0 {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return errors.New(msg)
-		}
-		return fmt.Errorf("%s exited %d", strings.Join(args, " "), exit)
+		return nil, &forgeExit{args: args, code: exit, msg: strings.TrimSpace(stderr.String())}
 	}
-	return nil
+	return stdout.Bytes(), nil
 }

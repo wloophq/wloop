@@ -24,12 +24,12 @@ import (
 	"github.com/wloophq/wloop/internal/domain/draft"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	"github.com/wloophq/wloop/internal/domain/jsonschema"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	"github.com/wloophq/wloop/internal/domain/unit"
 	"github.com/wloophq/wloop/internal/domain/workflow"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/intent/builtin"
 	"github.com/wloophq/wloop/internal/intent/expr"
 	"github.com/wloophq/wloop/internal/meter"
@@ -407,7 +407,7 @@ func TestGuidanceAGuidedRunDidNotUseIsKeptUnlessNewerIsStored(t *testing.T) {
 	ctx := context.Background()
 	rec := &memRecorder{}
 	g := recGuidance{&Env{Rec: rec}}
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 7}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 7}
 	if err := rec.KeepNextGuidance(ctx, ref, "check the migration"); err != nil {
 		t.Fatal(err)
 	}

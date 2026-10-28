@@ -13,10 +13,10 @@ import (
 	"github.com/wloophq/wloop/internal/config"
 	"github.com/wloophq/wloop/internal/daemon"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/shell"
 	"github.com/wloophq/wloop/internal/domain/task"
 	"github.com/wloophq/wloop/internal/domain/unit"
-	"github.com/wloophq/wloop/internal/github"
 )
 
 // The input surfaces of the command line: an intent's own command and a
@@ -55,7 +55,7 @@ func runIntent(ctx context.Context, e *Env, d dintent.Def, args []string) error 
 	if len(args) == 0 {
 		return errors.New(usage)
 	}
-	ref, err := github.ParseURL(args[0])
+	ref, err := pr.ParseURL(args[0])
 	if err != nil {
 		u, uerr := e.unitTarget(ctx, args[0])
 		switch {
@@ -326,7 +326,7 @@ func flagError(reg *dintent.Registry, d dintent.Def, flag string) error {
 // takeOverHint words the refusal of a pull request that is not the user's
 // with the command that takes it over first and asks again with the same
 // persisted flags.
-func takeOverHint(err error, d dintent.Def, ref github.Ref, inputs map[string]any) error {
+func takeOverHint(err error, d dintent.Def, ref pr.Ref, inputs map[string]any) error {
 	why := actionRefusal(err, d)
 	if why == "" {
 		return err

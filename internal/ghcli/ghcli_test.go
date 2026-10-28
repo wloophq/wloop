@@ -3,6 +3,8 @@ package ghcli_test
 import (
 	"context"
 	"errors"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/wloophq/wloop/internal/ghcli"
@@ -48,5 +50,12 @@ func TestMeteredCountsAFailure(t *testing.T) {
 	}
 	if got := metertest.Count(s, metertest.Limit{Res: meter.GitHub, Field: metertest.Errors}); got != 1 {
 		t.Fatalf("errors = %d", got)
+	}
+}
+
+func TestAMissingGhIsExecNotFound(t *testing.T) {
+	_, err := (&ghcli.Exec{Bin: "test-no-such-gh"}).Run(context.Background(), "auth", "status")
+	if !errors.Is(err, exec.ErrNotFound) || !strings.HasPrefix(err.Error(), "gh auth status: ") {
+		t.Fatalf("err = %v", err)
 	}
 }

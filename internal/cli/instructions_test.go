@@ -22,7 +22,6 @@ import (
 	"github.com/wloophq/wloop/internal/domain/pr"
 	dturn "github.com/wloophq/wloop/internal/domain/turn"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/profile"
 	"github.com/wloophq/wloop/internal/turn"
 	"github.com/wloophq/wloop/internal/workspace/fake"
@@ -217,7 +216,7 @@ func TestAddressByHandOnSomeoneElsesPullRequestAsksAndChangesNothing(t *testing.
 		t.Fatal(out)
 	}
 	st := te.Store
-	if evs, _ := st.Events(context.Background(), github.Ref{Owner: "acme", Repo: "api", Number: 21}); len(evs) != 0 || len(m.Writes) != 0 {
+	if evs, _ := st.Events(context.Background(), pr.Ref{Owner: "acme", Repo: "api", Number: 21}); len(evs) != 0 || len(m.Writes) != 0 {
 		t.Fatalf("events %v writes %v", evs, m.Writes)
 	}
 }
@@ -247,7 +246,7 @@ func TestTakeOverByHandWritesTheDaemonsStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	te.StateDir = filepath.Join(blocked, "state")
-	ref := github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	ref := pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	if code := te.run("instructions", "address", ref.URL(), "--take-over"); code != 0 {
 		t.Fatalf("exit %d: %s", code, te.err)
 	}
@@ -369,7 +368,7 @@ func TestNudgeByHandStartsItsTurn(t *testing.T) {
 	}
 }
 
-func bookOf(t *testing.T, te *testEnv, ref github.Ref) dturn.Book {
+func bookOf(t *testing.T, te *testEnv, ref pr.Ref) dturn.Book {
 	t.Helper()
 	books, err := te.Turns.Store.Books(context.Background(), pr.Ref(ref).Unit())
 	if err != nil {

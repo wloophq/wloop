@@ -109,16 +109,15 @@ type Pair interface{ Small; context.Context }
 // Enterprise Server paths.
 var githubAPI = regexp.MustCompile(`api\.github\.com|/api/graphql|/api/v3\b`)
 
-// ruleR10Imports flags an import of internal/ghcli outside internal/github
-// and the composition root, internal/cli.
+// ruleR10Imports flags an import of internal/ghcli outside internal/github.
 func ruleR10Imports(self string, imports []string) []string {
-	if under(self, "internal/github", "internal/ghcli", "internal/cli") {
+	if under(self, "internal/github", "internal/ghcli") {
 		return nil
 	}
 	var out []string
 	for _, imp := range imports {
 		if dep, internal := local(imp); internal && under(dep, "internal/ghcli") {
-			out = append(out, fmt.Sprintf("%s imports %s; only internal/github and internal/cli read the gh token (R10)", self, imp))
+			out = append(out, fmt.Sprintf("%s imports %s; only internal/github reads the gh token (R10)", self, imp))
 		}
 	}
 	return out
@@ -145,7 +144,7 @@ func ruleR10Literals(fset *token.FileSet, file string, f *ast.File) []string {
 }
 
 // TestOnlyGitHubReachesGitHub checks that only `internal/github` reaches
-// GitHub's API, and only it and the composition root import `ghcli`.
+// GitHub's API, and only it imports `ghcli`.
 func TestOnlyGitHubReachesGitHub(t *testing.T) {
 	t.Parallel()
 	seen := false
@@ -172,10 +171,10 @@ func TestOnlyGitHubReachesGitHub(t *testing.T) {
 func TestR10FlagsAPlantedImport(t *testing.T) {
 	t.Parallel()
 	imports := []string{"net/http", module + "internal/github", module + "internal/ghcli"}
-	for _, self := range []string{"internal/github", "internal/github/githubtest", "internal/cli", "internal/ghcli"} {
+	for _, self := range []string{"internal/github", "internal/github/githubtest", "internal/ghcli"} {
 		flagged(t, self, ruleR10Imports(self, imports), 0, "")
 	}
-	for _, self := range []string{"internal/adapter/source/github", "internal/daemon", "internal/brief", "internal/clix"} {
+	for _, self := range []string{"internal/adapter/source/github", "internal/daemon", "internal/brief", "internal/cli", "internal/clix"} {
 		flagged(t, self, ruleR10Imports(self, imports), 1, "(R10)")
 	}
 

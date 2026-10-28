@@ -10,9 +10,9 @@ import (
 	"github.com/wloophq/wloop/internal/core/automation"
 	dintent "github.com/wloophq/wloop/internal/domain/intent"
 	dinv "github.com/wloophq/wloop/internal/domain/inventory"
+	"github.com/wloophq/wloop/internal/domain/pr"
 	"github.com/wloophq/wloop/internal/domain/round"
 	wsdomain "github.com/wloophq/wloop/internal/domain/workspace"
-	"github.com/wloophq/wloop/internal/github"
 	"github.com/wloophq/wloop/internal/workspace/fake"
 )
 
@@ -43,7 +43,7 @@ func discoverScenario(t *testing.T, requested ...obj) (*fake.Manager, *testEnv) 
 func firstRoundCase(t *testing.T) sweepCase {
 	t.Helper()
 	sc := asSweep(discoverScenario(t, requestedPR(20, "feat/new", "acme", false)))
-	sc.ref = github.Ref{Owner: "acme", Repo: "api", Number: 20}
+	sc.ref = pr.Ref{Owner: "acme", Repo: "api", Number: 20}
 	return sc
 }
 
